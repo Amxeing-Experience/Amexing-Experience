@@ -8,7 +8,7 @@ on:
     branches: [main, master]
 
 env:
-  NODE_VERSION: '18'
+  NODE_VERSION: '20'
 
 jobs:
   validate:
@@ -32,7 +32,7 @@ jobs:
       - name: Run Unit Tests
         run: |
           echo "🧪 Running unit tests (PCI DSS Req 6.2.4 - Quality Assurance)..."
-          yarn test
+          yarn test:unit
           echo "✅ Unit tests passed"
 
       # PCI DSS Requirement 6.2.4 - Code Quality (REQUIRED)
