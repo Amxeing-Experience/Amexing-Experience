@@ -138,10 +138,10 @@ jobs:
             FINDINGS=$((FINDINGS + 1))
           fi
           
-          # Check for private keys or certificates
-          if find . -name "*.key" -o -name "*.pem" -o -name "*.p12" | grep -q .; then
+          # Check for private keys or certificates (exclude node_modules)
+          if find . -name "*.key" -o -name "*.pem" -o -name "*.p12" | grep -v "node_modules" | grep -q .; then
             echo "❌ Private keys or certificates found!"
-            find . -name "*.key" -o -name "*.pem" -o -name "*.p12"
+            find . -name "*.key" -o -name "*.pem" -o -name "*.p12" | grep -v "node_modules"
             FINDINGS=$((FINDINGS + 1))
           fi
           
