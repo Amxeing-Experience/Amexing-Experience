@@ -22,8 +22,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
+          node-version: '20.x'
           cache: 'yarn'
+
+      - name: Verify Node.js version
+        run: |
+          echo "Node.js version:"
+          node --version
+          echo "Yarn version:"
+          yarn --version
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -46,7 +53,30 @@ jobs:
       - name: Security Analysis
         run: |
           echo "🔒 Running security analysis (PCI DSS Req 6.2.4 - Vulnerability Management)..."
-          yarn security:all
+          
+          # Run security audit with smart validation (same as pre-push hook)
+          echo "Running dependency security audit..."
+          audit_result=$(yarn audit --level critical 2>&1) || audit_exit_code=$?
+          if [ "${audit_exit_code:-0}" -gt 0 ]; then
+            if echo "$audit_result" | grep -E "(High|Critical)" >/dev/null; then
+              echo "❌ Critical or High severity vulnerabilities found!"
+              echo "$audit_result"
+              exit 1
+            else
+              echo "⚠️ Found only low/moderate vulnerabilities, continuing..."
+            fi
+          fi
+          
+          # Run Semgrep security analysis (install if needed)
+          echo "Running Semgrep static analysis..."
+          if command -v semgrep >/dev/null 2>&1; then
+            semgrep --config=auto --error src/
+          else
+            echo "Installing Semgrep..."
+            pip install semgrep
+            semgrep --config=auto --error src/
+          fi
+          
           echo "✅ Security analysis passed"
 
       # PCI DSS Requirement 6.2.4 - Dependency Security (REQUIRED)
