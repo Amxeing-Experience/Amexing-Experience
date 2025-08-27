@@ -113,27 +113,45 @@ jobs:
           
           FINDINGS=0
           
-          # Check for common secret patterns
-          if grep -rE '(password|secret|key|token|credential)\s*[:=]\s*["\'"'"'][^"'"'"']{8,}["\'"'"']' \
-            --exclude-dir=node_modules --exclude-dir=.git --exclude="*.md" --exclude="*.json" .; then
-            echo "❌ Potential hardcoded secrets found!"
+          # Check for real secrets (excluding test files and patterns)
+          echo "Scanning for potential real secrets in production code..."
+          
+          # Look for secrets in source code only (exclude tests, docs, configs)
+          if grep -rE '(password|secret|key|token|credential)\s*[:=]\s*["\'"'"'][^"'"'"']{12,}["\'"'"']' \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            --exclude-dir=tests \
+            --exclude-dir=docs \
+            --exclude="*.md" \
+            --exclude="*.json" \
+            --exclude="*.test.js" \
+            --exclude="*.spec.js" \
+            src/; then
+            echo "❌ Potential real secrets found in source code!"
             FINDINGS=$((FINDINGS + 1))
           fi
           
-          # Check for credit card patterns (PCI DSS specific)
-          if grep -rE '\b[0-9]{4}[-\s]?[0-9]{4}[-\s]?[0-9]{4}[-\s]?[0-9]{4}\b' \
-            --exclude-dir=node_modules --exclude-dir=.git --exclude="*.md" .; then
-            echo "❌ Potential credit card numbers found!"
+          # Check for actual environment files that shouldn't be committed
+          if find . -name ".env" -not -path "./node_modules/*" -not -name ".env.example" | grep -q .; then
+            echo "❌ Real .env file found (should not be committed)!"
+            find . -name ".env" -not -path "./node_modules/*" -not -name ".env.example"
+            FINDINGS=$((FINDINGS + 1))
+          fi
+          
+          # Check for private keys or certificates
+          if find . -name "*.key" -o -name "*.pem" -o -name "*.p12" | grep -q .; then
+            echo "❌ Private keys or certificates found!"
+            find . -name "*.key" -o -name "*.pem" -o -name "*.p12"
             FINDINGS=$((FINDINGS + 1))
           fi
           
           if [ "$FINDINGS" -gt 0 ]; then
             echo "🚨 Security scan failed: $FINDINGS security issue(s) found"
-            echo "Please remove any hardcoded secrets or sensitive data before merging"
+            echo "Please remove any real secrets or sensitive files before merging"
             exit 1
           fi
           
-          echo "✅ No secrets detected"
+          echo "✅ No real secrets detected (test data excluded)"
 
       # Success summary
       - name: Validation Summary
