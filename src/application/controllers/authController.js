@@ -85,64 +85,88 @@ class AuthController {
     }
 
     try {
-      const { username, password, email } = req.body;
-
-      if (!username || !password || !email) {
-        if (req.accepts('json')) {
-          return res.status(400).json({
-            success: false,
-            message: 'Username, password, and email are required',
-          });
-        }
-        return res.render('auth/register', {
-          title: 'Register - AmexingWeb',
-          error: 'All fields are required',
-        });
+      const validationResult = this.validateRegistration(req.body);
+      if (!validationResult.isValid) {
+        return this.handleRegistrationValidationError(res, validationResult.error);
       }
 
-      // Create new Parse User
-      const user = new Parse.User();
-      user.set('username', username);
-      user.set('password', password);
-      user.set('email', email);
+      const newUser = await this.createUser(req.body);
+      this.setUserSession(req, newUser);
 
-      const newUser = await user.signUp();
+      logger.info(`User ${req.body.username} registered successfully`);
 
-      // Store session information
-      req.session.user = {
-        id: newUser.id,
-        username: newUser.get('username'),
-      };
-      req.session.sessionToken = newUser.getSessionToken();
-
-      logger.info(`User ${username} registered successfully`);
-
-      if (req.accepts('json')) {
-        return res.json({
-          success: true,
-          user: {
-            id: newUser.id,
-            username: newUser.get('username'),
-          },
-        });
-      }
-
-      return res.redirect('/');
+      return this.handleRegistrationSuccess(res, newUser);
     } catch (error) {
-      logger.error('Registration error:', error);
+      return this.handleRegistrationError(res, error);
+    }
+  }
 
-      if (req.accepts('json')) {
-        return res.status(400).json({
-          success: false,
-          message: error.message || 'Registration failed',
-        });
-      }
+  validateRegistration({ username, password, email }) {
+    if (!username || !password || !email) {
+      return {
+        isValid: false,
+        error: 'Username, password, and email are required',
+      };
+    }
+    return { isValid: true };
+  }
 
-      return res.render('auth/register', {
-        title: 'Register - AmexingWeb',
-        error: error.message || 'Registration failed',
+  handleRegistrationValidationError(res, errorMessage) {
+    if (res.req.accepts('json')) {
+      return res.status(400).json({
+        success: false,
+        message: errorMessage,
       });
     }
+    return res.render('auth/register', {
+      title: 'Register - AmexingWeb',
+      error: 'All fields are required',
+    });
+  }
+
+  async createUser({ username, password, email }) {
+    const user = new Parse.User();
+    user.set('username', username);
+    user.set('password', password);
+    user.set('email', email);
+    return user.signUp();
+  }
+
+  setUserSession(req, user) {
+    req.session.user = {
+      id: user.id,
+      username: user.get('username'),
+    };
+    req.session.sessionToken = user.getSessionToken();
+  }
+
+  handleRegistrationSuccess(res, user) {
+    if (res.req.accepts('json')) {
+      return res.json({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.get('username'),
+        },
+      });
+    }
+    return res.redirect('/');
+  }
+
+  handleRegistrationError(res, error) {
+    logger.error('Registration error:', error);
+
+    if (res.req.accepts('json')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Registration failed',
+      });
+    }
+
+    return res.render('auth/register', {
+      title: 'Register - AmexingWeb',
+      error: error.message || 'Registration failed',
+    });
   }
 
   async logout(req, res) {
