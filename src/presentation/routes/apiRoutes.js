@@ -24,6 +24,17 @@ router.post(
   }
 );
 
+// Test endpoint for CSRF validation (development/testing only)
+if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') {
+  router.post('/test-csrf', (req, res) => {
+    res.json({
+      success: true,
+      message: 'CSRF token validated successfully',
+      data: req.body,
+    });
+  });
+}
+
 // Protected API endpoints
 router.use(authMiddleware.requireAuth);
 
