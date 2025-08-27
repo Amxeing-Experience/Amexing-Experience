@@ -170,21 +170,50 @@ else
     log_warning "Semgrep not found. Install with: pip install semgrep"
 fi
 
-# 3. Check for secrets in staged files
+# 3. Check for secrets in staged files (PCI DSS compliant)
 log_info "Scanning for potential secrets..."
 staged_files=$(git diff --cached --name-only)
+
 if [ -n "$staged_files" ]; then
-    # Check for common secret patterns
-    if echo "$staged_files" | xargs grep -l "password\\|secret\\|key\\|token\\|credential" 2>/dev/null; then
-        log_warning "Potential secrets detected in staged files:"
-        echo "$staged_files" | xargs grep -n "password\\|secret\\|key\\|token\\|credential" 2>/dev/null || true
-        echo ""
-        read -p "Continue anyway? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_error "Commit aborted. Review and remove sensitive data."
-            exit 1
+    # Exclude documentation and example files from secret scanning
+    sensitive_files=$(echo "$staged_files" | grep -v "\\.md$" | grep -v "^docs/" | grep -v "\\.example$" | grep -v "^README")
+    
+    if [ -n "$sensitive_files" ]; then
+        # Look for real secrets, excluding code examples and documentation
+        if echo "$sensitive_files" | xargs grep -l "password\\|secret\\|key\\|token\\|credential" 2>/dev/null | \\
+           xargs grep -v "// Example\\|# Example\\|\\.example\\|TODO\\|FIXME\\|body('password')\\|process\\.env\\." 2>/dev/null > /dev/null; then
+            
+            log_error "CRITICAL: Potential real secrets detected!"
+            echo "$sensitive_files" | xargs grep -n "password\\|secret\\|key\\|token\\|credential" 2>/dev/null | \\
+            grep -v "// Example\\|# Example\\|\\.example\\|TODO\\|FIXME\\|body('password')\\|process\\.env\\." || true
+            echo ""
+            
+            # In CI/CD, always fail if real secrets detected
+            if [ "$CI" = "true" ]; then
+                log_error "CI/CD detected - blocking commit with potential secrets"
+                exit 1
+            fi
+            
+            # In development, require explicit confirmation
+            read -p "Are these false positives? Type 'yes-false-positive' to continue: " response
+            echo
+            if [ "$response" != "yes-false-positive" ]; then
+                log_error "Commit aborted. Review and remove sensitive data."
+                exit 1
+            fi
+            
+            # Log override for PCI DSS audit trail
+            echo "$(date): Secret scan override by $(git config user.name || echo 'unknown') - $(git log -1 --pretty=format:'%s' 2>/dev/null || echo 'pending commit')" >> .git/security-audit.log
+            log_warning "Override logged to security audit trail"
         fi
+    fi
+    
+    # Additional PCI DSS checks - block real sensitive files
+    if echo "$staged_files" | grep -E "\\.env$|\\.key$|\\.pem$|\\.p12$|id_rsa$|id_dsa$" > /dev/null; then
+        log_error "Attempting to commit sensitive files - PCI DSS Req 3.4 violation!"
+        echo "Blocked files:"
+        echo "$staged_files" | grep -E "\\.env$|\\.key$|\\.pem$|\\.p12$|id_rsa$|id_dsa$"
+        exit 1
     fi
 fi
 
@@ -286,7 +315,7 @@ fi
 
 # 2. Run security audit
 log_info "Running security audit..."
-if ! yarn security:audit --level high; then
+if ! yarn audit --level high; then
     log_error "Security audit failed. Fix vulnerabilities before pushing."
     exit 1
 fi
