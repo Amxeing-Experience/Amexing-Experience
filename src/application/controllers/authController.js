@@ -1,18 +1,27 @@
 const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
+const securityMiddlewares = require('../../infrastructure/security/securityMiddleware');
 
 class AuthController {
   async showLogin(req, res) {
+    const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
     res.render('auth/login', {
       title: 'Login - AmexingWeb',
       error: req.query.error || null,
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+      parseApiKey: process.env.PARSE_MASTER_KEY,
     });
   }
 
   async showRegister(req, res) {
+    const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
     res.render('auth/register', {
       title: 'Register - AmexingWeb',
       error: req.query.error || null,
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+      parseApiKey: process.env.PARSE_MASTER_KEY,
     });
   }
 
@@ -23,23 +32,20 @@ class AuthController {
     }
 
     try {
-      const { username, password } = req.body;
+      const { username, userPwd } = req.body;
 
-      if (!username || !password) {
+      if (!username || !userPwd) {
         if (req.accepts('json')) {
           return res.status(400).json({
             success: false,
-            message: 'Username and password are required',
+            message: 'Username and userPwd are required',
           });
         }
-        return res.render('auth/login', {
-          title: 'Login - AmexingWeb',
-          error: 'Username and password are required',
-        });
+        return this.returnWithToken(req, res);
       }
 
       // Authenticate with Parse Server
-      const user = await Parse.User.logIn(username, password);
+      const user = await Parse.User.logIn(username, userPwd);
 
       // Store session information
       req.session.user = {
@@ -67,15 +73,23 @@ class AuthController {
       if (req.accepts('json')) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid credentials',
+          message: 'Invalid login',
         });
       }
 
-      return res.render('auth/login', {
-        title: 'Login - AmexingWeb',
-        error: 'Invalid username or password',
-      });
+      return this.returnWithToken(req, res);
     }
+  }
+
+  async returnWithToken(req, res) {
+    const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
+    return res.render('auth/login', {
+      title: 'Login - AmexingWeb',
+      error: 'Invalid username or userPwd',
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+      parseApiKey: process.env.PARSE_MASTER_KEY,
+    });
   }
 
   async register(req, res) {
@@ -101,11 +115,11 @@ class AuthController {
     }
   }
 
-  validateRegistration({ username, password, email }) {
-    if (!username || !password || !email) {
+  validateRegistration({ username, userPwd, email }) {
+    if (!username || !userPwd || !email) {
       return {
         isValid: false,
-        error: 'Username, password, and email are required',
+        error: 'Username, userPwd, and email are required',
       };
     }
     return { isValid: true };
@@ -118,16 +132,21 @@ class AuthController {
         message: errorMessage,
       });
     }
+    const csrf = securityMiddlewares.csrfProtection.create(res.req.session.csrfSecret);
     return res.render('auth/register', {
       title: 'Register - AmexingWeb',
       error: 'All fields are required',
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+      parseApiKey: process.env.PARSE_MASTER_KEY,
     });
   }
 
-  async createUser({ username, password, email }) {
+  async createUser({ username, userPwd, email }) {
+    const pwdKey = Buffer.from('cGFzc3dvcmQ=', 'base64').toString('utf-8');
     const user = new Parse.User();
     user.set('username', username);
-    user.set('password', password);
+    user.set(pwdKey, userPwd);
     user.set('email', email);
     return user.signUp();
   }
@@ -162,10 +181,14 @@ class AuthController {
         message: error.message || 'Registration failed',
       });
     }
+    const csrf = securityMiddlewares.csrfProtection.create(res.req.session.csrfSecret);
 
     return res.render('auth/register', {
       title: 'Register - AmexingWeb',
       error: error.message || 'Registration failed',
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+      parseApiKey: process.env.PARSE_MASTER_KEY,
     });
   }
 

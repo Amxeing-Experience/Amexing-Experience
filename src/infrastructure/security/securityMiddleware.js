@@ -38,7 +38,7 @@ class SecurityMiddleware {
           scriptSrc: ["'self'", this.isDevelopment ? "'unsafe-inline'" : ''],
           imgSrc: ["'self'", 'data:', 'https:'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com'],
-          connectSrc: ["'self'"],
+          connectSrc: ["'self'", 'http://localhost:1337'],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],
           frameSrc: ["'none'"],
@@ -97,7 +97,7 @@ class SecurityMiddleware {
   getStrictRateLimiter() {
     return rateLimit({
       windowMs: 15 * 60 * 1000,
-      max: 5,
+      max: 10,
       message: 'Too many attempts. Please try again later.',
       skipSuccessfulRequests: false,
     });
