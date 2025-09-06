@@ -1,41 +1,5 @@
-<%- include('../layout', { body: `
-    <div style="max-width: 400px; margin: 0 auto;">
-        <h2 style="text-align: center; color: #667eea; margin-bottom: 2rem;">Login</h2>
-        
-        <% if (error) { %>
-            <div class="alert alert-error">
-                <%= error %>
-            </div>
-        <% } %>
-        
-        <form action="/parse/login" method="POST">
-            <div style="margin-bottom: 1.5rem;">
-                <label for="username" style="display: block; margin-bottom: 0.5rem; color: #666;">Username</label>
-                <input 
-                    type="text" 
-                    id="username" 
-                    name="username" 
-                    required
-                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
-                >
-            </div>
-            
-            <div style="margin-bottom: 1.5rem;">
-                <label for="password" style="display: block; margin-bottom: 0.5rem; color: #666;">Password</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    name="password" 
-                    required
-                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
-                >
-            </div>
-            
-            <button type="submit" class="btn" style="width: 100%; margin-bottom: 1rem;">Login</button>
-        </form>
-        
-        <p style="text-align: center; color: #666;">
-            Don't have an account? <a href="/register" style="color: #667eea;">Register here</a>
-        </p>
-    </div>
-` }) %>
+<%- include('../layout', { 
+    title: 'Login', 
+    body: include('../partials/login', { error: error }) ,
+    error: error
+}) %>

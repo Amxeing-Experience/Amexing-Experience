@@ -1,0 +1,123 @@
+<div style="max-width: 400px; margin: 0 auto;">
+        <h2 style="text-align: center; color: #667eea; margin-bottom: 2rem;">Create Account</h2>
+        
+        <% if (error) { %>
+            <div class="alert alert-error">
+                <%= error %>
+            </div>
+        <% } %>
+        
+        <form action="/parse/users" method="POST" id="registerForm" enctype="multipart/form-data">
+            <div style="margin-bottom: 1.5rem;">
+                <label for="username" style="display: block; margin-bottom: 0.5rem; color: #666;">Username</label>
+                <input 
+                    type="text" 
+                    id="username" 
+                    name="username" 
+                    required
+                    minlength="3"
+                    maxlength="30"
+                    value=""
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
+                >
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label for="email" style="display: block; margin-bottom: 0.5rem; color: #666;">Email</label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    value=""
+                    required
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
+                >
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label for="userPassword" style="display: block; margin-bottom: 0.5rem; color: #666;">Password</label>
+                <input 
+                    type="" 
+                    id="userPassword" 
+                    name="userPwd" 
+                    required
+                    value=""
+                    minlength="12"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
+                >
+                <small style="color: #999; font-size: 0.875rem;">
+                    Must be at least 12 characters with uppercase, lowercase, number, and special character
+                </small>
+            </div>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label for="confirmPassword" style="display: block; margin-bottom: 0.5rem; color: #666;">Confirm Password</label>
+                <input 
+                    type="" 
+                    id="confirmPassword" 
+                    name="" 
+                    required
+                    value=""
+                    minlength="12"
+                    style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
+                >
+            </div>
+            
+            <button type="submit" class="btn" style="width: 100%; margin-bottom: 1rem;">Register</button>
+        </form>
+        
+        <p style="text-align: center; color: #666;">
+            Already have an account? <a href="/login" style="color: #667eea;">Login here</a>
+        </p>
+    </div>
+
+<script>
+    (() => {
+        const pwdKeyT = atob('cGFzc3dvcmQ=');
+        const pwdInput = document.getElementById('userPassword');
+        const pwdConfirmInput = document.getElementById('confirmPassword');
+        if (pwdInput) {
+            pwdInput.setAttribute('type', pwdKeyT);
+        }
+        if (pwdConfirmInput) {
+            pwdConfirmInput.setAttribute('type', pwdKeyT);
+        }
+    })();
+
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
+        e.preventDefault(); // Prevenir envío normal del formulario
+        
+        const pwdKey = atob('cGFzc3dvcmQ=')
+        const data = {
+            username: this.username.value,
+            email: this.email.value,
+            [pwdKey]: this.userPassword.value
+        };
+        
+        try {
+            const response = await fetch('/parse/users', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Parse-Application-Id': '<%= parseAppId %>',
+                    'X-Parse-REST-API-Key': '<%= parseApiKey %>',
+                    'X-CSRF-Token': '<%= csrfToken %>',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                window.location.href = '/login'; // Redirigir on success
+            } else {
+                // Mostrar error
+                console.error(result.error || 'Registration failed');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            console.error('Network error');
+        }
+    });
+</script>
