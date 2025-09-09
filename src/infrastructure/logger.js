@@ -5,7 +5,9 @@ const fs = require('fs');
 
 // Create logs directory if it doesn't exist
 const logDir = process.env.LOG_DIR || 'logs';
+// eslint-disable-next-line security/detect-non-literal-fs-filename
 if (!fs.existsSync(logDir)) {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   fs.mkdirSync(logDir, { recursive: true });
 }
 

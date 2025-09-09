@@ -36,8 +36,17 @@ jobs:
           echo "Running Semgrep security analysis..."
           yarn security:semgrep || echo "⚠️ Semgrep completed with findings"
           
+          echo "Running dependency audit with high threshold..."
+          yarn audit --level high || echo "⚠️ High vulnerabilities found - immediate review required"
+          
           echo "Running dependency audit with moderate threshold..."
           yarn audit --level moderate || echo "⚠️ Moderate vulnerabilities found - review recommended"
+          
+          echo "Checking Parse Server and Dashboard versions..."
+          PARSE_SERVER_VERSION=$(node -p "require('./package.json').dependencies['parse-server']")
+          PARSE_DASHBOARD_VERSION=$(node -p "require('./package.json').dependencies['parse-dashboard']")
+          echo "Parse Server version: $PARSE_SERVER_VERSION"
+          echo "Parse Dashboard version: $PARSE_DASHBOARD_VERSION"
           
           echo "Checking documentation coverage..."
           yarn docs:coverage || echo "⚠️ Documentation coverage below threshold"
@@ -64,6 +73,25 @@ jobs:
             echo "✅ All required security middleware configured"
           else
             echo "⚠️ $MISSING_COUNT security middleware components missing"
+            exit 1
+          fi
+          
+          # Verify minimum Parse versions (security requirement)
+          echo "🔍 Verifying Parse component versions..."
+          PARSE_SERVER_MIN="8.0.0"
+          PARSE_DASHBOARD_MIN="7.0.0"
+          
+          CURRENT_SERVER=$(node -p "require('./package.json').dependencies['parse-server']" | sed 's/[^0-9.]//g')
+          CURRENT_DASHBOARD=$(node -p "require('./package.json').dependencies['parse-dashboard']" | sed 's/[^0-9.]//g')
+          
+          echo "Current Parse Server: $CURRENT_SERVER (minimum: $PARSE_SERVER_MIN)"
+          echo "Current Parse Dashboard: $CURRENT_DASHBOARD (minimum: $PARSE_DASHBOARD_MIN)"
+          
+          if [ "$(printf '%s\n' "$PARSE_SERVER_MIN" "$CURRENT_SERVER" | sort -V | head -n1)" = "$PARSE_SERVER_MIN" ] && 
+             [ "$(printf '%s\n' "$PARSE_DASHBOARD_MIN" "$CURRENT_DASHBOARD" | sort -V | head -n1)" = "$PARSE_DASHBOARD_MIN" ]; then
+            echo "✅ Parse components meet minimum security versions"
+          else
+            echo "⚠️ Parse components below minimum security versions - update required"
           fi
 
       # Summary

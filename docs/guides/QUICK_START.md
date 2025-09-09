@@ -28,8 +28,8 @@ git clone <your-repo-url>
 cd amexing-web
 
 # Setup environment configuration
-cp .env.example .env
-# Edit .env with your configuration (see Environment section below)
+cp environments/.env.example environments/.env.development
+# Edit environments/.env.development with your configuration (see Environment section below)
 ```
 
 ### 2. Install Dependencies

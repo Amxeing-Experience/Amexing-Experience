@@ -41,7 +41,9 @@ describe('Authentication Controller', () => {
 
       expect(mockRes.render).toHaveBeenCalledWith('auth/login', {
         title: 'Login - AmexingWeb',
-        error: null
+        error: null,
+        csrfToken: expect.any(String),
+        parseAppId: expect.any(String),
       });
     });
 
@@ -79,7 +81,9 @@ describe('Authentication Controller', () => {
       expect(Parse.User.logIn).toHaveBeenCalledWith('testuser', 'wrongpass');
       expect(mockRes.render).toHaveBeenCalledWith('auth/login', {
         title: 'Login - AmexingWeb',
-        error: 'Invalid username or password'
+        error: 'Invalid username or password',
+        csrfToken: expect.any(String),
+        parseAppId: expect.any(String),
       });
     });
 
@@ -151,7 +155,9 @@ describe('Authentication Controller', () => {
 
       expect(mockRes.render).toHaveBeenCalledWith('auth/register', {
         title: 'Register - AmexingWeb',
-        error: null
+        error: null,
+        csrfToken: expect.any(String),
+        parseAppId: expect.any(String),
       });
     });
   });

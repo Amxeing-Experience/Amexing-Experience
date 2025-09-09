@@ -63,7 +63,7 @@ const { getSecretsManager } = require('./src/infrastructure/secrets/secretsManag
 
 const manager = getSecretsManager();
 manager.initialize(process.env.ENCRYPTION_KEY);
-const secrets = manager.loadEncryptedEnv('.env.development.vault');
+const secrets = manager.loadEncryptedEnv('./environments/.env.development.vault');
 ```
 
 ## 🏠 Development Environment
@@ -76,7 +76,7 @@ The development environment uses auto-generated secure secrets for local develop
 # Generate development secrets
 node scripts/generate-secrets.js development
 
-# Generated file: .env.development
+# Generated file: environments/.env.development
 # Contains: Auto-generated secure secrets for all services
 ```
 
@@ -84,7 +84,7 @@ node scripts/generate-secrets.js development
 
 1. **Copy example environment:**
    ```bash
-   cp .env.example .env.development
+   cp environments/.env.example environments/.env.development
    ```
 
 2. **Generate encryption key:**
@@ -138,7 +138,7 @@ The staging environment mimics production security while allowing for testing:
 # Generate staging secrets
 node scripts/generate-secrets.js staging --encrypt
 
-# Generated file: .env.staging.vault (encrypted)
+# Generated file: environments/.env.staging.vault (encrypted)
 ```
 
 ### Staging Configuration
@@ -331,13 +331,14 @@ EMAIL_PASS=manually_configured_production_email_credentials
 
 ```
 project-root/
-├── .env.example              # Template with all variables
-├── .env.development          # Development configuration
-├── .env.staging             # Staging configuration
-├── .env.production          # Production configuration (if used)
-├── .env.development.vault   # Encrypted development file
-├── .env.staging.vault       # Encrypted staging file
-└── .env.production.vault    # Encrypted production file (not recommended)
+├── environments/
+│   ├── .env.example              # Template with all variables
+│   ├── .env.development          # Development configuration
+│   ├── .env.staging             # Staging configuration
+│   ├── .env.production          # Production configuration (if used)
+│   ├── .env.development.vault   # Encrypted development file
+│   ├── .env.staging.vault       # Encrypted staging file
+│   └── .env.production.vault    # Encrypted production file (not recommended)
 ```
 
 ### Variable Categories
@@ -433,9 +434,9 @@ node scripts/audit-secrets.js
 1. **Never commit secrets to version control**
    ```bash
    # Add to .gitignore
-   .env*
-   !.env.example
-   *.vault
+   environments/.env*
+   !environments/.env.example
+   environments/*.vault
    ```
 
 2. **Use separate secrets per environment**

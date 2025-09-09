@@ -34,7 +34,7 @@ A PCI DSS 4.0 compliant e-commerce platform built with Parse Server, Node.js, an
 ```bash
 # Clone and setup
 git clone <your-repo-url> && cd amexing-web
-cp .env.example .env && yarn install
+cp environments/.env.example environments/.env.development && yarn install
 
 # Start development
 yarn dev

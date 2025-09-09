@@ -1,4 +1,3 @@
-
     <div style="max-width: 400px; margin: 0 auto;">
         <h2 style="text-align: center; color: #667eea; margin-bottom: 2rem;">Login</h2>
         
@@ -8,7 +7,9 @@
             </div>
         <% } %>
         
-        <form action="/parse/login" method="POST" id="loginForm">
+        <form action="/parse/login" method="POST">
+            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+            
             <div style="margin-bottom: 1.5rem;">
                 <label for="username" style="display: block; margin-bottom: 0.5rem; color: #666;">Username</label>
                 <input 
@@ -21,11 +22,11 @@
             </div>
 
             <div style="margin-bottom: 1.5rem;">
-                <label for="userPassword" style="display: block; margin-bottom: 0.5rem; color: #666;">Password</label>
+                <label for="password" style="display: block; margin-bottom: 0.5rem; color: #666;">Password</label>
                 <input 
-                    type="" 
-                    id="userPassword" 
-                    name="userPwd" 
+                    type="password" 
+                    id="password" 
+                    name="password" 
                     required
                     style="width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 1rem;"
                 >
@@ -38,49 +39,3 @@
             Don't have an account? <a href="/register" style="color: #667eea;">Register here</a>
         </p>
     </div>
-
-
-<script>
-    (() => {
-        const pwdKeyT = atob('cGFzc3dvcmQ=');
-        const pwdInput = document.getElementById('userPassword');
-        if (pwdInput) {
-            pwdInput.setAttribute('type', pwdKeyT);
-        }
-    })();
-
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
-        e.preventDefault(); // Prevenir envío normal del formulario
-        const pwdKey = atob('cGFzc3dvcmQ=')
-        const data = {
-            username: this.username.value,
-            [pwdKey]: this.userPassword.value
-        };
-        
-        try {
-            const response = await fetch('/parse/login', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Parse-Application-Id': '<%= parseAppId %>',
-                    'X-Parse-REST-API-Key': '<%= parseApiKey %>',
-                    'X-CSRF-Token': '<%= csrfToken %>',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify(data)
-            });
-            
-            const result = await response.json();
-            
-            if (response.ok) {
-                window.location.href = '/parse'; // Redirigir on success
-            } else {
-                // Mostrar error
-                console.error(result.error || 'Registration failed');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            console.error('Network error');
-        }
-    });
-</script>

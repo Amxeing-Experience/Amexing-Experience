@@ -137,7 +137,7 @@ function generateEnvironmentSecrets(environment) {
  */
 function createEnvironmentFile(secrets, environment, encrypt = false) {
   const fileName = encrypt ? `.env.${environment}.vault` : `.env.${environment}`;
-  const filePath = path.join(process.cwd(), fileName);
+  const filePath = path.join(process.cwd(), 'environments', fileName);
   
   console.log(`\n📄 Creating environment file: ${fileName}`);
   
@@ -162,7 +162,7 @@ function createEnvironmentFile(secrets, environment, encrypt = false) {
       '',
       '# ⚠️  SECURITY WARNING:',
       '# This file contains sensitive information. Do not commit to version control.',
-      '# Consider using encrypted .env.vault files for production.',
+      '# Consider using encrypted environments/.env.vault files for production.',
       '',
     ];
     
@@ -249,9 +249,9 @@ function displaySecurityRecommendations(environment) {
   const recommendations = {
     development: [
       '• Use generated secrets for local development',
-      '• Do not commit .env files to version control',
+      '• Do not commit environments/.env files to version control',
       '• Regularly rotate development secrets',
-      '• Use encrypted .env.vault files for team sharing',
+      '• Use encrypted environments/.env.vault files for team sharing',
     ],
     staging: [
       '• Use production-like security settings',
@@ -332,7 +332,7 @@ Security Notes:
     displaySecurityRecommendations(environment);
     
     console.log('\n✅ Secret generation completed successfully!');
-    console.log(`📄 Next steps: Review the generated .env.${environment} file`);
+    console.log(`📄 Next steps: Review the generated environments/.env.${environment} file`);
     
     if (encrypt) {
       console.log('🔑 Remember to securely store your encryption key');

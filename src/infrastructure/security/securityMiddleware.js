@@ -97,7 +97,7 @@ class SecurityMiddleware {
   getStrictRateLimiter() {
     return rateLimit({
       windowMs: 15 * 60 * 1000,
-      max: 10,
+      max: this.isDevelopment ? 10 : 5, // More lenient in development
       message: 'Too many attempts. Please try again later.',
       skipSuccessfulRequests: false,
     });

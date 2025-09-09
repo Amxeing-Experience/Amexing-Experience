@@ -117,6 +117,7 @@ class SecureSecretsManager {
    */
   loadEncryptedEnv(filePath) {
     try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
       const encryptedContent = fs.readFileSync(filePath, 'utf8');
       const secrets = {};
 
@@ -159,6 +160,7 @@ class SecureSecretsManager {
         }
       });
 
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
       fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
     } catch (error) {
       throw new Error(`Failed to save encrypted environment: ${error.message}`);

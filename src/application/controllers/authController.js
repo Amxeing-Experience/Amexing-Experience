@@ -10,7 +10,6 @@ class AuthController {
       error: req.query.error || null,
       csrfToken: csrf,
       parseAppId: process.env.PARSE_APP_ID,
-      parseApiKey: process.env.PARSE_MASTER_KEY,
     });
   }
 
@@ -21,7 +20,6 @@ class AuthController {
       error: req.query.error || null,
       csrfToken: csrf,
       parseAppId: process.env.PARSE_APP_ID,
-      parseApiKey: process.env.PARSE_MASTER_KEY,
     });
   }
 
@@ -32,20 +30,20 @@ class AuthController {
     }
 
     try {
-      const { username, userPwd } = req.body;
+      const { username, password } = req.body;
 
-      if (!username || !userPwd) {
+      if (!username || !password) {
         if (req.accepts('json')) {
           return res.status(400).json({
             success: false,
-            message: 'Username and userPwd are required',
+            message: 'Username and password are required',
           });
         }
         return this.returnWithToken(req, res);
       }
 
       // Authenticate with Parse Server
-      const user = await Parse.User.logIn(username, userPwd);
+      const user = await Parse.User.logIn(username, password);
 
       // Store session information
       req.session.user = {
@@ -85,10 +83,9 @@ class AuthController {
     const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
     return res.render('auth/login', {
       title: 'Login - AmexingWeb',
-      error: 'Invalid username or userPwd',
+      error: 'Invalid username or password',
       csrfToken: csrf,
       parseAppId: process.env.PARSE_APP_ID,
-      parseApiKey: process.env.PARSE_MASTER_KEY,
     });
   }
 
@@ -115,11 +112,11 @@ class AuthController {
     }
   }
 
-  validateRegistration({ username, userPwd, email }) {
-    if (!username || !userPwd || !email) {
+  validateRegistration({ username, password, email }) {
+    if (!username || !password || !email) {
       return {
         isValid: false,
-        error: 'Username, userPwd, and email are required',
+        error: 'Username, password, and email are required',
       };
     }
     return { isValid: true };
@@ -138,15 +135,13 @@ class AuthController {
       error: 'All fields are required',
       csrfToken: csrf,
       parseAppId: process.env.PARSE_APP_ID,
-      parseApiKey: process.env.PARSE_MASTER_KEY,
     });
   }
 
-  async createUser({ username, userPwd, email }) {
-    const pwdKey = Buffer.from('cGFzc3dvcmQ=', 'base64').toString('utf-8');
+  async createUser({ username, password, email }) {
     const user = new Parse.User();
     user.set('username', username);
-    user.set(pwdKey, userPwd);
+    user.set('password', password);
     user.set('email', email);
     return user.signUp();
   }
@@ -188,7 +183,6 @@ class AuthController {
       error: error.message || 'Registration failed',
       csrfToken: csrf,
       parseAppId: process.env.PARSE_APP_ID,
-      parseApiKey: process.env.PARSE_MASTER_KEY,
     });
   }
 
