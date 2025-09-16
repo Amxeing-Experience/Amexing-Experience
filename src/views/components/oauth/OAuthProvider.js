@@ -402,7 +402,7 @@ class OAuthProvider {
           throw new Error(`Unsupported OAuth provider: ${provider}`);
       }
     } catch (error) {
-      console.error(`OAuth authentication failed with ${provider}:`, error);
+      console.error('OAuth authentication failed with provider:', provider, error);
       this.handleAuthenticationError(error, provider);
     }
   }

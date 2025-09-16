@@ -4,7 +4,7 @@
  * Implements OAUTH-3-05: Contexto Departamental en Sesiones OAuth.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since Sprint 03 - Permission Context Management
+ * @since 1.0.0
  */
 
 const OAuthPermissionService = require('./OAuthPermissionService');
@@ -50,6 +50,8 @@ class PermissionContextService {
    * @param {string} userId - User ID.
    * @returns {Promise<Array>} Available contexts.
    * @example
+   * const service = new PermissionContextService();
+   * const contexts = await service.getAvailableContexts('user123');
    */
   async getAvailableContexts(userId) {
     try {
@@ -88,6 +90,8 @@ class PermissionContextService {
    * @param {string} userId - User ID.
    * @returns {Promise<Array>} Department contexts.
    * @example
+   * const service = new PermissionContextService();
+   * const deptContexts = await service.getDepartmentContexts('user123');
    */
   async getDepartmentContexts(userId) {
     try {
@@ -143,6 +147,8 @@ class PermissionContextService {
    * @param {string} userId - User ID.
    * @returns {Promise<Array>} Project contexts.
    * @example
+   * const service = new PermissionContextService();
+   * const projectContexts = await service.getProjectContexts('user123');
    */
   async getProjectContexts(userId) {
     try {
@@ -191,6 +197,8 @@ class PermissionContextService {
    * @param {string} userId - User ID.
    * @returns {Promise<Array>} Client contexts.
    * @example
+   * const service = new PermissionContextService();
+   * const clientContexts = await service.getClientContexts('user123');
    */
   async getClientContexts(userId) {
     try {
@@ -239,6 +247,8 @@ class PermissionContextService {
    * @param {string} userId - User ID.
    * @returns {Promise<Array>} Temporary contexts.
    * @example
+   * const service = new PermissionContextService();
+   * const tempContexts = await service.getTemporaryContexts('user123');
    */
   async getTemporaryContexts(userId) {
     try {
@@ -315,6 +325,8 @@ class PermissionContextService {
    * @param {string} sessionId - Current session ID.
    * @returns {Promise<object>} Context switch result.
    * @example
+   * const service = new PermissionContextService();
+   * const result = await service.switchToContext('user123', 'dept_hr', 'session456');
    */
   async switchToContext(userId, contextId, sessionId) {
     try {
@@ -380,6 +392,8 @@ class PermissionContextService {
    * @param {string} sessionId - Session ID.
    * @returns {Promise<Parse.Object>} Context record.
    * @example
+   * const service = new PermissionContextService();
+   * const contextRecord = await service.getOrCreateContextRecord('user123', 'session456');
    */
   async getOrCreateContextRecord(userId, sessionId) {
     try {
@@ -411,7 +425,10 @@ class PermissionContextService {
    * Validates user access to a context.
    * @param {string} userId - User ID.
    * @param {object} context - Context to validate.
+   * @returns {Promise<void>} Completes when validation passes, throws if fails
    * @example
+   * const service = new PermissionContextService();
+   * await service.validateContextAccess('user123', contextObject);
    */
   async validateContextAccess(userId, context) {
     try {
@@ -441,7 +458,10 @@ class PermissionContextService {
    * Validates department access.
    * @param {string} userId - User ID.
    * @param {string} departmentId - Department ID.
+   * @returns {Promise<void>} Completes when validation passes, throws if fails
    * @example
+   * const service = new PermissionContextService();
+   * await service.validateDepartmentAccess('user123', 'dept456');
    */
   async validateDepartmentAccess(userId, departmentId) {
     const employeeQuery = new Parse.Query('ClientEmployee');
@@ -460,7 +480,10 @@ class PermissionContextService {
    * Validates project access.
    * @param {string} userId - User ID
    * @param {string} projectId - Project ID
+   * @returns {Promise<void>} Completes when validation passes, throws if fails
    * @example
+   * const service = new PermissionContextService();
+   * await service.validateProjectAccess('user123', 'project456');
    */
   async validateProjectAccess(userId, projectId) {
     const assignmentQuery = new Parse.Query('ProjectAssignment');
@@ -479,7 +502,10 @@ class PermissionContextService {
    * Validates client access.
    * @param {string} userId - User ID.
    * @param {string} clientId - Client ID.
+   * @returns {Promise<void>} Completes when validation passes, throws if fails
    * @example
+   * const service = new PermissionContextService();
+   * await service.validateClientAccess('user123', 'client456');
    */
   async validateClientAccess(userId, clientId) {
     const accessQuery = new Parse.Query('ClientAccess');
@@ -498,7 +524,10 @@ class PermissionContextService {
    * Validates temporary access.
    * @param {string} userId - User ID.
    * @param {object} context - Temporary context.
+   * @returns {Promise<void>} Completes when validation passes, throws if fails
    * @example
+   * const service = new PermissionContextService();
+   * await service.validateTemporaryAccess('user123', tempContext);
    */
   async validateTemporaryAccess(userId, context) {
     if (context.expiresAt && context.expiresAt < new Date()) {
@@ -511,7 +540,10 @@ class PermissionContextService {
    * @param {string} userId - User ID.
    * @param {string} sessionId - Session ID.
    * @param {object} context - Context with permissions.
+   * @returns {Promise<void>} Completes when permissions are applied
    * @example
+   * const service = new PermissionContextService();
+   * await service.applyContextPermissions('user123', 'session456', contextObject);
    */
   async applyContextPermissions(userId, sessionId, context) {
     try {
@@ -551,6 +583,8 @@ class PermissionContextService {
    * @param {string} sessionId - Session ID.
    * @returns {Promise<object | null>} Current context or null.
    * @example
+   * const service = new PermissionContextService();
+   * const currentContext = await service.getCurrentContext('user123', 'session456');
    */
   async getCurrentContext(userId, sessionId) {
     try {
@@ -577,6 +611,8 @@ class PermissionContextService {
    * @param {string} contextId - Context ID.
    * @returns {Promise<Array>} Context permissions.
    * @example
+   * const service = new PermissionContextService();
+   * const permissions = await service.getContextPermissions('dept_hr');
    */
   async getContextPermissions(contextId) {
     try {
@@ -627,6 +663,8 @@ class PermissionContextService {
    * @param {string} departmentId - Department ID.
    * @returns {Promise<Array>} Department permissions.
    * @example
+   * const service = new PermissionContextService();
+   * const deptPermissions = await service.getDepartmentPermissions('hr');
    */
   async getDepartmentPermissions(departmentId) {
     return OAuthPermissionService.getDepartmentPermissions(null, departmentId);
@@ -637,6 +675,8 @@ class PermissionContextService {
    * @param {string} projectId - Project ID.
    * @returns {Promise<Array>} Project permissions.
    * @example
+   * const service = new PermissionContextService();
+   * const projectPermissions = await service.getProjectPermissions('project123');
    */
   async getProjectPermissions(projectId) {
     try {
@@ -655,6 +695,8 @@ class PermissionContextService {
    * @param {string} clientId - Client ID.
    * @returns {Promise<Array>} Client permissions.
    * @example
+   * const service = new PermissionContextService();
+   * const clientPermissions = await service.getClientPermissions('client123');
    */
   async getClientPermissions(clientId) {
     try {
@@ -673,6 +715,8 @@ class PermissionContextService {
    * @param {string} context - Temporary context.
    * @returns {Promise<Array>} Temporary permissions.
    * @example
+   * const service = new PermissionContextService();
+   * const tempPermissions = await service.getTemporaryPermissions('emergency');
    */
   async getTemporaryPermissions(context) {
     try {
@@ -694,7 +738,11 @@ class PermissionContextService {
   /**
    * Clears context permissions cache.
    * @param {string} userId - User ID (optional, clears all if not provided).
+   * @returns {void} No return value
    * @example
+   * const service = new PermissionContextService();
+   * service.clearContextCache('user123'); // Clear specific user cache
+   * service.clearContextCache(); // Clear all cache
    */
   clearContextCache(userId = null) {
     if (userId) {

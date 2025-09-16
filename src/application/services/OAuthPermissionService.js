@@ -3,7 +3,7 @@
  * Implements OAUTH-3-01 through OAUTH-3-07 user stories for Sprint 3.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since Sprint 03 - OAuth Permission System
+ * @since 1.0.0
  */
 
 const AmexingUser = require('../../domain/models/AmexingUser');
@@ -186,7 +186,7 @@ class OAuthPermissionService {
 
   /**
    * Gets Google Admin SDK groups for a user.
-   * @param {string} email - User email.
+   * @param {string} _email - User email (unused in current implementation).
    * @returns {Promise<Array>} List of Google groups.
    * @example
    * const service = new OAuthPermissionService();
@@ -328,6 +328,8 @@ class OAuthPermissionService {
    * @param {string} departmentId - Department ID.
    * @returns {Promise<Array>} Department-specific permissions.
    * @example
+   * const service = new OAuthPermissionService();
+   * const permissions = await service.getDepartmentPermissions('user123', 'hr');
    */
   async getDepartmentPermissions(userId, departmentId) {
     try {
@@ -357,6 +359,8 @@ class OAuthPermissionService {
    * @param {string} context - Optional context (department, project).
    * @returns {Promise<boolean>} True if user has permission.
    * @example
+   * const service = new OAuthPermissionService();
+   * const hasAccess = await service.hasPermission('user123', 'admin_access', 'department');
    */
   async hasPermission(userId, permission, context = null) {
     try {
@@ -399,6 +403,8 @@ class OAuthPermissionService {
    * @param {string} context - Context (department, project, etc.).
    * @returns {Promise<Array>} Context-specific permissions.
    * @example
+   * const service = new OAuthPermissionService();
+   * const permissions = await service.getContextPermissions('user123', 'finance_dept');
    */
   async getContextPermissions(userId, context) {
     try {
@@ -421,6 +427,8 @@ class OAuthPermissionService {
    * @param {string} email - Email address.
    * @returns {string} Masked email.
    * @example
+   * const service = new OAuthPermissionService();
+   * const masked = service.maskEmail('user@example.com'); // Returns 'use***@example.com'
    */
   maskEmail(email) {
     if (!email) return '';
@@ -432,6 +440,8 @@ class OAuthPermissionService {
    * Gets all available permissions in the system.
    * @returns {Array} List of all permissions.
    * @example
+   * const service = new OAuthPermissionService();
+   * const allPermissions = service.getAllAvailablePermissions();
    */
   getAllAvailablePermissions() {
     const allPermissions = new Set();
@@ -449,6 +459,8 @@ class OAuthPermissionService {
    * @param {string} provider - OAuth provider.
    * @returns {object} Provider-specific permission mappings.
    * @example
+   * const service = new OAuthPermissionService();
+   * const mappings = service.getProviderPermissionMappings('microsoft');
    */
   getProviderPermissionMappings(provider) {
     const mappings = {};

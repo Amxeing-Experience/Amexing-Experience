@@ -4,7 +4,7 @@
  * Implements OAUTH-3-06: Auditoría Completa Cambios Permisos OAuth.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since Sprint 03 - Permission Audit System
+ * @since 1.0.0
  */
 
 const logger = require('../../infrastructure/logger');
@@ -88,6 +88,8 @@ class PermissionAuditService {
    * @param {object} eventData - Audit event data.
    * @returns {Promise<Parse.Object>} Created audit record.
    * @example
+   * const service = new PermissionAuditService();
+   * const auditRecord = await service.recordPermissionAudit({ userId: 'user123', action: 'PERMISSION_GRANTED' });
    */
   async recordPermissionAudit(eventData) {
     try {
@@ -156,7 +158,10 @@ class PermissionAuditService {
    * Validates compliance fields for audit record.
    * @param {object} eventData - Event data to validate.
    * @param {string} framework - Compliance framework.
+   * @returns {void} Throws error if validation fails
    * @example
+   * const service = new PermissionAuditService();
+   * service.validateComplianceFields(eventData, 'PCI_DSS');
    */
   validateComplianceFields(eventData, framework) {
     const frameworkConfig = this.complianceFrameworks[framework];
@@ -183,6 +188,8 @@ class PermissionAuditService {
    * @param {string} action - Action performed.
    * @returns {string} Severity level.
    * @example
+   * const service = new PermissionAuditService();
+   * const severity = service.determineEventSeverity('PERMISSION_ELEVATION');
    */
   determineEventSeverity(action) {
     const eventConfig = this.auditEventTypes[action];
@@ -194,6 +201,8 @@ class PermissionAuditService {
    * @param {string} action - Action performed.
    * @returns {boolean} True if requires review.
    * @example
+   * const service = new PermissionAuditService();
+   * const needsReview = service.requiresReview('EMERGENCY_PERMISSION');
    */
   requiresReview(action) {
     const eventConfig = this.auditEventTypes[action];
@@ -205,6 +214,8 @@ class PermissionAuditService {
    * @param {object} data - Audit data.
    * @returns {Promise<Parse.Object>} Created audit record.
    * @example
+   * const service = new PermissionAuditService();
+   * const record = await service.createAuditRecord(auditData);
    */
   async createAuditRecord(data) {
     try {
@@ -245,6 +256,8 @@ class PermissionAuditService {
    * @param {object} metadata - Metadata to encrypt.
    * @returns {string} Encrypted metadata.
    * @example
+   * const service = new PermissionAuditService();
+   * const encrypted = service.encryptSensitiveData({ userAgent: 'browser', ip: '192.168.1.1' });
    */
   encryptSensitiveData(metadata) {
     try {
@@ -275,6 +288,8 @@ class PermissionAuditService {
    * @param {object} data - Audit data.
    * @returns {string} Sensitivity classification.
    * @example
+   * const service = new PermissionAuditService();
+   * const classification = service.classifyDataSensitivity(auditData);
    */
   classifyDataSensitivity(data) {
     // High sensitivity permissions
@@ -302,6 +317,8 @@ class PermissionAuditService {
    * @param {string} framework - Compliance framework.
    * @returns {Date} Retention date.
    * @example
+   * const service = new PermissionAuditService();
+   * const retentionDate = service.calculateRetentionDate('PCI_DSS');
    */
   calculateRetentionDate(framework) {
     const frameworkConfig = this.complianceFrameworks[framework];
@@ -314,7 +331,10 @@ class PermissionAuditService {
    * Creates compliance-specific record.
    * @param {Parse.Object} auditRecord - Main audit record.
    * @param {string} framework - Compliance framework.
+   * @returns {Promise<void>} Completes when compliance record is created
    * @example
+   * const service = new PermissionAuditService();
+   * await service.createComplianceRecord(auditRecord, 'SOX');
    */
   async createComplianceRecord(auditRecord, framework) {
     try {
@@ -338,6 +358,8 @@ class PermissionAuditService {
    * @param {string} framework - Compliance framework.
    * @returns {string} Framework version.
    * @example
+   * const service = new PermissionAuditService();
+   * const version = service.getFrameworkVersion('GDPR');
    */
   getFrameworkVersion(framework) {
     const versions = {
@@ -351,7 +373,10 @@ class PermissionAuditService {
   /**
    * Triggers immediate review for critical events.
    * @param {Parse.Object} auditRecord - Audit record.
+   * @returns {Promise<void>} Completes when review is triggered
    * @example
+   * const service = new PermissionAuditService();
+   * await service.triggerImmediateReview(criticalAuditRecord);
    */
   async triggerImmediateReview(auditRecord) {
     try {
@@ -385,6 +410,8 @@ class PermissionAuditService {
    * @param {object} reportParams - Report parameters.
    * @returns {Promise<object>} Audit report.
    * @example
+   * const service = new PermissionAuditService();
+   * const report = await service.generateComplianceReport({ startDate: '2024-01-01', endDate: '2024-12-31' });
    */
   async generateComplianceReport(reportParams) {
     try {
@@ -441,8 +468,10 @@ class PermissionAuditService {
    * @param {Array} auditRecords - Audit records.
    * @param {string} format - Report format.
    * @param {boolean} includeMetadata - Include metadata flag.
-   * @returns {object} Processed report.
+   * @returns {Promise<object>} Processed report.
    * @example
+   * const service = new PermissionAuditService();
+   * const processedReport = await service.processAuditRecords(auditRecords, 'detailed', true);
    */
   async processAuditRecords(auditRecords, format, includeMetadata) {
     try {
@@ -519,6 +548,8 @@ class PermissionAuditService {
    * @param {string} encryptedData - Encrypted metadata.
    * @returns {object} Decrypted metadata.
    * @example
+   * const service = new PermissionAuditService();
+   * const decrypted = service.decryptSensitiveData(encryptedString);
    */
   decryptSensitiveData(encryptedData) {
     try {
@@ -551,6 +582,8 @@ class PermissionAuditService {
    * @param {object} params - Query parameters.
    * @returns {Promise<object>} Audit statistics.
    * @example
+   * const service = new PermissionAuditService();
+   * const stats = await service.getAuditStatistics({ timeFrame: '30d', complianceFramework: 'PCI_DSS' });
    */
   async getAuditStatistics(params = {}) {
     try {
@@ -643,6 +676,8 @@ class PermissionAuditService {
    * Archives old audit records based on retention policy.
    * @returns {Promise<object>} Archive result.
    * @example
+   * const service = new PermissionAuditService();
+   * const archiveResult = await service.archiveOldRecords();
    */
   async archiveOldRecords() {
     try {

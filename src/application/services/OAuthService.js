@@ -5,7 +5,7 @@
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 2024-09-12
- * @since Sprint 02 - Real OAuth Implementation
+ * @since 2.0.0
  */
 
 const crypto = require('crypto');
@@ -34,6 +34,8 @@ class OAuthService {
    * Initializes OAuth providers configuration.
    * @returns {object} Providers configuration.
    * @example
+   * const service = new OAuthService();
+   * const providers = service.initializeProviders();
    */
   initializeProviders() {
     return {
@@ -80,6 +82,8 @@ class OAuthService {
    * @param {string} state - State parameter for CSRF protection.
    * @returns {Promise<string>} Authorization URL.
    * @example
+   * const service = new OAuthService();
+   * const authUrl = await service.generateAuthorizationUrl('google', 'state123');
    */
   async generateAuthorizationUrl(provider, state = null) {
     try {
@@ -141,6 +145,8 @@ class OAuthService {
    * @param {string} state - State parameter.
    * @returns {Promise<object>} Authentication result.
    * @example
+   * const service = new OAuthService();
+   * const result = await service.handleCallback('google', 'auth_code_123', 'state123');
    */
   async handleCallback(provider, code, state) {
     try {
@@ -203,6 +209,8 @@ class OAuthService {
    * @param {object} oauthData - OAuth account data.
    * @returns {Promise<object>} Link result.
    * @example
+   * const service = new OAuthService();
+   * const result = await service.linkOAuthAccount('user123', 'google', oauthData);
    */
   async linkOAuthAccount(userId, provider, oauthData) {
     try {
@@ -252,6 +260,8 @@ class OAuthService {
    * @param {string} provider - Provider name.
    * @returns {Promise<object>} Unlink result.
    * @example
+   * const service = new OAuthService();
+   * const result = await service.unlinkOAuthAccount('user123', 'google');
    */
   async unlinkOAuthAccount(userId, provider) {
     try {
@@ -294,6 +304,8 @@ class OAuthService {
    * @param {string} state - State parameter.
    * @returns {string} Mock authorization URL.
    * @example
+   * const service = new OAuthService();
+   * const mockUrl = service.generateMockAuthUrl('google', 'state123');
    */
   generateMockAuthUrl(provider, state) {
     const mockCode = `mock_${provider}_${crypto.randomBytes(16).toString('hex')}`;
@@ -303,9 +315,11 @@ class OAuthService {
   /**
    * Gets mock user info for testing.
    * @param {string} provider - Provider name.
-   * @param {string} code - Authorization code.
+   * @param {string} _code - Authorization code (unused in mock).
    * @returns {object} Mock user info.
    * @example
+   * const service = new OAuthService();
+   * const userInfo = service.getMockUserInfo('google', 'mock_code');
    */
   getMockUserInfo(provider, _code) {
     const baseUser = {
@@ -353,9 +367,11 @@ class OAuthService {
    * Exchanges authorization code for access tokens (real implementation).
    * @param {string} provider - Provider name.
    * @param {string} code - Authorization code.
-   * @param {string} state - State parameter.
+   * @param {string} _state - State parameter (unused in current implementation).
    * @returns {Promise<object>} Token response.
    * @example
+   * const service = new OAuthService();
+   * const tokens = await service.exchangeCodeForTokens('google', 'auth_code_123', 'state123');
    */
   async exchangeCodeForTokens(provider, code, _state) {
     const providerConfig = this.providers[provider];
@@ -402,6 +418,8 @@ class OAuthService {
    * @param {object} config - Provider configuration
    * @returns {Promise<object>} Token data
    * @example
+   * const service = new OAuthService();
+   * const tokenData = await service.performTokenExchange('google', 'auth_code_123', providerConfig);
    */
   async performTokenExchange(provider, code, config) {
     const tokenPayload = {
@@ -473,6 +491,8 @@ class OAuthService {
    * @param {object} config - Apple OAuth configuration.
    * @returns {Promise<string>} JWT client assertion.
    * @example
+   * const service = new OAuthService();
+   * const assertion = await service.createAppleClientAssertion(appleConfig);
    */
   async createAppleClientAssertion(config) {
     const fs = require('fs').promises;
@@ -509,6 +529,8 @@ class OAuthService {
    * @param {string} accessToken - Access token.
    * @returns {Promise<object>} User information.
    * @example
+   * const service = new OAuthService();
+   * const userInfo = await service.getUserInfo('google', 'access_token_123');
    */
   async getUserInfo(provider, accessToken) {
     if (this.mockMode) {
@@ -567,6 +589,8 @@ class OAuthService {
    * @param {object} userInfo - OAuth user information.
    * @returns {Promise<object>} Authentication result.
    * @example
+   * const service = new OAuthService();
+   * const result = await service.findOrCreateUser('google', userInfo);
    */
   async findOrCreateUser(provider, userInfo) {
     try {
@@ -707,6 +731,8 @@ class OAuthService {
    * @param {string} providerId - Provider user ID.
    * @returns {Promise<AmexingUser|null>} User object or null.
    * @example
+   * const service = new OAuthService();
+   * const user = await service.findUserByOAuth('google', 'provider_user_123');
    */
   async findUserByOAuth(provider, providerId) {
     const query = new Parse.Query(AmexingUser);
@@ -723,6 +749,8 @@ class OAuthService {
    * @param {string} email - Email address.
    * @returns {string} Generated username.
    * @example
+   * const service = new OAuthService();
+   * const username = service.generateUsernameFromEmail('user@example.com');
    */
   generateUsernameFromEmail(email) {
     const localPart = email.split('@')[0];
@@ -736,6 +764,8 @@ class OAuthService {
    * @param {object} userInfo - OAuth user information.
    * @returns {string} User role.
    * @example
+   * const service = new OAuthService();
+   * const role = service.determineUserRole(userInfo);
    */
   determineUserRole(userInfo) {
     // Corporate domains get different default roles
@@ -761,8 +791,10 @@ class OAuthService {
    * Stores OAuth state for CSRF protection.
    * @param {string} state - State parameter.
    * @param {object} data - State data.
-   * @returns {Promise<void>}
+   * @returns {Promise<void>} Completes when state is stored
    * @example
+   * const service = new OAuthService();
+   * await service.storeOAuthState('state123', { provider: 'google' });
    */
   async storeOAuthState(state, data) {
     // In production, store in Redis or database with expiration
@@ -782,6 +814,8 @@ class OAuthService {
    * @param {string} state - State parameter.
    * @returns {Promise<object | null>} State data or null.
    * @example
+   * const service = new OAuthService();
+   * const stateData = await service.verifyOAuthState('state123');
    */
   async verifyOAuthState(state) {
     if (!this.stateStore) {
@@ -811,6 +845,8 @@ class OAuthService {
    * @param {string} email - Email to mask.
    * @returns {string} Masked email.
    * @example
+   * const service = new OAuthService();
+   * const masked = service.maskEmail('user@example.com'); // Returns 'use***@example.com'
    */
   maskEmail(email) {
     if (!email) return '';
@@ -823,6 +859,8 @@ class OAuthService {
    * @param {string} idToken - Apple ID token JWT.
    * @returns {Promise<object>} User information from ID token.
    * @example
+   * const service = new OAuthService();
+   * const userInfo = await service.parseAppleIdToken(idTokenJWT);
    */
   async parseAppleIdToken(idToken) {
     try {
@@ -883,6 +921,8 @@ class OAuthService {
    * @param {string} accessToken - Microsoft access token.
    * @returns {Promise<object>} Token validation result.
    * @example
+   * const service = new OAuthService();
+   * const validation = await service.validateMicrosoftToken('access_token_123');
    */
   async validateMicrosoftToken(accessToken) {
     try {
@@ -928,6 +968,8 @@ class OAuthService {
    * @param {string} accessToken - Microsoft access token.
    * @returns {Promise<object>} Extended user profile.
    * @example
+   * const service = new OAuthService();
+   * const profile = await service.getMicrosoftUserProfile('access_token_123');
    */
   async getMicrosoftUserProfile(accessToken) {
     try {
@@ -975,6 +1017,8 @@ class OAuthService {
    * Gets list of available OAuth providers.
    * @returns {Array} Available providers.
    * @example
+   * const service = new OAuthService();
+   * const providers = service.getAvailableProviders();
    */
   getAvailableProviders() {
     return Object.keys(this.providers).filter((provider) => this.providers[provider].enabled || this.mockMode);
@@ -985,6 +1029,8 @@ class OAuthService {
    * @param {string} provider - Provider name.
    * @returns {object} Safe provider config.
    * @example
+   * const service = new OAuthService();
+   * const config = service.getProviderConfig('google');
    */
   getProviderConfig(provider) {
     const config = this.providers[provider];
@@ -1004,6 +1050,8 @@ class OAuthService {
    * Gets available corporate domains for SSO.
    * @returns {Array} List of corporate domain configurations.
    * @example
+   * const service = new OAuthService();
+   * const domains = service.getAvailableCorporateDomains();
    */
   getAvailableCorporateDomains() {
     return CorporateOAuthService.getAvailableCorporateDomains();
@@ -1014,6 +1062,8 @@ class OAuthService {
    * @param {string} email - Email address to check.
    * @returns {object | null} Corporate configuration if found.
    * @example
+   * const service = new OAuthService();
+   * const config = service.getCorporateDomainConfig('user@company.com');
    */
   getCorporateDomainConfig(email) {
     const domain = CorporateOAuthService.extractEmailDomain(email);
@@ -1026,7 +1076,10 @@ class OAuthService {
    * Adds new corporate domain configuration.
    * @param {string} domain - Email domain
    * @param {object} config - Corporate configuration
+   * @returns {object} Added domain configuration
    * @example
+   * const service = new OAuthService();
+   * const result = service.addCorporateDomain('company.com', corporateConfig);
    */
   addCorporateDomain(domain, config) {
     return CorporateOAuthService.addCorporateDomain(domain, config);

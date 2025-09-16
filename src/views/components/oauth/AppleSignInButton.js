@@ -191,12 +191,17 @@ class AppleSignInButton {
     button.className = 'oauth-btn apple-signin-fallback';
     button.setAttribute('data-provider', 'apple');
 
-    button.innerHTML = `
-            <span class="oauth-btn-icon">
-                ${this.getAppleIcon()}
-            </span>
-            <span class="oauth-btn-text">Continue with Apple</span>
-        `;
+    // Use DOM methods instead of innerHTML to prevent XSS
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'oauth-btn-icon';
+    iconSpan.innerHTML = this.getAppleIcon(); // Safe: getAppleIcon returns static SVG
+
+    const textSpan = document.createElement('span');
+    textSpan.className = 'oauth-btn-text';
+    textSpan.textContent = 'Continue with Apple'; // Safe: using textContent
+
+    button.appendChild(iconSpan);
+    button.appendChild(textSpan);
 
     button.style.cssText = `
             display: flex;

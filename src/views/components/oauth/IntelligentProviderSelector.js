@@ -246,23 +246,61 @@ class IntelligentProviderSelector {
     // Create main selector container
     const selectorDiv = document.createElement('div');
     selectorDiv.className = 'intelligent-provider-selector';
-    selectorDiv.innerHTML = `
-      <div class="suggestion-area" style="display: none;">
-        <div class="suggestion-content">
-          <div class="suggestion-icon">💡</div>
-          <div class="suggestion-text"></div>
-          <div class="suggestion-actions">
-            <button class="suggestion-accept" type="button">Use this</button>
-            <button class="suggestion-dismiss" type="button">×</button>
-          </div>
-        </div>
-      </div>
-      <div class="provider-grid"></div>
-      <div class="provider-alternatives" style="display: none;">
-        <p class="alternatives-text">Or choose another option:</p>
-        <div class="alternatives-grid"></div>
-      </div>
-    `;
+    // Build DOM structure to prevent XSS
+    const suggestionArea = document.createElement('div');
+    suggestionArea.className = 'suggestion-area';
+    suggestionArea.style.display = 'none';
+
+    const suggestionContent = document.createElement('div');
+    suggestionContent.className = 'suggestion-content';
+
+    const suggestionIcon = document.createElement('div');
+    suggestionIcon.className = 'suggestion-icon';
+    suggestionIcon.textContent = '💡';
+
+    const suggestionText = document.createElement('div');
+    suggestionText.className = 'suggestion-text';
+
+    const suggestionActions = document.createElement('div');
+    suggestionActions.className = 'suggestion-actions';
+
+    const suggestionAccept = document.createElement('button');
+    suggestionAccept.className = 'suggestion-accept';
+    suggestionAccept.type = 'button';
+    suggestionAccept.textContent = 'Use this';
+
+    const suggestionDismiss = document.createElement('button');
+    suggestionDismiss.className = 'suggestion-dismiss';
+    suggestionDismiss.type = 'button';
+    suggestionDismiss.textContent = '×';
+
+    suggestionActions.appendChild(suggestionAccept);
+    suggestionActions.appendChild(suggestionDismiss);
+    suggestionContent.appendChild(suggestionIcon);
+    suggestionContent.appendChild(suggestionText);
+    suggestionContent.appendChild(suggestionActions);
+    suggestionArea.appendChild(suggestionContent);
+
+    const providerGrid = document.createElement('div');
+    providerGrid.className = 'provider-grid';
+
+    const providerAlternatives = document.createElement('div');
+    providerAlternatives.className = 'provider-alternatives';
+    providerAlternatives.style.display = 'none';
+
+    const alternativesText = document.createElement('p');
+    alternativesText.className = 'alternatives-text';
+    alternativesText.textContent = 'Or choose another option:';
+
+    const alternativesGrid = document.createElement('div');
+    alternativesGrid.className = 'alternatives-grid';
+
+    providerAlternatives.appendChild(alternativesText);
+    providerAlternatives.appendChild(alternativesGrid);
+
+    selectorDiv.appendChild(suggestionArea);
+    selectorDiv.appendChild(providerGrid);
+    selectorDiv.appendChild(providerAlternatives);
 
     container.appendChild(selectorDiv);
 
@@ -594,13 +632,26 @@ class IntelligentProviderSelector {
     button.className = 'provider-button';
     button.dataset.provider = provider;
 
-    button.innerHTML = `
-      <div class="provider-icon">${info.icon}</div>
-      <div class="provider-info">
-        <div class="provider-name">${info.name}</div>
-        <div class="provider-description">${info.description}</div>
-      </div>
-    `;
+    // Use DOM methods to prevent XSS
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'provider-icon';
+    iconDiv.innerHTML = info.icon; // Safe: info.icon contains static SVG from trusted source
+
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'provider-info';
+
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'provider-name';
+    nameDiv.textContent = info.name; // Safe: using textContent
+
+    const descriptionDiv = document.createElement('div');
+    descriptionDiv.className = 'provider-description';
+    descriptionDiv.textContent = info.description; // Safe: using textContent
+
+    infoDiv.appendChild(nameDiv);
+    infoDiv.appendChild(descriptionDiv);
+    button.appendChild(iconDiv);
+    button.appendChild(infoDiv);
 
     button.addEventListener('click', () => {
       this.selectProvider(provider);
@@ -860,13 +911,19 @@ class IntelligentProviderSelector {
 
     // Update suggestion text
     const providerName = this.getProviderName(suggestion.provider);
-    let suggestionText = `We recommend signing in with ${providerName}`;
+
+    // Clear and rebuild suggestion text using DOM methods
+    this.elements.suggestionText.textContent = '';
+
+    const mainText = document.createTextNode(`We recommend signing in with ${providerName}`);
+    this.elements.suggestionText.appendChild(mainText);
 
     if (this.config.showSuggestionReason && suggestion.reason) {
-      suggestionText += `<div class="suggestion-reason">${suggestion.reason}</div>`;
+      const reasonDiv = document.createElement('div');
+      reasonDiv.className = 'suggestion-reason';
+      reasonDiv.textContent = suggestion.reason; // Safe: using textContent
+      this.elements.suggestionText.appendChild(reasonDiv);
     }
-
-    this.elements.suggestionText.innerHTML = suggestionText;
 
     // Update accept button
     this.elements.suggestionAccept.textContent = `Continue with ${providerName}`;
@@ -1032,7 +1089,10 @@ class IntelligentProviderSelector {
       this.elements.alternatives.style.display = 'block';
 
       // Clear existing alternatives
-      this.elements.alternativesGrid.innerHTML = '';
+      // Clear existing alternatives safely
+      while (this.elements.alternativesGrid.firstChild) {
+        this.elements.alternativesGrid.removeChild(this.elements.alternativesGrid.firstChild);
+      }
 
       // Add alternative buttons
       alternatives.forEach((provider) => {

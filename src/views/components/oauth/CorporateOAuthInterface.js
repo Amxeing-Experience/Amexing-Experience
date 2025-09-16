@@ -589,10 +589,17 @@ class CorporateOAuthInterface {
       text-align: center;
       font-weight: 500;
     `;
-    notice.innerHTML = `
-      <p style="margin: 0 0 0.5rem 0;">Welcome, ${this.corporateData.name} team member!</p>
-      <p style="margin: 0; font-size: 0.875rem; opacity: 0.9;">Sign in with your ${this.corporateData.name} account for the best experience.</p>
-    `;
+    // Use DOM methods to prevent XSS
+    const welcomeP = document.createElement('p');
+    welcomeP.style.cssText = 'margin: 0 0 0.5rem 0;';
+    welcomeP.textContent = `Welcome, ${this.corporateData.name} team member!`;
+
+    const instructionP = document.createElement('p');
+    instructionP.style.cssText = 'margin: 0; font-size: 0.875rem; opacity: 0.9;';
+    instructionP.textContent = `Sign in with your ${this.corporateData.name} account for the best experience.`;
+
+    notice.appendChild(welcomeP);
+    notice.appendChild(instructionP);
 
     oauthContainer.insertBefore(notice, oauthContainer.firstChild);
   }
@@ -740,11 +747,23 @@ class CorporateOAuthInterface {
       border-left: 4px solid ${this.corporateData?.theme?.primaryColor || '#667eea'};
     `;
 
-    welcomeDiv.innerHTML = `
-      <button onclick="this.parentElement.remove()" style="position: absolute; top: 0.5rem; right: 0.5rem; border: none; background: none; font-size: 1.2rem; cursor: pointer;">&times;</button>
-      <h4 style="margin: 0 0 0.5rem 0; color: ${this.corporateData?.theme?.primaryColor || '#667eea'};">Welcome!</h4>
-      <p style="margin: 0; font-size: 0.875rem; color: #666;">${message.replace('{name}', user.name || user.email)}</p>
-    `;
+    // Use DOM methods to prevent XSS
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '×';
+    closeBtn.style.cssText = 'position: absolute; top: 0.5rem; right: 0.5rem; border: none; background: none; font-size: 1.2rem; cursor: pointer;';
+    closeBtn.addEventListener('click', () => closeBtn.parentElement.remove());
+
+    const welcomeH4 = document.createElement('h4');
+    welcomeH4.style.cssText = `margin: 0 0 0.5rem 0; color: ${this.corporateData?.theme?.primaryColor || '#667eea'};`;
+    welcomeH4.textContent = 'Welcome!';
+
+    const messageP = document.createElement('p');
+    messageP.style.cssText = 'margin: 0; font-size: 0.875rem; color: #666;';
+    messageP.textContent = message.replace('{name}', user.name || user.email);
+
+    welcomeDiv.appendChild(closeBtn);
+    welcomeDiv.appendChild(welcomeH4);
+    welcomeDiv.appendChild(messageP);
 
     document.body.appendChild(welcomeDiv);
 

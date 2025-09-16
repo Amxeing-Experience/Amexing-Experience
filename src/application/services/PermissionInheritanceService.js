@@ -3,7 +3,7 @@
  * Implements OAUTH-3-01, OAUTH-3-02, OAUTH-3-03 user stories.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since Sprint 03 - Permission Inheritance System
+ * @since 1.0.0
  */
 
 const OAuthPermissionService = require('./OAuthPermissionService');
@@ -30,6 +30,8 @@ class PermissionInheritanceService {
    * @param {object} corporateConfig - Corporate configuration.
    * @returns {Promise<object>} Complete inheritance result.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const result = await service.processCompleteInheritance(user, oauthProfile, 'microsoft', corporateConfig);
    */
   async processCompleteInheritance(user, oauthProfile, provider, corporateConfig) {
     try {
@@ -100,6 +102,8 @@ class PermissionInheritanceService {
    * @param {object} corporateConfig - Corporate configuration.
    * @returns {Promise<Array>} Department permissions.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const deptPerms = await service.addDepartmentPermissions(user, oauthProfile, corporateConfig);
    */
   async addDepartmentPermissions(user, oauthProfile, corporateConfig) {
     try {
@@ -157,6 +161,8 @@ class PermissionInheritanceService {
    * @param {object} corporateConfig - Corporate configuration.
    * @returns {Promise<string|null>} Department ID or null.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const deptId = await service.extractDepartmentFromOAuth(oauthProfile, corporateConfig);
    */
   async extractDepartmentFromOAuth(oauthProfile, corporateConfig) {
     if (!corporateConfig || !corporateConfig.departmentMapping) {
@@ -173,6 +179,8 @@ class PermissionInheritanceService {
    * @param {AmexingUser} user - User object.
    * @returns {Promise<Array>} Applied overrides.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const overrides = await service.applyIndividualOverrides(user);
    */
   async applyIndividualOverrides(user) {
     try {
@@ -246,6 +254,8 @@ class PermissionInheritanceService {
    * @param {Array} overrides - Individual overrides.
    * @returns {Promise<Array>} Final resolved permissions.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const finalPerms = await service.validateAndResolvePermissions(user, oauthPerms, deptPerms, overrides);
    */
   async validateAndResolvePermissions(user, oauthPermissions, departmentPermissions, overrides) {
     try {
@@ -309,6 +319,8 @@ class PermissionInheritanceService {
    * @param {Array} permissions - Permissions to validate.
    * @returns {Array} Validated permissions.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const validatedPerms = service.validatePermissionHierarchy(['admin_full', 'basic_access']);
    */
   validatePermissionHierarchy(permissions) {
     const hierarchy = OAuthPermissionService.permissionHierarchy;
@@ -340,6 +352,8 @@ class PermissionInheritanceService {
    * @param {string} lowerPermission - Lower-level permission.
    * @returns {boolean} True if higher includes lower.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const includes = service.permissionIncludes('admin_full', 'basic_access'); // Returns true
    */
   permissionIncludes(higherPermission, lowerPermission) {
     // Define permission inclusion rules
@@ -360,6 +374,8 @@ class PermissionInheritanceService {
    * @param {object} data - Inheritance data.
    * @returns {Promise<Parse.Object>} Created record.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const record = await service.createMasterInheritanceRecord(inheritanceData);
    */
   async createMasterInheritanceRecord(data) {
     try {
@@ -390,6 +406,8 @@ class PermissionInheritanceService {
    * @param {object} data - Department permission data.
    * @returns {Promise<Parse.Object>} Created record.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const record = await service.createDepartmentPermissionRecord(deptPermissionData);
    */
   async createDepartmentPermissionRecord(data) {
     try {
@@ -418,6 +436,12 @@ class PermissionInheritanceService {
    * @param {object} overrideData - Override data.
    * @returns {Promise<Parse.Object>} Created override.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const override = await service.createPermissionOverride({
+   *   userId: 'user123',
+   *   type: 'grant',
+   *   permission: 'admin_access'
+   * });
    */
   async createPermissionOverride(overrideData) {
     try {
@@ -461,6 +485,8 @@ class PermissionInheritanceService {
    * @param {string} userId - User ID.
    * @returns {Promise<object>} Complete inheritance status.
    * @example
+   * const service = new PermissionInheritanceService();
+   * const status = await service.getInheritanceStatus('user123');
    */
   async getInheritanceStatus(userId) {
     try {
