@@ -6,6 +6,7 @@
  * @created Sprint 02 - Corporate SSO Admin Portal
  */
 
+const Parse = require('parse/node');
 const OAuthService = require('../../application/services/OAuthService');
 const CorporateOAuthService = require('../../application/services/CorporateOAuthService');
 const logger = require('../../infrastructure/logger');
@@ -15,7 +16,7 @@ const logger = require('../../infrastructure/logger');
  * Endpoint: GET /functions/getAvailableCorporateDomains
  * Access: Requires admin role.
  */
-Parse.Cloud.define('getAvailableCorporateDomains', async (request) => {
+const getAvailableCorporateDomains = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
@@ -46,14 +47,14 @@ Parse.Cloud.define('getAvailableCorporateDomains', async (request) => {
     logger.error('Error retrieving corporate domains:', error);
     throw error;
   }
-});
+};
 
 /**
  * Adds new corporate domain configuration
  * Endpoint: POST /functions/addCorporateDomain
  * Access: Requires superadmin role.
  */
-Parse.Cloud.define('addCorporateDomain', async (request) => {
+const addCorporateDomain = async (request) => {
   try {
     // Check superadmin permissions
     if (!request.user) {
@@ -140,14 +141,14 @@ Parse.Cloud.define('addCorporateDomain', async (request) => {
     logger.error('Error adding corporate domain:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets OAuth provider status and configuration
  * Endpoint: GET /functions/getOAuthProviderStatus
  * Access: Requires admin role.
  */
-Parse.Cloud.define('getOAuthProviderStatus', async (request) => {
+const getOAuthProviderStatus = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
@@ -191,14 +192,14 @@ Parse.Cloud.define('getOAuthProviderStatus', async (request) => {
     logger.error('Error retrieving OAuth provider status:', error);
     throw error;
   }
-});
+};
 
 /**
  * Tests corporate domain OAuth flow
  * Endpoint: POST /functions/testCorporateDomain
  * Access: Requires admin role.
  */
-Parse.Cloud.define('testCorporateDomain', async (request) => {
+const testCorporateDomain = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
@@ -260,14 +261,14 @@ Parse.Cloud.define('testCorporateDomain', async (request) => {
     logger.error('Error testing corporate domain:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets OAuth audit logs (admin view)
  * Endpoint: GET /functions/getOAuthAuditLogs
  * Access: Requires admin role.
  */
-Parse.Cloud.define('getOAuthAuditLogs', async (request) => {
+const getOAuthAuditLogs = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
@@ -321,11 +322,12 @@ Parse.Cloud.define('getOAuthAuditLogs', async (request) => {
     logger.error('Error retrieving OAuth audit logs:', error);
     throw error;
   }
-});
+};
 
-// Functions are already registered with Parse.Cloud.define() above
-// No need to export them as Parse.Cloud.getFunction() is not available in this version
 module.exports = {
-  // Cloud functions are automatically available through Parse.Cloud.run()
-  // Example: Parse.Cloud.run('getAvailableCorporateDomains', params)
+  getAvailableCorporateDomains,
+  addCorporateDomain,
+  getOAuthProviderStatus,
+  testCorporateDomain,
+  getOAuthAuditLogs,
 };

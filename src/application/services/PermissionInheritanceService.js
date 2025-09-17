@@ -6,6 +6,7 @@
  * @since 1.0.0
  */
 
+const Parse = require('parse/node');
 const OAuthPermissionService = require('./OAuthPermissionService');
 const CorporateOAuthService = require('./CorporateOAuthService');
 const AmexingUser = require('../../domain/models/AmexingUser');
@@ -522,4 +523,4 @@ class PermissionInheritanceService {
   }
 }
 
-module.exports = new PermissionInheritanceService();
+module.exports = { PermissionInheritanceService };

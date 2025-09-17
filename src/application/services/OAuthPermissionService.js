@@ -6,6 +6,7 @@
  * @since 1.0.0
  */
 
+const Parse = require('parse/node');
 const AmexingUser = require('../../domain/models/AmexingUser');
 const logger = require('../../infrastructure/logger');
 

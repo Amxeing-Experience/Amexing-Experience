@@ -4,6 +4,7 @@
  * Integrates with Sprint 03 permission system.
  */
 
+const Parse = require('parse/node');
 const { DepartmentOAuthFlowService } = require('../../application/services/DepartmentOAuthFlowService');
 const { PermissionAuditService } = require('../../application/services/PermissionAuditService');
 const logger = require('../../infrastructure/logger');
@@ -15,7 +16,7 @@ const auditService = new PermissionAuditService();
 /**
  * Get available departments for OAuth.
  */
-Parse.Cloud.define('getAvailableDepartments', async (request) => {
+const getAvailableDepartments = async (request) => {
   const { user } = request;
 
   try {
@@ -53,12 +54,12 @@ Parse.Cloud.define('getAvailableDepartments', async (request) => {
     logger.error('Get available departments failed:', error);
     throw new Parse.Error(Parse.Error.INTERNAL_SERVER_ERROR, 'Failed to get departments');
   }
-});
+};
 
 /**
  * Initiate department-specific OAuth flow.
  */
-Parse.Cloud.define('initiateDepartmentOAuth', async (request) => {
+const initiateDepartmentOAuth = async (request) => {
   const { params, ip } = request;
   const {
     department, provider, corporateConfigId, redirectUri,
@@ -108,12 +109,12 @@ Parse.Cloud.define('initiateDepartmentOAuth', async (request) => {
     logger.error('Initiate department OAuth failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Handle department OAuth callback.
  */
-Parse.Cloud.define('handleDepartmentOAuthCallback', async (request) => {
+const handleDepartmentOAuthCallback = async (request) => {
   const { params, ip } = request;
   const {
     code, state, error: oauthError, provider: callbackProvider,
@@ -167,12 +168,12 @@ Parse.Cloud.define('handleDepartmentOAuthCallback', async (request) => {
     logger.error('Department OAuth callback failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Get department OAuth configuration.
  */
-Parse.Cloud.define('getDepartmentOAuthConfig', async (request) => {
+const getDepartmentOAuthConfig = async (request) => {
   const { params, user } = request;
   const { department } = params;
 
@@ -224,12 +225,12 @@ Parse.Cloud.define('getDepartmentOAuthConfig', async (request) => {
     logger.error('Get department OAuth config failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Switch user to department context post-OAuth.
  */
-Parse.Cloud.define('switchToDepartmentContext', async (request) => {
+const switchToDepartmentContext = async (request) => {
   const { params, user } = request;
   const { department, sessionId } = params;
 
@@ -280,12 +281,12 @@ Parse.Cloud.define('switchToDepartmentContext', async (request) => {
     logger.error('Switch to department context failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Get department OAuth providers with dynamic configuration.
  */
-Parse.Cloud.define('getDepartmentOAuthProviders', async (request) => {
+const getDepartmentOAuthProviders = async (request) => {
   const { params, user } = request;
   const { department } = params;
 
@@ -327,12 +328,12 @@ Parse.Cloud.define('getDepartmentOAuthProviders', async (request) => {
     logger.error('Get department OAuth providers failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Validate department OAuth access.
  */
-Parse.Cloud.define('validateDepartmentOAuthAccess', async (request) => {
+const validateDepartmentOAuthAccess = async (request) => {
   const { params, user, ip } = request;
   const { department, provider, email } = params;
 
@@ -409,12 +410,12 @@ Parse.Cloud.define('validateDepartmentOAuthAccess', async (request) => {
     logger.error('Validate department OAuth access failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Get department OAuth analytics (for admins).
  */
-Parse.Cloud.define('getDepartmentOAuthAnalytics', async (request) => {
+const getDepartmentOAuthAnalytics = async (request) => {
   const { params, user } = request;
   const { department, timeRange = '30d' } = params;
 
@@ -558,7 +559,7 @@ Parse.Cloud.define('getDepartmentOAuthAnalytics', async (request) => {
     logger.error('Get department OAuth analytics failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Helper function to get provider display names.
@@ -577,6 +578,14 @@ function getProviderDisplayName(provider) {
 }
 
 module.exports = {
-  // Export functions for testing
+  getAvailableDepartments,
+  initiateDepartmentOAuth,
+  handleDepartmentOAuthCallback,
+  getDepartmentOAuthConfig,
+  switchToDepartmentContext,
+  getDepartmentOAuthProviders,
+  validateDepartmentOAuthAccess,
+  getDepartmentOAuthAnalytics,
+  // Export helper functions for testing
   getProviderDisplayName,
 };

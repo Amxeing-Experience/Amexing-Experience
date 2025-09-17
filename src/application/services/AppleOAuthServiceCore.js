@@ -4,6 +4,7 @@
  * Backend integration for Apple Sign In with privacy compliance.
  */
 
+const Parse = require('parse/node');
 const crypto = require('crypto');
 const fs = require('fs');
 
@@ -39,6 +40,11 @@ class AppleOAuthServiceCore {
     const missing = required.filter((key) => !this.config[key]);
 
     if (missing.length > 0) {
+      if (process.env.NODE_ENV === 'development') {
+        logger.warn(`Apple OAuth not configured in development: ${missing.join(', ')}`);
+        this.disabled = true;
+        return;
+      }
       throw new Error(`Missing Apple OAuth configuration: ${missing.join(', ')}`);
     }
   }
@@ -48,6 +54,10 @@ class AppleOAuthServiceCore {
    * @example
    */
   loadPrivateKey() {
+    if (this.disabled) {
+      return;
+    }
+
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       if (!fs.existsSync(this.config.privateKeyPath)) {
@@ -68,6 +78,10 @@ class AppleOAuthServiceCore {
    * @example
    */
   initializeHelpers() {
+    if (this.disabled) {
+      return;
+    }
+
     this.tokenValidator = new AppleIdTokenValidator(this.config);
     this.tokenExchanger = new AppleTokenExchanger(this.config, this.privateKey);
   }

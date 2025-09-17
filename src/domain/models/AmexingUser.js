@@ -6,6 +6,7 @@
  * @created 2024-09-12
  */
 
+const Parse = require('parse/node');
 const bcrypt = require('bcrypt');
 const logger = require('../../infrastructure/logger');
 

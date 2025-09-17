@@ -6,11 +6,12 @@
  * @created Sprint 03 - OAuth Permission Management
  */
 
+const Parse = require('parse/node');
 const OAuthPermissionService = require('../../application/services/OAuthPermissionService');
 const PermissionInheritanceService = require('../../application/services/PermissionInheritanceService');
 const PermissionContextService = require('../../application/services/PermissionContextService');
 const PermissionDelegationService = require('../../application/services/PermissionDelegationService');
-const PermissionAuditService = require('../../application/services/PermissionAuditService');
+const { PermissionAuditService } = require('../../application/services/PermissionAuditService');
 const logger = require('../../infrastructure/logger');
 
 /**
@@ -18,7 +19,7 @@ const logger = require('../../infrastructure/logger');
  * Endpoint: GET /functions/getUserPermissionInheritance
  * Access: User can view own permissions, admins can view any.
  */
-Parse.Cloud.define('getUserPermissionInheritance', async (request) => {
+const getUserPermissionInheritance = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -54,14 +55,14 @@ Parse.Cloud.define('getUserPermissionInheritance', async (request) => {
     logger.error('Error getting user permission inheritance:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets available contexts for a user
  * Endpoint: GET /functions/getAvailableContexts
  * Access: User can view own contexts.
  */
-Parse.Cloud.define('getAvailableContexts', async (request) => {
+const getAvailableContexts = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -92,14 +93,14 @@ Parse.Cloud.define('getAvailableContexts', async (request) => {
     logger.error('Error getting available contexts:', error);
     throw error;
   }
-});
+};
 
 /**
  * Switches user to a specific permission context
  * Endpoint: POST /functions/switchPermissionContext
  * Access: User can switch own context.
  */
-Parse.Cloud.define('switchPermissionContext', async (request) => {
+const switchPermissionContext = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -138,14 +139,14 @@ Parse.Cloud.define('switchPermissionContext', async (request) => {
     logger.error('Error switching permission context:', error);
     throw error;
   }
-});
+};
 
 /**
  * Creates permission delegation from manager to employee
  * Endpoint: POST /functions/createPermissionDelegation
  * Access: Requires manager role or higher.
  */
-Parse.Cloud.define('createPermissionDelegation', async (request) => {
+const createPermissionDelegation = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -211,14 +212,14 @@ Parse.Cloud.define('createPermissionDelegation', async (request) => {
     logger.error('Error creating permission delegation:', error);
     throw error;
   }
-});
+};
 
 /**
  * Revokes permission delegation
  * Endpoint: POST /functions/revokePermissionDelegation
  * Access: Original manager or admin.
  */
-Parse.Cloud.define('revokePermissionDelegation', async (request) => {
+const revokePermissionDelegation = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -246,14 +247,14 @@ Parse.Cloud.define('revokePermissionDelegation', async (request) => {
     logger.error('Error revoking permission delegation:', error);
     throw error;
   }
-});
+};
 
 /**
  * Creates emergency permission elevation
  * Endpoint: POST /functions/createEmergencyElevation
  * Access: Requires admin role.
  */
-Parse.Cloud.define('createEmergencyElevation', async (request) => {
+const createEmergencyElevation = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -317,14 +318,14 @@ Parse.Cloud.define('createEmergencyElevation', async (request) => {
     logger.error('Error creating emergency elevation:', error);
     throw error;
   }
-});
+};
 
 /**
  * Creates individual permission override
  * Endpoint: POST /functions/createPermissionOverride
  * Access: Requires admin role.
  */
-Parse.Cloud.define('createPermissionOverride', async (request) => {
+const createPermissionOverride = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -394,14 +395,14 @@ Parse.Cloud.define('createPermissionOverride', async (request) => {
     logger.error('Error creating permission override:', error);
     throw error;
   }
-});
+};
 
 /**
  * Checks if user has specific permission
  * Endpoint: GET /functions/checkUserPermission
  * Access: User can check own permissions, admins can check any.
  */
-Parse.Cloud.define('checkUserPermission', async (request) => {
+const checkUserPermission = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -442,14 +443,14 @@ Parse.Cloud.define('checkUserPermission', async (request) => {
     logger.error('Error checking user permission:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets active delegations for a manager
  * Endpoint: GET /functions/getActiveDelegations
  * Access: Manager can view own delegations.
  */
-Parse.Cloud.define('getActiveDelegations', async (request) => {
+const getActiveDelegations = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -480,14 +481,14 @@ Parse.Cloud.define('getActiveDelegations', async (request) => {
     logger.error('Error getting active delegations:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets delegated permissions for an employee
  * Endpoint: GET /functions/getDelegatedPermissions
  * Access: Employee can view own delegated permissions.
  */
-Parse.Cloud.define('getDelegatedPermissions', async (request) => {
+const getDelegatedPermissions = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -518,14 +519,14 @@ Parse.Cloud.define('getDelegatedPermissions', async (request) => {
     logger.error('Error getting delegated permissions:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets permission audit report
  * Endpoint: GET /functions/getPermissionAuditReport
  * Access: Requires admin role.
  */
-Parse.Cloud.define('getPermissionAuditReport', async (request) => {
+const getPermissionAuditReport = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -572,14 +573,14 @@ Parse.Cloud.define('getPermissionAuditReport', async (request) => {
     logger.error('Error generating permission audit report:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets permission audit statistics
  * Endpoint: GET /functions/getPermissionAuditStats
  * Access: Requires admin role.
  */
-Parse.Cloud.define('getPermissionAuditStats', async (request) => {
+const getPermissionAuditStats = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -613,14 +614,14 @@ Parse.Cloud.define('getPermissionAuditStats', async (request) => {
     logger.error('Error getting permission audit statistics:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets all available permissions in the system
  * Endpoint: GET /functions/getAvailablePermissions
  * Access: Requires manager role or higher.
  */
-Parse.Cloud.define('getAvailablePermissions', async (request) => {
+const getAvailablePermissions = async (request) => {
   try {
     if (!request.user) {
       throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
@@ -653,11 +654,20 @@ Parse.Cloud.define('getAvailablePermissions', async (request) => {
     logger.error('Error getting available permissions:', error);
     throw error;
   }
-});
+};
 
-// Functions are already registered with Parse.Cloud.define() above
-// No need to export them as Parse.Cloud.getFunction() is not available in this version
 module.exports = {
-  // Cloud functions are automatically available through Parse.Cloud.run()
-  // Example: Parse.Cloud.run('getUserPermissionInheritance', params)
+  getUserPermissionInheritance,
+  getAvailableContexts,
+  switchPermissionContext,
+  createPermissionDelegation,
+  revokePermissionDelegation,
+  createEmergencyElevation,
+  createPermissionOverride,
+  checkUserPermission,
+  getActiveDelegations,
+  getDelegatedPermissions,
+  getPermissionAuditReport,
+  getPermissionAuditStats,
+  getAvailablePermissions,
 };

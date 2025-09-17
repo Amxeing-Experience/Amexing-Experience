@@ -3,6 +3,7 @@
  * Handles Apple ID token verification with public key validation.
  */
 
+const Parse = require('parse/node');
 const jwt = require('jsonwebtoken');
 const https = require('https');
 const logger = require('../../infrastructure/logger');

@@ -7,6 +7,7 @@
  * @since 1.0.0
  */
 
+const Parse = require('parse/node');
 const OAuthPermissionService = require('./OAuthPermissionService');
 // const AmexingUser = require('../../domain/models/AmexingUser'); // Unused import
 const logger = require('../../infrastructure/logger');
@@ -759,4 +760,4 @@ class PermissionContextService {
   }
 }
 
-module.exports = new PermissionContextService();
+module.exports = { PermissionContextService };

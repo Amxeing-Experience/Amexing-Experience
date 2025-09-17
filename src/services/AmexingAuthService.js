@@ -13,6 +13,7 @@
  * @since 2025-09-11
  */
 
+const Parse = require('parse/node');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');

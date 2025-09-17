@@ -1,6 +1,7 @@
 // Minimal Cloud Code for Parse Server 7.0
 // This file is loaded by Parse Server and has access to Parse.Cloud global
 
+const Parse = require('parse/node');
 const logger = require('../infrastructure/logger');
 
 // Simple hello function

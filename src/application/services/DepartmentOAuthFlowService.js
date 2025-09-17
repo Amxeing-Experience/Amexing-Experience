@@ -5,6 +5,7 @@
  * Integrates with Sprint 03 permission system and context switching.
  */
 
+const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const { PermissionContextService } = require('./PermissionContextService');
 const { PermissionInheritanceService } = require('./PermissionInheritanceService');

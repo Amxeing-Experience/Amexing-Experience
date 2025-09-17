@@ -6,6 +6,7 @@
  * @since 2024-09-12
  */
 
+const Parse = require('parse/node');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 // const AuthenticationService = require('../../application/services/AuthenticationService'); // Unused import

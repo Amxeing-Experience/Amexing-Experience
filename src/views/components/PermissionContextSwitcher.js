@@ -6,6 +6,8 @@
  * @created Sprint 03 - Frontend Permission Context
  */
 
+const Parse = require('parse/node');
+
 class PermissionContextSwitcher {
   constructor(containerId, options = {}) {
     this.container = document.getElementById(containerId);

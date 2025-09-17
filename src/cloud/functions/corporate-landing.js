@@ -6,6 +6,7 @@
  * @created Sprint 02 - Corporate Landing Pages
  */
 
+const Parse = require('parse/node');
 const OAuthService = require('../../application/services/OAuthService');
 const CorporateOAuthService = require('../../application/services/CorporateOAuthService');
 const logger = require('../../infrastructure/logger');
@@ -15,7 +16,7 @@ const logger = require('../../infrastructure/logger');
  * Endpoint: GET /functions/getCorporateLandingConfig
  * Access: Public (but logs for security monitoring).
  */
-Parse.Cloud.define('getCorporateLandingConfig', async (request) => {
+const getCorporateLandingConfig = async (request) => {
   try {
     const { clientSlug, departmentCode, email } = request.params;
 
@@ -112,14 +113,14 @@ Parse.Cloud.define('getCorporateLandingConfig', async (request) => {
     logger.error('Error generating corporate landing config:', error);
     throw error;
   }
-});
+};
 
 /**
  * Generates OAuth authorization URL for corporate landing
  * Endpoint: POST /functions/generateCorporateOAuthURL
  * Access: Public.
  */
-Parse.Cloud.define('generateCorporateOAuthURL', async (request) => {
+const generateCorporateOAuthURL = async (request) => {
   try {
     const {
       provider, email, clientSlug, departmentCode, redirectUri,
@@ -193,14 +194,14 @@ Parse.Cloud.define('generateCorporateOAuthURL', async (request) => {
     logger.error('Error generating corporate OAuth URL:', error);
     throw error;
   }
-});
+};
 
 /**
  * Validates corporate landing page access
  * Endpoint: POST /functions/validateCorporateLandingAccess
  * Access: Public (with rate limiting).
  */
-Parse.Cloud.define('validateCorporateLandingAccess', async (request) => {
+const validateCorporateLandingAccess = async (request) => {
   try {
     const {
       clientSlug, departmentCode, email, accessCode,
@@ -300,14 +301,14 @@ Parse.Cloud.define('validateCorporateLandingAccess', async (request) => {
     logger.error('Error validating corporate landing access:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets corporate client departments for landing page
  * Endpoint: GET /functions/getCorporateClientDepartments
  * Access: Public (for client-specific landing pages).
  */
-Parse.Cloud.define('getCorporateClientDepartments', async (request) => {
+const getCorporateClientDepartments = async (request) => {
   try {
     const { clientSlug } = request.params;
 
@@ -373,11 +374,11 @@ Parse.Cloud.define('getCorporateClientDepartments', async (request) => {
     logger.error('Error getting corporate client departments:', error);
     throw error;
   }
-});
+};
 
-// Functions are already registered with Parse.Cloud.define() above
-// No need to export them as Parse.Cloud.getFunction() is not available in this version
 module.exports = {
-  // Cloud functions are automatically available through Parse.Cloud.run()
-  // Example: Parse.Cloud.run('getCorporateLandingConfig', params)
+  getCorporateLandingConfig,
+  generateCorporateOAuthURL,
+  validateCorporateLandingAccess,
+  getCorporateClientDepartments,
 };

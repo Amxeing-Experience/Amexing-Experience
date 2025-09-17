@@ -4,18 +4,28 @@
  * Integrates with department OAuth and corporate configurations.
  */
 
+const Parse = require('parse/node');
 const { AppleOAuthService } = require('../../application/services/AppleOAuthService');
 const { PermissionAuditService } = require('../../application/services/PermissionAuditService');
 const logger = require('../../infrastructure/logger');
 
 // Initialize services
-const appleOAuthService = new AppleOAuthService();
+let appleOAuthService = null;
+try {
+  appleOAuthService = new AppleOAuthService();
+} catch (error) {
+  logger.warn('Apple OAuth service disabled:', error.message);
+}
 const auditService = new PermissionAuditService();
 
 /**
  * Initiate Apple Sign In flow.
  */
-Parse.Cloud.define('initiateAppleOAuth', async (request) => {
+const initiateAppleOAuth = async (request) => {
+  if (!appleOAuthService) {
+    throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Apple OAuth service is not available');
+  }
+
   const { params, ip } = request;
   const {
     department, corporateConfigId, redirectUri, nonce,
@@ -75,12 +85,16 @@ Parse.Cloud.define('initiateAppleOAuth', async (request) => {
     logger.error('Initiate Apple OAuth failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Handle Apple OAuth callback (form_post response mode).
  */
-Parse.Cloud.define('handleAppleOAuthCallback', async (request) => {
+const handleAppleOAuthCallback = async (request) => {
+  if (!appleOAuthService) {
+    throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Apple OAuth service is not available');
+  }
+
   const { params, ip } = request;
   const {
     code,
@@ -177,12 +191,12 @@ Parse.Cloud.define('handleAppleOAuthCallback', async (request) => {
     logger.error('Apple OAuth callback failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Get Apple OAuth configuration.
  */
-Parse.Cloud.define('getAppleOAuthConfig', async (request) => {
+const getAppleOAuthConfig = async (request) => {
   const { params } = request;
   const { department } = params;
 
@@ -225,12 +239,16 @@ Parse.Cloud.define('getAppleOAuthConfig', async (request) => {
     logger.error('Get Apple OAuth config failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Revoke Apple OAuth tokens.
  */
-Parse.Cloud.define('revokeAppleOAuth', async (request) => {
+const revokeAppleOAuth = async (request) => {
+  if (!appleOAuthService) {
+    throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Apple OAuth service is not available');
+  }
+
   const { user } = request;
 
   if (!user) {
@@ -262,12 +280,16 @@ Parse.Cloud.define('revokeAppleOAuth', async (request) => {
     logger.error('Apple OAuth revocation failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Handle Apple Server-to-Server notifications (webhooks).
  */
-Parse.Cloud.define('handleAppleWebhook', async (request) => {
+const handleAppleWebhook = async (request) => {
+  if (!appleOAuthService) {
+    throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Apple OAuth service is not available');
+  }
+
   const { params, headers } = request;
 
   try {
@@ -290,12 +312,16 @@ Parse.Cloud.define('handleAppleWebhook', async (request) => {
     logger.error('Apple webhook processing failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Get Apple OAuth user data (privacy-compliant).
  */
-Parse.Cloud.define('getAppleUserData', async (request) => {
+const getAppleUserData = async (request) => {
+  if (!appleOAuthService) {
+    throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Apple OAuth service is not available');
+  }
+
   const { user } = request;
 
   if (!user) {
@@ -320,12 +346,12 @@ Parse.Cloud.define('getAppleUserData', async (request) => {
     logger.error('Get Apple user data failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Validate Apple domain for corporate configurations.
  */
-Parse.Cloud.define('validateAppleDomain', async (request) => {
+const validateAppleDomain = async (request) => {
   const { params } = request;
   const { domain, corporateConfigId } = params;
 
@@ -372,12 +398,12 @@ Parse.Cloud.define('validateAppleDomain', async (request) => {
     logger.error('Apple domain validation failed:', error);
     throw error;
   }
-});
+};
 
 /**
  * Get Apple OAuth analytics.
  */
-Parse.Cloud.define('getAppleOAuthAnalytics', async (request) => {
+const getAppleOAuthAnalytics = async (request) => {
   const { params, user } = request;
   const { timeRange = '30d' } = params;
 
@@ -475,9 +501,17 @@ Parse.Cloud.define('getAppleOAuthAnalytics', async (request) => {
     logger.error('Get Apple OAuth analytics failed:', error);
     throw error;
   }
-});
+};
 
 module.exports = {
+  initiateAppleOAuth,
+  handleAppleOAuthCallback,
+  getAppleOAuthConfig,
+  revokeAppleOAuth,
+  handleAppleWebhook,
+  getAppleUserData,
+  validateAppleDomain,
+  getAppleOAuthAnalytics,
   // Export for testing
   appleOAuthService,
 };

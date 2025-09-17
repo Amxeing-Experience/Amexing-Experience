@@ -6,6 +6,7 @@
  * @created Sprint 02 - Corporate Sync System
  */
 
+const Parse = require('parse/node');
 const CorporateSyncService = require('../../application/services/CorporateSyncService');
 const logger = require('../../infrastructure/logger');
 
@@ -14,7 +15,7 @@ const logger = require('../../infrastructure/logger');
  * Endpoint: POST /functions/triggerCorporateSync
  * Access: Requires admin role.
  */
-Parse.Cloud.define('triggerCorporateSync', async (request) => {
+const triggerCorporateSync = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
@@ -54,14 +55,14 @@ Parse.Cloud.define('triggerCorporateSync', async (request) => {
     logger.error('Error triggering corporate sync:', error);
     throw error;
   }
-});
+};
 
 /**
  * Starts periodic sync for a corporate client
  * Endpoint: POST /functions/startPeriodicSync
  * Access: Requires admin role.
  */
-Parse.Cloud.define('startPeriodicSync', async (request) => {
+const startPeriodicSync = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
@@ -121,14 +122,14 @@ Parse.Cloud.define('startPeriodicSync', async (request) => {
     logger.error('Error starting periodic sync:', error);
     throw error;
   }
-});
+};
 
 /**
  * Stops periodic sync for a corporate client
  * Endpoint: POST /functions/stopPeriodicSync
  * Access: Requires admin role.
  */
-Parse.Cloud.define('stopPeriodicSync', async (request) => {
+const stopPeriodicSync = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
@@ -166,14 +167,14 @@ Parse.Cloud.define('stopPeriodicSync', async (request) => {
     logger.error('Error stopping periodic sync:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets sync status for all corporate clients
  * Endpoint: GET /functions/getAllSyncStatuses
  * Access: Requires admin role.
  */
-Parse.Cloud.define('getAllSyncStatuses', async (request) => {
+const getAllSyncStatuses = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
@@ -205,14 +206,14 @@ Parse.Cloud.define('getAllSyncStatuses', async (request) => {
     logger.error('Error getting sync statuses:', error);
     throw error;
   }
-});
+};
 
 /**
  * Gets detailed sync history for a corporate client
  * Endpoint: GET /functions/getCorporateSyncHistory
  * Access: Requires admin role.
  */
-Parse.Cloud.define('getCorporateSyncHistory', async (request) => {
+const getCorporateSyncHistory = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
@@ -281,60 +282,62 @@ Parse.Cloud.define('getCorporateSyncHistory', async (request) => {
     logger.error('Error getting sync history:', error);
     throw error;
   }
-});
+};
 
 /**
  * Background job to auto-start syncs for corporate clients
  * This is triggered by Parse Server's job scheduling.
  */
-Parse.Cloud.job('autoStartCorporateSyncs', async (request) => {
-  try {
-    const { message } = request;
+// // TODO: Fix Parse.Cloud.job - temporarily commented to allow server start
+// // Parse.Cloud.job('autoStartCorporateSyncs', async (request) => {
+// //   try {
+// //     const { message } = request;
+// //
+// //     // Get all corporate clients that should have sync enabled
+// //     const clientQuery = new Parse.Query('Client');
+// //     clientQuery.equalTo('isCorporate', true);
+// //     clientQuery.equalTo('oauthEnabled', true);
+// //     clientQuery.equalTo('active', true);
+// //     clientQuery.exists('corporateDomain');
+// //
+// //     const corporateClients = await clientQuery.find({ useMasterKey: true });
+// //
+// //     let startedCount = 0;
+// //
+// //     for (const client of corporateClients) {
+// //       try {
+// //         // Check if sync is already running
+// //         const statuses = await CorporateSyncService.getAllSyncStatuses();
+// //         const clientStatus = statuses.find((s) => s.clientId === client.id);
+// //
+// //         if (!clientStatus || !clientStatus.syncActive) {
+// //           // Start sync with default 1-hour interval
+// //           CorporateSyncService.startPeriodicSync(client, 60);
+// //           startedCount++;
+// //
+// //           message(`Started sync for ${client.get('name')}`);
+// //         }
+// //       } catch (error) {
+// //         message(`Failed to start sync for ${client.get('name')}: ${error.message}`);
+// //       }
+// //     }
+// //
+// //     logger.logSecurityEvent('AUTO_SYNC_JOB_COMPLETED', null, {
+// //       totalClients: corporateClients.length,
+// //       startedCount,
+// //     });
+// //
+// //     message(`Auto-start job completed: ${startedCount}/${corporateClients.length} syncs started`);
+// //   } catch (error) {
+// //     logger.error('Auto-start corporate syncs job failed:', error);
+// //     throw error;
+// //   }
+// // });
 
-    // Get all corporate clients that should have sync enabled
-    const clientQuery = new Parse.Query('Client');
-    clientQuery.equalTo('isCorporate', true);
-    clientQuery.equalTo('oauthEnabled', true);
-    clientQuery.equalTo('active', true);
-    clientQuery.exists('corporateDomain');
-
-    const corporateClients = await clientQuery.find({ useMasterKey: true });
-
-    let startedCount = 0;
-
-    for (const client of corporateClients) {
-      try {
-        // Check if sync is already running
-        const statuses = await CorporateSyncService.getAllSyncStatuses();
-        const clientStatus = statuses.find((s) => s.clientId === client.id);
-
-        if (!clientStatus || !clientStatus.syncActive) {
-          // Start sync with default 1-hour interval
-          CorporateSyncService.startPeriodicSync(client, 60);
-          startedCount++;
-
-          message(`Started sync for ${client.get('name')}`);
-        }
-      } catch (error) {
-        message(`Failed to start sync for ${client.get('name')}: ${error.message}`);
-      }
-    }
-
-    logger.logSecurityEvent('AUTO_SYNC_JOB_COMPLETED', null, {
-      totalClients: corporateClients.length,
-      startedCount,
-    });
-
-    message(`Auto-start job completed: ${startedCount}/${corporateClients.length} syncs started`);
-  } catch (error) {
-    logger.error('Auto-start corporate syncs job failed:', error);
-    throw error;
-  }
-});
-
-// Functions are already registered with Parse.Cloud.define() above
-// No need to export them as Parse.Cloud.getFunction() is not available in this version
 module.exports = {
-  // Cloud functions are automatically available through Parse.Cloud.run()
-  // Example: Parse.Cloud.run('triggerCorporateSync', params)
+  triggerCorporateSync,
+  startPeriodicSync,
+  stopPeriodicSync,
+  getAllSyncStatuses,
+  getCorporateSyncHistory,
 };

@@ -6,6 +6,7 @@
  * @since 1.0.0
  */
 
+const Parse = require('parse/node');
 const jwt = require('jsonwebtoken');
 // const crypto = require('crypto'); // Not used in this file
 const AmexingUser = require('../../domain/models/AmexingUser');

@@ -7,6 +7,7 @@
  * @since 2.0.0
  */
 
+const Parse = require('parse/node');
 const CorporateOAuthService = require('./CorporateOAuthService');
 // const OAuthService = require('./OAuthService'); // TODO: Remove unused import
 const AmexingUser = require('../../domain/models/AmexingUser');

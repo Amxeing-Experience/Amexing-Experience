@@ -7,6 +7,7 @@
  * @since 1.0.0
  */
 
+const Parse = require('parse/node');
 const OAuthPermissionService = require('./OAuthPermissionService');
 const PermissionInheritanceService = require('./PermissionInheritanceService');
 // const AmexingUser = require('../../domain/models/AmexingUser'); // Reserved for future validation implementation
@@ -776,4 +777,4 @@ class PermissionDelegationService {
   }
 }
 
-module.exports = new PermissionDelegationService();
+module.exports = { PermissionDelegationService };

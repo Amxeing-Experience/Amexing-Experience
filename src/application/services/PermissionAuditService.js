@@ -7,6 +7,7 @@
  * @since 1.0.0
  */
 
+const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 
 class PermissionAuditService {
@@ -727,4 +728,4 @@ class PermissionAuditService {
   }
 }
 
-module.exports = new PermissionAuditService();
+module.exports = { PermissionAuditService };

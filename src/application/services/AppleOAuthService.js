@@ -4,6 +4,7 @@
  * Integrates with department OAuth flows and corporate configurations.
  */
 
+const Parse = require('parse/node');
 const { AppleOAuthServiceCore } = require('./AppleOAuthServiceCore');
 const logger = require('../../infrastructure/logger');
 

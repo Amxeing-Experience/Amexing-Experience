@@ -7,6 +7,7 @@
  * @since 2.0.0
  */
 
+const Parse = require('parse/node');
 const AmexingUser = require('../../domain/models/AmexingUser');
 const PermissionInheritanceService = require('./PermissionInheritanceService');
 const logger = require('../../infrastructure/logger');
@@ -517,4 +518,4 @@ class CorporateOAuthService {
   }
 }
 
-module.exports = new CorporateOAuthService();
+module.exports = { CorporateOAuthService };
