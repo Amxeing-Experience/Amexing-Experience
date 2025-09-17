@@ -2648,7 +2648,7 @@ bn.js@^4.0.0:
   resolved "https://registry.yarnpkg.com/bn.js/-/bn.js-4.12.2.tgz#3d8fed6796c24e177737f7cc5172ee04ef39ec99"
   integrity sha512-n4DSx829VRTRByMRGdjQ9iqsN0Bh4OolPsFnaZBLcbi8iXcB+kJ9s7EnRt4wILZNV3kPLHkRVfOc/HvhC3ovDw==
 
-body-parser@1.20.0, body-parser@1.20.2, body-parser@1.20.3, body-parser@>=1.20.3, body-parser@^2.2.0:
+body-parser@1.20.0, body-parser@1.20.3, body-parser@>=1.20.3, body-parser@^2.2.0:
   version "2.2.0"
   resolved "https://registry.yarnpkg.com/body-parser/-/body-parser-2.2.0.tgz#f7a9656de305249a715b549b7b8fd1ab9dfddcfa"
   integrity sha512-02qvAaxv8tp7fBa/mw1ga98OGm+eCbqzJOKoRt70sLmfEEi+jyBYVTDGfCL/k06/4EMk/z01gCe7HoCH/f2LTg==
@@ -4745,7 +4745,7 @@ express-session@^1.17.3:
     safe-buffer "5.2.1"
     uid-safe "~2.1.5"
 
-express@4.18.1, express@4.18.3, express@>=4.19.2:
+express@4.18.1, express@4.21.0, express@>=4.19.2:
   version "5.1.0"
   resolved "https://registry.yarnpkg.com/express/-/express-5.1.0.tgz#d31beaf715a0016f0d53f47d3b4d7acf28c75cc9"
   integrity sha512-DT9ck5YIRU+8GYzzU5kT3eHGA5iL+1Zd0EutOmTE9Dtk+Tvuzd23VBU+ec7HPNSTxXYO55gPV/hq4pSBJDjFpA==
@@ -8583,10 +8583,10 @@ parse-passwd@^1.0.0:
   resolved "https://registry.yarnpkg.com/parse-passwd/-/parse-passwd-1.0.0.tgz#6d5b934a456993b23d37f40a382d6f1666a8e5c6"
   integrity sha512-1Y1A//QUXEZK7YKz+rD9WydcE1+EuPr6ZBgKecAB8tmoW6UFv0NREVJe1p+jRxtThkcbbKkfwIbWJe/IeE6m2Q==
 
-parse-server@6.5.7:
-  version "6.5.7"
-  resolved "https://registry.yarnpkg.com/parse-server/-/parse-server-6.5.7.tgz#aaa590f2baff16a18262ea65d4be6da725cd6904"
-  integrity sha512-hpVVhEqadq7QN3mCpItjFM1KzwCHgEn+EmiGggcKKWncOnB1viZ2C68+miu6nadgvIDwbeK1mAzx/QvJliVALw==
+parse-server@6.5.9:
+  version "6.5.9"
+  resolved "https://registry.yarnpkg.com/parse-server/-/parse-server-6.5.9.tgz#24798bcc397e98ad5a8b930284ad7908036419c7"
+  integrity sha512-1EFpEdgCqWJLoAZ2S6QmWgyV2QpWMgGtxxjDA1v9d2XSZbwWIJhZToOzERViiL45D4R2tUiOKTXuoBVug+tYVw==
   dependencies:
     "@babel/eslint-parser" "7.24.1"
     "@graphql-tools/merge" "8.4.1"
@@ -8596,11 +8596,11 @@ parse-server@6.5.7:
     "@parse/fs-files-adapter" "2.0.1"
     "@parse/push-adapter" "5.1.1"
     bcryptjs "2.4.3"
-    body-parser "1.20.2"
+    body-parser "1.20.3"
     commander "10.0.1"
     cors "2.8.5"
     deepcopy "2.1.0"
-    express "4.18.3"
+    express "4.21.0"
     express-rate-limit "6.7.0"
     follow-redirects "1.15.6"
     graphql "16.8.1"
@@ -8617,7 +8617,7 @@ parse-server@6.5.7:
     mongodb "4.10.0"
     mustache "4.2.0"
     otpauth "9.2.2"
-    parse "4.1.0"
+    parse "4.2.0"
     path-to-regexp "6.2.1"
     pg-monitor "2.0.0"
     pg-promise "11.5.4"
@@ -8650,20 +8650,6 @@ parse@3.4.2:
     react-native-crypto-js "1.0.0"
     uuid "3.4.0"
     ws "7.5.1"
-    xmlhttprequest "1.8.0"
-  optionalDependencies:
-    crypto-js "4.1.1"
-
-parse@4.1.0:
-  version "4.1.0"
-  resolved "https://registry.yarnpkg.com/parse/-/parse-4.1.0.tgz#343b8a7814965bf4881ec624e2bae4b781b1aea1"
-  integrity sha512-s0Ti+nWrKWj9DlFcmkEE05fGwa/K5ycZSdqCz01F8YL7Hevqv4WLXAmYGOwzq5UJSZ005seKgb20KwVwLdy/Zg==
-  dependencies:
-    "@babel/runtime-corejs3" "7.21.0"
-    idb-keyval "6.2.0"
-    react-native-crypto-js "1.0.0"
-    uuid "9.0.0"
-    ws "8.12.0"
     xmlhttprequest "1.8.0"
   optionalDependencies:
     crypto-js "4.1.1"
@@ -8758,9 +8744,9 @@ path-parse@^1.0.7:
   integrity sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw==
 
 path-to-regexp@0.1.12, path-to-regexp@0.1.7, path-to-regexp@6.2.1:
-  version "0.1.7"
-  resolved "https://registry.yarnpkg.com/path-to-regexp/-/path-to-regexp-0.1.7.tgz#df604178005f522f15eb4490e7247a1bfaa67f8c"
-  integrity sha512-5DFkuoqlv1uYQKxy8omFBeJPQcdoE07Kv2sferDCrAq1ohOU+MSDswDIbnx3YAM60qIOnYa53wBhXW0EbMonrQ==
+  version "0.1.12"
+  resolved "https://registry.yarnpkg.com/path-to-regexp/-/path-to-regexp-0.1.12.tgz#d5e1a12e478a976d432ef3c58d534b9923164bb7"
+  integrity sha512-RA1GjUVMnvYFxuqovrEqZoxxW5NUZqbwKtYz/Tt7nXerk0LbLblQmrsgdeOxV5SFHf0UDggjS/bSeOZwt1pmEQ==
 
 path-type@^3.0.0:
   version "3.0.0"
@@ -11075,10 +11061,10 @@ undici-types@~7.12.0:
   resolved "https://registry.yarnpkg.com/undici-types/-/undici-types-7.12.0.tgz#15c5c7475c2a3ba30659529f5cdb4674b622fafb"
   integrity sha512-goOacqME2GYyOZZfb5Lgtu+1IDmAlAEu5xnD3+xTzS10hT0vzpf0SPjkXwAw9Jm+4n/mQGDP3LO8CPbYROeBfQ==
 
-undici@5.5.1:
-  version "5.5.1"
-  resolved "https://registry.yarnpkg.com/undici/-/undici-5.5.1.tgz#baaf25844a99eaa0b22e1ef8d205bffe587c8f43"
-  integrity sha512-MEvryPLf18HvlCbLSzCW0U00IMftKGI5udnjrQbC5D4P0Hodwffhv+iGfWuJwg16Y/TK11ZFK8i+BPVW2z/eAw==
+undici@5.5.1, undici@>=5.19.1:
+  version "7.16.0"
+  resolved "https://registry.yarnpkg.com/undici/-/undici-7.16.0.tgz#cb2a1e957726d458b536e3f076bf51f066901c1a"
+  integrity sha512-QEg3HPMll0o3t2ourKwOeUAZ159Kn9mx5pnzHRQO8+Wixmh88YdZRiIwat0iNzNNXn0yoEtXJqFpyW7eM8BV7g==
 
 universalify@^2.0.0:
   version "2.0.1"
@@ -11515,7 +11501,7 @@ write-file-atomic@^4.0.2:
     imurmurhash "^0.1.4"
     signal-exit "^3.0.7"
 
-ws@7.5.1, ws@8.12.0, ws@8.13.0, ws@8.17.1, ws@>=7.5.10, "ws@^5.2.0 || ^6.0.0 || ^7.0.0":
+ws@7.5.1, ws@8.13.0, ws@8.17.1, ws@>=7.5.10, "ws@^5.2.0 || ^6.0.0 || ^7.0.0":
   version "8.18.3"
   resolved "https://registry.yarnpkg.com/ws/-/ws-8.18.3.tgz#b56b88abffde62791c639170400c93dcb0c95472"
   integrity sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==
