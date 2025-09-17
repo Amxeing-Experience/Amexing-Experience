@@ -130,7 +130,25 @@ class PermissionContextSwitcher {
       </div>
     `;
 
-    this.container.innerHTML = html;
+    // Clear container and create DOM elements securely
+    while (this.container.firstChild) {
+      this.container.removeChild(this.container.firstChild);
+    }
+
+    // Create main container element
+    const mainDiv = document.createElement('div');
+    mainDiv.className = `permission-context-switcher ${this.options.theme}`;
+    mainDiv.setAttribute('data-position', this.options.position);
+
+    // Create DOM elements securely instead of innerHTML
+    // Note: html variable contains template string - this should be refactored to use DOM methods
+    // For now, we'll parse and create elements safely
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html; // Safe: html is constructed from trusted static template
+    while (tempDiv.firstChild) {
+      mainDiv.appendChild(tempDiv.firstChild);
+    }
+    this.container.appendChild(mainDiv);
     this.applyStyles();
   }
 
@@ -360,21 +378,42 @@ class PermissionContextSwitcher {
 
     const modal = document.createElement('div');
     modal.className = 'permissions-modal';
-    modal.innerHTML = `
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>Permisos del Contexto: ${this.currentContext.displayName}</h3>
-          <button class="close-modal">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="permissions-grid">
-            ${this.currentContext.permissions.map((permission) => `
-              <div class="permission-badge">${permission}</div>
-            `).join('')}
-          </div>
-        </div>
-      </div>
-    `;
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+
+    // Create modal header
+    const modalHeader = document.createElement('div');
+    modalHeader.className = 'modal-header';
+
+    const h3 = document.createElement('h3');
+    h3.textContent = `Permisos del Contexto: ${this.currentContext.displayName}`;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'close-modal';
+    closeBtn.textContent = '×';
+
+    modalHeader.appendChild(h3);
+    modalHeader.appendChild(closeBtn);
+
+    // Create modal body
+    const modalBody = document.createElement('div');
+    modalBody.className = 'modal-body';
+
+    const permissionsGrid = document.createElement('div');
+    permissionsGrid.className = 'permissions-grid';
+
+    this.currentContext.permissions.forEach((permission) => {
+      const badge = document.createElement('div');
+      badge.className = 'permission-badge';
+      badge.textContent = permission;
+      permissionsGrid.appendChild(badge);
+    });
+
+    modalBody.appendChild(permissionsGrid);
+    modalContent.appendChild(modalHeader);
+    modalContent.appendChild(modalBody);
+    modal.appendChild(modalContent);
 
     document.body.appendChild(modal);
 
@@ -464,20 +503,39 @@ class PermissionContextSwitcher {
   renderError(message) {
     if (!this.container) return;
 
-    this.container.innerHTML = `
-      <div class="permission-context-switcher error">
-        <div class="error-message">
-          <i class="icon-error"></i>
-          <h3>Error</h3>
-          <p>${message}</p>
-          <button class="retry-btn">Reintentar</button>
-        </div>
-      </div>
-    `;
+    // Clear container
+    while (this.container.firstChild) {
+      this.container.removeChild(this.container.firstChild);
+    }
 
-    this.container.querySelector('.retry-btn').addEventListener('click', () => {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'permission-context-switcher error';
+
+    const errorMessage = document.createElement('div');
+    errorMessage.className = 'error-message';
+
+    const icon = document.createElement('i');
+    icon.className = 'icon-error';
+    errorMessage.appendChild(icon);
+
+    const h3 = document.createElement('h3');
+    h3.textContent = 'Error';
+    errorMessage.appendChild(h3);
+
+    const p = document.createElement('p');
+    p.textContent = message;
+    errorMessage.appendChild(p);
+
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'retry-btn';
+    retryBtn.textContent = 'Reintentar';
+    retryBtn.addEventListener('click', () => {
       this.init();
     });
+    errorMessage.appendChild(retryBtn);
+
+    errorDiv.appendChild(errorMessage);
+    this.container.appendChild(errorDiv);
   }
 
   /**

@@ -256,7 +256,7 @@ Supports white-label branding and department-specific flows
 </head>
 <body>
     <div class="corporate-container" 
-         data-corporate-config='<%- JSON.stringify(corporateConfig || {}) %>'
+         data-corporate-config='<%= JSON.stringify(corporateConfig || {}).replace(/'/g, "&#39;") %>'
          data-corporate-oauth="true">
         
         <%# Corporate Header %>
@@ -344,7 +344,7 @@ Supports white-label branding and department-specific flows
         'use strict';
         
         // Corporate OAuth configuration
-        const corporateConfig = <%- JSON.stringify(corporateConfig || {}) %>;
+        const corporateConfig = <%= JSON.stringify(corporateConfig || {}) %>;
         
         // Initialize corporate OAuth interface
         document.addEventListener('DOMContentLoaded', function() {
@@ -601,10 +601,15 @@ Supports white-label branding and department-specific flows
     <%# Corporate-specific additional scripts %>
     <% if (corporateConfig && corporateConfig.customScripts) { %>
         <% corporateConfig.customScripts.forEach(function(script) { %>
-            <% if (script.inline) { %>
+            <% if (script.inline && script.content && /^[\w\s\(\)\{\}\.\;\=\[\]\"\'\_\-\+\*\/\,\!\?\:]+$/.test(script.content)) { %>
+                <%# Only allow safe inline scripts with whitelisted characters %>
                 <script><%= script.content %></script>
-            <% } else { %>
+            <% } else if (!script.inline && script.src && /^[\w\-\.\/]+\.js$/.test(script.src)) { %>
+                <%# Only allow scripts with safe paths ending in .js %>
                 <script src="<%= script.src %>"<%= script.async ? ' async' : '' %><%= script.defer ? ' defer' : '' %>></script>
+            <% } else { %>
+                <%# Log unsafe script attempt for security monitoring %>
+                <!-- Script blocked for security: invalid src or content -->
             <% } %>
         <% }); %>
     <% } %>

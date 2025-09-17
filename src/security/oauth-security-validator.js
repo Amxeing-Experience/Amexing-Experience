@@ -167,15 +167,27 @@ class OAuthSecurityValidator {
         results.checks.structure = true;
       }
 
-      // Decode and validate token
-      const decoded = jwt.decode(token, { complete: true });
-      if (!decoded) {
+      // Decode and validate token structure (without verification)
+      // Note: This is for validation purposes only. Production code should use jwt.verify()
+      const decoded = jwt.decode(token, { complete: true, json: true });
+      if (!decoded || !decoded.header || !decoded.payload) {
         results.valid = false;
-        results.issues.push('Token decode failed');
+        results.issues.push('Token decode failed - invalid JWT structure');
         results.checks.decodable = false;
         return results;
       }
       results.checks.decodable = true;
+
+      // Additional JWT structure validation
+      if (!decoded.payload.iss) {
+        results.issues.push('Missing issuer (iss) claim');
+      }
+      if (!decoded.payload.sub) {
+        results.issues.push('Missing subject (sub) claim');
+      }
+      if (!decoded.payload.aud) {
+        results.issues.push('Missing audience (aud) claim');
+      }
 
       // Validate token claims
       const validationChecks = [

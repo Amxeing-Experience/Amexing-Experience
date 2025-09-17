@@ -222,6 +222,10 @@
     "form-data": ">=2.5.4",
     "express": ">=4.19.2",
     "@babel/runtime": ">=7.26.10",
+    "axios": ">=1.12.0",
+    "passport": ">=0.6.0",
+    "tough-cookie": ">=4.1.3",
+    "cookie": ">=0.7.0",
     "@babel/runtime-corejs3": ">=7.26.10",
     "prismjs": ">=1.29.0",
     "minimist": ">=1.2.8"

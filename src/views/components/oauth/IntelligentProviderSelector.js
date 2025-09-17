@@ -635,7 +635,8 @@ class IntelligentProviderSelector {
     // Use DOM methods to prevent XSS
     const iconDiv = document.createElement('div');
     iconDiv.className = 'provider-icon';
-    iconDiv.innerHTML = info.icon; // Safe: info.icon contains static SVG from trusted source
+    // Create icon element safely using DOM methods
+    iconDiv.appendChild(this.createProviderIconElement(provider));
 
     const infoDiv = document.createElement('div');
     infoDiv.className = 'provider-info';
@@ -1310,8 +1311,47 @@ class IntelligentProviderSelector {
   }
 
   getProviderIcon(provider) {
-    // Return SVG icons or placeholder
+    // Return SVG icons or placeholder - DEPRECATED: Use createProviderIconElement instead
     return '<div style="width: 32px; height: 32px; background: #ddd; border-radius: 4px;"></div>';
+  }
+
+  createProviderIconElement(provider) {
+    // Create icon element safely using DOM methods
+    const iconElement = document.createElement('div');
+    iconElement.style.width = '32px';
+    iconElement.style.height = '32px';
+    iconElement.style.background = '#ddd';
+    iconElement.style.borderRadius = '4px';
+    iconElement.style.display = 'flex';
+    iconElement.style.alignItems = 'center';
+    iconElement.style.justifyContent = 'center';
+    iconElement.style.fontSize = '12px';
+    iconElement.style.fontWeight = 'bold';
+    iconElement.style.color = '#666';
+
+    // Add provider initial as text content
+    switch (provider) {
+      case 'google':
+        iconElement.textContent = 'G';
+        iconElement.style.background = '#db4437';
+        iconElement.style.color = '#fff';
+        break;
+      case 'microsoft':
+        iconElement.textContent = 'M';
+        iconElement.style.background = '#0078d4';
+        iconElement.style.color = '#fff';
+        break;
+      case 'apple':
+        iconElement.textContent = '🍎';
+        iconElement.style.background = '#000';
+        iconElement.style.color = '#fff';
+        break;
+      default:
+        iconElement.textContent = '?';
+        break;
+    }
+
+    return iconElement;
   }
 
   getConfidenceClass(confidence) {

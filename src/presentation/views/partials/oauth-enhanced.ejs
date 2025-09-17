@@ -317,7 +317,7 @@ Supports corporate branding, department selection, and mobile optimization
         
         // Corporate domain mapping (if available)
         <% if (typeof corporateConfig !== 'undefined' && corporateConfig && corporateConfig.domainMappings) { %>
-            const corporateMappings = <%- JSON.stringify(corporateConfig.domainMappings) %>;
+            const corporateMappings = <%= JSON.stringify(corporateConfig.domainMappings) %>;
             if (corporateMappings[domain]) {
                 suggestedProvider = corporateMappings[domain];
             }

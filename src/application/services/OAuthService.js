@@ -867,11 +867,25 @@ class OAuthService {
       // Apple ID tokens are JWTs that contain user information
       const jwtLib = require('jsonwebtoken');
 
-      // Decode without verification for now (in production, should verify with Apple's public keys)
-      const decoded = jwtLib.decode(idToken, { complete: true });
+      // Note: In production, we should verify with Apple's public keys
+      // For now, we'll decode and validate basic structure only
+      // TODO: Implement proper JWT verification with Apple's public keys
+      const decoded = jwtLib.decode(idToken, { complete: true, json: true });
 
-      if (!decoded || !decoded.payload) {
-        throw new Error('Invalid Apple ID token format');
+      // Basic validation - check if token has required structure
+      if (!decoded || !decoded.header || !decoded.payload) {
+        throw new Error('Invalid JWT token structure');
+      }
+
+      // Additional validation - check issuer
+      if (decoded.payload.iss !== 'https://appleid.apple.com') {
+        throw new Error('Invalid token issuer');
+      }
+
+      // Check if token is expired
+      const now = Math.floor(Date.now() / 1000);
+      if (decoded.payload.exp && decoded.payload.exp < now) {
+        throw new Error('Token has expired');
       }
 
       const { payload } = decoded;

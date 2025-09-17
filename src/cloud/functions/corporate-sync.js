@@ -243,9 +243,13 @@ Parse.Cloud.define('getCorporateSyncHistory', async (request) => {
       'PERIODIC_SYNC_STOPPED',
     ]);
 
-    // Filter by clientId in the additional data
-    // eslint-disable-next-line security/detect-non-literal-regexp
-    auditQuery.matches('additionalData', new RegExp(`"clientId":"${clientId}"`));
+    // Filter by clientId in the additional data - use escaped string matching
+    // Escape clientId to prevent RegExp injection attacks
+    const escapedClientId = clientId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const safePattern = `"clientId":"${escapedClientId}"`;
+
+    // Use string contains instead of RegExp to avoid ReDoS
+    auditQuery.contains('additionalData', safePattern);
     auditQuery.descending('createdAt');
     auditQuery.limit(Math.min(limit, 100));
     auditQuery.skip(skip);
