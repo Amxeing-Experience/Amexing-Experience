@@ -598,20 +598,14 @@ Supports white-label branding and department-specific flows
     })();
     </script>
     
-    <%# Corporate-specific additional scripts %>
+    <%# Corporate-specific additional scripts - SECURITY: Dynamic script loading disabled for PCI DSS compliance %>
     <% if (corporateConfig && corporateConfig.customScripts) { %>
-        <% corporateConfig.customScripts.forEach(function(script) { %>
-            <% if (script.inline && script.content && /^[\w\s\(\)\{\}\.\;\=\[\]\"\'\_\-\+\*\/\,\!\?\:]+$/.test(script.content)) { %>
-                <%# Only allow safe inline scripts with whitelisted characters %>
-                <script><%= script.content %></script>
-            <% } else if (!script.inline && script.src && /^[\w\-\.\/]+\.js$/.test(script.src)) { %>
-                <%# Only allow scripts with safe paths ending in .js %>
-                <script src="<%= script.src %>"<%= script.async ? ' async' : '' %><%= script.defer ? ' defer' : '' %>></script>
-            <% } else { %>
-                <%# Log unsafe script attempt for security monitoring %>
-                <!-- Script blocked for security: invalid src or content -->
-            <% } %>
-        <% }); %>
+        <%# Security Notice: Dynamic script loading has been disabled for security compliance %>
+        <!--
+        Corporate custom scripts are disabled for security reasons.
+        All scripts must be statically included during build time.
+        Contact your security team to whitelist required scripts.
+        -->
     <% } %>
 </body>
 </html>

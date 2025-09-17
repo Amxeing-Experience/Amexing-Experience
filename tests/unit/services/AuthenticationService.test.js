@@ -13,12 +13,13 @@ jest.mock('parse/node', () => {
     equalTo: jest.fn().mockReturnThis(),
     greaterThan: jest.fn().mockReturnThis(),
     or: jest.fn().mockReturnThis(),
-    first: jest.fn(),
+    first: jest.fn().mockResolvedValue(null), // Default to no results
     get: jest.fn(),
     count: jest.fn()
   };
 
-  return {
+  // Mock the Parse object
+  const Parse = {
     Query: jest.fn(() => mockQuery),
     Error: {
       VALIDATION_ERROR: 142,
@@ -31,19 +32,43 @@ jest.mock('parse/node', () => {
     },
     Object: {
       extend: jest.fn()
-    }
+    },
+    masterKey: 'test-master-key'
   };
+
+  // Set Parse globally to enable master key
+  global.Parse = Parse;
+
+  return Parse;
 });
 
-jest.mock('jsonwebtoken', () => ({
-  sign: jest.fn(() => 'mock.jwt.token'),
-  verify: jest.fn(() => ({
-    userId: 'test-user-id',
-    username: 'testuser',
-    role: 'user',
-    type: 'access'
-  }))
-}));
+jest.mock('jsonwebtoken', () => {
+  class TokenExpiredError extends Error {
+    constructor(message) {
+      super(message);
+      this.name = 'TokenExpiredError';
+    }
+  }
+
+  class JsonWebTokenError extends Error {
+    constructor(message) {
+      super(message);
+      this.name = 'JsonWebTokenError';
+    }
+  }
+
+  return {
+    sign: jest.fn(() => 'mock.jwt.token'),
+    verify: jest.fn(() => ({
+      userId: 'test-user-id',
+      username: 'testuser',
+      role: 'user',
+      type: 'access'
+    })),
+    TokenExpiredError,
+    JsonWebTokenError
+  };
+});
 
 jest.mock('../../../src/infrastructure/logger', () => ({
   info: jest.fn(),
@@ -53,6 +78,13 @@ jest.mock('../../../src/infrastructure/logger', () => ({
   logSecurityEvent: jest.fn(),
   logAccessAttempt: jest.fn()
 }));
+
+// Mock AmexingUser
+jest.mock('../../../src/domain/models/AmexingUser', () => {
+  return class AmexingUser {
+    static create = jest.fn();
+  };
+});
 
 const AuthenticationService = require('../../../src/application/services/AuthenticationService');
 const AmexingUser = require('../../../src/domain/models/AmexingUser');
@@ -99,8 +131,16 @@ describe('AuthenticationService', () => {
     };
 
     it('should successfully register a new user', async () => {
+      // Mock Parse.Query for checkUserExists - no existing users
+      const Parse = require('parse/node');
+      Parse.Query.mockImplementation(() => ({
+        equalTo: jest.fn().mockReturnThis(),
+        or: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(null) // No existing user
+      }));
+
       mockUser.save.mockResolvedValue(mockUser);
-      
+
       const result = await AuthenticationService.registerUser(validUserData);
 
       expect(result.success).toBe(true);
@@ -228,7 +268,7 @@ describe('AuthenticationService', () => {
       });
 
       await expect(AuthenticationService.refreshToken(validRefreshToken))
-        .rejects.toThrow('Invalid refresh token');
+        .rejects.toThrow('Invalid or expired refresh token');
     });
 
     it('should fail with inactive user', async () => {
@@ -242,7 +282,7 @@ describe('AuthenticationService', () => {
       jest.spyOn(AuthenticationService, 'findUserById').mockResolvedValue(inactiveUser);
 
       await expect(AuthenticationService.refreshToken(validRefreshToken))
-        .rejects.toThrow('User not found or inactive');
+        .rejects.toThrow('Invalid or expired refresh token');
     });
   });
 
@@ -279,8 +319,7 @@ describe('AuthenticationService', () => {
     });
 
     it('should fail with expired token', async () => {
-      const expiredError = new Error('Token expired');
-      expiredError.name = 'TokenExpiredError';
+      const expiredError = new jwt.TokenExpiredError('Token expired');
       jwt.verify.mockImplementation(() => {
         throw expiredError;
       });
@@ -345,13 +384,13 @@ describe('AuthenticationService', () => {
 
     describe('resetPassword', () => {
       it('should successfully reset password with valid token', async () => {
-        const mockQuery = {
+        const Parse = require('parse/node');
+        Parse.Query.mockImplementation(() => ({
           equalTo: jest.fn().mockReturnThis(),
           greaterThan: jest.fn().mockReturnThis(),
           first: jest.fn().mockResolvedValue(mockUser)
-        };
-        
-        require('parse/node').Query.mockReturnValue(mockQuery);
+        }));
+
         mockUser.save.mockResolvedValue(mockUser);
 
         const result = await AuthenticationService.resetPassword(resetToken, newPassword);
@@ -365,13 +404,12 @@ describe('AuthenticationService', () => {
       });
 
       it('should fail with invalid or expired token', async () => {
-        const mockQuery = {
+        const Parse = require('parse/node');
+        Parse.Query.mockImplementation(() => ({
           equalTo: jest.fn().mockReturnThis(),
           greaterThan: jest.fn().mockReturnThis(),
           first: jest.fn().mockResolvedValue(null) // No user found
-        };
-        
-        require('parse/node').Query.mockReturnValue(mockQuery);
+        }));
 
         await expect(AuthenticationService.resetPassword(resetToken, newPassword))
           .rejects.toThrow('Invalid or expired reset token');

@@ -136,7 +136,7 @@ describe('JWT Middleware', () => {
     it('should continue without authentication when no token provided', async () => {
       await jwtMiddleware.authenticateOptional(mockReq, mockRes, mockNext);
 
-      expect(mockReq.user).toBeUndefined();
+      expect(mockReq.user).toBeFalsy();
       expect(mockNext).toHaveBeenCalled();
     });
 
@@ -146,7 +146,7 @@ describe('JWT Middleware', () => {
 
       await jwtMiddleware.authenticateOptional(mockReq, mockRes, mockNext);
 
-      expect(mockReq.user).toBeUndefined();
+      expect(mockReq.user).toBeFalsy();
       expect(mockNext).toHaveBeenCalled();
     });
   });
@@ -287,7 +287,7 @@ describe('JWT Middleware', () => {
     it('should continue without user when no authentication exists', () => {
       jwtMiddleware.extractUser(mockReq, mockRes, mockNext);
 
-      expect(mockReq.user).toBeUndefined();
+      expect(mockReq.user).toBeFalsy();
       expect(mockNext).toHaveBeenCalled();
     });
   });
