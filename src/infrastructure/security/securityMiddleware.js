@@ -30,8 +30,7 @@ const uidSafe = require('uid-safe');
  * - Session management with secure MongoDB storage
  * - CSRF token generation and validation
  * - Environment-specific security configurations
- * - Comprehensive logging and monitoring
- *
+ * - Comprehensive logging and monitoring.
  * @class SecurityMiddleware
  * @author Amexing Development Team
  * @version 2.0.0

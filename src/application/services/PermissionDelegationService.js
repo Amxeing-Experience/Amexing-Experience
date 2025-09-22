@@ -30,8 +30,7 @@ const logger = require('../../infrastructure/logger');
  * - Approval workflows for sensitive delegations
  * - Comprehensive audit logging
  * - Delegation validation and security checks
- * - Integration with permission inheritance
- *
+ * - Integration with permission inheritance.
  * @class PermissionDelegationService
  * @author Amexing Development Team
  * @version 1.0.0

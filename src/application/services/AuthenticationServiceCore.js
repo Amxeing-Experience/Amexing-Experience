@@ -28,8 +28,7 @@ const AmexingUser = require('../../domain/models/AmexingUser');
  * - Email and username validation
  * - Password strength enforcement
  * - Token expiration handling
- * - Common authentication helpers
- *
+ * - Common authentication helpers.
  * @class AuthenticationServiceCore
  * @author Amexing Development Team
  * @version 1.0.0
@@ -151,10 +150,9 @@ class AuthenticationServiceCore {
    * Retrieves user by unique identifier with Parse Server query optimization.
    * Performs direct user lookup using Parse Server's get method with master key
    * privileges for administrative operations and user data retrieval.
-   *
-   * @method findUserById
-   * @param {string} userId - Unique Parse Server user identifier
-   * @returns {Promise<AmexingUser|null>} User object or null if not found
+   * @function findUserById
+   * @param {string} userId - Unique Parse Server user identifier.
+   * @returns {Promise<AmexingUser|null>} User object or null if not found.
    * @example
    * // Find user by Parse Server ID
    * const user = await authService.findUserById('user123');
@@ -171,10 +169,9 @@ class AuthenticationServiceCore {
    * Generates secure JWT access and refresh token pairs for authenticated sessions.
    * Creates cryptographically signed tokens with appropriate expiration times and
    * user claims for secure session management and API access authorization.
-   *
-   * @method generateTokens
-   * @param {AmexingUser} user - Authenticated Parse Server user object
-   * @returns {Promise<object>} Token object containing access_token, refresh_token, and metadata
+   * @function generateTokens
+   * @param {AmexingUser} user - Authenticated Parse Server user object.
+   * @returns {Promise<object>} Token object containing access_token, refresh_token, and metadata.
    * @example
    * // Generate tokens for authenticated user
    * const tokens = await authService.generateTokens(user);

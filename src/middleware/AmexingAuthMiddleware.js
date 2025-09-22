@@ -36,8 +36,7 @@ const PermissionService = require('../services/PermissionService');
  * - Rate limiting based on user roles and permissions
  * - Comprehensive security logging and audit trails
  * - Multi-tenant and department-aware authorization
- * - Token expiration and renewal mechanisms
- *
+ * - Token expiration and renewal mechanisms.
  * @class AmexingAuthMiddleware
  * @author Claude Code + Technical Team
  * @version 2.0
@@ -564,6 +563,7 @@ class AmexingAuthMiddleware {
   /**
    * Update session activity timestamp.
    * @param {string} jti - JWT ID.
+   * @param _jti
    * @example
    */
   async updateSessionActivity(_jti) {

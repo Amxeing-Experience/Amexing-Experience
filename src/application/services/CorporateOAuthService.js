@@ -29,8 +29,7 @@ const logger = require('../../infrastructure/logger');
  * - Multi-provider corporate OAuth support
  * - Permission inheritance from corporate roles
  * - Comprehensive audit and compliance logging
- * - Integration with existing corporate systems
- *
+ * - Integration with existing corporate systems.
  * @class CorporateOAuthService
  * @author Amexing Development Team
  * @version 1.0.0

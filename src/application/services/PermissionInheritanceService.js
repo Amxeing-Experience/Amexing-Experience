@@ -29,8 +29,7 @@ const logger = require('../../infrastructure/logger');
  * - Hierarchical permission inheritance
  * - Comprehensive audit logging
  * - Permission validation and cleanup
- * - Dynamic permission updates
- *
+ * - Dynamic permission updates.
  * @class PermissionInheritanceService
  * @author Amexing Development Team
  * @version 1.0.0

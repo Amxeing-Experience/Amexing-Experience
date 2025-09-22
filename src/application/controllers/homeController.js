@@ -16,8 +16,7 @@ const logger = require('../../infrastructure/logger');
  * - Responsive page rendering with EJS templates
  * - Error handling with graceful fallbacks
  * - Security compliance information display
- * - Platform feature and technology showcasing
- *
+ * - Platform feature and technology showcasing.
  * @class HomeController
  * @author Amexing Development Team
  * @version 2.0.0
@@ -61,12 +60,11 @@ class HomeController {
    * Renders the about page with platform information and user context.
    * Displays comprehensive information about the AmexingWeb platform including
    * security features, PCI DSS compliance, and platform capabilities.
-   *
-   * @method about
-   * @param {object} req - Express request object with optional user session
-   * @param {object} res - Express response object
-   * @param {Function} next - Express next middleware function for error handling
-   * @returns {Promise<void>} Renders about page template
+   * @function about
+   * @param {object} req - Express request object with optional user session.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function for error handling.
+   * @returns {Promise<void>} Renders about page template.
    * @example
    * // GET /about
    * // Renders about page with platform information and user context

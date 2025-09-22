@@ -4,10 +4,9 @@ const logger = require('../../infrastructure/logger');
  * Logs comprehensive error details for debugging, monitoring, and audit purposes.
  * Captures error context including user session, request details, and error stack trace
  * for security and operational monitoring with PCI DSS compliance.
- *
  * @function logError
- * @param {Error} err - The error object containing message and stack trace
- * @param {object} req - Express request object with user context and request details
+ * @param {Error} err - The error object containing message and stack trace.
+ * @param {object} req - Express request object with user context and request details.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -40,10 +39,9 @@ function logError(err, req) {
  * Provides standardized HTTP status codes and user-friendly error messages
  * for common Parse Server error conditions, supporting authentication,
  * session management, and data validation scenarios.
- *
  * @function handleParseError
- * @param {Error} err - The Parse Server error object containing error code and message
- * @returns {object|null} Status and message object with HTTP status code and user message, or null if not a Parse error
+ * @param {Error} err - The Parse Server error object containing error code and message.
+ * @returns {object|null} Status and message object with HTTP status code and user message, or null if not a Parse error.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -83,10 +81,9 @@ function handleParseError(err) {
  * Provides standardized HTTP status codes and user-friendly error messages
  * for common MongoDB error conditions, including duplicate key violations,
  * connection failures, and database operational errors with PCI DSS compliance.
- *
  * @function handleMongoError
- * @param {Error} err - The MongoDB error object containing name, code, and message properties
- * @returns {object|null} Status and message object with HTTP status code and user message, or null if not a MongoDB error
+ * @param {Error} err - The MongoDB error object containing name, code, and message properties.
+ * @returns {object|null} Status and message object with HTTP status code and user message, or null if not a MongoDB error.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -123,10 +120,9 @@ function handleMongoError(err) {
  * Provides standardized HTTP status codes and user-friendly error messages
  * for input validation failures, supporting Joi validation schemas and
  * custom validation scenarios with detailed field-level error reporting.
- *
  * @function handleValidationError
- * @param {Error} err - The validation error object containing name and details array
- * @returns {object|null} Status and message object with HTTP status code and aggregated validation messages, or null if not a validation error
+ * @param {Error} err - The validation error object containing name and details array.
+ * @returns {object|null} Status and message object with HTTP status code and aggregated validation messages, or null if not a validation error.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -169,10 +165,9 @@ function handleValidationError(err) {
  * Orchestrates error handling by delegating to specialized error handlers in sequence,
  * providing standardized HTTP status codes and user-friendly error messages for
  * Parse Server, MongoDB, validation, and generic error scenarios.
- *
  * @function getErrorDetails
- * @param {Error} err - The error object containing various error properties (code, name, status, message)
- * @returns {object} Status and message object with HTTP status code and user-friendly error message
+ * @param {Error} err - The error object containing various error properties (code, name, status, message).
+ * @returns {object} Status and message object with HTTP status code and user-friendly error message.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0

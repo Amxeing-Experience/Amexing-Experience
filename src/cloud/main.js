@@ -26,7 +26,6 @@ const appleOAuthFunctions = require('./functions/apple-oauth');
  * This function orchestrates the registration of all cloud functions including OAuth
  * admin operations, corporate landing configuration, sync management, permission
  * handling, department OAuth flows, and Apple authentication integration.
- *
  * @function registerCloudFunctions
  * @author Amexing Development Team
  * @version 2.0.0

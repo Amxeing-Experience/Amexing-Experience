@@ -27,8 +27,7 @@ const logger = require('../../infrastructure/logger');
  * - Corporate group and role mapping
  * - Permission validation and conflict resolution
  * - Comprehensive audit logging
- * - Dynamic permission updates
- *
+ * - Dynamic permission updates.
  * @class OAuthPermissionService
  * @author Amexing Development Team
  * @version 1.0.0

@@ -19,10 +19,9 @@ const logger = require('../../infrastructure/logger');
  * - Corporate domain mapping and department flows
  * - Enhanced security with nonce validation
  * - Automatic user creation and linking
- * - Comprehensive audit logging
- *
+ * - Comprehensive audit logging.
  * @class AppleOAuthService
- * @extends AppleOAuthServiceCore
+ * @augments AppleOAuthServiceCore
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0

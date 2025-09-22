@@ -17,8 +17,7 @@
  * - Loading states and comprehensive error handling
  * - Dynamic theme support for light/dark mode
  * - Touch-optimized interactions for mobile devices
- * - Graceful degradation for unsupported browsers
- *
+ * - Graceful degradation for unsupported browsers.
  * @class AppleSignInButton
  * @author Amexing Development Team
  * @version 2.0.0

@@ -23,8 +23,7 @@ const logger = require('../../infrastructure/logger');
  * - Token expiration and issuer validation
  * - Automatic public key fetching and caching
  * - Comprehensive error handling and logging
- * - PCI DSS compliant token processing
- *
+ * - PCI DSS compliant token processing.
  * @class AppleIdTokenValidator
  * @author Amexing Development Team
  * @version 2.0.0

@@ -30,8 +30,7 @@ const logger = require('../../infrastructure/logger');
  * - Sync scheduling and interval management
  * - Comprehensive sync reporting and logging
  * - Error handling and retry mechanisms
- * - Incremental and full sync capabilities
- *
+ * - Incremental and full sync capabilities.
  * @class CorporateSyncService
  * @author Amexing Development Team
  * @version 1.0.0

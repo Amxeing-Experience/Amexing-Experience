@@ -17,8 +17,7 @@ const logger = require('../../infrastructure/logger');
  * - Authentication and authorization validation
  * - Comprehensive error handling with proper HTTP codes
  * - Security logging and audit trails
- * - JSON response formatting with consistent structure
- *
+ * - JSON response formatting with consistent structure.
  * @class ApiController
  * @author Amexing Development Team
  * @version 2.0.0
@@ -42,11 +41,10 @@ class ApiController {
    * Retrieves system operational status and environment information.
    * Provides real-time status information for monitoring systems, health checks,
    * and client applications to verify API availability and system state.
-   *
-   * @method getStatus
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} JSON response with system status and timestamp
+   * @function getStatus
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} JSON response with system status and timestamp.
    * @example
    * // GET /api/status
    * // Response: { status: 'operational', timestamp: '2025-01-15T10:30:00Z', environment: 'production' }
@@ -63,11 +61,10 @@ class ApiController {
    * Retrieves API version information and system details.
    * Provides version metadata for client compatibility checks, debugging,
    * and system integration validation with Parse Server and Node.js versions.
-   *
-   * @method getVersion
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} JSON response with version information
+   * @function getVersion
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} JSON response with version information.
    * @example
    * // GET /api/version
    * // Response: { version: '1.0.0', parseVersion: '5.0.0', nodeVersion: 'v18.0.0', api: {...} }
@@ -88,12 +85,11 @@ class ApiController {
    * Retrieves authenticated user profile information.
    * Returns user profile data for authenticated requests with proper
    * authorization validation and privacy-conscious data filtering.
-   *
-   * @method getUserProfile
-   * @param {object} req - Express request object with authenticated user
-   * @param {object} res - Express response object
-   * @param {Function} next - Express next middleware function
-   * @returns {Promise<void>} JSON response with user profile data
+   * @function getUserProfile
+   * @param {object} req - Express request object with authenticated user.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {Promise<void>} JSON response with user profile data.
    * @example
    * // GET /api/user/profile (with authentication)
    * // Response: { id: 'user123', username: 'john_doe', email: 'john@example.com', emailVerified: true, ... }
@@ -127,12 +123,11 @@ class ApiController {
    * Updates authenticated user profile information with validation and audit logging.
    * Processes profile updates for email and username with proper validation,
    * security logging, and email verification reset when email changes.
-   *
-   * @method updateUserProfile
-   * @param {object} req - Express request object with user and profile data in body
-   * @param {object} res - Express response object
-   * @param {Function} next - Express next middleware function
-   * @returns {Promise<void>} JSON response with updated profile data
+   * @function updateUserProfile
+   * @param {object} req - Express request object with user and profile data in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {Promise<void>} JSON response with updated profile data.
    * @example
    * // PUT /api/user/profile (with authentication)
    * // Body: { email: 'newemail@example.com', username: 'newusername' }
@@ -185,11 +180,10 @@ class ApiController {
    * Retrieves sample data for API demonstration and testing.
    * Provides mock e-commerce data structure for client application development,
    * testing, and API integration validation with consistent response format.
-   *
-   * @method getData
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} JSON response with sample data items
+   * @function getData
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} JSON response with sample data items.
    * @example
    * // GET /api/data
    * // Response: { items: [{id: 1, name: 'Item 1', price: 29.99}, ...], total: 3, timestamp: '...' }

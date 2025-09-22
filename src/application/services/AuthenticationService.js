@@ -24,10 +24,9 @@ const { AuthenticationServiceCore } = require('./AuthenticationServiceCore');
  * - Password reset and change functionality
  * - Account lockout protection
  * - Comprehensive security logging
- * - Integration with AmexingUser model
- *
+ * - Integration with AmexingUser model.
  * @class AuthenticationService
- * @extends AuthenticationServiceCore
+ * @augments AuthenticationServiceCore
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0

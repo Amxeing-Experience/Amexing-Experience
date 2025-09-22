@@ -19,9 +19,8 @@
  * - Health check and monitoring endpoints
  * - Graceful shutdown and process management
  * - Environment-specific configuration loading
- * - Production and development mode optimizations
- *
- * @fileoverview Main application server and initialization
+ * - Production and development mode optimizations.
+ * @file Main application server and initialization.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -193,9 +192,8 @@ app.use('/', webRoutes);
  * Retrieves database connection metrics for health monitoring and diagnostics.
  * Performs a direct MongoDB connection test with timeout controls to assess
  * database availability, response time, and connection health for monitoring.
- *
  * @function getDatabaseMetrics
- * @returns {Promise<object>} Database metrics object with connection status, response time, and error details
+ * @returns {Promise<object>} Database metrics object with connection status, response time, and error details.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -313,9 +311,8 @@ app.get('/health', async (req, res) => {
  * Retrieves comprehensive system metrics for monitoring and performance analysis.
  * Collects Node.js process information, memory usage, CPU statistics, and platform
  * details for system monitoring, alerting, and performance optimization.
- *
  * @function getSystemMetrics
- * @returns {object} System metrics object containing uptime, memory, CPU, and platform information
+ * @returns {object} System metrics object containing uptime, memory, CPU, and platform information.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -418,10 +415,9 @@ const server = app.listen(PORT, () => {
  * Handles graceful application shutdown for clean process termination.
  * Manages orderly shutdown sequence including server closing, connection cleanup,
  * and resource disposal to prevent data loss and ensure clean termination.
- *
  * @function gracefulShutdown
- * @param {string} signal - The signal that triggered the shutdown (e.g., 'SIGTERM', 'SIGINT', 'SIGUSR2')
- * @returns {Promise<void>} Resolves when shutdown is complete
+ * @param {string} signal - The signal that triggered the shutdown (e.g., 'SIGTERM', 'SIGINT', 'SIGUSR2').
+ * @returns {Promise<void>} Resolves when shutdown is complete.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0

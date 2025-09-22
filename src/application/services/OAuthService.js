@@ -26,8 +26,7 @@ const logger = require('../../infrastructure/logger');
  * - Mock mode for testing environments
  * - CSRF protection with state parameters
  * - Automatic user creation and linking
- * - PCI DSS compliant token handling
- *
+ * - PCI DSS compliant token handling.
  * @class OAuthService
  * @author Amexing Development Team
  * @version 2.0.0

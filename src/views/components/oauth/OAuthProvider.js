@@ -18,8 +18,7 @@
  * - Real-time provider availability updates based on department selection
  * - CSRF protection with secure state and nonce generation
  * - Graceful fallback mechanisms for unsupported browsers
- * - Auto-initialization with configuration injection support
- *
+ * - Auto-initialization with configuration injection support.
  * @class OAuthProvider
  * @author Amexing Development Team
  * @version 2.0.0

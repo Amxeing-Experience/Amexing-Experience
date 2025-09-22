@@ -17,9 +17,8 @@
  * - HTTP request logging integration with Morgan
  * - Uncaught exception and rejection handling
  * - Configurable log levels and retention periods
- * - JSON audit logs for compliance reporting
- *
- * @fileoverview Infrastructure logging system for Amexing platform
+ * - JSON audit logs for compliance reporting.
+ * @file Infrastructure logging system for Amexing platform.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -151,10 +150,9 @@ if (process.env.ENABLE_AUDIT_LOGGING === 'true') {
  * Logs security events for PCI DSS compliance and security monitoring.
  * Creates structured security event logs with standardized format for
  * compliance reporting, security analysis, and incident investigation.
- *
  * @function logSecurityEvent
- * @param {string} event - Security event type (e.g., 'FAILED_LOGIN', 'ACCOUNT_LOCKED', 'PERMISSION_DENIED')
- * @param {object} details - Additional event details and context
+ * @param {string} event - Security event type (e.g., 'FAILED_LOGIN', 'ACCOUNT_LOCKED', 'PERMISSION_DENIED').
+ * @param {object} details - Additional event details and context.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -194,12 +192,11 @@ logger.logSecurityEvent = (event, details) => {
  * Logs authentication access attempts with privacy protection and PCI DSS compliance.
  * Tracks both successful and failed login attempts with partial username masking
  * for security while maintaining audit trail requirements.
- *
  * @function logAccessAttempt
- * @param {boolean} success - Whether the access attempt was successful
- * @param {string} username - Username attempting access (will be partially masked)
- * @param {string} ip - IP address of the access attempt
- * @param {string|null} [reason=null] - Reason for failure (if applicable)
+ * @param {boolean} success - Whether the access attempt was successful.
+ * @param {string} username - Username attempting access (will be partially masked).
+ * @param {string} ip - IP address of the access attempt.
+ * @param {string|null} [reason] - Reason for failure (if applicable).
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -237,12 +234,11 @@ logger.logAccessAttempt = (success, username, ip, reason = null) => {
  * Logs data access events for compliance and audit requirements.
  * Tracks all data access operations including reads, writes, updates, and deletions
  * with user attribution for PCI DSS and regulatory compliance.
- *
  * @function logDataAccess
- * @param {string} userId - Unique identifier of the user accessing the data
- * @param {string} resource - Resource or data type being accessed (e.g., 'customer_data', 'payment_info')
- * @param {string} action - Action performed (READ, WRITE, UPDATE, DELETE)
- * @param {boolean} success - Whether the data access was successful
+ * @param {string} userId - Unique identifier of the user accessing the data.
+ * @param {string} resource - Resource or data type being accessed (e.g., 'customer_data', 'payment_info').
+ * @param {string} action - Action performed (READ, WRITE, UPDATE, DELETE).
+ * @param {boolean} success - Whether the data access was successful.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -270,12 +266,11 @@ logger.logDataAccess = (userId, resource, action, success) => {
  * Logs system configuration and data changes for audit trails and compliance.
  * Tracks modifications to system settings, user permissions, and critical data
  * with privacy protection for sensitive values while maintaining audit requirements.
- *
  * @function logSystemChange
- * @param {string} userId - Unique identifier of the user making the change
- * @param {string} change - Description of what was changed (e.g., 'user_permissions', 'system_config')
- * @param {string|null} oldValue - Previous value (will be masked with *** for privacy)
- * @param {string|null} newValue - New value (will be masked with *** for privacy)
+ * @param {string} userId - Unique identifier of the user making the change.
+ * @param {string} change - Description of what was changed (e.g., 'user_permissions', 'system_config').
+ * @param {string|null} oldValue - Previous value (will be masked with *** for privacy).
+ * @param {string|null} newValue - New value (will be masked with *** for privacy).
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0

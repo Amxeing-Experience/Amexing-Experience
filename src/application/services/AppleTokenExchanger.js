@@ -21,8 +21,7 @@ const jwt = require('jsonwebtoken');
  * - Automatic token expiration handling
  * - Apple-specific OAuth flow compliance
  * - Error handling and validation
- * - Private key based authentication
- *
+ * - Private key based authentication.
  * @class AppleTokenExchanger
  * @author Amexing Development Team
  * @version 2.0.0

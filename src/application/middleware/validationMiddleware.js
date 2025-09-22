@@ -18,8 +18,7 @@ const logger = require('../../infrastructure/logger');
  * - Comprehensive logging of validation failures
  * - PCI DSS compliant input validation
  * - Support for complex nested object validation
- * - Integration with authentication and authorization flows
- *
+ * - Integration with authentication and authorization flows.
  * @class ValidationMiddleware
  * @author Amexing Development Team
  * @version 2.0.0
@@ -56,11 +55,10 @@ class ValidationMiddleware {
    * Creates dynamic validation middleware for request data validation.
    * Returns Express middleware function that validates specified request property
    * against Joi schema with comprehensive error handling and security measures.
-   *
-   * @method validateRequest
-   * @param {object} schema - Joi validation schema object
-   * @param {string} [property='body'] - Request property to validate ('body', 'query', 'params')
-   * @returns {Function} Express middleware function for request validation
+   * @function validateRequest
+   * @param {object} schema - Joi validation schema object.
+   * @param {string} [property] - Request property to validate ('body', 'query', 'params').
+   * @returns {Function} Express middleware function for request validation.
    * @example
    * // Validate request body
    * const middleware = validationMiddleware.validateRequest(userSchema, 'body');
@@ -114,11 +112,10 @@ class ValidationMiddleware {
    * Safely retrieves request property data with type validation.
    * Provides secure access to request properties with proper validation
    * to prevent injection attacks and ensure data integrity.
-   *
-   * @method getRequestProperty
-   * @param {object} req - Express request object
-   * @param {string} property - Property name to retrieve ('body', 'query', 'params')
-   * @returns {object} Request property data or empty object if invalid
+   * @function getRequestProperty
+   * @param {object} req - Express request object.
+   * @param {string} property - Property name to retrieve ('body', 'query', 'params').
+   * @returns {object} Request property data or empty object if invalid.
    * @example
    * // Get request body data
    * const bodyData = this.getRequestProperty(req, 'body');
@@ -140,12 +137,11 @@ class ValidationMiddleware {
    * Safely sets validated request property data with security measures.
    * Updates request properties with validated and sanitized data after
    * successful Joi schema validation, preventing data corruption.
-   *
-   * @method setRequestProperty
-   * @param {object} req - Express request object
-   * @param {string} property - Property name to set ('body', 'query', 'params')
-   * @param {object} value - Validated data to set
-   * @returns {void} Updates request object in place
+   * @function setRequestProperty
+   * @param {object} req - Express request object.
+   * @param {string} property - Property name to set ('body', 'query', 'params').
+   * @param {object} value - Validated data to set.
+   * @returns {void} Updates request object in place.
    * @example
    * // Set validated body data
    * this.setRequestProperty(req, 'body', validatedData);
@@ -171,12 +167,11 @@ class ValidationMiddleware {
    * Validates user profile update data with optional field validation.
    * Ensures profile updates meet security requirements with proper input sanitization
    * and data type validation for user account modifications.
-   *
-   * @method validateUpdateProfile
-   * @param {object} req - Express request object with profile data in body
-   * @param {object} res - Express response object
-   * @param {Function} next - Express next middleware function
-   * @returns {void} Continues to next middleware or returns validation error
+   * @function validateUpdateProfile
+   * @param {object} req - Express request object with profile data in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
    * @example
    * // POST /profile/update
    * // Body: { username: 'newusername', email: 'new@email.com' }
@@ -196,12 +191,11 @@ class ValidationMiddleware {
    * Validates user registration data with comprehensive security requirements.
    * Enforces password complexity, email format validation, and username constraints
    * with PCI DSS compliant input validation for new user accounts.
-   *
-   * @method validateRegistration
-   * @param {object} req - Express request object with registration data in body
-   * @param {object} res - Express response object
-   * @param {Function} next - Express next middleware function
-   * @returns {void} Continues to next middleware or returns validation error
+   * @function validateRegistration
+   * @param {object} req - Express request object with registration data in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
    * @example
    * // POST /register
    * // Body: { username: 'user123', email: 'user@example.com', password: 'SecurePass123!', confirmPassword: 'SecurePass123!' }
@@ -236,12 +230,11 @@ class ValidationMiddleware {
    * Validates user login credentials with security requirements.
    * Ensures login requests contain required username and password fields
    * with proper data type validation for authentication processing.
-   *
-   * @method validateLogin
-   * @param {object} req - Express request object with login credentials in body
-   * @param {object} res - Express response object
-   * @param {Function} next - Express next middleware function
-   * @returns {void} Continues to next middleware or returns validation error
+   * @function validateLogin
+   * @param {object} req - Express request object with login credentials in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
    * @example
    * // POST /login
    * // Body: { username: 'user@example.com', password: 'userpassword' }
@@ -260,12 +253,11 @@ class ValidationMiddleware {
    * Validates password reset request with email format verification.
    * Ensures password reset requests contain a valid email address format
    * for sending password recovery instructions to users.
-   *
-   * @method validatePasswordReset
-   * @param {object} req - Express request object with email in body
-   * @param {object} res - Express response object
-   * @param {Function} next - Express next middleware function
-   * @returns {void} Continues to next middleware or returns validation error
+   * @function validatePasswordReset
+   * @param {object} req - Express request object with email in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
    * @example
    * // POST /auth/forgot-password
    * // Body: { email: 'user@example.com' }
@@ -283,12 +275,11 @@ class ValidationMiddleware {
    * Validates new password during password reset process with security requirements.
    * Enforces password complexity rules, confirmation matching, and token validation
    * with PCI DSS compliant security standards for password recovery completion.
-   *
-   * @method validateNewPassword
-   * @param {object} req - Express request object with password, confirmPassword, and token in body
-   * @param {object} res - Express response object
-   * @param {Function} next - Express next middleware function
-   * @returns {void} Continues to next middleware or returns validation error
+   * @function validateNewPassword
+   * @param {object} req - Express request object with password, confirmPassword, and token in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
    * @example
    * // POST /auth/reset-password
    * // Body: { password: 'NewSecurePass123!', confirmPassword: 'NewSecurePass123!', token: 'reset-token-abc123' }

@@ -27,8 +27,7 @@ const { AppleTokenExchanger } = require('./AppleTokenExchanger');
  * - ID token validation and verification
  * - Token exchange functionality
  * - User data parsing and validation
- * - Error handling and logging
- *
+ * - Error handling and logging.
  * @class AppleOAuthServiceCore
  * @author Amexing Development Team
  * @version 2.0.0
@@ -92,10 +91,9 @@ class AppleOAuthServiceCore {
    * Loads Apple private key from filesystem with error handling and validation.
    * Reads the private key file for JWT signing in Apple OAuth flow with
    * proper error handling and security validation for key format.
-   *
-   * @method loadPrivateKey
-   * @returns {void} Loads private key into service instance
-   * @throws {Error} If private key file cannot be read or is invalid
+   * @function loadPrivateKey
+   * @returns {void} Loads private key into service instance.
+   * @throws {Error} If private key file cannot be read or is invalid.
    * @example
    * // Load private key during service initialization
    * appleOAuthService.loadPrivateKey();

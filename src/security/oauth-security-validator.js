@@ -27,8 +27,7 @@ const logger = require('../infrastructure/logger');
  * - State parameter validation for CSRF protection
  * - Comprehensive security audit logging
  * - Real-time security monitoring and alerting
- * - Security policy enforcement and compliance reporting
- *
+ * - Security policy enforcement and compliance reporting.
  * @class OAuthSecurityValidator
  * @author Amexing Development Team
  * @version 2.0.0

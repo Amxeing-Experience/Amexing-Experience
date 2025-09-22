@@ -29,10 +29,9 @@ const logger = require('../../infrastructure/logger');
  * - Comprehensive audit trails for security monitoring
  * - Email verification and user activation workflows
  * - Role-based access control integration
- * - Session management and authentication tracking
- *
+ * - Session management and authentication tracking.
  * @class AmexingUser
- * @extends Parse.Object
+ * @augments Parse.Object
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
@@ -140,10 +139,9 @@ class AmexingUser extends Parse.Object {
    * Validates user password against stored hash with bcrypt comparison.
    * Performs secure password verification using bcrypt hashing algorithm
    * for authentication validation with timing attack protection.
-   *
-   * @method validatePassword
-   * @param {string} password - Plain text password to validate
-   * @returns {Promise<boolean>} True if password matches stored hash, false otherwise
+   * @function validatePassword
+   * @param {string} password - Plain text password to validate.
+   * @returns {Promise<boolean>} True if password matches stored hash, false otherwise.
    * @example
    * // Validate user password during login
    * const isValid = await user.validatePassword('userPassword123!');
@@ -267,10 +265,9 @@ class AmexingUser extends Parse.Object {
    * Records successful login with authentication method tracking and security logging.
    * Resets failed login attempts, updates last login timestamp, and logs successful
    * authentication event for audit trail and user activity monitoring.
-   *
-   * @method recordSuccessfulLogin
-   * @param {string} [authMethod='password'] - Authentication method used (password, oauth, etc.)
-   * @returns {Promise<void>} Saves user with updated login information
+   * @function recordSuccessfulLogin
+   * @param {string} [authMethod] - Authentication method used (password, oauth, etc.).
+   * @returns {Promise<void>} Saves user with updated login information.
    * @example
    * // Record successful password login
    * await user.recordSuccessfulLogin('password');

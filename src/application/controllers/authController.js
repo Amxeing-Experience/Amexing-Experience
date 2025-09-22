@@ -18,8 +18,7 @@ const securityMiddlewares = require('../../infrastructure/security/securityMiddl
  * - CSRF protection for all forms
  * - Session management and security
  * - Comprehensive error handling and logging
- * - Mobile and web responsive interfaces
- *
+ * - Mobile and web responsive interfaces.
  * @class AuthController
  * @author Amexing Development Team
  * @version 2.0.0
@@ -43,11 +42,10 @@ class AuthController {
    * Displays the login form with CSRF protection and OAuth provider options.
    * Renders the login view with security tokens, error messages, and available
    * OAuth authentication providers for user authentication.
-   *
-   * @method showLogin
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} Renders login view
+   * @function showLogin
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Renders login view.
    * @example
    * // GET /login
    * // Displays login form with CSRF token and OAuth providers
@@ -76,11 +74,10 @@ class AuthController {
    * Displays the registration form with CSRF protection and input validation.
    * Renders the registration view with security tokens, error messages, and
    * proper form validation setup for new user account creation.
-   *
-   * @method showRegister
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} Renders registration form
+   * @function showRegister
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Renders registration form.
    * @example
    * // GET /register
    * // Displays registration form with CSRF token and validation
@@ -99,11 +96,10 @@ class AuthController {
    * Processes user login with Parse Server authentication and session management.
    * Handles POST requests for user authentication, validates credentials, creates
    * sessions, and manages login attempts with security logging and error handling.
-   *
-   * @method login
-   * @param {object} req - Express request object with username and password in body
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} Redirects on success or renders login with error
+   * @function login
+   * @param {object} req - Express request object with username and password in body.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Redirects on success or renders login with error.
    * @example
    * // POST /login
    * // Body: { username: 'user@example.com', password: 'securepassword' }
@@ -180,11 +176,10 @@ class AuthController {
    * Processes user registration with validation, user creation, and session setup.
    * Handles POST requests for new user registration, validates input data,
    * creates Parse Server user accounts, and establishes authentication sessions.
-   *
-   * @method register
-   * @param {object} req - Express request object with username, email, password in body
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} Redirects on success or renders registration with error
+   * @function register
+   * @param {object} req - Express request object with username, email, password in body.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Redirects on success or renders registration with error.
    * @example
    * // POST /register
    * // Body: { username: 'newuser', email: 'user@example.com', password: 'SecurePass123!' }
@@ -292,11 +287,10 @@ class AuthController {
    * Handles user logout with session cleanup and security logging.
    * Invalidates Parse Server session, clears browser sessions/cookies,
    * and logs security event for audit trail compliance.
-   *
-   * @method logout
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} Redirects to login page
+   * @function logout
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Redirects to login page.
    * @example
    * // POST /logout
    * // Clears all session data and redirects to login
@@ -347,11 +341,10 @@ class AuthController {
    * Displays the forgot password form for password reset requests.
    * Renders the password reset form with CSRF protection and status messages
    * for users who need to recover access to their accounts.
-   *
-   * @method showForgotPassword
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} Renders forgot password form
+   * @function showForgotPassword
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Renders forgot password form.
    * @example
    * // GET /auth/forgot-password
    * // Displays password reset request form
@@ -370,11 +363,10 @@ class AuthController {
    * Displays the password reset form with token validation.
    * Validates the reset token and renders the password reset form with
    * security measures for users completing their password recovery process.
-   *
-   * @method showResetPassword
-   * @param {object} req - Express request object with reset token in query
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} Renders reset password form or redirects on error
+   * @function showResetPassword
+   * @param {object} req - Express request object with reset token in query.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Renders reset password form or redirects on error.
    * @example
    * // GET /auth/reset-password?token=abc123
    * // Displays password reset form with validated token

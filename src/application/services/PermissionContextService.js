@@ -28,8 +28,7 @@ const logger = require('../../infrastructure/logger');
  * - Permission caching and performance optimization
  * - Audit logging for context changes
  * - Context metadata and UI integration
- * - Temporary permission elevation
- *
+ * - Temporary permission elevation.
  * @class PermissionContextService
  * @author Amexing Development Team
  * @version 1.0.0

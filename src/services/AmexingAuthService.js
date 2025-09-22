@@ -39,8 +39,7 @@ const logger = require('../infrastructure/logger');
  * - Corporate SSO with automatic employee provisioning
  * - PCI DSS compliant password handling
  * - Comprehensive audit logging
- * - Account lockout and security features
- *
+ * - Account lockout and security features.
  * @class AmexingAuthService
  * @author Claude Code + Technical Team
  * @version 2.0
