@@ -1,0 +1,23 @@
+<div class="card overflow-hidden mb-4">
+    <div class="card-body p-4">
+        <h5 class="card-title mb-9 fw-semibold"><%= title %></h5>
+        <div class="row align-items-center">
+            <div class="col-8">
+                <h4 class="fw-semibold mb-3"><%= value %></h4>
+                <div class="d-flex align-items-center mb-3">
+                    <span class="me-1 rounded-circle bg-light-<%= trendColor %> round-20 d-flex align-items-center justify-content-center">
+                        <i class="ti ti-arrow-up-left text-<%= trendColor %>"></i>
+                    </span>
+                    <p class="text-<%= trendColor %> mb-0 fw-semibold"><%= trend %></p>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="d-flex justify-content-end">
+                    <div class="text-white bg-<%= color %> rounded-circle p-6 d-flex align-items-center justify-content-center">
+                        <i class="<%= icon %> fs-6"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

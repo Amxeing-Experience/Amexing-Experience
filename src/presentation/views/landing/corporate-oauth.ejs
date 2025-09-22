@@ -14,8 +14,8 @@ Supports white-label branding and department-specific flows
     <%# Dynamic title based on corporate configuration %>
     <title><%= corporateConfig && corporateConfig.metadata && corporateConfig.metadata.title ? 
                corporateConfig.metadata.title : 
-               (corporateConfig && corporateConfig.name ? 
-                `Sign in to ${corporateConfig.name}` : 
+               (corporateConfig && corporateConfig.name ?
+                'Sign in to ' + corporateConfig.name :
                 'Corporate Sign In - AmexingWeb') %></title>
     
     <%# Dynamic meta description %>
@@ -247,8 +247,8 @@ Supports white-label branding and department-specific flows
     <% if (corporateConfig && corporateConfig.fonts && corporateConfig.fonts.googleFonts) { %>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?<%= corporateConfig.fonts.googleFonts.map(font => 
-            `family=${encodeURIComponent(font)}`).join('&') %>&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?<%= corporateConfig.fonts.googleFonts.map(font =>
+            'family=' + encodeURIComponent(font)).join('&') %>&display=swap" rel="stylesheet">
     <% } %>
     
     <%# OAuth Component Styles %>
@@ -320,7 +320,7 @@ Supports white-label branding and department-specific flows
         <%# Corporate Footer %>
         <div class="footer">
             <% if (corporateConfig && corporateConfig.supportInfo) { %>
-                <p>Need help? Contact <a href="<%= corporateConfig.supportInfo.url || `mailto:${corporateConfig.supportInfo.email}` %>">
+                <p>Need help? Contact <a href="<%= corporateConfig.supportInfo.url || ('mailto:' + corporateConfig.supportInfo.email) %>">
                     <%= corporateConfig.supportInfo.name || 'IT Support' %>
                 </a></p>
             <% } else { %>
@@ -437,7 +437,7 @@ Supports white-label branding and department-specific flows
             // Google Analytics
             if (analytics.googleAnalytics) {
                 const script = document.createElement('script');
-                script.src = `https://www.googletagmanager.com/gtag/js?id=${analytics.googleAnalytics}`;
+                script.src = 'https://www.googletagmanager.com/gtag/js?id=' + analytics.googleAnalytics;
                 script.async = true;
                 document.head.appendChild(script);
                 

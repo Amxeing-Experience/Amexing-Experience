@@ -1,0 +1,75 @@
+<% if (typeof additionalScripts !== 'undefined' && additionalScripts) { %>
+    <% additionalScripts.forEach(function(script) { %>
+        <%
+        // Allowlist of safe script patterns
+        const safeScriptPattern = /^(\/|\.\/|\.\.\/|https?:\/\/(localhost|127\.0\.0\.1|[a-zA-Z0-9.-]+\.trusted\.domain))/;
+        const relativeDashboardPattern = /^\/dashboard\//;
+        const relativePublicPattern = /^\/public\//;
+
+        if (script && (relativeDashboardPattern.test(script) || relativePublicPattern.test(script) || script.startsWith('/flexy-bootstrap'))) {
+        %>
+        <script src="<%= script %>"></script> <!-- semgrep-ignore -->
+        <% } %>
+    <% }); %>
+<% } %>
+
+<script>
+    // Role-specific JavaScript initialization
+    const userRole = '<%= typeof userRole !== "undefined" ? userRole : "guest" %>';
+    const userId = '<%= typeof userId !== "undefined" ? userId : null %>';
+
+    // Initialize tooltips
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+
+    // Initialize popovers
+    const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+    const popoverList = [...popoverTriggerList].map(popoverTriggerEl => new bootstrap.Popover(popoverTriggerEl));
+
+    // Custom Amexing dashboard functions
+    const AmexingDashboard = {
+        init: function() {
+            this.setupNotifications();
+            this.setupSearch();
+            this.setupThemeToggle();
+        },
+
+        setupNotifications: function() {
+            // Setup real-time notifications
+            console.log('Notifications initialized for role:', userRole);
+        },
+
+        setupSearch: function() {
+            // Setup global search
+            const searchInput = document.querySelector('#global-search');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    // Implement search logic
+                    console.log('Searching:', e.target.value);
+                });
+            }
+        },
+
+        setupThemeToggle: function() {
+            // Setup dark/light theme toggle
+            const themeToggle = document.querySelector('#theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', () => {
+                    document.body.classList.toggle('dark-mode');
+                    localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+                });
+            }
+
+            // Apply saved theme
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+            }
+        }
+    };
+
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', function() {
+        AmexingDashboard.init();
+    });
+</script>

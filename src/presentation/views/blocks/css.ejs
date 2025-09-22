@@ -1,0 +1,118 @@
+<% if (typeof additionalStyles !== 'undefined' && additionalStyles) { %>
+    <% additionalStyles.forEach(function(style) { %>
+        <link rel="stylesheet" href="<%= style %>" />
+    <% }); %>
+<% } %>
+
+<style>
+    /* Custom styles for Amexing */
+    .brand-logo img {
+        max-height: 40px;
+    }
+
+    .sidebar-nav .sidebar-item .sidebar-link.active {
+        background-color: #5d87ff;
+        color: white;
+    }
+
+    .card {
+        border-radius: 12px;
+    }
+
+    .btn {
+        border-radius: 8px;
+    }
+
+    /* Fix dashboard layout spacing issues */
+    .app-header {
+        top: 0 !important; /* Remove the 65px top offset */
+    }
+
+    @media (max-width: 991.98px) {
+        .app-header {
+            top: 0 !important; /* Remove the 131px top offset on mobile */
+        }
+    }
+
+    /* Fix excessive body wrapper padding */
+    .body-wrapper .container-fluid,
+    .body-wrapper .container-sm,
+    .body-wrapper .container-md,
+    .body-wrapper .container-lg,
+    .body-wrapper .container-xl,
+    .body-wrapper .container-xxl {
+        padding-top: 90px !important; /* Reduce from 180px to 90px */
+    }
+
+    @media (max-width: 991.98px) {
+        .body-wrapper .container-fluid,
+        .body-wrapper .container-sm,
+        .body-wrapper .container-md,
+        .body-wrapper .container-lg,
+        .body-wrapper .container-xl,
+        .body-wrapper .container-xxl {
+            padding-top: 120px !important; /* Reduce from 230px to 120px on mobile */
+        }
+    }
+
+    /* Fix the fixed header padding calculation */
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-fluid,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-sm,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-md,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-lg,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-xl,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-xxl {
+        padding-top: 70px !important; /* Remove the extra 30px, keep just header height */
+    }
+
+    /* Fix sidebar positioning - remove the 65px top offset */
+    #main-wrapper[data-layout=vertical][data-sidebar-position=fixed] .left-sidebar {
+        top: 0 !important; /* Remove the 65px top offset */
+    }
+
+    @media (max-width: 991.98px) {
+        #main-wrapper[data-layout=vertical][data-sidebar-position=fixed] .left-sidebar {
+            top: 0 !important; /* Remove the 131px top offset on mobile */
+        }
+    }
+
+    /* Role-specific color schemes */
+    <% if (typeof userRole !== 'undefined') { %>
+        <% if (userRole === 'superadmin') { %>
+            :root {
+                --primary-color: #ff6b6b;
+                --secondary-color: #4ecdc4;
+            }
+        <% } else if (userRole === 'admin') { %>
+            :root {
+                --primary-color: #5d87ff;
+                --secondary-color: #49beff;
+            }
+        <% } else if (userRole === 'client') { %>
+            :root {
+                --primary-color: #8b5cf6;
+                --secondary-color: #ec4899;
+            }
+        <% } else if (userRole === 'department_manager') { %>
+            :root {
+                --primary-color: #10b981;
+                --secondary-color: #3b82f6;
+            }
+        <% } else if (userRole === 'employee') { %>
+            :root {
+                --primary-color: #06b6d4;
+                --secondary-color: #8b5cf6;
+            }
+        <% } else if (userRole === 'driver') { %>
+            :root {
+                --primary-color: #f59e0b;
+                --secondary-color: #ef4444;
+            }
+        <% } else { %>
+            :root {
+                --primary-color: #6b7280;
+                --secondary-color: #9ca3af;
+            }
+        <% } %>
+    <% } %>
+</style>

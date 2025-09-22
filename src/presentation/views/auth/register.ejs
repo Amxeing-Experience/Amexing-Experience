@@ -1,5 +1,6 @@
-<%- include('../layout', { 
-    title: 'Login', 
-    body: include('../partials/register', { error: error }) ,
+<% var registerContent = include('../partials/register', { error: error }); %>
+<%- include('../layout', {
+    title: 'Register',
+    body: registerContent,
     error: error
 }) %>

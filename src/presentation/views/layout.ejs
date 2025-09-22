@@ -133,10 +133,10 @@
     
     <div class="container">
         <main>
-            <%# SECURITY: Safe to use unescaped output here because:
-                1. 'body' variable contains only trusted pre-rendered EJS templates
-                2. No external user data reaches this location
-                3. Content is generated server-side from controlled template files %>
+            <!-- SECURITY: Safe to use unescaped output here because:
+                 1. 'body' variable contains only trusted pre-rendered EJS templates
+                 2. No external user data reaches this location
+                 3. Content is generated server-side from controlled template files -->
             <%- body %>
         </main>
     </div>

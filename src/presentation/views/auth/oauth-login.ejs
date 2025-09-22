@@ -4,28 +4,32 @@ Corporate OAuth-enabled login page with department selection and mobile optimiza
 Integrates with landing page system and supports corporate branding
 %>
 
-<%- include('../layout', { 
-    title: (typeof corporateConfig !== 'undefined' && corporateConfig && corporateConfig.name) 
-           ? `Sign in to ${corporateConfig.name}` 
-           : 'Sign In - Enhanced OAuth', 
-    body: include('../partials/oauth-enhanced', { 
-        title: (typeof corporateConfig !== 'undefined' && corporateConfig && corporateConfig.name) 
-               ? `Welcome to ${corporateConfig.name}` 
-               : 'Sign In',
-        error: typeof error !== 'undefined' ? error : null,
-        success: typeof success !== 'undefined' ? success : null,
-        corporateConfig: typeof corporateConfig !== 'undefined' ? corporateConfig : null,
-        departmentRequired: typeof departmentRequired !== 'undefined' ? departmentRequired : false,
-        departments: typeof departments !== 'undefined' ? departments : null,
-        oauthProviders: typeof oauthProviders !== 'undefined' ? oauthProviders : null,
-        allowedProviders: typeof allowedProviders !== 'undefined' ? allowedProviders : ['google', 'microsoft', 'apple'],
-        intelligentSelection: typeof intelligentSelection !== 'undefined' ? intelligentSelection : true,
-        mobile: typeof mobile !== 'undefined' ? mobile : false,
-        theme: typeof theme !== 'undefined' ? theme : 'default',
-        csrfToken: typeof csrfToken !== 'undefined' ? csrfToken : '',
-        showForgotPassword: typeof showForgotPassword !== 'undefined' ? showForgotPassword : true,
-        showRegister: typeof showRegister !== 'undefined' ? showRegister : true
-    }),
+<%
+var oauthContent = include('../partials/oauth-enhanced', {
+    title: (typeof corporateConfig !== 'undefined' && corporateConfig && corporateConfig.name)
+           ? 'Welcome to ' + corporateConfig.name
+           : 'Sign In',
+    error: typeof error !== 'undefined' ? error : null,
+    success: typeof success !== 'undefined' ? success : null,
+    corporateConfig: typeof corporateConfig !== 'undefined' ? corporateConfig : null,
+    departmentRequired: typeof departmentRequired !== 'undefined' ? departmentRequired : false,
+    departments: typeof departments !== 'undefined' ? departments : null,
+    oauthProviders: typeof oauthProviders !== 'undefined' ? oauthProviders : null,
+    allowedProviders: typeof allowedProviders !== 'undefined' ? allowedProviders : ['google', 'microsoft', 'apple'],
+    intelligentSelection: typeof intelligentSelection !== 'undefined' ? intelligentSelection : true,
+    mobile: typeof mobile !== 'undefined' ? mobile : false,
+    theme: typeof theme !== 'undefined' ? theme : 'default',
+    csrfToken: typeof csrfToken !== 'undefined' ? csrfToken : '',
+    showForgotPassword: typeof showForgotPassword !== 'undefined' ? showForgotPassword : true,
+    showRegister: typeof showRegister !== 'undefined' ? showRegister : true
+});
+%>
+
+<%- include('../layout', {
+    title: (typeof corporateConfig !== 'undefined' && corporateConfig && corporateConfig.name)
+           ? 'Sign in to ' + corporateConfig.name
+           : 'Sign In - Enhanced OAuth',
+    body: oauthContent,
     user: typeof user !== 'undefined' ? user : null,
     corporateConfig: typeof corporateConfig !== 'undefined' ? corporateConfig : null
 }) %>

@@ -1,0 +1,32 @@
+HTTP/1.1 302 Found
+X-Request-Id: ccdd24cc-f948-4830-80f2-d0a784798ea8
+Content-Security-Policy: default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;script-src 'self' 'unsafe-inline';img-src 'self' data: https:;font-src 'self' https://fonts.gstatic.com data:;connect-src 'self' http://localhost:1337;object-src 'none';media-src 'self';frame-src 'none';sandbox allow-forms allow-scripts allow-same-origin;report-uri /api/csp-report;base-uri 'self';form-action 'self';frame-ancestors 'self';script-src-attr 'none'
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: DENY
+X-XSS-Protection: 1; mode=block
+Vary: Origin, Accept, Accept-Encoding
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: X-Total-Count,X-Page,X-Per-Page
+RateLimit-Policy: 100;w=900
+RateLimit-Limit: 100
+RateLimit-Remaining: 99
+RateLimit-Reset: 900
+Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate
+Pragma: no-cache
+Expires: 0
+Surrogate-Control: no-store
+Location: /login?error=Invalid%20function%3A%20%22loginUser%22
+Content-Type: text/plain; charset=utf-8
+Content-Length: 74
+Set-Cookie: amexing.sid=s%3A9OFgGN91WoPdGY2tzfyQamSfW37BnKAx.JjTn1Soc0WiRAOXXqz21kmfJkM8xRaCsI10nzaDIJu0; Path=/; Expires=Mon, 22 Sep 2025 17:02:43 GMT; HttpOnly; SameSite=Lax
+Date: Mon, 22 Sep 2025 16:48:07 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+

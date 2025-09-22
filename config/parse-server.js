@@ -119,12 +119,21 @@ const parseServerConfig = {
           username: { type: 'String' },
           email: { type: 'String' },
           emailVerified: { type: 'Boolean' },
-          password: { type: 'String' },
+          passwordHash: { type: 'String' },  // Changed from password to passwordHash
           role: { type: 'String' },
           active: { type: 'Boolean' },
           lastLoginAt: { type: 'Date' },
-          failedLoginAttempts: { type: 'Number' },
-          accountLockedUntil: { type: 'Date' },
+          loginAttempts: { type: 'Number' },  // Changed from failedLoginAttempts
+          lockedUntil: { type: 'Date' },  // Changed from accountLockedUntil
+          passwordChangedAt: { type: 'Date' },
+          mustChangePassword: { type: 'Boolean' },
+          oauthAccounts: { type: 'Array' },
+          primaryOAuthProvider: { type: 'String' },
+          lastAuthMethod: { type: 'String' },
+          firstName: { type: 'String' },
+          lastName: { type: 'String' },
+          createdBy: { type: 'String' },
+          modifiedBy: { type: 'String' },
           authData: { type: 'Object' },
         },
         classLevelPermissions: {

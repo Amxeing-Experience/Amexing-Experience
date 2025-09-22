@@ -91,6 +91,38 @@ app.use(
   })
 );
 
+// Dashboard static assets
+app.use(
+  '/dashboard',
+  express.static(path.join(__dirname, '..', 'public', 'dashboard'), {
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+  })
+);
+
+// Landing page assets
+app.use(
+  '/landing',
+  express.static(path.join(__dirname, '..', 'public', 'landing'), {
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+  })
+);
+
+// Common assets
+app.use(
+  '/common',
+  express.static(path.join(__dirname, '..', 'public', 'common'), {
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+  })
+);
+
+// Flexy Bootstrap template assets
+app.use(
+  '/flexy-bootstrap-lite-1.0.0',
+  express.static(path.join(__dirname, '..', 'public', 'flexy-bootstrap-lite-1.0.0'), {
+    maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+  })
+);
+
 // Initialize Parse Server
 const parseServer = new ParseServer(parseServerConfig);
 
@@ -110,6 +142,7 @@ const parseServer = new ParseServer(parseServerConfig);
     Parse.serverURL = parseServerConfig.serverURL;
 
     logger.info('Parse SDK initialized for internal operations');
+    // Cloud functions are automatically loaded by Parse Server via the config
   } catch (error) {
     logger.error('Failed to initialize Parse Server:', error);
 
@@ -184,6 +217,11 @@ app.use('/auth', authRoutes);
 
 // Documentation Routes
 app.use('/', docsRoutes);
+
+// Dashboard Routes
+const dashboardRoutes = require('./presentation/routes/dashboardRoutes');
+
+app.use('/dashboard', dashboardRoutes);
 
 // Web Routes
 app.use('/', webRoutes);

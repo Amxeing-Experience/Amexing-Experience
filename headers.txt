@@ -1,0 +1,27 @@
+HTTP/1.1 403 Forbidden
+X-Request-Id: 02a6d87d-2a82-4f5c-8dd4-15452d4a8ad6
+Content-Security-Policy: default-src 'self';style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;script-src 'self' 'unsafe-inline';img-src 'self' data: https:;font-src 'self' https://fonts.gstatic.com data:;connect-src 'self' http://localhost:1337;object-src 'none';media-src 'self';frame-src 'none';sandbox allow-forms allow-scripts allow-same-origin;report-uri /api/csp-report;base-uri 'self';form-action 'self';frame-ancestors 'self';script-src-attr 'none'
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
+Origin-Agent-Cluster: ?1
+Referrer-Policy: strict-origin-when-cross-origin
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-DNS-Prefetch-Control: off
+X-Download-Options: noopen
+X-Frame-Options: DENY
+X-XSS-Protection: 0
+Vary: Origin, Accept-Encoding
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: X-Total-Count,X-Page,X-Per-Page
+RateLimit-Policy: 100;w=900
+RateLimit-Limit: 100
+RateLimit-Remaining: 99
+RateLimit-Reset: 900
+Content-Type: application/json; charset=utf-8
+Content-Length: 66
+ETag: W/"42-mgk6ZPJGJMvkF0Phm0PcevaDdik"
+Date: Mon, 22 Sep 2025 16:47:32 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+

@@ -1,0 +1,277 @@
+const DashboardController = require('./DashboardController');
+
+/**
+ * RoleBasedController - Liskov Substitution Principle (LSP) & Interface Segregation Principle (ISP)
+ * Child classes can be substituted for parent class
+ * Provides role-specific interfaces without forcing unnecessary implementations.
+ */
+class RoleBasedController extends DashboardController {
+  constructor(role) {
+    super();
+    this.role = role;
+    this.permissions = this.getDefaultPermissions();
+  }
+
+  /**
+   * Get default permissions for the role.
+   * @example
+   */
+  getDefaultPermissions() {
+    const permissionMap = {
+      superadmin: ['*'], // All permissions
+      admin: [
+        'view_all_clients',
+        'manage_clients',
+        'view_all_users',
+        'manage_bookings',
+        'view_reports',
+        'manage_fleet',
+        'manage_drivers',
+      ],
+      client: [
+        'view_own_company',
+        'manage_departments',
+        'manage_employees',
+        'view_company_reports',
+        'manage_budgets',
+        'approve_bookings',
+      ],
+      department_manager: [
+        'view_department',
+        'manage_team',
+        'approve_team_bookings',
+        'view_department_budget',
+        'allocate_budget',
+        'view_department_reports',
+      ],
+      employee: [
+        'view_own_profile',
+        'create_booking',
+        'view_own_bookings',
+        'view_own_budget',
+        'submit_feedback',
+      ],
+      driver: [
+        'view_own_profile',
+        'view_assigned_trips',
+        'update_trip_status',
+        'view_earnings',
+        'manage_vehicle',
+      ],
+      guest: [
+        'view_event_info',
+        'view_transport_details',
+      ],
+    };
+
+    return permissionMap[this.role] || [];
+  }
+
+  /**
+   * Check if user has required role.
+   * @param requiredRole
+   * @example
+   */
+  requireRole(requiredRole) {
+    return (req, res, next) => {
+      if (!req.user) {
+        return this.redirectWithMessage(res, '/login', 'Please login to continue', 'error');
+      }
+
+      const roleHierarchy = {
+        superadmin: 7,
+        admin: 6,
+        client: 5,
+        department_manager: 4,
+        employee: 3,
+        driver: 2,
+        guest: 1,
+      };
+
+      const userLevel = roleHierarchy[req.user.role] || 0;
+      const requiredLevel = roleHierarchy[requiredRole] || 0;
+
+      if (userLevel < requiredLevel) {
+        return this.handleError(res, new Error('Insufficient permissions'), 403);
+      }
+
+      next();
+    };
+  }
+
+  /**
+   * Get role-specific view path.
+   * @param viewName
+   * @example
+   */
+  getRoleViewPath(viewName) {
+    return `dashboards/${this.role}/${viewName}`;
+  }
+
+  /**
+   * Render role-specific view.
+   * @param req
+   * @param res
+   * @param viewName
+   * @param data
+   * @example
+   */
+  async renderRoleView(req, res, viewName, data = {}) {
+    const viewPath = this.getRoleViewPath(viewName);
+    const roleData = {
+      ...data,
+      userRole: this.role,
+      permissions: this.permissions,
+    };
+
+    return this.renderDashboard(req, res, viewPath, roleData);
+  }
+
+  /**
+   * Get role-specific menu items.
+   * @example
+   */
+  getRoleMenuItems() {
+    // This will be overridden by specific role controllers
+    return [];
+  }
+
+  /**
+   * Get role-specific dashboard widgets.
+   * @param userId
+   * @param _userId
+   * @example
+   */
+  async getRoleWidgets(_userId) {
+    // This will be overridden by specific role controllers
+    return [];
+  }
+
+  /**
+   * Apply role-specific data filters.
+   * @param query
+   * @param user
+   * @param _user
+   * @example
+   */
+  applyRoleFilters(query, _user) {
+    // This will be overridden by specific role controllers
+    return query;
+  }
+
+  /**
+   * Get role-specific notifications.
+   * @param userId
+   * @param _userId
+   * @example
+   */
+  async getRoleNotifications(_userId) {
+    // This will be overridden by specific role controllers
+    return [];
+  }
+
+  /**
+   * Validate role-specific actions.
+   * @param action
+   * @param user
+   * @param _user
+   * @example
+   */
+  validateRoleAction(action, _user) {
+    if (this.permissions.includes('*')) {
+      return true;
+    }
+
+    return this.permissions.includes(action);
+  }
+
+  /**
+   * Get role dashboard route.
+   * @example
+   */
+  getRoleDashboardRoute() {
+    return `/dashboard/${this.role}`;
+  }
+
+  /**
+   * Handle role-specific redirects.
+   * @param req
+   * @param res
+   * @example
+   */
+  handleRoleRedirect(req, res) {
+    const dashboardRoute = this.getRoleDashboardRoute();
+    return res.redirect(dashboardRoute);
+  }
+
+  /**
+   * Log role-specific activity.
+   * @param userId
+   * @param action
+   * @param details
+   * @example
+   */
+  async logRoleActivity(userId, action, details = {}) {
+    const activityData = {
+      ...details,
+      role: this.role,
+      timestamp: new Date(),
+    };
+
+    return this.logActivity(userId, action, activityData);
+  }
+
+  /**
+   * Get role-specific settings.
+   * @example
+   */
+  getRoleSettings() {
+    const settingsMap = {
+      superadmin: {
+        showSystemStats: true,
+        showAllClients: true,
+        canModifySystem: true,
+        canViewAuditLogs: true,
+      },
+      admin: {
+        showOperationalStats: true,
+        showClientManagement: true,
+        canManageFleet: true,
+        canViewReports: true,
+      },
+      client: {
+        showCompanyStats: true,
+        showDepartments: true,
+        canManageBudgets: true,
+        canApproveBookings: true,
+      },
+      department_manager: {
+        showDepartmentStats: true,
+        showTeamManagement: true,
+        canAllocateBudget: true,
+        canApproveTeamBookings: true,
+      },
+      employee: {
+        showPersonalStats: true,
+        canCreateBookings: true,
+        canViewBudget: true,
+        canSubmitFeedback: true,
+      },
+      driver: {
+        showTripStats: true,
+        showEarnings: true,
+        canUpdateTripStatus: true,
+        canManageVehicle: true,
+      },
+      guest: {
+        showEventInfo: true,
+        showTransportInfo: true,
+        canViewOnly: true,
+      },
+    };
+
+    return settingsMap[this.role] || {};
+  }
+}
+
+module.exports = RoleBasedController;

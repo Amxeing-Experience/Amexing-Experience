@@ -1,15 +1,12 @@
-<%- include('../layout', { body: `
-    <div style="text-align: center; padding: 3rem 0;">
-        <h1 style="font-size: 3rem; color: #c33; margin-bottom: 1rem;">Error ${status}</h1>
-        <h2 style="color: #333; margin-bottom: 1rem;">${title}</h2>
-        <p style="color: #666; margin-bottom: 2rem;">${message}</p>
-        
-        <% if (error && error.stack) { %>
-            <div style="text-align: left; margin: 2rem auto; max-width: 800px; padding: 1rem; background: #f0f0f0; border-radius: 4px; overflow-x: auto;">
-                <pre style="font-family: monospace; font-size: 0.875rem; color: #333;"><%= error.stack %></pre>
-            </div>
-        <% } %>
-        
-        <a href="/" class="btn">Go to Homepage</a>
-    </div>
-` }) %>
+<%- include('../layout', {
+    body: '<div style="text-align: center; padding: 3rem 0;">' +
+          '<h1 style="font-size: 3rem; color: #c33; margin-bottom: 1rem;">Error ' + (typeof status !== "undefined" ? status : "500") + '</h1>' +
+          '<h2 style="color: #333; margin-bottom: 1rem;">' + (typeof title !== "undefined" ? title : "Server Error") + '</h2>' +
+          '<p style="color: #666; margin-bottom: 2rem;">' + (typeof message !== "undefined" ? message : "An unexpected error occurred") + '</p>' +
+          (typeof error !== "undefined" && error && error.stack ?
+            '<div style="text-align: left; margin: 2rem auto; max-width: 800px; padding: 1rem; background: #f0f0f0; border-radius: 4px; overflow-x: auto;">' +
+            '<pre style="font-family: monospace; font-size: 0.875rem; color: #333;">' + error.stack + '</pre>' +
+            '</div>' : '') +
+          '<a href="/" class="btn">Go to Homepage</a>' +
+          '</div>'
+}) %>

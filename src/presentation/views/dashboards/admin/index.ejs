@@ -1,0 +1,180 @@
+<!-- Admin Dashboard -->
+<div class="row">
+    <!-- Operational Overview -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-sm-flex d-block align-items-center justify-content-between mb-3">
+                    <div class="mb-3 mb-sm-0">
+                        <h5 class="card-title fw-semibold">Operational Dashboard</h5>
+                        <p class="card-subtitle mb-0">Today's operations summary</p>
+                    </div>
+                    <div>
+                        <span class="badge bg-light-primary text-primary fs-2">
+                            <%= new Date().toLocaleDateString() %>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-calendar-event',
+                            title: 'Today\'s Bookings',
+                            value: typeof stats !== 'undefined' ? stats.todayBookings : '23',
+                            color: 'primary',
+                            trend: '+5 from yesterday',
+                            trendColor: 'success'
+                        }) %>
+                    </div>
+                    <div class="col-md-4">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-car',
+                            title: 'Active Drivers',
+                            value: typeof stats !== 'undefined' ? stats.activeDrivers : '87',
+                            color: 'success',
+                            trend: '94% availability',
+                            trendColor: 'success'
+                        }) %>
+                    </div>
+                    <div class="col-md-4">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-building',
+                            title: 'Active Clients',
+                            value: typeof stats !== 'undefined' ? stats.activeClients : '42',
+                            color: 'info',
+                            trend: '+2 this week',
+                            trendColor: 'success'
+                        }) %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Quick Actions</h5>
+                <div class="d-grid gap-2">
+                    <a href="/dashboard/admin/bookings" class="btn btn-primary">
+                        <i class="ti ti-calendar-plus me-2"></i>Manage Bookings
+                    </a>
+                    <a href="/dashboard/admin/drivers" class="btn btn-outline-primary">
+                        <i class="ti ti-users me-2"></i>Driver Management
+                    </a>
+                    <a href="/dashboard/admin/fleet" class="btn btn-outline-secondary">
+                        <i class="ti ti-bus me-2"></i>Fleet Status
+                    </a>
+                    <a href="/dashboard/admin/reports" class="btn btn-outline-info">
+                        <i class="ti ti-report-analytics me-2"></i>View Reports
+                    </a>
+                </div>
+
+                <hr class="my-4">
+
+                <h6 class="card-title mb-3">Pending Approvals</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted">Driver Applications</span>
+                    <span class="badge bg-warning">3</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted">Client Requests</span>
+                    <span class="badge bg-info">2</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Booking Modifications</span>
+                    <span class="badge bg-secondary">8</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Bookings & Performance -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h5 class="card-title mb-0">Recent Bookings</h5>
+                    <a href="/dashboard/admin/bookings" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table text-nowrap mb-0 align-middle">
+                        <thead class="text-dark fs-4">
+                            <tr>
+                                <th class="border-bottom-0">Booking ID</th>
+                                <th class="border-bottom-0">Client</th>
+                                <th class="border-bottom-0">Date</th>
+                                <th class="border-bottom-0">Driver</th>
+                                <th class="border-bottom-0">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (typeof recentBookings !== 'undefined' && recentBookings.length > 0) { %>
+                                <% recentBookings.forEach(function(booking) { %>
+                                    <tr>
+                                        <td class="border-bottom-0">
+                                            <span class="fw-semibold"><%= booking.id %></span>
+                                        </td>
+                                        <td class="border-bottom-0"><%= booking.client %></td>
+                                        <td class="border-bottom-0">
+                                            <span class="text-muted">
+                                                <%= new Date(booking.date).toLocaleDateString() %>
+                                            </span>
+                                        </td>
+                                        <td class="border-bottom-0"><%= booking.driver %></td>
+                                        <td class="border-bottom-0">
+                                            <span class="badge bg-light-<%= booking.status === 'confirmed' ? 'success' : 'warning' %> text-<%= booking.status === 'confirmed' ? 'success' : 'warning' %>">
+                                                <%= booking.status.charAt(0).toUpperCase() + booking.status.slice(1) %>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">No recent bookings</td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Financial Summary</h5>
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Monthly Revenue</span>
+                        <span class="fw-semibold">$<%= typeof stats !== 'undefined' ? (stats.monthlyRevenue/1000).toFixed(0) : '125' %>K</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 5px;">
+                        <div class="progress-bar bg-primary" style="width: 75%;"></div>
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Completion Rate</span>
+                        <span class="fw-semibold text-success"><%= typeof stats !== 'undefined' ? stats.completionRate : '94%' %></span>
+                    </div>
+                    <div class="progress mb-3" style="height: 5px;">
+                        <div class="progress-bar bg-success" style="width: 94%;"></div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Available Vehicles</span>
+                    <span class="fw-semibold"><%= typeof stats !== 'undefined' ? stats.availableVehicles : '65' %></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

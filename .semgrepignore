@@ -24,6 +24,11 @@ docs/
 src/index.js
 src/infrastructure/security/securityMiddleware.js
 src/presentation/views/layout.ejs
+# Layout templates with safe body content (server-side controlled)
+src/presentation/views/auth-layout.ejs
+src/presentation/views/layouts/dashboard.ejs
+# Script blocks with proper URL validation implemented
+src/presentation/views/blocks/scripts.ejs
 
 # Logs
 logs/

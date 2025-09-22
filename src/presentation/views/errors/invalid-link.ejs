@@ -1,8 +1,8 @@
-<%- include('../layout', { body: `
-    <div style="text-align: center; padding: 3rem 0;">
-        <div style="font-size: 4rem; color: #c33; margin-bottom: 1rem;">⚠</div>
-        <h2 style="color: #333; margin-bottom: 1rem;">${title}</h2>
-        <p style="color: #666; margin-bottom: 2rem;">${message}</p>
-        <a href="/" class="btn">Go to Homepage</a>
-    </div>
-` }) %>
+<%- include('../layout', {
+    body: '<div style="text-align: center; padding: 3rem 0;">' +
+          '<div style="font-size: 4rem; color: #c33; margin-bottom: 1rem;">⚠</div>' +
+          '<h2 style="color: #333; margin-bottom: 1rem;">' + (typeof title !== "undefined" ? title : "Invalid Link") + '</h2>' +
+          '<p style="color: #666; margin-bottom: 2rem;">' + (typeof message !== "undefined" ? message : "The link you followed is invalid or has expired.") + '</p>' +
+          '<a href="/" class="btn">Go to Homepage</a>' +
+          '</div>'
+}) %>

@@ -1,0 +1,195 @@
+<!-- Employee Dashboard -->
+<div class="row">
+    <!-- Welcome Section -->
+    <div class="col-lg-12">
+        <div class="card bg-light-primary position-relative overflow-hidden">
+            <div class="card-body px-4 py-3">
+                <div class="row align-items-center">
+                    <div class="col-9">
+                        <h4 class="fw-semibold mb-8">Welcome back, <%= userName || 'Employee' %>!</h4>
+                        <p class="mb-0">Your next trip is scheduled for today at 9:00 AM</p>
+                    </div>
+                    <div class="col-3">
+                        <div class="text-center mb-n5">
+                            <img src="/dashboard/images/breadcrumb/ChatBc.png" alt="" class="img-fluid mb-n4" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row">
+    <div class="col-md-6 col-lg-3">
+        <%- include('../../components/cards/stats', {
+            icon: 'ti ti-calendar-event',
+            title: 'Upcoming Trips',
+            value: typeof stats !== 'undefined' ? stats.upcomingTrips : '3',
+            color: 'primary',
+            trend: 'This week',
+            trendColor: 'muted'
+        }) %>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <%- include('../../components/cards/stats', {
+            icon: 'ti ti-route',
+            title: 'Completed Trips',
+            value: typeof stats !== 'undefined' ? stats.completedTrips : '45',
+            color: 'success',
+            trend: 'This month',
+            trendColor: 'muted'
+        }) %>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <%- include('../../components/cards/stats', {
+            icon: 'ti ti-wallet',
+            title: 'Budget Used',
+            value: '$' + (typeof stats !== 'undefined' ? stats.budgetUsed : '320'),
+            color: 'warning',
+            trend: 'of $' + (typeof stats !== 'undefined' ? stats.monthlyBudget : '500'),
+            trendColor: 'muted'
+        }) %>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <%- include('../../components/cards/stats', {
+            icon: 'ti ti-bookmark',
+            title: 'Saved Routes',
+            value: typeof stats !== 'undefined' ? stats.savedRoutes : '5',
+            color: 'info',
+            trend: 'Favorites',
+            trendColor: 'muted'
+        }) %>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="row">
+    <!-- Upcoming Trips -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h5 class="card-title mb-0">Upcoming Trips</h5>
+                    <a href="/dashboard/employee/bookings" class="btn btn-sm btn-primary">
+                        <i class="ti ti-plus me-1"></i>Book New Trip
+                    </a>
+                </div>
+
+                <div class="row">
+                    <!-- Trip Card -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card border border-primary">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="badge bg-primary">Today</span>
+                                    <span class="text-muted">9:00 AM</span>
+                                </div>
+                                <h6 class="fw-semibold mb-2">Office to Conference Center</h6>
+                                <p class="text-muted mb-2 fs-3">
+                                    <i class="ti ti-map-pin me-1"></i>
+                                    Main Office → Convention Center
+                                </p>
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span class="text-muted fs-3">Driver: John Doe</span>
+                                    <span class="badge bg-light-success text-success">Confirmed</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trip Card -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card border">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="badge bg-secondary">Tomorrow</span>
+                                    <span class="text-muted">2:00 PM</span>
+                                </div>
+                                <h6 class="fw-semibold mb-2">Client Meeting</h6>
+                                <p class="text-muted mb-2 fs-3">
+                                    <i class="ti ti-map-pin me-1"></i>
+                                    Office → Client Site
+                                </p>
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <span class="text-muted fs-3">Driver: Pending</span>
+                                    <span class="badge bg-light-warning text-warning">Pending</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <a href="/dashboard/employee/trips" class="btn btn-outline-primary">
+                        View All Trips
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions & Budget -->
+    <div class="col-lg-4">
+        <!-- Quick Actions -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Quick Actions</h5>
+                <div class="d-grid gap-2">
+                    <a href="/dashboard/employee/bookings" class="btn btn-primary">
+                        <i class="ti ti-calendar-plus me-2"></i>Book Transport
+                    </a>
+                    <a href="/dashboard/employee/trips" class="btn btn-outline-primary">
+                        <i class="ti ti-route me-2"></i>My Trips
+                    </a>
+                    <a href="/dashboard/employee/history" class="btn btn-outline-secondary">
+                        <i class="ti ti-history me-2"></i>Trip History
+                    </a>
+                    <a href="/dashboard/employee/profile" class="btn btn-outline-info">
+                        <i class="ti ti-user me-2"></i>My Profile
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Budget Overview -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Monthly Budget</h5>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Used</span>
+                        <span class="fw-semibold">$<%= typeof stats !== 'undefined' ? stats.budgetUsed : '320' %></span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Remaining</span>
+                        <span class="fw-semibold text-success">$<%= typeof stats !== 'undefined' ? (stats.monthlyBudget - stats.budgetUsed) : '180' %></span>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar bg-primary" style="width: <%= typeof stats !== 'undefined' ? ((stats.budgetUsed / stats.monthlyBudget) * 100) : '64' %>%;"></div>
+                    </div>
+                    <p class="text-muted fs-3 mt-2">
+                        <%= typeof stats !== 'undefined' ? Math.round((stats.budgetUsed / stats.monthlyBudget) * 100) : '64' %>% of $<%= typeof stats !== 'undefined' ? stats.monthlyBudget : '500' %> used
+                    </p>
+                </div>
+
+                <hr>
+
+                <h6 class="mb-3">Recent Expenses</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fs-3">Airport Trip</span>
+                    <span class="fw-semibold">$45</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fs-3">Client Meeting</span>
+                    <span class="fw-semibold">$32</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted fs-3">Conference</span>
+                    <span class="fw-semibold">$58</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

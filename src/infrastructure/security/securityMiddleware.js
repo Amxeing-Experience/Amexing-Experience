@@ -80,7 +80,7 @@ class SecurityMiddleware {
           ],
           scriptSrc: ["'self'", this.isDevelopment ? "'unsafe-inline'" : ''],
           imgSrc: ["'self'", 'data:', 'https:'],
-          fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
           connectSrc: ["'self'", 'http://localhost:1337'],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],
@@ -270,12 +270,13 @@ class SecurityMiddleware {
         if (
           !contentType
           || (!contentType.includes('application/json')
-            && !contentType.includes('multipart/form-data'))
+            && !contentType.includes('multipart/form-data')
+            && !contentType.includes('application/x-www-form-urlencoded'))
         ) {
           return res.status(400).json({
             error: 'Invalid Content-Type',
             message:
-              'Content-Type must be application/json or multipart/form-data',
+              'Content-Type must be application/json, multipart/form-data, or application/x-www-form-urlencoded',
           });
         }
       }

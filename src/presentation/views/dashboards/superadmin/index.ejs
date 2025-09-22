@@ -1,0 +1,209 @@
+<!-- SuperAdmin Dashboard -->
+<div class="row">
+    <!-- System Overview Stats -->
+    <div class="col-lg-8 d-flex align-items-strech">
+        <div class="card w-100">
+            <div class="card-body">
+                <div class="d-sm-flex d-block align-items-center justify-content-between mb-7">
+                    <div class="mb-3 mb-sm-0">
+                        <h5 class="card-title fw-semibold">System Overview</h5>
+                        <p class="card-subtitle mb-0">Real-time system statistics</p>
+                    </div>
+                    <div>
+                        <select class="form-select">
+                            <option value="1">Last 7 days</option>
+                            <option value="2">Last 30 days</option>
+                            <option value="3" selected>Last 90 days</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row align-items-center">
+                    <div class="col-8">
+                        <div id="chart"></div>
+                    </div>
+                    <div class="col-4">
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="me-1 rounded-circle bg-light-danger round-20 d-flex align-items-center justify-content-center">
+                                <i class="ti ti-point text-danger"></i>
+                            </span>
+                            <p class="text-muted mb-0 fs-3">Active Users</p>
+                        </div>
+                        <h4 class="fw-semibold text-danger mb-3"><%= typeof stats !== 'undefined' ? stats.dailyActiveUsers : '450' %></h4>
+
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="me-1 rounded-circle bg-light-success round-20 d-flex align-items-center justify-content-center">
+                                <i class="ti ti-point text-success"></i>
+                            </span>
+                            <p class="text-muted mb-0 fs-3">Total Bookings</p>
+                        </div>
+                        <h4 class="fw-semibold text-success mb-0"><%= typeof stats !== 'undefined' ? stats.totalBookings : '8,750' %></h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="col-lg-4">
+        <div class="row">
+            <div class="col-lg-12">
+                <!-- Total Users Card -->
+                <% var statsData1 = {
+                    icon: 'ti ti-users',
+                    title: 'Total Users',
+                    value: typeof stats !== 'undefined' ? stats.totalUsers : '1,250',
+                    color: 'primary',
+                    trend: '+12%',
+                    trendColor: 'success'
+                }; %>
+                <%- include('../../components/cards/stats', statsData1) %>
+            </div>
+            <div class="col-lg-12">
+                <!-- System Uptime Card -->
+                <% var statsData2 = {
+                    icon: 'ti ti-server',
+                    title: 'System Uptime',
+                    value: typeof stats !== 'undefined' ? stats.systemUptime : '99.9%',
+                    color: 'success',
+                    trend: 'Excellent',
+                    trendColor: 'success'
+                }; %>
+                <%- include('../../components/cards/stats', statsData2) %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity & Alerts -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h5 class="card-title mb-0">Recent System Activity</h5>
+                    <a href="/dashboard/superadmin/audit" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table text-nowrap mb-0 align-middle">
+                        <thead class="text-dark fs-4">
+                            <tr>
+                                <th class="border-bottom-0">Type</th>
+                                <th class="border-bottom-0">Message</th>
+                                <th class="border-bottom-0">Time</th>
+                                <th class="border-bottom-0">Severity</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% if (typeof recentActivity !== 'undefined' && recentActivity.length > 0) { %>
+                                <% recentActivity.forEach(function(activity) { %>
+                                    <tr>
+                                        <td class="border-bottom-0">
+                                            <span class="badge bg-light-<%= activity.severity %> text-<%= activity.severity %>">
+                                                <%= activity.type.replace('_', ' ').toUpperCase() %>
+                                            </span>
+                                        </td>
+                                        <td class="border-bottom-0"><%= activity.message %></td>
+                                        <td class="border-bottom-0">
+                                            <span class="text-muted">
+                                                <%= new Date(activity.timestamp).toLocaleTimeString() %>
+                                            </span>
+                                        </td>
+                                        <td class="border-bottom-0">
+                                            <span class="badge bg-light-<%= activity.severity %> text-<%= activity.severity %>">
+                                                <%= activity.severity.charAt(0).toUpperCase() + activity.severity.slice(1) %>
+                                            </span>
+                                        </td>
+                                    </tr>
+                                <% }); %>
+                            <% } else { %>
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-4">No recent activity</td>
+                                </tr>
+                            <% } %>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions & System Status -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Quick Actions</h5>
+                <div class="d-grid gap-2">
+                    <a href="/dashboard/superadmin/users" class="btn btn-primary">
+                        <i class="ti ti-users me-2"></i>Manage Users
+                    </a>
+                    <a href="/dashboard/superadmin/clients" class="btn btn-outline-primary">
+                        <i class="ti ti-building me-2"></i>Manage Clients
+                    </a>
+                    <a href="/dashboard/superadmin/permissions" class="btn btn-outline-secondary">
+                        <i class="ti ti-shield-lock me-2"></i>Permissions
+                    </a>
+                    <a href="/dashboard/superadmin/reports" class="btn btn-outline-info">
+                        <i class="ti ti-report me-2"></i>Generate Report
+                    </a>
+                </div>
+
+                <hr class="my-4">
+
+                <h6 class="card-title mb-3">System Status</h6>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted">Database</span>
+                    <span class="badge bg-success">Online</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted">Payment Gateway</span>
+                    <span class="badge bg-success">Connected</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted">OAuth Services</span>
+                    <span class="badge bg-success">Active</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Backup System</span>
+                    <span class="badge bg-warning">Scheduled</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Revenue & Performance Metrics -->
+<div class="row">
+    <div class="col-lg-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Performance Metrics</h5>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h3 class="mb-0 fw-semibold">$<%= typeof stats !== 'undefined' ? (stats.totalRevenue/1000).toFixed(0) : '1,250' %>K</h3>
+                            <p class="text-muted mb-0">Total Revenue</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h3 class="mb-0 fw-semibold"><%= typeof stats !== 'undefined' ? stats.totalClients : '45' %></h3>
+                            <p class="text-muted mb-0">Active Clients</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h3 class="mb-0 fw-semibold"><%= typeof stats !== 'undefined' ? stats.activeDrivers : '125' %></h3>
+                            <p class="text-muted mb-0">Active Drivers</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center">
+                            <h3 class="mb-0 fw-semibold"><%= typeof stats !== 'undefined' ? stats.pendingApprovals : '23' %></h3>
+                            <p class="text-muted mb-0">Pending Approvals</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

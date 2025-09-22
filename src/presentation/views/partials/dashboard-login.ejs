@@ -1,0 +1,172 @@
+<div class="row justify-content-center w-100">
+    <div class="col-md-8 col-lg-6 col-xxl-3">
+        <div class="card mb-0">
+            <div class="card-body">
+                <a href="/" class="text-nowrap logo-img text-center d-block py-3 w-100">
+                    <h2 class="fw-bold text-primary mb-0">Amexing</h2>
+                </a>
+                <p class="text-center">Your Transportation Management</p>
+
+                <!-- Display messages -->
+                <% if (typeof error !== 'undefined' && error) { %>
+                    <div class="alert alert-danger mb-3" role="alert">
+                        <i class="ti ti-alert-circle me-2"></i>
+                        <%= error %>
+                    </div>
+                <% } %>
+
+                <% if (typeof message !== 'undefined' && message) { %>
+                    <div class="alert alert-success mb-3" role="alert">
+                        <i class="ti ti-check-circle me-2"></i>
+                        <%= message %>
+                    </div>
+                <% } %>
+
+                <!-- Login Form -->
+                <form action="/auth/login" method="POST" class="login-form">
+                    <input type="hidden" name="csrfToken" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+                    <% if (typeof returnTo !== 'undefined' && returnTo) { %>
+                        <input type="hidden" name="returnTo" value="<%= returnTo %>">
+                    <% } %>
+
+                    <div class="mb-3">
+                        <label for="identifier" class="form-label">Username</label>
+                        <input
+                            type="text"
+                            class="form-control"
+                            id="identifier"
+                            name="identifier"
+                            required
+                            placeholder="Enter your email or username"
+                            autocomplete="username"
+                        >
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="password" class="form-label">Password</label>
+                        <input
+                            type="password"
+                            class="form-control"
+                            id="password"
+                            name="password"
+                            required
+                            placeholder="Enter your password"
+                            autocomplete="current-password"
+                        >
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input primary" type="checkbox" value="" id="flexCheckChecked" name="rememberMe">
+                            <label class="form-check-label text-dark" for="flexCheckChecked">
+                                Remember this Device
+                            </label>
+                        </div>
+                        <a class="text-primary fw-bold" href="/auth/forgot-password">Forgot Password ?</a>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-8 fs-4 mb-4 rounded-2">Sign In</button>
+
+                    <div class="d-flex align-items-center justify-content-center">
+                        <p class="fs-4 mb-0 fw-bold">New to Amexing?</p>
+                        <a class="text-primary fw-bold ms-2" href="/register">Create an account</a>
+                    </div>
+                </form>
+
+                <!-- Test Users (Development Only) -->
+                <% if (process.env.NODE_ENV === 'development') { %>
+                    <div class="test-users mt-4 p-3 bg-light rounded">
+                        <h6 class="text-muted mb-3">
+                            <i class="ti ti-flask me-2"></i>Development Test Users
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-1 test-login"
+                                        data-username="dev.superadmin"
+                                        data-password="DevSuper2024!@#">
+                                    SuperAdmin
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary w-100 mb-1 test-login"
+                                        data-username="dev.admin"
+                                        data-password="DevAdmin2024!@#">
+                                    Admin
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-info w-100 mb-1 test-login"
+                                        data-username="dev.client"
+                                        data-password="DevClient2024!@#">
+                                    Client
+                                </button>
+                            </div>
+                            <div class="col-md-6">
+                                <button type="button" class="btn btn-sm btn-outline-success w-100 mb-1 test-login"
+                                        data-username="dev.department_manager"
+                                        data-password="DevDepMgr2024!@#">
+                                    Dept Manager
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-success w-100 mb-1 test-login"
+                                        data-username="dev.employee"
+                                        data-password="DevEmployee2024!@#">
+                                    Employee
+                                </button>
+                                <!-- Driver and Guest buttons hidden as per request -->
+                                <!--
+                                <button type="button" class="btn btn-sm btn-outline-warning w-100 mb-1 test-login"
+                                        data-username="dev.driver"
+                                        data-password="DevDriver2024!@#">
+                                    Driver
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-dark w-100 mb-1 test-login"
+                                        data-username="dev.guest"
+                                        data-password="DevGuest2024!@#">
+                                    Guest
+                                </button>
+                                -->
+                            </div>
+                        </div>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<style>
+.test-users {
+    border-left: 4px solid #007bff;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Test user login buttons (development only)
+    const testLoginButtons = document.querySelectorAll('.test-login');
+    testLoginButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const username = this.getAttribute('data-username');
+            const password = this.getAttribute('data-password');
+
+            document.getElementById('identifier').value = username;
+            document.getElementById('password').value = password;
+        });
+    });
+
+    // Form submission handling
+    const loginForm = document.querySelector('.login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', function(e) {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+
+            submitBtn.innerHTML = '<i class="ti ti-loader-2 me-2"></i>Signing in...';
+            submitBtn.disabled = true;
+
+            // Re-enable button after 5 seconds as fallback
+            setTimeout(() => {
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }, 5000);
+        });
+    }
+});
+</script>

@@ -101,6 +101,52 @@ function registerCloudFunctions() {
     Parse.Cloud.define('getAppleOAuthAnalytics', appleOAuthFunctions.getAppleOAuthAnalytics);
 
     // Authentication Cloud Functions
+    Parse.Cloud.define('getUserById', async (request) => {
+      const { params, user } = request;
+      const { userId } = params;
+
+      try {
+        // Allow superadmin/admin to get any user, others can only get their own
+        if (user && (user.get('role') === 'superadmin' || user.get('role') === 'admin' || user.id === userId)) {
+          // Try AmexingUser first, then fallback to Parse.User
+          const AmexingUserQuery = new Parse.Query('AmexingUser');
+          AmexingUserQuery.equalTo('objectId', userId);
+
+          let foundUser = await AmexingUserQuery.first({ useMasterKey: true });
+
+          if (!foundUser) {
+            const ParseUserQuery = new Parse.Query(Parse.User);
+            ParseUserQuery.equalTo('objectId', userId);
+            foundUser = await ParseUserQuery.first({ useMasterKey: true });
+          }
+
+          if (!foundUser) {
+            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
+          }
+
+          // Return sanitized user data
+          return {
+            id: foundUser.id,
+            username: foundUser.get('username'),
+            email: foundUser.get('email'),
+            firstName: foundUser.get('firstName'),
+            lastName: foundUser.get('lastName'),
+            role: foundUser.get('role') || 'user',
+            displayName: foundUser.get('displayName') || `${foundUser.get('firstName')} ${foundUser.get('lastName')}`,
+            isActive: foundUser.get('isActive') !== false,
+            emailVerified: foundUser.get('emailVerified') === true,
+            lastLoginAt: foundUser.get('lastLoginAt'),
+            createdAt: foundUser.get('createdAt'),
+            updatedAt: foundUser.get('updatedAt'),
+          };
+        }
+        throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Not authorized to access user data');
+      } catch (error) {
+        logger.error('Get user by ID error:', error);
+        throw error;
+      }
+    });
+
     Parse.Cloud.define('registerUser', async (request) => {
       const { params, ip } = request;
 
@@ -537,19 +583,10 @@ function registerCloudFunctions() {
   }
 }
 
-// Check if Parse.Cloud is available and register functions
-if (typeof Parse.Cloud !== 'undefined' && typeof Parse.Cloud.define === 'function') {
-  registerCloudFunctions();
-} else {
-  /* eslint-disable no-console */
-  console.warn('Parse.Cloud not available, deferring cloud function registration');
-  // Try again after a delay
-  setTimeout(() => {
-    if (typeof Parse.Cloud !== 'undefined' && typeof Parse.Cloud.define === 'function') {
-      registerCloudFunctions();
-    } else {
-      console.error('Parse.Cloud still not available after delay');
-    }
-    /* eslint-enable no-console */
-  }, 1000);
-}
+// The retry mechanism is not needed since Parse Server loads this file directly
+// and Parse.Cloud is always available in this context
+
+// Register cloud functions immediately
+// Parse Server loads this file and Parse.Cloud is available
+registerCloudFunctions();
+logger.info('Cloud functions registration initiated');

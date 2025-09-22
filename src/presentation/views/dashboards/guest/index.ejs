@@ -1,0 +1,102 @@
+<!-- Guest Dashboard -->
+<div class="row">
+    <!-- Welcome Section -->
+    <div class="col-lg-12">
+        <div class="card bg-light-secondary position-relative overflow-hidden">
+            <div class="card-body px-4 py-3">
+                <div class="row align-items-center">
+                    <div class="col-9">
+                        <h4 class="fw-semibold mb-8">Welcome Guest!</h4>
+                        <p class="mb-0">Access your event transportation information</p>
+                    </div>
+                    <div class="col-3">
+                        <div class="text-center mb-n5">
+                            <img src="/dashboard/images/breadcrumb/ChatBc.png" alt="" class="img-fluid mb-n4" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Event Information -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-4">Event Information</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h6 class="text-muted mb-1">Event Name</h6>
+                            <p class="fw-semibold mb-0"><%= typeof eventInfo !== 'undefined' ? eventInfo.eventName : 'Annual Company Meeting' %></p>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="text-muted mb-1">Date</h6>
+                            <p class="fw-semibold mb-0"><%= typeof eventInfo !== 'undefined' ? new Date(eventInfo.eventDate).toLocaleDateString() : new Date().toLocaleDateString() %></p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <h6 class="text-muted mb-1">Transport Time</h6>
+                            <p class="fw-semibold mb-0"><%= typeof eventInfo !== 'undefined' ? eventInfo.transportTime : '9:00 AM' %></p>
+                        </div>
+                        <div class="mb-3">
+                            <h6 class="text-muted mb-1">Pickup Location</h6>
+                            <p class="fw-semibold mb-0"><%= typeof eventInfo !== 'undefined' ? eventInfo.pickupLocation : 'Main Office' %></p>
+                        </div>
+                    </div>
+                </div>
+                <hr>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h6 class="text-muted mb-1">Destination</h6>
+                        <p class="fw-semibold mb-0"><%= typeof eventInfo !== 'undefined' ? eventInfo.dropoffLocation : 'Convention Center' %></p>
+                    </div>
+                    <span class="badge bg-success fs-3">Confirmed</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Quick Actions</h5>
+                <div class="d-grid gap-2">
+                    <a href="/dashboard/guest/event" class="btn btn-secondary">
+                        <i class="ti ti-calendar-event me-2"></i>Event Details
+                    </a>
+                    <a href="/dashboard/guest/transport" class="btn btn-outline-secondary">
+                        <i class="ti ti-bus me-2"></i>Transport Info
+                    </a>
+                    <a href="/dashboard/guest/help" class="btn btn-outline-info">
+                        <i class="ti ti-help me-2"></i>Need Help?
+                    </a>
+                    <a href="/dashboard/guest/contact" class="btn btn-outline-primary">
+                        <i class="ti ti-phone me-2"></i>Contact Us
+                    </a>
+                </div>
+                
+                <hr class="my-4">
+                
+                <h6 class="mb-3">Important Information</h6>
+                <div class="alert alert-info">
+                    <i class="ti ti-info-circle me-2"></i>
+                    Please arrive 10 minutes before scheduled pickup time.
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted fs-3">Driver Contact</span>
+                    <span class="fw-semibold">Available soon</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted fs-3">Vehicle Number</span>
+                    <span class="fw-semibold">TBA</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

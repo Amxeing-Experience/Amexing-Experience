@@ -1,4 +1,5 @@
 const express = require('express');
+const logger = require('../../infrastructure/logger');
 
 const router = express.Router();
 const apiController = require('../../application/controllers/apiController');
@@ -17,11 +18,20 @@ router.get('/version', apiController.getVersion);
 // CSP Report endpoint
 router.post(
   '/csp-report',
-  express.json({ type: 'application/csp-report' }),
+  express.json({
+    type: ['application/csp-report', 'application/json'],
+    limit: '1mb',
+  }),
   (req, res) => {
-    const logger = require('../../infrastructure/logger');
-    logger.warn('CSP Violation:', req.body);
-    res.status(204).end();
+    try {
+      if (req.body && Object.keys(req.body).length > 0) {
+        logger.warn('CSP Violation Report:', JSON.stringify(req.body, null, 2));
+      }
+      res.status(204).end();
+    } catch (error) {
+      logger.warn('CSP Report parsing error:', error);
+      res.status(204).end();
+    }
   }
 );
 

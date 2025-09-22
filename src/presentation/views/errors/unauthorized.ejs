@@ -1,0 +1,123 @@
+<!-- Unauthorized Access Error Page -->
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 col-md-8">
+            <div class="card shadow-lg border-0">
+                <div class="card-body text-center p-5">
+                    <!-- Error Icon -->
+                    <div class="mb-4">
+                        <i class="ti ti-shield-x display-1 text-danger"></i>
+                    </div>
+
+                    <!-- Error Title -->
+                    <h1 class="fw-bold text-danger mb-3">Access Denied</h1>
+
+                    <!-- Error Message -->
+                    <p class="text-muted mb-4 fs-5">
+                        <%= typeof message !== 'undefined' ? message : 'You don\'t have permission to access this resource.' %>
+                    </p>
+
+                    <!-- User Information -->
+                    <% if (typeof userRole !== 'undefined' && userRole) { %>
+                        <div class="alert alert-info mb-4">
+                            <i class="ti ti-info-circle me-2"></i>
+                            You are currently logged in as: <strong><%= userRole.charAt(0).toUpperCase() + userRole.slice(1) %></strong>
+                        </div>
+                    <% } %>
+
+                    <!-- Action Buttons -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <% if (typeof suggestedUrl !== 'undefined' && suggestedUrl) { %>
+                            <a href="<%= suggestedUrl %>" class="btn btn-primary">
+                                <i class="ti ti-home me-2"></i>Go to My Dashboard
+                            </a>
+                        <% } else if (typeof userRole !== 'undefined' && userRole) { %>
+                            <a href="/dashboard/<%= userRole %>" class="btn btn-primary">
+                                <i class="ti ti-home me-2"></i>Go to My Dashboard
+                            </a>
+                        <% } %>
+
+                        <a href="javascript:history.back()" class="btn btn-outline-secondary">
+                            <i class="ti ti-arrow-left me-2"></i>Go Back
+                        </a>
+
+                        <a href="/logout" class="btn btn-outline-danger">
+                            <i class="ti ti-logout me-2"></i>Logout
+                        </a>
+                    </div>
+
+                    <!-- Help Section -->
+                    <div class="mt-5 pt-4 border-top">
+                        <h6 class="text-muted mb-3">Need Help?</h6>
+                        <p class="text-muted small mb-3">
+                            If you believe you should have access to this resource, please contact your administrator.
+                        </p>
+
+                        <!-- Role-based Contact Information -->
+                        <% if (typeof userRole !== 'undefined') { %>
+                            <% if (userRole === 'employee' || userRole === 'department_manager') { %>
+                                <p class="text-muted small">
+                                    <i class="ti ti-mail me-1"></i>
+                                    Contact your department manager or IT support for assistance.
+                                </p>
+                            <% } else if (userRole === 'client') { %>
+                                <p class="text-muted small">
+                                    <i class="ti ti-phone me-1"></i>
+                                    Contact Amexing support at support@amexing.com
+                                </p>
+                            <% } else if (userRole === 'driver') { %>
+                                <p class="text-muted small">
+                                    <i class="ti ti-headset me-1"></i>
+                                    Contact fleet management for access questions.
+                                </p>
+                            <% } else if (userRole === 'guest') { %>
+                                <p class="text-muted small">
+                                    <i class="ti ti-help me-1"></i>
+                                    Contact the event organizer for additional access.
+                                </p>
+                            <% } %>
+                        <% } %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.ti.display-1 {
+    font-size: 5rem;
+}
+
+.card {
+    border-radius: 15px;
+    margin-top: 2rem;
+}
+
+.alert {
+    border-radius: 10px;
+}
+
+.btn {
+    border-radius: 8px;
+    padding: 0.6rem 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .ti.display-1 {
+        font-size: 3.5rem;
+    }
+
+    .card-body {
+        padding: 2rem 1.5rem !important;
+    }
+
+    .d-md-flex {
+        flex-direction: column;
+    }
+
+    .btn {
+        margin-bottom: 0.5rem;
+    }
+}
+</style>
