@@ -53,14 +53,14 @@ const logger = require('../infrastructure/logger');
  * const userData = {
  *   username: 'johndoe',
  *   email: 'john@example.com',
- *   password: 'securePass123!',
+ *   password: 'your-secure-password',
  *   firstName: 'John',
  *   lastName: 'Doe'
  * };
  * const user = await authService.registerUser(userData);
  *
  * // Authenticate user
- * const loginResult = await authService.authenticateUser('john@example.com', 'securePass123!');
+ * const loginResult = await authService.authenticateUser('john@example.com', 'user-password');
  *
  * // OAuth login
  * const oauthResult = await authService.authenticateWithOAuth('google', oauthToken);

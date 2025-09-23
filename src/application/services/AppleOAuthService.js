@@ -32,7 +32,7 @@ const logger = require('../../infrastructure/logger');
  * // Handle Apple OAuth callback
  * const callbackData = {
  *   code: 'authorization_code',
- *   id_token: 'jwt_id_token',
+ *   id_token: 'sample-jwt-token',
  *   department: 'engineering',
  *   corporateConfigId: 'config123'
  * };

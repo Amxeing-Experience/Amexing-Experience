@@ -102,7 +102,7 @@ class AuthController {
    * @returns {Promise<void>} Redirects on success or renders login with error.
    * @example
    * // POST /login
-   * // Body: { username: 'user@example.com', password: 'securepassword' }
+   * // Body: { username: 'user@example.com', password: 'user-password' }
    * // Success: redirects to dashboard
    * // Failure: renders login with error message
    */
@@ -182,7 +182,7 @@ class AuthController {
    * @returns {Promise<void>} Redirects on success or renders registration with error.
    * @example
    * // POST /register
-   * // Body: { username: 'newuser', email: 'user@example.com', password: 'SecurePass123!' }
+   * // Body: { username: 'newuser', email: 'user@example.com', password: 'user-password' }
    * // Success: creates user and redirects to dashboard
    * // Failure: renders registration form with validation errors
    */

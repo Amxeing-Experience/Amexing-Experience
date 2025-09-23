@@ -198,7 +198,7 @@ class ValidationMiddleware {
    * @returns {void} Continues to next middleware or returns validation error.
    * @example
    * // POST /register
-   * // Body: { username: 'user123', email: 'user@example.com', password: 'SecurePass123!', confirmPassword: 'SecurePass123!' }
+   * // Body: { username: 'user123', email: 'user@example.com', password: 'user-password', confirmPassword: 'user-password' }
    */
   validateRegistration(req, res, next) {
     const schema = Joi.object({
@@ -237,7 +237,7 @@ class ValidationMiddleware {
    * @returns {void} Continues to next middleware or returns validation error.
    * @example
    * // POST /login
-   * // Body: { username: 'user@example.com', password: 'userpassword' }
+   * // Body: { username: 'user@example.com', password: 'user-password' }
    */
   validateLogin(req, res, next) {
     const schema = Joi.object({
@@ -282,7 +282,7 @@ class ValidationMiddleware {
    * @returns {void} Continues to next middleware or returns validation error.
    * @example
    * // POST /auth/reset-password
-   * // Body: { password: 'NewSecurePass123!', confirmPassword: 'NewSecurePass123!', token: 'reset-token-abc123' }
+   * // Body: { password: 'new-password', confirmPassword: 'new-password', token: 'reset-token-abc123' }
    */
   validateNewPassword(req, res, next) {
     const schema = Joi.object({

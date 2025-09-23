@@ -44,11 +44,11 @@ const logger = require('../../infrastructure/logger');
  *   lastName: 'Doe'
  * };
  * const user = AmexingUser.create(userData);
- * await user.setPassword('SecurePass123!');
+ * await user.setPassword('user-password');
  * await user.save();
  *
  * // Validate user password
- * const isValid = await user.validatePassword('SecurePass123!');
+ * const isValid = await user.validatePassword('user-password');
  * if (isValid) {
  *   await user.recordSuccessfulLogin('password');
  * } else {
