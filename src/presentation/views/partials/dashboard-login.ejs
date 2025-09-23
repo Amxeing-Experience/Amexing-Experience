@@ -73,84 +73,13 @@
                     </div>
                 </form>
 
-                <!-- Test Users (Development Only) -->
-                <% if (process.env.NODE_ENV === 'development') { %>
-                    <div class="test-users mt-4 p-3 bg-light rounded">
-                        <h6 class="text-muted mb-3">
-                            <i class="ti ti-flask me-2"></i>Development Test Users
-                        </h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <button type="button" class="btn btn-sm btn-outline-primary w-100 mb-1 test-login"
-                                        data-username="dev.superadmin"
-                                        data-password="DevSuper2024!@#">
-                                    SuperAdmin
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary w-100 mb-1 test-login"
-                                        data-username="dev.admin"
-                                        data-password="DevAdmin2024!@#">
-                                    Admin
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-info w-100 mb-1 test-login"
-                                        data-username="dev.client"
-                                        data-password="DevClient2024!@#">
-                                    Client
-                                </button>
-                            </div>
-                            <div class="col-md-6">
-                                <button type="button" class="btn btn-sm btn-outline-success w-100 mb-1 test-login"
-                                        data-username="dev.department_manager"
-                                        data-password="DevDepMgr2024!@#">
-                                    Dept Manager
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-success w-100 mb-1 test-login"
-                                        data-username="dev.employee"
-                                        data-password="DevEmployee2024!@#">
-                                    Employee
-                                </button>
-                                <!-- Driver and Guest buttons hidden as per request -->
-                                <!--
-                                <button type="button" class="btn btn-sm btn-outline-warning w-100 mb-1 test-login"
-                                        data-username="dev.driver"
-                                        data-password="DevDriver2024!@#">
-                                    Driver
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-dark w-100 mb-1 test-login"
-                                        data-username="dev.guest"
-                                        data-password="DevGuest2024!@#">
-                                    Guest
-                                </button>
-                                -->
-                            </div>
-                        </div>
-                    </div>
-                <% } %>
             </div>
         </div>
     </div>
 </div>
 
-
-<style>
-.test-users {
-    border-left: 4px solid #007bff;
-}
-</style>
-
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Test user login buttons (development only)
-    const testLoginButtons = document.querySelectorAll('.test-login');
-    testLoginButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const username = this.getAttribute('data-username');
-            const password = this.getAttribute('data-password');
-
-            document.getElementById('identifier').value = username;
-            document.getElementById('password').value = password;
-        });
-    });
-
     // Form submission handling
     const loginForm = document.querySelector('.login-form');
     if (loginForm) {

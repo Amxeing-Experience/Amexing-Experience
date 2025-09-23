@@ -35,14 +35,14 @@ const { AuthenticationServiceCore } = require('./AuthenticationServiceCore');
  * const userData = {
  *   username: 'john_doe',
  *   email: 'john@example.com',
- *   password: 'securePass123!',
+ *   password: 'your-secure-password',
  *   firstName: 'John',
  *   lastName: 'Doe'
  * };
  * const registrationResult = await AuthenticationService.registerUser(userData);
  *
  * // Login user
- * const loginResult = await AuthenticationService.loginUser('john@example.com', 'securePass123!');
+ * const loginResult = await AuthenticationService.loginUser('john@example.com', 'user-password');
  *
  * // Validate token
  * const tokenValidation = await AuthenticationService.validateToken(accessToken);
@@ -53,7 +53,7 @@ class AuthenticationService extends AuthenticationServiceCore {
    * @param {object} userData - User registration data.
    * @returns {Promise<object>} Registration result with tokens.
    * @example
-   * const userData = { username: 'john_doe', email: 'john@example.com', password: 'securepass123', firstName: 'John', lastName: 'Doe' };
+   * const userData = { username: 'john_doe', email: 'john@example.com', password: 'user-password', firstName: 'John', lastName: 'Doe' };
    * const result = await authService.registerUser(userData);
    */
   async registerUser(userData) {
