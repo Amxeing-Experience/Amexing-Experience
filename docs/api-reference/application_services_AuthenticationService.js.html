@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: application/services/AuthenticationService.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: application/services/AuthenticationService.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * Authentication Service - Handles traditional and OAuth authentication
+ * Integrates with AmexingUser model and provides comprehensive auth functionality.
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 1.0.0
+ */
+
+const Parse = require('parse/node');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const AmexingUser = require('../../domain/models/AmexingUser');
+const logger = require('../../infrastructure/logger');
+const { AuthenticationServiceCore } = require('./AuthenticationServiceCore');
+
+/**
+ * Authentication Service - Handles traditional and OAuth authentication.
+ * Provides comprehensive authentication functionality including JWT token management,
+ * user registration, login, and OAuth integration with AmexingUser model.
+ *
+ * Features:
+ * - Email/password authentication with PCI DSS compliance
+ * - JWT token generation and validation
+ * - Password reset and change functionality
+ * - Account lockout protection
+ * - Comprehensive security logging
+ * - Integration with AmexingUser model.
+ * @class AuthenticationService
+ * @augments AuthenticationServiceCore
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 1.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+ * // Register a new user
+ * const userData = {
+ *   username: 'john_doe',
+ *   email: 'john@example.com',
+ *   password: 'your-secure-password',
+ *   firstName: 'John',
+ *   lastName: 'Doe'
+ * };
+ * const registrationResult = await AuthenticationService.registerUser(userData);
+ *
+ * // Login user
+ * const loginResult = await AuthenticationService.loginUser('john@example.com', 'user-password');
+ *
+ * // Validate token
+ * const tokenValidation = await AuthenticationService.validateToken(accessToken);
+ */
+class AuthenticationService extends AuthenticationServiceCore {
+  /**
+   * Registers a new user with email/password.
+   * @param {object} userData - User registration data.
+   * @returns {Promise&lt;object>} Registration result with tokens.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * const userData = { username: 'john_doe', email: 'john@example.com', password: 'user-password', firstName: 'John', lastName: 'Doe' };
+   * const result = await authService.registerUser(userData);
+   */
+  async registerUser(userData) {
+    try {
+      // Validate required fields
+      this.validateRegistrationData(userData);
+
+      // Check if user already exists
+      await this.checkUserExists(userData.email, userData.username);
+
+      // Create new AmexingUser
+      const user = AmexingUser.create({
+        username: userData.username,
+        email: userData.email,
+        firstName: userData.firstName,
+        lastName: userData.lastName,
+        role: userData.role || 'user',
+      });
+
+      // Set password with validation
+      await user.setPassword(userData.password);
+
+      // Save user to database
+      const savedUser = await user.save(null, { useMasterKey: true });
+
+      // Generate tokens
+      const tokens = await this.generateTokens(savedUser);
+
+      // Log registration
+      logger.logSecurityEvent('USER_REGISTRATION', {
+        userId: savedUser.id,
+        username: savedUser.get('username'),
+        email: this.maskEmail(savedUser.get('email')),
+        authMethod: 'password',
+      });
+
+      return {
+        success: true,
+        user: savedUser.toSafeJSON(),
+        tokens,
+        message: 'User registered successfully',
+      };
+    } catch (error) {
+      logger.error('User registration error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Authenticates user with email/password.
+   * @param {string} identifier - Email or username.
+   * @param {string} password - Plain text password.
+   * @returns {Promise&lt;object>} Login result with tokens.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * const result = await authService.loginUser('user@example.com', 'password123');
+   */
+  async loginUser(identifier, password) {
+    try {
+      // Find user by email or username
+      const user = await this.findUserByIdentifier(identifier);
+
+      if (!user) {
+        logger.logAccessAttempt(false, identifier, 'User not found');
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Invalid credentials');
+      }
+
+      // Check if account is locked
+      if (user.isAccountLocked()) {
+        logger.logSecurityEvent('LOGIN_ATTEMPT_LOCKED', {
+          userId: user.id,
+          username: user.get('username'),
+        });
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Account is temporarily locked');
+      }
+
+      // Check if account is active
+      if (!user.get('active')) {
+        logger.logSecurityEvent('LOGIN_ATTEMPT_INACTIVE', {
+          userId: user.id,
+          username: user.get('username'),
+        });
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Account is inactive');
+      }
+
+      // Validate password
+      const isValidPassword = await user.validatePassword(password);
+
+      if (!isValidPassword) {
+        const isLocked = await user.recordFailedLogin();
+        logger.logAccessAttempt(false, identifier, 'Invalid password');
+
+        if (isLocked) {
+          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Account has been locked due to failed login attempts');
+        } else {
+          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Invalid credentials');
+        }
+      }
+
+      // Record successful login
+      await user.recordSuccessfulLogin('password');
+
+      // Generate tokens
+      const tokens = await this.generateTokens(user);
+
+      // Log successful login
+      logger.logAccessAttempt(true, identifier, 'Password login');
+      logger.logSecurityEvent('USER_LOGIN', {
+        userId: user.id,
+        username: user.get('username'),
+        authMethod: 'password',
+      });
+
+      return {
+        success: true,
+        user: user.toSafeJSON(),
+        tokens,
+        message: 'Login successful',
+      };
+    } catch (error) {
+      logger.error('User login error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Refreshes JWT token using refresh token.
+   * @param {string} refreshToken - Refresh token.
+   * @returns {Promise&lt;object>} New tokens.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * const newTokens = await authService.refreshToken('refresh_token_here');
+   */
+  async refreshToken(refreshToken) {
+    try {
+      // Verify refresh token
+      const decoded = jwt.verify(refreshToken, this.jwtSecret);
+
+      if (decoded.type !== 'refresh') {
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid refresh token');
+      }
+
+      // Find user
+      const user = await this.findUserById(decoded.userId);
+
+      if (!user || !user.get('active')) {
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found or inactive');
+      }
+
+      // Generate new tokens
+      const tokens = await this.generateTokens(user);
+
+      logger.logSecurityEvent('TOKEN_REFRESH', {
+        userId: user.id,
+        username: user.get('username'),
+      });
+
+      return {
+        success: true,
+        tokens,
+        user: user.toSafeJSON(),
+      };
+    } catch (error) {
+      logger.error('Token refresh error:', error);
+      throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid or expired refresh token');
+    }
+  }
+
+  /**
+   * Logs out user and invalidates tokens.
+   * @param {string} userId - User ID.
+   * @param {string} sessionToken - Session token to invalidate.
+   * @returns {Promise&lt;object>} Logout result.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * await authService.logoutUser('user123', 'session_token');
+   */
+  async logoutUser(userId, sessionToken) {
+    try {
+      const user = await this.findUserById(userId);
+
+      if (user) {
+        logger.logSecurityEvent('USER_LOGOUT', {
+          userId: user.id,
+          username: user.get('username'),
+          sessionToken: `${sessionToken.substring(0, 8)}***`,
+        });
+      }
+
+      return {
+        success: true,
+        message: 'Logout successful',
+      };
+    } catch (error) {
+      logger.error('Logout error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validates JWT token.
+   * @param {string} token - JWT token.
+   * @returns {Promise&lt;object>} Decoded token data.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * const decoded = await authService.validateToken('jwt_token_here');
+   */
+  async validateToken(token) {
+    try {
+      const decoded = jwt.verify(token, this.jwtSecret);
+
+      // Check token type if present (backward compatibility)
+      if (decoded.type &amp;&amp; decoded.type !== 'access') {
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid token type');
+      }
+
+      // Check if user still exists and is active
+      const user = await this.findUserById(decoded.userId);
+
+      if (!user || !user.get('active')) {
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found or inactive');
+      }
+
+      return {
+        success: true,
+        userId: decoded.userId,
+        username: decoded.username,
+        role: decoded.role,
+        user: user.toSafeJSON(),
+      };
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Token expired');
+      } else if (error instanceof jwt.JsonWebTokenError) {
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid token');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Initiates password reset process.
+   * @param {string} email - User email.
+   * @returns {Promise&lt;object>} Password reset result.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * await authService.initiatePasswordReset('user@example.com');
+   */
+  async initiatePasswordReset(email) {
+    try {
+      const user = await this.findUserByEmail(email);
+
+      if (!user) {
+        return {
+          success: true,
+          message: 'If the email exists, a password reset link has been sent',
+        };
+      }
+
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const resetExpires = new Date();
+      resetExpires.setHours(resetExpires.getHours() + 1); // 1 hour expiration
+
+      user.set('passwordResetToken', resetToken);
+      user.set('passwordResetExpires', resetExpires);
+      await user.save(null, { useMasterKey: true });
+
+      logger.logSecurityEvent('PASSWORD_RESET_INITIATED', {
+        userId: user.id,
+        email: this.maskEmail(email),
+      });
+
+      return {
+        success: true,
+        message: 'Password reset link has been sent to your email',
+        resetToken, // Remove this in production
+      };
+    } catch (error) {
+      logger.error('Password reset initiation error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Resets password using reset token.
+   * @param {string} resetToken - Password reset token.
+   * @param {string} newPassword - New password.
+   * @returns {Promise&lt;object>} Password reset result.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * await authService.resetPassword('reset_token', 'newpass123');
+   */
+  async resetPassword(resetToken, newPassword) {
+    try {
+      const query = new Parse.Query(AmexingUser);
+      query.equalTo('passwordResetToken', resetToken);
+      query.greaterThan('passwordResetExpires', new Date());
+
+      const user = await query.first({ useMasterKey: true });
+
+      if (!user) {
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Invalid or expired reset token');
+      }
+
+      await user.setPassword(newPassword);
+      user.unset('passwordResetToken');
+      user.unset('passwordResetExpires');
+      await user.save(null, { useMasterKey: true });
+
+      logger.logSecurityEvent('PASSWORD_RESET_COMPLETED', {
+        userId: user.id,
+        username: user.get('username'),
+      });
+
+      return {
+        success: true,
+        message: 'Password has been reset successfully',
+      };
+    } catch (error) {
+      logger.error('Password reset error:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Changes user password (authenticated user).
+   * @param {string} userId - User ID.
+   * @param {string} currentPassword - Current password.
+   * @param {string} newPassword - New password.
+   * @returns {Promise&lt;object>} Password change result.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * await authService.changePassword('user123', 'oldpass', 'newpass123');
+   */
+  async changePassword(userId, currentPassword, newPassword) {
+    try {
+      const user = await this.findUserById(userId);
+
+      if (!user) {
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
+      }
+
+      const isValidPassword = await user.validatePassword(currentPassword);
+
+      if (!isValidPassword) {
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Current password is incorrect');
+      }
+
+      await user.setPassword(newPassword);
+      await user.save(null, { useMasterKey: true });
+
+      logger.logSecurityEvent('PASSWORD_CHANGED', {
+        userId: user.id,
+        username: user.get('username'),
+      });
+
+      return {
+        success: true,
+        message: 'Password changed successfully',
+      };
+    } catch (error) {
+      logger.error('Password change error:', error);
+      throw error;
+    }
+  }
+}
+
+module.exports = new AuthenticationService();
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

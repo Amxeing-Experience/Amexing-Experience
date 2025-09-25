@@ -5,6 +5,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
+ * @example
+ * // Service method usage
+ * const result = await permissionauditservice.require({ 'parse/node': 'example' });
+ * // Returns: { success: true, data: {...} }
  */
 
 const Parse = require('parse/node');
@@ -15,8 +19,10 @@ const logger = require('../../infrastructure/logger');
  * Provides comprehensive audit trails for PCI DSS compliance and security monitoring.
  * @class PermissionAuditService
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * const auditService = new PermissionAuditService();
- * await auditService.recordPermissionAudit({ userId: '123', action: 'oauth_login' });
+ * await auditService.recordPermissionAudit({ userId: '123' , action: 'oauth_login' });
  */
 class PermissionAuditService {
   constructor() {
@@ -95,10 +101,15 @@ class PermissionAuditService {
   /**
    * Records a permission audit event.
    * @param {object} eventData - Audit event data.
-   * @returns {Promise<Parse.Object>} Created audit record.
+   * @returns {Promise<Parse.Object>} - Created audit record.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.recordPermissionAudit({ eventData: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
-   * const auditRecord = await service.recordPermissionAudit({ userId: 'user123', action: 'PERMISSION_GRANTED' });
+   * const auditRecord = await service.recordPermissionAudit({ userId: 'user123' , action: 'PERMISSION_GRANTED' });
    */
   async recordPermissionAudit(eventData) {
     try {
@@ -167,8 +178,13 @@ class PermissionAuditService {
    * Validates compliance fields for audit record.
    * @param {object} eventData - Event data to validate.
    * @param {string} framework - Compliance framework.
-   * @returns {void} Throws error if validation fails.
+   * @returns {void} - No return value Throws error if validation fails.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.validateComplianceFields({ eventData: 'example', framework: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * service.validateComplianceFields(eventData, 'PCI_DSS');
    */
@@ -195,8 +211,13 @@ class PermissionAuditService {
   /**
    * Determines event severity based on action.
    * @param {string} action - Action performed.
-   * @returns {string} Severity level.
+   * @returns {string} - Operation result Severity level.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.determineEventSeverity({ action: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const severity = service.determineEventSeverity('PERMISSION_ELEVATION');
    */
@@ -208,8 +229,13 @@ class PermissionAuditService {
   /**
    * Checks if action requires manual review.
    * @param {string} action - Action performed.
-   * @returns {boolean} True if requires review.
+   * @returns {boolean} - Boolean result True if requires review.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.requiresReview({ action: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const needsReview = service.requiresReview('EMERGENCY_PERMISSION');
    */
@@ -221,8 +247,13 @@ class PermissionAuditService {
   /**
    * Creates audit record in database.
    * @param {object} data - Audit data.
-   * @returns {Promise<Parse.Object>} Created audit record.
+   * @returns {Promise<Parse.Object>} - Created audit record.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.createAuditRecord({ data: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const record = await service.createAuditRecord(auditData);
    */
@@ -263,8 +294,13 @@ class PermissionAuditService {
   /**
    * Encrypts sensitive data in metadata.
    * @param {object} metadata - Metadata to encrypt.
-   * @returns {string} Encrypted metadata.
+   * @returns {string} - Operation result Encrypted metadata.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.encryptSensitiveData({ metadata: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const encrypted = service.encryptSensitiveData({ userAgent: 'browser', ip: '192.168.1.1' });
    */
@@ -295,8 +331,13 @@ class PermissionAuditService {
   /**
    * Classifies data sensitivity level.
    * @param {object} data - Audit data.
-   * @returns {string} Sensitivity classification.
+   * @returns {string} - Operation result Sensitivity classification.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.classifyDataSensitivity({ data: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionAuditService();
    * const classification = service.classifyDataSensitivity(auditData);
    */
@@ -324,8 +365,13 @@ class PermissionAuditService {
   /**
    * Calculates retention date based on compliance framework.
    * @param {string} framework - Compliance framework.
-   * @returns {Date} Retention date.
+   * @returns {Date} - Operation result Retention date.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.calculateRetentionDate({ framework: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const retentionDate = service.calculateRetentionDate('PCI_DSS');
    */
@@ -340,8 +386,13 @@ class PermissionAuditService {
    * Creates compliance-specific record.
    * @param {Parse.Object} auditRecord - Main audit record.
    * @param {string} framework - Compliance framework.
-   * @returns {Promise<void>} Completes when compliance record is created.
+   * @returns {Promise<void>} - Completes when compliance record is created.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.createComplianceRecord({ auditRecord: 'example', framework: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * await service.createComplianceRecord(auditRecord, 'SOX');
    */
@@ -365,8 +416,13 @@ class PermissionAuditService {
   /**
    * Gets framework version.
    * @param {string} framework - Compliance framework.
-   * @returns {string} Framework version.
+   * @returns {string} - Operation result Framework version.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.getFrameworkVersion({ framework: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const version = service.getFrameworkVersion('GDPR');
    */
@@ -382,8 +438,13 @@ class PermissionAuditService {
   /**
    * Triggers immediate review for critical events.
    * @param {Parse.Object} auditRecord - Audit record.
-   * @returns {Promise<void>} Completes when review is triggered.
+   * @returns {Promise<void>} - Completes when review is triggered.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.triggerImmediateReview({ auditRecord: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * await service.triggerImmediateReview(criticalAuditRecord);
    */
@@ -417,8 +478,13 @@ class PermissionAuditService {
   /**
    * Generates compliance audit report.
    * @param {object} reportParams - Report parameters.
-   * @returns {Promise<object>} Audit report.
+   * @returns {Promise<object>} - Audit report.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.generateComplianceReport({ reportParams: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const report = await service.generateComplianceReport({ startDate: '2024-01-01', endDate: '2024-12-31' });
    */
@@ -477,8 +543,13 @@ class PermissionAuditService {
    * @param {Array} auditRecords - Audit records.
    * @param {string} format - Report format.
    * @param {boolean} includeMetadata - Include metadata flag.
-   * @returns {Promise<object>} Processed report.
+   * @returns {Promise<object>} - Processed report.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.processAuditRecords({ auditRecords: 'example', format: 'example', includeMetadata: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const processedReport = await service.processAuditRecords(auditRecords, 'detailed', true);
    */
@@ -555,8 +626,13 @@ class PermissionAuditService {
   /**
    * Decrypts sensitive data from metadata.
    * @param {string} encryptedData - Encrypted metadata.
-   * @returns {object} Decrypted metadata.
+   * @returns {object} - Operation result Decrypted metadata.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.decryptSensitiveData({ encryptedData: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const decrypted = service.decryptSensitiveData(encryptedString);
    */
@@ -597,8 +673,13 @@ class PermissionAuditService {
   /**
    * Gets audit statistics for dashboard.
    * @param {object} params - Query parameters.
-   * @returns {Promise<object>} Audit statistics.
+   * @returns {Promise<object>} - Audit statistics.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.getAuditStatistics({ params: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const stats = await service.getAuditStatistics({ timeFrame: '30d', complianceFramework: 'PCI_DSS' });
    */
@@ -691,8 +772,13 @@ class PermissionAuditService {
 
   /**
    * Archives old audit records based on retention policy.
-   * @returns {Promise<object>} Archive result.
+   * @returns {Promise<object>} - Archive result.
    * @example
+   * // Service method usage
+   * const result = await permissionauditservice.archiveOldRecords({ params: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionAuditService();
    * const archiveResult = await service.archiveOldRecords();
    */

@@ -12,6 +12,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 2024-09-22
+ * @example
+ * // Usage example
+ * const result = await require({ 'express': 'example' });
+ * // Returns: operation result
  */
 
 const express = require('express');
@@ -60,8 +64,13 @@ router.use(jwtMiddleware.authenticateToken);
  * Access: Private (authenticated users with appropriate permissions).
  * @param {object} req - Express request object with query parameters: page, limit, role, active, search, clientId, departmentId, sortField, sortDirection.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await get({ '/': 'example', async: 'example' });
+ * // Returns: operation result
+ * // GET /api/endpoint
+ * // Response: { "success": true, "data": [...] }
  * GET /api/users?page=1&limit=10&role=admin&active=true
  */
 router.get('/', async (req, res) => {
@@ -74,8 +83,13 @@ router.get('/', async (req, res) => {
  * Access: Private (authenticated users with appropriate permissions).
  * @param {object} req - Express request object with query parameters: q (search term), role, active, page, limit, sortField, sortDirection.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await get({ '/search': 'example', async: 'example' });
+ * // Returns: operation result
+ * // GET /api/endpoint
+ * // Response: { "success": true, "data": [...] }
  * GET /api/users/search?q=john&role=employee&active=true
  */
 router.get('/search', async (req, res) => {
@@ -88,8 +102,13 @@ router.get('/search', async (req, res) => {
  * Access: Private (superadmin, admin).
  * @param {object} req - Express request object.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await get({ '/statistics': 'example', async: 'example' });
+ * // Returns: operation result
+ * // GET /api/endpoint
+ * // Response: { "success": true, "data": [...] }
  * GET /api/users/statistics
  */
 router.get('/statistics', async (req, res) => {
@@ -102,8 +121,13 @@ router.get('/statistics', async (req, res) => {
  * Access: Private (authenticated users with appropriate permissions).
  * @param {object} req - Express request object with params: {id: User ID}.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await get({ '/:id': 'example', async: 'example' });
+ * // Returns: operation result
+ * // GET /api/endpoint
+ * // Response: { "success": true, "data": [...] }
  * GET /api/users/abc123
  */
 router.get('/:id', async (req, res) => {
@@ -116,8 +140,13 @@ router.get('/:id', async (req, res) => {
  * Access: Private (superadmin, admin, client - based on role hierarchy).
  * @param {object} req - Express request object with body: {email, firstName, lastName, role, password?, clientId?, departmentId?, emailVerified?}.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await post({ '/': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
+ * // Returns: operation result
+ * // GET /api/endpoint
+ * // Response: { "success": true, "data": [...] }
  * POST /api/users with body: {email: 'user@example.com', firstName: 'John', lastName: 'Doe', role: 'employee'}
  */
 router.post('/', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
@@ -130,8 +159,14 @@ router.post('/', writeOperationsLimiter, securityMiddleware.getCsrfProtection(),
  * Access: Private (authenticated users with appropriate permissions).
  * @param {object} req - Express request object with params: {id: User ID} and body: Partial user data to update.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await put({ '/:id': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
+ * // Returns: operation result
+ * // POST /api/endpoint
+ * // Body: { "data": "value" }
+ * // Response: { "success": true, "message": "Created" }
  * PUT /api/users/abc123 with body: {firstName: 'Jane', active: false}
  */
 router.put('/:id', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
@@ -144,8 +179,14 @@ router.put('/:id', writeOperationsLimiter, securityMiddleware.getCsrfProtection(
  * Access: Private (superadmin, admin, or users managing their subordinates).
  * @param {object} req - Express request object with params: {id: User ID} and body: {reason?: string}.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await delete({ '/:id': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
+ * // Returns: operation result
+ * // PUT /api/endpoint/123
+ * // Body: { "field": "updated value" }
+ * // Response: { "success": true, "data": {...} }
  * DELETE /api/users/abc123 with body: {reason: 'Policy violation'}
  */
 router.delete('/:id', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
@@ -158,8 +199,14 @@ router.delete('/:id', writeOperationsLimiter, securityMiddleware.getCsrfProtecti
  * Access: Private (superadmin, admin, or users managing their subordinates).
  * @param {object} req - Express request object with params: {id: User ID} and body: {reason?: string}.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await put({ '/:id/reactivate': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
+ * // Returns: operation result
+ * // PUT /api/endpoint/123
+ * // Body: { "field": "updated value" }
+ * // Response: { "success": true, "data": {...} }
  * PUT /api/users/abc123/reactivate with body: {reason: 'Appeal approved'}
  */
 router.put('/:id/reactivate', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
@@ -172,8 +219,14 @@ router.put('/:id/reactivate', writeOperationsLimiter, securityMiddleware.getCsrf
  * Access: Private (superadmin, admin, or users managing their subordinates).
  * @param {object} req - Express request object with params: {id: User ID} and body: {active: boolean, reason?: string}.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await patch({ '/:id/toggle-status': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
+ * // Returns: operation result
+ * // PUT /api/endpoint/123
+ * // Body: { "field": "updated value" }
+ * // Response: { "success": true, "data": {...} }
  * PATCH /api/users/abc123/toggle-status with body: {active: false, reason: 'Suspension'}
  */
 router.patch('/:id/toggle-status', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
@@ -186,8 +239,14 @@ router.patch('/:id/toggle-status', writeOperationsLimiter, securityMiddleware.ge
  * Access: Private (superadmin only).
  * @param {object} req - Express request object with params: {id: User ID} and body: {reason?: string}.
  * @param {object} res - Express response object.
- * @returns {Promise<void>} Resolves when response is sent.
+ * @returns {Promise<void>} - Resolves when response is sent.
  * @example
+ * // Usage example
+ * const result = await patch({ '/:id/archive': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
+ * // Returns: operation result
+ * // PATCH /api/endpoint/123
+ * // Body: { "field": "new value" }
+ * // Response: { "success": true, "data": {...} }
  * PATCH /api/users/abc123/archive with body: {reason: 'Data retention policy'}
  */
 router.patch('/:id/archive', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
@@ -196,6 +255,15 @@ router.patch('/:id/archive', writeOperationsLimiter, securityMiddleware.getCsrfP
 
 /**
  * Error handling middleware for this router.
+ * @param {*} next - _next parameter.
+ * @param {object} res - Express response object.
+ * @param {object} req - Express request object.
+ * @param {*} (error - (error parameter.
+ * @returns {*} - Operation result.
+ * @example
+ * // Usage example
+ * const result = await use({ (error: 'example', _next: 'example' });
+ * // Returns: operation result
  */
 router.use((error, req, res, _next) => {
   logger.error('User Management API Error:', {

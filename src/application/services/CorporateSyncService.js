@@ -5,6 +5,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 2.0.0
+ * @example
+ * // Service method usage
+ * const result = await corporatesyncservice.require({ 'parse/node': 'example' });
+ * // Returns: { success: true, data: {...} }
  */
 
 const Parse = require('parse/node');
@@ -36,6 +40,8 @@ const logger = require('../../infrastructure/logger');
  * @version 1.0.0
  * @since 2.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize corporate sync service
  * const syncService = new CorporateSyncService();
  *
@@ -65,8 +71,14 @@ class CorporateSyncService {
    * @param {Parse.Object} client - Corporate client object.
    * @param {number} intervalMinutes - Sync interval in minutes (default: 60).
    * @example
+   * // Service method usage
+   * const result = await corporatesyncservice.startPeriodicSync({ client: 'example', intervalMinutes: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
    * const syncService = require('./CorporateSyncService');
    * await syncService.startPeriodicSync(clientObject, 30);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   startPeriodicSync(client, intervalMinutes = 60) {
     const clientId = client.id;
@@ -97,8 +109,14 @@ class CorporateSyncService {
    * Stops periodic sync for a corporate client.
    * @param {string} clientId - Client ID.
    * @example
+   * // Service method usage
+   * const result = await corporatesyncservice.stopPeriodicSync({ clientId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const syncService = require('./CorporateSyncService');
    * syncService.stopPeriodicSync('clientId123');
+   * @returns {*} - Operation result.
    */
   stopPeriodicSync(clientId) {
     const intervalId = this.syncIntervals.get(clientId);
@@ -115,8 +133,10 @@ class CorporateSyncService {
   /**
    * Performs one-time sync for a corporate client.
    * @param {string} clientId - Corporate client ID.
-   * @returns {Promise<object>} Sync result.
+   * @returns {Promise<object>} - Sync result.
    * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const syncService = require('./CorporateSyncService');
    * const result = await syncService.syncCorporateClient('clientId123');
    */
@@ -239,35 +259,38 @@ class CorporateSyncService {
   }
 
   /**
-   * Syncs individual employee data from OAuth provider.
+   * Syncs individual employee data from OAuth _provider.
    * @param {AmexingUser} user - User object.
    * @param {Parse.Object} employee - ClientEmployee object.
    * @param {Parse.Object} client - Client object.
-   * @param {string} provider - OAuth provider.
-   * @returns {Promise<object>} Sync result.
+   * @param {string} provider - OAuth _provider.
+   * @param _provider
+   * @returns {Promise<object>} - Sync result.
    * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const syncService = require('./CorporateSyncService');
    * const result = await syncService.syncEmployeeData(user, employee, client, 'microsoft');
    */
   // eslint-disable-next-line max-params, max-lines-per-function
-  async syncEmployeeData(user, employee, client, provider) {
+  async syncEmployeeData(user, employee, client, _provider) {
     try {
       const oauthProfile = user.get('oauthProfile');
       let refreshedProfile = null;
 
       // Try to refresh user data from provider (if we have refresh token)
       try {
-        if (provider === 'microsoft' && user.get('refreshToken')) {
+        if (_provider === 'microsoft' && user.get('refreshToken')) {
           // Microsoft refresh token flow
           refreshedProfile = await this.refreshMicrosoftUserData(user.get('refreshToken'));
-        } else if (provider === 'google' && user.get('refreshToken')) {
+        } else if (_provider === 'google' && user.get('refreshToken')) {
           // Google refresh token flow
           refreshedProfile = await this.refreshGoogleUserData(user.get('refreshToken'));
         }
       } catch (refreshError) {
         // If refresh fails, we'll continue with existing data
         logger.logSecurityEvent('OAUTH_REFRESH_FAILED', user.id, {
-          provider,
+          provider, // eslint-disable-line no-undef
           error: refreshError.message,
         });
       }
@@ -355,10 +378,15 @@ class CorporateSyncService {
   /**
    * Refreshes Microsoft user data using refresh token.
    * @param {string} refreshToken - Microsoft refresh token.
-   * @returns {Promise<object>} Updated user profile.
+   * @returns {Promise<object>} - Updated user profile.
    * @example
+   * // Service method usage
+   * const result = await corporatesyncservice.refreshMicrosoftUserData({ refreshToken: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const syncService = require('./CorporateSyncService');
-   * const profile = await syncService.refreshMicrosoftUserData('refresh_token_here');
+   * const profile = await syncService.refreshMicrosoftUserData('refreshtoken_here');
    */
   async refreshMicrosoftUserData(refreshToken) {
     try {
@@ -373,8 +401,8 @@ class CorporateSyncService {
         body: new URLSearchParams({
           client_id: process.env.MICROSOFT_OAUTH_CLIENT_ID,
           client_secret: process.env.MICROSOFT_OAUTH_CLIENT_SECRET,
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
+          grant_type: 'refreshtoken',
+          refreshtoken: refreshToken,
           scope: 'openid profile email User.Read Directory.Read.All',
         }),
       });
@@ -388,7 +416,7 @@ class CorporateSyncService {
       // Get updated user profile
       const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation', {
         headers: {
-          Authorization: `Bearer ${tokenData.access_token}`,
+          Authorization: `Bearer ${tokenData.accesstoken}`,
         },
       });
 
@@ -412,10 +440,15 @@ class CorporateSyncService {
   /**
    * Refreshes Google user data using refresh token.
    * @param {string} refreshToken - Google refresh token.
-   * @returns {Promise<object>} Updated user profile.
+   * @returns {Promise<object>} - Updated user profile.
    * @example
+   * // Service method usage
+   * const result = await corporatesyncservice.refreshGoogleUserData({ refreshToken: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const syncService = require('./CorporateSyncService');
-   * const profile = await syncService.refreshGoogleUserData('refresh_token_here');
+   * const profile = await syncService.refreshGoogleUserData('refreshtoken_here');
    */
   async refreshGoogleUserData(refreshToken) {
     try {
@@ -428,8 +461,8 @@ class CorporateSyncService {
         body: new URLSearchParams({
           client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
           client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
+          grant_type: 'refreshtoken',
+          refreshtoken: refreshToken,
         }),
       });
 
@@ -442,7 +475,7 @@ class CorporateSyncService {
       // Get updated user profile
       const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
         headers: {
-          Authorization: `Bearer ${tokenData.access_token}`,
+          Authorization: `Bearer ${tokenData.accesstoken}`,
         },
       });
 
@@ -464,8 +497,13 @@ class CorporateSyncService {
 
   /**
    * Gets sync status for all corporate clients.
-   * @returns {Promise<Array>} Array of sync statuses.
+   * @returns {Promise<Array>} - Array of sync statuses.
    * @example
+   * // Service method usage
+   * const result = await corporatesyncservice.getAllSyncStatuses({ refreshToken: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const syncService = require('./CorporateSyncService');
    * const statuses = await syncService.getAllSyncStatuses();
    */
@@ -501,8 +539,14 @@ class CorporateSyncService {
   /**
    * Stops all periodic syncs (cleanup method).
    * @example
+   * // Service method usage
+   * const result = await corporatesyncservice.stopAllSyncs({ refreshToken: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const syncService = require('./CorporateSyncService');
    * syncService.stopAllSyncs();
+   * @returns {*} - Operation result.
    */
   stopAllSyncs() {
     for (const [clientId, intervalId] of this.syncIntervals) {

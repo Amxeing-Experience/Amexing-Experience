@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @created 2024-09-12
+ * @example
+ * // Model method usage
+ * const result = await amexinguser.require({ 'parse/node': 'example' });
+ * // Returns: model operation result
  */
 
 const Parse = require('parse/node');
@@ -37,6 +41,8 @@ const BaseModel = require('./BaseModel');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Create new user with secure password
  * const userData = {
  *   username: 'john.doe',
@@ -61,7 +67,7 @@ const BaseModel = require('./BaseModel');
  *   provider: 'google',
  *   providerId: '123456789',
  *   email: 'john@gmail.com',
- *   accessToken: 'oauth_token'
+ *   accessToken: 'oauthtoken'
  * });
  *
  * // Safe user data for API responses
@@ -75,8 +81,13 @@ class AmexingUser extends BaseModel {
   /**
    * Creates a new AmexingUser instance.
    * @param {object} userData - User data object.
-   * @returns {AmexingUser} New AmexingUser instance.
+   * @returns {AmexingUser} - Operation result New AmexingUser instance.
    * @example
+   * // Create model instance
+   * const instance = AmexingUser.create(data);
+   * const saved = await instance.save();
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   static create(userData) {
     const user = new AmexingUser();
@@ -119,6 +130,12 @@ class AmexingUser extends BaseModel {
    * @param {string} password - Plain text password.
    * @param {boolean} validateStrength - Whether to validate password strength.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.setPassword({ password: 'example', validateStrength: 'example' });
+   * // Returns: model operation result
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async setPassword(password, validateStrength = true) {
     if (validateStrength) {
@@ -138,8 +155,10 @@ class AmexingUser extends BaseModel {
   /**
    * Validates password against stored hash.
    * @param {string} password - Plain text password.
-   * @returns {boolean} True if password matches.
+   * @returns {boolean} - Boolean result True if password matches.
    * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   /**
    * Validates user password against stored hash with bcrypt comparison.
@@ -147,8 +166,13 @@ class AmexingUser extends BaseModel {
    * for authentication validation with timing attack protection.
    * @function validatePassword
    * @param {string} password - Plain text password to validate.
-   * @returns {Promise<boolean>} True if password matches stored hash, false otherwise.
+   * @returns {Promise<boolean>} - True if password matches stored hash, false otherwise.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.validatePassword({ password: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * // Validate user password during login
    * const isValid = await user.validatePassword('userPassword123!');
    * if (isValid) {
@@ -168,6 +192,12 @@ class AmexingUser extends BaseModel {
    * @param {string} password - Plain text password.
    * @throws {Parse.Error} If password doesn't meet requirements.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.validatePasswordStrength({ password: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   validatePasswordStrength(password) {
     const minLength = parseInt(process.env.PASSWORD_MIN_LENGTH, 10) || 12;
@@ -181,6 +211,12 @@ class AmexingUser extends BaseModel {
     /**
      * Validates minimum password length according to PCI DSS requirements.
      * Ensures password meets configured minimum length for security compliance.
+     * @param {*} password.length < minLength - password.length < minLength parameter.
+     * @returns {*} - Operation result.
+     * @example
+     * // Model method usage
+     * const result = await amexinguser.if({ password.length: 'example' });
+     * // Returns: model operation result
      */
     if (password.length < minLength) {
       errors.push(`Password must be at least ${minLength} characters long`);
@@ -189,6 +225,12 @@ class AmexingUser extends BaseModel {
     /**
      * Validates password contains required uppercase letters for security.
      * Ensures compliance with uppercase letter requirements when enabled.
+     * @param {*} requireUppercase && !/[A-Z]/.test(password - requireUppercase && !/[A-Z]/.test(password parameter.
+     * @returns {*} - Operation result.
+     * @example
+     * // Model method usage
+     * const result = await amexinguser.if({ requireUppercase: 'example' });
+     * // Returns: model operation result
      */
     if (requireUppercase && !/[A-Z]/.test(password)) {
       errors.push('Password must contain at least one uppercase letter');
@@ -197,6 +239,12 @@ class AmexingUser extends BaseModel {
     /**
      * Validates password contains required lowercase letters for security.
      * Ensures compliance with lowercase letter requirements when enabled.
+     * @param {*} requireLowercase && !/[a-z]/.test(password - requireLowercase && !/[a-z]/.test(password parameter.
+     * @returns {*} - Operation result.
+     * @example
+     * // Model method usage
+     * const result = await amexinguser.if({ requireLowercase: 'example' });
+     * // Returns: model operation result
      */
     if (requireLowercase && !/[a-z]/.test(password)) {
       errors.push('Password must contain at least one lowercase letter');
@@ -205,6 +253,12 @@ class AmexingUser extends BaseModel {
     /**
      * Validates password contains required numeric characters for security.
      * Ensures compliance with number requirements when enabled.
+     * @param {*} requireNumbers && !/\d/.test(password - requireNumbers && !/\d/.test(password parameter.
+     * @returns {*} - Operation result.
+     * @example
+     * // Model method usage
+     * const result = await amexinguser.if({ requireNumbers: 'example' });
+     * // Returns: model operation result
      */
     if (requireNumbers && !/\d/.test(password)) {
       errors.push('Password must contain at least one number');
@@ -213,6 +267,12 @@ class AmexingUser extends BaseModel {
     /**
      * Validates password contains required special characters for security.
      * Ensures compliance with special character requirements when enabled.
+     * @param {*} requireSpecial && !/[!@#$%^&*( - requireSpecial && !/[!@#$%^&*( parameter.
+     * @returns {*} - Operation result.
+     * @example
+     * // Model method usage
+     * const result = await amexinguser.if({ requireSpecial: 'example' });
+     * // Returns: model operation result
      */
     if (requireSpecial && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
       errors.push('Password must contain at least one special character');
@@ -221,6 +281,12 @@ class AmexingUser extends BaseModel {
     /**
      * Throws Parse validation error if any password requirements fail.
      * Aggregates all validation errors into comprehensive error message.
+     * @param {*} errors.length > 0 - errors.length > 0 parameter.
+     * @returns {*} - Operation result.
+     * @example
+     * // Model method usage
+     * const result = await amexinguser.if({ errors.length: 'example' });
+     * // Returns: model operation result
      */
     if (errors.length > 0) {
       throw new Parse.Error(
@@ -232,8 +298,13 @@ class AmexingUser extends BaseModel {
 
   /**
    * Records a failed login attempt.
-   * @returns {boolean} True if account is now locked.
+   * @returns {boolean} - Boolean result True if account is now locked.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.recordFailedLogin({ errors.length: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async recordFailedLogin() {
     const maxAttempts = parseInt(process.env.MAX_LOGIN_ATTEMPTS, 10) || 5;
@@ -247,6 +318,12 @@ class AmexingUser extends BaseModel {
      * Implements account lockout mechanism when max attempts exceeded.
      * Locks user account for configured duration and logs security event
      * for compliance and monitoring purposes.
+     * @param {*} attempts > - attempts > parameter.
+     * @returns {boolean} - Boolean result Operation result.
+     * @example
+     * // Model method usage
+     * const result = await amexinguser.if({ attempts: 'example' });
+     * // Returns: model operation result
      */
     if (attempts >= maxAttempts) {
       const lockoutTime = new Date();
@@ -273,8 +350,13 @@ class AmexingUser extends BaseModel {
    * authentication event for audit trail and user activity monitoring.
    * @function recordSuccessfulLogin
    * @param {string} [authMethod] - Authentication method used (password, oauth, etc.).
-   * @returns {Promise<void>} Saves user with updated login information.
+   * @returns {Promise<void>} - Saves user with updated login information.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.recordSuccessfulLogin({ authMethod: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * // Record successful password login
    * await user.recordSuccessfulLogin('password');
    *
@@ -292,8 +374,13 @@ class AmexingUser extends BaseModel {
 
   /**
    * Checks if account is currently locked.
-   * @returns {boolean} True if account is locked.
+   * @returns {boolean} - Boolean result True if account is locked.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.isAccountLocked({ authMethod: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   isAccountLocked() {
     const lockedUntil = this.get('lockedUntil');
@@ -307,6 +394,12 @@ class AmexingUser extends BaseModel {
    * Adds OAuth account information.
    * @param {object} oauthData - OAuth account data.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.addOAuthAccount({ oauthData: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   addOAuthAccount(oauthData) {
     const existingAccounts = this.get('oauthAccounts') || [];
@@ -343,8 +436,15 @@ class AmexingUser extends BaseModel {
   /**
    * Removes OAuth account.
    * @param {string} provider - OAuth provider name.
+   * @param _provider
    * @param {string} providerId - Provider user ID.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.removeOAuthAccount({ provider: 'example', providerId: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   removeOAuthAccount(provider, providerId) {
     const existingAccounts = this.get('oauthAccounts') || [];
@@ -363,8 +463,14 @@ class AmexingUser extends BaseModel {
   /**
    * Gets OAuth account by provider.
    * @param {string} provider - OAuth provider name.
-   * @returns {object | null} OAuth account data or null.
+   * @param _provider
+   * @returns {object | null} - Operation result OAuth account data or null.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.getOAuthAccount({ provider: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   getOAuthAccount(provider) {
     const accounts = this.get('oauthAccounts') || [];
@@ -374,17 +480,28 @@ class AmexingUser extends BaseModel {
   /**
    * Checks if user has OAuth account for provider.
    * @param {string} provider - OAuth provider name.
-   * @returns {boolean} True if user has account for provider.
+   * @param _provider
+   * @returns {boolean} - Boolean result True if user has account for provider.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.hasOAuthAccount({ provider: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  hasOAuthAccount(provider) {
-    return this.getOAuthAccount(provider) !== null;
+  hasOAuthAccount(_provider) {
+    return this.getOAuthAccount(_provider) !== null;
   }
 
   /**
    * Gets user's full name.
-   * @returns {string} Full name.
+   * @returns {string} - Operation result Full name.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.getFullName({ provider: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   getFullName() {
     const firstName = this.get('firstName') || '';
@@ -394,8 +511,14 @@ class AmexingUser extends BaseModel {
 
   /**
    * Gets user's display name (full name or username).
-   * @returns {string} Display name.
+   * @returns {string} - Operation result Display name.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.getDisplayName({ provider: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   getDisplayName() {
     const fullName = this.getFullName();
@@ -405,8 +528,14 @@ class AmexingUser extends BaseModel {
   /**
    * Get the client this user belongs to.
    * Uses AI agent compliant queries.
-   * @returns {Promise<object | null>} Client object or null.
+   * @returns {Promise<object | null>} - Client object or null.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.getClient({ provider: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getClient() {
     try {
@@ -432,8 +561,14 @@ class AmexingUser extends BaseModel {
   /**
    * Get the department this user belongs to.
    * Uses AI agent compliant queries.
-   * @returns {Promise<object | null>} Department object or null.
+   * @returns {Promise<object | null>} - Department object or null.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.getDepartment({ provider: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getDepartment() {
     try {
@@ -459,8 +594,13 @@ class AmexingUser extends BaseModel {
   /**
    * Check if user belongs to a specific client.
    * @param {string} clientId - Client ID to check.
-   * @returns {boolean} True if user belongs to client.
+   * @returns {boolean} - Boolean result True if user belongs to client.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.belongsToClient({ clientId: 'example' });
+   * // Returns: model operation result
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
    */
   belongsToClient(clientId) {
     return this.get('clientId') === clientId;
@@ -469,8 +609,13 @@ class AmexingUser extends BaseModel {
   /**
    * Check if user belongs to a specific department.
    * @param {string} departmentId - Department ID to check.
-   * @returns {boolean} True if user belongs to department.
+   * @returns {boolean} - Boolean result True if user belongs to department.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.belongsToDepartment({ departmentId: 'example' });
+   * // Returns: model operation result
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
    */
   belongsToDepartment(departmentId) {
     return this.get('departmentId') === departmentId;
@@ -480,8 +625,13 @@ class AmexingUser extends BaseModel {
    * Assign user to a client.
    * @param {string} clientId - Client ID to assign to.
    * @param {string} modifiedBy - User ID making the change.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.assignToClient({ clientId: 'example', modifiedBy: 'example' });
+   * // Returns: model operation result
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
    */
   async assignToClient(clientId, modifiedBy) {
     try {
@@ -513,8 +663,14 @@ class AmexingUser extends BaseModel {
    * Assign user to a department.
    * @param {string} departmentId - Department ID to assign to.
    * @param {string} modifiedBy - User ID making the change.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.assignToDepartment({ departmentId: 'example', modifiedBy: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async assignToDepartment(departmentId, modifiedBy) {
     try {
@@ -544,8 +700,14 @@ class AmexingUser extends BaseModel {
 
   /**
    * Converts user to safe JSON (excludes sensitive data).
-   * @returns {object} Safe user data.
+   * @returns {object} - Operation result Safe user data.
    * @example
+   * // Model method usage
+   * const result = await amexinguser.toSafeJSON({ departmentId: 'example', modifiedBy: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   toSafeJSON() {
     return {

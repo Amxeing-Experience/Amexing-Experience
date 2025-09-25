@@ -1,0 +1,359 @@
+<%
+/**
+ * Users DataTable Organism - Simplified Version
+ * Advanced DataTable component for user management with role-based features
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role for permission-based features
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+// Default values
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'users-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/users';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
+
+// Permission checks
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-gradient-primary text-white">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0">
+                    <i class="ti ti-users me-2"></i>
+                    Gestión de Usuarios
+                </h5>
+                <small class="opacity-75">Administra usuarios del sistema con funciones avanzadas</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#createUserModal">
+                        <i class="ti ti-plus me-1"></i>
+                        Nuevo Usuario
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <!-- Search and Filter Controls -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="ti ti-search"></i>
+                    </span>
+                    <input type="text" class="form-control dt-search-custom" placeholder="Buscar usuarios..." data-table="<%= dtTableId %>">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="role-filter">
+                    <option value="">Todos los roles</option>
+                    <option value="superadmin">Super Admin</option>
+                    <option value="admin">Admin</option>
+                    <option value="client">Cliente</option>
+                    <option value="department_manager">Jefe Departamento</option>
+                    <option value="employee">Empleado</option>
+                    <option value="driver">Conductor</option>
+                    <option value="guest">Invitado</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="status-filter">
+                    <option value="">Todos los estados</option>
+                    <option value="active">Activos</option>
+                    <option value="inactive">Inactivos</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- DataTable Container -->
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Apellido</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th>Estado</th>
+                        <th>Registro</th>
+                        <% if (dtShowActions && (canEdit || canDelete)) { %>
+                            <th>Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be loaded via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- DataTable Configuration Script -->
+<script>
+// Function to load API data first, then initialize DataTable
+async function loadUsersAndInitializeTable() {
+    // Check if jQuery and DataTables are loaded
+    if (typeof jQuery === 'undefined' || typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+        console.log('⚠️ Libraries not ready, retrying in 500ms...');
+        setTimeout(loadUsersAndInitializeTable, 500);
+        return;
+    }
+
+    console.log('✅ Libraries loaded, loading API data...');
+
+    const apiEndpoint = '<%= dtApiEndpoint %>';
+    console.log('🎯 API Endpoint:', apiEndpoint);
+
+    try {
+        // Load users data from API
+        console.log('📤 Fetching users data...');
+        const response = await fetch(apiEndpoint, {
+            method: 'GET',
+            credentials: 'include', // Send cookies
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        console.log('📤 Response status:', response.status);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('📊 API Response:', data);
+
+        if (!data.success) {
+            throw new Error(data.error || 'API returned error');
+        }
+
+        const users = data.data?.users || [];
+        console.log('📊 Users loaded:', users.length);
+
+        if (users.length > 0) {
+            console.log('📊 Sample user:', users[0]);
+        }
+
+        // Initialize DataTable with the loaded data
+        console.log('🎯 About to initialize DataTable with users:', users);
+        console.log('🎯 Sample user structure:', JSON.stringify(users[0], null, 2));
+        initializeDataTableWithData(users);
+
+    } catch (error) {
+        console.error('❌ Error loading users:', error);
+        // Initialize empty table on error
+        initializeDataTableWithData([]);
+    }
+}
+
+// Function to initialize DataTable with pre-loaded data
+function initializeDataTableWithData(usersData) {
+    console.log('🎯 Initializing DataTable with', usersData.length, 'users');
+
+    const tableId = '<%= dtTableId %>';
+    const canEdit = <%= canEdit %>;
+    const canDelete = <%= canDelete %>;
+
+    // DataTable configuration
+    const tableConfig = {
+        data: usersData,
+        columns: [
+            {
+                title: 'Foto',
+                data: 'profileImage',
+                orderable: false,
+                searchable: false,
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        const imgSrc = data || '/dashboard/images/profile/user-default.jpg';
+                        return `<div class="text-center">
+                            <img src="${imgSrc}" class="rounded-circle border" width="40" height="40"
+                                 alt="Profile" onerror="this.src='/dashboard/images/profile/user-default.jpg'">
+                        </div>`;
+                    }
+                    return data;
+                }
+            },
+            { title: 'Nombre', data: 'firstName', className: 'fw-bold' },
+            { title: 'Apellido', data: 'lastName' },
+            { title: 'Email', data: 'email', className: 'text-muted' },
+            {
+                title: 'Rol',
+                data: 'role',
+                className: 'text-center',
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        const roleNames = {
+                            'superadmin': { name: 'Super Admin', class: 'danger' },
+                            'admin': { name: 'Admin', class: 'primary' },
+                            'client': { name: 'Cliente', class: 'info' },
+                            'department_manager': { name: 'Jefe Depto.', class: 'success' },
+                            'employee': { name: 'Empleado', class: 'secondary' },
+                            'driver': { name: 'Conductor', class: 'warning' },
+                            'guest': { name: 'Invitado', class: 'light' }
+                        };
+                        const role = roleNames[data] || { name: data, class: 'secondary' };
+                        return `<span class="badge bg-${role.class}">${role.name}</span>`;
+                    }
+                    return data;
+                }
+            },
+            {
+                title: 'Estado',
+                data: 'active',
+                className: 'text-center',
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        const isActive = data === true || data === 'true';
+                        const statusClass = isActive ? 'success' : 'danger';
+                        const statusText = isActive ? 'Activo' : 'Inactivo';
+                        return `<span class="badge bg-${statusClass}">${statusText}</span>`;
+                    }
+                    return data;
+                }
+            },
+            {
+                title: 'Registro',
+                data: 'createdAt',
+                className: 'text-center',
+                render: function(data, type, row) {
+                    if (type === 'display' && data) {
+                        const date = new Date(data);
+                        return date.toLocaleDateString('es-ES', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                    }
+                    return data;
+                }
+            }
+        ],
+        language: {
+            url: '/assets/libs/datatables/es-ES.json'
+        },
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
+        processing: false,
+        serverSide: false,
+        searching: true,
+        ordering: true,
+        responsive: true
+    };
+
+    // Add actions column if permissions allow
+    <% if (dtShowActions && (canEdit || canDelete)) { %>
+    if (canEdit || canDelete) {
+        tableConfig.columns.push({
+            title: 'Acciones',
+            data: null,
+            orderable: false,
+            searchable: false,
+            className: 'text-center',
+            render: function(data, type, row) {
+                if (type === 'display') {
+                    let actions = '';
+                    if (canEdit) {
+                        actions += `<button type="button" class="btn btn-sm btn-primary me-1"
+                                    onclick="editUser('${row.id}')" title="Editar">
+                                    <i class="ti ti-edit"></i>
+                                </button>`;
+                    }
+                    if (canDelete && row.role !== 'superadmin') {
+                        actions += `<button type="button" class="btn btn-sm btn-danger"
+                                    onclick="deleteUser('${row.id}')" title="Eliminar">
+                                    <i class="ti ti-trash"></i>
+                                </button>`;
+                    }
+                    return actions;
+                }
+                return '';
+            }
+        });
+    }
+    <% } %>
+
+    // Initialize DataTable
+    try {
+        // Destroy existing instance if exists
+        if ($.fn.DataTable.isDataTable('#' + tableId)) {
+            $('#' + tableId).DataTable().destroy();
+            console.log('🔄 Destroyed existing DataTable instance');
+        }
+
+        const usersTable = $('#' + tableId).DataTable(tableConfig);
+        console.log('✅ DataTable initialized successfully with', usersData.length, 'users');
+        console.log('✅ Table ID used:', tableId);
+        console.log('✅ Table element exists:', $('#' + tableId).length > 0);
+        console.log('✅ Table data loaded:', usersTable.data().count());
+
+        // Store reference globally
+        window.usersTable = usersTable;
+        console.log('✅ Global reference stored at window.usersTable');
+
+        // Force immediate draw to show data
+        setTimeout(() => {
+            usersTable.draw();
+            console.log('🔄 Forced redraw completed');
+            const info = usersTable.page.info();
+            console.log('🔄 Table info after redraw:', info);
+        }, 100);
+
+        // Setup custom filters
+        $('#role-filter').on('change', function() {
+            const value = this.value;
+            usersTable.column(4).search(value).draw(); // Role column
+        });
+
+        $('#status-filter').on('change', function() {
+            const value = this.value;
+            if (value === '') {
+                usersTable.column(5).search('').draw(); // Clear filter
+            } else if (value === 'active') {
+                usersTable.column(5).search('Activo').draw();
+            } else if (value === 'inactive') {
+                usersTable.column(5).search('Inactivo').draw();
+            }
+        });
+
+        // Custom search
+        $('.dt-search-custom').on('keyup', function() {
+            usersTable.search(this.value).draw();
+        });
+
+        console.log('✅ All filters and events configured');
+
+    } catch (error) {
+        console.error('❌ Failed to initialize DataTable:', error);
+    }
+}
+
+// User action functions (placeholders)
+function editUser(userId) {
+    console.log('Edit user:', userId);
+    // TODO: Implement edit functionality
+}
+
+function deleteUser(userId) {
+    console.log('Delete user:', userId);
+    // TODO: Implement delete functionality
+}
+
+// Wait for document ready and start loading
+$(document).ready(function() {
+    console.log('📋 Document ready, starting users table initialization...');
+    loadUsersAndInitializeTable();
+});
+</script>

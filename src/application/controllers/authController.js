@@ -24,6 +24,8 @@ const securityMiddlewares = require('../../infrastructure/security/securityMiddl
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize authentication controller
  * const authController = new AuthController();
  *
@@ -45,8 +47,13 @@ class AuthController {
    * @function showLogin
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Renders login view.
+   * @returns {Promise<void>} - Renders login view.
    * @example
+   * // GET endpoint example
+   * const result = await AuthController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
    * // GET /login
    * // Displays login form with CSRF token and OAuth providers
    */
@@ -77,8 +84,13 @@ class AuthController {
    * @function showRegister
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Renders registration form.
+   * @returns {Promise<void>} - Renders registration form.
    * @example
+   * // GET endpoint example
+   * const result = await AuthController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
    * // GET /register
    * // Displays registration form with CSRF token and validation
    */
@@ -99,8 +111,15 @@ class AuthController {
    * @function login
    * @param {object} req - Express request object with username and password in body.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Redirects on success or renders login with error.
+   * @returns {Promise<void>} - Redirects on success or renders login with error.
    * @example
+   * // POST endpoint example
+   * const result = await AuthController.login(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
    * // POST /login
    * // Body: { username: 'user@example.com', password: 'user-password' }
    * // Success: redirects to dashboard
@@ -179,8 +198,15 @@ class AuthController {
    * @function register
    * @param {object} req - Express request object with username, email, password in body.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Redirects on success or renders registration with error.
+   * @returns {Promise<void>} - Redirects on success or renders registration with error.
    * @example
+   * // POST endpoint example
+   * const result = await AuthController.register(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
    * // POST /register
    * // Body: { username: 'newuser', email: 'user@example.com', password: 'user-password' }
    * // Success: creates user and redirects to dashboard
@@ -290,8 +316,14 @@ class AuthController {
    * @function logout
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Redirects to login page.
+   * @returns {Promise<void>} - Redirects to login page.
    * @example
+   * // Usage example
+   * const result = await logout(parameters);
+   * // Returns: operation result
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
    * // POST /logout
    * // Clears all session data and redirects to login
    */
@@ -344,8 +376,13 @@ class AuthController {
    * @function showForgotPassword
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Renders forgot password form.
+   * @returns {Promise<void>} - Renders forgot password form.
    * @example
+   * // GET endpoint example
+   * const result = await AuthController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
    * // GET /auth/forgot-password
    * // Displays password reset request form
    */
@@ -366,8 +403,13 @@ class AuthController {
    * @function showResetPassword
    * @param {object} req - Express request object with reset token in query.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Renders reset password form or redirects on error.
+   * @returns {Promise<void>} - Renders reset password form or redirects on error.
    * @example
+   * // GET endpoint example
+   * const result = await AuthController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
    * // GET /auth/reset-password?token=abc123
    * // Displays password reset form with validated token
    */

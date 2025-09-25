@@ -12,6 +12,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 2024-09-22
+ * @example
+ * // Model method usage
+ * const result = await department.require({ './BaseModel': 'example' });
+ * // Returns: model operation result
  */
 
 const BaseModel = require('./BaseModel');
@@ -30,8 +34,13 @@ class Department extends BaseModel {
    * Creates a new Department instance with default lifecycle values.
    * Follows AI agent rules for data creation.
    * @param {object} departmentData - Department data object.
-   * @returns {Department} New Department instance.
+   * @returns {Department} - Operation result New Department instance.
    * @example
+   * // Create model instance
+   * const instance = Department.create(data);
+   * const saved = await instance.save();
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   static create(departmentData) {
     const department = new Department();
@@ -59,8 +68,14 @@ class Department extends BaseModel {
   /**
    * Get the department manager.
    * Uses AI agent compliant queries.
-   * @returns {Promise<object | null>} Department manager or null.
+   * @returns {Promise<object | null>} - Department manager or null.
    * @example
+   * // Model method usage
+   * const result = await department.getManager({ departmentData: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getManager() {
     try {
@@ -87,8 +102,14 @@ class Department extends BaseModel {
    * Get all active employees in this department.
    * Uses AI agent compliant queries.
    * @param {object} options - Query options.
-   * @returns {Promise<Array>} Array of department employees.
+   * @returns {Promise<Array>} - Array of department employees.
    * @example
+   * // Model method usage
+   * const result = await department.getEmployees({ options: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getEmployees(options = {}) {
     try {
@@ -137,8 +158,14 @@ class Department extends BaseModel {
   /**
    * Get the parent client for this department.
    * Uses AI agent compliant queries.
-   * @returns {Promise<object | null>} Parent client or null.
+   * @returns {Promise<object | null>} - Parent client or null.
    * @example
+   * // Model method usage
+   * const result = await department.getClient({ options: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getClient() {
     try {
@@ -163,8 +190,14 @@ class Department extends BaseModel {
 
   /**
    * Get department statistics for dashboard display.
-   * @returns {Promise<object>} Department statistics object.
+   * @returns {Promise<object>} - Department statistics object.
    * @example
+   * // Model method usage
+   * const result = await department.getStatistics({ options: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getStatistics() {
     try {
@@ -212,8 +245,14 @@ class Department extends BaseModel {
 
   /**
    * Get count of active employees in this department.
-   * @returns {Promise<number>} Employee count.
+   * @returns {Promise<number>} - Employee count.
    * @example
+   * // Model method usage
+   * const result = await department.getEmployeeCount({ options: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getEmployeeCount() {
     try {
@@ -228,8 +267,14 @@ class Department extends BaseModel {
 
   /**
    * Get count of active orders for this department.
-   * @returns {Promise<number>} Active order count.
+   * @returns {Promise<number>} - Active order count.
    * @example
+   * // Model method usage
+   * const result = await department.getActiveOrderCount({ options: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getActiveOrderCount() {
     try {
@@ -244,8 +289,14 @@ class Department extends BaseModel {
 
   /**
    * Calculate total budget used by this department.
-   * @returns {Promise<number>} Budget used amount.
+   * @returns {Promise<number>} - Budget used amount.
    * @example
+   * // Model method usage
+   * const result = await department.getBudgetUsed({ options: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getBudgetUsed() {
     try {
@@ -270,8 +321,13 @@ class Department extends BaseModel {
    * Assign a manager to this department.
    * @param {string} userId - User ID to assign as manager.
    * @param {string} assignedBy - User ID performing the assignment.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // Model method usage
+   * const result = await department.assignManager({ userId: 'example' , assignedBy: 'example' });
+   * // Returns: model operation result
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
    */
   async assignManager(userId, assignedBy) {
     try {
@@ -328,8 +384,14 @@ class Department extends BaseModel {
    * Remove the current manager from this department.
    * @param {string} removedBy - User ID performing the removal.
    * @param {boolean} demoteUser - Whether to demote user back to employee.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // Model method usage
+   * const result = await department.removeManager({ removedBy: 'example', demoteUser: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async removeManager(removedBy, demoteUser = false) {
     try {
@@ -384,8 +446,14 @@ class Department extends BaseModel {
    * @param {number} newBudget - New budget amount.
    * @param {string} modifiedBy - User ID making the update.
    * @param {string} reason - Reason for budget change.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // Update model
+   * const updated = await department.update(data);
+   * // Returns: updated instance
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async updateBudget(newBudget, modifiedBy, reason = '') {
     try {
@@ -422,8 +490,14 @@ class Department extends BaseModel {
    * Add an employee to this department.
    * @param {string} userId - User ID to add to department.
    * @param {string} addedBy - User ID performing the addition.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // Model method usage
+   * const result = await department.addEmployee({ userId: 'example' , addedBy: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async addEmployee(userId, addedBy) {
     try {
@@ -464,8 +538,14 @@ class Department extends BaseModel {
    * Remove an employee from this department.
    * @param {string} userId - User ID to remove from department.
    * @param {string} removedBy - User ID performing the removal.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // Model method usage
+   * const result = await department.removeEmployee({ userId: 'example' , removedBy: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async removeEmployee(userId, removedBy) {
     try {
@@ -505,8 +585,14 @@ class Department extends BaseModel {
   /**
    * Get safe department data for API responses.
    * Excludes sensitive information.
-   * @returns {object} Safe department data.
+   * @returns {object} - Operation result Safe department data.
    * @example
+   * // Model method usage
+   * const result = await department.toSafeJSON({ userId: 'example' , removedBy: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   toSafeJSON() {
     return {
@@ -529,8 +615,13 @@ class Department extends BaseModel {
   /**
    * Validate department data before save operations.
    * @param {object} departmentData - Data to validate.
-   * @returns {Array} Array of validation errors.
+   * @returns {Array} - Array of results Array of validation errors.
    * @example
+   * // Model method usage
+   * const result = await department.validate({ departmentData: 'example' });
+   * // Returns: model operation result
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
    */
   static validate(departmentData) {
     const errors = [];

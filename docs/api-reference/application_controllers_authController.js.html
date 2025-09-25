@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: application/controllers/authController.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: application/controllers/authController.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const Parse = require('parse/node');
+const logger = require('../../infrastructure/logger');
+const securityMiddlewares = require('../../infrastructure/security/securityMiddleware');
+
+/**
+ * Authentication Controller - Handles authentication operations and user flows.
+ * Provides comprehensive authentication endpoints including login, registration, logout,
+ * password reset, and OAuth integration with CSRF protection and security compliance.
+ *
+ * This controller manages both web interface and JSON API endpoints for all
+ * authentication flows, integrating with Parse Server, OAuth providers, and
+ * security middleware for PCI DSS compliance.
+ *
+ * Features:
+ * - User login and registration with validation
+ * - Password reset and change functionality
+ * - OAuth provider integration (Google, Microsoft, Apple)
+ * - CSRF protection for all forms
+ * - Session management and security
+ * - Comprehensive error handling and logging
+ * - Mobile and web responsive interfaces.
+ * @class AuthController
+ * @author Amexing Development Team
+ * @version 2.0.0
+ * @since 1.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Initialize authentication controller
+ * const authController = new AuthController();
+ *
+ * // Express route integration
+ * router.get('/login', authController.showLogin.bind(authController));
+ * router.post('/login', authController.login.bind(authController));
+ * router.get('/register', authController.showRegister.bind(authController));
+ * router.post('/register', authController.register.bind(authController));
+ *
+ * // OAuth integration
+ * router.get('/oauth/:provider', authController.initiateOAuth.bind(authController));
+ * router.post('/oauth/:provider/callback', authController.handleOAuthCallback.bind(authController));
+ */
+class AuthController {
+  /**
+   * Displays the login form with CSRF protection and OAuth provider options.
+   * Renders the login view with security tokens, error messages, and available
+   * OAuth authentication providers for user authentication.
+   * @function showLogin
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise&lt;void>} Renders login view.
+   * @example
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+   * // GET /login
+   * // Displays login form with CSRF token and OAuth providers
+   */
+  async showLogin(req, res) {
+    const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
+
+    // Get OAuth providers for login form
+    let oauthProviders = [];
+    try {
+      const providersResult = await Parse.Cloud.run('getOAuthProviders');
+      oauthProviders = providersResult.providers || [];
+    } catch (error) {
+      logger.error('Error getting OAuth providers for login:', error);
+    }
+    res.render('auth/login', {
+      title: 'Login - AmexingWeb',
+      error: req.query.error || null,
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+      oauthProviders,
+    });
+  }
+
+  /**
+   * Displays the registration form with CSRF protection and input validation.
+   * Renders the registration view with security tokens, error messages, and
+   * proper form validation setup for new user account creation.
+   * @function showRegister
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise&lt;void>} Renders registration form.
+   * @example
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+   * // GET /register
+   * // Displays registration form with CSRF token and validation
+   */
+  async showRegister(req, res) {
+    const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
+    res.render('auth/register', {
+      title: 'Register - AmexingWeb',
+      error: req.query.error || null,
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+    });
+  }
+
+  /**
+   * Processes user login with Parse Server authentication and session management.
+   * Handles POST requests for user authentication, validates credentials, creates
+   * sessions, and manages login attempts with security logging and error handling.
+   * @function login
+   * @param {object} req - Express request object with username and password in body.
+   * @param {object} res - Express response object.
+   * @returns {Promise&lt;void>} Redirects on success or renders login with error.
+   * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+   * // POST /login
+   * // Body: { username: 'user@example.com', password: 'user-password' }
+   * // Success: redirects to dashboard
+   * // Failure: renders login with error message
+   */
+  async login(req, res) {
+    // Handle both GET (show form) and POST (process login)
+    if (req.method === 'GET') {
+      return this.showLogin(req, res);
+    }
+
+    try {
+      const { username, password } = req.body;
+
+      if (!username || !password) {
+        if (req.accepts('json')) {
+          return res.status(400).json({
+            success: false,
+            message: 'Username and password are required',
+          });
+        }
+        return this.returnWithToken(req, res);
+      }
+
+      // Authenticate with Parse Server
+      const user = await Parse.User.logIn(username, password);
+
+      // Store session information
+      req.session.user = {
+        id: user.id,
+        username: user.get('username'),
+      };
+      req.session.sessionToken = user.getSessionToken();
+
+      logger.info(`User ${username} logged in successfully`);
+
+      if (req.accepts('json')) {
+        return res.json({
+          success: true,
+          user: {
+            id: user.id,
+            username: user.get('username'),
+          },
+        });
+      }
+
+      return res.redirect('/');
+    } catch (error) {
+      logger.error('Login error:', error);
+
+      if (req.accepts('json')) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid login',
+        });
+      }
+
+      return this.returnWithToken(req, res);
+    }
+  }
+
+  async returnWithToken(req, res) {
+    const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
+    return res.render('auth/login', {
+      title: 'Login - AmexingWeb',
+      error: 'Invalid username or password',
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+    });
+  }
+
+  /**
+   * Processes user registration with validation, user creation, and session setup.
+   * Handles POST requests for new user registration, validates input data,
+   * creates Parse Server user accounts, and establishes authentication sessions.
+   * @function register
+   * @param {object} req - Express request object with username, email, password in body.
+   * @param {object} res - Express response object.
+   * @returns {Promise&lt;void>} Redirects on success or renders registration with error.
+   * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+   * // POST /register
+   * // Body: { username: 'newuser', email: 'user@example.com', password: 'user-password' }
+   * // Success: creates user and redirects to dashboard
+   * // Failure: renders registration form with validation errors
+   */
+  async register(req, res) {
+    // Handle both GET (show form) and POST (process registration)
+    if (req.method === 'GET') {
+      return this.showRegister(req, res);
+    }
+
+    try {
+      const validationResult = this.validateRegistration(req.body);
+      if (!validationResult.isValid) {
+        return this.handleRegistrationValidationError(res, validationResult.error);
+      }
+
+      const newUser = await this.createUser(req.body);
+      this.setUserSession(req, newUser);
+
+      logger.info(`User ${req.body.username} registered successfully`);
+
+      return this.handleRegistrationSuccess(res, newUser);
+    } catch (error) {
+      return this.handleRegistrationError(res, error);
+    }
+  }
+
+  validateRegistration({ username, password, email }) {
+    if (!username || !password || !email) {
+      return {
+        isValid: false,
+        error: 'Username, password, and email are required',
+      };
+    }
+    return { isValid: true };
+  }
+
+  handleRegistrationValidationError(res, errorMessage) {
+    if (res.req.accepts('json')) {
+      return res.status(400).json({
+        success: false,
+        message: errorMessage,
+      });
+    }
+    const csrf = securityMiddlewares.csrfProtection.create(res.req.session.csrfSecret);
+    return res.render('auth/register', {
+      title: 'Register - AmexingWeb',
+      error: 'All fields are required',
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+    });
+  }
+
+  async createUser({ username, password, email }) {
+    const user = new Parse.User();
+    user.set('username', username);
+    user.set('password', password);
+    user.set('email', email);
+    return user.signUp();
+  }
+
+  setUserSession(req, user) {
+    req.session.user = {
+      id: user.id,
+      username: user.get('username'),
+    };
+    req.session.sessionToken = user.getSessionToken();
+  }
+
+  handleRegistrationSuccess(res, user) {
+    if (res.req.accepts('json')) {
+      return res.json({
+        success: true,
+        user: {
+          id: user.id,
+          username: user.get('username'),
+        },
+      });
+    }
+    return res.redirect('/');
+  }
+
+  handleRegistrationError(res, error) {
+    logger.error('Registration error:', error);
+
+    if (res.req.accepts('json')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || 'Registration failed',
+      });
+    }
+    const csrf = securityMiddlewares.csrfProtection.create(res.req.session.csrfSecret);
+
+    return res.render('auth/register', {
+      title: 'Register - AmexingWeb',
+      error: error.message || 'Registration failed',
+      csrfToken: csrf,
+      parseAppId: process.env.PARSE_APP_ID,
+    });
+  }
+
+  /**
+   * Handles user logout with session cleanup and security logging.
+   * Invalidates Parse Server session, clears browser sessions/cookies,
+   * and logs security event for audit trail compliance.
+   * @function logout
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise&lt;void>} Redirects to login page.
+   * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+   * // POST /logout
+   * // Clears all session data and redirects to login
+   */
+  async logout(req, res) {
+    try {
+      // Clear Parse session if exists
+      if (req.session?.sessionToken) {
+        const { sessionToken } = req.session;
+        await Parse.User.logOut({ sessionToken });
+      }
+
+      // Destroy Express session
+      req.session.destroy((err) => {
+        if (err) {
+          logger.error('Error destroying session:', err);
+        }
+      });
+
+      // Clear cookie
+      res.clearCookie('amexing.sid');
+
+      // Handle response type
+      if (req.accepts('json')) {
+        return res.json({
+          success: true,
+          message: 'Logged out successfully',
+        });
+      }
+
+      // Redirect to home
+      res.redirect('/');
+    } catch (error) {
+      logger.error('Error during logout:', error);
+
+      if (req.accepts('json')) {
+        return res.status(500).json({
+          success: false,
+          message: 'Logout failed',
+        });
+      }
+
+      res.redirect('/');
+    }
+  }
+
+  /**
+   * Displays the forgot password form for password reset requests.
+   * Renders the password reset form with CSRF protection and status messages
+   * for users who need to recover access to their accounts.
+   * @function showForgotPassword
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise&lt;void>} Renders forgot password form.
+   * @example
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+   * // GET /auth/forgot-password
+   * // Displays password reset request form
+   */
+  async showForgotPassword(req, res) {
+    const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
+    res.render('auth/forgot-password', {
+      title: 'Forgot Password - AmexingWeb',
+      error: req.query.error || null,
+      success: req.query.success || null,
+      csrfToken: csrf,
+    });
+  }
+
+  /**
+   * Displays the password reset form with token validation.
+   * Validates the reset token and renders the password reset form with
+   * security measures for users completing their password recovery process.
+   * @function showResetPassword
+   * @param {object} req - Express request object with reset token in query.
+   * @param {object} res - Express response object.
+   * @returns {Promise&lt;void>} Renders reset password form or redirects on error.
+   * @example
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+   * // GET /auth/reset-password?token=abc123
+   * // Displays password reset form with validated token
+   */
+  async showResetPassword(req, res) {
+    const csrf = securityMiddlewares.csrfProtection.create(req.session.csrfSecret);
+    const { token } = req.query;
+
+    if (!token) {
+      return res.redirect(`/auth/forgot-password?error=${encodeURIComponent('Invalid or missing reset token')}`);
+    }
+
+    res.render('auth/reset-password', {
+      title: 'Reset Password - AmexingWeb',
+      error: req.query.error || null,
+      token,
+      csrfToken: csrf,
+    });
+  }
+}
+
+module.exports = new AuthController();
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

@@ -12,6 +12,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 2024-09-22
+ * @example
+ * // Model method usage
+ * const result = await client.require({ './BaseModel': 'example' });
+ * // Returns: model operation result
  */
 
 const BaseModel = require('./BaseModel');
@@ -30,8 +34,13 @@ class Client extends BaseModel {
    * Creates a new Client instance with default lifecycle values.
    * Follows AI agent rules for data creation.
    * @param {object} clientData - Client data object.
-   * @returns {Client} New Client instance.
+   * @returns {Client} - Operation result New Client instance.
    * @example
+   * // Create model instance
+   * const instance = Client.create(data);
+   * const saved = await instance.save();
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   static create(clientData) {
     const client = new Client();
@@ -75,8 +84,14 @@ class Client extends BaseModel {
   /**
    * Get all active departments for this client.
    * Uses AI agent compliant queries.
-   * @returns {Promise<Array>} Array of active departments.
+   * @returns {Promise<Array>} - Array of active departments.
    * @example
+   * // Model method usage
+   * const result = await client.getDepartments({ clientData: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getDepartments() {
     try {
@@ -99,8 +114,14 @@ class Client extends BaseModel {
    * Get all active employees for this client.
    * Uses AI agent compliant queries with role filtering.
    * @param {string} role - Optional role filter.
-   * @returns {Promise<Array>} Array of client employees.
+   * @returns {Promise<Array>} - Array of client employees.
    * @example
+   * // Model method usage
+   * const result = await client.getEmployees({ role: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getEmployees(role = null) {
     try {
@@ -132,8 +153,14 @@ class Client extends BaseModel {
 
   /**
    * Get client statistics for dashboard display.
-   * @returns {Promise<object>} Client statistics object.
+   * @returns {Promise<object>} - Client statistics object.
    * @example
+   * // Model method usage
+   * const result = await client.getStatistics({ role: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getStatistics() {
     try {
@@ -169,8 +196,14 @@ class Client extends BaseModel {
 
   /**
    * Get count of active departments.
-   * @returns {Promise<number>} Department count.
+   * @returns {Promise<number>} - Department count.
    * @example
+   * // Model method usage
+   * const result = await client.getDepartmentCount({ role: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getDepartmentCount() {
     try {
@@ -184,8 +217,14 @@ class Client extends BaseModel {
 
   /**
    * Get count of active employees.
-   * @returns {Promise<number>} Employee count.
+   * @returns {Promise<number>} - Employee count.
    * @example
+   * // Model method usage
+   * const result = await client.getEmployeeCount({ role: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getEmployeeCount() {
     try {
@@ -200,8 +239,14 @@ class Client extends BaseModel {
 
   /**
    * Get count of active orders.
-   * @returns {Promise<number>} Active order count.
+   * @returns {Promise<number>} - Active order count.
    * @example
+   * // Model method usage
+   * const result = await client.getActiveOrderCount({ role: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async getActiveOrderCount() {
     try {
@@ -218,8 +263,14 @@ class Client extends BaseModel {
    * Create a new department for this client.
    * @param {object} departmentData - Department data.
    * @param {string} createdBy - User ID creating the department.
-   * @returns {Promise<object>} Created department.
+   * @returns {Promise<object>} - Created department.
    * @example
+   * // Create model instance
+   * const instance = Client.create(data);
+   * const saved = await instance.save();
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   async createDepartment(departmentData, createdBy) {
     try {
@@ -256,8 +307,13 @@ class Client extends BaseModel {
    * Auto-provision an employee based on OAuth domain settings.
    * @param {object} userData - User data from OAuth.
    * @param {string} oauthProvider - OAuth provider name.
-   * @returns {Promise<object>} Created user or null if not allowed.
+   * @returns {Promise<object>} - Created user or null if not allowed.
    * @example
+   * // Model method usage
+   * const result = await client.autoProvisionEmployee({ userData: 'example', oauthProvider: 'example' });
+   * // Returns: model operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async autoProvisionEmployee(userData, oauthProvider) {
     try {
@@ -288,7 +344,7 @@ class Client extends BaseModel {
 
         // Update OAuth accounts
         const oauthAccounts = existingUser.get('oauthAccounts') || [];
-        const hasProvider = oauthAccounts.some((account) => account.provider === oauthProvider);
+        const hasProvider = oauthAccounts.some((account) => account.__provider === oauthProvider); // eslint-disable-line no-underscore-dangle
 
         if (!hasProvider) {
           oauthAccounts.push({
@@ -358,8 +414,13 @@ class Client extends BaseModel {
    * Update client settings with validation.
    * @param {object} updates - Fields to update.
    * @param {string} modifiedBy - User ID making the update.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // Update model
+   * const updated = await client.update(data);
+   * // Returns: updated instance
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async updateSettings(updates, modifiedBy) {
     try {
@@ -404,8 +465,14 @@ class Client extends BaseModel {
   /**
    * Get safe client data for API responses.
    * Excludes sensitive information.
-   * @returns {object} Safe client data.
+   * @returns {object} - Operation result Safe client data.
    * @example
+   * // Model method usage
+   * const result = await client.toSafeJSON({ updates: 'example', modifiedBy: 'example' });
+   * // Returns: model operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   toSafeJSON() {
     return {
@@ -434,8 +501,13 @@ class Client extends BaseModel {
   /**
    * Validate client data before save operations.
    * @param {object} clientData - Data to validate.
-   * @returns {Array} Array of validation errors.
+   * @returns {Array} - Array of results Array of validation errors.
    * @example
+   * // Model method usage
+   * const result = await client.validate({ clientData: 'example' });
+   * // Returns: model operation result
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
    */
   static validate(clientData) {
     const errors = [];

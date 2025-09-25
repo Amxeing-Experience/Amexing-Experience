@@ -14,10 +14,16 @@ class DashboardController extends BaseController {
 
   /**
    * Initialize dashboard-specific middleware.
-   * @param req
-   * @param res
-   * @param next
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Next middleware function.
    * @example
+   * // Usage example
+   * const result = await initializeDashboard(parameters);
+   * // Returns: operation result
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async initializeDashboard(req, res, next) {
     try {
@@ -41,11 +47,19 @@ class DashboardController extends BaseController {
 
   /**
    * Get dashboard statistics (to be overridden by child classes).
-   * @param userId
-   * @param role
+   * @param {string} userId - User unique identifier.
+   * @param {*} role - Role parameter.
+   * @param {*} userId - _userId parameter.
+   * @param {*} role - _role parameter.
    * @param _userId
    * @param _role
    * @example
+   * // GET endpoint example
+   * const result = await DashboardController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getDashboardStats(_userId, _role) {
     // Default implementation - can be overridden by specific role controllers
@@ -59,11 +73,17 @@ class DashboardController extends BaseController {
 
   /**
    * Render dashboard with common structure.
-   * @param req
-   * @param res
-   * @param view
-   * @param additionalData
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {*} view - View parameter.
+   * @param {*} additionalData - AdditionalData parameter.
    * @example
+   * // Usage example
+   * const result = await renderDashboard({ view: 'example', additionalData: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async renderDashboard(req, res, view, additionalData = {}) {
     try {
@@ -90,10 +110,17 @@ class DashboardController extends BaseController {
 
   /**
    * Build breadcrumb navigation.
-   * @param path
-   * @param role
+   * @param {*} path - Path parameter.
+   * @param {*} role - Role parameter.
+   * @param {*} role - _role parameter.
    * @param _role
    * @example
+   * // Usage example
+   * const result = await buildBreadcrumb({ path: 'example', _role: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {object} - Operation result.
    */
   buildBreadcrumb(path, _role) {
     const pathParts = path.split('/').filter((part) => part);
@@ -130,11 +157,19 @@ class DashboardController extends BaseController {
 
   /**
    * Get notifications for dashboard.
-   * @param userId
-   * @param role
+   * @param {string} userId - User unique identifier.
+   * @param {*} role - Role parameter.
+   * @param {*} userId - _userId parameter.
+   * @param {*} role - _role parameter.
    * @param _userId
    * @param _role
    * @example
+   * // GET endpoint example
+   * const result = await DashboardController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getNotifications(_userId, _role) {
     // Default implementation - can be overridden
@@ -143,9 +178,16 @@ class DashboardController extends BaseController {
 
   /**
    * Get quick actions based on role.
-   * @param role
+   * @param {*} role - Role parameter.
+   * @param {*} role - _role parameter.
    * @param _role
    * @example
+   * // GET endpoint example
+   * const result = await DashboardController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {Array} - Array of results Operation result.
    */
   getQuickActions(_role) {
     // Default implementation - can be overridden
@@ -154,10 +196,16 @@ class DashboardController extends BaseController {
 
   /**
    * Log dashboard activity.
-   * @param userId
-   * @param action
-   * @param details
+   * @param {string} userId - User unique identifier.
+   * @param {string} action - Action identifier.
+   * @param {*} details - Details parameter.
    * @example
+   * // Usage example
+   * const result = await logActivity({ userId: 'example' , action: 'example', details: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async logActivity(userId, action, details = {}) {
     try {
@@ -171,9 +219,15 @@ class DashboardController extends BaseController {
 
   /**
    * Check dashboard permissions.
-   * @param user
-   * @param permission
+   * @param {*} user - User parameter.
+   * @param {*} permission - Permission parameter.
    * @example
+   * // Usage example
+   * const result = await hasPermission({ user: 'example', permission: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {boolean} - Boolean result Operation result.
    */
   hasPermission(user, permission) {
     if (!user || !user.permissions) {
@@ -190,9 +244,15 @@ class DashboardController extends BaseController {
 
   /**
    * Get filtered data based on user's access level.
-   * @param query
-   * @param user
+   * @param {object} query - Query parameters object.
+   * @param {*} user - User parameter.
    * @example
+   * // GET endpoint example
+   * const result = await DashboardController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getFilteredData(query, user) {
     const filters = { ...query };

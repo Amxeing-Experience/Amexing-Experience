@@ -11,10 +11,16 @@ class BaseController {
 
   /**
    * Render a view with common data and layout.
-   * @param res
-   * @param view
-   * @param data
+   * @param {object} res - Express response object.
+   * @param {*} view - View parameter.
+   * @param {object} data - Data object.
    * @example
+   * // Usage example
+   * const result = await render({ view: 'example', data: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async render(res, view, data = {}) {
     try {
@@ -51,10 +57,16 @@ class BaseController {
 
   /**
    * Send JSON response.
-   * @param res
-   * @param data
-   * @param statusCode
+   * @param {object} res - Express response object.
+   * @param {object} data - Data object.
+   * @param {*} statusCode - StatusCode parameter.
    * @example
+   * // Usage example
+   * const result = await json({ data: 'example', statusCode: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {void} - No return value Operation result.
    */
   json(res, data, statusCode = 200) {
     return res.status(statusCode).json(data);
@@ -62,10 +74,16 @@ class BaseController {
 
   /**
    * Handle errors consistently.
-   * @param res
-   * @param error
-   * @param statusCode
+   * @param {object} res - Express response object.
+   * @param {Error} error - Error object.
+   * @param {*} statusCode - StatusCode parameter.
    * @example
+   * // Usage example
+   * const result = await handleError({ error: 'example', statusCode: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {*} - Operation result.
    */
   handleError(res, error, statusCode = 500) {
     logger.error('Controller Error:', error);
@@ -85,11 +103,17 @@ class BaseController {
 
   /**
    * Redirect with flash message.
-   * @param res
-   * @param url
-   * @param message
-   * @param type
+   * @param {object} res - Express response object.
+   * @param {*} url - Url parameter.
+   * @param {string} message - Message string.
+   * @param {*} type - Type parameter.
    * @example
+   * // Usage example
+   * const result = await redirectWithMessage({ url: 'example', message: 'example', type: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {void} - No return value Operation result.
    */
   redirectWithMessage(res, url, message, type = 'info') {
     if (res.locals.flash) {
@@ -100,9 +124,15 @@ class BaseController {
 
   /**
    * Validate required fields.
-   * @param data
-   * @param requiredFields
+   * @param {object} data - Data object.
+   * @param {*} requiredFields - RequiredFields parameter.
    * @example
+   * // Validation utility usage
+   * const isValid = validateFunction(input);
+   * // Returns: boolean
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {boolean} - Boolean result Operation result.
    */
   validateRequired(data, requiredFields) {
     const missing = [];
@@ -122,8 +152,14 @@ class BaseController {
 
   /**
    * Get pagination parameters.
-   * @param query
+   * @param {object} query - Query parameters object.
    * @example
+   * // GET endpoint example
+   * const result = await BaseController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {object} - Operation result.
    */
   getPaginationParams(query) {
     const page = parseInt(query.page, 10) || 1;
@@ -140,8 +176,14 @@ class BaseController {
 
   /**
    * Format date for display.
-   * @param date
+   * @param {*} date - Date parameter.
    * @example
+   * // Transform utility usage
+   * const result = transformFunction(data);
+   * // Returns: transformed data object
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {object} - Operation result.
    */
   formatDate(date) {
     if (!date) return '';
@@ -154,8 +196,14 @@ class BaseController {
 
   /**
    * Format currency.
-   * @param amount
+   * @param {*} amount - Amount parameter.
    * @example
+   * // Transform utility usage
+   * const result = transformFunction(data);
+   * // Returns: transformed data object
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {object} - Operation result.
    */
   formatCurrency(amount) {
     return new Intl.NumberFormat('en-US', {

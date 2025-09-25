@@ -79,12 +79,16 @@ claude.md
 CLAUDE.md
 planning/
 
-# OAuth Real Testing - NO COMMIT
+# Local Development Scripts - NO COMMIT
+scripts/local/
 scripts/oauth-real-*.js
+scripts/*-real-*.js
+scripts/seed-test-users.js
+scripts/debug-*.js
+scripts/clean-*.js
+
+# Development Testing - NO COMMIT
 tests/oauth/real-flow/
-reports/oauth-real-*.html
-reports/oauth-real-*.json
-reports/oauth-real-*.pdf
-reports/performance-metrics-real.json
-reports/security-validation-real.*
 reports/
+*.env.development
+*.env.local

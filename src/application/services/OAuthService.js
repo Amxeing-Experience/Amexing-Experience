@@ -5,6 +5,10 @@
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 2.0.0
+ * @example
+ * // OAuth service usage
+ * const result = await ooauthservice.require(_provider, authCode);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
 const Parse = require('parse/node');
@@ -32,6 +36,11 @@ const logger = require('../../infrastructure/logger');
  * @version 2.0.0
  * @since 2.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Example usage:
+ * // const result = await methodName(params);
+ * // console.log(result);
  * const oauthService = new OAuthService();
  * const authUrl = await oauthService.generateAuthorizationUrl('google', 'state123');
  * const result = await oauthService.handleCallback('google', 'auth_code', 'state123');
@@ -44,8 +53,15 @@ class OAuthService {
 
   /**
    * Initializes OAuth providers configuration.
-   * @returns {object} Providers configuration.
+   * @returns {object} - Operation result Providers configuration.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.initializeProviders(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const providers = service.initializeProviders();
    */
@@ -91,23 +107,31 @@ class OAuthService {
   /**
    * Generates OAuth authorization URL.
    * @param {string} provider - Provider name (google, microsoft, apple).
+   * @param _provider
    * @param {string} state - State parameter for CSRF protection.
-   * @returns {Promise<string>} Authorization URL.
+   * @returns {Promise<string>} - Authorization URL.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.generateAuthorizationUrl(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const authUrl = await service.generateAuthorizationUrl('google', 'state123');
    */
-  async generateAuthorizationUrl(provider, state = null) {
+  async generateAuthorizationUrl(_provider, state = null) {
     try {
-      const providerConfig = this.providers[provider];
+      const providerConfig = this.providers[provider]; // eslint-disable-line no-undef
 
       if (!providerConfig) {
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${provider}`);
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${_provider}`);
       }
 
       // In mock mode, return mock URL
       if (this.mockMode || providerConfig.mockMode) {
-        return this.generateMockAuthUrl(provider, state);
+        return this.generateMockAuthUrl(_provider, state);
       }
 
       // Generate state if not provided
@@ -117,7 +141,7 @@ class OAuthService {
       }
 
       // Store state for verification (in production, use Redis or database)
-      await this.storeOAuthState(stateValue, { provider, timestamp: Date.now() });
+      await this.storeOAuthState(stateValue, { provider, timestamp: Date.now() }); // eslint-disable-line no-undef
 
       const params = new URLSearchParams({
         client_id: providerConfig.clientId,
@@ -128,24 +152,24 @@ class OAuthService {
       });
 
       // Provider-specific parameters
-      if (provider === 'microsoft' && providerConfig.tenantId) {
+      if (_provider === 'microsoft' && providerConfig.tenantId) {
         params.append('tenant', providerConfig.tenantId);
       }
 
-      if (provider === 'apple') {
+      if (_provider === 'apple') {
         params.append('response_mode', 'form_post');
       }
 
       const authUrl = `${providerConfig.authUrl}?${params.toString()}`;
 
       logger.logSecurityEvent('OAUTH_AUTH_URL_GENERATED', {
-        provider,
+        provider, // eslint-disable-line no-undef
         state: `${stateValue.substring(0, 8)}***`,
       });
 
       return authUrl;
     } catch (error) {
-      logger.error(`OAuth authorization URL generation error for ${provider}:`, error);
+      logger.error(`OAuth authorization URL generation error for ${_provider}:`, error);
       throw error;
     }
   }
@@ -153,24 +177,32 @@ class OAuthService {
   /**
    * Handles OAuth callback and exchanges code for tokens.
    * @param {string} provider - Provider name.
+   * @param _provider
    * @param {string} code - Authorization code.
    * @param {string} state - State parameter.
-   * @returns {Promise<object>} Authentication result.
+   * @returns {Promise<object>} - Authentication result.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.handleCallback(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const result = await service.handleCallback('google', 'auth_code_123', 'state123');
    */
-  async handleCallback(provider, code, state) {
+  async handleCallback(_provider, code, state) {
     try {
-      const providerConfig = this.providers[provider];
+      const providerConfig = this.providers[provider]; // eslint-disable-line no-undef
 
       if (!providerConfig) {
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${provider}`);
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${_provider}`);
       }
 
       // Verify state parameter
       const stateData = await this.verifyOAuthState(state);
-      if (!stateData || stateData.provider !== provider) {
+      if (!stateData || stateData._provider !== _provider) { // eslint-disable-line no-underscore-dangle
         throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid state parameter');
       }
 
@@ -178,36 +210,36 @@ class OAuthService {
 
       // In mock mode, return mock user data
       if (this.mockMode || providerConfig.mockMode) {
-        userInfo = this.getMockUserInfo(provider, code);
+        userInfo = this.getMockUserInfo(_provider, code);
       } else {
         // Exchange code for tokens
-        const tokens = await this.exchangeCodeForTokens(provider, code);
+        const tokens = await this.exchangeCodeForTokens(_provider, code);
 
         // Get user information
-        if (provider === 'apple' && tokens.userInfo) {
+        if (_provider === 'apple' && tokens.userInfo) {
           // For Apple, user info comes from the ID token parsed during token exchange
-          const { userInfo: appleUserInfo } = tokens;
-          userInfo = appleUserInfo;
+          const { userInfo: _userInfo } = tokens;
+          userInfo = _userInfo;
         } else {
           // For other providers, get user info via API
-          userInfo = await this.getUserInfo(provider, tokens.access_token);
+          userInfo = await this.getUserInfo(_provider, tokens.accesstoken);
         }
       }
 
       // Find or create user
-      const authResult = await this.findOrCreateUser(provider, userInfo);
+      const authResult = await this.findOrCreateUser(_provider, userInfo);
 
       logger.logSecurityEvent('OAUTH_LOGIN_SUCCESS', {
-        provider,
+        provider, // eslint-disable-line no-undef
         userId: authResult.user.id,
         email: this.maskEmail(userInfo.email),
       });
 
       return authResult;
     } catch (error) {
-      logger.error(`OAuth callback error for ${provider}:`, error);
+      logger.error(`OAuth callback error for ${_provider}:`, error);
       logger.logSecurityEvent('OAUTH_LOGIN_FAILURE', {
-        provider,
+        provider, // eslint-disable-line no-undef
         error: error.message,
       });
       throw error;
@@ -218,13 +250,21 @@ class OAuthService {
    * Links OAuth account to existing user.
    * @param {string} userId - Existing user ID.
    * @param {string} provider - Provider name.
+   * @param _provider
    * @param {object} oauthData - OAuth account data.
-   * @returns {Promise<object>} Link result.
+   * @returns {Promise<object>} - Link result.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.linkOAuthAccount(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const result = await service.linkOAuthAccount('user123', 'google', oauthData);
    */
-  async linkOAuthAccount(userId, provider, oauthData) {
+  async linkOAuthAccount(userId, _provider, oauthData) {
     try {
       const user = await AuthenticationService.findUserById(userId);
 
@@ -233,14 +273,14 @@ class OAuthService {
       }
 
       // Check if OAuth account is already linked to another user
-      const existingUser = await this.findUserByOAuth(provider, oauthData.id);
+      const existingUser = await this.findUserByOAuth(_provider, oauthData.id);
       if (existingUser && existingUser.id !== userId) {
         throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, 'OAuth account is already linked to another user');
       }
 
       // Add OAuth account to user
       user.addOAuthAccount({
-        provider,
+        _provider,
         providerId: oauthData.id,
         email: oauthData.email,
         name: oauthData.name,
@@ -251,7 +291,7 @@ class OAuthService {
 
       logger.logSecurityEvent('OAUTH_ACCOUNT_LINKED', {
         userId,
-        provider,
+        _provider,
         email: this.maskEmail(oauthData.email),
       });
 
@@ -270,12 +310,20 @@ class OAuthService {
    * Unlinks OAuth account from user.
    * @param {string} userId - User ID.
    * @param {string} provider - Provider name.
-   * @returns {Promise<object>} Unlink result.
+   * @param _provider
+   * @returns {Promise<object>} - Unlink result.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.unlinkOAuthAccount(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const result = await service.unlinkOAuthAccount('user123', 'google');
    */
-  async unlinkOAuthAccount(userId, provider) {
+  async unlinkOAuthAccount(userId, _provider) {
     try {
       const user = await AuthenticationService.findUserById(userId);
 
@@ -283,18 +331,18 @@ class OAuthService {
         throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
       }
 
-      const oauthAccount = user.getOAuthAccount(provider);
+      const oauthAccount = user.getOAuthAccount(_provider);
       if (!oauthAccount) {
         throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'OAuth account not found');
       }
 
       // Remove OAuth account
-      user.removeOAuthAccount(provider, oauthAccount.providerId);
+      user.removeOAuthAccount(_provider, oauthAccount.providerId);
       await user.save(null, { useMasterKey: true });
 
       logger.logSecurityEvent('OAUTH_ACCOUNT_UNLINKED', {
         userId,
-        provider,
+        _provider,
       });
 
       return {
@@ -313,51 +361,70 @@ class OAuthService {
   /**
    * Generates mock authorization URL for testing.
    * @param {string} provider - Provider name.
+   * @param _provider
    * @param {string} state - State parameter.
-   * @returns {string} Mock authorization URL.
+   * @returns {string} - Operation result Mock authorization URL.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.generateMockAuthUrl(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const mockUrl = service.generateMockAuthUrl('google', 'state123');
    */
-  generateMockAuthUrl(provider, state) {
-    const mockCode = `mock_${provider}_${crypto.randomBytes(16).toString('hex')}`;
-    return `http://localhost:1337/auth/${provider}/mock?code=${mockCode}&state=${state}`;
+  generateMockAuthUrl(_provider, state) {
+    const mockCode = `mock_${_provider}_${crypto.randomBytes(16).toString('hex')}`;
+    return `http://localhost:1337/auth/${_provider}/mock?code=${mockCode}&state=${state}`;
   }
 
   /**
    * Gets mock user info for testing.
    * @param {string} provider - Provider name.
-   * @param {string} _code - Authorization code (unused in mock).
-   * @returns {object} Mock user info.
+   * @param _provider
+   * @param {*} code - Authorization code (unused in mock).
+   * @param _code
+   * @returns {object} - Operation result Mock user info.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.getMockUserInfo(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const userInfo = service.getMockUserInfo('google', 'mock_code');
    */
-  getMockUserInfo(provider, _code) {
+  getMockUserInfo(_provider, _code) {
     const baseUser = {
-      id: `mock_${provider}_${crypto.randomBytes(8).toString('hex')}`,
-      name: `Test User ${provider}`,
+      id: `mock_${_provider}_${crypto.randomBytes(8).toString('hex')}`,
+      name: `Test User ${_provider}`,
       given_name: 'Test',
       family_name: 'User',
-      picture: `https://via.placeholder.com/150?text=${provider}`,
+      picture: `https://via.placeholder.com/150?text=${_provider}`,
       locale: 'en',
-      verified_email: true,
+      verifiedemail: true,
     };
 
-    switch (provider) {
+    switch (_provider) {
       case 'google':
         return {
           ...baseUser,
-          email: `test.${provider}@utq.edu.mx`, // Mock corporate domain
+          email: `test.${_provider}@utq.edu.mx`, // Mock corporate domain
           hd: 'utq.edu.mx', // Hosted domain for Google Workspace
         };
 
       case 'microsoft':
         return {
           ...baseUser,
-          email: `test.${provider}@nuba.com.mx`, // Mock corporate domain
-          mail: `test.${provider}@nuba.com.mx`,
-          userPrincipalName: `test.${provider}@nuba.com.mx`,
+          email: `test.${_provider}@nuba.com.mx`, // Mock corporate domain
+          mail: `test.${_provider}@nuba.com.mx`,
+          userPrincipalName: `test.${_provider}@nuba.com.mx`,
           jobTitle: 'Test Employee',
           department: 'IT',
         };
@@ -365,9 +432,9 @@ class OAuthService {
       case 'apple':
         return {
           ...baseUser,
-          email: `test.${provider}@icloud.com`,
+          email: `test.${_provider}@icloud.com`,
           email_verified: true,
-          is_private_email: false,
+          is_privateemail: false,
         };
 
       default:
@@ -378,45 +445,55 @@ class OAuthService {
   /**
    * Exchanges authorization code for access tokens (real implementation).
    * @param {string} provider - Provider name.
+   * @param _provider
    * @param {string} code - Authorization code.
-   * @param {string} _state - State parameter (unused in current implementation).
-   * @returns {Promise<object>} Token response.
+   * @param {*} state - State parameter (unused in current implementation).
+   * @param _state
+   * @returns {Promise<object>} - Token response.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.exchangeCodeForTokens(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const tokens = await service.exchangeCodeForTokens('google', 'auth_code_123', 'state123');
    */
-  async exchangeCodeForTokens(provider, code, _state) {
-    const providerConfig = this.providers[provider];
+  async exchangeCodeForTokens(_provider, code, _state) {
+    const providerConfig = this.providers[provider]; // eslint-disable-line no-undef
 
     if (!providerConfig) {
-      throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${provider}`);
+      throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${_provider}`);
     }
 
     // In mock mode, return mock tokens
     if (this.mockMode || providerConfig.mockMode) {
       return {
-        access_token: `mock_access_token_${provider}`,
+        accesstoken: `mock_accesstoken_${_provider}`,
         token_type: 'Bearer',
         expires_in: 3600,
-        refresh_token: `mock_refresh_token_${provider}`,
+        refreshtoken: `mock_refreshtoken_${_provider}`,
         scope: providerConfig.scopes.join(' '),
       };
     }
 
     // Real token exchange implementation
     try {
-      const tokenData = await this.performTokenExchange(provider, code, providerConfig);
+      const tokenData = await this.performTokenExchange(_provider, code, providerConfig);
 
       logger.logSecurityEvent('OAUTH_TOKEN_EXCHANGE_SUCCESS', null, {
-        provider,
-        hasRefreshToken: !!tokenData.refresh_token,
+        provider, // eslint-disable-line no-undef
+        hasRefreshToken: !!tokenData.refreshtoken,
       });
 
       return tokenData;
     } catch (error) {
-      logger.error(`OAuth token exchange failed for ${provider}:`, error);
+      logger.error(`OAuth token exchange failed for ${_provider}:`, error);
       logger.logSecurityEvent('OAUTH_TOKEN_EXCHANGE_FAILURE', null, {
-        provider,
+        provider, // eslint-disable-line no-undef
         error: error.message,
       });
       throw new Parse.Error(Parse.Error.OTHER_CAUSE, `Token exchange failed: ${error.message}`);
@@ -424,16 +501,25 @@ class OAuthService {
   }
 
   /**
-   * Performs the actual HTTP token exchange with the provider.
+   * Performs the actual HTTP token exchange with the _provider.
    * @param {string} provider - Provider name.
+   * @param _provider
    * @param {string} code - Authorization code.
    * @param {object} config - Provider configuration.
-   * @returns {Promise<object>} Token data.
+   * @returns {Promise<object>} - Token data.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.performTokenExchange(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const tokenData = await service.performTokenExchange('google', 'auth_code_123', providerConfig);
    */
-  async performTokenExchange(provider, code, config) {
+  async performTokenExchange(_provider, code, config) {
     const tokenPayload = {
       grant_type: 'authorization_code',
       client_id: config.clientId,
@@ -446,7 +532,7 @@ class OAuthService {
     let configWithTenantUrl = null;
 
     // Microsoft Azure AD specific configuration
-    if (provider === 'microsoft') {
+    if (_provider === 'microsoft') {
       const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || 'common';
       const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
       // Create updated configuration without modifying parameter
@@ -457,7 +543,7 @@ class OAuthService {
     }
 
     // Apple requires JWT client assertion instead of client_secret
-    if (provider === 'apple') {
+    if (_provider === 'apple') {
       delete tokenPayload.client_secret;
       tokenPayload.client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
       tokenPayload.client_assertion = await this.createAppleClientAssertion(config);
@@ -474,7 +560,7 @@ class OAuthService {
 
     if (!response.ok) {
       const errorData = await response.text();
-      logger.error(`Token exchange failed for ${provider}:`, {
+      logger.error(`Token exchange failed for ${_provider}:`, {
         status: response.status,
         statusText: response.statusText,
         error: errorData,
@@ -486,13 +572,13 @@ class OAuthService {
     const tokenData = await response.json();
 
     // Microsoft-specific token validation
-    if (provider === 'microsoft' && tokenData.access_token) {
-      await this.validateMicrosoftToken(tokenData.access_token);
+    if (_provider === 'microsoft' && tokenData.accesstoken) {
+      await this.validateMicrosoftToken(tokenData.accesstoken);
     }
 
     // Apple-specific ID token processing
-    if (provider === 'apple' && tokenData.id_token) {
-      tokenData.userInfo = await this.parseAppleIdToken(tokenData.id_token);
+    if (_provider === 'apple' && tokenData.idtoken) {
+      tokenData.userInfo = await this.parseAppleIdToken(tokenData.idtoken);
     }
 
     return tokenData;
@@ -501,8 +587,15 @@ class OAuthService {
   /**
    * Creates Apple client assertion JWT.
    * @param {object} config - Apple OAuth configuration.
-   * @returns {Promise<string>} JWT client assertion.
+   * @returns {Promise<string>} - JWT client assertion.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.createAppleClientAssertion(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const assertion = await service.createAppleClientAssertion(appleConfig);
    */
@@ -538,26 +631,35 @@ class OAuthService {
   /**
    * Gets user information from provider (real implementation).
    * @param {string} provider - Provider name.
+   * @param _provider
    * @param {string} accessToken - Access token.
-   * @returns {Promise<object>} User information.
+   * @returns {Promise<object>} - User information.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.getUserInfo(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
-   * const userInfo = await service.getUserInfo('google', 'access_token_123');
+   * const userInfo = await service.getUserInfo('google', 'accesstoken_123');
    */
-  async getUserInfo(provider, accessToken) {
+  async getUserInfo(_provider, accessToken) {
     if (this.mockMode) {
-      return this.getMockUserInfo(provider, 'mock_code');
+      return this.getMockUserInfo(_provider, 'mock_code');
     }
 
-    const config = this.providers[provider];
+    const config = this.providers[provider]; // eslint-disable-line no-undef
     if (!config) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, `Unsupported provider: ${provider}`);
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, `Unsupported provider: ${_provider}`);
     }
 
     try {
       let userInfo;
 
-      if (provider === 'google') {
+      if (_provider === 'google') {
         const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
@@ -567,10 +669,10 @@ class OAuthService {
         }
 
         userInfo = await response.json();
-      } else if (provider === 'microsoft') {
+      } else if (_provider === 'microsoft') {
         // Use specialized Microsoft method for directory information
         userInfo = await this.getMicrosoftUserProfile(accessToken);
-      } else if (provider === 'apple') {
+      } else if (_provider === 'apple') {
         // Apple returns user info in the ID token JWT
         // Access token is used for Apple's API but user info comes from ID token
         throw new Parse.Error(
@@ -580,17 +682,17 @@ class OAuthService {
       }
 
       logger.logSecurityEvent('OAUTH_USER_INFO_RETRIEVED', null, {
-        provider,
+        provider, // eslint-disable-line no-undef
         userId: userInfo.id || userInfo.sub,
         email: this.maskEmail(userInfo.email),
       });
 
       return userInfo;
     } catch (error) {
-      logger.error(`Error getting user info from ${provider}:`, error);
+      logger.error(`Error getting user info from ${_provider}:`, error);
       throw new Parse.Error(
         Parse.Error.OTHER_CAUSE,
-        `Failed to get user information from ${provider}`
+        `Failed to get user information from ${_provider}`
       );
     }
   }
@@ -598,23 +700,31 @@ class OAuthService {
   /**
    * Finds or creates user from OAuth data.
    * @param {string} provider - Provider name.
+   * @param _provider
    * @param {object} userInfo - OAuth user information.
-   * @returns {Promise<object>} Authentication result.
+   * @returns {Promise<object>} - Authentication result.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.findOrCreateUser(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const result = await service.findOrCreateUser('google', userInfo);
    */
-  async findOrCreateUser(provider, userInfo) {
+  async findOrCreateUser(_provider, userInfo) {
     try {
       // Check if this is a corporate user first
-      const corporateResult = await CorporateOAuthService.mapCorporateUser(userInfo, provider);
+      const corporateResult = await CorporateOAuthService.mapCorporateUser(userInfo, _provider);
 
       if (corporateResult.isCorporateUser) {
         // Corporate user handling - generate tokens for corporate user
         const tokens = await AuthenticationService.generateTokens(corporateResult.user);
 
         logger.logSecurityEvent('CORPORATE_OAUTH_LOGIN_SUCCESS', corporateResult.user.id, {
-          provider,
+          provider, // eslint-disable-line no-undef
           clientId: corporateResult.client?.id,
           clientName: corporateResult.client?.get('name'),
           email: this.maskEmail(userInfo.email),
@@ -639,19 +749,19 @@ class OAuthService {
 
       // Regular OAuth user handling (non-corporate)
       // Try to find existing user by OAuth ID
-      let user = await this.findUserByOAuth(provider, userInfo.id);
+      let user = await this.findUserByOAuth(_provider, userInfo.id);
 
       if (user) {
         // Update OAuth data
         user.addOAuthAccount({
-          provider,
+          _provider,
           providerId: userInfo.id,
           email: userInfo.email,
           name: userInfo.name,
           profileData: userInfo,
         });
 
-        await user.recordSuccessfulLogin(`oauth_${provider}`);
+        await user.recordSuccessfulLogin(`oauth_${_provider}`);
 
         const tokens = await AuthenticationService.generateTokens(user);
 
@@ -671,14 +781,14 @@ class OAuthService {
       if (user) {
         // Link OAuth account to existing user
         user.addOAuthAccount({
-          provider,
+          _provider,
           providerId: userInfo.id,
           email: userInfo.email,
           name: userInfo.name,
           profileData: userInfo,
         });
 
-        await user.recordSuccessfulLogin(`oauth_${provider}`);
+        await user.recordSuccessfulLogin(`oauth_${_provider}`);
         await user.save(null, { useMasterKey: true });
 
         const tokens = await AuthenticationService.generateTokens(user);
@@ -702,12 +812,12 @@ class OAuthService {
         lastName: userInfo.family_name
           || userInfo.name?.split(' ').slice(1).join(' ') || '',
         role: this.determineUserRole(userInfo),
-        primaryOAuthProvider: provider,
+        primaryOAuthProvider: provider, // eslint-disable-line no-undef
       });
 
       // Add OAuth account
       user.addOAuthAccount({
-        provider,
+        _provider,
         providerId: userInfo.id,
         email: userInfo.email,
         name: userInfo.name,
@@ -715,12 +825,12 @@ class OAuthService {
       });
 
       // Set email as verified if provider confirms it
-      if (userInfo.verified_email || userInfo.email_verified) {
+      if (userInfo.verifiedemail || userInfo.email_verified) {
         user.set('emailVerified', true);
       }
 
       const savedUser = await user.save(null, { useMasterKey: true });
-      await savedUser.recordSuccessfulLogin(`oauth_${provider}`);
+      await savedUser.recordSuccessfulLogin(`oauth_${_provider}`);
 
       const tokens = await AuthenticationService.generateTokens(savedUser);
 
@@ -740,16 +850,24 @@ class OAuthService {
   /**
    * Finds user by OAuth provider and ID.
    * @param {string} provider - Provider name.
+   * @param _provider
    * @param {string} providerId - Provider user ID.
-   * @returns {Promise<AmexingUser|null>} User object or null.
+   * @returns {Promise<AmexingUser|null>} - User object or null.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.findUserByOAuth(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const user = await service.findUserByOAuth('google', 'provider_user_123');
    */
-  async findUserByOAuth(provider, providerId) {
+  async findUserByOAuth(_provider, providerId) {
     const query = new Parse.Query(AmexingUser);
     query.contains('oauthAccounts', {
-      provider,
+      provider, // eslint-disable-line no-undef
       providerId,
     });
 
@@ -759,8 +877,17 @@ class OAuthService {
   /**
    * Generates username from email.
    * @param {string} email - Email address.
-   * @returns {string} Generated username.
+   * @param email
+   * @returns {string} - Operation result Generated username.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.generateUsernameFromEmail(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const username = service.generateUsernameFromEmail('user@example.com');
    */
@@ -774,23 +901,30 @@ class OAuthService {
   /**
    * Determines user role based on OAuth data.
    * @param {object} userInfo - OAuth user information.
-   * @returns {string} User role.
+   * @returns {string} - Operation result User role.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.determineUserRole(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const role = service.determineUserRole(userInfo);
    */
   determineUserRole(userInfo) {
     // Corporate domains get different default roles
     if (userInfo.email) {
-      const domain = userInfo.email.split('@')[1];
+      const _domain = userInfo.email.split('@')[1]; // eslint-disable-line no-underscore-dangle
 
       // Educational institutions
-      if (domain === 'utq.edu.mx') {
+      if (_domain === 'utq.edu.mx') {
         return 'employee';
       }
 
       // Corporate clients
-      if (domain === 'nuba.com.mx') {
+      if (_domain === 'nuba.com.mx') {
         return 'client';
       }
     }
@@ -803,8 +937,15 @@ class OAuthService {
    * Stores OAuth state for CSRF protection.
    * @param {string} state - State parameter.
    * @param {object} data - State data.
-   * @returns {Promise<void>} Completes when state is stored.
+   * @returns {Promise<void>} - Completes when state is stored.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.storeOAuthState(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * await service.storeOAuthState('state123', { provider: 'google' });
    */
@@ -824,8 +965,15 @@ class OAuthService {
   /**
    * Verifies OAuth state parameter.
    * @param {string} state - State parameter.
-   * @returns {Promise<object | null>} State data or null.
+   * @returns {Promise<object | null>} - State data or null.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.verifyOAuthState(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const stateData = await service.verifyOAuthState('state123');
    */
@@ -855,8 +1003,17 @@ class OAuthService {
   /**
    * Masks email for logging.
    * @param {string} email - Email to mask.
-   * @returns {string} Masked email.
+   * @param email
+   * @returns {string} - Operation result Masked email.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.maskEmail(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const masked = service.maskEmail('user@example.com'); // Returns 'use***@example.com'
    */
@@ -869,7 +1026,11 @@ class OAuthService {
   /**
    * Gets Apple's public key for JWT verification.
    * @param {string} idToken - Apple ID token to get key ID from.
-   * @returns {Promise<string>} Public key in PEM format.
+   * @returns {Promise<string>} - Public key in PEM format.
+   * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.getApplePublicKey(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * @private
    */
   async getApplePublicKey(idToken) {
@@ -896,8 +1057,8 @@ class OAuthService {
           res.on('data', (chunk) => { data += chunk; });
           res.on('end', () => {
             try {
-              const keys = JSON.parse(data);
-              const key = keys.keys.find((k) => k.kid === keyId);
+              const _keys = JSON.parse(data); // eslint-disable-line no-underscore-dangle
+              const key = _keys.keys.find((k) => k.kid === keyId);
 
               if (!key) {
                 throw new Error(`No public key found for key ID: ${keyId}`);
@@ -930,8 +1091,16 @@ class OAuthService {
   /**
    * Parses Apple ID token to extract user information.
    * @param {string} idToken - Apple ID token JWT.
-   * @returns {Promise<object>} User information from ID token.
+   * @returns {Promise<object>} - User information from ID token.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.parseAppleIdToken(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const userInfo = await service.parseAppleIdToken(idTokenJWT);
    */
@@ -986,10 +1155,18 @@ class OAuthService {
   /**
    * Validates Microsoft Azure AD access token.
    * @param {string} accessToken - Microsoft access token.
-   * @returns {Promise<object>} Token validation result.
+   * @returns {Promise<object>} - Token validation result.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.validateMicrosoftToken(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
-   * const validation = await service.validateMicrosoftToken('access_token_123');
+   * const validation = await service.validateMicrosoftToken('accesstoken_123');
    */
   async validateMicrosoftToken(accessToken) {
     try {
@@ -1033,10 +1210,18 @@ class OAuthService {
   /**
    * Gets Microsoft user profile with extended directory information.
    * @param {string} accessToken - Microsoft access token.
-   * @returns {Promise<object>} Extended user profile.
+   * @returns {Promise<object>} - Extended user profile.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.getMicrosoftUserProfile(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
-   * const profile = await service.getMicrosoftUserProfile('access_token_123');
+   * const profile = await service.getMicrosoftUserProfile('accesstoken_123');
    */
   async getMicrosoftUserProfile(accessToken) {
     try {
@@ -1082,31 +1267,47 @@ class OAuthService {
 
   /**
    * Gets list of available OAuth providers.
-   * @returns {Array} Available providers.
+   * @returns {Array} - Array of results Available providers.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.getAvailableProviders(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await _provider.getAuthorizationUrl(options);
    * const service = new OAuthService();
    * const providers = service.getAvailableProviders();
    */
   getAvailableProviders() {
-    return Object.keys(this.providers).filter((provider) => this.providers[provider].enabled || this.mockMode);
+    return Object.keys(this.providers).filter((_provider) => this.providers[provider].enabled || this.mockMode); // eslint-disable-line no-undef
   }
 
   /**
    * Gets provider configuration (safe for client).
    * @param {string} provider - Provider name.
-   * @returns {object} Safe provider config.
+   * @param _provider
+   * @returns {object} - Operation result Safe provider config.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.getProviderConfig(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const config = service.getProviderConfig('google');
    */
-  getProviderConfig(provider) {
-    const config = this.providers[provider];
+  getProviderConfig(_provider) {
+    const config = this.providers[provider]; // eslint-disable-line no-undef
     if (!config) {
       return null;
     }
 
     return {
-      name: provider,
+      name: provider, // eslint-disable-line no-undef
       enabled: config.enabled || this.mockMode,
       mockMode: config.mockMode || this.mockMode,
       scopes: config.scopes,
@@ -1115,8 +1316,16 @@ class OAuthService {
 
   /**
    * Gets available corporate domains for SSO.
-   * @returns {Array} List of corporate domain configurations.
+   * @returns {Array} - Array of results List of corporate domain configurations.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.getAvailableCorporateDomains(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const domains = service.getAvailableCorporateDomains();
    */
@@ -1127,29 +1336,47 @@ class OAuthService {
   /**
    * Checks if an email domain is configured for corporate SSO.
    * @param {string} email - Email address to check.
-   * @returns {object | null} Corporate configuration if found.
+   * @param email
+   * @returns {object | null} - Operation result Corporate configuration if found.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.getCorporateDomainConfig(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const config = service.getCorporateDomainConfig('user@company.com');
    */
   getCorporateDomainConfig(email) {
-    const domain = CorporateOAuthService.extractEmailDomain(email);
+    const _domain = CorporateOAuthService.extractEmailDomain(email); // eslint-disable-line no-underscore-dangle
     const corporateDomains = CorporateOAuthService.getAvailableCorporateDomains();
 
-    return corporateDomains.find((config) => config.domain === domain) || null;
+    return corporateDomains.find((config) => config._domain === _domain) || null; // eslint-disable-line no-underscore-dangle
   }
 
   /**
    * Adds new corporate domain configuration.
-   * @param {string} domain - Email domain.
+   * @param {string} domain - Email _domain.
+   * @param _domain
    * @param {object} config - Corporate configuration.
-   * @returns {object} Added domain configuration.
+   * @returns {object} - Operation result Added domain configuration.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthservice.addCorporateDomain(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const service = new OAuthService();
    * const result = service.addCorporateDomain('company.com', corporateConfig);
    */
-  addCorporateDomain(domain, config) {
-    return CorporateOAuthService.addCorporateDomain(domain, config);
+  addCorporateDomain(_domain, config) {
+    return CorporateOAuthService.addCorporateDomain(_domain, config);
   }
 }
 

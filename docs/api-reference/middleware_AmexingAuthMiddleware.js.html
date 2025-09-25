@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: middleware/AmexingAuthMiddleware.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: middleware/AmexingAuthMiddleware.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * AmexingAuthMiddleware - Enhanced authentication and permission middleware
+ * Replaces Parse authentication with custom AmexingUser + dynamic permissions.
+ *
+ * Features:
+ * - JWT token validation
+ * - Dynamic permission checking
+ * - OAuth token handling
+ * - Session management
+ * - Context-aware authorization
+ * - Rate limiting per user role.
+ * @author Claude Code + Technical Team
+ * @version 2.0
+ * @date 2025-09-11
+ */
+
+const jwt = require('jsonwebtoken');
+const logger = require('../infrastructure/logger');
+const AmexingAuthService = require('../services/AmexingAuthService');
+const PermissionService = require('../services/PermissionService');
+
+/**
+ * Amexing Authentication Middleware - Enhanced authentication and authorization system.
+ * Replaces Parse authentication with custom AmexingUser model and dynamic permissions,
+ * providing comprehensive JWT validation, OAuth token handling, and context-aware authorization.
+ *
+ * This middleware implements the core authentication layer for the Amexing platform,
+ * supporting multiple authentication methods, dynamic permission checking, and
+ * sophisticated session management with PCI DSS compliance.
+ *
+ * Features:
+ * - JWT token validation and refresh handling
+ * - Dynamic permission checking with context awareness
+ * - OAuth token integration (Google, Microsoft, Apple)
+ * - Session management and user context injection
+ * - Rate limiting based on user roles and permissions
+ * - Comprehensive security logging and audit trails
+ * - Multi-tenant and department-aware authorization
+ * - Token expiration and renewal mechanisms.
+ * @class AmexingAuthMiddleware
+ * @author Claude Code + Technical Team
+ * @version 2.0
+ * @since 2025-09-11
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Initialize authentication middleware
+ * const authMiddleware = new AmexingAuthMiddleware();
+ * authMiddleware.initialize(amexingAuthService);
+ *
+ * // Apply to API routes
+ * app.use('/api', authMiddleware.validateToken());
+ * app.use('/api/admin', authMiddleware.requirePermission('admin_access'));
+ *
+ * // Apply to specific routes with context
+ * app.use('/api/department/:deptId', authMiddleware.validateDepartmentAccess());
+ * app.use('/api/oauth', authMiddleware.validateOAuthToken());
+ *
+ * // Role-based access control
+ * app.use('/api/users', authMiddleware.requireRole(['admin', 'manager']));
+ */
+class AmexingAuthMiddleware {
+  constructor() {
+    this.jwtSecret = process.env.JWT_SECRET;
+    this.authService = null;
+
+    if (!this.jwtSecret) {
+      throw new Error('JWT_SECRET environment variable not set');
+    }
+  }
+
+  /**
+   * Initialize middleware with auth service.
+   * @param {AmexingAuthService} authService - Authentication service instance.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  initialize(authService) {
+    this.authService = authService;
+    logger.info('AmexingAuthMiddleware initialized');
+  }
+
+  // ============================================
+  // AUTHENTICATION MIDDLEWARE
+  // ============================================
+
+  /**
+   * Require authentication - validates JWT and loads user.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @param {Function} next - Next middleware.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  requireAuth = async (req, res, next) => {
+    try {
+      const token = this.extractToken(req);
+
+      if (!token) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+          code: 'AUTH_REQUIRED',
+        });
+      }
+
+      // Verify JWT token
+      const decoded = jwt.verify(token, this.jwtSecret);
+
+      // Load user from database
+      const user = await this.authService.findUserById(decoded.sub);
+
+      if (!user || !user.active || user.deleted) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid or expired token',
+          code: 'INVALID_TOKEN',
+        });
+      }
+
+      // Check if session exists and is valid
+      const sessionValid = await this.validateSession(decoded.jti, user.id);
+      if (!sessionValid) {
+        return res.status(401).json({
+          success: false,
+          error: 'Session expired',
+          code: 'SESSION_EXPIRED',
+        });
+      }
+
+      // Attach user and token info to request
+      req.user = user;
+      req.tokenData = decoded;
+      req.authMethod = 'jwt';
+
+      // Update session activity
+      await this.updateSessionActivity(decoded.jti);
+
+      logger.debug(`User authenticated: ${user.email}`);
+      next();
+    } catch (error) {
+      if (error.name === 'JsonWebTokenError') {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid token',
+          code: 'INVALID_TOKEN',
+        });
+      }
+
+      if (error.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          error: 'Token expired',
+          code: 'TOKEN_EXPIRED',
+        });
+      }
+
+      logger.error('Authentication middleware error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Authentication failed',
+        code: 'AUTH_ERROR',
+      });
+    }
+  };
+
+  /**
+   * Optional authentication - validates token if present but doesn't require it.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @param {Function} next - Next middleware.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  optionalAuth = async (req, res, next) => {
+    try {
+      const token = this.extractToken(req);
+
+      if (!token) {
+        // No token provided, continue without authentication
+        req.user = null;
+        req.tokenData = null;
+        req.authMethod = null;
+        return next();
+      }
+
+      // Try to authenticate if token is provided
+      await this.requireAuth(req, res, next);
+    } catch (error) {
+      // If authentication fails, continue without authentication
+      req.user = null;
+      req.tokenData = null;
+      req.authMethod = null;
+      next();
+    }
+  };
+
+  // ============================================
+  // PERMISSION MIDDLEWARE
+  // ============================================
+
+  /**
+   * Require specific permission.
+   * @param {string|Array} permissions - Required permission code(s).
+   * @param {object} options - Permission check options.
+   * @returns {Function} Middleware function.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  requirePermission = (permissions, options = {}) => async (req, res, next) => {
+    try {
+      // Ensure user is authenticated
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required for this action',
+          code: 'AUTH_REQUIRED',
+        });
+      }
+
+      // Normalize permissions to array
+      const requiredPermissions = Array.isArray(permissions) ? permissions : [permissions];
+
+      // Build context for permission checking
+      const context = this.buildPermissionContext(req, options);
+
+      // Check if user has all required permissions
+      const hasAllPermissions = await this.checkUserPermissions(
+        req.user.id,
+        requiredPermissions,
+        context,
+        options.requireAll !== false // Default to requiring all permissions
+      );
+
+      if (!hasAllPermissions) {
+        return res.status(403).json({
+          success: false,
+          error: 'Insufficient permissions',
+          code: 'INSUFFICIENT_PERMISSIONS',
+          required: requiredPermissions,
+          context: this.sanitizeContext(context),
+        });
+      }
+
+      // Log permission check for audit
+      await this.logPermissionCheck({
+        userId: req.user.id,
+        permissions: requiredPermissions,
+        context,
+        granted: true,
+        req,
+      });
+
+      next();
+    } catch (error) {
+      logger.error('Permission middleware error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Permission check failed',
+        code: 'PERMISSION_ERROR',
+      });
+    }
+  };
+
+  /**
+   * Require specific role.
+   * @param {string|Array} roles - Required role(s).
+   * @param {object} _options - Role check options (currently unused).
+   * @returns {Function} Middleware function.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  requireRole = (roles, _options = {}) => async (req, res, next) => {
+    try {
+      // Ensure user is authenticated
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required for this action',
+          code: 'AUTH_REQUIRED',
+        });
+      }
+
+      // Normalize roles to array
+      const requiredRoles = Array.isArray(roles) ? roles : [roles];
+
+      // Check if user has required role
+      if (!requiredRoles.includes(req.user.role)) {
+        return res.status(403).json({
+          success: false,
+          error: 'Insufficient role',
+          code: 'INSUFFICIENT_ROLE',
+          required: requiredRoles,
+          current: req.user.role,
+        });
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Role middleware error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Role check failed',
+        code: 'ROLE_ERROR',
+      });
+    }
+  };
+
+  /**
+   * Require access level.
+   * @param {string} minimumLevel - Minimum access level (basic, premium, executive).
+   * @returns {Function} Middleware function.
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   */
+  requireAccessLevel = (minimumLevel) => {
+    const levelHierarchy = {
+      basic: 1,
+      premium: 2,
+      executive: 3,
+      vip: 4,
+    };
+
+    return async (req, res, next) => {
+      try {
+        // Ensure user is authenticated
+        if (!req.user) {
+          return res.status(401).json({
+            success: false,
+            error: 'Authentication required for this action',
+            code: 'AUTH_REQUIRED',
+          });
+        }
+
+        const userLevel = req.user.accessLevel || 'basic';
+        const userLevelValue = levelHierarchy[userLevel] || 1;
+        const requiredLevelValue = levelHierarchy[minimumLevel] || 1;
+
+        if (userLevelValue &lt; requiredLevelValue) {
+          return res.status(403).json({
+            success: false,
+            error: 'Insufficient access level',
+            code: 'INSUFFICIENT_ACCESS_LEVEL',
+            required: minimumLevel,
+            current: userLevel,
+          });
+        }
+
+        next();
+      } catch (error) {
+        logger.error('Access level middleware error:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Access level check failed',
+          code: 'ACCESS_LEVEL_ERROR',
+        });
+      }
+    };
+  };
+
+  /**
+   * Require corporate context (user must belong to a client/department).
+   * @param {object} options - Corporate check options.
+   * @returns {Function} Middleware function.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  requireCorporateContext = (options = {}) => async (req, res, next) => {
+    try {
+      // Ensure user is authenticated
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required for this action',
+          code: 'AUTH_REQUIRED',
+        });
+      }
+
+      // Check if user has corporate association
+      if (!req.user.clientId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Corporate association required',
+          code: 'NO_CORPORATE_CONTEXT',
+        });
+      }
+
+      // If department is required, check department association
+      if (options.requireDepartment &amp;&amp; !req.user.departmentId) {
+        return res.status(403).json({
+          success: false,
+          error: 'Department association required',
+          code: 'NO_DEPARTMENT_CONTEXT',
+        });
+      }
+
+      // Load corporate context
+      req.corporateContext = await this.loadCorporateContext(req.user);
+
+      next();
+    } catch (error) {
+      logger.error('Corporate context middleware error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Corporate context check failed',
+        code: 'CORPORATE_CONTEXT_ERROR',
+      });
+    }
+  };
+
+  // ============================================
+  // OAUTH MIDDLEWARE
+  // ============================================
+
+  /**
+   * Handle OAuth token in request.
+   * @param {object} req - Express request.
+   * @param {object} res - Express response.
+   * @param {Function} next - Next middleware.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  handleOAuthToken = async (req, res, next) => {
+    try {
+      const oauthToken = req.headers['x-oauth-token'];
+
+      if (!oauthToken) {
+        return next(); // No OAuth token, continue with regular auth
+      }
+
+      // Validate OAuth token
+      const tokenData = await this.validateOAuthToken(oauthToken);
+
+      if (!tokenData) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid OAuth token',
+          code: 'INVALID_OAUTH_TOKEN',
+        });
+      }
+
+      // Load user from OAuth token
+      const user = await this.authService.findUserById(tokenData.userId);
+
+      if (!user || !user.active) {
+        return res.status(401).json({
+          success: false,
+          error: 'OAuth user not found or inactive',
+          code: 'OAUTH_USER_INACTIVE',
+        });
+      }
+
+      // Attach OAuth context to request
+      req.user = user;
+      req.oauthToken = tokenData;
+      req.authMethod = 'oauth';
+
+      logger.debug(`OAuth user authenticated: ${user.email}`);
+      next();
+    } catch (error) {
+      logger.error('OAuth middleware error:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'OAuth authentication failed',
+        code: 'OAUTH_ERROR',
+      });
+    }
+  };
+
+  // ============================================
+  // RATE LIMITING MIDDLEWARE
+  // ============================================
+
+  /**
+   * Role-based rate limiting.
+   * @param {object} limits - Rate limits per role.
+   * @returns {Function} Middleware function.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  rateLimitByRole = (limits = {}) => {
+    const defaultLimits = {
+      guest: { requests: 100, window: 3600 }, // 100 requests per hour
+      employee: { requests: 500, window: 3600 }, // 500 requests per hour
+      client: { requests: 1000, window: 3600 }, // 1000 requests per hour
+      admin: { requests: 5000, window: 3600 }, // 5000 requests per hour
+      superadmin: { requests: -1, window: 3600 }, // Unlimited
+    };
+
+    const rateLimits = { ...defaultLimits, ...limits };
+
+    return async (req, res, next) => {
+      try {
+        const userRole = req.user?.role || 'guest';
+        const limit = rateLimits[userRole] || rateLimits.guest;
+
+        // Skip rate limiting for unlimited roles
+        if (limit.requests === -1) {
+          return next();
+        }
+
+        const userId = req.user?.id || req.ip;
+        const key = `rate_limit:${userRole}:${userId}`;
+
+        // Check rate limit (implementation would use Redis or similar)
+        const isAllowed = await this.checkRateLimit(key, limit);
+
+        if (!isAllowed) {
+          return res.status(429).json({
+            success: false,
+            error: 'Rate limit exceeded',
+            code: 'RATE_LIMIT_EXCEEDED',
+            limit: limit.requests,
+            window: limit.window,
+          });
+        }
+
+        next();
+      } catch (error) {
+        logger.error('Rate limiting error:', error);
+        next(); // Continue on error to avoid blocking requests
+      }
+    };
+  };
+
+  // ============================================
+  // UTILITY METHODS
+  // ============================================
+
+  /**
+   * Extract JWT token from request.
+   * @param {object} req - Express request.
+   * @returns {string|null} JWT token.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  extractToken(req) {
+    // Check Authorization header
+    const authHeader = req.headers.authorization;
+    if (authHeader &amp;&amp; authHeader.startsWith('Bearer ')) {
+      return authHeader.substring(7);
+    }
+
+    // Check query parameter
+    if (req.query.token) {
+      return req.query.token;
+    }
+
+    // Check cookie
+    if (req.cookies &amp;&amp; req.cookies.auth_token) {
+      return req.cookies.auth_token;
+    }
+
+    return null;
+  }
+
+  /**
+   * Validate session exists and is active.
+   * @param {string} _jti - JWT ID (currently unused).
+   * @param {string} _userId - User ID (currently unused).
+   * @returns {boolean} Session is valid.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  async validateSession(_jti, _userId) {
+    try {
+      // This would check the Session table
+      // For now, we'll assume valid if JWT is valid
+      return true;
+    } catch (error) {
+      logger.error('Session validation error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Update session activity timestamp.
+   * @param {string} jti - JWT ID.
+   * @param _jti
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   */
+  async updateSessionActivity(_jti) {
+    try {
+      // This would update the Session table
+      // Implementation depends on your session storage strategy
+    } catch (error) {
+      logger.error('Session activity update error:', error);
+    }
+  }
+
+  /**
+   * Build permission context from request.
+   * @param {object} req - Express request.
+   * @param {object} options - Context options.
+   * @returns {object} Permission context.
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   */
+  buildPermissionContext(req, options = {}) {
+    const context = {
+      // Extract from URL parameters
+      clientId: req.params.clientId || req.user?.clientId,
+      departmentId: req.params.departmentId || req.user?.departmentId,
+
+      // Extract from request body
+      amount: req.body?.amount || req.query?.amount,
+      location: req.body?.location || req.query?.location,
+
+      // Add custom context from options
+      ...options.context,
+    };
+
+    // Remove undefined values
+    Object.keys(context).forEach((key) => {
+      if (context[key] === undefined) {
+        delete context[key];
+      }
+    });
+
+    return context;
+  }
+
+  /**
+   * Check if user has required permissions.
+   * @param {string} userId - User ID.
+   * @param {Array} permissions - Required permissions.
+   * @param {object} context - Permission context.
+   * @param {boolean} requireAll - Require all permissions (vs any).
+   * @returns {boolean} Has required permissions.
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   */
+  async checkUserPermissions(userId, permissions, context, requireAll = true) {
+    try {
+      if (requireAll) {
+        // User must have all permissions
+        for (const permission of permissions) {
+          const hasPermission = await PermissionService.hasPermission(userId, permission, context);
+          if (!hasPermission) {
+            return false;
+          }
+        }
+        return true;
+      }
+      // User must have at least one permission
+      for (const permission of permissions) {
+        const hasPermission = await PermissionService.hasPermission(userId, permission, context);
+        if (hasPermission) {
+          return true;
+        }
+      }
+      return false;
+    } catch (error) {
+      logger.error('Permission check error:', error);
+      return false; // Fail secure
+    }
+  }
+
+  /**
+   * Load corporate context for user.
+   * @param {object} user - User object.
+   * @returns {object} Corporate context.
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   */
+  async loadCorporateContext(user) {
+    try {
+      const context = {};
+
+      if (user.clientId) {
+        // Load client information
+        const client = await this.authService.db.collection('Client').findOne({
+          id: user.clientId,
+          active: true,
+          deleted: false,
+        });
+        context.client = client;
+      }
+
+      if (user.departmentId) {
+        // Load department information
+        const department = await this.authService.db.collection('Department').findOne({
+          id: user.departmentId,
+          active: true,
+          deleted: false,
+        });
+        context.department = department;
+      }
+
+      if (user.employeeId) {
+        // Load employee information
+        const employee = await this.authService.db.collection('ClientEmployee').findOne({
+          id: user.employeeId,
+          active: true,
+          deleted: false,
+        });
+        context.employee = employee;
+      }
+
+      return context;
+    } catch (error) {
+      logger.error('Corporate context loading error:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Validate OAuth token.
+   * @param {string} token - OAuth token.
+   * @returns {object | null} Token data.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  async validateOAuthToken(token) {
+    try {
+      // This would validate the OAuth token with the provider
+      // and return token data if valid
+      return null; // Placeholder implementation
+    } catch (error) {
+      logger.error('OAuth token validation error:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Check rate limit for key.
+   * @param {string} key - Rate limit key.
+   * @param {object} limit - Rate limit configuration.
+   * @returns {boolean} Request is allowed.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  async checkRateLimit(key, limit) {
+    try {
+      // This would implement rate limiting using Redis or similar
+      // For now, always allow
+      return true;
+    } catch (error) {
+      logger.error('Rate limit check error:', error);
+      return true; // Allow on error
+    }
+  }
+
+  /**
+   * Log permission check for audit.
+   * @param {object} logData - Log data.
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   */
+  async logPermissionCheck(logData) {
+    try {
+      // This would log permission checks for audit purposes
+      logger.info('Permission check:', {
+        userId: logData.userId,
+        permissions: logData.permissions,
+        granted: logData.granted,
+        ip: logData.req.ip,
+        userAgent: logData.req.get('User-Agent'),
+        endpoint: `${logData.req.method} ${logData.req.originalUrl}`,
+      });
+    } catch (error) {
+      logger.error('Permission logging error:', error);
+    }
+  }
+
+  /**
+   * Sanitize context for response.
+   * @param {object} context - Permission context.
+   * @returns {object} Sanitized context.
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   */
+  sanitizeContext(context) {
+    // Remove sensitive information from context before sending in response
+    const sanitized = { ...context };
+    delete sanitized.internalId;
+    delete sanitized.secrets;
+    return sanitized;
+  }
+}
+
+module.exports = new AmexingAuthMiddleware();
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

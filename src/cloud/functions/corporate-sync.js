@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @created Sprint 02 - Corporate Sync System
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { 'parse/node': 'example' });
+ * // Returns: function result
  */
 
 const Parse = require('parse/node');
@@ -14,8 +18,15 @@ const logger = require('../../infrastructure/logger');
  * Manually triggers sync for a corporate client
  * Endpoint: POST /functions/triggerCorporateSync
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // POST /api/endpoint
+ * // Body: { "data": "value" }
+ * // Response: { "success": true, "message": "Created" }
+ * @returns {Promise<object>} - Promise resolving to operation result.
  */
 const triggerCorporateSync = async (request) => {
   try {
@@ -63,8 +74,15 @@ const triggerCorporateSync = async (request) => {
  * Starts periodic sync for a corporate client
  * Endpoint: POST /functions/startPeriodicSync
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // POST /api/endpoint
+ * // Body: { "data": "value" }
+ * // Response: { "success": true, "message": "Created" }
+ * @returns {Promise<object>} - Promise resolving to operation result.
  */
 const startPeriodicSync = async (request) => {
   try {
@@ -132,8 +150,15 @@ const startPeriodicSync = async (request) => {
  * Stops periodic sync for a corporate client
  * Endpoint: POST /functions/stopPeriodicSync
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // POST /api/endpoint
+ * // Body: { "data": "value" }
+ * // Response: { "success": true, "message": "Created" }
+ * @returns {Promise<object>} - Promise resolving to operation result.
  */
 const stopPeriodicSync = async (request) => {
   try {
@@ -179,8 +204,14 @@ const stopPeriodicSync = async (request) => {
  * Gets sync status for all corporate clients
  * Endpoint: GET /functions/getAllSyncStatuses
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // GET /api/endpoint
+ * // Response: { "success": true, "data": [...] }
+ * @returns {Promise<object>} - Promise resolving to operation result.
  */
 const getAllSyncStatuses = async (request) => {
   try {
@@ -220,8 +251,14 @@ const getAllSyncStatuses = async (request) => {
  * Gets detailed sync history for a corporate client
  * Endpoint: GET /functions/getCorporateSyncHistory
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // GET /api/endpoint
+ * // Response: { "success": true, "data": [...] }
+ * @returns {Promise<object>} - Promise resolving to operation result.
  */
 const getCorporateSyncHistory = async (request) => {
   try {
@@ -238,7 +275,7 @@ const getCorporateSyncHistory = async (request) => {
       );
     }
 
-    const { clientId, limit = 50, skip = 0 } = request.params;
+    const { clientId, _limit = 50, skip = 0 } = request.params;
 
     if (!clientId) {
       throw new Parse.Error(Parse.Error.INVALID_QUERY, 'clientId parameter required');
@@ -262,7 +299,7 @@ const getCorporateSyncHistory = async (request) => {
     // Use string contains instead of RegExp to avoid ReDoS
     auditQuery.contains('additionalData', safePattern);
     auditQuery.descending('createdAt');
-    auditQuery.limit(Math.min(limit, 100));
+    auditQuery.limit(Math.min(_limit, 100));
     auditQuery.skip(skip);
 
     const syncHistory = await auditQuery.find({ useMasterKey: true });

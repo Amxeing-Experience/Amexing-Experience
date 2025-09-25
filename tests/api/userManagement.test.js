@@ -6,7 +6,8 @@
 
 const request = require('supertest');
 const express = require('express');
-const { setupTests, teardownTests, authenticateTestUser, testUsers } = require('../setup/testSetup');
+const { setupTests, teardownTests, clearDatabase } = require('../setup');
+const { createTestUser } = require('../helpers/testUtils');
 
 // Mock Express app for testing
 let app;

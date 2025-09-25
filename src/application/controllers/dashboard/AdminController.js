@@ -10,9 +10,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Dashboard index page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await index(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async index(req, res) {
     try {
@@ -32,9 +41,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Clients page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await clients(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async clients(req, res) {
     try {
@@ -53,9 +71,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Departments page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await departments(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async departments(req, res) {
     try {
@@ -74,9 +101,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Employees page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await employees(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async employees(req, res) {
     try {
@@ -95,9 +131,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Drivers page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await drivers(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async drivers(req, res) {
     try {
@@ -116,9 +161,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Bookings page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await bookings(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async bookings(req, res) {
     try {
@@ -137,9 +191,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Fleet management page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await fleet(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async fleet(req, res) {
     try {
@@ -158,9 +221,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Routes and zones page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await routes(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async routes(req, res) {
     try {
@@ -179,9 +251,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Billing page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await billing(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async billing(req, res) {
     try {
@@ -200,9 +281,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Reports page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await reports(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async reports(req, res) {
     try {
@@ -221,9 +311,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Settings page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await settings(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async settings(req, res) {
     try {
@@ -242,9 +341,18 @@ class AdminController extends RoleBasedController {
 
   /**
    * Notifications page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await notifications(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async notifications(req, res) {
     try {
@@ -264,6 +372,15 @@ class AdminController extends RoleBasedController {
   /**
    * Get operational statistics.
    * @example
+   * // GET endpoint example
+   * const result = await AdminController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getOperationalStats() {
     return {
@@ -281,6 +398,15 @@ class AdminController extends RoleBasedController {
   /**
    * Get recent bookings.
    * @example
+   * // GET endpoint example
+   * const result = await AdminController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getRecentBookings() {
     return [

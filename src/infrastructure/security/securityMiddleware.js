@@ -36,6 +36,8 @@ const uidSafe = require('uid-safe');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize security middleware
  * const securityMiddleware = new SecurityMiddleware();
  *
@@ -67,7 +69,7 @@ class SecurityMiddleware {
     });
   }
 
-  // Helmet configuration for comprehensive security headers
+  // Helmet configuration for comprehensive security headers with DataTables CSP support
   getHelmetConfig() {
     return helmet({
       contentSecurityPolicy: {
@@ -77,11 +79,28 @@ class SecurityMiddleware {
             "'self'",
             "'unsafe-inline'",
             'https://fonts.googleapis.com',
+            'https://cdn.datatables.net',
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
           ],
-          scriptSrc: ["'self'", this.isDevelopment ? "'unsafe-inline'" : ''],
+          scriptSrc: [
+            "'self'",
+            this.isDevelopment ? "'unsafe-inline'" : '',
+            this.isDevelopment ? "'unsafe-eval'" : '',
+            'https://code.jquery.com',
+            'https://cdn.datatables.net',
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
+          ].filter(Boolean),
           imgSrc: ["'self'", 'data:', 'https:'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
-          connectSrc: ["'self'", 'http://localhost:1337'],
+          connectSrc: [
+            "'self'",
+            'http://localhost:1337',
+            'https://cdn.datatables.net',
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
+          ],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],
           frameSrc: ["'none'"],
@@ -161,9 +180,9 @@ class SecurityMiddleware {
   getMongoSanitizer() {
     return mongoSanitize({
       replaceWith: '_',
-      onSanitize: ({ req, key }) => {
+      onSanitize: ({ req, _key }) => {
         winston.warn(
-          `Attempted NoSQL injection from IP ${req.ip} on field ${key}`
+          `Attempted NoSQL injection from IP ${req.ip} on field ${_key}`
         );
       },
     });
@@ -221,13 +240,18 @@ class SecurityMiddleware {
   // Session configuration
   // eslint-disable-next-line complexity
   getSessionConfig() {
-    return session({
+    // Use MemoryStore for development to avoid MongoDB dependency issues
+    const sessionConfig = {
       secret:
         process.env.SESSION_SECRET || 'default-secret-change-in-production',
       name: 'amexing.sid',
       resave: false,
-      saveUninitialized: false,
-      store: MongoStore.create({
+      saveUninitialized: true, // Changed to true for CSRF initialization
+    };
+
+    // Only use MongoStore in production
+    if (process.env.NODE_ENV === 'production') {
+      sessionConfig.store = MongoStore.create({
         mongoUrl:
           process.env.DATABASE_URI || 'mongodb://localhost:27017/amexingdb',
         collectionName: 'sessions',
@@ -237,7 +261,11 @@ class SecurityMiddleware {
           secret:
             process.env.SESSION_SECRET || 'default-secret-change-in-production',
         },
-      }),
+      });
+    }
+
+    return session({
+      ...sessionConfig,
       cookie: {
         secure: process.env.NODE_ENV === 'production', // Explicit secure flag for HTTPS
         httpOnly: true,
@@ -322,9 +350,9 @@ class SecurityMiddleware {
 
   // Request ID middleware for tracking
   requestId() {
-    const { v4: uuidv4 } = require('uuid');
+    const { v4: uuid } = require('uuid');
     return (req, res, next) => {
-      req.id = req.headers['x-request-id'] || uuidv4();
+      req.id = req.headers['x-request-id'] || uuid();
       res.setHeader('X-Request-Id', req.id);
       next();
     };

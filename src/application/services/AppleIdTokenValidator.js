@@ -1,6 +1,10 @@
 /**
  * Apple ID Token Validator
  * Handles Apple ID token verification with public key validation.
+ * @example
+ * // Service method usage
+ * const result = await appleidtokenvalidator.require({ 'parse/node': 'example' });
+ * // Returns: { success: true, data: {...} }
  */
 
 const Parse = require('parse/node');
@@ -29,6 +33,8 @@ const logger = require('../../infrastructure/logger');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize validator with Apple OAuth config
  * const config = {
  *   clientId: process.env.APPLE_CLIENT_ID,
@@ -53,7 +59,7 @@ class AppleIdTokenValidator {
    * Verifies Apple ID token.
    * @param {string} idToken - Apple ID token.
    * @param {string} expectedNonce - Expected nonce value.
-   * @returns {Promise<object>} Decoded token payload.
+   * @returns {Promise<object>} - Decoded token payload.
    * @example Verify Apple ID token
    * const validator = new AppleIdTokenValidator(config);
    * const payload = await validator.verifyIdToken(token, nonce);
@@ -73,7 +79,7 @@ class AppleIdTokenValidator {
   /**
    * Validates token structure and signature.
    * @param {string} idToken - ID token to validate.
-   * @returns {Promise<object>} Decoded payload.
+   * @returns {Promise<object>} - Decoded payload.
    * @example Validate token structure
    * const payload = await validator.validateTokenStructure(idToken);
    */
@@ -85,6 +91,12 @@ class AppleIdTokenValidator {
      * Validates JWT token structure and extracts key identifier.
      * Ensures token has proper format and contains required header information
      * for public key lookup and signature verification.
+     * @param {*} !decoded || !decoded.header.kid - !decoded || !decoded.header.kid parameter.
+     * @returns {*} - Operation result.
+     * @example
+     * // Service method usage
+     * const result = await appleidtokenvalidator.if({ !decoded: 'example' });
+     * // Returns: { success: true, data: {...} }
      */
     if (!decoded || !decoded.header.kid) {
       throw new Error('Invalid ID token format');
@@ -113,6 +125,7 @@ class AppleIdTokenValidator {
    * @param {string} expectedNonce - Expected nonce.
    * @example Validate nonce
    * validator.validateNonce(payload, 'expected-nonce');
+   * @returns {*} - Operation result.
    */
   validateNonce(payload, expectedNonce) {
     if (expectedNonce && payload.nonce !== expectedNonce) {
@@ -125,6 +138,7 @@ class AppleIdTokenValidator {
    * @param {object} payload - Token payload.
    * @example Validate expiration
    * validator.validateExpiration(payload);
+   * @returns {*} - Operation result.
    */
   validateExpiration(payload) {
     const now = Math.floor(Date.now() / 1000);
@@ -135,7 +149,7 @@ class AppleIdTokenValidator {
 
   /**
    * Gets Apple's public keys for token verification.
-   * @returns {Promise<object>} Public keys indexed by kid.
+   * @returns {Promise<object>} - Public keys indexed by kid.
    * @example Get Apple public keys
    * const keys = await validator.getApplePublicKeys();
    */
@@ -155,9 +169,9 @@ class AppleIdTokenValidator {
             const keys = JSON.parse(data);
             const publicKeys = {};
 
-            keys.keys.forEach((key) => {
-              const publicKey = this.jwkToPublicKey(key);
-              publicKeys[key.kid] = publicKey;
+            keys.keys.forEach((_key) => {
+              const publicKey = this.jwkToPublicKey(_key);
+              publicKeys[_key.kid] = publicKey;
             });
 
             resolve(publicKeys);
@@ -172,7 +186,7 @@ class AppleIdTokenValidator {
   /**
    * Converts JWK to public key format.
    * @param {object} jwk - JSON Web Key.
-   * @returns {string} Public key in PEM format.
+   * @returns {string} - Operation result Public key in PEM format.
    * @example Convert JWK to public key
    * const pem = validator.jwkToPublicKey(jwkObject);
    */

@@ -44,6 +44,20 @@
 
     <section>
         <article><h1>AmexingWeb</h1>
+<!-- Status Badges -->
+<p><a href="https://github.com/black4ninja/amexing-web/actions/workflows/pr-validation.yml"><img src="https://img.shields.io/github/actions/workflow/status/black4ninja/amexing-web/pr-validation.yml?branch=main&amp;label=build&amp;logo=github&amp;style=flat-square" alt="Build Status"></a>
+<a href="https://github.com/black4ninja/amexing-web/actions/workflows/pci-security-scan.yml"><img src="https://img.shields.io/github/actions/workflow/status/black4ninja/amexing-web/pci-security-scan.yml?branch=main&amp;label=security%20scan&amp;logo=shield&amp;style=flat-square&amp;color=success" alt="Security Scan"></a>
+<a href="https://nodejs.org/"><img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?logo=node.js&amp;style=flat-square" alt="Node.js"></a>
+<a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a></p>
+<!-- Compliance & Quality Badges -->
+<p><a href="https://www.pcisecuritystandards.org/"><img src="https://img.shields.io/badge/PCI%20DSS-4.0%20Compliant-gold?style=flat-square&amp;logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K" alt="PCI DSS"></a>
+<a href="https://github.com/black4ninja/amexing-web/actions"><img src="https://img.shields.io/badge/code%20quality-ESLint%20%2B%20Prettier-blue?style=flat-square&amp;logo=eslint" alt="Code Quality"></a>
+<a href="https://github.com/black4ninja/amexing-web/network/dependencies"><img src="https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen?style=flat-square&amp;logo=dependabot" alt="Dependencies"></a></p>
+<!-- Technology Stack Badges -->
+<p><a href="https://parseplatform.org/"><img src="https://img.shields.io/badge/Parse%20Server-7.0-blueviolet?style=flat-square&amp;logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMjIgOEwxMiAxNEwyIDhMMTIgMloiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=" alt="Parse Server"></a>
+<a href="https://www.mongodb.com/"><img src="https://img.shields.io/badge/MongoDB-6%2B-green?style=flat-square&amp;logo=mongodb&amp;logoColor=white" alt="MongoDB"></a>
+<a href="https://expressjs.com/"><img src="https://img.shields.io/badge/Express.js-4.18-lightgrey?style=flat-square&amp;logo=express" alt="Express.js"></a>
+<a href="https://conventionalcommits.org"><img src="https://img.shields.io/badge/Conventional%20Commits-%E2%9C%93-brightgreen?style=flat-square&amp;logo=conventionalcommits" alt="Conventional Commits"></a></p>
 <p>A PCI DSS 4.0 compliant e-commerce platform built with Parse Server, Node.js, and MongoDB. This project implements Clean Architecture with MVC pattern, following SOLID principles and security-first design.</p>
 <h2>✨ Key Features</h2>
 <ul>
@@ -58,7 +72,7 @@
 <h2>🚀 Quick Start</h2>
 <pre class="prettyprint source lang-bash"><code># Clone and setup
 git clone &lt;your-repo-url> && cd amexing-web
-cp .env.example .env && yarn install
+cp environments/.env.example environments/.env.development && yarn install
 
 # Start development
 yarn dev
@@ -71,22 +85,43 @@ open http://localhost:1337
 <h3>📖 Getting Started</h3>
 <ul>
 <li><a href="docs/guides/QUICK_START.md">⚡ Quick Start Guide</a> - Get running in 5 minutes</li>
-<li><a href="docs/guides/DEVELOPMENT.md">⚙️ Development Guide</a> - Development workflow and best practices</li>
-<li><a href="docs/guides/DEPLOYMENT.md">🚀 Deployment Guide</a> - Production deployment instructions</li>
-<li><a href="docs/guides/TROUBLESHOOTING.md">🔧 Troubleshooting</a> - Common issues and solutions</li>
+<li><a href="docs/readme/DEVELOPMENT.md">⚙️ Development Guide</a> - Development workflow and best practices</li>
+<li><a href="docs/readme/DEPLOYMENT.md">🚀 Deployment Guide</a> - Production deployment instructions</li>
+<li><a href="docs/readme/TROUBLESHOOTING.md">🔧 Troubleshooting</a> - Common issues and solutions</li>
 </ul>
 <h3>📋 Reference Documentation</h3>
 <ul>
 <li><a href="docs/reference/SCRIPTS.md">📜 Scripts Reference</a> - All 58 npm scripts documented</li>
-<li><a href="docs/reference/API_REFERENCE.md">🔌 API Reference</a> - Complete API documentation</li>
-<li><a href="docs/reference/ENVIRONMENT.md">🌍 Environment Variables</a> - Configuration options</li>
-<li><a href="docs/reference/SECURITY.md">🔒 Security Guide</a> - Security best practices and PCI DSS compliance</li>
+<li><a href="docs/readme/API_REFERENCE.md">🔌 API Reference</a> - Complete API documentation</li>
+<li><a href="docs/readme/ENVIRONMENT.md">🌍 Environment Variables</a> - Configuration options</li>
+<li><a href="SECURITY.md">🔒 Security Guide</a> - Security best practices and PCI DSS compliance</li>
 </ul>
 <h3>🔄 Development Workflows</h3>
 <ul>
-<li><a href="docs/workflows/TESTING.md">🧪 Testing Guide</a> - Testing strategies and best practices</li>
-<li><a href="docs/workflows/CODE_QUALITY.md">✨ Code Quality</a> - Quality standards and tools</li>
-<li><a href="docs/workflows/RELEASE.md">🎯 Release Process</a> - Release management workflow</li>
+<li><a href="docs/readme/TESTING.md">🧪 Testing Guide</a> - Testing strategies and best practices</li>
+<li><a href="docs/project/CODE_QUALITY.md">✨ Code Quality</a> - Quality standards and tools</li>
+<li><a href="docs/readme/RELEASE.md">🎯 Release Process</a> - Release management workflow</li>
+</ul>
+<h2>🔄 Después de hacer Git Pull</h2>
+<p><strong>¿Acabas de hacer <code>git pull</code> y algo no funciona?</strong> Sigue estos pasos:</p>
+<pre class="prettyprint source lang-bash"><code># 1. Verificar si necesitas actualizar dependencias
+yarn deps:update-check
+
+# 2. Si hay cambios en package.json/yarn.lock, actualizar:
+yarn install
+
+# 3. Si hay actualizaciones importantes (Parse, Node.js, etc.):
+yarn after-pull
+
+# 4. Verificar que todo funciona:
+yarn dev
+</code></pre>
+<h3>🚨 Casos Críticos Recientes</h3>
+<ul>
+<li><strong>Parse Server 8.2.4</strong>: Requiere Node.js 20+ y <code>yarn install</code></li>
+<li><strong>Parse Dashboard 7.4.0</strong>: Compatible con las nuevas versiones</li>
+<li><strong>Node.js 24</strong>: Usar <code>--experimental-vm-modules</code> (ya configurado)</li>
+<li><strong>Yarn resolutions</strong>: Configuraciones de seguridad automáticas</li>
 </ul>
 <h2>🎯 Essential Commands</h2>
 <pre class="prettyprint source lang-bash"><code># Interactive help system
@@ -97,6 +132,11 @@ yarn scripts:help security     # Show security scripts
 # Development
 yarn dev                       # Start development server
 yarn dashboard                 # Open Parse Dashboard (port 4040)
+
+# Post-pull utilities
+yarn after-pull               # Complete post-pull setup
+yarn deps:update-check        # Check if dependencies need updating
+yarn deps:full-update         # Full dependency refresh
 
 # Testing & Quality
 yarn test                      # Run all tests
@@ -219,16 +259,270 @@ yarn scripts:help --search &lt;term>  # Find specific scripts
 
 
 
+
+
+
+<section>
+
+<header>
+    
+        <h2>index.js</h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>Main application server and initialization.</p></div>
+        
+
+        
+
+
+<dl class="details">
+
+    
+    <dt class="tag-version">Version:</dt>
+    <dd class="tag-version"><ul class="dummy"><li>2.0.0</li></ul></dd>
+    
+
+    
+    <dt class="tag-since">Since:</dt>
+    <dd class="tag-since"><ul class="dummy"><li>1.0.0</li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-author">Author:</dt>
+    <dd class="tag-author">
+        <ul>
+            <li>Amexing Development Team</li>
+        </ul>
+    </dd>
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+            <h3>Example</h3>
+            
+    <pre class="prettyprint"><code>// const result = await authService.login(credentials);
+// Returns: { success: true, user: {...}, tokens: {...} }
+// Start the application
+npm start
+
+// Development mode with hot reloading
+npm run dev
+
+// Production deployment
+NODE_ENV=production npm start
+
+// Environment variables
+PORT=3000 NODE_ENV=production npm start</code></pre>
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+
+
+
+<section>
+
+<header>
+    
+        <h2>infrastructure/logger.js</h2>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+            <div class="description"><p>Infrastructure logging system for Amexing platform.</p></div>
+        
+
+        
+
+
+<dl class="details">
+
+    
+    <dt class="tag-version">Version:</dt>
+    <dd class="tag-version"><ul class="dummy"><li>2.0.0</li></ul></dd>
+    
+
+    
+    <dt class="tag-since">Since:</dt>
+    <dd class="tag-since"><ul class="dummy"><li>1.0.0</li></ul></dd>
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-author">Author:</dt>
+    <dd class="tag-author">
+        <ul>
+            <li>Amexing Development Team</li>
+        </ul>
+    </dd>
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="infrastructure_logger.js.html">infrastructure/logger.js</a>, <a href="infrastructure_logger.js.html#line1">line 1</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+        
+            <h3>Example</h3>
+            
+    <pre class="prettyprint"><code>// const result = await authService.login(credentials);
+// Returns: { success: true, user: {...}, tokens: {...} }
+// Basic logging
+const logger = require('./infrastructure/logger');
+logger.info('Application started', { port: 3000, env: 'production' });
+logger.error('Database connection failed', { error: dbError });
+
+// Security event logging
+logger.logSecurityEvent('FAILED_LOGIN', {
+  username: 'user@example.com',
+  ip: '192.168.1.1',
+  attempts: 3
+});
+
+// Access attempt logging
+logger.logAccessAttempt(false, 'john.doe', '10.0.0.1', 'Invalid password');
+logger.logAccessAttempt(true, 'jane.smith', '10.0.0.2');
+
+// Data access auditing
+logger.logDataAccess('user123', 'customer_data', 'READ', true);
+logger.logSystemChange('admin456', 'user_permissions', 'read', 'read,write');</code></pre>
+
+        
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li></ul><h3>Global</h3><ul><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#logError">logError</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Tue Aug 26 2025 22:49:38 GMT-0600 (hora estándar central)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
 </footer>
 
 <script> prettyPrint(); </script>

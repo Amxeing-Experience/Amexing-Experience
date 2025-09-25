@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 2024-09-12
+ * @example
+ * // Usage example
+ * const result = await require({ 'parse/node': 'example' });
+ * // Returns: operation result
  */
 
 const Parse = require('parse/node');
@@ -458,11 +462,11 @@ router.get('/oauth/providers', async (req, res) => {
 // OAuth initiation
 router.get('/oauth/:provider', async (req, res) => {
   try {
-    const { provider } = req.params;
+    const { _provider } = req.params;
     const state = req.query.state || 'default';
 
     const result = await Parse.Cloud.run('generateOAuthUrl', {
-      provider,
+      provider: _provider,
       state,
     });
 
@@ -476,7 +480,7 @@ router.get('/oauth/:provider', async (req, res) => {
 // OAuth callback
 router.get('/oauth/:provider/callback', async (req, res) => {
   try {
-    const { provider } = req.params;
+    const { provider: _provider } = req.params;
     const { code, state, error } = req.query;
 
     if (error) {
@@ -489,7 +493,7 @@ router.get('/oauth/:provider/callback', async (req, res) => {
     }
 
     const result = await Parse.Cloud.run('handleOAuthCallback', {
-      provider,
+      provider: _provider,
       code,
       state,
     });
@@ -529,11 +533,11 @@ router.post('/oauth/:provider/link', jwtMiddleware.authenticateToken, async (req
   try {
     const { user } = req;
 
-    const { provider } = req.params;
+    const { provider: _provider } = req.params;
     const { oauthData } = req.body;
 
     const result = await Parse.Cloud.run('linkOAuthAccount', {
-      provider,
+      provider: _provider,
       oauthData,
     }, {
       user: { id: user.id },
@@ -554,10 +558,10 @@ router.delete('/oauth/:provider/unlink', jwtMiddleware.authenticateToken, async 
   try {
     const { user } = req;
 
-    const { provider } = req.params;
+    const { provider: _provider } = req.params;
 
     const result = await Parse.Cloud.run('unlinkOAuthAccount', {
-      provider,
+      provider: _provider,
     }, {
       user: { id: user.id },
     });

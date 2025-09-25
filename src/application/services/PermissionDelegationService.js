@@ -5,6 +5,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
+ * @example
+ * // Service method usage
+ * const result = await permissiondelegationservice.require({ 'parse/node': 'example' });
+ * // Returns: { success: true, data: {...} }
  */
 
 const Parse = require('parse/node');
@@ -36,6 +40,8 @@ const logger = require('../../infrastructure/logger');
  * @version 1.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize delegation service
  * const delegationService = new PermissionDelegationService();
  *
@@ -115,8 +121,13 @@ class PermissionDelegationService {
   /**
    * Creates a permission delegation from manager to employee.
    * @param {object} delegationData - Delegation data.
-   * @returns {Promise<object>} Delegation result.
+   * @returns {Promise<object>} - Delegation result.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.createDelegation({ delegationData: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * const result = await service.createDelegation({
    *   managerId: 'mgr123',
@@ -195,8 +206,13 @@ class PermissionDelegationService {
    * @param {string} employeeId - Employee user ID.
    * @param {Array} permissions - Permissions to delegate.
    * @param {string} delegationType - Type of delegation.
-   * @returns {Promise<void>} Completes when validation passes, throws if fails.
+   * @returns {Promise<void>} - Completes when validation passes, throws if fails.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.validateDelegationRequest({ managerId: 'example', employeeId: 'example', permissions: 'example', delegationType: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * await service.validateDelegationRequest('mgr123', 'emp456', ['team_management'], 'temporary');
    */
@@ -242,8 +258,13 @@ class PermissionDelegationService {
    * Validates manager-employee relationship.
    * @param {string} managerId - Manager user ID.
    * @param {string} employeeId - Employee user ID.
-   * @returns {Promise<void>} Completes when validation passes, throws if fails.
+   * @returns {Promise<void>} - Completes when validation passes, throws if fails.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.validateManagerEmployeeRelationship({ managerId: 'example', employeeId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * await service.validateManagerEmployeeRelationship('mgr123', 'emp456');
    */
@@ -289,8 +310,13 @@ class PermissionDelegationService {
   /**
    * Gets numeric value for access level comparison.
    * @param {string} accessLevel - Access level string.
-   * @returns {number} Numeric value.
+   * @returns {number} - Operation result Numeric value.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.getAccessLevelValue({ accessLevel: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * const level = service.getAccessLevelValue('manager'); // Returns 5
    */
@@ -310,8 +336,13 @@ class PermissionDelegationService {
    * Validates delegation limits for manager.
    * @param {string} managerId - Manager user ID.
    * @param {string} delegationType - Delegation type.
-   * @returns {Promise<void>} Completes when validation passes, throws if fails.
+   * @returns {Promise<void>} - Completes when validation passes, throws if fails.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.validateDelegationLimits({ managerId: 'example', delegationType: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * await service.validateDelegationLimits('mgr123', 'temporary');
    */
@@ -348,8 +379,13 @@ class PermissionDelegationService {
    * Calculates expiration time for delegation.
    * @param {string} delegationType - Delegation type.
    * @param {number} customDuration - Custom duration in milliseconds (optional).
-   * @returns {Date} Expiration date.
+   * @returns {Date} - Operation result Expiration date.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.calculateExpirationTime({ delegationType: 'example', customDuration: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * const expiration = service.calculateExpirationTime('temporary', 1000 * 60 * 60); // 1 hour
    */
@@ -366,8 +402,13 @@ class PermissionDelegationService {
   /**
    * Creates delegation record in database.
    * @param {object} data - Delegation data.
-   * @returns {Promise<Parse.Object>} Created delegation record.
+   * @returns {Promise<Parse.Object>} - Created delegation record.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.createDelegationRecord({ data: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * const delegation = await service.createDelegationRecord(delegationData);
    */
@@ -402,8 +443,13 @@ class PermissionDelegationService {
    * @param {Array} permissions - Permissions to apply.
    * @param {string} delegationId - Delegation record ID.
    * @param {Date} expiresAt - Expiration date.
-   * @returns {Promise<void>} Completes when permissions are applied.
+   * @returns {Promise<void>} - Completes when permissions are applied.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.applyDelegatedPermissions({ employeeId: 'example', permissions: 'example', delegationId: 'example', expiresAt: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * await service.applyDelegatedPermissions('emp456', ['team_management'], 'del123', expirationDate);
    */
@@ -438,8 +484,13 @@ class PermissionDelegationService {
    * Schedules delegation expiration.
    * @param {string} delegationId - Delegation record ID.
    * @param {Date} expiresAt - Expiration date.
-   * @returns {Promise<void>} Completes when expiration is scheduled.
+   * @returns {Promise<void>} - Completes when expiration is scheduled.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.scheduleExpiration({ delegationId: 'example', expiresAt: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * await service.scheduleExpiration('del123', expirationDate);
    */
@@ -464,8 +515,13 @@ class PermissionDelegationService {
   /**
    * Expires a delegation and removes delegated permissions.
    * @param {string} delegationId - Delegation record ID.
-   * @returns {Promise<void>} Completes when delegation is expired.
+   * @returns {Promise<void>} - Completes when delegation is expired.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.expireDelegation({ delegationId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * await service.expireDelegation('del123');
    */
@@ -520,8 +576,13 @@ class PermissionDelegationService {
    * @param {string} delegationId - Delegation record ID.
    * @param {string} revokedBy - User ID who revoked the delegation.
    * @param {string} reason - Reason for revocation.
-   * @returns {Promise<object>} Revocation result.
+   * @returns {Promise<object>} - Revocation result.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.revokeDelegation({ delegationId: 'example', revokedBy: 'example', reason: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * const result = await service.revokeDelegation('del123', 'mgr123', 'No longer needed');
    */
@@ -595,8 +656,13 @@ class PermissionDelegationService {
    * Validates authority to revoke a delegation.
    * @param {string} revokerId - User attempting to revoke.
    * @param {string} managerId - Original manager who created delegation.
-   * @returns {Promise<boolean>} True if has authority.
+   * @returns {Promise<boolean>} - True if has authority.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.validateRevocationAuthority({ revokerId: 'example', managerId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionDelegationService();
    * const hasAuthority = await service.validateRevocationAuthority('admin123', 'mgr123');
    */
@@ -629,8 +695,13 @@ class PermissionDelegationService {
   /**
    * Gets employee record for a user.
    * @param {string} userId - User ID.
-   * @returns {Promise<Parse.Object|null>} Employee record.
+   * @returns {Promise<Parse.Object|null>} - Employee record.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.getEmployeeRecord({ userId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionDelegationService();
    * const employeeRecord = await service.getEmployeeRecord('user123');
    */
@@ -650,11 +721,16 @@ class PermissionDelegationService {
   /**
    * Creates temporary elevated permissions for emergency cases.
    * @param {object} elevationData - Elevation data.
-   * @returns {Promise<object>} Elevation result.
+   * @returns {Promise<object>} - Elevation result.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.createEmergencyElevation({ elevationData: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * const result = await service.createEmergencyElevation({
-   *   userId: 'user123',
+   *   userId: 'user123' ,
    *   permissions: ['admin_access'],
    *   reason: 'System emergency'
    * });
@@ -723,8 +799,13 @@ class PermissionDelegationService {
   /**
    * Validates authority for emergency permission elevation.
    * @param {string} elevatedBy - User requesting elevation.
-   * @returns {Promise<boolean>} True if has authority.
+   * @returns {Promise<boolean>} - True if has authority.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.validateEmergencyAuthority({ elevatedBy: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionDelegationService();
    * const hasAuthority = await service.validateEmergencyAuthority('admin123');
    */
@@ -754,8 +835,13 @@ class PermissionDelegationService {
   /**
    * Gets active delegations for a manager.
    * @param {string} managerId - Manager user ID.
-   * @returns {Promise<Array>} Active delegations.
+   * @returns {Promise<Array>} - Active delegations.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.getActiveDelegations({ managerId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionDelegationService();
    * const activeDelegations = await service.getActiveDelegations('mgr123');
    */
@@ -790,8 +876,13 @@ class PermissionDelegationService {
   /**
    * Gets delegated permissions for an employee.
    * @param {string} employeeId - Employee user ID.
-   * @returns {Promise<Array>} Delegated permissions.
+   * @returns {Promise<Array>} - Delegated permissions.
    * @example
+   * // Service method usage
+   * const result = await permissiondelegationservice.getDelegatedPermissions({ employeeId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionDelegationService();
    * const delegatedPerms = await service.getDelegatedPermissions('emp456');
    */

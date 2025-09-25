@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test DataTable</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Test DataTable with API</h2>
+        <table id="testTable" class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>First Name</th>
+                    <th>Last Name</th>
+                    <th>Role</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+
+    <script>
+    $(document).ready(function() {
+        $('#testTable').DataTable({
+            ajax: {
+                url: 'http://localhost:1337/api/users',
+                type: 'GET',
+                xhrFields: {
+                    withCredentials: true
+                },
+                beforeSend: function(xhr) {
+                    // Use the JWT token from cookie
+                    xhr.setRequestHeader('Cookie', 'accessToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI5VUdXSUhLTW5BIiwidXNlcm5hbWUiOiJzdXBlcmFkbWluQGRldi5hbWV4aW5nLmNvbSIsImVtYWlsIjoic3VwZXJhZG1pbkBkZXYuYW1leGluZy5jb20iLCJyb2xlIjoic3VwZXJhZG1pbiIsIm5hbWUiOiJTdXBlciBBZG1pbmlzdHJhdG9yIiwiaWF0IjoxNzU4NzQ4MDM0LCJleHAiOjE3NTg3NzY4MzR9.e2iOz1W3Hzp2aasPevCRQZuHWyyNWyqmkDBp3rzviGs');
+                },
+                dataSrc: function(json) {
+                    console.log('API Response:', json);
+                    if (!json.success) {
+                        console.error('API Error:', json);
+                        return [];
+                    }
+                    return json.data?.users || [];
+                }
+            },
+            columns: [
+                { data: 'email' },
+                { data: 'firstName' },
+                { data: 'lastName' },
+                { data: 'role' }
+            ]
+        });
+    });
+    </script>
+</body>
+</html>

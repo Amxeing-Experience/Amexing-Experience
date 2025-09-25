@@ -11,6 +11,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 2024-09-22
+ * @example
+ * // User management service usage
+ * const result = await usermanagementservice.require(userId, data);
+ * // Returns: { success: true, user: {...} }
  */
 
 const Parse = require('parse/node');
@@ -54,8 +58,13 @@ class UserManagementService {
    * @param {number} options.limit - Items per page (default: 25).
    * @param {object} options.filters - Additional filters.
    * @param {object} options.sort - Sorting configuration.
-   * @returns {Promise<object>} Users data with pagination info.
+   * @returns {Promise<object>} - Users data with pagination info.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getUsers(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async getUsers(currentUser, options = {}) {
     try {
@@ -150,8 +159,13 @@ class UserManagementService {
    * Get a single user by ID with role-based access validation.
    * @param {object} currentUser - User making the request.
    * @param {string} userId - ID of user to retrieve.
-   * @returns {Promise<object>} User data or null if not accessible.
+   * @returns {Promise<object>} - User data or null if not accessible.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getUserById(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async getUserById(currentUser, userId) {
     try {
@@ -189,8 +203,13 @@ class UserManagementService {
    * Create a new user following AI agent lifecycle rules.
    * @param {object} userData - User data to create.
    * @param {object} createdBy - User creating the new user.
-   * @returns {Promise<object>} Created user data.
+   * @returns {Promise<object>} - Created user data.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.createUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async createUser(userData, createdBy) {
     try {
@@ -260,8 +279,13 @@ class UserManagementService {
    * @param {string} userId - ID of user to update.
    * @param {object} updates - Data to update.
    * @param {object} modifiedBy - User making the update.
-   * @returns {Promise<object>} Updated user data.
+   * @returns {Promise<object>} - Updated user data.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.updateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async updateUser(userId, updates, modifiedBy) {
     try {
@@ -340,8 +364,13 @@ class UserManagementService {
    * @param {string} userId - ID of user to deactivate.
    * @param {object} deactivatedBy - User performing the deactivation.
    * @param {string} reason - Reason for deactivation.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.deactivateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async deactivateUser(userId, deactivatedBy, reason = 'Admin action') {
     try {
@@ -396,8 +425,13 @@ class UserManagementService {
    * @param {string} userId - ID of user to reactivate.
    * @param {object} reactivatedBy - User performing the reactivation.
    * @param {string} reason - Reason for reactivation.
-   * @returns {Promise<boolean>} Success status.
+   * @returns {Promise<boolean>} - Success status.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.reactivateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async reactivateUser(userId, reactivatedBy, reason = 'Admin action') {
     try {
@@ -449,8 +483,13 @@ class UserManagementService {
    * @param {string} userId - ID of user to toggle.
    * @param {boolean} targetStatus - Target active status (true/false).
    * @param {string} reason - Reason for status change.
-   * @returns {Promise<object>} Result with success status and user data.
+   * @returns {Promise<object>} - Result with success status and user data.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.toggleUserStatus(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async toggleUserStatus(currentUser, userId, targetStatus, reason = 'Status change via API') {
     try {
@@ -535,8 +574,13 @@ class UserManagementService {
    * @param {object} currentUser - User performing the action.
    * @param {string} userId - ID of user to archive.
    * @param {string} reason - Reason for archiving.
-   * @returns {Promise<object>} Result with success status and user data.
+   * @returns {Promise<object>} - Result with success status and user data.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.archiveUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async archiveUser(currentUser, userId, reason = 'User archived via API') {
     try {
@@ -618,9 +662,15 @@ class UserManagementService {
    * Search users with advanced filtering and role-based access.
    * @param {object} currentUser - User performing the search.
    * @param {object} searchParams - Search parameters.
+   * @param {*} currentUser - _currentUser parameter.
    * @param _currentUser
-   * @returns {Promise<object>} Search results with pagination.
+   * @returns {Promise<object>} - Search results with pagination.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getUserStatistics(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async getUserStatistics(_currentUser) {
     try {
@@ -796,10 +846,16 @@ class UserManagementService {
   /**
    * Apply role-based filtering to query based on current user's permissions.
    * Implements business rules for user visibility.
-   * @param query
-   * @param currentUser
-   * @param targetRole
+   * @param {object} query - Query parameters object.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {string} targetRole - Target role for authorization check.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.applyRoleBasedFiltering(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
    */
   applyRoleBasedFiltering(query, currentUser, targetRole = null) {
     switch (currentUser.role) {
@@ -856,14 +912,27 @@ class UserManagementService {
 
   /**
    * Apply advanced filters to the query.
-   * @param query
-   * @param filters
+   * @param {object} query - Query parameters object.
+   * @param {*} filters - Filters parameter.
+   * @param _filters
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.applyAdvancedFilters(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
    */
-  applyAdvancedFilters(query, filters) {
-    Object.entries(filters).forEach(([key, value]) => {
+  applyAdvancedFilters(query, _filters) {
+    // Skip corporate config filtering if not available
+    if (!this.config?.corporateConfig?.departments) {
+      logger.debug('Corporate config not available, skipping advanced filters');
+      return;
+    }
+
+    Object.entries(this.config.corporateConfig.departments).forEach(([_key, value]) => {
       if (value !== null && value !== undefined && value !== '') {
-        switch (key) {
+        switch (_key) {
           case 'active':
             query.equalTo('active', value);
             break;
@@ -895,9 +964,15 @@ class UserManagementService {
 
   /**
    * Apply sorting to the query.
-   * @param query
-   * @param sort
+   * @param {object} query - Query parameters object.
+   * @param {*} sort - Sort parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.applySorting(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
    */
   applySorting(query, sort) {
     const { field, direction } = sort;
@@ -921,10 +996,16 @@ class UserManagementService {
 
   /**
    * Get total count of users matching criteria.
-   * @param currentUser
-   * @param targetRole
-   * @param filters
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {string} targetRole - Target role for authorization check.
+   * @param {*} filters - Filters parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getTotalUserCount(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getTotalUserCount(currentUser, targetRole, filters) {
     // TEMPORARY FIX: Query all users instead of only active ones
@@ -939,9 +1020,15 @@ class UserManagementService {
 
   /**
    * Get count of search results.
-   * @param currentUser
-   * @param searchParams
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} searchParams - SearchParams parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getSearchResultCount(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getSearchResultCount(currentUser, searchParams) {
     const { query: searchQuery, role, active } = searchParams;
@@ -975,8 +1062,14 @@ class UserManagementService {
   /**
    * Transform user object to safe format for API responses.
    * Removes sensitive fields and includes only necessary data.
-   * @param user
+   * @param {*} user - User parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.transformUserToSafeFormat(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {object} - Operation result.
    */
   transformUserToSafeFormat(user) {
     return {
@@ -1003,11 +1096,18 @@ class UserManagementService {
 
   /**
    * Validate user data for create/update operations.
-   * @param userData
-   * @param operation
-   * @param existingUser
+   * @param {object} userData - User registration/update data.
+   * @param {*} operation - Operation parameter.
+   * @param {*} existingUser - ExistingUser parameter.
+   * @param {*} existingUser - _existingUser parameter.
    * @param _existingUser
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.validateUserData(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async validateUserData(userData, operation = 'create', _existingUser = null) {
     const errors = [];
@@ -1049,8 +1149,15 @@ class UserManagementService {
 
   /**
    * Check if user with email already exists.
+   * @param {string} email - User email address.
    * @param email
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.checkExistingUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async checkExistingUser(email) {
     try {
@@ -1068,8 +1175,14 @@ class UserManagementService {
 
   /**
    * Extract auditable fields from user for change tracking.
-   * @param user
+   * @param {*} user - User parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.extractAuditableFields(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {object} - Operation result.
    */
   extractAuditableFields(user) {
     return {
@@ -1087,9 +1200,15 @@ class UserManagementService {
 
   /**
    * Check if current user can access target user.
-   * @param currentUser
-   * @param targetUser
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUser - TargetUser parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canAccessUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {boolean} - Boolean result Operation result.
    */
   canAccessUser(currentUser, targetUser) {
     const currentLevel = this.roleHierarchy[currentUser.role] || 0;
@@ -1119,9 +1238,15 @@ class UserManagementService {
 
   /**
    * Check if current user can create user with target role.
-   * @param currentUser
-   * @param targetRole
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {string} targetRole - Target role for authorization check.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canCreateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
    */
   canCreateUser(currentUser, targetRole) {
     const currentLevel = this.roleHierarchy[currentUser.role] || 0;
@@ -1133,9 +1258,15 @@ class UserManagementService {
 
   /**
    * Check if current user can modify target user.
-   * @param currentUser
-   * @param targetUser
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUser - TargetUser parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canModifyUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {boolean} - Boolean result Operation result.
    */
   canModifyUser(currentUser, targetUser) {
     const currentLevel = this.roleHierarchy[currentUser.role] || 0;
@@ -1156,9 +1287,15 @@ class UserManagementService {
 
   /**
    * Check if current user can deactivate target user.
-   * @param currentUser
-   * @param targetUser
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUser - TargetUser parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canDeactivateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
    */
   canDeactivateUser(currentUser, targetUser) {
     // Same rules as modify for deactivation
@@ -1167,9 +1304,15 @@ class UserManagementService {
 
   /**
    * Check if current user can reactivate target user.
-   * @param currentUser
-   * @param targetUser
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUser - TargetUser parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canReactivateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
    */
   canReactivateUser(currentUser, targetUser) {
     // Same rules as modify for reactivation
@@ -1180,9 +1323,15 @@ class UserManagementService {
 
   /**
    * Log user query activity for audit trails.
-   * @param currentUser
-   * @param queryDetails
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} queryDetails - QueryDetails parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.logUserQueryActivity(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async logUserQueryActivity(currentUser, queryDetails) {
     try {
@@ -1201,10 +1350,16 @@ class UserManagementService {
 
   /**
    * Log user access activity.
-   * @param currentUser
-   * @param targetUserId
-   * @param action
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUserId - TargetUserId parameter.
+   * @param {string} action - Action identifier.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.logUserAccessActivity(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async logUserAccessActivity(currentUser, targetUserId, action) {
     try {
@@ -1222,11 +1377,17 @@ class UserManagementService {
 
   /**
    * Log CRUD operations for audit compliance.
-   * @param performedBy
-   * @param action
-   * @param targetUserId
-   * @param details
+   * @param {*} performedBy - PerformedBy parameter.
+   * @param {string} action - Action identifier.
+   * @param {*} targetUserId - TargetUserId parameter.
+   * @param {*} details - Details parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.logUserCRUDActivity(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async logUserCRUDActivity(performedBy, action, targetUserId, details = {}) {
     try {
@@ -1246,10 +1407,16 @@ class UserManagementService {
 
   /**
    * Log search operations for audit trails.
-   * @param currentUser
-   * @param searchParams
-   * @param resultCount
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} searchParams - SearchParams parameter.
+   * @param {*} resultCount - ResultCount parameter.
    * @example
+   * // User management service usage
+   * const result = await usermanagementservice.logUserSearchActivity(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async logUserSearchActivity(currentUser, searchParams, resultCount) {
     try {

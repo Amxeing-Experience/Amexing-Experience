@@ -24,6 +24,8 @@ const logger = require('../../infrastructure/logger');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize validation middleware
  * const validationMiddleware = new ValidationMiddleware();
  *
@@ -58,8 +60,13 @@ class ValidationMiddleware {
    * @function validateRequest
    * @param {object} schema - Joi validation schema object.
    * @param {string} [property] - Request property to validate ('body', 'query', 'params').
-   * @returns {Function} Express middleware function for request validation.
+   * @returns {Function} - Operation result Express middleware function for request validation.
    * @example
+   * // Middleware usage
+   * app.use('/path', middlewareFunction);
+   * // Processes request before route handler
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
    * // Validate request body
    * const middleware = validationMiddleware.validateRequest(userSchema, 'body');
    * router.post('/users', middleware, userController.create);
@@ -115,8 +122,13 @@ class ValidationMiddleware {
    * @function getRequestProperty
    * @param {object} req - Express request object.
    * @param {string} property - Property name to retrieve ('body', 'query', 'params').
-   * @returns {object} Request property data or empty object if invalid.
+   * @returns {object} - Operation result Request property data or empty object if invalid.
    * @example
+   * // Middleware usage
+   * app.use('/path', middlewareFunction);
+   * // Processes request before route handler
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
    * // Get request body data
    * const bodyData = this.getRequestProperty(req, 'body');
    */
@@ -141,8 +153,13 @@ class ValidationMiddleware {
    * @param {object} req - Express request object.
    * @param {string} property - Property name to set ('body', 'query', 'params').
    * @param {object} value - Validated data to set.
-   * @returns {void} Updates request object in place.
+   * @returns {void} - No return value Updates request object in place.
    * @example
+   * // Middleware usage
+   * app.use('/path', middlewareFunction);
+   * // Processes request before route handler
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
    * // Set validated body data
    * this.setRequestProperty(req, 'body', validatedData);
    */
@@ -171,8 +188,14 @@ class ValidationMiddleware {
    * @param {object} req - Express request object with profile data in body.
    * @param {object} res - Express response object.
    * @param {Function} next - Express next middleware function.
-   * @returns {void} Continues to next middleware or returns validation error.
+   * @returns {void} - No return value Continues to next middleware or returns validation error.
    * @example
+   * // Middleware usage
+   * app.use('/path', middlewareFunction);
+   * // Processes request before route handler
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
    * // POST /profile/update
    * // Body: { username: 'newusername', email: 'new@email.com' }
    */
@@ -195,8 +218,14 @@ class ValidationMiddleware {
    * @param {object} req - Express request object with registration data in body.
    * @param {object} res - Express response object.
    * @param {Function} next - Express next middleware function.
-   * @returns {void} Continues to next middleware or returns validation error.
+   * @returns {void} - No return value Continues to next middleware or returns validation error.
    * @example
+   * // Middleware usage
+   * app.use('/path', middlewareFunction);
+   * // Processes request before route handler
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
    * // POST /register
    * // Body: { username: 'user123', email: 'user@example.com', password: 'user-password', confirmPassword: 'user-password' }
    */
@@ -234,8 +263,14 @@ class ValidationMiddleware {
    * @param {object} req - Express request object with login credentials in body.
    * @param {object} res - Express response object.
    * @param {Function} next - Express next middleware function.
-   * @returns {void} Continues to next middleware or returns validation error.
+   * @returns {void} - No return value Continues to next middleware or returns validation error.
    * @example
+   * // Middleware usage
+   * app.use('/path', middlewareFunction);
+   * // Processes request before route handler
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
    * // POST /login
    * // Body: { username: 'user@example.com', password: 'user-password' }
    */
@@ -257,8 +292,14 @@ class ValidationMiddleware {
    * @param {object} req - Express request object with email in body.
    * @param {object} res - Express response object.
    * @param {Function} next - Express next middleware function.
-   * @returns {void} Continues to next middleware or returns validation error.
+   * @returns {void} - No return value Continues to next middleware or returns validation error.
    * @example
+   * // Middleware usage
+   * app.use('/path', middlewareFunction);
+   * // Processes request before route handler
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
    * // POST /auth/forgot-password
    * // Body: { email: 'user@example.com' }
    */
@@ -279,8 +320,14 @@ class ValidationMiddleware {
    * @param {object} req - Express request object with password, confirmPassword, and token in body.
    * @param {object} res - Express response object.
    * @param {Function} next - Express next middleware function.
-   * @returns {void} Continues to next middleware or returns validation error.
+   * @returns {void} - No return value Continues to next middleware or returns validation error.
    * @example
+   * // Middleware usage
+   * app.use('/path', middlewareFunction);
+   * // Processes request before route handler
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
    * // POST /auth/reset-password
    * // Body: { password: 'new-password', confirmPassword: 'new-password', token: 'reset-token-abc123' }
    */

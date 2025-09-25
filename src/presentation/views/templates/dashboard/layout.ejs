@@ -1,0 +1,77 @@
+<%- include('../base-layout', {
+    layoutType: 'admin',
+    bodyClass: 'dashboard-layout',
+    head: `
+        <!-- Dashboard Core Styles -->
+        <link rel="stylesheet" href="/dashboard/css/styles.min.css" />
+
+        <!-- DataTables Styles -->
+        <link href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+        <link href="https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css" rel="stylesheet">
+        <link href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css" rel="stylesheet">
+
+        <!-- Additional component styles -->
+        ${typeof additionalStyles !== 'undefined' && additionalStyles ? additionalStyles.map(style => \`<link rel="stylesheet" href="\${style}" />\`).join('\\n        ') : ''}
+    `,
+    body: `
+        <div class="page-wrapper" id="main-wrapper" data-layout="vertical" data-navbarbg="skin6" data-sidebartype="full"
+            data-sidebar-position="fixed" data-header-position="fixed">
+
+            <!-- Sidebar Start -->
+            <%- include('../../organisms/sidebar/sidebar', { userRole: userRole }) %>
+            <!-- Sidebar End -->
+
+            <!-- Main wrapper -->
+            <div class="body-wrapper">
+                <!-- Header Start -->
+                <%- include('../../organisms/header/header', { user: user, userRole: userRole }) %>
+                <!-- Header End -->
+
+                <!-- Main Content -->
+                <div class="container-fluid">
+                    ${typeof content !== 'undefined' ? content : body}
+                </div>
+                <!-- Main Content End -->
+            </div>
+        </div>
+
+        <!-- Loading overlay -->
+        <div id="loading-overlay" class="d-none">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    `,
+    scripts: `
+        <!-- jQuery (required for DataTables) -->
+        <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+        <!-- Bootstrap Bundle -->
+        <script src="/dashboard/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+        <!-- Dashboard Core Scripts -->
+        <script src="/dashboard/js/sidebarmenu.js"></script>
+        <script src="/dashboard/js/app.min.js"></script>
+
+        <!-- DataTables Core -->
+        <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+        <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+        <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+
+        <!-- DataTables Buttons -->
+        <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
+        <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.bootstrap5.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/pdfmake.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
+        <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
+        <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+
+        <!-- SweetAlert2 for notifications -->
+        <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+        <!-- Additional scripts -->
+        ${typeof additionalScripts !== 'undefined' && additionalScripts ? additionalScripts.map(script => \`<script src="\${script}"></script>\`).join('\\n        ') : ''}
+    `
+}) %>

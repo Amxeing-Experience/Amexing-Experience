@@ -12,6 +12,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 2025-09-22
+ * @example
+ * // Model method usage
+ * const result = await basemodel.require({ 'parse/node': 'example' });
+ * // Returns: model operation result
  */
 
 const Parse = require('parse/node');
@@ -36,8 +40,13 @@ class BaseModel extends Parse.Object {
 
   /**
    * Check if record is active and exists (normal business operations).
-   * @returns {boolean}
+   * @returns {boolean} - Boolean result.
    * @example
+   * // Model method usage
+   * const result = await basemodel.isActive({ 'parse/node': 'example' });
+   * // Returns: model operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   isActive() {
     return this.get('active') === true && this.get('exists') === true;
@@ -45,8 +54,13 @@ class BaseModel extends Parse.Object {
 
   /**
    * Check if record exists but is inactive (archived).
-   * @returns {boolean}
+   * @returns {boolean} - Boolean result.
    * @example
+   * // Model method usage
+   * const result = await basemodel.isArchived({ 'parse/node': 'example' });
+   * // Returns: model operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   isArchived() {
     return this.get('active') === false && this.get('exists') === true;
@@ -54,8 +68,13 @@ class BaseModel extends Parse.Object {
 
   /**
    * Check if record is soft deleted (hidden from normal queries).
-   * @returns {boolean}
+   * @returns {boolean} - Boolean result.
    * @example
+   * // Model method usage
+   * const result = await basemodel.isSoftDeleted({ 'parse/node': 'example' });
+   * // Returns: model operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   isSoftDeleted() {
     return this.get('exists') === false;
@@ -64,8 +83,13 @@ class BaseModel extends Parse.Object {
   /**
    * Activate record (set active to true, ensure exists is true).
    * @param {string} modifiedBy - User ID who performed the action.
-   * @returns {Promise<BaseModel>}
+   * @returns {Promise<BaseModel>} - Promise resolving to operation result.
    * @example
+   * // Model method usage
+   * const result = await basemodel.activate({ modifiedBy: 'example' });
+   * // Returns: model operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   async activate(modifiedBy = null) {
     this.set('active', true);
@@ -87,8 +111,13 @@ class BaseModel extends Parse.Object {
   /**
    * Deactivate record (set active to false, keep exists true for archive).
    * @param {string} modifiedBy - User ID who performed the action.
-   * @returns {Promise<BaseModel>}
+   * @returns {Promise<BaseModel>} - Promise resolving to operation result.
    * @example
+   * // Model method usage
+   * const result = await basemodel.deactivate({ modifiedBy: 'example' });
+   * // Returns: model operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   async deactivate(modifiedBy = null) {
     this.set('active', false);
@@ -110,8 +139,13 @@ class BaseModel extends Parse.Object {
   /**
    * Soft delete record (set exists to false, hide from normal queries but keep for audit).
    * @param {string} modifiedBy - User ID who performed the action.
-   * @returns {Promise<BaseModel>}
+   * @returns {Promise<BaseModel>} - Promise resolving to operation result.
    * @example
+   * // Model method usage
+   * const result = await basemodel.softDelete({ modifiedBy: 'example' });
+   * // Returns: model operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   async softDelete(modifiedBy = null) {
     this.set('active', false);
@@ -135,8 +169,13 @@ class BaseModel extends Parse.Object {
   /**
    * Restore soft deleted record (set exists back to true, but keep inactive).
    * @param {string} modifiedBy - User ID who performed the action.
-   * @returns {Promise<BaseModel>}
+   * @returns {Promise<BaseModel>} - Promise resolving to operation result.
    * @example
+   * // Model method usage
+   * const result = await basemodel.restore({ modifiedBy: 'example' });
+   * // Returns: model operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   async restore(modifiedBy = null) {
     this.set('exists', true);
@@ -159,9 +198,15 @@ class BaseModel extends Parse.Object {
 
   /**
    * Override save to always update the updatedAt timestamp.
-   * @param attributes
-   * @param options
+   * @param {*} attributes - Attributes parameter.
+   * @param {object} options - Configuration options.
    * @example
+   * // Update model
+   * const updated = await basemodel.update(data);
+   * // Returns: updated instance
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async save(attributes, options) {
     this.set('updatedAt', new Date());
@@ -170,8 +215,13 @@ class BaseModel extends Parse.Object {
 
   /**
    * Get lifecycle status as string.
-   * @returns {string}
+   * @returns {string} - Operation result.
    * @example
+   * // Model method usage
+   * const result = await basemodel.getLifecycleStatus({ attributes: 'example', options: 'example' });
+   * // Returns: model operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   getLifecycleStatus() {
     if (this.isSoftDeleted()) return 'deleted';
@@ -183,8 +233,13 @@ class BaseModel extends Parse.Object {
   /**
    * Static method to create a query that only returns active records.
    * @param {string} className - Parse class name.
-   * @returns {Parse.Query}
+   * @returns {Parse.Query} - Operation result.
    * @example
+   * // Query model
+   * const results = await BaseModel.query(criteria);
+   * // Returns: array of instances
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   static queryActive(className) {
     const query = new Parse.Query(className);
@@ -196,8 +251,13 @@ class BaseModel extends Parse.Object {
   /**
    * Static method to create a query that returns active and archived records (excludes soft deleted).
    * @param {string} className - Parse class name.
-   * @returns {Parse.Query}
+   * @returns {Parse.Query} - Operation result.
    * @example
+   * // Query model
+   * const results = await BaseModel.query(criteria);
+   * // Returns: array of instances
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   static queryExisting(className) {
     const query = new Parse.Query(className);
@@ -208,8 +268,13 @@ class BaseModel extends Parse.Object {
   /**
    * Static method to create a query that returns all records including soft deleted (for admin/audit).
    * @param {string} className - Parse class name.
-   * @returns {Parse.Query}
+   * @returns {Parse.Query} - Operation result.
    * @example
+   * // Query model
+   * const results = await BaseModel.query(criteria);
+   * // Returns: array of instances
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   static queryAll(className) {
     return new Parse.Query(className);
@@ -218,8 +283,13 @@ class BaseModel extends Parse.Object {
   /**
    * Static method to create a query that only returns archived records.
    * @param {string} className - Parse class name.
-   * @returns {Parse.Query}
+   * @returns {Parse.Query} - Operation result.
    * @example
+   * // Query model
+   * const results = await BaseModel.query(criteria);
+   * // Returns: array of instances
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   static queryArchived(className) {
     const query = new Parse.Query(className);
@@ -231,8 +301,13 @@ class BaseModel extends Parse.Object {
   /**
    * Static method to create a query that only returns soft deleted records.
    * @param {string} className - Parse class name.
-   * @returns {Parse.Query}
+   * @returns {Parse.Query} - Operation result.
    * @example
+   * // Query model
+   * const results = await BaseModel.query(criteria);
+   * // Returns: array of instances
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
    */
   static querySoftDeleted(className) {
     const query = new Parse.Query(className);

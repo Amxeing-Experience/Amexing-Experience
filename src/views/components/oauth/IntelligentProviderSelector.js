@@ -28,6 +28,12 @@ class IntelligentProviderSelector {
   /**
    * Initialize the intelligent provider selector.
    * @example
+   * // Usage example
+   * const result = await initialize(parameters);
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async initialize() {
     if (!this.config.container) {
@@ -60,6 +66,12 @@ class IntelligentProviderSelector {
   /**
    * Load domain intelligence database.
    * @example
+   * // Usage example
+   * const result = await loadDomainDatabase(parameters);
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async loadDomainDatabase() {
     try {
@@ -137,6 +149,12 @@ class IntelligentProviderSelector {
   /**
    * Load user learning data from local storage.
    * @example
+   * // Usage example
+   * const result = await loadUserLearningData(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   loadUserLearningData() {
     try {
@@ -160,6 +178,12 @@ class IntelligentProviderSelector {
   /**
    * Save learning data to local storage.
    * @example
+   * // Usage example
+   * const result = await saveLearningData(parameters);
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   saveLearningData() {
     if (!this.config.enableLearning) return;
@@ -174,6 +198,12 @@ class IntelligentProviderSelector {
   /**
    * Setup provider detection.
    * @example
+   * // Usage example
+   * const result = await setupProviderDetection(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   setupProviderDetection() {
     // Email input detection
@@ -203,6 +233,12 @@ class IntelligentProviderSelector {
   /**
    * Setup analytics tracking.
    * @example
+   * // Usage example
+   * const result = await setupAnalytics(parameters);
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   setupAnalytics() {
     // Track provider selection events
@@ -219,6 +255,12 @@ class IntelligentProviderSelector {
   /**
    * Initialize UI components.
    * @example
+   * // Usage example
+   * const result = await initializeUI(parameters);
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   initializeUI() {
     if (!this.config.container) return;
@@ -239,6 +281,12 @@ class IntelligentProviderSelector {
   /**
    * Create provider selector UI.
    * @example
+   * // Usage example
+   * const result = await createProviderSelectorUI(parameters);
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   createProviderSelectorUI() {
     const { container } = this.config;
@@ -320,6 +368,12 @@ class IntelligentProviderSelector {
   /**
    * Create suggestion display.
    * @example
+   * // Usage example
+   * const result = await createSuggestionDisplay(parameters);
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   createSuggestionDisplay() {
     // Style the suggestion area
@@ -586,6 +640,12 @@ class IntelligentProviderSelector {
   /**
    * Create provider buttons.
    * @example
+   * // Usage example
+   * const result = await createProviderButtons(parameters);
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   createProviderButtons() {
     const providerInfo = {
@@ -622,9 +682,16 @@ class IntelligentProviderSelector {
 
   /**
    * Create individual provider button.
-   * @param provider
-   * @param info
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
+   * @param {*} info - Info parameter.
    * @example
+   * // Usage example
+   * const result = await createProviderButton({ provider: 'example' , info: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   createProviderButton(provider, info) {
     const button = document.createElement('button');
@@ -663,8 +730,15 @@ class IntelligentProviderSelector {
 
   /**
    * Analyze email and suggest provider.
+   * @param {string} email - User email address.
    * @param email
    * @example
+   * // Usage example
+   * const result = await analyzeEmailAndSuggest({ email: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   analyzeEmailAndSuggest(email) {
     if (!email || !email.includes('@')) {
@@ -684,9 +758,18 @@ class IntelligentProviderSelector {
 
   /**
    * Generate intelligent suggestion.
+   * @param {string} email - User email address.
+   * @param {*} domain - Domain parameter.
    * @param email
-   * @param domain
+   * @param _domain
    * @example
+   * // Usage example
+   * const result = await generateSuggestion({ email: 'example', domain: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {object} - Operation result.
    */
   generateSuggestion(email, domain) {
     const analyses = [
@@ -718,8 +801,15 @@ class IntelligentProviderSelector {
 
   /**
    * Analyze domain database.
-   * @param domain
+   * @param {*} domain - Domain parameter.
+   * @param _domain
    * @example
+   * // Usage example
+   * const result = await analyzeDomainDatabase({ domain: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {object} - Operation result.
    */
   analyzeDomainDatabase(domain) {
     const domainInfo = this.domainDatabase.get(domain);
@@ -749,9 +839,17 @@ class IntelligentProviderSelector {
 
   /**
    * Analyze learning data.
+   * @param {string} email - User email address.
+   * @param {*} domain - Domain parameter.
    * @param email
-   * @param domain
+   * @param _domain
    * @example
+   * // Usage example
+   * const result = await analyzeLearningData({ email: 'example', domain: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {object} - Operation result.
    */
   analyzeLearningData(email, domain) {
     if (!this.config.enableLearning) return null;
@@ -765,7 +863,7 @@ class IntelligentProviderSelector {
         provider: choice.provider,
         confidence: Math.min(choice.successCount * 0.2 + 0.6, 0.95),
         reason: 'Based on your previous choice for this email',
-        source: 'user_email_history',
+        source: 'useremail_history',
       };
     }
 
@@ -798,8 +896,15 @@ class IntelligentProviderSelector {
 
   /**
    * Analyze corporate context.
-   * @param domain
+   * @param {*} domain - Domain parameter.
+   * @param _domain
    * @example
+   * // Usage example
+   * const result = await analyzeCorporateContext({ domain: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {object} - Operation result.
    */
   analyzeCorporateContext(domain) {
     if (!this.config.corporateConfig) return null;
@@ -833,8 +938,15 @@ class IntelligentProviderSelector {
 
   /**
    * Analyze department context.
-   * @param domain
+   * @param {*} domain - Domain parameter.
+   * @param _domain
    * @example
+   * // Usage example
+   * const result = await analyzeDepartmentContext({ domain: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {object} - Operation result.
    */
   analyzeDepartmentContext(domain) {
     if (!this.config.department) return null;
@@ -863,8 +975,14 @@ class IntelligentProviderSelector {
 
   /**
    * Analyze common patterns.
-   * @param domain
+   * @param {string} domain - Domain parameter.
    * @example
+   * // Usage example
+   * const result = await analyzeCommonPatterns('example.edu');
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {object} - Operation result.
    */
   analyzeCommonPatterns(domain) {
     // Educational institutions typically use Google
@@ -902,8 +1020,14 @@ class IntelligentProviderSelector {
 
   /**
    * Show suggestion.
-   * @param suggestion
+   * @param {*} suggestion - Suggestion parameter.
    * @example
+   * // Usage example
+   * const result = await showSuggestion({ suggestion: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   showSuggestion(suggestion) {
     if (!suggestion || !this.elements.suggestionArea) return;
@@ -953,6 +1077,12 @@ class IntelligentProviderSelector {
   /**
    * Hide suggestion.
    * @example
+   * // Usage example
+   * const result = await hideSuggestion({ suggestion: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   hideSuggestion() {
     if (this.elements.suggestionArea) {
@@ -966,8 +1096,14 @@ class IntelligentProviderSelector {
 
   /**
    * Accept suggestion.
-   * @param suggestion
+   * @param {*} suggestion - Suggestion parameter.
    * @example
+   * // Usage example
+   * const result = await acceptSuggestion({ suggestion: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   acceptSuggestion(suggestion) {
     // Record acceptance in learning data
@@ -985,8 +1121,14 @@ class IntelligentProviderSelector {
 
   /**
    * Dismiss suggestion.
-   * @param suggestion
+   * @param {*} suggestion - Suggestion parameter.
    * @example
+   * // Usage example
+   * const result = await dismissSuggestion({ suggestion: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   dismissSuggestion(suggestion) {
     // Record dismissal in learning data
@@ -1004,8 +1146,15 @@ class IntelligentProviderSelector {
 
   /**
    * Select provider.
-   * @param provider
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
    * @example
+   * // Usage example
+   * const result = await selectProvider({ provider: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   selectProvider(provider) {
     // Record user choice
@@ -1037,8 +1186,15 @@ class IntelligentProviderSelector {
 
   /**
    * Highlight suggested provider.
-   * @param provider
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
    * @example
+   * // Usage example
+   * const result = await highlightSuggestedProvider({ provider: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   highlightSuggestedProvider(provider) {
     // Clear existing highlights
@@ -1063,6 +1219,12 @@ class IntelligentProviderSelector {
   /**
    * Clear provider highlights.
    * @example
+   * // Usage example
+   * const result = await clearProviderHighlights({ provider: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   clearProviderHighlights() {
     const buttons = this.elements.providerGrid.querySelectorAll('.provider-button');
@@ -1077,8 +1239,14 @@ class IntelligentProviderSelector {
 
   /**
    * Update alternatives display.
-   * @param excludeProvider
+   * @param {*} excludeProvider - ExcludeProvider parameter.
    * @example
+   * // Usage example
+   * const result = await updateAlternativesDisplay({ excludeProvider: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   updateAlternativesDisplay(excludeProvider = null) {
     if (!this.elements.alternatives) return;
@@ -1113,8 +1281,14 @@ class IntelligentProviderSelector {
 
   /**
    * Record suggestion acceptance.
-   * @param suggestion
+   * @param {*} suggestion - Suggestion parameter.
    * @example
+   * // Usage example
+   * const result = await recordSuggestionAcceptance({ suggestion: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   recordSuggestionAcceptance(suggestion) {
     if (!this.config.enableLearning) return;
@@ -1144,8 +1318,14 @@ class IntelligentProviderSelector {
 
   /**
    * Record suggestion dismissal.
-   * @param suggestion
+   * @param {*} suggestion - Suggestion parameter.
    * @example
+   * // Usage example
+   * const result = await recordSuggestionDismissal({ suggestion: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   recordSuggestionDismissal(suggestion) {
     if (!this.config.enableLearning) return;
@@ -1162,8 +1342,15 @@ class IntelligentProviderSelector {
 
   /**
    * Record user choice.
-   * @param provider
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
    * @example
+   * // Usage example
+   * const result = await recordUserChoice({ provider: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   recordUserChoice(provider) {
     if (!this.config.enableLearning) return;
@@ -1181,6 +1368,12 @@ class IntelligentProviderSelector {
   /**
    * Detect contextual provider.
    * @example
+   * // Usage example
+   * const result = await detectContextualProvider({ provider: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   detectContextualProvider() {
     // URL-based detection
@@ -1224,6 +1417,13 @@ class IntelligentProviderSelector {
   /**
    * Setup UI interactions.
    * @example
+   * // Usage example
+   * const result = await setupUIInteractions({ provider: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   setupUIInteractions() {
     // Keyboard navigation
@@ -1242,6 +1442,13 @@ class IntelligentProviderSelector {
   /**
    * Setup touch gestures for mobile.
    * @example
+   * // Usage example
+   * const result = await setupTouchGestures({ provider: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   setupTouchGestures() {
     let startX = 0;
@@ -1268,8 +1475,15 @@ class IntelligentProviderSelector {
 
   /**
    * Track suggestion shown.
-   * @param suggestion
+   * @param {*} suggestion - Suggestion parameter.
    * @example
+   * // Usage example
+   * const result = await trackSuggestionShown({ suggestion: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   trackSuggestionShown(suggestion) {
     // Implementation for analytics tracking
@@ -1278,8 +1492,15 @@ class IntelligentProviderSelector {
 
   /**
    * Track suggestion interaction.
-   * @param detail
+   * @param {*} detail - Detail parameter.
    * @example
+   * // Usage example
+   * const result = await trackSuggestionInteraction({ detail: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   trackSuggestionInteraction(detail) {
     const event = new CustomEvent('suggestionInteraction', { detail });
@@ -1288,8 +1509,14 @@ class IntelligentProviderSelector {
 
   /**
    * Track provider selection.
-   * @param detail
+   * @param {*} detail - Detail parameter.
    * @example
+   * // Usage example
+   * const result = await trackProviderSelection({ detail: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   trackProviderSelection(detail) {
     const event = new CustomEvent('providerSelected', { detail });
@@ -1298,8 +1525,15 @@ class IntelligentProviderSelector {
 
   /**
    * Utility methods.
-   * @param provider
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
    * @example
+   * // Usage example
+   * const result = await getProviderName({ provider: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   getProviderName(provider) {
     const names = {
@@ -1360,25 +1594,31 @@ class IntelligentProviderSelector {
     return 'confidence-low';
   }
 
-  generateDomainReason(domain, domainInfo) {
+  generateDomainReason(_domain, domainInfo) {
     switch (domainInfo.type) {
       case 'corporate_verified':
-        return `${domain} is configured in your organization`;
+        return `${_domain} is configured in your organization`;
       case 'corporate':
-        return `${domain} typically uses ${this.getProviderName(domainInfo.provider)}`;
+        return `${_domain} typically uses ${this.getProviderName(domainInfo.provider)}`;
       case 'consumer':
-        return `${domain} accounts work with ${this.getProviderName(domainInfo.provider)}`;
+        return `${_domain} accounts work with ${this.getProviderName(domainInfo.provider)}`;
       case 'educational':
-        return `Educational domains like ${domain} commonly use ${this.getProviderName(domainInfo.provider)}`;
+        return `Educational domains like ${_domain} commonly use ${this.getProviderName(domainInfo.provider)}`;
       default:
-        return `Based on ${domain} domain`;
+        return `Based on ${_domain} domain`;
     }
   }
 
   /**
    * Public methods.
-   * @param newConfig
+   * @param {*} newConfig - NewConfig parameter.
    * @example
+   * // Usage example
+   * const result = await updateConfiguration({ newConfig: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   updateConfiguration(newConfig) {
     Object.assign(this.config, newConfig);

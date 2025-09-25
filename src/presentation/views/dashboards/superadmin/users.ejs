@@ -1,258 +1,355 @@
-<!-- User Management Dashboard -->
-<div class="container-fluid">
-  <!-- Page Header -->
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h1 class="h3 mb-0 text-gray-800">User Management</h1>
-      <nav aria-label="breadcrumb">
-        <ol class="breadcrumb mb-0">
-          <li class="breadcrumb-item"><a href="/dashboard/superadmin">Dashboard</a></li>
-          <li class="breadcrumb-item active" aria-current="page">User Management</li>
-        </ol>
-      </nav>
+<%
+/**
+ * Superadmin Users Page
+ * Uses new atomic design structure with DataTables
+ */
+
+// Set layout and page variables
+const layoutType = 'dashboard';
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'superadmin';
+const currentPath = '/dashboard/superadmin/users';
+const title = 'Gestión de Usuarios - Amexing';
+%>
+
+<%
+// Set layout configuration for dashboard
+const head = `
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Gestión de usuarios del sistema Amexing">
+`;
+%>
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <title><%= title %></title>
+    <%# Safe: head contains server-generated trusted HTML %><%-  head || '' %>
+    <%- include('../../assets/admin/cdn-dependencies') %>
+    <%- include('../../assets/dashboard/css') %>
+
+    <!-- Custom CSS for better space utilization -->
+    <style>
+        /* Override Flexy's restrictive layout for better space usage */
+        .body-wrapper .container-fluid,
+        .body-wrapper .container-sm,
+        .body-wrapper .container-md,
+        .body-wrapper .container-lg,
+        .body-wrapper .container-xl,
+        .body-wrapper .container-xxl {
+            max-width: none !important;  /* Remove width restriction */
+            margin: 0 !important;        /* Remove auto centering */
+            padding: 20px !important;    /* Reduce from 24px */
+        }
+
+        /* Optimize for desktop screens */
+        @media (min-width: 1200px) {
+            .body-wrapper .container-fluid,
+            .body-wrapper .container-sm,
+            .body-wrapper .container-md,
+            .body-wrapper .container-lg,
+            .body-wrapper .container-xl,
+            .body-wrapper .container-xxl {
+                padding: 15px 30px !important; /* Less vertical, reasonable horizontal */
+            }
+        }
+
+        /* Mobile optimization */
+        @media (max-width: 991.98px) {
+            .body-wrapper .container-fluid,
+            .body-wrapper .container-sm,
+            .body-wrapper .container-md,
+            .body-wrapper .container-lg,
+            .body-wrapper .container-xl,
+            .body-wrapper .container-xxl {
+                padding: 15px !important;
+            }
+        }
+
+        /* Small mobile screens */
+        @media (max-width: 767.98px) {
+            .body-wrapper > .container-fluid,
+            .body-wrapper > .container-sm,
+            .body-wrapper > .container-md,
+            .body-wrapper > .container-lg,
+            .body-wrapper > .container-xl,
+            .body-wrapper > .container-xxl {
+                padding: 15px 10px !important;
+            }
+        }
+
+        /* Ensure table uses full available width */
+        .table-responsive {
+            margin: 0 !important;
+        }
+
+        /* Card optimizations */
+        .card {
+            margin-bottom: 1rem;
+        }
+
+        .card-body {
+            padding: 1rem;
+        }
+
+        /* DataTable wrapper optimizations */
+        .dataTables_wrapper {
+            width: 100%;
+        }
+
+        .dataTables_wrapper .row {
+            margin-left: 0;
+            margin-right: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Main wrapper - Flexy Bootstrap Lite structure -->
+    <div class="page-wrapper" id="main-wrapper" data-layout="vertical" data-navbarbg="skin6"
+         data-sidebartype="full" data-sidebar-position="fixed" data-header-position="fixed">
+
+        <!-- Sidebar Start -->
+        <%- include('../../organisms/sidebar/sidebar', { user: user, userRole: currentUserRole, currentPath: currentPath }) %>
+        <!-- Sidebar End -->
+
+        <!-- Main Content wrapper -->
+        <div class="body-wrapper">
+            <!-- Header Start -->
+            <%- include('../../organisms/header/header', { user: user, userRole: currentUserRole, currentPath: currentPath, pageTitle: 'Usuarios' }) %>
+            <!-- Header End -->
+
+            <!-- Main Content -->
+            <div class="container-fluid">
+                <!-- Page Header -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <div>
+                                <h2 class="mb-1 fw-bold">Gestión de Usuarios</h2>
+                                <nav aria-label="breadcrumb">
+                                    <ol class="breadcrumb mb-0">
+                                        <li class="breadcrumb-item">
+                                            <a href="/dashboard/superadmin" class="text-decoration-none">
+                                                <i class="ti ti-home me-1"></i>Dashboard
+                                            </a>
+                                        </li>
+                                        <li class="breadcrumb-item active" aria-current="page">
+                                            <i class="ti ti-users me-1"></i>Usuarios
+                                        </li>
+                                    </ol>
+                                </nav>
+                            </div>
+                            <div class="text-muted">
+                                <small class="d-block">Total usuarios registrados</small>
+                                <strong id="total-users-count">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users DataTable -->
+                <div class="row">
+                    <div class="col-12">
+                        <%- include('../../organisms/datatable/users-table', {
+                            tableId: 'users-table',
+                            apiEndpoint: '/api/users',
+                            userRole: currentUserRole,
+                            showActions: true
+                        }) %>
+                    </div>
+                </div>
+
+                <!-- User Modals will go here -->
+                <!-- Create User Modal -->
+                <div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="createUserModalLabel">
+                                    <i class="ti ti-user-plus me-2"></i>Crear Nuevo Usuario
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <!-- Create user form will go here -->
+                                <p class="text-muted">Formulario de creación de usuario pendiente de implementar</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Edit User Modal -->
+                <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="editUserModalLabel">
+                                    <i class="ti ti-edit me-2"></i>Editar Usuario
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <!-- Edit user form will go here -->
+                                <p class="text-muted">Formulario de edición de usuario pendiente de implementar</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- View User Modal -->
+                <div class="modal fade" id="viewUserModal" tabindex="-1" aria-labelledby="viewUserModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="viewUserModalLabel">
+                                    <i class="ti ti-eye me-2"></i>Detalles de Usuario
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <!-- User details will go here -->
+                                <p class="text-muted">Vista de detalles de usuario pendiente de implementar</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="text-muted">
-      <i class="ti ti-users"></i>
-      User management and administration
+
+    <!-- Global Loading Overlay -->
+    <div id="loading-overlay" class="d-none">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+            <div class="mt-2">
+                <small class="text-muted">Cargando datos...</small>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- Simple User Table -->
-  <div class="card shadow mb-4">
-    <div class="card-header py-3">
-      <h6 class="m-0 font-weight-bold text-primary">
-        <i class="ti ti-table"></i>
-        All Users
-      </h6>
-    </div>
-    <div class="card-body">
-      <!-- User Table Container -->
-      <div id="usersTableContainer"></div>
-    </div>
-  </div>
+    <!-- Include DataTables CDN Scripts -->
+    <%- include('../../assets/admin/cdn-scripts') %>
+    <!-- Include Dashboard Admin Scripts (for DataTables compatibility) -->
+    <%- include('../../assets/admin/scripts') %>
 
-</div>
+    <!-- Page-specific JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔴 SuperAdmin Users page initialized');
 
-<!-- Include JavaScript -->
-<script src="/js/components/UserTableManager.js"></script>
+            // Wait for libraries and then load data
+            setTimeout(async function() {
+                if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+                    console.log('⚠️ Libraries not ready, waiting longer...');
+                    setTimeout(arguments.callee, 500);
+                    return;
+                }
 
-<script>
-// Initialize page when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-  console.log('User management page loading...');
+                console.log('✅ Libraries ready, loading users data...');
 
-  // Check if required scripts are loaded
-  if (typeof UserTableManager === 'undefined') {
-    console.error('UserTableManager component not loaded');
-    return;
-  }
+                try {
+                    // Load users from API
+                    const response = await fetch('/api/users', {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'Content-Type': 'application/json'
+                        }
+                    });
 
-  try {
-    // Store access token if available
-    <% if (typeof accessToken !== 'undefined' && accessToken) { %>
-    sessionStorage.setItem('authToken', '<%= accessToken %>');
-    console.log('Token stored in sessionStorage');
-    <% } else { %>
-    console.warn('No access token available to store');
-    <% } %>
+                    console.log('📤 API Response status:', response.status);
 
-    // Initialize optimized user table with advanced features
-    window.usersTable = new UserTableManager('usersTableContainer', {
-      apiBaseUrl: '/api',
-      pageSize: 20,
-      cacheEnabled: true,
-      cacheTimeout: 300000, // 5 minutes
-      debounceDelay: 250,
-      retryAttempts: 3,
-      retryDelay: 1000
-    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
 
-    // Load users with initial call
-    window.usersTable.loadUsers(false);
+                    const data = await response.json();
+                    console.log('📊 API Data:', data);
 
-    console.log('User management page initialized successfully');
+                    if (!data.success) {
+                        throw new Error(data.error || 'API error');
+                    }
 
-    // Auto-refresh every 5 minutes
-    setInterval(() => {
-      if (window.usersTable && document.visibilityState === 'visible') {
-        console.log('Auto-refreshing user table...');
-        window.usersTable.loadUsers(false);
-      }
-    }, 300000); // 5 minutes
+                    const users = data.data?.users || [];
+                    console.log('📊 Users loaded:', users.length);
 
-  } catch (error) {
-    console.error('Failed to initialize user management page:', error);
-  }
-});
+                    // Destroy any existing table
+                    if ($.fn.DataTable.isDataTable('#users-table')) {
+                        $('#users-table').DataTable().destroy();
+                    }
 
-// Cleanup when page unloads
-window.addEventListener('beforeunload', function() {
-  if (window.usersTable) {
-    window.usersTable.destroy();
-  }
-});
+                    // Initialize DataTable with data
+                    const table = $('#users-table').DataTable({
+                        data: users,
+                        columns: [
+                            { title: 'Nombre', data: 'firstName', className: 'fw-bold' },
+                            { title: 'Apellido', data: 'lastName' },
+                            { title: 'Email', data: 'email' },
+                            {
+                                title: 'Rol',
+                                data: 'role',
+                                className: 'text-center',
+                                render: function(data) {
+                                    const roleNames = {
+                                        'superadmin': { name: 'Super Admin', class: 'danger' },
+                                        'admin': { name: 'Admin', class: 'primary' },
+                                        'client': { name: 'Cliente', class: 'info' },
+                                        'department_manager': { name: 'Jefe Depto.', class: 'success' },
+                                        'employee': { name: 'Empleado', class: 'secondary' },
+                                        'driver': { name: 'Conductor', class: 'warning' },
+                                        'guest': { name: 'Invitado', class: 'light' }
+                                    };
+                                    const role = roleNames[data] || { name: data, class: 'secondary' };
+                                    return `<span class="badge bg-${role.class}">${role.name}</span>`;
+                                }
+                            },
+                            {
+                                title: 'Estado',
+                                data: 'active',
+                                className: 'text-center',
+                                render: function(data) {
+                                    const isActive = data === true;
+                                    const statusClass = isActive ? 'success' : 'danger';
+                                    const statusText = isActive ? 'Activo' : 'Inactivo';
+                                    return `<span class="badge bg-${statusClass}">${statusText}</span>`;
+                                }
+                            },
+                            {
+                                title: 'Registro',
+                                data: 'createdAt',
+                                className: 'text-center',
+                                render: function(data) {
+                                    if (data) {
+                                        const date = new Date(data);
+                                        return date.toLocaleDateString('es-ES');
+                                    }
+                                    return '';
+                                }
+                            }
+                        ],
+                        pageLength: 25,
+                        language: {
+                            url: '/assets/libs/datatables/es-ES.json'
+                        }
+                    });
 
-// Handle visibility change (pause auto-refresh when tab is hidden)
-document.addEventListener('visibilitychange', function() {
-  if (window.usersTable && document.visibilityState === 'visible') {
-    // Refresh when tab becomes visible again
-    window.usersTable.refresh();
-  }
-});
-</script>
+                    window.usersTable = table;
 
-<style>
-/* Custom styles for optimized user management page */
-.card {
-  border: none;
-  box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
-}
+                    // Update count
+                    document.getElementById('total-users-count').textContent = users.length;
 
-.user-table-wrapper {
-  min-height: 500px;
-  position: relative;
-}
+                    console.log('✅ DataTable initialized with', users.length, 'users');
 
-/* Table optimizations */
-.table-responsive {
-  border-radius: 0.5rem;
-  overflow: hidden;
-}
+                } catch (error) {
+                    console.error('❌ Error loading users:', error);
+                }
 
-.table th {
-  background-color: #f8f9fa;
-  border-bottom: 2px solid #dee2e6;
-  font-weight: 600;
-  text-transform: uppercase;
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  padding: 1rem 0.75rem;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-.table td {
-  padding: 0.75rem;
-  vertical-align: middle;
-  border-bottom: 1px solid #f1f3f4;
-}
-
-.table tbody tr:hover {
-  background-color: #f8f9fa;
-  transition: background-color 0.15s ease-in-out;
-}
-
-/* Avatar styling */
-.avatar-sm {
-  width: 32px;
-  height: 32px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-/* Badge styling */
-.badge {
-  font-size: 0.75rem;
-  font-weight: 500;
-  padding: 0.35em 0.65em;
-}
-
-/* Button styling */
-.btn-sm {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  border-radius: 0.375rem;
-}
-
-/* Loading overlay */
-.bg-opacity-75 {
-  background-color: rgba(255, 255, 255, 0.75) !important;
-}
-
-/* Pagination styling */
-.pagination {
-  margin-bottom: 0;
-}
-
-.page-link {
-  padding: 0.375rem 0.75rem;
-  font-size: 0.875rem;
-  border-radius: 0.375rem;
-  margin: 0 0.125rem;
-}
-
-.page-item.active .page-link {
-  background-color: #5d87ff;
-  border-color: #5d87ff;
-}
-
-/* Loading animation */
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.table tbody tr {
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-/* Cache indicator */
-#usersTableContainer-cache-indicator {
-  animation: pulse 2s infinite;
-}
-
-/* Responsive improvements */
-@media (max-width: 768px) {
-  .table th,
-  .table td {
-    padding: 0.5rem 0.25rem;
-    font-size: 0.875rem;
-  }
-
-  .avatar-sm {
-    width: 28px;
-    height: 28px;
-    font-size: 10px;
-  }
-
-  .btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.75rem;
-  }
-}
-
-/* Error and success alerts */
-.alert {
-  border-radius: 0.5rem;
-  border: none;
-}
-
-.alert-danger {
-  background-color: #f8d7da;
-  color: #721c24;
-}
-
-.alert-success {
-  background-color: #d1e7dd;
-  color: #0f5132;
-}
-
-/* Smooth transitions */
-* {
-  transition: all 0.15s ease-in-out;
-}
-
-/* Loading spinner */
-.spinner-border-sm {
-  width: 1rem;
-  height: 1rem;
-}
-</style>
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

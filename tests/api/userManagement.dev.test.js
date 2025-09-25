@@ -18,12 +18,12 @@ const BASE_URL = 'http://localhost:1337';
 // Test users from development environment
 const testCredentials = {
   superadmin: {
-    email: 'superadmin@dev.amexing.com',
-    password: 'DevSuper2024!@#'
+    email: process.env.DEV_SUPERADMIN_EMAIL || 'superadmin@dev.amexing.com',
+    password: process.env.DEV_SUPERADMIN_PASSWORD || 'fallback-password'
   },
   admin: {
-    email: 'admin@dev.amexing.com',
-    password: 'DevAdmin2024!@#'
+    email: process.env.DEV_ADMIN_EMAIL || 'admin@dev.amexing.com',
+    password: process.env.DEV_ADMIN_PASSWORD || 'fallback-password'
   }
 };
 

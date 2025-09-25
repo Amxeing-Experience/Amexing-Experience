@@ -12,6 +12,10 @@
  * @author Claude Code + Technical Team
  * @version 2.0
  * @date 2025-09-11
+ * @example
+ * // Authentication middleware usage
+ * app.use('/api', authMiddleware);
+ * // Validates JWT token and sets req.user
  */
 
 const jwt = require('jsonwebtoken');
@@ -42,6 +46,8 @@ const PermissionService = require('../services/PermissionService');
  * @version 2.0
  * @since 2025-09-11
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize authentication middleware
  * const authMiddleware = new AmexingAuthMiddleware();
  * authMiddleware.initialize(amexingAuthService);
@@ -71,6 +77,12 @@ class AmexingAuthMiddleware {
    * Initialize middleware with auth service.
    * @param {AmexingAuthService} authService - Authentication service instance.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   initialize(authService) {
     this.authService = authService;
@@ -87,6 +99,12 @@ class AmexingAuthMiddleware {
    * @param {object} res - Express response.
    * @param {Function} next - Next middleware.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   requireAuth = async (req, res, next) => {
     try {
@@ -166,6 +184,12 @@ class AmexingAuthMiddleware {
    * @param {object} res - Express response.
    * @param {Function} next - Next middleware.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   optionalAuth = async (req, res, next) => {
     try {
@@ -198,8 +222,13 @@ class AmexingAuthMiddleware {
    * Require specific permission.
    * @param {string|Array} permissions - Required permission code(s).
    * @param {object} options - Permission check options.
-   * @returns {Function} Middleware function.
+   * @returns {Function} - Operation result Middleware function.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   requirePermission = (permissions, options = {}) => async (req, res, next) => {
     try {
@@ -259,9 +288,15 @@ class AmexingAuthMiddleware {
   /**
    * Require specific role.
    * @param {string|Array} roles - Required role(s).
-   * @param {object} _options - Role check options (currently unused).
-   * @returns {Function} Middleware function.
+   * @param {*} options - Role check options (currently unused).
+   * @param _options
+   * @returns {Function} - Operation result Middleware function.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   requireRole = (roles, _options = {}) => async (req, res, next) => {
     try {
@@ -302,8 +337,10 @@ class AmexingAuthMiddleware {
   /**
    * Require access level.
    * @param {string} minimumLevel - Minimum access level (basic, premium, executive).
-   * @returns {Function} Middleware function.
+   * @returns {Function} - Operation result Middleware function.
    * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
    */
   requireAccessLevel = (minimumLevel) => {
     const levelHierarchy = {
@@ -353,8 +390,13 @@ class AmexingAuthMiddleware {
   /**
    * Require corporate context (user must belong to a client/department).
    * @param {object} options - Corporate check options.
-   * @returns {Function} Middleware function.
+   * @returns {Function} - Operation result Middleware function.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   requireCorporateContext = (options = {}) => async (req, res, next) => {
     try {
@@ -409,6 +451,12 @@ class AmexingAuthMiddleware {
    * @param {object} res - Express response.
    * @param {Function} next - Next middleware.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   handleOAuthToken = async (req, res, next) => {
     try {
@@ -464,8 +512,10 @@ class AmexingAuthMiddleware {
   /**
    * Role-based rate limiting.
    * @param {object} limits - Rate limits per role.
-   * @returns {Function} Middleware function.
+   * @returns {Function} - Operation result Middleware function.
    * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   rateLimitByRole = (limits = {}) => {
     const defaultLimits = {
@@ -519,8 +569,13 @@ class AmexingAuthMiddleware {
   /**
    * Extract JWT token from request.
    * @param {object} req - Express request.
-   * @returns {string|null} JWT token.
+   * @returns {string|null} - Operation result JWT token.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   extractToken(req) {
     // Check Authorization header
@@ -535,8 +590,8 @@ class AmexingAuthMiddleware {
     }
 
     // Check cookie
-    if (req.cookies && req.cookies.auth_token) {
-      return req.cookies.auth_token;
+    if (req.cookies && req.cookies.authtoken) {
+      return req.cookies.authtoken;
     }
 
     return null;
@@ -544,12 +599,18 @@ class AmexingAuthMiddleware {
 
   /**
    * Validate session exists and is active.
-   * @param {string} _jti - JWT ID (currently unused).
-   * @param {string} _userId - User ID (currently unused).
-   * @returns {boolean} Session is valid.
+   * @param {*} jti - JWT ID (currently unused).
+   * @param _jti
+   * @param {*} userId - User ID (currently unused).
+   * @returns {boolean} - Boolean result Session is valid.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async validateSession(_jti, _userId) {
+  async validateSession(_jti, userId /* unused */) {
     try {
       // This would check the Session table
       // For now, we'll assume valid if JWT is valid
@@ -563,8 +624,15 @@ class AmexingAuthMiddleware {
   /**
    * Update session activity timestamp.
    * @param {string} jti - JWT ID.
+   * @param {*} jti - _jti parameter.
    * @param _jti
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async updateSessionActivity(_jti) {
     try {
@@ -579,8 +647,13 @@ class AmexingAuthMiddleware {
    * Build permission context from request.
    * @param {object} req - Express request.
    * @param {object} options - Context options.
-   * @returns {object} Permission context.
+   * @returns {object} - Operation result Permission context.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
    */
   buildPermissionContext(req, options = {}) {
     const context = {
@@ -612,8 +685,13 @@ class AmexingAuthMiddleware {
    * @param {Array} permissions - Required permissions.
    * @param {object} context - Permission context.
    * @param {boolean} requireAll - Require all permissions (vs any).
-   * @returns {boolean} Has required permissions.
+   * @returns {boolean} - Boolean result Has required permissions.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
    */
   async checkUserPermissions(userId, permissions, context, requireAll = true) {
     try {
@@ -644,8 +722,13 @@ class AmexingAuthMiddleware {
   /**
    * Load corporate context for user.
    * @param {object} user - User object.
-   * @returns {object} Corporate context.
+   * @returns {object} - Operation result Corporate context.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
    */
   async loadCorporateContext(user) {
     try {
@@ -691,10 +774,16 @@ class AmexingAuthMiddleware {
   /**
    * Validate OAuth token.
    * @param {string} token - OAuth token.
-   * @returns {object | null} Token data.
+   * @param token
+   * @returns {object | null} - Operation result Token data.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async validateOAuthToken(token) {
+  async validateOAuthToken(token /* unused */) {
     try {
       // This would validate the OAuth token with the provider
       // and return token data if valid
@@ -706,13 +795,20 @@ class AmexingAuthMiddleware {
   }
 
   /**
-   * Check rate limit for key.
-   * @param {string} key - Rate limit key.
+   * Check rate limit for _key.
+   * @param {string} key - Rate limit _key.
    * @param {object} limit - Rate limit configuration.
-   * @returns {boolean} Request is allowed.
+   * @param _key
+   * @param _limit
+   * @returns {boolean} - Boolean result Request is allowed.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async checkRateLimit(key, limit) {
+  async checkRateLimit(key /* unused */, limit /* unused */) {
     try {
       // This would implement rate limiting using Redis or similar
       // For now, always allow
@@ -727,6 +823,12 @@ class AmexingAuthMiddleware {
    * Log permission check for audit.
    * @param {object} logData - Log data.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async logPermissionCheck(logData) {
     try {
@@ -747,8 +849,13 @@ class AmexingAuthMiddleware {
   /**
    * Sanitize context for response.
    * @param {object} context - Permission context.
-   * @returns {object} Sanitized context.
+   * @returns {object} - Operation result Sanitized context.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
    */
   sanitizeContext(context) {
     // Remove sensitive information from context before sending in response

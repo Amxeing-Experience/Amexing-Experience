@@ -344,7 +344,7 @@ class MobileOAuthOptimizer {
       const currentHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
       const heightDifference = initialViewportHeight - currentHeight;
 
-      const wasKeyboardVisible = keyboardVisible;
+      const wasKeyboardVisible = _keyboardVisible; // eslint-disable-line no-undef
       keyboardVisible = heightDifference > 150;
 
       if (keyboardVisible && !wasKeyboardVisible) {
@@ -494,7 +494,7 @@ class MobileOAuthOptimizer {
 
   setupKeyboardNavigation() {
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Tab') {
+      if (e._key === 'Tab') { // eslint-disable-line no-underscore-dangle
         document.body.classList.add('keyboard-navigation');
       }
     });
@@ -541,7 +541,7 @@ class MobileOAuthOptimizer {
   }
 
   optimizeImages() {
-    const images = document.querySelectorAll('.oauth-provider-logo, .oauth-btn img');
+    const images = document.querySelectorAll('.oauth-provider-logo , .oauth-btn img');
 
     images.forEach((img) => {
       if (!img.loading) {

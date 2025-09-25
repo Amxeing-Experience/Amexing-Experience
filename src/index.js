@@ -25,6 +25,11 @@
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Usage example
+ * const result = await require({ 'dotenv': 'example' });
+ * // Returns: operation result
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Start the application
  * npm start
  *
@@ -36,6 +41,8 @@
  *
  * // Environment variables
  * PORT=3000 NODE_ENV=production npm start
+ * @param {*} 'dotenv' - 'dotenv' parameter.
+ * @returns {*} - Operation result.
  */
 
 require('dotenv').config({
@@ -250,11 +257,16 @@ app.use('/', webRoutes);
  * Performs a direct MongoDB connection test with timeout controls to assess
  * database availability, response time, and connection health for monitoring.
  * @function getDatabaseMetrics
- * @returns {Promise<object>} Database metrics object with connection status, response time, and error details.
+ * @returns {Promise<object>} - Database metrics object with connection status, response time, and error details.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Usage example
+ * const result = await async({ 'dotenv': 'example' });
+ * // Returns: operation result
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Get database health metrics
  * const metrics = await getDatabaseMetrics();
  * console.log('DB Connected:', metrics.connected);
@@ -369,11 +381,13 @@ app.get('/health', async (req, res) => {
  * Collects Node.js process information, memory usage, CPU statistics, and platform
  * details for system monitoring, alerting, and performance optimization.
  * @function getSystemMetrics
- * @returns {object} System metrics object containing uptime, memory, CPU, and platform information.
+ * @returns {object} - Operation result System metrics object containing uptime, memory, CPU, and platform information.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Get current system metrics
  * const metrics = getSystemMetrics();
  * console.log('Uptime:', metrics.uptime, 'seconds');
@@ -474,11 +488,16 @@ const server = app.listen(PORT, () => {
  * and resource disposal to prevent data loss and ensure clean termination.
  * @function gracefulShutdown
  * @param {string} signal - The signal that triggered the shutdown (e.g., 'SIGTERM', 'SIGINT', 'SIGUSR2').
- * @returns {Promise<void>} Resolves when shutdown is complete.
+ * @returns {Promise<void>} - Resolves when shutdown is complete.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Usage example
+ * const result = await async({ signal: 'example' });
+ * // Returns: operation result
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Triggered automatically by process signals
  * process.on('SIGTERM', gracefulShutdown);
  * process.on('SIGINT', gracefulShutdown);

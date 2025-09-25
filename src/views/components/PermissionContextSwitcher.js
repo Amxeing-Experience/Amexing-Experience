@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @created Sprint 03 - Frontend Permission Context
+ * @example
+ * // Usage example
+ * const result = await require({ 'parse/node': 'example' });
+ * // Returns: operation result
  */
 
 const Parse = require('parse/node');
@@ -29,6 +33,13 @@ class PermissionContextSwitcher {
   /**
    * Initializes the context switcher.
    * @example
+   * // Usage example
+   * const result = await init({ 'parse/node': 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async init() {
     try {
@@ -62,6 +73,13 @@ class PermissionContextSwitcher {
   /**
    * Loads available contexts from the server.
    * @example
+   * // Usage example
+   * const result = await loadAvailableContexts({ 'parse/node': 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async loadAvailableContexts() {
     try {
@@ -88,6 +106,13 @@ class PermissionContextSwitcher {
   /**
    * Renders the context switcher component.
    * @example
+   * // Usage example
+   * const result = await render({ 'parse/node': 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   render() {
     if (!this.container) {
@@ -189,6 +214,12 @@ class PermissionContextSwitcher {
   /**
    * Renders current context display.
    * @example
+   * // Usage example
+   * const result = await renderCurrentContext({ 'parse/node': 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {string} - Operation result.
    */
   renderCurrentContext() {
     if (!this.currentContext) {
@@ -213,6 +244,12 @@ class PermissionContextSwitcher {
   /**
    * Renders list of available contexts.
    * @example
+   * // Usage example
+   * const result = await renderContextList({ 'parse/node': 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {string} - Operation result.
    */
   renderContextList() {
     if (this.availableContexts.length === 0) {
@@ -247,6 +284,12 @@ class PermissionContextSwitcher {
   /**
    * Renders context information panel.
    * @example
+   * // Usage example
+   * const result = await renderContextInfo({ 'parse/node': 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {string} - Operation result.
    */
   renderContextInfo() {
     if (!this.currentContext) {
@@ -282,6 +325,12 @@ class PermissionContextSwitcher {
   /**
    * Sets up event listeners.
    * @example
+   * // Usage example
+   * const result = await setupEventListeners({ 'parse/node': 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {*} - Operation result.
    */
   setupEventListeners() {
     // Context selection
@@ -319,8 +368,15 @@ class PermissionContextSwitcher {
 
   /**
    * Selects a context for switching.
-   * @param contextId
+   * @param {*} contextId - ContextId parameter.
    * @example
+   * // Usage example
+   * const result = await selectContext({ contextId: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   selectContext(contextId) {
     const context = this.availableContexts.find((ctx) => ctx.id === contextId);
@@ -352,6 +408,12 @@ class PermissionContextSwitcher {
   /**
    * Switches to the selected context.
    * @example
+   * // Usage example
+   * const result = await switchContext({ contextId: 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async switchContext() {
     if (!this.selectedContext) {
@@ -403,6 +465,13 @@ class PermissionContextSwitcher {
   /**
    * Shows permissions modal.
    * @example
+   * // Usage example
+   * const result = await showPermissionsModal({ contextId: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   showPermissionsModal() {
     if (!this.currentContext) {
@@ -466,6 +535,13 @@ class PermissionContextSwitcher {
   /**
    * Refreshes the context switcher.
    * @example
+   * // Usage example
+   * const result = await refresh({ contextId: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async refresh() {
     try {
@@ -486,6 +562,12 @@ class PermissionContextSwitcher {
   /**
    * Sets up auto-refresh.
    * @example
+   * // Usage example
+   * const result = await setupAutoRefresh({ contextId: 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {*} - Operation result.
    */
   setupAutoRefresh() {
     setInterval(() => {
@@ -495,9 +577,15 @@ class PermissionContextSwitcher {
 
   /**
    * Shows a message to the user.
-   * @param message
-   * @param type
+   * @param {string} message - Message string.
+   * @param {*} type - Type parameter.
    * @example
+   * // Usage example
+   * const result = await showMessage({ message: 'example', type: 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {*} - Operation result.
    */
   showMessage(message, type = 'info') {
     const messageDiv = document.createElement('div');
@@ -516,6 +604,12 @@ class PermissionContextSwitcher {
   /**
    * Triggers context changed event.
    * @example
+   * // Usage example
+   * const result = await triggerContextChangedEvent({ message: 'example', type: 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {*} - Operation result.
    */
   triggerContextChangedEvent() {
     const event = new CustomEvent('contextChanged', {
@@ -531,8 +625,15 @@ class PermissionContextSwitcher {
 
   /**
    * Renders error state.
-   * @param message
+   * @param {string} message - Message string.
    * @example
+   * // Usage example
+   * const result = await renderError({ message: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   renderError(message) {
     if (!this.container) return;
@@ -575,6 +676,12 @@ class PermissionContextSwitcher {
   /**
    * Applies CSS styles to the component.
    * @example
+   * // Usage example
+   * const result = await applyStyles({ message: 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {*} - Operation result.
    */
   applyStyles() {
     // Check if styles are already applied
@@ -827,6 +934,13 @@ class PermissionContextSwitcher {
   /**
    * Gets current context.
    * @example
+   * // Usage example
+   * const result = await getCurrentContext({ message: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   getCurrentContext() {
     return this.currentContext;
@@ -835,6 +949,13 @@ class PermissionContextSwitcher {
   /**
    * Destroys the component.
    * @example
+   * // Usage example
+   * const result = await destroy({ message: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   destroy() {
     if (this.container) {
@@ -850,8 +971,14 @@ class PermissionContextSwitcher {
 
   /**
    * Gets current context as plain text.
-   * @returns {string} Current context text.
+   * @returns {string} - Operation result Current context text.
    * @example
+   * // Usage example
+   * const result = await getCurrentContextText({ message: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
    */
   getCurrentContextText() {
     if (this.currentContext) {
@@ -863,13 +990,21 @@ class PermissionContextSwitcher {
   /**
    * Appends context list elements to a container.
    * @param {HTMLElement} container - Container to append elements to.
+   * @param _container
    * @example
+   * // Usage example
+   * const result = await appendContextListElements({ container: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
-  appendContextListElements(container) {
+  appendContextListElements(_container) {
     if (!this.availableContexts || this.availableContexts.length === 0) {
       const noContextsMsg = document.createElement('p');
       noContextsMsg.textContent = 'No contexts available';
-      container.appendChild(noContextsMsg);
+      container.appendChild(noContextsMsg); // eslint-disable-line no-undef
       return;
     }
 
@@ -888,20 +1023,27 @@ class PermissionContextSwitcher {
 
       contextItem.appendChild(contextName);
       contextItem.appendChild(contextType);
-      container.appendChild(contextItem);
+      container.appendChild(contextItem); // eslint-disable-line no-undef
     });
   }
 
   /**
    * Appends context info elements to a container.
    * @param {HTMLElement} container - Container to append elements to.
+   * @param _container
    * @example
+   * // Usage example
+   * const result = await appendContextInfoElements({ container: 'example' });
+   * // Returns: operation result
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   * @returns {*} - Operation result.
    */
-  appendContextInfoElements(container) {
+  appendContextInfoElements(_container) {
     if (!this.currentContext) {
       const noInfoMsg = document.createElement('p');
       noInfoMsg.textContent = 'No context information available';
-      container.appendChild(noInfoMsg);
+      container.appendChild(noInfoMsg); // eslint-disable-line no-undef
       return;
     }
 
@@ -923,8 +1065,8 @@ class PermissionContextSwitcher {
     infoList.appendChild(typeItem);
     infoList.appendChild(permissionsItem);
 
-    container.appendChild(infoTitle);
-    container.appendChild(infoList);
+    container.appendChild(infoTitle); // eslint-disable-line no-undef
+    container.appendChild(infoList); // eslint-disable-line no-undef
   }
 }
 

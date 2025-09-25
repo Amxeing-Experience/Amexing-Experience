@@ -13,6 +13,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
+ * @example
+ * // Usage example
+ * const result = await require({ '../../services/UserManagementService': 'example' });
+ * // Returns: operation result
  */
 
 const UserManagementService = require('../../services/UserManagementService');
@@ -44,8 +48,16 @@ class UserManagementController {
    * - sortDirection: Sort direction (asc/desc, default: asc).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Promise that resolves when users are retrieved.
+   * @returns {Promise<void>} - Promise that resolves when users are retrieved.
    * @example
+   * // GET endpoint example
+   * const result = await UserManagementController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * // Get users with pagination
    * GET /api/users?page=1&limit=10&role=employee
    */
@@ -96,8 +108,15 @@ class UserManagementController {
    * GET /api/users/:id - Get specific user by ID.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Promise that resolves when user is retrieved.
+   * @returns {Promise<void>} - Promise that resolves when user is retrieved.
    * @example
+   * // GET endpoint example
+   * const result = await UserManagementController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+   * // GET /api/users?page=1&limit=10
+   * // Response: { "users": [...], "pagination": {...} }
    * // Get specific user by ID
    * GET /api/users/12345
    */
@@ -150,8 +169,18 @@ class UserManagementController {
    * - emailVerified: Email verification status (optional, default: false).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Promise that resolves when user is created.
+   * @returns {Promise<void>} - Promise that resolves when user is created.
    * @example
+   * // POST endpoint example
+   * const result = await UserManagementController.createUser(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * // Create new user
    * POST /api/users with body: { email: 'user@example.com', firstName: 'John', lastName: 'Doe', role: 'employee' }
    */
@@ -225,8 +254,18 @@ class UserManagementController {
    * - clientId, departmentId: Organizational assignments (optional).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Promise that resolves when user is updated.
+   * @returns {Promise<void>} - Promise that resolves when user is updated.
    * @example
+   * // POST endpoint example
+   * const result = await UserManagementController.updateUser(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // PUT /api/endpoint/123
+   * // Body: { "field": "updated value" }
+   * // Response: { "success": true, "data": {...} }
+   * // PUT /api/users/123
+   * // Body: { "firstName": "John", "lastName": "Doe" }
+   * // Response: { "success": true, "user": {...} }
    * // Update user
    * PUT /api/users/12345 with body: { firstName: 'Jane', role: 'manager' }
    */
@@ -251,7 +290,11 @@ class UserManagementController {
       const updates = this.sanitizeUserData(req.body);
 
       // Update user through service
-      const updatedUser = await this.userService.updateUser(userId, updates, currentUser);
+      const updatedUser = await this.userService.updateUser(
+        userId,
+        updates,
+        currentUser
+      );
 
       logger.info('User updated via API', {
         updatedUserId: userId,
@@ -288,8 +331,16 @@ class UserManagementController {
    * - reason: Reason for deactivation (optional).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} Promise that resolves when user is deactivated.
+   * @returns {Promise<void>} - Promise that resolves when user is deactivated.
    * @example
+   * // POST endpoint example
+   * const result = await UserManagementController.deactivateUser(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // DELETE /api/endpoint/123
+   * // Response: { "success": true, "message": "Deleted" }
+   * // DELETE /api/users/123
+   * // Response: { "success": true, "message": "User deleted" }
    * // Deactivate user
    * DELETE /api/users/12345 with body: { reason: 'Employee resigned' }
    */
@@ -308,7 +359,11 @@ class UserManagementController {
       const reason = req.body.reason || 'Deactivated via API';
 
       // Deactivate user through service
-      const success = await this.userService.deactivateUser(userId, currentUser, reason);
+      const success = await this.userService.deactivateUser(
+        userId,
+        currentUser,
+        reason
+      );
 
       if (success) {
         logger.info('User deactivated via API', {
@@ -352,6 +407,20 @@ class UserManagementController {
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @example
+   * // POST endpoint example
+   * const result = await UserManagementController.reactivateUser(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // PUT /api/endpoint/123
+   * // Body: { "field": "updated value" }
+   * // Response: { "success": true, "data": {...} }
+   * // PUT /api/users/123
+   * // Body: { "firstName": "John", "lastName": "Doe" }
+   * // Response: { "success": true, "user": {...} }
+   * // PUT /api/users/123/reactivate
+   * // Body: { "reason": "Account review completed" }
+   * // Response: { "success": true, "user": {...}, "message": "User reactivated successfully" }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async reactivateUser(req, res) {
     try {
@@ -368,7 +437,11 @@ class UserManagementController {
       const reason = req.body.reason || 'Reactivated via API';
 
       // Reactivate user through service
-      const success = await this.userService.reactivateUser(userId, currentUser, reason);
+      const success = await this.userService.reactivateUser(
+        userId,
+        currentUser,
+        reason
+      );
 
       if (success) {
         logger.info('User reactivated via API', {
@@ -408,6 +481,17 @@ class UserManagementController {
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @example
+   * // POST endpoint example
+   * const result = await UserManagementController.toggleUserStatus(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // PATCH /api/endpoint/123
+   * // Body: { "field": "new value" }
+   * // Response: { "success": true, "data": {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async toggleUserStatus(req, res) {
     try {
@@ -466,6 +550,17 @@ class UserManagementController {
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @example
+   * // POST endpoint example
+   * const result = await UserManagementController.archiveUser(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // PATCH /api/endpoint/123
+   * // Body: { "field": "new value" }
+   * // Response: { "success": true, "data": {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async archiveUser(req, res) {
     try {
@@ -524,6 +619,15 @@ class UserManagementController {
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @example
+   * // GET endpoint example
+   * const result = await UserManagementController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getUserStatistics(req, res) {
     try {
@@ -561,6 +665,15 @@ class UserManagementController {
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @example
+   * // GET endpoint example
+   * const result = await UserManagementController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async searchUsers(req, res) {
     try {
@@ -590,12 +703,24 @@ class UserManagementController {
 
   /**
    * Parse and validate query parameters for user listing.
-   * @param query
+   * @param {object} query - Query parameters object.
    * @example
+   * // Usage example
+   * const result = await parseUserQueryParams({ query: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {object} - Operation result.
    */
   parseUserQueryParams(query) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(this.maxPageSize, Math.max(1, parseInt(query.limit, 10) || this.defaultPageSize));
+    const limit = Math.min(
+      this.maxPageSize,
+      Math.max(1, parseInt(query.limit, 10) || this.defaultPageSize)
+    );
 
     return {
       targetRole: query.role || null,
@@ -618,8 +743,17 @@ class UserManagementController {
 
   /**
    * Parse search parameters.
-   * @param query
+   * @param {object} query - Query parameters object.
    * @example
+   * // Usage example
+   * const result = await parseSearchParams({ query: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {object} - Operation result.
    */
   parseSearchParams(query) {
     return {
@@ -627,7 +761,10 @@ class UserManagementController {
       role: query.role || null,
       active: query.active !== undefined ? query.active === 'true' : null,
       page: Math.max(1, parseInt(query.page, 10) || 1),
-      limit: Math.min(this.maxPageSize, Math.max(1, parseInt(query.limit, 10) || this.defaultPageSize)),
+      limit: Math.min(
+        this.maxPageSize,
+        Math.max(1, parseInt(query.limit, 10) || this.defaultPageSize)
+      ),
       sortField: query.sortField || 'lastName',
       sortDirection: query.sortDirection || 'asc',
     };
@@ -635,8 +772,18 @@ class UserManagementController {
 
   /**
    * Validate create user request data.
-   * @param data
+   * @param {object} data - Data object.
    * @example
+   * // POST endpoint example
+   * const result = await UserManagementController.validateCreateUserRequest(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   validateCreateUserRequest(data) {
     const errors = [];
@@ -676,8 +823,18 @@ class UserManagementController {
 
   /**
    * Validate update user request data.
-   * @param data
+   * @param {object} data - Data object.
    * @example
+   * // PUT endpoint example
+   * const result = await Controller.updateMethod(req, res);
+   * // Body: { id: '123', updates: {...} }
+   * // Returns: { success: true, data: {...} }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   validateUpdateUserRequest(data) {
     const errors = [];
@@ -703,8 +860,17 @@ class UserManagementController {
 
   /**
    * Sanitize user data to prevent injection attacks.
-   * @param data
+   * @param {object} data - Data object.
    * @example
+   * // Usage example
+   * const result = await sanitizeUserData({ data: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   sanitizeUserData(data) {
     const sanitized = {};
@@ -735,9 +901,18 @@ class UserManagementController {
 
   /**
    * Check if current user can view users with specified role.
-   * @param currentUser
-   * @param targetRole
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {string} targetRole - Target role for authorization check.
    * @example
+   * // Usage example
+   * const result = await canViewUsers({ currentUser: 'example', targetRole: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {boolean} - Boolean result Operation result.
    */
   canViewUsers(currentUser, targetRole) {
     const roleHierarchy = {
@@ -781,6 +956,15 @@ class UserManagementController {
   /**
    * Generate secure random password.
    * @example
+   * // Usage example
+   * const result = await generateSecurePassword({ currentUser: 'example', targetRole: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   generateSecurePassword() {
     const length = 12;
@@ -796,11 +980,20 @@ class UserManagementController {
 
   /**
    * Send successful response.
-   * @param res
-   * @param data
-   * @param message
-   * @param statusCode
+   * @param {object} res - Express response object.
+   * @param {object} data - Data object.
+   * @param {string} message - Message string.
+   * @param {*} statusCode - StatusCode parameter.
    * @example
+   * // Usage example
+   * const result = await sendSuccess({ data: 'example', message: 'example', statusCode: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   sendSuccess(res, data, message = 'Success', statusCode = 200) {
     res.status(statusCode).json({
@@ -813,11 +1006,20 @@ class UserManagementController {
 
   /**
    * Send error response.
-   * @param res
-   * @param message
-   * @param statusCode
-   * @param details
+   * @param {object} res - Express response object.
+   * @param {string} message - Message string.
+   * @param {*} statusCode - StatusCode parameter.
+   * @param {*} details - Details parameter.
    * @example
+   * // Usage example
+   * const result = await sendError({ message: 'example', statusCode: 'example', details: 'example' });
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   sendError(res, message, statusCode = 500, details = null) {
     const response = {

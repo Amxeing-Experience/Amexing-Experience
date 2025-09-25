@@ -26,6 +26,12 @@ class CorporateOAuthInterface {
   /**
    * Initialize Corporate OAuth Interface.
    * @example
+   * // Usage example
+   * const result = await init(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async init() {
     try {
@@ -58,6 +64,12 @@ class CorporateOAuthInterface {
   /**
    * Load corporate configuration from server or local config.
    * @example
+   * // Usage example
+   * const result = await loadCorporateConfiguration(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async loadCorporateConfiguration() {
     if (this.config.corporateConfig) {
@@ -89,6 +101,13 @@ class CorporateOAuthInterface {
   /**
    * Auto-detect corporate context from domain, subdomain, or URL parameters.
    * @example
+   * // Usage example
+   * const result = await detectCorporateContext(parameters);
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async detectCorporateContext() {
     const currentDomain = window.location.hostname;
@@ -120,14 +139,22 @@ class CorporateOAuthInterface {
 
   /**
    * Detect corporate configuration from custom domain.
-   * @param domain
+   * @param {*} domain - Domain parameter.
+   * @param _domain
    * @example
+   * // Usage example
+   * const result = await detectFromCustomDomain({ domain: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
-  async detectFromCustomDomain(domain) {
-    if (!domain || domain === 'localhost') return null;
+  async detectFromCustomDomain(_domain) {
+    if (!_domain || _domain === 'localhost') return null;
 
     try {
-      const response = await fetch(`/api/corporate/detect/domain/${encodeURIComponent(domain)}`, {
+      const response = await fetch(`/api/corporate/detect/domain/${encodeURIComponent(_domain)}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -147,8 +174,15 @@ class CorporateOAuthInterface {
 
   /**
    * Detect corporate configuration from subdomain.
-   * @param subdomain
+   * @param {*} subdomain - Subdomain parameter.
    * @example
+   * // Usage example
+   * const result = await detectFromSubdomain({ subdomain: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async detectFromSubdomain(subdomain) {
     if (!subdomain || subdomain === 'www' || subdomain === 'localhost') return null;
@@ -174,8 +208,15 @@ class CorporateOAuthInterface {
 
   /**
    * Detect corporate configuration from URL parameter.
-   * @param param
+   * @param {*} param - Param parameter.
    * @example
+   * // Usage example
+   * const result = await detectFromUrlParameter({ param: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async detectFromUrlParameter(param) {
     if (!param) return null;
@@ -202,6 +243,13 @@ class CorporateOAuthInterface {
   /**
    * Detect corporate configuration from local storage (for returning users).
    * @example
+   * // Usage example
+   * const result = await detectFromLocalStorage({ param: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   detectFromLocalStorage() {
     try {
@@ -224,6 +272,12 @@ class CorporateOAuthInterface {
   /**
    * Detect corporate configuration from referrer URL.
    * @example
+   * // Usage example
+   * const result = await detectFromReferrer({ param: 'example' });
+   * // Returns: operation result
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async detectFromReferrer() {
     const { referrer } = document;
@@ -242,6 +296,13 @@ class CorporateOAuthInterface {
   /**
    * Apply corporate branding to the interface.
    * @example
+   * // Usage example
+   * const result = await applyCorporateBranding({ param: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async applyCorporateBranding() {
     if (!this.corporateData || this.brandingApplied) return;
@@ -274,6 +335,13 @@ class CorporateOAuthInterface {
   /**
    * Apply corporate theme colors.
    * @example
+   * // Usage example
+   * const result = await applyThemeColors({ param: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   applyThemeColors() {
     const { theme } = this.corporateData;
@@ -314,6 +382,13 @@ class CorporateOAuthInterface {
   /**
    * Apply corporate logos and imagery.
    * @example
+   * // Usage example
+   * const result = await applyLogosAndImagery({ param: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async applyLogosAndImagery() {
     const { branding } = this.corporateData;
@@ -361,7 +436,7 @@ class CorporateOAuthInterface {
 
     // Apply corporate imagery to OAuth sections
     if (branding.oauthBackground) {
-      const oauthContainers = document.querySelectorAll('.oauth-provider-container, .corporate-branding');
+      const oauthContainers = document.querySelectorAll('.oauth-provider-container , .corporate-branding');
       oauthContainers.forEach((container) => {
         container.style.backgroundImage = `url(${branding.oauthBackground})`;
         container.style.backgroundSize = 'cover';
@@ -373,6 +448,12 @@ class CorporateOAuthInterface {
   /**
    * Apply custom fonts.
    * @example
+   * // Usage example
+   * const result = await applyCustomFonts({ param: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async applyCustomFonts() {
     const { fonts } = this.corporateData;
@@ -404,6 +485,13 @@ class CorporateOAuthInterface {
   /**
    * Apply custom CSS.
    * @example
+   * // Usage example
+   * const result = await applyCustomCSS({ param: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async applyCustomCSS() {
     const { customCSS } = this.corporateData;
@@ -423,6 +511,13 @@ class CorporateOAuthInterface {
   /**
    * Update page metadata with corporate information.
    * @example
+   * // Usage example
+   * const result = await updatePageMetadata({ param: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   updatePageMetadata() {
     const meta = this.corporateData.metadata;
@@ -473,10 +568,17 @@ class CorporateOAuthInterface {
 
   /**
    * Helper to update or create meta tags.
-   * @param attribute
-   * @param value
-   * @param content
+   * @param {*} attribute - Attribute parameter.
+   * @param {*} value - Value parameter.
+   * @param {*} content - Content parameter.
    * @example
+   * // Usage example
+   * const result = await updateMetaTag({ attribute: 'example', value: 'example', content: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   updateMetaTag(attribute, value, content) {
     let metaTag = document.querySelector(`meta[${attribute}="${value}"]`);
@@ -491,6 +593,13 @@ class CorporateOAuthInterface {
   /**
    * Store corporate configuration for future visits.
    * @example
+   * // Usage example
+   * const result = await storeCorporateConfig({ attribute: 'example', value: 'example', content: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   storeCorporateConfig() {
     try {
@@ -508,6 +617,12 @@ class CorporateOAuthInterface {
   /**
    * Initialize OAuth Provider with corporate settings.
    * @example
+   * // Usage example
+   * const result = await initializeOAuthProvider({ attribute: 'example', value: 'example', content: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async initializeOAuthProvider() {
     if (!window.OAuthProvider) return;
@@ -532,6 +647,12 @@ class CorporateOAuthInterface {
   /**
    * Setup corporate-specific event handlers.
    * @example
+   * // Usage example
+   * const result = await setupCorporateEventHandlers({ attribute: 'example', value: 'example', content: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   setupCorporateEventHandlers() {
     // Handle corporate domain email detection
@@ -552,23 +673,36 @@ class CorporateOAuthInterface {
 
   /**
    * Handle email domain detection for corporate users.
-   * @param event
+   * @param {*} event - Event parameter.
    * @example
+   * // Usage example
+   * const result = await handleEmailDomainDetection({ event: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   handleEmailDomainDetection(event) {
-    const { domain, email } = event.detail;
+    const { _domain, email } = event.detail;
 
-    if (this.corporateData?.emailDomains?.includes(domain)) {
+    if (this.corporateData?.emailDomains?.includes(_domain)) {
       // User is using corporate email domain
       this.highlightCorporateLogin(email);
-      this.suggestCorporateProviders(domain);
+      this.suggestCorporateProviders(_domain);
     }
   }
 
   /**
    * Highlight corporate login options.
+   * @param {string} email - User email address.
    * @param email
    * @example
+   * // Usage example
+   * const result = await highlightCorporateLogin({ email: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   highlightCorporateLogin(email) {
     const oauthContainer = document.getElementById('oauth-container');
@@ -606,8 +740,15 @@ class CorporateOAuthInterface {
 
   /**
    * Suggest corporate OAuth providers based on email domain.
-   * @param domain
+   * @param {*} domain - Domain parameter.
+   * @param _domain
    * @example
+   * // Usage example
+   * const result = await suggestCorporateProviders({ domain: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   suggestCorporateProviders(domain) {
     if (!this.corporateData?.domainMappings) return;
@@ -624,8 +765,14 @@ class CorporateOAuthInterface {
 
   /**
    * Handle department selection changes.
-   * @param event
+   * @param {*} event - Event parameter.
    * @example
+   * // Usage example
+   * const result = await handleDepartmentChange({ event: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   handleDepartmentChange(event) {
     const { department } = event.detail;
@@ -647,8 +794,14 @@ class CorporateOAuthInterface {
 
   /**
    * Apply department-specific theme.
-   * @param theme
+   * @param {*} theme - Theme parameter.
    * @example
+   * // Usage example
+   * const result = await applyDepartmentTheme({ theme: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   applyDepartmentTheme(theme) {
     const root = document.documentElement;
@@ -664,14 +817,20 @@ class CorporateOAuthInterface {
 
   /**
    * Handle corporate OAuth success.
-   * @param event
+   * @param {*} event - Event parameter.
    * @example
+   * // Usage example
+   * const result = await handleCorporateOAuthSuccess({ event: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   handleCorporateOAuthSuccess(event) {
-    const { provider, user, department } = event.detail;
+    const { _provider, user, department } = event.detail;
 
     // Track corporate OAuth usage
-    this.trackCorporateOAuthUsage(provider, department);
+    this.trackCorporateOAuthUsage(_provider, department);
 
     // Apply post-login corporate customizations
     this.applyPostLoginCustomizations(user);
@@ -679,11 +838,18 @@ class CorporateOAuthInterface {
 
   /**
    * Track corporate OAuth usage for analytics.
-   * @param provider
-   * @param department
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
+   * @param {object} department - Department object.
    * @example
+   * // Usage example
+   * const result = await trackCorporateOAuthUsage({ provider: 'example' , department: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
-  trackCorporateOAuthUsage(provider, department) {
+  trackCorporateOAuthUsage(_provider, department) {
     try {
       fetch('/api/analytics/corporate-oauth', {
         method: 'POST',
@@ -693,7 +859,7 @@ class CorporateOAuthInterface {
         },
         body: JSON.stringify({
           corporateId: this.corporateData.id,
-          provider,
+          _provider,
           department,
           timestamp: new Date().toISOString(),
           userAgent: navigator.userAgent,
@@ -707,8 +873,14 @@ class CorporateOAuthInterface {
 
   /**
    * Apply post-login corporate customizations.
-   * @param user
+   * @param {*} user - User parameter.
    * @example
+   * // Usage example
+   * const result = await applyPostLoginCustomizations({ user: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   applyPostLoginCustomizations(user) {
     if (!this.corporateData?.postLoginCustomizations) return;
@@ -728,9 +900,16 @@ class CorporateOAuthInterface {
 
   /**
    * Show corporate welcome message.
-   * @param message
-   * @param user
+   * @param {string} message - Message string.
+   * @param {*} user - User parameter.
    * @example
+   * // Usage example
+   * const result = await showWelcomeMessage({ message: 'example', user: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   showWelcomeMessage(message, user) {
     const welcomeDiv = document.createElement('div');
@@ -777,8 +956,15 @@ class CorporateOAuthInterface {
 
   /**
    * Handle branding updates (for dynamic rebranding).
-   * @param event
+   * @param {*} event - Event parameter.
    * @example
+   * // Usage example
+   * const result = await handleBrandingUpdate({ event: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   handleBrandingUpdate(event) {
     const { newBranding } = event.detail;
@@ -793,6 +979,13 @@ class CorporateOAuthInterface {
   /**
    * Handle page visibility changes.
    * @example
+   * // Usage example
+   * const result = await handleVisibilityChange({ event: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   handleVisibilityChange() {
     if (document.hidden) {
@@ -808,6 +1001,12 @@ class CorporateOAuthInterface {
   /**
    * Pause corporate features when page is hidden.
    * @example
+   * // Usage example
+   * const result = await pauseCorporateFeatures({ event: 'example' });
+   * // Returns: operation result
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
+   * @returns {*} - Operation result.
    */
   pauseCorporateFeatures() {
     // Pause any ongoing animations or periodic tasks
@@ -819,6 +1018,13 @@ class CorporateOAuthInterface {
   /**
    * Resume corporate features when page becomes visible.
    * @example
+   * // Usage example
+   * const result = await resumeCorporateFeatures({ event: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   resumeCorporateFeatures() {
     // Resume periodic updates
@@ -830,6 +1036,12 @@ class CorporateOAuthInterface {
   /**
    * Check for corporate configuration updates.
    * @example
+   * // Validation utility usage
+   * const isValid = validateFunction(input);
+   * // Returns: boolean
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async checkForUpdates() {
     if (!this.corporateData?.id) return;
@@ -859,6 +1071,12 @@ class CorporateOAuthInterface {
   /**
    * Fallback to regular OAuth if corporate configuration fails.
    * @example
+   * // Usage example
+   * const result = await fallbackToRegularOAuth({ event: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   fallbackToRegularOAuth() {
     console.log('Falling back to regular OAuth interface');
@@ -878,6 +1096,12 @@ class CorporateOAuthInterface {
   /**
    * Remove corporate branding.
    * @example
+   * // Usage example
+   * const result = await removeCorporateBranding({ event: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   removeCorporateBranding() {
     // Remove corporate CSS
@@ -902,6 +1126,13 @@ class CorporateOAuthInterface {
   /**
    * Utility methods.
    * @example
+   * // Usage example
+   * const result = await detectMobile({ event: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   detectMobile() {
     return window.innerWidth <= 768
@@ -911,6 +1142,13 @@ class CorporateOAuthInterface {
   /**
    * Get corporate configuration.
    * @example
+   * // Usage example
+   * const result = await getCorporateConfig({ event: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   getCorporateConfig() {
     return this.corporateData;
@@ -918,8 +1156,15 @@ class CorporateOAuthInterface {
 
   /**
    * Update corporate configuration.
-   * @param newConfig
+   * @param {*} newConfig - NewConfig parameter.
    * @example
+   * // Usage example
+   * const result = await updateCorporateConfig({ newConfig: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async updateCorporateConfig(newConfig) {
     this.corporateData = { ...this.corporateData, ...newConfig };
@@ -930,6 +1175,13 @@ class CorporateOAuthInterface {
   /**
    * Cleanup resources.
    * @example
+   * // Usage example
+   * const result = await cleanup({ newConfig: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * @returns {*} - Operation result.
    */
   cleanup() {
     if (this.updateTimer) {

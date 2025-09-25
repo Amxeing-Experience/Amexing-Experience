@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: cloud/functions/corporate-sync.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: cloud/functions/corporate-sync.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * Corporate Sync Cloud Functions
+ * Provides sync management functionality for corporate OAuth data.
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @created Sprint 02 - Corporate Sync System
+ */
+
+const Parse = require('parse/node');
+const CorporateSyncService = require('../../application/services/CorporateSyncService');
+const logger = require('../../infrastructure/logger');
+
+/**
+ * Manually triggers sync for a corporate client
+ * Endpoint: POST /functions/triggerCorporateSync
+ * Access: Requires admin role.
+ * @param request
+ * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+ */
+const triggerCorporateSync = async (request) => {
+  try {
+    // Check admin permissions
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Admin access required for corporate sync'
+      );
+    }
+
+    const { clientId } = request.params;
+
+    if (!clientId) {
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'clientId parameter required');
+    }
+
+    // Trigger sync
+    const syncResult = await CorporateSyncService.syncCorporateClient(clientId);
+
+    logger.logSecurityEvent('CORPORATE_SYNC_TRIGGERED', request.user.id, {
+      adminUser: request.user.get('username'),
+      clientId,
+      syncedCount: syncResult.syncedCount,
+      errorCount: syncResult.errorCount,
+    });
+
+    return {
+      success: true,
+      syncResult,
+      message: `Sync completed for client ${clientId}`,
+    };
+  } catch (error) {
+    logger.error('Error triggering corporate sync:', error);
+    throw error;
+  }
+};
+
+/**
+ * Starts periodic sync for a corporate client
+ * Endpoint: POST /functions/startPeriodicSync
+ * Access: Requires admin role.
+ * @param request
+ * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+ */
+const startPeriodicSync = async (request) => {
+  try {
+    // Check admin permissions
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Admin access required for sync management'
+      );
+    }
+
+    const { clientId, intervalMinutes = 60 } = request.params;
+
+    if (!clientId) {
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'clientId parameter required');
+    }
+
+    // Validate interval
+    if (intervalMinutes &lt; 15 || intervalMinutes > 1440) { // 15 minutes to 24 hours
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'intervalMinutes must be between 15 and 1440'
+      );
+    }
+
+    // Get client
+    const clientQuery = new Parse.Query('Client');
+    const client = await clientQuery.get(clientId, { useMasterKey: true });
+
+    if (!client.get('isCorporate') || !client.get('oauthEnabled')) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Client is not configured for corporate OAuth sync'
+      );
+    }
+
+    // Start periodic sync
+    CorporateSyncService.startPeriodicSync(client, intervalMinutes);
+
+    logger.logSecurityEvent('PERIODIC_SYNC_STARTED', request.user.id, {
+      adminUser: request.user.get('username'),
+      clientId,
+      clientName: client.get('name'),
+      intervalMinutes,
+    });
+
+    return {
+      success: true,
+      message: `Periodic sync started for client ${client.get('name')}`,
+      clientId,
+      intervalMinutes,
+    };
+  } catch (error) {
+    logger.error('Error starting periodic sync:', error);
+    throw error;
+  }
+};
+
+/**
+ * Stops periodic sync for a corporate client
+ * Endpoint: POST /functions/stopPeriodicSync
+ * Access: Requires admin role.
+ * @param request
+ * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+ */
+const stopPeriodicSync = async (request) => {
+  try {
+    // Check admin permissions
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Admin access required for sync management'
+      );
+    }
+
+    const { clientId } = request.params;
+
+    if (!clientId) {
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'clientId parameter required');
+    }
+
+    // Stop periodic sync
+    CorporateSyncService.stopPeriodicSync(clientId);
+
+    logger.logSecurityEvent('PERIODIC_SYNC_STOPPED', request.user.id, {
+      adminUser: request.user.get('username'),
+      clientId,
+    });
+
+    return {
+      success: true,
+      message: `Periodic sync stopped for client ${clientId}`,
+      clientId,
+    };
+  } catch (error) {
+    logger.error('Error stopping periodic sync:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets sync status for all corporate clients
+ * Endpoint: GET /functions/getAllSyncStatuses
+ * Access: Requires admin role.
+ * @param request
+ * @example
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+ */
+const getAllSyncStatuses = async (request) => {
+  try {
+    // Check admin permissions
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Admin access required for sync status'
+      );
+    }
+
+    // Get all sync statuses
+    const statuses = await CorporateSyncService.getAllSyncStatuses();
+
+    logger.logSecurityEvent('SYNC_STATUSES_RETRIEVED', request.user.id, {
+      adminUser: request.user.get('username'),
+      clientCount: statuses.length,
+    });
+
+    return {
+      success: true,
+      statuses,
+      count: statuses.length,
+    };
+  } catch (error) {
+    logger.error('Error getting sync statuses:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets detailed sync history for a corporate client
+ * Endpoint: GET /functions/getCorporateSyncHistory
+ * Access: Requires admin role.
+ * @param request
+ * @example
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+ */
+const getCorporateSyncHistory = async (request) => {
+  try {
+    // Check admin permissions
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Admin access required for sync history'
+      );
+    }
+
+    const { clientId, limit = 50, skip = 0 } = request.params;
+
+    if (!clientId) {
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'clientId parameter required');
+    }
+
+    // Query sync-related audit logs
+    const auditQuery = new Parse.Query('AuditLog');
+    auditQuery.containedIn('action', [
+      'CORPORATE_SYNC_STARTED',
+      'CORPORATE_SYNC_COMPLETED',
+      'CORPORATE_SYNC_FAILED',
+      'PERIODIC_SYNC_STARTED',
+      'PERIODIC_SYNC_STOPPED',
+    ]);
+
+    // Filter by clientId in the additional data - use escaped string matching
+    // Escape clientId to prevent RegExp injection attacks
+    const escapedClientId = clientId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&amp;');
+    const safePattern = `"clientId":"${escapedClientId}"`;
+
+    // Use string contains instead of RegExp to avoid ReDoS
+    auditQuery.contains('additionalData', safePattern);
+    auditQuery.descending('createdAt');
+    auditQuery.limit(Math.min(limit, 100));
+    auditQuery.skip(skip);
+
+    const syncHistory = await auditQuery.find({ useMasterKey: true });
+
+    const history = syncHistory.map((log) => ({
+      id: log.id,
+      action: log.get('action'),
+      timestamp: log.get('createdAt'),
+      userId: log.get('userId'),
+      additionalData: log.get('additionalData'),
+      success: !log.get('action').includes('FAILED'),
+    }));
+
+    logger.logSecurityEvent('SYNC_HISTORY_RETRIEVED', request.user.id, {
+      adminUser: request.user.get('username'),
+      clientId,
+      historyCount: history.length,
+    });
+
+    return {
+      success: true,
+      clientId,
+      history,
+      count: history.length,
+    };
+  } catch (error) {
+    logger.error('Error getting sync history:', error);
+    throw error;
+  }
+};
+
+/**
+ * Background job to auto-start syncs for corporate clients
+ * This is triggered by Parse Server's job scheduling.
+ */
+// // TODO: Fix Parse.Cloud.job - temporarily commented to allow server start
+// // Parse.Cloud.job('autoStartCorporateSyncs', async (request) => {
+// //   try {
+// //     const { message } = request;
+// //
+// //     // Get all corporate clients that should have sync enabled
+// //     const clientQuery = new Parse.Query('Client');
+// //     clientQuery.equalTo('isCorporate', true);
+// //     clientQuery.equalTo('oauthEnabled', true);
+// //     clientQuery.equalTo('active', true);
+// //     clientQuery.exists('corporateDomain');
+// //
+// //     const corporateClients = await clientQuery.find({ useMasterKey: true });
+// //
+// //     let startedCount = 0;
+// //
+// //     for (const client of corporateClients) {
+// //       try {
+// //         // Check if sync is already running
+// //         const statuses = await CorporateSyncService.getAllSyncStatuses();
+// //         const clientStatus = statuses.find((s) => s.clientId === client.id);
+// //
+// //         if (!clientStatus || !clientStatus.syncActive) {
+// //           // Start sync with default 1-hour interval
+// //           CorporateSyncService.startPeriodicSync(client, 60);
+// //           startedCount++;
+// //
+// //           message(`Started sync for ${client.get('name')}`);
+// //         }
+// //       } catch (error) {
+// //         message(`Failed to start sync for ${client.get('name')}: ${error.message}`);
+// //       }
+// //     }
+// //
+// //     logger.logSecurityEvent('AUTO_SYNC_JOB_COMPLETED', null, {
+// //       totalClients: corporateClients.length,
+// //       startedCount,
+// //     });
+// //
+// //     message(`Auto-start job completed: ${startedCount}/${corporateClients.length} syncs started`);
+// //   } catch (error) {
+// //     logger.error('Auto-start corporate syncs job failed:', error);
+// //     throw error;
+// //   }
+// // });
+
+module.exports = {
+  triggerCorporateSync,
+  startPeriodicSync,
+  stopPeriodicSync,
+  getAllSyncStatuses,
+  getCorporateSyncHistory,
+};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

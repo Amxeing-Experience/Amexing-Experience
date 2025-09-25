@@ -51,8 +51,15 @@ router.use(jwtMiddleware.authenticateToken);
 
 // User Management API routes
 const userManagementRoutes = require('./api/userManagementRoutes');
+// Notifications API controller
+const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
 router.use('/users', userManagementRoutes);
+
+// Notifications endpoints
+router.get('/notifications', NotificationsController.getNotifications);
+router.patch('/notifications/:notificationId/read', NotificationsController.markAsRead);
+router.patch('/notifications/mark-all-read', NotificationsController.markAllAsRead);
 
 // User endpoints
 router.get('/user/profile', apiController.getUserProfile);

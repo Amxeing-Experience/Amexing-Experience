@@ -2,6 +2,10 @@
  * Apple OAuth Service - Sprint 04 (Refactored)
  * Backend integration for Apple Sign In with privacy compliance
  * Integrates with department OAuth flows and corporate configurations.
+ * @example
+ * // OAuth service usage
+ * const result = await oappleoauthservice.require(_provider, authCode);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
 const Parse = require('parse/node');
@@ -26,13 +30,15 @@ const logger = require('../../infrastructure/logger');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize Apple OAuth service
  * const appleService = new AppleOAuthService();
  *
  * // Handle Apple OAuth callback
  * const callbackData = {
  *   code: 'authorization_code',
- *   id_token: 'sample-jwt-token',
+ *   idtoken: 'sample-jwt-token',
  *   department: 'engineering',
  *   corporateConfigId: 'config123'
  * };
@@ -48,7 +54,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Handles Apple OAuth callback with enhanced security.
    * @param {object} callbackData - Callback data from Apple.
-   * @returns {Promise<object>} Authentication result.
+   * @returns {Promise<object>} - Authentication result.
    * @example Handle Apple OAuth callback
    * const service = new AppleOAuthService();
    * const result = await service.handleCallback(callbackData);
@@ -56,13 +62,13 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   async handleCallback(callbackData) {
     const {
       code,
-      id_token: idToken,
-      user: userJsonString,
+      idtoken: idToken,
       error,
-      error_description: errorDescription,
+      errorDescription,
+      expectedNonce,
+      userJsonString,
       department,
       corporateConfigId,
-      nonce: expectedNonce,
     } = callbackData;
 
     try {
@@ -106,6 +112,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * @param {string} data.errorDescription - Error description if present.
    * @example Validate callback data
    * service.validateCallbackData({ code: 'abc', idToken: 'token' });
+   * @returns {*} - Operation result.
    */
   validateCallbackData({
     code, idToken, error, errorDescription,
@@ -113,6 +120,12 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     /**
      * Validates for OAuth error responses from Apple's authorization server.
      * Handles error codes and descriptions returned by Apple during failed authentication.
+     * @param {Error} error - Error object.
+     * @returns {*} - Operation result.
+     * @example
+     * // OAuth service usage
+     * const result = await oappleoauthservice.if(_provider, authCode);
+     * // Returns: { success: true, user: {...}, tokens: {...} }
      */
     if (error) {
       throw new Parse.Error(
@@ -124,6 +137,12 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     /**
      * Ensures required authorization data is present for token exchange.
      * Both authorization code and ID token are required for Apple OAuth flow completion.
+     * @param {*} !code || !idToken - !code || !idToken parameter.
+     * @returns {*} - Operation result.
+     * @example
+     * // OAuth service usage
+     * const result = await oappleoauthservice.if(_provider, authCode);
+     * // Returns: { success: true, user: {...}, tokens: {...} }
      */
     if (!code || !idToken) {
       throw new Parse.Error(
@@ -136,7 +155,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Parses user data from Apple callback.
    * @param {string} userJsonString - JSON string with user data.
-   * @returns {object|null} Parsed user data or null.
+   * @returns {object|null} - Operation result Parsed user data or null.
    * @example Parse user JSON data
    * const userData = service.parseUserData('{"email":"user@example.com"}');
    */
@@ -155,7 +174,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * Processes authentication after successful Apple OAuth.
    * @param {object} userProfile - User profile from Apple.
    * @param {object} context - Authentication context.
-   * @returns {Promise<object>} Authentication result.
+   * @returns {Promise<object>} - Authentication result.
    * @example Process authentication
    * const result = await service.processAuthentication(userProfile, { department: 'IT' });
    */
@@ -192,16 +211,16 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Finds or creates user from Apple profile.
    * @param {object} userProfile - Apple user profile.
-   * @returns {Promise<Parse.User>} Parse User object.
+   * @returns {Promise<Parse.User>} - Parse User object.
    * @example Find or create user
    * const user = await service.findOrCreateUser({ email: 'user@example.com', id: 'apple123' });
    */
   async findOrCreateUser(userProfile) {
-    const { email, id: appleId } = userProfile;
+    const { email, id } = userProfile;
 
     // First, try to find by Apple ID
     let userQuery = new Parse.Query(Parse.User);
-    userQuery.equalTo('appleId', appleId);
+    userQuery.equalTo('appleId', id);
     let user = await userQuery.first({ useMasterKey: true });
 
     if (!user && email) {
@@ -210,7 +229,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
       user = await userQuery.first({ useMasterKey: true });
 
       if (user) {
-        user.set('appleId', appleId);
+        user.set('appleId', id);
         await user.save(null, { useMasterKey: true });
       }
     }
@@ -227,17 +246,17 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Creates new user from Apple profile.
    * @param {object} userProfile - Apple user profile.
-   * @returns {Promise<Parse.User>} New Parse User.
+   * @returns {Promise<Parse.User>} - New Parse User.
    * @example Create new user
    * const user = await service.createNewUser({ email: 'user@example.com', id: 'apple123' });
    */
   async createNewUser(userProfile) {
-    const { email, id: appleId } = userProfile;
+    const { email, id } = userProfile;
     const user = new Parse.User();
 
-    user.set('username', email || `apple_${appleId}`);
+    user.set('username', email || `apple_${id}`);
     user.set('email', email);
-    user.set('appleId', appleId);
+    user.set('appleId', id);
 
     if (userProfile.firstName) user.set('firstName', userProfile.firstName);
     if (userProfile.lastName) user.set('lastName', userProfile.lastName);
@@ -259,7 +278,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Updates existing user login info.
    * @param {Parse.User} user - Existing user.
-   * @returns {Promise<Parse.User>} Updated user.
+   * @returns {Promise<Parse.User>} - Updated user.
    * @example Update existing user
    * const updatedUser = await service.updateExistingUser(user);
    */
@@ -281,7 +300,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Gets corporate configuration.
    * @param {string} corporateConfigId - Corporate config ID.
-   * @returns {Promise<Parse.Object>} Corporate config.
+   * @returns {Promise<Parse.Object>} - Corporate config.
    * @example Get corporate config
    * const config = await service.getCorporateConfig('config123');
    */
@@ -298,6 +317,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * @param {object} userProfile - User profile.
    * @example Apply department permissions
    * await service.applyDepartmentPermissions(user, 'IT', userProfile);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async applyDepartmentPermissions(user, department, userProfile) {
     const { DepartmentOAuthFlowService } = require('./DepartmentOAuthFlowService');
@@ -314,9 +334,9 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Creates user session.
    * @param {Parse.User} user - User object.
-   * @returns {Promise<string>} Session token.
+   * @returns {Promise<string>} - Session token.
    * @example Create user session
-   * const token = await service.createUserSession(user);
+   * let token = await service.createUserSession(user);
    */
   async createUserSession(user) {
     const crypto = require('crypto');
@@ -340,7 +360,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Revokes Apple OAuth tokens.
    * @param {Parse.User} user - User to revoke tokens for.
-   * @returns {Promise<object>} Revocation result.
+   * @returns {Promise<object>} - Revocation result.
    * @example Revoke Apple tokens
    * const result = await service.revokeTokens(user);
    */
@@ -365,8 +385,9 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Validates Apple webhook.
    * @param {object} requestBody - Webhook request body.
-   * @param {string} _signature - Webhook signature (unused for now).
-   * @returns {Promise<object>} Validation result.
+   * @param {*} signature - Webhook signature (unused for now).
+   * @param _signature
+   * @returns {Promise<object>} - Validation result.
    * @example Validate Apple webhook
    * const result = await service.validateAppleWebhook(requestBody, signature);
    */
@@ -390,6 +411,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * @param {string} appleId - Apple ID of user.
    * @example Handle consent revoked
    * await service.handleConsentRevoked('apple123');
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async handleConsentRevoked(appleId) {
     const userQuery = new Parse.Query(Parse.User);
@@ -416,7 +438,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Gets privacy-compliant user data.
    * @param {Parse.User} user - User object.
-   * @returns {object} Privacy-compliant user data.
+   * @returns {object} - Operation result Privacy-compliant user data.
    * @example Get privacy-compliant data
    * const safeData = service.getPrivacyCompliantUserData(user);
    */
