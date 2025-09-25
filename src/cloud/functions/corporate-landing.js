@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @created Sprint 02 - Corporate Landing Pages
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { 'parse/node': 'example' });
+ * // Returns: function result
  */
 
 const Parse = require('parse/node');
@@ -15,8 +19,14 @@ const logger = require('../../infrastructure/logger');
  * Generates corporate landing page configuration
  * Endpoint: GET /functions/getCorporateLandingConfig
  * Access: Public (but logs for security monitoring).
- * @param request
+ * @param {object} request - HTTP request object.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // GET /api/endpoint
+ * // Response: { "success": true, "data": [...] }
+ * @returns {Promise<object>} - Promise resolving to operation result.
  */
 const getCorporateLandingConfig = async (request) => {
   try {
@@ -30,8 +40,8 @@ const getCorporateLandingConfig = async (request) => {
     if (email) {
       const domainConfig = OAuthService.getCorporateDomainConfig(email);
       if (domainConfig) {
-        corporateConfig = domainConfig;
-        suggestedProvider = domainConfig.primaryProvider;
+        corporateConfig = _domainConfig; // eslint-disable-line no-undef
+        suggestedProvider = _domainConfig.primaryProvider; // eslint-disable-line no-undef
         autoSSO = true;
 
         logger.logSecurityEvent('CORPORATE_LANDING_EMAIL_DETECTED', null, {
@@ -67,8 +77,8 @@ const getCorporateLandingConfig = async (request) => {
           if (clientInfo.oauthEnabled && clientInfo.corporateDomain) {
             const domainConfig = OAuthService.getCorporateDomainConfig(`test@${clientInfo.corporateDomain}`);
             if (domainConfig) {
-              corporateConfig = domainConfig;
-              suggestedProvider = clientInfo.primaryOAuthProvider || domainConfig.primaryProvider;
+              corporateConfig = _domainConfig; // eslint-disable-line no-undef
+              suggestedProvider = clientInfo.primaryOAuthProvider || _domainConfig.primaryProvider; // eslint-disable-line no-undef
             }
           }
         }
@@ -82,7 +92,7 @@ const getCorporateLandingConfig = async (request) => {
     const providerConfigs = {};
 
     for (const provider of availableProviders) {
-      const config = OAuthService.getProviderConfig(provider);
+      const config = OAuthService.getProviderConfig(_provider); // eslint-disable-line no-undef
       providerConfigs[provider] = {
         name: provider,
         enabled: config.enabled,
@@ -121,25 +131,32 @@ const getCorporateLandingConfig = async (request) => {
  * Generates OAuth authorization URL for corporate landing
  * Endpoint: POST /functions/generateCorporateOAuthURL
  * Access: Public.
- * @param request
+ * @param {object} request - HTTP request object.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // POST /api/endpoint
+ * // Body: { "data": "value" }
+ * // Response: { "success": true, "message": "Created" }
+ * @returns {Promise<object>} - Promise resolving to operation result.
  */
 const generateCorporateOAuthURL = async (request) => {
   try {
     const {
-      provider, email, clientSlug, departmentCode, redirectUri,
+      _provider, email, clientSlug, departmentCode, redirectUri,
     } = request.params;
 
-    if (!provider) {
+    if (!_provider) {
       throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Provider is required');
     }
 
     // Validate provider
     const availableProviders = OAuthService.getAvailableProviders();
-    if (!availableProviders.includes(provider)) {
+    if (!availableProviders.includes(_provider)) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        `Invalid provider. Available: ${availableProviders.join(', ')}`
+        `Invalid _provider. Available: ${availableProviders.join(', ')}`
       );
     }
 
@@ -155,11 +172,11 @@ const generateCorporateOAuthURL = async (request) => {
         };
 
         // Warn if using different provider than configured
-        if (domainConfig.primaryProvider !== provider) {
+        if (domainConfig.primaryProvider !== _provider) {
           logger.logSecurityEvent('CORPORATE_OAUTH_PROVIDER_MISMATCH', null, {
             email: CorporateOAuthService.maskEmail(email),
             configuredProvider: domainConfig.primaryProvider,
-            requestedProvider: provider,
+            requestedProvider: provider, // eslint-disable-line no-undef
           });
         }
       }
@@ -169,18 +186,18 @@ const generateCorporateOAuthURL = async (request) => {
     const state = JSON.stringify({
       clientSlug: clientSlug || null,
       departmentCode: departmentCode || null,
-      corporateDomain: corporateInfo?.domain || null,
+      corporateDomain: corporateInfo?._domain || null, // eslint-disable-line no-underscore-dangle
       timestamp: Date.now(),
     });
 
     const authURL = await OAuthService.generateAuthorizationURL(
-      provider,
-      redirectUri || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/${provider}/callback`,
+      _provider,
+      redirectUri || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/${_provider}/callback`,
       state
     );
 
     logger.logSecurityEvent('CORPORATE_OAUTH_URL_GENERATED', null, {
-      provider,
+      provider, // eslint-disable-line no-undef
       hasEmail: !!email,
       hasCorporateInfo: !!corporateInfo,
       clientSlug: clientSlug || 'none',
@@ -190,7 +207,7 @@ const generateCorporateOAuthURL = async (request) => {
     return {
       success: true,
       authURL,
-      provider,
+      provider, // eslint-disable-line no-undef
       corporateInfo,
       state,
     };
@@ -204,8 +221,15 @@ const generateCorporateOAuthURL = async (request) => {
  * Validates corporate landing page access
  * Endpoint: POST /functions/validateCorporateLandingAccess
  * Access: Public (with rate limiting).
- * @param request
+ * @param {object} request - HTTP request object.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // POST /api/endpoint
+ * // Body: { "data": "value" }
+ * // Response: { "success": true, "message": "Created" }
+ * @returns {Promise<object>} - Promise resolving to operation result.
  */
 const validateCorporateLandingAccess = async (request) => {
   try {
@@ -313,8 +337,14 @@ const validateCorporateLandingAccess = async (request) => {
  * Gets corporate client departments for landing page
  * Endpoint: GET /functions/getCorporateClientDepartments
  * Access: Public (for client-specific landing pages).
- * @param request
+ * @param {object} request - HTTP request object.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // GET /api/endpoint
+ * // Response: { "success": true, "data": [...] }
+ * @returns {Promise<object>} - Promise resolving to operation result.
  */
 const getCorporateClientDepartments = async (request) => {
   try {

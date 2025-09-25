@@ -30,15 +30,15 @@
                     <% } %>
 
                     <div class="mb-3">
-                        <label for="identifier" class="form-label">Username</label>
+                        <label for="identifier" class="form-label">Email</label>
                         <input
-                            type="text"
+                            type="email"
                             class="form-control"
                             id="identifier"
                             name="identifier"
                             required
-                            placeholder="Enter your email or username"
-                            autocomplete="username"
+                            placeholder="Enter your email address"
+                            autocomplete="email"
                         >
                     </div>
 
@@ -55,13 +55,7 @@
                         >
                     </div>
 
-                    <div class="d-flex align-items-center justify-content-between mb-4">
-                        <div class="form-check">
-                            <input class="form-check-input primary" type="checkbox" value="" id="flexCheckChecked" name="rememberMe">
-                            <label class="form-check-label text-dark" for="flexCheckChecked">
-                                Remember this Device
-                            </label>
-                        </div>
+                    <div class="d-flex align-items-center justify-content-end mb-4">
                         <a class="text-primary fw-bold" href="/auth/forgot-password">Forgot Password ?</a>
                     </div>
 

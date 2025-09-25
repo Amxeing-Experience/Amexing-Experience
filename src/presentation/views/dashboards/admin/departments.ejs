@@ -1,0 +1,233 @@
+<!-- Admin Dashboard - Department Management -->
+<div class="row">
+    <!-- Page Header -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-sm-flex d-block align-items-center justify-content-between mb-3">
+                    <div class="mb-3 mb-sm-0">
+                        <h5 class="card-title fw-semibold">Department Management</h5>
+                        <p class="card-subtitle mb-0">Manage departments and department managers across all clients</p>
+                    </div>
+                    <div>
+                        <span class="badge bg-light-success text-success fs-2">
+                            Admin View
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="row">
+                    <div class="col-md-3">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-hierarchy',
+                            title: 'Total Departments',
+                            value: typeof stats !== 'undefined' ? stats.totalDepartments : '125',
+                            color: 'primary',
+                            trend: '+8 this month',
+                            trendColor: 'success'
+                        }) %>
+                    </div>
+                    <div class="col-md-3">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-crown',
+                            title: 'Department Managers',
+                            value: typeof stats !== 'undefined' ? stats.departmentManagers : '98',
+                            color: 'warning',
+                            trend: '78% assigned',
+                            trendColor: 'info'
+                        }) %>
+                    </div>
+                    <div class="col-md-3">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-users',
+                            title: 'Department Employees',
+                            value: typeof stats !== 'undefined' ? stats.departmentEmployees : '1,247',
+                            color: 'info',
+                            trend: '+45 this month',
+                            trendColor: 'success'
+                        }) %>
+                    </div>
+                    <div class="col-md-3">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-chart-bar',
+                            title: 'Avg Team Size',
+                            value: typeof stats !== 'undefined' ? stats.avgTeamSize : '12.6',
+                            color: 'success',
+                            trend: '↑ 8% efficiency',
+                            trendColor: 'success'
+                        }) %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Department Management -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <!-- Navigation Tabs -->
+                <ul class="nav nav-pills mb-3" id="departmentTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="all-departments-tab" data-bs-toggle="pill" data-bs-target="#all-departments" type="button" role="tab">
+                            <i class="ti ti-hierarchy me-2"></i>All Departments
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="department-managers-tab" data-bs-toggle="pill" data-bs-target="#department-managers" type="button" role="tab">
+                            <i class="ti ti-crown me-2"></i>Department Managers
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="unassigned-managers-tab" data-bs-toggle="pill" data-bs-target="#unassigned-managers" type="button" role="tab">
+                            <i class="ti ti-user-question me-2"></i>Unassigned Managers
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content" id="departmentTabsContent">
+                    <!-- All Departments Tab -->
+                    <div class="tab-pane fade show active" id="all-departments" role="tabpanel">
+                        <div id="departmentTableContainer"></div>
+                    </div>
+
+                    <!-- Department Managers Tab -->
+                    <div class="tab-pane fade" id="department-managers" role="tabpanel">
+                        <div id="departmentManagerTableContainer"></div>
+                    </div>
+
+                    <!-- Unassigned Managers Tab -->
+                    <div class="tab-pane fade" id="unassigned-managers" role="tabpanel">
+                        <div id="unassignedManagerTableContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include CSS -->
+<link rel="stylesheet" href="/css/components/user-management.css">
+
+<!-- JavaScript -->
+<script src="/js/components/UserTableManager.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get current user context
+    const currentUser = {
+        id: '<%= user.id %>',
+        role: '<%= user.role %>',
+        email: '<%= user.email %>'
+    };
+
+    // Initialize Department Table (showing departments as entities, not users)
+    // Note: This would need a separate DepartmentTableManager component
+    // For now, we'll show department managers as a proxy for departments
+    window.departmentTable = new UserTableManager('departmentTableContainer', {
+        userRole: 'department_manager',
+        userId: currentUser.id,
+        currentUserRole: currentUser.role,
+        pageSize: 25,
+        apiBaseUrl: '/api',
+        permissions: {
+            canCreateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canDeactivateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
+        },
+        filters: {
+            role: 'department_manager',
+            active: true
+        },
+        customizations: {
+            title: 'All Departments (via Managers)',
+            showBulkActions: true,
+            showExport: true,
+            showFilters: true,
+            extraColumns: ['departmentId', 'clientId']
+        }
+    });
+
+    // Initialize Department Managers Table
+    window.departmentManagerTable = new UserTableManager('departmentManagerTableContainer', {
+        userRole: 'department_manager',
+        userId: currentUser.id,
+        currentUserRole: currentUser.role,
+        pageSize: 25,
+        apiBaseUrl: '/api',
+        permissions: {
+            canCreateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canDeactivateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
+        },
+        filters: {
+            role: 'department_manager',
+            active: true,
+            hasDepartment: true
+        },
+        customizations: {
+            title: 'Assigned Department Managers',
+            showBulkActions: true,
+            showExport: true,
+            showFilters: true
+        }
+    });
+
+    // Initialize Unassigned Managers Table
+    window.unassignedManagerTable = new UserTableManager('unassignedManagerTableContainer', {
+        userRole: 'department_manager',
+        userId: currentUser.id,
+        currentUserRole: currentUser.role,
+        pageSize: 25,
+        apiBaseUrl: '/api',
+        permissions: {
+            canCreateUsers: false,
+            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canDeactivateUsers: false,
+            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
+        },
+        filters: {
+            role: 'department_manager',
+            active: true,
+            hasDepartment: false
+        },
+        customizations: {
+            title: 'Unassigned Department Managers',
+            showBulkActions: true,
+            showExport: false,
+            showFilters: false,
+            highlightUnassigned: true
+        }
+    });
+
+    // Tab switching logic
+    const tabs = document.querySelectorAll('[data-bs-toggle="pill"]');
+    tabs.forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function(event) {
+            const targetTab = event.target.getAttribute('data-bs-target');
+
+            // Refresh the appropriate table when tab is shown
+            switch(targetTab) {
+                case '#all-departments':
+                    window.departmentTable.refresh();
+                    break;
+                case '#department-managers':
+                    window.departmentManagerTable.refresh();
+                    break;
+                case '#unassigned-managers':
+                    window.unassignedManagerTable.refresh();
+                    break;
+            }
+        });
+    });
+
+    // Load initial data
+    window.departmentTable.loadUsers();
+});
+</script>

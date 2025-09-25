@@ -1,6 +1,10 @@
 /**
  * Documentation Routes
  * API documentation endpoints using Swagger UI.
+ * @example
+ * // Usage example
+ * const result = await require({ 'express': 'example' });
+ * // Returns: operation result
  */
 
 const express = require('express');

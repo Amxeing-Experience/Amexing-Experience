@@ -15,7 +15,8 @@ jest.mock('../../../src/application/services/AuthenticationService', () => ({
 
 jest.mock('../../../src/infrastructure/logger', () => ({
   error: jest.fn(),
-  warn: jest.fn()
+  warn: jest.fn(),
+  debug: jest.fn()
 }));
 
 const jwtMiddleware = require('../../../src/application/middleware/jwtMiddleware');

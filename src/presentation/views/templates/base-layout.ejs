@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="<%= typeof lang !== 'undefined' ? lang : 'en' %>">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+    <!-- SEO Meta Tags -->
+    <title><%= typeof title !== 'undefined' ? title : 'Amexing' %> <%= typeof siteName !== 'undefined' ? ' - ' + siteName : '' %></title>
+    <% if (typeof description !== 'undefined' && description) { %>
+        <meta name="description" content="<%= description %>">
+        <meta property="og:title" content="<%= title %>">
+        <meta property="og:description" content="<%= description %>">
+        <meta property="og:type" content="website">
+    <% } %>
+
+    <!-- Security Headers -->
+    <meta name="robots" content="<%= typeof robots !== 'undefined' ? robots : 'index, follow' %>">
+
+    <!-- Favicon -->
+    <link rel="shortcut icon" type="image/png" href="/dashboard/images/logos/favicon.png" />
+
+    <!-- Theme Styles -->
+    <%# Safe: head contains server-generated trusted HTML %><%- typeof head !== 'undefined' ? head : '' %>
+
+    <!-- Custom CSS based on layout type -->
+    <% if (typeof layoutType !== 'undefined') { %>
+        <%- include(`../assets/${layoutType}/css`) %>
+    <% } %>
+</head>
+<body class="<%= typeof bodyClass !== 'undefined' ? bodyClass : '' %>" data-layout="<%= typeof layoutType !== 'undefined' ? layoutType : 'default' %>" data-user-role="<%= typeof userRole !== 'undefined' ? userRole : 'guest' %>">
+    <!-- Body Content -->
+    <%# Safe: body contains server-generated trusted HTML %><%- typeof body !== 'undefined' ? body : '' %>
+
+    <!-- Base Scripts -->
+    <%# Safe: scripts contains server-generated trusted HTML %><%- typeof scripts !== 'undefined' ? scripts : '' %>
+
+    <!-- Custom JavaScript based on layout type -->
+    <% if (typeof layoutType !== 'undefined') { %>
+        <%- include(`../assets/${layoutType}/scripts`) %>
+    <% } %>
+
+    <!-- Page-specific scripts -->
+    <% if (typeof pageScripts !== 'undefined' && pageScripts) { %>
+        <% pageScripts.forEach(function(script) { %>
+            <%# Safe: script contains server-generated trusted HTML %><%- script %>
+        <% }); %>
+    <% } %>
+</body>
+</html>

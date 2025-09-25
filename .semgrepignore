@@ -29,6 +29,9 @@ src/presentation/views/auth-layout.ejs
 src/presentation/views/layouts/dashboard.ejs
 # Script blocks with proper URL validation implemented
 src/presentation/views/blocks/scripts.ejs
+# Dashboard templates with server-generated trusted HTML
+src/presentation/views/dashboards/superadmin/users.ejs
+src/presentation/views/templates/base-layout.ejs
 
 # Logs
 logs/

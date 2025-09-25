@@ -1,6 +1,5 @@
-<% var registerContent = include('../partials/register', { error: error }); %>
 <%- include('../layout', {
     title: 'Register',
-    body: registerContent,
+    body: include('../partials/register', { error: error }),
     error: error
 }) %>

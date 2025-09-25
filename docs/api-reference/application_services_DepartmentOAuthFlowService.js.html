@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: application/services/DepartmentOAuthFlowService.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: application/services/DepartmentOAuthFlowService.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/* eslint-disable max-lines */
+/**
+ * Department OAuth Flow Service - Sprint 04
+ * Handles department-specific OAuth authentication flows
+ * Integrates with Sprint 03 permission system and context switching.
+ */
+
+const Parse = require('parse/node');
+const logger = require('../../infrastructure/logger');
+const { PermissionContextService } = require('./PermissionContextService');
+const { PermissionInheritanceService } = require('./PermissionInheritanceService');
+const { PermissionAuditService } = require('./PermissionAuditService');
+const { CorporateOAuthService } = require('./CorporateOAuthService');
+
+/**
+ * Department OAuth Flow Service - Manages department-specific OAuth authentication flows.
+ * Provides OAuth integration with Google, Microsoft, and Apple for department-level authentication.
+ * Handles permission inheritance, context switching, and audit logging.
+ * @class DepartmentOAuthFlowService
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * const service = new DepartmentOAuthFlowService();
+ * const authUrl = await service.initiateDepartmentOAuth('engineering', 'google', 'callback-url');
+ */
+class DepartmentOAuthFlowService {
+  constructor() {
+    this.contextService = new PermissionContextService();
+    this.inheritanceService = new PermissionInheritanceService();
+    this.auditService = new PermissionAuditService();
+    this.corporateService = new CorporateOAuthService();
+
+    // Department-specific OAuth configurations
+    this.departmentConfigurations = new Map();
+
+    // Supported OAuth providers per department type
+    this.defaultProviderMappings = {
+      sistemas: ['google', 'microsoft', 'github'],
+      rrhh: ['microsoft', 'google'],
+      finanzas: ['microsoft', 'google'],
+      marketing: ['google', 'microsoft', 'apple'],
+      ventas: ['microsoft', 'google', 'apple'],
+      operaciones: ['google', 'microsoft'],
+      legal: ['microsoft', 'google'],
+      compras: ['microsoft', 'google'],
+    };
+
+    // Department-specific OAuth scopes
+    this.departmentScopes = {
+      sistemas: {
+        google: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/admin.directory.user'],
+        microsoft: ['openid', 'email', 'profile', 'User.Read', 'Directory.Read.All'],
+        github: ['user:email', 'read:user', 'read:org'],
+      },
+      rrhh: {
+        microsoft: ['openid', 'email', 'profile', 'User.Read', 'People.Read'],
+        google: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/directory.readonly'],
+      },
+      finanzas: {
+        microsoft: ['openid', 'email', 'profile', 'User.Read', 'Financials.ReadWrite.All'],
+        google: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/spreadsheets'],
+      },
+      marketing: {
+        google: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/analytics.readonly'],
+        microsoft: ['openid', 'email', 'profile', 'User.Read'],
+        apple: ['name', 'email'],
+      },
+    };
+
+    this.initialized = false;
+  }
+
+  /**
+   * Initialize the service.
+   * @returns {Promise&lt;void>} Completes when service is initialized.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const service = new DepartmentOAuthFlowService();
+   * await service.initialize();
+   */
+  async initialize() {
+    if (this.initialized) {
+      return;
+    }
+
+    try {
+      await this.loadDepartmentConfigurations();
+      await this.validateDepartmentSetup();
+      this.initialized = true;
+      logger.info('DepartmentOAuthFlowService initialized successfully');
+    } catch (error) {
+      logger.error('Failed to initialize DepartmentOAuthFlowService:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Ensure the service is initialized before use.
+   * @returns {Promise&lt;void>}
+   * @private
+   */
+  async ensureInitialized() {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+  }
+
+  /**
+   * Load department configurations from database.
+   * @returns {Promise&lt;void>} Completes when configurations are loaded.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const service = new DepartmentOAuthFlowService();
+   * await service.loadDepartmentConfigurations();
+   */
+  async loadDepartmentConfigurations() {
+    try {
+      // Don't load from database during initial construction
+      // This prevents Parse queries before Parse Server is ready
+      if (!Parse.applicationId) {
+        logger.warn('Parse not initialized yet, skipping department configurations load');
+        return;
+      }
+
+      const DepartmentConfig = Parse.Object.extend('DepartmentOAuthConfig');
+      const query = new Parse.Query(DepartmentConfig);
+      query.equalTo('isActive', true);
+
+      const configs = await query.find({ useMasterKey: true });
+
+      configs.forEach((config) => {
+        this.departmentConfigurations.set(config.get('departmentCode'), {
+          id: config.id,
+          name: config.get('departmentName'),
+          code: config.get('departmentCode'),
+          allowedProviders: config.get('allowedProviders') || this.defaultProviderMappings[config.get('departmentCode')] || ['google', 'microsoft'],
+          customScopes: config.get('customScopes') || {},
+          requiredClaims: config.get('requiredClaims') || [],
+          autoProvisionRoles: config.get('autoProvisionRoles') || [],
+          permissionMappings: config.get('permissionMappings') || {},
+          contextSettings: config.get('contextSettings') || {},
+          approvalRequired: config.get('approvalRequired') || false,
+          approvalWorkflow: config.get('approvalWorkflow') || null,
+          customValidation: config.get('customValidation') || null,
+          postAuthActions: config.get('postAuthActions') || [],
+          metadata: config.get('metadata') || {},
+        });
+      });
+
+      // Add default configurations for departments without custom config
+      Object.keys(this.defaultProviderMappings).forEach((deptCode) => {
+        if (!this.departmentConfigurations.has(deptCode)) {
+          this.departmentConfigurations.set(deptCode, {
+            code: deptCode,
+            name: this.formatDepartmentName(deptCode),
+            // eslint-disable-next-line security/detect-object-injection
+            allowedProviders: this.defaultProviderMappings[deptCode],
+            // eslint-disable-next-line security/detect-object-injection
+            customScopes: this.departmentScopes[deptCode] || {},
+            requiredClaims: [],
+            autoProvisionRoles: [],
+            permissionMappings: {},
+            contextSettings: {},
+            approvalRequired: false,
+            postAuthActions: [],
+          });
+        }
+      });
+    } catch (error) {
+      logger.error('Failed to load department configurations:', error);
+      // Continue with default configurations
+    }
+  }
+
+  /**
+   * Validate department setup.
+   * @returns {Promise&lt;void>} Completes when validation is finished.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const service = new DepartmentOAuthFlowService();
+   * await service.validateDepartmentSetup();
+   */
+  async validateDepartmentSetup() {
+    for (const [deptCode, config] of this.departmentConfigurations) {
+      try {
+        // Validate provider configurations
+        for (const provider of config.allowedProviders) {
+          await this.validateProviderSetup(provider, deptCode);
+        }
+
+        // Validate permission mappings
+        if (config.permissionMappings) {
+          await this.validatePermissionMappings(config.permissionMappings, deptCode);
+        }
+      } catch (error) {
+        logger.warn(`Department validation failed for ${deptCode}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Initiate department-specific OAuth flow.
+   * @param {object} request - OAuth request parameters.
+   * @param {string} request.department - Department identifier.
+   * @param {string} request.provider - OAuth provider.
+   * @param {string} request.corporateConfigId - Corporate configuration ID.
+   * @param {string} request.redirectUri - Redirect URI.
+   * @param {string} request.state - OAuth state parameter.
+   * @returns {Promise&lt;object>} OAuth initiation result with authorization URL.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const service = new DepartmentOAuthFlowService();
+   * const result = await service.initiateDepartmentOAuth({
+   *   department: 'hr',
+   *   provider: 'microsoft',
+   *   redirectUri: 'https://app.com/callback'
+   * });
+   */
+  async initiateDepartmentOAuth(request) {
+    await this.ensureInitialized();
+
+    const {
+      department, provider, corporateConfigId, redirectUri, state,
+    } = request;
+
+    try {
+      // Validate department
+      const deptConfig = this.getDepartmentConfig(department);
+      if (!deptConfig) {
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, `Invalid department: ${department}`);
+      }
+
+      // Validate provider for department
+      if (!deptConfig.allowedProviders.includes(provider)) {
+        throw new Parse.Error(
+          Parse.Error.INVALID_QUERY,
+          `Provider ${provider} not allowed for department ${department}`
+        );
+      }
+
+      // Get corporate configuration if provided
+      let corporateConfig = null;
+      if (corporateConfigId) {
+        corporateConfig = await this.getCorporateConfig(corporateConfigId);
+      }
+
+      // Build department-specific OAuth URL
+      const authUrl = await this.buildDepartmentOAuthUrl({
+        department: deptConfig,
+        provider,
+        corporateConfig,
+        redirectUri,
+        state,
+      });
+
+      // Log OAuth initiation for audit
+      await this.auditService.recordPermissionAudit({
+        userId: 'anonymous',
+        action: 'department_oauth_initiated',
+        resource: 'oauth_flow',
+        performedBy: 'system',
+        metadata: {
+          department,
+          provider,
+          corporateConfigId,
+          timestamp: new Date(),
+          userAgent: request.headers?.['user-agent'],
+          ipAddress: request.ip,
+        },
+      });
+
+      return {
+        success: true,
+        authUrl,
+        department: deptConfig,
+        provider,
+        expiresIn: 300000, // 5 minutes
+      };
+    } catch (error) {
+      logger.error('Failed to initiate department OAuth:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Handle department OAuth callback.
+   * @param {object} request - OAuth callback parameters.
+   * @param {string} request.code - Authorization code.
+   * @param {string} request.state - OAuth state parameter.
+   * @param {string} request.provider - OAuth provider.
+   * @param {string} request.department - Department identifier.
+   * @param {string} [request.error] - OAuth error if any.
+   * @returns {Promise&lt;object>} Authentication result with user session.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const service = new DepartmentOAuthFlowService();
+   * const result = await service.handleDepartmentOAuthCallback({
+   *   code: 'auth_code_123',
+   *   provider: 'microsoft',
+   *   department: 'hr'
+   * });
+   */
+  async handleDepartmentOAuthCallback(request) {
+    const {
+      code, state, provider, department, error: oauthError,
+    } = request;
+
+    try {
+      if (oauthError) {
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, `OAuth error: ${oauthError}`);
+      }
+
+      // Validate callback parameters
+      if (!code || !provider || !department) {
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Missing required OAuth callback parameters');
+      }
+
+      // Get department configuration
+      const deptConfig = this.getDepartmentConfig(department);
+      if (!deptConfig) {
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, `Invalid department: ${department}`);
+      }
+
+      // Exchange code for tokens
+      const tokenData = await this.exchangeCodeForTokens({
+        code,
+        provider,
+        department: deptConfig,
+        state,
+      });
+
+      // Get user info from OAuth provider
+      const userInfo = await this.getUserInfoFromProvider(provider, tokenData.accessToken);
+
+      // Validate department-specific claims
+      await this.validateDepartmentClaims(userInfo, deptConfig);
+
+      // Check if approval is required
+      if (deptConfig.approvalRequired) {
+        return await this.handleApprovalRequired(userInfo, deptConfig, tokenData);
+      }
+
+      // Process OAuth authentication
+      const authResult = await this.processDepartmentOAuth({
+        userInfo,
+        tokenData,
+        department: deptConfig,
+        provider,
+      });
+
+      return authResult;
+    } catch (error) {
+      logger.error('Failed to handle department OAuth callback:', error);
+
+      // Log failed callback for audit
+      await this.auditService.recordPermissionAudit({
+        userId: 'anonymous',
+        action: 'department_oauth_callback_failed',
+        resource: 'oauth_flow',
+        performedBy: 'system',
+        metadata: {
+          department,
+          provider,
+          error: error.message,
+          timestamp: new Date(),
+        },
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Process department-specific OAuth authentication.
+   * @param {object} options - Processing options.
+   * @param {object} options.userInfo - User information from OAuth provider.
+   * @param {object} options.tokenData - OAuth token data.
+   * @param {object} options.department - Department configuration.
+   * @param {string} options.provider - OAuth provider name.
+   * @returns {Promise&lt;object>} Authentication result with session data.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const service = new DepartmentOAuthFlowService();
+   * const result = await service.processDepartmentOAuth({
+   *   userInfo: { email: 'user@company.com' },
+   *   tokenData: { accessToken: 'token_123' },
+   *   department: deptConfig,
+   *   provider: 'microsoft'
+   * });
+   */
+  async processDepartmentOAuth(options) {
+    const {
+      userInfo, department, provider,
+    } = options;
+
+    try {
+      // Find or create AmexingUser
+      const user = await this.findOrCreateDepartmentUser(userInfo, department, provider);
+
+      // Apply department-specific permission inheritance
+      await this.applyDepartmentPermissionInheritance(user, userInfo, department, provider);
+
+      // Initialize department context
+      const contextResult = await this.initializeDepartmentContext(user, department);
+
+      // Execute post-auth actions
+      if (department.postAuthActions &amp;&amp; department.postAuthActions.length > 0) {
+        await this.executePostAuthActions(user, department, contextResult);
+      }
+
+      // Create session with department context
+      const sessionData = await this.createDepartmentSession(user, department, contextResult);
+
+      // Log successful authentication
+      await this.auditService.recordPermissionAudit({
+        userId: user.id,
+        sessionId: sessionData.sessionToken,
+        action: 'department_oauth_success',
+        resource: 'oauth_authentication',
+        performedBy: 'system',
+        metadata: {
+          department: department.code,
+          provider,
+          contextId: contextResult.contextId,
+          permissions: contextResult.permissions,
+          timestamp: new Date(),
+        },
+      });
+
+      return {
+        success: true,
+        user: {
+          id: user.id,
+          username: user.get('username'),
+          email: user.get('email'),
+          firstName: user.get('firstName'),
+          lastName: user.get('lastName'),
+          department: department.code,
+          role: user.get('role'),
+        },
+        session: sessionData,
+        context: contextResult,
+        redirectUrl: this.determineDepartmentRedirect(user, department),
+      };
+    } catch (error) {
+      logger.error('Failed to process department OAuth:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Find or create user for department OAuth.
+   * @param {object} userInfo - User information from OAuth provider.
+   * @param {object} department - Department configuration.
+   * @param {string} provider - OAuth provider name.
+   * @returns {Promise&lt;object>} AmexingUser object.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const user = await service.findOrCreateDepartmentUser(userInfo, deptConfig, 'microsoft');
+   */
+  async findOrCreateDepartmentUser(userInfo, department, provider) {
+    try {
+      // Try to find existing user by OAuth provider info
+      const AmexingUser = Parse.Object.extend('AmexingUser');
+      const query = new Parse.Query(AmexingUser);
+
+      // Look for user with matching OAuth account
+      query.equalTo('oauthAccounts', {
+        $elemMatch: {
+          provider,
+          providerId: userInfo.id || userInfo.sub,
+        },
+      });
+
+      let user = await query.first({ useMasterKey: true });
+
+      if (!user) {
+        // Try to find by email
+        const emailQuery = new Parse.Query(AmexingUser);
+        emailQuery.equalTo('email', userInfo.email.toLowerCase());
+        user = await emailQuery.first({ useMasterKey: true });
+
+        if (user) {
+          // Link OAuth account to existing user
+          await this.linkOAuthAccountToUser(user, userInfo, provider);
+        }
+      }
+
+      if (!user) {
+        // Create new user
+        user = await this.createDepartmentUser(userInfo, department, provider);
+      } else {
+        // Update existing user with department info if needed
+        await this.updateUserDepartmentInfo(user, department);
+      }
+
+      return user;
+    } catch (error) {
+      logger.error('Failed to find or create department user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create new user for department OAuth.
+   * @param {object} userInfo - User information from OAuth provider.
+   * @param {object} department - Department configuration.
+   * @param {string} provider - OAuth provider name.
+   * @returns {Promise&lt;object>} Created AmexingUser object.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const user = await service.createDepartmentUser(userInfo, deptConfig, 'microsoft');
+   */
+  async createDepartmentUser(userInfo, department, provider) {
+    const AmexingUser = Parse.Object.extend('AmexingUser');
+    const user = new AmexingUser();
+
+    // Basic user information
+    user.set('username', this.generateDepartmentUsername(userInfo, department));
+    user.set('email', userInfo.email.toLowerCase());
+    user.set('firstName', userInfo.given_name || userInfo.first_name || '');
+    user.set('lastName', userInfo.family_name || userInfo.last_name || '');
+    user.set('emailVerified', true); // OAuth emails are considered verified
+
+    // Department-specific information
+    user.set('department', department.code);
+    user.set('primaryDepartment', department.code);
+    user.set('departments', [department.code]);
+
+    // Role assignment based on department configuration
+    const role = this.determineDepartmentRole(userInfo, department);
+    user.set('role', role);
+
+    // OAuth account information
+    user.set('oauthAccounts', [{
+      provider,
+      providerId: userInfo.id || userInfo.sub,
+      email: userInfo.email,
+      profile: userInfo,
+      linkedAt: new Date(),
+      department: department.code,
+    }]);
+
+    // Primary OAuth provider
+    user.set('primaryOAuthProvider', provider);
+
+    // Department-specific metadata
+    user.set('departmentMetadata', {
+      joinedAt: new Date(),
+      joinedVia: 'oauth',
+      approvalStatus: department.approvalRequired ? 'pending' : 'approved',
+      initialProvider: provider,
+    });
+
+    await user.save(null, { useMasterKey: true });
+
+    logger.info(`Created new department user: ${user.id} for department: ${department.code}`);
+    return user;
+  }
+
+  /**
+   * Apply department-specific permission inheritance.
+   * @param {object} user - AmexingUser object.
+   * @param {object} userInfo - User information from OAuth provider.
+   * @param {object} department - Department configuration.
+   * @param {string} provider - OAuth provider name.
+   * @returns {Promise&lt;void>} Completes when inheritance is applied.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * await service.applyDepartmentPermissionInheritance(user, userInfo, deptConfig, 'microsoft');
+   */
+  // eslint-disable-next-line max-params
+  async applyDepartmentPermissionInheritance(user, userInfo, department, provider) {
+    try {
+      // Create synthetic corporate config for department
+      const syntheticCorporateConfig = {
+        permissionMappings: department.permissionMappings || {},
+        departmentPermissions: {
+          [department.code]: this.getDepartmentBasePermissions(department.code),
+        },
+      };
+
+      // Apply permission inheritance using Sprint 03 system
+      await this.inheritanceService.processCompleteInheritance(
+        user,
+        userInfo,
+        provider,
+        syntheticCorporateConfig
+      );
+
+      // Apply department-specific role mappings
+      if (department.autoProvisionRoles &amp;&amp; department.autoProvisionRoles.length > 0) {
+        await this.applyAutoProvisionRoles(user, userInfo, department);
+      }
+    } catch (error) {
+      logger.error('Failed to apply department permission inheritance:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Initialize department context for user.
+   * @param {object} user - AmexingUser object.
+   * @param {object} department - Department configuration.
+   * @returns {Promise&lt;object>} Context initialization result.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const contextResult = await service.initializeDepartmentContext(user, deptConfig);
+   */
+  async initializeDepartmentContext(user, department) {
+    try {
+      // Create department context
+      const contextId = `dept-${department.code}`;
+
+      // Get available contexts for user
+      const availableContexts = await this.contextService.getAvailableContexts(user.id);
+
+      // Check if department context already exists
+      let deptContext = availableContexts.find((ctx) => ctx.id === contextId);
+
+      if (!deptContext) {
+        // Create new department context
+        deptContext = await this.createDepartmentContext(user, department);
+      }
+
+      // Switch to department context
+      const contextResult = await this.contextService.switchToContext(
+        user.id,
+        contextId,
+        null // Session will be created separately
+      );
+
+      return {
+        contextId,
+        context: deptContext,
+        permissions: contextResult.appliedPermissions || [],
+        switchResult: contextResult,
+      };
+    } catch (error) {
+      logger.error('Failed to initialize department context:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Create department context.
+   * @param {object} user - AmexingUser object.
+   * @param {object} department - Department configuration.
+   * @returns {Promise&lt;object>} Created PermissionContext object.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const context = await service.createDepartmentContext(user, deptConfig);
+   */
+  async createDepartmentContext(user, department) {
+    const PermissionContext = Parse.Object.extend('PermissionContext');
+    const context = new PermissionContext();
+
+    context.set('userId', user.id);
+    context.set('contextId', `dept-${department.code}`);
+    context.set('contextType', 'department');
+    context.set('name', `${department.name} Department`);
+    context.set('department', department.code);
+    context.set('permissions', this.getDepartmentBasePermissions(department.code));
+    context.set('isDefault', user.get('primaryDepartment') === department.code);
+    context.set('metadata', {
+      createdVia: 'oauth_flow',
+      departmentConfig: department.id,
+      autoCreated: true,
+    });
+    context.set('isActive', true);
+
+    await context.save(null, { useMasterKey: true });
+    return context;
+  }
+
+  /**
+   * Create session with department context.
+   * @param {object} user - AmexingUser object.
+   * @param {object} department - Department configuration.
+   * @param {object} contextResult - Context initialization result.
+   * @returns {Promise&lt;object>} Session data with token and metadata.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const sessionData = await service.createDepartmentSession(user, deptConfig, contextResult);
+   */
+  async createDepartmentSession(user, department, contextResult) {
+    try {
+      // Create Parse session
+      const session = new Parse.Session();
+      session.set('user', user);
+      session.set('department', department.code);
+      session.set('contextId', contextResult.contextId);
+      session.set('expiresAt', new Date(Date.now() + 24 * 60 * 60 * 1000)); // 24 hours
+      session.set('metadata', {
+        createdVia: 'department_oauth',
+        provider: 'oauth',
+        department: department.code,
+      });
+
+      await session.save(null, { useMasterKey: true });
+
+      return {
+        sessionToken: session.get('sessionToken'),
+        expiresAt: session.get('expiresAt'),
+        userId: user.id,
+        department: department.code,
+        contextId: contextResult.contextId,
+      };
+    } catch (error) {
+      logger.error('Failed to create department session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Build department-specific OAuth URL.
+   * @param {object} options - OAuth URL build options.
+   * @param {object} options.department - Department configuration.
+   * @param {string} options.provider - OAuth provider name.
+   * @param {string} options.redirectUri - Redirect URI.
+   * @param {string} options.state - OAuth state parameter.
+   * @returns {Promise&lt;string>} Generated OAuth authorization URL.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const authUrl = await service.buildDepartmentOAuthUrl({ department, provider: 'google', redirectUri, state });
+   */
+  async buildDepartmentOAuthUrl(options) {
+    const {
+      department, provider, redirectUri, state,
+    } = options;
+
+    // Get provider configuration
+    const providerConfig = await this.getProviderConfig(provider);
+
+    // Get department-specific scopes
+    const scopes = this.getDepartmentScopes(department.code, provider);
+
+    // Build OAuth URL based on provider
+    switch (provider) {
+      case 'google':
+        return this.buildGoogleOAuthUrl(providerConfig, scopes, redirectUri, state, department);
+      case 'microsoft':
+        return this.buildMicrosoftOAuthUrl(providerConfig, scopes, redirectUri, state, department);
+      case 'apple':
+        return this.buildAppleOAuthUrl(providerConfig, scopes, redirectUri, state, department);
+      default:
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, `Unsupported provider: ${provider}`);
+    }
+  }
+
+  /**
+   * Build Google OAuth URL with department-specific parameters.
+   * @param {object} config - OAuth provider configuration.
+   * @param {string[]} scopes - OAuth scopes array.
+   * @param {string} redirectUri - Redirect URI.
+   * @param {string} state - OAuth state parameter.
+   * @param {object} department - Department configuration.
+   * @returns {string} Google OAuth authorization URL.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const authUrl = service.buildGoogleOAuthUrl(config, ['openid', 'email'], redirectUri, state, deptConfig);
+   */
+  buildGoogleOAuthUrl(config, scopes, redirectUri, state, department) {
+    const params = new URLSearchParams({
+      client_id: config.clientId,
+      response_type: 'code',
+      scope: scopes.join(' '),
+      redirect_uri: redirectUri,
+      state: JSON.stringify({
+        provider: 'google',
+        department: department.code,
+        originalState: state,
+        timestamp: Date.now(),
+      }),
+      access_type: 'offline',
+      prompt: 'consent',
+      // Department-specific parameters
+      hd: department.emailDomain || undefined, // Restrict to specific domain
+      include_granted_scopes: 'true',
+    });
+
+    // Remove undefined parameters
+    [...params.entries()].forEach(([key, value]) => {
+      if (value === undefined || value === 'undefined') {
+        params.delete(key);
+      }
+    });
+
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  /**
+   * Build Microsoft OAuth URL with department-specific parameters.
+   * @param {object} config - OAuth provider configuration.
+   * @param {string[]} scopes - OAuth scopes array.
+   * @param {string} redirectUri - Redirect URI.
+   * @param {string} state - OAuth state parameter.
+   * @param {object} department - Department configuration.
+   * @returns {string} Microsoft OAuth authorization URL.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const authUrl = service.buildMicrosoftOAuthUrl(config, ['openid', 'email'], redirectUri, state, deptConfig);
+   */
+  buildMicrosoftOAuthUrl(config, scopes, redirectUri, state, department) {
+    const params = new URLSearchParams({
+      client_id: config.clientId,
+      response_type: 'code',
+      scope: scopes.join(' '),
+      redirect_uri: redirectUri,
+      state: JSON.stringify({
+        provider: 'microsoft',
+        department: department.code,
+        originalState: state,
+        timestamp: Date.now(),
+      }),
+      response_mode: 'query',
+      prompt: 'consent',
+      // Department-specific parameters
+      domain_hint: department.emailDomain || undefined,
+    });
+
+    // Remove undefined parameters
+    [...params.entries()].forEach(([key, value]) => {
+      if (value === undefined || value === 'undefined') {
+        params.delete(key);
+      }
+    });
+
+    return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
+  }
+
+  /**
+   * Build Apple OAuth URL with department-specific parameters.
+   * @param {object} config - OAuth provider configuration.
+   * @param {string[]} scopes - OAuth scopes array.
+   * @param {string} redirectUri - Redirect URI.
+   * @param {string} state - OAuth state parameter.
+   * @param {object} department - Department configuration.
+   * @returns {string} Apple OAuth authorization URL.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const authUrl = service.buildAppleOAuthUrl(config, ['name', 'email'], redirectUri, state, deptConfig);
+   */
+  buildAppleOAuthUrl(config, scopes, redirectUri, state, department) {
+    const params = new URLSearchParams({
+      client_id: config.clientId,
+      response_type: 'code id_token',
+      response_mode: 'form_post',
+      scope: scopes.join(' '),
+      redirect_uri: redirectUri,
+      state: JSON.stringify({
+        provider: 'apple',
+        department: department.code,
+        originalState: state,
+        timestamp: Date.now(),
+      }),
+      nonce: this.generateNonce(),
+    });
+
+    return `https://appleid.apple.com/auth/authorize?${params.toString()}`;
+  }
+
+  /**
+   * Get department configuration.
+   * @param {string} departmentCode - Department code identifier.
+   * @returns {object|undefined} Department configuration or undefined if not found.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const deptConfig = service.getDepartmentConfig('hr');
+   */
+  getDepartmentConfig(departmentCode) {
+    return this.departmentConfigurations.get(departmentCode);
+  }
+
+  /**
+   * Get available departments.
+   * @returns {object[]} Array of available department configurations.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const departments = service.getAvailableDepartments();
+   */
+  getAvailableDepartments() {
+    return Array.from(this.departmentConfigurations.values())
+      .map((config) => ({
+        code: config.code,
+        name: config.name,
+        allowedProviders: config.allowedProviders,
+        requiresApproval: config.approvalRequired,
+      }));
+  }
+
+  /**
+   * Get department-specific OAuth scopes.
+   * @param {string} departmentCode - Department code identifier.
+   * @param {string} provider - OAuth provider name.
+   * @returns {string[]} Array of OAuth scopes for the department and provider.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const scopes = service.getDepartmentScopes('hr', 'microsoft');
+   */
+  getDepartmentScopes(departmentCode, provider) {
+    const deptConfig = this.departmentConfigurations.get(departmentCode);
+
+    if (deptConfig &amp;&amp; deptConfig.customScopes &amp;&amp; deptConfig.customScopes[provider]) {
+      return deptConfig.customScopes[provider];
+    }
+
+    return this.departmentScopes[departmentCode]?.[provider]
+           || this.getDefaultScopes(provider);
+  }
+
+  /**
+   * Get default OAuth scopes for provider.
+   * @param {string} provider - OAuth provider name.
+   * @returns {string[]} Array of default OAuth scopes.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const defaultScopes = service.getDefaultScopes('google');
+   */
+  getDefaultScopes(provider) {
+    const defaultScopes = {
+      google: ['openid', 'email', 'profile'],
+      microsoft: ['openid', 'email', 'profile', 'User.Read'],
+      apple: ['name', 'email'],
+    };
+
+    return defaultScopes[provider] || [];
+  }
+
+  /**
+   * Get department base permissions.
+   * @param {string} departmentCode - Department code identifier.
+   * @returns {string[]} Array of base permissions for the department.
+   * @example
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * const permissions = service.getDepartmentBasePermissions('hr');
+   */
+  getDepartmentBasePermissions(departmentCode) {
+    const basePermissions = {
+      sistemas: ['technical_access', 'system_support', 'user_support', 'dev_tools'],
+      rrhh: ['employee_management', 'payroll_access', 'benefits_admin', 'recruitment'],
+      finanzas: ['financial_access', 'budget_management', 'audit_read', 'accounting'],
+      marketing: ['marketing_access', 'campaign_management', 'social_media', 'analytics'],
+      ventas: ['sales_access', 'lead_management', 'customer_data', 'pipeline'],
+      operaciones: ['operations_access', 'workflow_management', 'quality_control'],
+      legal: ['legal_access', 'contract_management', 'compliance_read'],
+      compras: ['purchasing_access', 'vendor_management', 'procurement'],
+    };
+
+    return basePermissions[departmentCode] || ['basic_access', 'department_read'];
+  }
+
+  /**
+   * Format department name from code.
+   * @param {string} code - Department code.
+   * @returns {string} Formatted department name.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const name = service.formatDepartmentName('rrhh'); // Returns 'Recursos Humanos'
+   */
+  formatDepartmentName(code) {
+    const names = {
+      sistemas: 'Sistemas',
+      rrhh: 'Recursos Humanos',
+      finanzas: 'Finanzas',
+      marketing: 'Marketing',
+      ventas: 'Ventas',
+      operaciones: 'Operaciones',
+      legal: 'Legal',
+      compras: 'Compras',
+    };
+
+    return names[code] || code.charAt(0).toUpperCase() + code.slice(1);
+  }
+
+  generateDepartmentUsername(userInfo, department) {
+    const emailPrefix = userInfo.email.split('@')[0];
+    return `${emailPrefix}_${department.code}`.toLowerCase();
+  }
+
+  generateNonce() {
+    return require('crypto').randomBytes(16).toString('hex');
+  }
+
+  determineDepartmentRole(userInfo, department) {
+    // Basic role determination logic
+    if (department.code === 'sistemas') {
+      return 'employee';
+    }
+
+    // Check for admin indicators in OAuth profile
+    if (userInfo.roles?.includes('admin')
+        || userInfo.groups?.some((group) => group.includes('admin'))) {
+      return 'admin';
+    }
+
+    // Check for manager indicators
+    if (userInfo.job_title?.toLowerCase().includes('manager')
+        || userInfo.department_role === 'manager') {
+      return 'manager';
+    }
+
+    return 'employee';
+  }
+
+  determineDepartmentRedirect(user, department) {
+    // Department-specific redirect URLs
+    const redirects = {
+      sistemas: '/dashboard/technical',
+      rrhh: '/dashboard/hr',
+      finanzas: '/dashboard/finance',
+      marketing: '/dashboard/marketing',
+      ventas: '/dashboard/sales',
+      operaciones: '/dashboard/operations',
+      legal: '/dashboard/legal',
+      compras: '/dashboard/procurement',
+    };
+
+    return redirects[department.code] || '/dashboard';
+  }
+
+  // Additional helper methods would be implemented here...
+  async validateProviderSetup(_provider, _deptCode) {
+    // Implementation for provider validation
+    return true;
+  }
+
+  async validatePermissionMappings(_mappings, _deptCode) {
+    // Implementation for permission mapping validation
+    return true;
+  }
+
+  async getCorporateConfig(_configId) {
+    // Implementation to get corporate config
+    return null;
+  }
+
+  async getProviderConfig(_provider) {
+    // Implementation to get provider config
+    return {};
+  }
+
+  async exchangeCodeForTokens(_options) {
+    // Implementation to exchange code for tokens
+    return {};
+  }
+
+  async getUserInfoFromProvider(_provider, _token) {
+    // Implementation to get user info from provider
+    return {};
+  }
+
+  async validateDepartmentClaims(_userInfo, _deptConfig) {
+    // Implementation to validate department-specific claims
+    return true;
+  }
+
+  async handleApprovalRequired(_userInfo, _deptConfig, _tokenData) {
+    // Implementation for approval workflow
+    return {};
+  }
+
+  async linkOAuthAccountToUser(_user, _userInfo, _provider) {
+    // Implementation to link OAuth account
+
+  }
+
+  async updateUserDepartmentInfo(_user, _department) {
+    // Implementation to update user department info
+
+  }
+
+  async applyAutoProvisionRoles(_user, _userInfo, _department) {
+    // Implementation for auto-provision roles
+
+  }
+
+  async executePostAuthActions(_user, _department, _contextResult) {
+    // Implementation for post-auth actions
+
+  }
+}
+
+module.exports = { DepartmentOAuthFlowService };
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

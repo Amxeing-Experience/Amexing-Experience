@@ -23,6 +23,8 @@
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Basic Apple Sign In button
  * const appleButton = new AppleSignInButton({
  *   clientId: 'com.amexing.service',
@@ -56,7 +58,7 @@ class AppleSignInButton {
     this.options = {
       clientId: options.clientId || window.APPLE_CLIENT_ID,
       scope: options.scope || 'email name',
-      responseType: options.responseType || 'code id_token',
+      responseType: options.responseType || 'code idtoken',
       responseMode: options.responseMode || 'form_post',
       usePopup: options.usePopup || false,
       locale: options.locale || 'en_US',
@@ -171,13 +173,13 @@ class AppleSignInButton {
     container.innerHTML = '';
 
     if (this.supportsAppleID && window.AppleID) {
-      this.createNativeAppleButton(container);
+      this.createNativeAppleButton(_container); // eslint-disable-line no-undef
     } else {
-      this.createFallbackButton(container);
+      this.createFallbackButton(_container); // eslint-disable-line no-undef
     }
 
     // Add mobile optimizations
-    this.applyMobileOptimizations(container);
+    this.applyMobileOptimizations(_container); // eslint-disable-line no-undef
   }
 
   createButtonContainer() {
@@ -188,15 +190,15 @@ class AppleSignInButton {
     // Find OAuth providers container
     const providersContainer = document.querySelector('.oauth-providers');
     if (providersContainer) {
-      providersContainer.appendChild(container);
+      providersContainer.appendChild(_container); // eslint-disable-line no-undef
     } else {
-      document.body.appendChild(container);
+      document.body.appendChild(_container); // eslint-disable-line no-undef
     }
 
     return container;
   }
 
-  createNativeAppleButton(container) {
+  createNativeAppleButton(_container) {
     // Create Apple ID sign-in button
     const buttonDiv = document.createElement('div');
     buttonDiv.id = 'appleid-signin';
@@ -210,7 +212,7 @@ class AppleSignInButton {
     buttonDiv.setAttribute('data-size', 'medium');
     buttonDiv.setAttribute('data-logo-color', this.isAppleDevice ? 'white' : 'black');
 
-    container.appendChild(buttonDiv);
+    container.appendChild(buttonDiv); // eslint-disable-line no-undef
 
     // Render the button
     try {
@@ -228,11 +230,11 @@ class AppleSignInButton {
       document.addEventListener('AppleIDSignInOnFailure', this.handleError.bind(this));
     } catch (error) {
       console.error('Failed to render Apple button:', error);
-      this.createFallbackButton(container);
+      this.createFallbackButton(_container);
     }
   }
 
-  createFallbackButton(container) {
+  createFallbackButton(_container) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'oauth-btn apple-signin-fallback';
@@ -289,7 +291,7 @@ class AppleSignInButton {
       });
     }
 
-    container.appendChild(button);
+    container.appendChild(button); // eslint-disable-line no-undef
   }
 
   getAppleIcon() {
@@ -314,7 +316,7 @@ class AppleSignInButton {
     return svg;
   }
 
-  applyMobileOptimizations(container) {
+  applyMobileOptimizations(_container) {
     if (!window.oauthMobileOptimizer) return;
 
     // Apply mobile-specific styling

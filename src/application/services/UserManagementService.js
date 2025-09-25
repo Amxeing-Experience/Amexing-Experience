@@ -1,0 +1,1437 @@
+/**
+ * UserManagementService - AI Agent Compatible User CRUD Operations
+ * Implements SOLID principles and follows AI agent data lifecycle rules.
+ *
+ * Features:
+ * - Role-based user access filtering
+ * - AI agent compliant data lifecycle management (active/exists pattern)
+ * - Comprehensive audit logging
+ * - Performance optimized queries with pagination
+ * - Security validation and input sanitization.
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 2024-09-22
+ * @example
+ * // User management service usage
+ * const result = await usermanagementservice.require(userId, data);
+ * // Returns: { success: true, user: {...} }
+ */
+
+const Parse = require('parse/node');
+const AmexingUser = require('../../domain/models/AmexingUser');
+const BaseModel = require('../../domain/models/BaseModel');
+const logger = require('../../infrastructure/logger');
+
+/**
+ * UserManagementService class implementing comprehensive user management
+ * with AI agent compliance and role-based access control.
+ *
+ * Follows SOLID Principles:
+ * - Single Responsibility: Manages user operations only
+ * - Open/Closed: Extensible through role-specific filtering strategies
+ * - Liskov Substitution: Can be substituted with role-specific implementations
+ * - Interface Segregation: Provides specific interfaces for different operations
+ * - Dependency Inversion: Depends on BaseModel abstractions.
+ */
+class UserManagementService {
+  constructor() {
+    this.className = 'AmexingUser';
+    this.allowedRoles = ['superadmin', 'admin', 'client', 'department_manager', 'employee', 'driver', 'guest'];
+    this.roleHierarchy = {
+      superadmin: 7,
+      admin: 6,
+      client: 5,
+      department_manager: 4,
+      employee: 3,
+      driver: 2,
+      guest: 1,
+    };
+  }
+
+  /**
+   * Get users with role-based filtering and AI agent compliance.
+   * Always respects active/exists pattern for data lifecycle management.
+   * @param {object} currentUser - User making the request.
+   * @param {object} options - Query options.
+   * @param {string} options.targetRole - Role of users to retrieve.
+   * @param {number} options.page - Page number for pagination (default: 1).
+   * @param {number} options.limit - Items per page (default: 25).
+   * @param {object} options.filters - Additional filters.
+   * @param {object} options.sort - Sorting configuration.
+   * @returns {Promise<object>} - Users data with pagination info.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getUsers(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   */
+  async getUsers(currentUser, options = {}) {
+    try {
+      const {
+        targetRole = null,
+        page = 1,
+        limit = 25,
+        filters = {},
+        sort = { field: 'lastName', direction: 'asc' },
+      } = options;
+
+      // TEMPORARY FIX: Query all users instead of only active ones
+      // Original: const query = BaseModel.queryActive(this.className);
+      const query = new Parse.Query(this.className);
+
+      // Apply role-based access filtering
+      this.applyRoleBasedFiltering(query, currentUser, targetRole);
+
+      // Apply additional filters
+      this.applyAdvancedFilters(query, filters);
+
+      // Apply sorting
+      this.applySorting(query, sort);
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+      query.skip(skip);
+      query.limit(limit);
+
+      // Debug: Check total users in database without filters
+      const debugQuery = new Parse.Query(this.className);
+      const allUsers = await debugQuery.find({ useMasterKey: true });
+      logger.debug('Total users in database:', { count: allUsers.length });
+      allUsers.forEach((user, index) => {
+        logger.debug('User details:', {
+          index: index + 1,
+          email: user.get('email') || 'no-email',
+          active: user.get('active'),
+          exists: user.get('exists'),
+        });
+      });
+
+      // Execute queries in parallel for performance
+      const [users, totalCount] = await Promise.all([
+        query.find({ useMasterKey: true }),
+        this.getTotalUserCount(currentUser, targetRole, filters),
+      ]);
+
+      logger.debug('Filtered users found:', { count: users.length });
+
+      // Transform users to safe format
+      const safeUsers = users.map((user) => this.transformUserToSafeFormat(user));
+
+      // Log activity for audit compliance
+      await this.logUserQueryActivity(currentUser, {
+        targetRole,
+        page,
+        limit,
+        totalResults: totalCount,
+        filtersApplied: Object.keys(filters).length,
+      });
+
+      return {
+        users: safeUsers,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          hasNext: (page * limit) < totalCount,
+          hasPrev: page > 1,
+        },
+        metadata: {
+          queriedAt: new Date(),
+          requestedBy: currentUser.id,
+          appliedRole: targetRole,
+          activeFilters: Object.keys(filters),
+        },
+      };
+    } catch (error) {
+      logger.error('Error in UserManagementService.getUsers', {
+        error: error.message,
+        stack: error.stack,
+        currentUser: currentUser?.id,
+        options,
+      });
+      throw new Error(`Failed to retrieve users: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get a single user by ID with role-based access validation.
+   * @param {object} currentUser - User making the request.
+   * @param {string} userId - ID of user to retrieve.
+   * @returns {Promise<object>} - User data or null if not accessible.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getUserById(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   */
+  async getUserById(currentUser, userId) {
+    try {
+      // AI Agent Rule: Use queryActive for business operations
+      const query = BaseModel.queryActive(this.className);
+      const user = await query.get(userId, { useMasterKey: true });
+
+      if (!user) {
+        return null;
+      }
+
+      // Validate access permissions
+      if (!this.canAccessUser(currentUser, user)) {
+        throw new Error('Insufficient permissions to access this user');
+      }
+
+      // Log access for audit compliance
+      await this.logUserAccessActivity(currentUser, userId, 'view');
+
+      return this.transformUserToSafeFormat(user);
+    } catch (error) {
+      if (error.code === 101) { // Parse object not found
+        return null;
+      }
+      logger.error('Error in UserManagementService.getUserById', {
+        error: error.message,
+        currentUser: currentUser?.id,
+        targetUserId: userId,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Create a new user following AI agent lifecycle rules.
+   * @param {object} userData - User data to create.
+   * @param {object} createdBy - User creating the new user.
+   * @returns {Promise<object>} - Created user data.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.createUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   */
+  async createUser(userData, createdBy) {
+    try {
+      // Validate permissions
+      if (!this.canCreateUser(createdBy, userData.role)) {
+        throw new Error('Insufficient permissions to create user with this role');
+      }
+
+      // Validate input data
+      await this.validateUserData(userData, 'create');
+
+      // Check for existing user with same email
+      const existingUser = await this.checkExistingUser(userData.email);
+      if (existingUser) {
+        throw new Error('User with this email already exists');
+      }
+
+      // Prepare user data with AI agent lifecycle fields
+      const userDataWithDefaults = {
+        ...userData,
+        username: userData.email, // Email-primary authentication
+        active: true,
+        exists: true,
+        emailVerified: false,
+        loginAttempts: 0,
+        createdBy: createdBy.id,
+        modifiedBy: createdBy.id,
+      };
+
+      // Create user using AmexingUser model (follows BaseModel patterns)
+      const user = AmexingUser.create(userDataWithDefaults);
+
+      // Set password securely
+      if (userData.password) {
+        await user.setPassword(userData.password);
+      }
+
+      // Save with master key for admin operations
+      await user.save(null, { useMasterKey: true });
+
+      // Log creation activity
+      await this.logUserCRUDActivity(createdBy, 'create', user.id, {
+        role: userData.role,
+        email: userData.email,
+      });
+
+      logger.info('User created successfully', {
+        userId: user.id,
+        email: userData.email,
+        role: userData.role,
+        createdBy: createdBy.id,
+      });
+
+      return this.transformUserToSafeFormat(user);
+    } catch (error) {
+      logger.error('Error in UserManagementService.createUser', {
+        error: error.message,
+        userData: { ...userData, password: '[REDACTED]' },
+        createdBy: createdBy?.id,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Update an existing user following AI agent lifecycle rules.
+   * @param {string} userId - ID of user to update.
+   * @param {object} updates - Data to update.
+   * @param {object} modifiedBy - User making the update.
+   * @returns {Promise<object>} - Updated user data.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.updateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   */
+  async updateUser(userId, updates, modifiedBy) {
+    try {
+      // Get existing user using AI agent compliant query
+      const query = BaseModel.queryActive(this.className);
+      const user = await query.get(userId, { useMasterKey: true });
+
+      if (!user) {
+        throw new Error('User not found or not accessible');
+      }
+
+      // Validate permissions
+      if (!this.canModifyUser(modifiedBy, user)) {
+        throw new Error('Insufficient permissions to modify this user');
+      }
+
+      // Validate update data
+      await this.validateUserData(updates, 'update', user);
+
+      // Store original values for audit
+      const originalValues = this.extractAuditableFields(user);
+
+      // Apply updates while preserving lifecycle management
+      const allowedUpdateFields = [
+        'firstName', 'lastName', 'role', 'active', 'emailVerified',
+        'mustChangePassword', 'oauthAccounts', 'primaryOAuthProvider',
+      ];
+
+      allowedUpdateFields.forEach((field) => {
+        if (Object.prototype.hasOwnProperty.call(updates, field)) {
+          user.set(field, updates[field]);
+        }
+      });
+
+      // Update modification tracking
+      user.set('modifiedBy', modifiedBy.id);
+      user.set('updatedAt', new Date());
+
+      // Handle password update separately if provided
+      if (updates.password) {
+        await user.setPassword(updates.password);
+        user.set('passwordChangedAt', new Date());
+      }
+
+      // Save changes
+      await user.save(null, { useMasterKey: true });
+
+      // Log update activity with field changes
+      await this.logUserCRUDActivity(modifiedBy, 'update', userId, {
+        originalValues,
+        newValues: this.extractAuditableFields(user),
+        fieldsChanged: Object.keys(updates),
+      });
+
+      logger.info('User updated successfully', {
+        userId,
+        modifiedBy: modifiedBy.id,
+        fieldsUpdated: Object.keys(updates),
+      });
+
+      return this.transformUserToSafeFormat(user);
+    } catch (error) {
+      logger.error('Error in UserManagementService.updateUser', {
+        error: error.message,
+        userId,
+        updates: { ...updates, password: updates.password ? '[REDACTED]' : undefined },
+        modifiedBy: modifiedBy?.id,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Deactivate a user (soft delete) following AI agent rules.
+   * Never hard deletes - uses BaseModel.deactivate() method.
+   * @param {string} userId - ID of user to deactivate.
+   * @param {object} deactivatedBy - User performing the deactivation.
+   * @param {string} reason - Reason for deactivation.
+   * @returns {Promise<boolean>} - Success status.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.deactivateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   */
+  async deactivateUser(userId, deactivatedBy, reason = 'Admin action') {
+    try {
+      // Get user using existing records query (includes archived)
+      const query = BaseModel.queryExisting(this.className);
+      const user = await query.get(userId, { useMasterKey: true });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Validate permissions
+      if (!this.canDeactivateUser(deactivatedBy, user)) {
+        throw new Error('Insufficient permissions to deactivate this user');
+      }
+
+      // Prevent self-deactivation
+      if (userId === deactivatedBy.id) {
+        throw new Error('Cannot deactivate your own account');
+      }
+
+      // AI Agent Rule: Use deactivate method, never hard delete
+      await user.deactivate(deactivatedBy.id);
+
+      // Log deactivation activity
+      await this.logUserCRUDActivity(deactivatedBy, 'deactivate', userId, {
+        reason,
+        originalRole: user.get('role'),
+        originalEmail: user.get('email'),
+      });
+
+      logger.info('User deactivated successfully', {
+        userId,
+        deactivatedBy: deactivatedBy.id,
+        reason,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error('Error in UserManagementService.deactivateUser', {
+        error: error.message,
+        userId,
+        deactivatedBy: deactivatedBy?.id,
+        reason,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Reactivate a deactivated user following AI agent rules.
+   * @param {string} userId - ID of user to reactivate.
+   * @param {object} reactivatedBy - User performing the reactivation.
+   * @param {string} reason - Reason for reactivation.
+   * @returns {Promise<boolean>} - Success status.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.reactivateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   */
+  async reactivateUser(userId, reactivatedBy, reason = 'Admin action') {
+    try {
+      // Query archived users (deactivated but still exist)
+      const query = BaseModel.queryArchived(this.className);
+      const user = await query.get(userId, { useMasterKey: true });
+
+      if (!user) {
+        throw new Error('User not found or permanently deleted');
+      }
+
+      // Validate permissions
+      if (!this.canReactivateUser(reactivatedBy, user)) {
+        throw new Error('Insufficient permissions to reactivate this user');
+      }
+
+      // AI Agent Rule: Use activate method for lifecycle management
+      await user.activate(reactivatedBy.id);
+
+      // Log reactivation activity
+      await this.logUserCRUDActivity(reactivatedBy, 'reactivate', userId, {
+        reason,
+        role: user.get('role'),
+        email: user.get('email'),
+      });
+
+      logger.info('User reactivated successfully', {
+        userId,
+        reactivatedBy: reactivatedBy.id,
+        reason,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error('Error in UserManagementService.reactivateUser', {
+        error: error.message,
+        userId,
+        reactivatedBy: reactivatedBy?.id,
+        reason,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Toggle user active status (activate/deactivate) while maintaining exists: true
+   * AI Agent Rule: Preserves data lifecycle management by only changing active field.
+   * @param {object} currentUser - User performing the action.
+   * @param {string} userId - ID of user to toggle.
+   * @param {boolean} targetStatus - Target active status (true/false).
+   * @param {string} reason - Reason for status change.
+   * @returns {Promise<object>} - Result with success status and user data.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.toggleUserStatus(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   */
+  async toggleUserStatus(currentUser, userId, targetStatus, reason = 'Status change via API') {
+    try {
+      // Query active users to get current user data
+      const query = BaseModel.queryActive(this.className);
+      let user;
+
+      try {
+        user = await query.get(userId, { useMasterKey: true });
+      } catch (error) {
+        // If user not found in active query, try archived query
+        const archivedQuery = BaseModel.queryArchived(this.className);
+        user = await archivedQuery.get(userId, { useMasterKey: true });
+      }
+
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found',
+        };
+      }
+
+      // Validate permissions based on target status
+      const canPerformAction = targetStatus
+        ? this.canReactivateUser(currentUser, user)
+        : this.canDeactivateUser(currentUser, user);
+
+      if (!canPerformAction) {
+        return {
+          success: false,
+          message: 'Insufficient permissions to change user status',
+        };
+      }
+
+      const previousStatus = user.get('active');
+
+      // AI Agent Rule: Only change active field, maintain exists: true
+      user.set('active', targetStatus);
+      user.set('exists', true); // Ensure exists remains true
+      user.set('updatedAt', new Date());
+
+      await user.save(null, { useMasterKey: true });
+
+      // Log activity
+      await this.logUserCRUDActivity(currentUser, targetStatus ? 'activate' : 'deactivate', userId, {
+        reason,
+        role: user.get('role'),
+        email: user.get('email'),
+        previousStatus,
+        newStatus: targetStatus,
+      });
+
+      logger.info('User status toggled successfully', {
+        userId,
+        previousStatus,
+        newStatus: targetStatus,
+        changedBy: currentUser.id,
+        reason,
+      });
+
+      return {
+        success: true,
+        user: this.transformUserToSafeFormat(user),
+        previousStatus,
+        newStatus: targetStatus,
+      };
+    } catch (error) {
+      logger.error('Error in UserManagementService.toggleUserStatus', {
+        error: error.message,
+        userId,
+        targetStatus,
+        changedBy: currentUser?.id,
+        reason,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Archive user (soft delete) by setting active: false, exists: false
+   * AI Agent Rule: Makes user invisible to normal queries while preserving data.
+   * @param {object} currentUser - User performing the action.
+   * @param {string} userId - ID of user to archive.
+   * @param {string} reason - Reason for archiving.
+   * @returns {Promise<object>} - Result with success status and user data.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.archiveUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   */
+  async archiveUser(currentUser, userId, reason = 'User archived via API') {
+    try {
+      // Query active users first, then archived if not found
+      const query = BaseModel.queryActive(this.className);
+      let user;
+
+      try {
+        user = await query.get(userId, { useMasterKey: true });
+      } catch (error) {
+        // If user not found in active query, try archived query
+        const archivedQuery = BaseModel.queryArchived(this.className);
+        user = await archivedQuery.get(userId, { useMasterKey: true });
+      }
+
+      if (!user) {
+        return {
+          success: false,
+          message: 'User not found',
+        };
+      }
+
+      // Validate permissions - only superadmin can archive
+      if (currentUser.role !== 'superadmin') {
+        return {
+          success: false,
+          message: 'Only superadmin can archive users',
+        };
+      }
+
+      // Prevent self-archiving
+      if (user.id === currentUser.id) {
+        return {
+          success: false,
+          message: 'Cannot archive your own account',
+        };
+      }
+
+      // AI Agent Rule: Set both active and exists to false for archiving
+      user.set('active', false);
+      user.set('exists', false);
+      user.set('updatedAt', new Date());
+
+      await user.save(null, { useMasterKey: true });
+
+      // Log archiving activity
+      await this.logUserCRUDActivity(currentUser, 'archive', userId, {
+        reason,
+        role: user.get('role'),
+        email: user.get('email'),
+        archivedAt: new Date(),
+      });
+
+      logger.info('User archived successfully', {
+        userId,
+        archivedBy: currentUser.id,
+        reason,
+        role: user.get('role'),
+        email: user.get('email'),
+      });
+
+      return {
+        success: true,
+        user: this.transformUserToSafeFormat(user),
+        archived: true,
+      };
+    } catch (error) {
+      logger.error('Error in UserManagementService.archiveUser', {
+        error: error.message,
+        userId,
+        archivedBy: currentUser?.id,
+        reason,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Search users with advanced filtering and role-based access.
+   * @param {object} currentUser - User performing the search.
+   * @param {object} searchParams - Search parameters.
+   * @param {*} currentUser - _currentUser parameter.
+   * @param _currentUser
+   * @returns {Promise<object>} - Search results with pagination.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getUserStatistics(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   */
+  async getUserStatistics(_currentUser) {
+    try {
+      // Get total users
+      const totalUsersQuery = BaseModel.queryActive(this.className);
+      const totalUsers = await totalUsersQuery.count({ useMasterKey: true });
+
+      // Get active users
+      const activeUsersQuery = BaseModel.queryActive(this.className);
+      activeUsersQuery.equalTo('active', true);
+      const activeUsers = await activeUsersQuery.count({ useMasterKey: true });
+
+      // Get users created this month
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+
+      const newUsersQuery = BaseModel.queryActive(this.className);
+      newUsersQuery.greaterThanOrEqualTo('createdAt', startOfMonth);
+      const newThisMonth = await newUsersQuery.count({ useMasterKey: true });
+
+      // Get users pending email verification
+      const pendingQuery = BaseModel.queryActive(this.className);
+      pendingQuery.equalTo('emailVerified', false);
+      const pendingVerification = await pendingQuery.count({ useMasterKey: true });
+
+      // Get role distribution
+      const roles = ['superadmin', 'admin', 'client', 'department_manager', 'employee', 'driver', 'guest'];
+      const roleDistribution = {};
+
+      for (const role of roles) {
+        const roleQuery = BaseModel.queryActive(this.className);
+        roleQuery.equalTo('role', role);
+        roleDistribution[role] = await roleQuery.count({ useMasterKey: true });
+      }
+
+      // Get registration trends (last 6 months)
+      const trends = [];
+      const currentDate = new Date();
+
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = new Date(currentDate);
+        monthDate.setMonth(currentDate.getMonth() - i);
+
+        const startDate = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+        const endDate = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+
+        const monthQuery = BaseModel.queryActive(this.className);
+        monthQuery.greaterThanOrEqualTo('createdAt', startDate);
+        monthQuery.lessThanOrEqualTo('createdAt', endDate);
+
+        const count = await monthQuery.count({ useMasterKey: true });
+
+        trends.push({
+          month: startDate.toLocaleDateString('en-US', { month: 'short' }),
+          count,
+        });
+      }
+
+      return {
+        totalUsers,
+        activeUsers,
+        newThisMonth,
+        pendingVerification,
+        roleDistribution,
+        registrationTrends: trends,
+      };
+    } catch (error) {
+      logger.error('Error getting user statistics', {
+        error: error.message,
+        stack: error.stack,
+      });
+      throw error;
+    }
+  }
+
+  async searchUsers(currentUser, searchParams = {}) {
+    try {
+      const {
+        query: searchQuery = '',
+        role = null,
+        active = null,
+        page = 1,
+        limit = 25,
+        sortField = 'lastName',
+        sortDirection = 'asc',
+      } = searchParams;
+
+      // AI Agent Rule: Query active users for search operations
+      const query = BaseModel.queryActive(this.className);
+
+      // Apply role-based filtering
+      this.applyRoleBasedFiltering(query, currentUser, role);
+
+      // Apply search query across multiple fields
+      if (searchQuery.trim()) {
+        const searchTerms = searchQuery.trim().toLowerCase();
+
+        // Create compound query for searching across multiple fields
+        const emailQuery = new Parse.Query(this.className);
+        emailQuery.matches('email', searchTerms, 'i');
+
+        const firstNameQuery = new Parse.Query(this.className);
+        firstNameQuery.matches('firstName', searchTerms, 'i');
+
+        const lastNameQuery = new Parse.Query(this.className);
+        lastNameQuery.matches('lastName', searchTerms, 'i');
+
+        const compoundQuery = Parse.Query.or(emailQuery, firstNameQuery, lastNameQuery);
+        query.matchesQuery('objectId', compoundQuery);
+      }
+
+      // Apply active filter if specified
+      if (active !== null) {
+        query.equalTo('active', active);
+      }
+
+      // Apply role filter if specified
+      if (role) {
+        query.equalTo('role', role);
+      }
+
+      // Apply sorting
+      const sortOrder = sortDirection === 'desc' ? 'descending' : 'ascending';
+      query.addOrder(sortField, sortOrder);
+
+      // Calculate pagination
+      const skip = (page - 1) * limit;
+      query.skip(skip);
+      query.limit(limit);
+
+      // Execute search
+      const [users, totalCount] = await Promise.all([
+        query.find({ useMasterKey: true }),
+        this.getSearchResultCount(currentUser, searchParams),
+      ]);
+
+      // Transform results
+      const safeUsers = users.map((user) => this.transformUserToSafeFormat(user));
+
+      // Log search activity
+      await this.logUserSearchActivity(currentUser, searchParams, totalCount);
+
+      return {
+        users: safeUsers,
+        pagination: {
+          page,
+          limit,
+          totalCount,
+          totalPages: Math.ceil(totalCount / limit),
+          hasNext: (page * limit) < totalCount,
+          hasPrev: page > 1,
+        },
+        searchMetadata: {
+          query: searchQuery,
+          appliedFilters: { role, active },
+          searchedAt: new Date(),
+          searchedBy: currentUser.id,
+        },
+      };
+    } catch (error) {
+      logger.error('Error in UserManagementService.searchUsers', {
+        error: error.message,
+        currentUser: currentUser?.id,
+        searchParams,
+      });
+      throw new Error(`Search failed: ${error.message}`);
+    }
+  }
+
+  // ===== PRIVATE HELPER METHODS =====
+
+  /**
+   * Apply role-based filtering to query based on current user's permissions.
+   * Implements business rules for user visibility.
+   * @param {object} query - Query parameters object.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {string} targetRole - Target role for authorization check.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.applyRoleBasedFiltering(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
+   */
+  applyRoleBasedFiltering(query, currentUser, targetRole = null) {
+    switch (currentUser.role) {
+      case 'superadmin':
+        // Superadmin can see all users
+        if (targetRole) {
+          query.equalTo('role', targetRole);
+        }
+        break;
+
+      case 'admin':
+        // Admin can see all users except other superadmins
+        query.notEqualTo('role', 'superadmin');
+        if (targetRole && targetRole !== 'superadmin') {
+          query.equalTo('role', targetRole);
+        }
+        break;
+
+      case 'client': {
+        // Client can only see users from their company
+        const allowedClientRoles = ['employee', 'department_manager'];
+        if (targetRole) {
+          if (allowedClientRoles.includes(targetRole)) {
+            query.equalTo('role', targetRole);
+          } else {
+            // Restrict to no results if requesting unauthorized role
+            query.equalTo('objectId', 'non-existent-id');
+            return;
+          }
+        } else {
+          query.containedIn('role', allowedClientRoles);
+        }
+        // Add client filter when clientId field is available
+        if (currentUser.clientId) {
+          query.equalTo('clientId', currentUser.clientId);
+        }
+        break;
+      }
+
+      case 'department_manager':
+        // Department manager can only see their department employees
+        query.equalTo('role', 'employee');
+        if (currentUser.departmentId) {
+          query.equalTo('departmentId', currentUser.departmentId);
+        }
+        break;
+
+      default:
+        // Employee, driver, guest can only see their own profile
+        query.equalTo('objectId', currentUser.id);
+        break;
+    }
+  }
+
+  /**
+   * Apply advanced filters to the query.
+   * @param {object} query - Query parameters object.
+   * @param {*} filters - Filters parameter.
+   * @param _filters
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.applyAdvancedFilters(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
+   */
+  applyAdvancedFilters(query, _filters) {
+    // Skip corporate config filtering if not available
+    if (!this.config?.corporateConfig?.departments) {
+      logger.debug('Corporate config not available, skipping advanced filters');
+      return;
+    }
+
+    Object.entries(this.config.corporateConfig.departments).forEach(([_key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        switch (_key) {
+          case 'active':
+            query.equalTo('active', value);
+            break;
+          case 'emailVerified':
+            query.equalTo('emailVerified', value);
+            break;
+          case 'role':
+            query.equalTo('role', value);
+            break;
+          case 'clientId':
+            query.equalTo('clientId', value);
+            break;
+          case 'departmentId':
+            query.equalTo('departmentId', value);
+            break;
+          case 'createdAfter':
+            query.greaterThan('createdAt', new Date(value));
+            break;
+          case 'createdBefore':
+            query.lessThan('createdAt', new Date(value));
+            break;
+          default:
+            // Ignore unknown filter keys
+            break;
+        }
+      }
+    });
+  }
+
+  /**
+   * Apply sorting to the query.
+   * @param {object} query - Query parameters object.
+   * @param {*} sort - Sort parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.applySorting(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
+   */
+  applySorting(query, sort) {
+    const { field, direction } = sort;
+    const allowedSortFields = [
+      'firstName', 'lastName', 'email', 'role', 'createdAt',
+      'updatedAt', 'lastLoginAt', 'active',
+    ];
+
+    if (allowedSortFields.includes(field)) {
+      if (direction === 'desc') {
+        query.descending(field);
+      } else {
+        query.ascending(field);
+      }
+    } else {
+      // Default sorting - ascending by lastName, then firstName
+      query.ascending('lastName');
+      query.addAscending('firstName');
+    }
+  }
+
+  /**
+   * Get total count of users matching criteria.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {string} targetRole - Target role for authorization check.
+   * @param {*} filters - Filters parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getTotalUserCount(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async getTotalUserCount(currentUser, targetRole, filters) {
+    // TEMPORARY FIX: Query all users instead of only active ones
+    // Original: const countQuery = BaseModel.queryActive(this.className);
+    const countQuery = new Parse.Query(this.className);
+    this.applyRoleBasedFiltering(countQuery, currentUser, targetRole);
+    this.applyAdvancedFilters(countQuery, filters);
+
+    const count = await countQuery.count({ useMasterKey: true });
+    return count;
+  }
+
+  /**
+   * Get count of search results.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} searchParams - SearchParams parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.getSearchResultCount(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async getSearchResultCount(currentUser, searchParams) {
+    const { query: searchQuery, role, active } = searchParams;
+
+    const countQuery = BaseModel.queryActive(this.className);
+    this.applyRoleBasedFiltering(countQuery, currentUser, role);
+
+    if (searchQuery?.trim()) {
+      const searchTerms = searchQuery.trim().toLowerCase();
+      const emailQuery = new Parse.Query(this.className);
+      emailQuery.matches('email', searchTerms, 'i');
+
+      const firstNameQuery = new Parse.Query(this.className);
+      firstNameQuery.matches('firstName', searchTerms, 'i');
+
+      const lastNameQuery = new Parse.Query(this.className);
+      lastNameQuery.matches('lastName', searchTerms, 'i');
+
+      const compoundQuery = Parse.Query.or(emailQuery, firstNameQuery, lastNameQuery);
+      countQuery.matchesQuery('objectId', compoundQuery);
+    }
+
+    if (active !== null) {
+      countQuery.equalTo('active', active);
+    }
+
+    const count = await countQuery.count({ useMasterKey: true });
+    return count;
+  }
+
+  /**
+   * Transform user object to safe format for API responses.
+   * Removes sensitive fields and includes only necessary data.
+   * @param {*} user - User parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.transformUserToSafeFormat(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {object} - Operation result.
+   */
+  transformUserToSafeFormat(user) {
+    return {
+      id: user.id,
+      email: user.get('email'),
+      username: user.get('username'),
+      firstName: user.get('firstName'),
+      lastName: user.get('lastName'),
+      role: user.get('role'),
+      active: user.get('active'),
+      exists: user.get('exists'),
+      emailVerified: user.get('emailVerified'),
+      lastLoginAt: user.get('lastLoginAt'),
+      loginAttempts: user.get('loginAttempts'),
+      mustChangePassword: user.get('mustChangePassword'),
+      primaryOAuthProvider: user.get('primaryOAuthProvider'),
+      lastAuthMethod: user.get('lastAuthMethod'),
+      createdAt: user.get('createdAt'),
+      updatedAt: user.get('updatedAt'),
+      createdBy: user.get('createdBy'),
+      modifiedBy: user.get('modifiedBy'),
+    };
+  }
+
+  /**
+   * Validate user data for create/update operations.
+   * @param {object} userData - User registration/update data.
+   * @param {*} operation - Operation parameter.
+   * @param {*} existingUser - ExistingUser parameter.
+   * @param {*} existingUser - _existingUser parameter.
+   * @param _existingUser
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.validateUserData(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async validateUserData(userData, operation = 'create', _existingUser = null) {
+    const errors = [];
+
+    // Required fields validation
+    if (operation === 'create') {
+      const requiredFields = ['email', 'firstName', 'lastName', 'role'];
+      requiredFields.forEach((field) => {
+        if (!userData[field] || userData[field].toString().trim() === '') {
+          errors.push(`${field} is required`);
+        }
+      });
+    }
+
+    // Email validation
+    if (userData.email) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(userData.email)) {
+        errors.push('Invalid email format');
+      }
+    }
+
+    // Role validation
+    if (userData.role && !this.allowedRoles.includes(userData.role)) {
+      errors.push(`Invalid role: ${userData.role}`);
+    }
+
+    // Password validation (if provided)
+    if (userData.password) {
+      if (userData.password.length < 8) {
+        errors.push('Password must be at least 8 characters long');
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new Error(`Validation failed: ${errors.join(', ')}`);
+    }
+  }
+
+  /**
+   * Check if user with email already exists.
+   * @param {string} email - User email address.
+   * @param email
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.checkExistingUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async checkExistingUser(email) {
+    try {
+      const query = BaseModel.queryExisting(this.className);
+      query.equalTo('email', email.toLowerCase().trim());
+      query.limit(1);
+
+      const existingUser = await query.first({ useMasterKey: true });
+      return existingUser || null;
+    } catch (error) {
+      // If error, assume no existing user to proceed safely
+      return null;
+    }
+  }
+
+  /**
+   * Extract auditable fields from user for change tracking.
+   * @param {*} user - User parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.extractAuditableFields(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {object} - Operation result.
+   */
+  extractAuditableFields(user) {
+    return {
+      email: user.get('email'),
+      firstName: user.get('firstName'),
+      lastName: user.get('lastName'),
+      role: user.get('role'),
+      active: user.get('active'),
+      emailVerified: user.get('emailVerified'),
+      mustChangePassword: user.get('mustChangePassword'),
+    };
+  }
+
+  // ===== PERMISSION VALIDATION METHODS =====
+
+  /**
+   * Check if current user can access target user.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUser - TargetUser parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canAccessUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {boolean} - Boolean result Operation result.
+   */
+  canAccessUser(currentUser, targetUser) {
+    const currentLevel = this.roleHierarchy[currentUser.role] || 0;
+    const targetLevel = this.roleHierarchy[targetUser.get('role')] || 0;
+
+    // Higher or equal level can access lower level users
+    if (currentLevel >= targetLevel) {
+      return true;
+    }
+
+    // Users can access their own profile
+    if (currentUser.id === targetUser.id) {
+      return true;
+    }
+
+    // Client/Department manager specific rules
+    if (currentUser.role === 'client' && targetUser.get('clientId') === currentUser.clientId) {
+      return true;
+    }
+
+    if (currentUser.role === 'department_manager' && targetUser.get('departmentId') === currentUser.departmentId) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if current user can create user with target role.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {string} targetRole - Target role for authorization check.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canCreateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
+   */
+  canCreateUser(currentUser, targetRole) {
+    const currentLevel = this.roleHierarchy[currentUser.role] || 0;
+    const targetLevel = this.roleHierarchy[targetRole] || 0;
+
+    // Can only create users with lower or equal role level
+    return currentLevel >= targetLevel;
+  }
+
+  /**
+   * Check if current user can modify target user.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUser - TargetUser parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canModifyUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {boolean} - Boolean result Operation result.
+   */
+  canModifyUser(currentUser, targetUser) {
+    const currentLevel = this.roleHierarchy[currentUser.role] || 0;
+    const targetLevel = this.roleHierarchy[targetUser.get('role')] || 0;
+
+    // Cannot modify users with higher role level
+    if (currentLevel < targetLevel) {
+      return false;
+    }
+
+    // Cannot modify other superadmins unless you are superadmin
+    if (targetUser.get('role') === 'superadmin' && currentUser.role !== 'superadmin') {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if current user can deactivate target user.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUser - TargetUser parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canDeactivateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
+   */
+  canDeactivateUser(currentUser, targetUser) {
+    // Same rules as modify for deactivation
+    return this.canModifyUser(currentUser, targetUser);
+  }
+
+  /**
+   * Check if current user can reactivate target user.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUser - TargetUser parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.canReactivateUser(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
+   */
+  canReactivateUser(currentUser, targetUser) {
+    // Same rules as modify for reactivation
+    return this.canModifyUser(currentUser, targetUser);
+  }
+
+  // ===== LOGGING METHODS FOR AUDIT COMPLIANCE =====
+
+  /**
+   * Log user query activity for audit trails.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} queryDetails - QueryDetails parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.logUserQueryActivity(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async logUserQueryActivity(currentUser, queryDetails) {
+    try {
+      logger.info('User query performed', {
+        action: 'user_query',
+        performedBy: currentUser.id,
+        userRole: currentUser.role,
+        queryDetails,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      // Don't fail the main operation if logging fails
+      logger.error('Failed to log user query activity', { error: error.message });
+    }
+  }
+
+  /**
+   * Log user access activity.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} targetUserId - TargetUserId parameter.
+   * @param {string} action - Action identifier.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.logUserAccessActivity(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async logUserAccessActivity(currentUser, targetUserId, action) {
+    try {
+      logger.info('User access activity', {
+        action: `user_${action}`,
+        performedBy: currentUser.id,
+        targetUser: targetUserId,
+        userRole: currentUser.role,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      logger.error('Failed to log user access activity', { error: error.message });
+    }
+  }
+
+  /**
+   * Log CRUD operations for audit compliance.
+   * @param {*} performedBy - PerformedBy parameter.
+   * @param {string} action - Action identifier.
+   * @param {*} targetUserId - TargetUserId parameter.
+   * @param {*} details - Details parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.logUserCRUDActivity(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async logUserCRUDActivity(performedBy, action, targetUserId, details = {}) {
+    try {
+      logger.info('User CRUD operation', {
+        action: `user_${action}`,
+        performedBy: performedBy.id,
+        performedByRole: performedBy.role,
+        targetUser: targetUserId,
+        details,
+        timestamp: new Date(),
+        compliance: 'AI_AGENT_LIFECYCLE',
+      });
+    } catch (error) {
+      logger.error('Failed to log CRUD activity', { error: error.message });
+    }
+  }
+
+  /**
+   * Log search operations for audit trails.
+   * @param {object} currentUser - Current authenticated user object.
+   * @param {*} searchParams - SearchParams parameter.
+   * @param {*} resultCount - ResultCount parameter.
+   * @example
+   * // User management service usage
+   * const result = await usermanagementservice.logUserSearchActivity(userId , data);
+   * // Returns: { success: true, user: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async logUserSearchActivity(currentUser, searchParams, resultCount) {
+    try {
+      logger.info('User search performed', {
+        action: 'user_search',
+        performedBy: currentUser.id,
+        userRole: currentUser.role,
+        searchParams: { ...searchParams, password: undefined },
+        resultCount,
+        timestamp: new Date(),
+      });
+    } catch (error) {
+      logger.error('Failed to log search activity', { error: error.message });
+    }
+  }
+}
+
+module.exports = UserManagementService;

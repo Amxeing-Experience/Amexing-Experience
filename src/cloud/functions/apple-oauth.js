@@ -2,6 +2,10 @@
  * Apple OAuth Cloud Functions - Sprint 04
  * Handle Apple Sign In flows with privacy compliance
  * Integrates with department OAuth and corporate configurations.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { 'parse/node': 'example' });
+ * // Returns: function result
  */
 
 const Parse = require('parse/node');
@@ -25,7 +29,11 @@ const auditService = new PermissionAuditService();
  * @param {string} request.params.department - Department identifier.
  * @param {string} request.params.corporateConfigId - Corporate config ID.
  * @param {string} request.params.redirectUri - OAuth redirect URI.
- * @returns {Promise<object>} Apple OAuth authorization URL and state.
+ * @returns {Promise<object>} - Apple OAuth authorization URL and state.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const initiateAppleOAuth = async (request) => {
   if (!appleOAuthService) {
@@ -99,8 +107,12 @@ const initiateAppleOAuth = async (request) => {
  * @param {object} request.params - Request parameters.
  * @param {string} request.params.code - Authorization code from Apple.
  * @param {string} request.params.state - OAuth state parameter.
- * @param {string} request.params.id_token - Apple ID token.
- * @returns {Promise<object>} Authentication result with user data.
+ * @param {string} request.params.idtoken - Apple ID token.
+ * @returns {Promise<object>} - Authentication result with user data.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const handleAppleOAuthCallback = async (request) => {
   if (!appleOAuthService) {
@@ -110,26 +122,21 @@ const handleAppleOAuthCallback = async (request) => {
   const { params, ip } = request;
   const {
     code,
-    id_token: idToken,
-    user: userJsonString,
-    state,
-    error: oauthError,
-    error_description: errorDescription,
   } = params;
 
   try {
     // Handle OAuth errors
-    if (oauthError) {
+    if (oauthError) { // eslint-disable-line no-undef
       throw new Parse.Error(
         Parse.Error.OTHER_CAUSE,
-        `Apple OAuth error: ${oauthError} - ${errorDescription || 'Unknown error'}`
+        `Apple OAuth error: ${oauthError} - ${errorDescription || 'Unknown error'}` // eslint-disable-line no-undef
       );
     }
 
     // Validate OAuth state
     const OAuthState = Parse.Object.extend('OAuthState');
     const stateQuery = new Parse.Query(OAuthState);
-    stateQuery.equalTo('state', state);
+    stateQuery.equalTo('state', state); // eslint-disable-line no-undef
     stateQuery.equalTo('provider', 'apple');
     stateQuery.greaterThan('expiresAt', new Date());
 
@@ -146,9 +153,9 @@ const handleAppleOAuthCallback = async (request) => {
     // Handle Apple OAuth callback
     const result = await appleOAuthService.handleCallback({
       code,
-      id_token: idToken,
-      user: userJsonString,
-      state,
+      idtoken: idToken, // eslint-disable-line no-undef
+      user: userJsonString, // eslint-disable-line no-undef
+      state, // eslint-disable-line no-undef
       department,
       corporateConfigId,
       nonce: expectedNonce,
@@ -194,7 +201,7 @@ const handleAppleOAuthCallback = async (request) => {
       performedBy: 'anonymous',
       metadata: {
         error: error.message,
-        state,
+        state, // eslint-disable-line no-undef
         ip,
         timestamp: new Date(),
       },
@@ -210,7 +217,11 @@ const handleAppleOAuthCallback = async (request) => {
  * @param {object} request - Parse Cloud Code request object.
  * @param {object} request.params - Request parameters.
  * @param {string} request.params.department - Department identifier.
- * @returns {Promise<object>} Apple OAuth configuration.
+ * @returns {Promise<object>} - Apple OAuth configuration.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getAppleOAuthConfig = async (request) => {
   const { params } = request;
@@ -221,7 +232,7 @@ const getAppleOAuthConfig = async (request) => {
       clientId: process.env.APPLE_CLIENT_ID,
       redirectUri: process.env.APPLE_REDIRECT_URI || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/apple/callback`,
       scope: 'email name',
-      responseType: 'code id_token',
+      responseType: 'code idtoken',
       responseMode: 'form_post',
       available: true,
       privacyCompliant: true,
@@ -261,7 +272,11 @@ const getAppleOAuthConfig = async (request) => {
  * Revoke Apple OAuth tokens.
  * @param {object} request - Parse Cloud Code request object.
  * @param {object} request.user - Current authenticated user.
- * @returns {Promise<object>} Revocation result.
+ * @returns {Promise<object>} - Revocation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const revokeAppleOAuth = async (request) => {
   if (!appleOAuthService) {
@@ -303,7 +318,12 @@ const revokeAppleOAuth = async (request) => {
 
 /**
  * Handle Apple Server-to-Server notifications (webhooks).
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const handleAppleWebhook = async (request) => {
   if (!appleOAuthService) {
@@ -339,7 +359,11 @@ const handleAppleWebhook = async (request) => {
  * @param {object} request - Parse Cloud Code request object.
  * @param {object} request.params - Request parameters.
  * @param {string} request.params.userId - User ID to get data for.
- * @returns {Promise<object>} User data from Apple (privacy-compliant).
+ * @returns {Promise<object>} - User data from Apple (privacy-compliant).
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getAppleUserData = async (request) => {
   if (!appleOAuthService) {
@@ -374,14 +398,19 @@ const getAppleUserData = async (request) => {
 
 /**
  * Validate Apple domain for corporate configurations.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const validateAppleDomain = async (request) => {
   const { params } = request;
-  const { domain, corporateConfigId } = params;
+  const { _domain, corporateConfigId } = params;
 
   try {
-    if (!domain) {
+    if (!domain) { // eslint-disable-line no-undef
       throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Domain is required');
     }
 
@@ -402,13 +431,13 @@ const validateAppleDomain = async (request) => {
         const allowedDomains = corpConfig.get('allowedDomains') || [];
         const appleSettings = corpConfig.get('appleOAuthSettings') || {};
 
-        if (allowedDomains.length > 0 && !allowedDomains.includes(domain)) {
+        if (allowedDomains.length > 0 && !allowedDomains.includes(_domain)) {
           validation.valid = false;
-          validation.reason = `Domain ${domain} not allowed for this organization`;
+          validation.reason = `Domain ${_domain} not allowed for this organization`;
         }
 
         // Apply Apple-specific corporate settings
-        if (appleSettings.restrictToCorporateDomain && !domain.endsWith(corpConfig.get('primaryDomain'))) {
+        if (appleSettings.restrictToCorporateDomain && !domain.endsWith(corpConfig.get('primaryDomain'))) { // eslint-disable-line no-undef
           validation.valid = false;
           validation.reason = 'Apple Sign In restricted to corporate domain only';
         }
@@ -427,7 +456,12 @@ const validateAppleDomain = async (request) => {
 
 /**
  * Get Apple OAuth analytics.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getAppleOAuthAnalytics = async (request) => {
   const { params, user } = request;

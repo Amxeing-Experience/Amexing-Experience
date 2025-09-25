@@ -1,17 +1,13 @@
-<%
-var loginContent = include('../partials/dashboard-login', {
-    error: typeof error !== 'undefined' ? error : null,
-    message: typeof message !== 'undefined' ? message : null,
-    returnTo: typeof returnTo !== 'undefined' ? returnTo : null,
-    oauthProviders: [
-        { name: 'google', displayName: 'Google' },
-        { name: 'microsoft', displayName: 'Microsoft' },
-        { name: 'apple', displayName: 'Apple' }
-    ]
-});
-%>
-
 <%- include('../auth-layout', {
     title: 'Login - Amexing',
-    body: loginContent
+    body: include('../partials/dashboard-login', {
+        error: typeof error !== 'undefined' ? error : null,
+        message: typeof message !== 'undefined' ? message : null,
+        returnTo: typeof returnTo !== 'undefined' ? returnTo : null,
+        oauthProviders: [
+            { name: 'google', displayName: 'Google' },
+            { name: 'microsoft', displayName: 'Microsoft' },
+            { name: 'apple', displayName: 'Apple' }
+        ]
+    })
 }) %>

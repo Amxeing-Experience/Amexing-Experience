@@ -2,6 +2,10 @@
  * Department OAuth Cloud Functions - Sprint 04
  * Handle department-specific OAuth flows and integration
  * Integrates with Sprint 03 permission system.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { 'parse/node': 'example' });
+ * // Returns: function result
  */
 
 const Parse = require('parse/node');
@@ -17,7 +21,11 @@ const auditService = new PermissionAuditService();
  * Get available departments for OAuth.
  * @param {object} request - Parse Cloud Code request object.
  * @param {object} request.user - Current authenticated user.
- * @returns {Promise<object>} Available departments for user.
+ * @returns {Promise<object>} - Available departments for user.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getAvailableDepartments = async (request) => {
   const { user } = request;
@@ -61,17 +69,22 @@ const getAvailableDepartments = async (request) => {
 
 /**
  * Initiate department-specific OAuth flow.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const initiateDepartmentOAuth = async (request) => {
   const { params, ip } = request;
   const {
-    department, provider, corporateConfigId, redirectUri,
+    department, _provider, corporateConfigId, redirectUri,
   } = params;
 
   try {
     // Validate required parameters
-    if (!department || !provider) {
+    if (!department || !_provider) {
       throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Department and provider are required');
     }
 
@@ -81,7 +94,7 @@ const initiateDepartmentOAuth = async (request) => {
     // Initiate OAuth flow
     const result = await departmentOAuthService.initiateDepartmentOAuth({
       department,
-      provider,
+      _provider,
       corporateConfigId,
       redirectUri: redirectUri || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/callback`,
       state,
@@ -94,14 +107,14 @@ const initiateDepartmentOAuth = async (request) => {
     const stateRecord = new OAuthState();
     stateRecord.set('state', state);
     stateRecord.set('department', department);
-    stateRecord.set('provider', provider);
+    stateRecord.set('provider', _provider);
     stateRecord.set('corporateConfigId', corporateConfigId);
     stateRecord.set('expiresAt', new Date(Date.now() + 10 * 60 * 1000)); // 10 minutes
     stateRecord.set('ipAddress', ip);
     stateRecord.set('userAgent', request.headers['user-agent']);
     await stateRecord.save(null, { useMasterKey: true });
 
-    logger.info(`Department OAuth initiated: ${department}/${provider} from IP: ${ip}`);
+    logger.info(`Department OAuth initiated: ${department}/${_provider} from IP: ${ip}`);
 
     return {
       success: true,
@@ -117,12 +130,17 @@ const initiateDepartmentOAuth = async (request) => {
 
 /**
  * Handle department OAuth callback.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const handleDepartmentOAuthCallback = async (request) => {
   const { params, ip } = request;
   const {
-    code, state, error: oauthError,
+    code, state, error,
   } = params;
 
   try {
@@ -135,7 +153,7 @@ const handleDepartmentOAuthCallback = async (request) => {
       stateData = { originalState: state };
     }
 
-    const { provider, department, originalState } = stateData;
+    const { _provider, department, originalState } = stateData;
 
     // Validate OAuth state
     const OAuthState = Parse.Object.extend('OAuthState');
@@ -149,7 +167,7 @@ const handleDepartmentOAuthCallback = async (request) => {
     }
 
     // Use provider from state record if not in parsed data
-    const finalProvider = provider || stateRecord.get('provider');
+    const finalProvider = _provider || stateRecord.get('provider');
     const finalDepartment = department || stateRecord.get('department');
 
     // Handle OAuth callback
@@ -158,7 +176,7 @@ const handleDepartmentOAuthCallback = async (request) => {
       state: originalState || state,
       provider: finalProvider,
       department: finalDepartment,
-      error: oauthError,
+      error,
       corporateConfigId: stateRecord.get('corporateConfigId'),
       ip,
     });
@@ -169,15 +187,20 @@ const handleDepartmentOAuthCallback = async (request) => {
     logger.info(`Department OAuth callback successful: ${finalDepartment}/${finalProvider} for user: ${result.user.id}`);
 
     return result;
-  } catch (error) {
-    logger.error('Department OAuth callback failed:', error);
-    throw error;
+  } catch (callbackError) {
+    logger.error('Department OAuth callback failed:', callbackError);
+    throw callbackError;
   }
 };
 
 /**
  * Get department OAuth configuration.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getDepartmentOAuthConfig = async (request) => {
   const { params, user } = request;
@@ -235,7 +258,12 @@ const getDepartmentOAuthConfig = async (request) => {
 
 /**
  * Switch user to department context post-OAuth.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const switchToDepartmentContext = async (request) => {
   const { params, user } = request;
@@ -292,7 +320,12 @@ const switchToDepartmentContext = async (request) => {
 
 /**
  * Get department OAuth providers with dynamic configuration.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getDepartmentOAuthProviders = async (request) => {
   const { params } = request;
@@ -340,14 +373,19 @@ const getDepartmentOAuthProviders = async (request) => {
 
 /**
  * Validate department OAuth access.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const validateDepartmentOAuthAccess = async (request) => {
   const { params, user, ip } = request;
-  const { department, provider, email } = params;
+  const { department, _provider, email } = params;
 
   try {
-    if (!department || !provider) {
+    if (!department || !_provider) {
       throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Department and provider are required');
     }
 
@@ -358,10 +396,10 @@ const validateDepartmentOAuthAccess = async (request) => {
     }
 
     // Validate provider is allowed for department
-    if (!deptConfig.allowedProviders.includes(provider)) {
+    if (!deptConfig.allowedProviders.includes(_provider)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        `Provider ${provider} not allowed for department ${department}`
+        `Provider ${_provider} not allowed for department ${department}`
       );
     }
 
@@ -392,7 +430,7 @@ const validateDepartmentOAuthAccess = async (request) => {
       performedBy: user?.id || 'anonymous',
       metadata: {
         department,
-        provider,
+        _provider,
         email: email ? `${email.substring(0, 3)}***` : null,
         valid: emailValidation.valid,
         approvalRequired: deptConfig.approvalRequired,
@@ -410,7 +448,7 @@ const validateDepartmentOAuthAccess = async (request) => {
         name: deptConfig.name,
       },
       provider: {
-        name: provider,
+        name: _provider,
         allowed: true,
       },
       approval: approvalInfo,
@@ -423,7 +461,12 @@ const validateDepartmentOAuthAccess = async (request) => {
 
 /**
  * Get department OAuth analytics (for admins).
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getDepartmentOAuthAnalytics = async (request) => {
   const { params, user } = request;
@@ -573,8 +616,15 @@ const getDepartmentOAuthAnalytics = async (request) => {
 
 /**
  * Helper function to get provider display names.
- * @param provider
+ * @param {string} provider - OAuth provider name.
+ * @param _provider
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { provider: 'example' });
+ * // Returns: function result
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
+ * @returns {*} - Operation result.
  */
 function getProviderDisplayName(provider) {
   const displayNames = {

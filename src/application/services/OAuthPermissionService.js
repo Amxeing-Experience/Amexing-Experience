@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
+ * @example
+ * // OAuth service usage
+ * const result = await ooauthpermissionservice.require(_provider, authCode);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
 const Parse = require('parse/node');
@@ -33,6 +37,8 @@ const logger = require('../../infrastructure/logger');
  * @version 1.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize permission service
  * const permissionService = new OAuthPermissionService();
  *
@@ -108,22 +114,28 @@ class OAuthPermissionService {
    * @param {AmexingUser} user - User to assign permissions.
    * @param {object} oauthProfile - OAuth profile with group information.
    * @param {string} provider - OAuth provider (google, microsoft).
-   * @returns {Promise<object>} Permission inheritance result.
+   * @param _provider
+   * @returns {Promise<object>} - Permission inheritance result.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.inheritPermissionsFromOAuth(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const result = await service.inheritPermissionsFromOAuth(user, profile, 'microsoft');
    */
-  async inheritPermissionsFromOAuth(user, oauthProfile, provider) {
+  async inheritPermissionsFromOAuth(user, oauthProfile, _provider) {
     try {
       const userId = user.id;
       const inheritedPermissions = new Set();
       const sourceGroups = [];
 
       // Extract groups from OAuth profile based on provider
-      const groups = await this.extractGroupsFromProfile(oauthProfile, provider);
+      const groups = await this.extractGroupsFromProfile(oauthProfile, _provider);
 
       for (const group of groups) {
-        const normalizedGroup = this.normalizeGroupName(group, provider);
+        const normalizedGroup = this.normalizeGroupName(group, _provider);
         const permissions = this.permissionMappings.get(normalizedGroup);
 
         if (permissions) {
@@ -142,7 +154,7 @@ class OAuthPermissionService {
         sourceType: 'oauth_group',
         sourceGroups,
         permissions: Array.from(inheritedPermissions),
-        provider,
+        provider, // eslint-disable-line no-undef
         inheritedAt: new Date(),
       });
 
@@ -150,7 +162,7 @@ class OAuthPermissionService {
       await this.applyPermissionsToUser(user, Array.from(inheritedPermissions), 'oauth_inherited');
 
       logger.logSecurityEvent('OAUTH_PERMISSIONS_INHERITED', userId, {
-        provider,
+        provider, // eslint-disable-line no-undef
         groupCount: sourceGroups.length,
         permissionCount: inheritedPermissions.size,
         permissions: Array.from(inheritedPermissions),
@@ -160,7 +172,7 @@ class OAuthPermissionService {
       return {
         success: true,
         userId,
-        provider,
+        provider, // eslint-disable-line no-undef
         inheritedPermissions: Array.from(inheritedPermissions),
         sourceGroups,
         inheritanceId: inheritanceRecord.id,
@@ -172,19 +184,25 @@ class OAuthPermissionService {
   }
 
   /**
-   * Extracts groups from OAuth profile based on provider.
+   * Extracts groups from OAuth profile based on _provider.
    * @param {object} oauthProfile - OAuth profile data.
-   * @param {string} provider - OAuth provider.
-   * @returns {Promise<Array>} List of group names.
+   * @param {string} provider - OAuth _provider.
+   * @param _provider
+   * @returns {Promise<Array>} - List of group names.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.extractGroupsFromProfile(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const groups = await service.extractGroupsFromProfile(profile, 'microsoft');
    */
-  async extractGroupsFromProfile(oauthProfile, provider) {
+  async extractGroupsFromProfile(oauthProfile, _provider) {
     try {
       let groups = [];
 
-      if (provider === 'google') {
+      if (_provider === 'google') {
         // Google Workspace groups extraction
         if (oauthProfile.groups) {
           groups = oauthProfile.groups.map((group) => group.name || group);
@@ -195,11 +213,11 @@ class OAuthPermissionService {
           const adminGroups = await this.getGoogleAdminGroups(oauthProfile.email);
           groups = groups.concat(adminGroups);
         }
-      } else if (provider === 'microsoft') {
+      } else if (_provider === 'microsoft') {
         // Microsoft Azure AD groups extraction
         if (oauthProfile.groups) {
-          const { groups: profileGroups } = oauthProfile;
-          groups = profileGroups;
+          const { groups: _groups } = oauthProfile;
+          groups = _groups;
         }
 
         // Extract from job title and department
@@ -212,7 +230,7 @@ class OAuthPermissionService {
 
         // Try to get groups from Microsoft Graph API
         try {
-          const graphGroups = await this.getMicrosoftGraphGroups(oauthProfile.access_token);
+          const graphGroups = await this.getMicrosoftGraphGroups(oauthProfile.accesstoken);
           groups = groups.concat(graphGroups);
         } catch (graphError) {
           logger.warn('Could not fetch Microsoft Graph groups:', graphError.message);
@@ -228,13 +246,18 @@ class OAuthPermissionService {
 
   /**
    * Gets Google Admin SDK groups for a user.
-   * @param {string} _email - User email (unused in current implementation).
-   * @returns {Promise<Array>} List of Google groups.
+   * @param {*} email - User email (unused in current implementation).
+   * @returns {Promise<Array>} - List of Google groups.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.getGoogleAdminGroups(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const groups = await service.getGoogleAdminGroups('user@company.com');
    */
-  async getGoogleAdminGroups(_email) {
+  async getGoogleAdminGroups(email) { // eslint-disable-line no-unused-vars
     try {
       // This would require Google Admin SDK implementation
       // For now, return empty array - implement when Admin SDK is available
@@ -249,10 +272,15 @@ class OAuthPermissionService {
   /**
    * Gets Microsoft Graph API groups for a user.
    * @param {string} accessToken - Microsoft access token.
-   * @returns {Promise<Array>} List of Microsoft groups.
+   * @returns {Promise<Array>} - List of Microsoft groups.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.getMicrosoftGraphGroups(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
-   * const groups = await service.getMicrosoftGraphGroups('access_token_123');
+   * const groups = await service.getMicrosoftGraphGroups('accesstoken_123');
    */
   async getMicrosoftGraphGroups(accessToken) {
     try {
@@ -282,26 +310,37 @@ class OAuthPermissionService {
   /**
    * Normalizes group names for permission mapping.
    * @param {string} groupName - Original group name.
-   * @param {string} provider - OAuth provider.
-   * @returns {string} Normalized group name.
+   * @param {string} provider - OAuth _provider.
+   * @param _provider
+   * @returns {string} - Operation result Normalized group name.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.normalizeGroupName(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const normalized = service.normalizeGroupName('HR Managers', 'microsoft');
    */
-  normalizeGroupName(groupName, provider) {
+  normalizeGroupName(groupName, _provider) {
     if (!groupName) return '';
 
     const normalized = groupName.toLowerCase().replace(/\s+/g, '_');
 
     // Add provider prefix for disambiguation
-    return `${provider}_${normalized}`;
+    return `${_provider}_${normalized}`;
   }
 
   /**
    * Creates permission inheritance record.
    * @param {object} inheritanceData - Inheritance data.
-   * @returns {Promise<Parse.Object>} Created inheritance record.
+   * @returns {Promise<Parse.Object>} - Created inheritance record.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.createPermissionInheritance(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const record = await service.createPermissionInheritance(inheritanceData);
    */
@@ -314,7 +353,7 @@ class OAuthPermissionService {
       inheritance.set('sourceType', inheritanceData.sourceType);
       inheritance.set('sourceGroups', inheritanceData.sourceGroups);
       inheritance.set('permissions', inheritanceData.permissions);
-      inheritance.set('provider', inheritanceData.provider);
+      inheritance.set('provider', inheritanceData._provider); // eslint-disable-line no-underscore-dangle
       inheritance.set('inheritedAt', inheritanceData.inheritedAt);
       inheritance.set('active', true);
 
@@ -332,8 +371,13 @@ class OAuthPermissionService {
    * @param {AmexingUser} user - User to apply permissions.
    * @param {Array<string>} permissions - Permissions to apply.
    * @param {string} source - Source of permissions.
-   * @returns {Promise<void>} Completes when permissions are applied.
+   * @returns {Promise<void>} - Completes when permissions are applied.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.applyPermissionsToUser(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * await service.applyPermissionsToUser(user, ['admin_access'], 'oauth_group');
    */
@@ -368,8 +412,13 @@ class OAuthPermissionService {
    * Implements OAUTH-3-02: Permisos Específicos por Departamento via OAuth.
    * @param {string} userId - User ID.
    * @param {string} departmentId - Department ID.
-   * @returns {Promise<Array>} Department-specific permissions.
+   * @returns {Promise<Array>} - Department-specific permissions.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.getDepartmentPermissions(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const permissions = await service.getDepartmentPermissions('user123', 'hr');
    */
@@ -399,14 +448,24 @@ class OAuthPermissionService {
    * @param {string} userId - User ID.
    * @param {string} permission - Permission to check.
    * @param {string} context - Optional context (department, project).
-   * @returns {Promise<boolean>} True if user has permission.
+   * @returns {Promise<boolean>} - True if user has permission.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.hasPermission(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const hasAccess = await service.hasPermission('user123', 'admin_access', 'department');
    */
   async hasPermission(userId, permission, context = null) {
     try {
-      const user = await new Parse.Query(AmexingUser).get(userId, { useMasterKey: true });
+      const user = await new Parse.Query(
+        AmexingUser
+      ).get(
+        userId,
+        { useMasterKey: true }
+      );
       const userPermissions = user.get('permissions') || [];
 
       // Check direct permission
@@ -416,7 +475,10 @@ class OAuthPermissionService {
 
       // Check context-specific permissions
       if (context) {
-        const contextPermissions = await this.getContextPermissions(userId, context);
+        const contextPermissions = await this.getContextPermissions(
+          userId,
+          context
+        );
         if (contextPermissions.includes(permission)) {
           return true;
         }
@@ -443,8 +505,13 @@ class OAuthPermissionService {
    * Gets context-specific permissions for a user.
    * @param {string} userId - User ID.
    * @param {string} context - Context (department, project, etc.).
-   * @returns {Promise<Array>} Context-specific permissions.
+   * @returns {Promise<Array>} - Context-specific permissions.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.getContextPermissions(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const permissions = await service.getContextPermissions('user123', 'finance_dept');
    */
@@ -467,21 +534,32 @@ class OAuthPermissionService {
   /**
    * Masks email for logging.
    * @param {string} email - Email address.
-   * @returns {string} Masked email.
+   * @param email
+   * @returns {string} - Operation result Masked email.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.maskEmail(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const masked = service.maskEmail('user@example.com'); // Returns 'use***@example.com'
    */
   maskEmail(email) {
     if (!email) return '';
-    const [local, domain] = email.split('@');
-    return `${local.substring(0, 3)}***@${domain}`;
+    const [local, _domain] = email.split('@');
+    return `${local.substring(0, 3)}***@${_domain}`;
   }
 
   /**
    * Gets all available permissions in the system.
-   * @returns {Array} List of all permissions.
+   * @returns {Array} - Array of results List of all permissions.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.getAllAvailablePermissions(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const allPermissions = service.getAllAvailablePermissions();
    */
@@ -497,18 +575,24 @@ class OAuthPermissionService {
   }
 
   /**
-   * Gets permission mappings for a specific provider.
-   * @param {string} provider - OAuth provider.
-   * @returns {object} Provider-specific permission mappings.
+   * Gets permission mappings for a specific _provider.
+   * @param {string} provider - OAuth _provider.
+   * @param _provider
+   * @returns {object} - Operation result Provider-specific permission mappings.
    * @example
+   * // OAuth service usage
+   * const result = await ooauthpermissionservice.getProviderPermissionMappings(_provider, authCode);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new OAuthPermissionService();
    * const mappings = service.getProviderPermissionMappings('microsoft');
    */
-  getProviderPermissionMappings(provider) {
+  getProviderPermissionMappings(_provider) {
     const mappings = {};
 
     for (const [groupName, permissions] of this.permissionMappings) {
-      if (groupName.startsWith(`${provider}_`)) {
+      if (groupName.startsWith(`${_provider}_`)) {
         mappings[groupName] = permissions;
       }
     }

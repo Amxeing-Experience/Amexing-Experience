@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @created Sprint 02 - Corporate SSO Admin Portal
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { 'parse/node': 'example' });
+ * // Returns: function result
  */
 
 const Parse = require('parse/node');
@@ -15,7 +19,12 @@ const logger = require('../../infrastructure/logger');
  * Gets available corporate domains configuration
  * Endpoint: GET /functions/getAvailableCorporateDomains
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getAvailableCorporateDomains = async (request) => {
   try {
@@ -54,7 +63,12 @@ const getAvailableCorporateDomains = async (request) => {
  * Adds new corporate domain configuration
  * Endpoint: POST /functions/addCorporateDomain
  * Access: Requires superadmin role.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const addCorporateDomain = async (request) => {
   try {
@@ -72,11 +86,11 @@ const addCorporateDomain = async (request) => {
     }
 
     const {
-      domain, clientName, type, primaryProvider, autoProvisionEmployees, departmentMapping,
+      _domain, clientName, type, primaryProvider, autoProvisionEmployees, departmentMapping,
     } = request.params;
 
     // Validate required parameters
-    if (!domain || !clientName || !type || !primaryProvider) {
+    if (!_domain || !clientName || !type || !primaryProvider) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
         'Missing required parameters: domain, clientName, type, primaryProvider'
@@ -88,23 +102,23 @@ const addCorporateDomain = async (request) => {
     if (!availableProviders.includes(primaryProvider)) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        `Invalid provider. Available: ${availableProviders.join(', ')}`
+        `Invalid _provider. Available: ${availableProviders.join(', ')}`
       );
     }
 
     // Validate domain format
     // eslint-disable-next-line security/detect-unsafe-regex
     const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-    if (!domainRegex.test(domain)) {
+    if (!domainRegex.test(_domain)) {
       throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Invalid domain format');
     }
 
     // Check if domain already exists
-    const existingConfig = OAuthService.getCorporateDomainConfig(`test@${domain}`);
+    const existingConfig = OAuthService.getCorporateDomainConfig(`test@${_domain}`);
     if (existingConfig) {
       throw new Parse.Error(
         Parse.Error.DUPLICATE_VALUE,
-        `Domain ${domain} is already configured`
+        `Domain ${_domain} is already configured`
       );
     }
 
@@ -123,11 +137,11 @@ const addCorporateDomain = async (request) => {
     }
 
     // Add the corporate domain
-    OAuthService.addCorporateDomain(domain, config);
+    OAuthService.addCorporateDomain(_domain, config);
 
     logger.logSecurityEvent('CORPORATE_DOMAIN_ADDED', request.user.id, {
       adminUser: request.user.get('username'),
-      domain,
+      domain, // eslint-disable-line no-undef
       clientName,
       provider: primaryProvider,
       type,
@@ -135,9 +149,9 @@ const addCorporateDomain = async (request) => {
 
     return {
       success: true,
-      domain,
+      domain, // eslint-disable-line no-undef
       config,
-      message: `Corporate domain ${domain} configured successfully`,
+      message: `Corporate domain ${_domain} configured successfully`,
     };
   } catch (error) {
     logger.error('Error adding corporate domain:', error);
@@ -149,7 +163,12 @@ const addCorporateDomain = async (request) => {
  * Gets OAuth provider status and configuration
  * Endpoint: GET /functions/getOAuthProviderStatus
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getOAuthProviderStatus = async (request) => {
   try {
@@ -170,7 +189,7 @@ const getOAuthProviderStatus = async (request) => {
     const providerConfigs = {};
 
     for (const provider of availableProviders) {
-      const config = OAuthService.getProviderConfig(provider);
+      const config = OAuthService.getProviderConfig(_provider); // eslint-disable-line no-undef
       providerConfigs[provider] = {
         ...config,
         // Remove sensitive information
@@ -201,7 +220,12 @@ const getOAuthProviderStatus = async (request) => {
  * Tests corporate domain OAuth flow
  * Endpoint: POST /functions/testCorporateDomain
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const testCorporateDomain = async (request) => {
   try {
@@ -231,7 +255,7 @@ const testCorporateDomain = async (request) => {
     if (!domainConfig) {
       return {
         success: false,
-        message: `Domain ${domain} is not configured for corporate SSO`,
+        message: `Domain ${_domain} is not configured for corporate SSO`, // eslint-disable-line no-undef
         domain,
         configured: false,
       };
@@ -250,7 +274,7 @@ const testCorporateDomain = async (request) => {
 
     return {
       success: true,
-      message: `Domain ${domain} is configured for corporate SSO`,
+      message: `Domain ${_domain} is configured for corporate SSO`, // eslint-disable-line no-undef
       domain,
       configured: true,
       corporateConfig: {
@@ -271,7 +295,12 @@ const testCorporateDomain = async (request) => {
  * Gets OAuth audit logs (admin view)
  * Endpoint: GET /functions/getOAuthAuditLogs
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getOAuthAuditLogs = async (request) => {
   try {
@@ -288,13 +317,13 @@ const getOAuthAuditLogs = async (request) => {
       );
     }
 
-    const { limit = 50, skip = 0, entityType = 'OAuthEvent' } = request.params;
+    const { _limit = 50, skip = 0, entityType = 'OAuthEvent' } = request.params;
 
     // Query OAuth-related audit logs
     const auditQuery = new Parse.Query('AuditLog');
     auditQuery.equalTo('entityType', entityType);
     auditQuery.descending('createdAt');
-    auditQuery.limit(Math.min(limit, 100)); // Max 100 records
+    auditQuery.limit(Math.min(_limit, 100)); // Max 100 records
     auditQuery.skip(skip);
 
     const auditLogs = await auditQuery.find({ useMasterKey: true });

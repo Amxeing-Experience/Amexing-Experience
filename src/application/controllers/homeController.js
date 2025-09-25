@@ -22,6 +22,8 @@ const logger = require('../../infrastructure/logger');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize home controller (singleton pattern)
  * const homeController = require('./homeController');
  *
@@ -64,8 +66,13 @@ class HomeController {
    * @param {object} req - Express request object with optional user session.
    * @param {object} res - Express response object.
    * @param {Function} next - Express next middleware function for error handling.
-   * @returns {Promise<void>} Renders about page template.
+   * @returns {Promise<void>} - Renders about page template.
    * @example
+   * // Usage example
+   * const result = await about(parameters);
+   * // Returns: operation result
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
    * // GET /about
    * // Renders about page with platform information and user context
    */

@@ -1,0 +1,4763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Class: IntelligentProviderSelector</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Class: IntelligentProviderSelector</h1>
+
+    
+
+
+
+
+<section>
+
+<header>
+    
+        <h2><span class="attribs"><span class="type-signature"></span></span>IntelligentProviderSelector<span class="signature">()</span><span class="type-signature"></span></h2>
+        
+            <div class="class-description"><p>Intelligent OAuth Provider Selector - Sprint 04
+Smart provider selection based on email domain, corporate context, and user behavior
+Provides intelligent suggestions and seamless user experience.</p></div>
+        
+    
+</header>
+
+<article>
+    <div class="container-overview">
+    
+        
+
+    
+    <h2>Constructor</h2>
+    
+
+    
+    <h4 class="name" id="IntelligentProviderSelector"><span class="type-signature"></span>new IntelligentProviderSelector<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line7">line 7</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    </div>
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+        <h3 class="subsection-title">Methods</h3>
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="acceptSuggestion"><span class="type-signature"></span>acceptSuggestion<span class="signature">(suggestion)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Accept suggestion.</p>
+    
+
+
+
+<div class="description">
+    <p>Accept suggestion.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>suggestion</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1015">line 1015</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="analyzeCommonPatterns"><span class="type-signature"></span>analyzeCommonPatterns<span class="signature">(domain)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Analyze common patterns.</p>
+    
+
+
+
+<div class="description">
+    <p>Analyze common patterns.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>domain</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line906">line 906</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="analyzeCorporateContext"><span class="type-signature"></span>analyzeCorporateContext<span class="signature">(domain)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Analyze corporate context.</p>
+    
+
+
+
+<div class="description">
+    <p>Analyze corporate context.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>domain</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line837">line 837</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="analyzeDepartmentContext"><span class="type-signature"></span>analyzeDepartmentContext<span class="signature">(domain)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Analyze department context.</p>
+    
+
+
+
+<div class="description">
+    <p>Analyze department context.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>domain</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line874">line 874</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="analyzeDomainDatabase"><span class="type-signature"></span>analyzeDomainDatabase<span class="signature">(domain)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Analyze domain database.</p>
+    
+
+
+
+<div class="description">
+    <p>Analyze domain database.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>domain</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line753">line 753</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="analyzeEmailAndSuggest"><span class="type-signature"></span>analyzeEmailAndSuggest<span class="signature">(email)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Analyze email and suggest provider.</p>
+    
+
+
+
+<div class="description">
+    <p>Analyze email and suggest provider.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>email</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line693">line 693</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="analyzeLearningData"><span class="type-signature"></span>analyzeLearningData<span class="signature">(email, domain)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Analyze learning data.</p>
+    
+
+
+
+<div class="description">
+    <p>Analyze learning data.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>email</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>domain</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line787">line 787</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="clearProviderHighlights"><span class="type-signature"></span>clearProviderHighlights<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Clear provider highlights.</p>
+    
+
+
+
+<div class="description">
+    <p>Clear provider highlights.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1118">line 1118</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="createProviderButton"><span class="type-signature"></span>createProviderButton<span class="signature">(provider, info)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Create individual provider button.</p>
+    
+
+
+
+<div class="description">
+    <p>Create individual provider button.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>provider</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>info</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line651">line 651</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="createProviderButtons"><span class="type-signature"></span>createProviderButtons<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Create provider buttons.</p>
+    
+
+
+
+<div class="description">
+    <p>Create provider buttons.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line610">line 610</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="createProviderSelectorUI"><span class="type-signature"></span>createProviderSelectorUI<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Create provider selector UI.</p>
+    
+
+
+
+<div class="description">
+    <p>Create provider selector UI.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line259">line 259</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="createSuggestionDisplay"><span class="type-signature"></span>createSuggestionDisplay<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Create suggestion display.</p>
+    
+
+
+
+<div class="description">
+    <p>Create suggestion display.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line342">line 342</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="detectContextualProvider"><span class="type-signature"></span>detectContextualProvider<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Detect contextual provider.</p>
+    
+
+
+
+<div class="description">
+    <p>Detect contextual provider.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1246">line 1246</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="dismissSuggestion"><span class="type-signature"></span>dismissSuggestion<span class="signature">(suggestion)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Dismiss suggestion.</p>
+    
+
+
+
+<div class="description">
+    <p>Dismiss suggestion.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>suggestion</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1036">line 1036</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="generateSuggestion"><span class="type-signature"></span>generateSuggestion<span class="signature">(email, domain)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Generate intelligent suggestion.</p>
+    
+
+
+
+<div class="description">
+    <p>Generate intelligent suggestion.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>email</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+
+        <tr>
+            
+                <td class="name"><code>domain</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line718">line 718</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Example usage:
+// const result = await methodName(params);
+// Returns appropriate result based on operation</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getProviderName"><span class="type-signature"></span>getProviderName<span class="signature">(provider)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Utility methods.</p>
+    
+
+
+
+<div class="description">
+    <p>Utility methods.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>provider</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1381">line 1381</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="hideSuggestion"><span class="type-signature"></span>hideSuggestion<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Hide suggestion.</p>
+    
+
+
+
+<div class="description">
+    <p>Hide suggestion.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line998">line 998</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="highlightSuggestedProvider"><span class="type-signature"></span>highlightSuggestedProvider<span class="signature">(provider)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Highlight suggested provider.</p>
+    
+
+
+
+<div class="description">
+    <p>Highlight suggested provider.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>provider</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1092">line 1092</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const result = await authService.login(credentials);
+// Returns: { success: true, user: {...}, tokens: {...} }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="initialize"><span class="type-signature">(async) </span>initialize<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Initialize the intelligent provider selector.</p>
+    
+
+
+
+<div class="description">
+    <p>Initialize the intelligent provider selector.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line34">line 34</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="initializeUI"><span class="type-signature"></span>initializeUI<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Initialize UI components.</p>
+    
+
+
+
+<div class="description">
+    <p>Initialize UI components.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line237">line 237</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="loadDomainDatabase"><span class="type-signature">(async) </span>loadDomainDatabase<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Load domain intelligence database.</p>
+    
+
+
+
+<div class="description">
+    <p>Load domain intelligence database.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line68">line 68</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="loadUserLearningData"><span class="type-signature"></span>loadUserLearningData<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Load user learning data from local storage.</p>
+    
+
+
+
+<div class="description">
+    <p>Load user learning data from local storage.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line147">line 147</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const result = await authService.login(credentials);
+// Returns: { success: true, user: {...}, tokens: {...} }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="recordSuggestionAcceptance"><span class="type-signature"></span>recordSuggestionAcceptance<span class="signature">(suggestion)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Record suggestion acceptance.</p>
+    
+
+
+
+<div class="description">
+    <p>Record suggestion acceptance.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>suggestion</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1174">line 1174</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="recordSuggestionDismissal"><span class="type-signature"></span>recordSuggestionDismissal<span class="signature">(suggestion)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Record suggestion dismissal.</p>
+    
+
+
+
+<div class="description">
+    <p>Record suggestion dismissal.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>suggestion</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1207">line 1207</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="recordUserChoice"><span class="type-signature"></span>recordUserChoice<span class="signature">(provider)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Record user choice.</p>
+    
+
+
+
+<div class="description">
+    <p>Record user choice.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>provider</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1227">line 1227</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="saveLearningData"><span class="type-signature"></span>saveLearningData<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Save learning data to local storage.</p>
+    
+
+
+
+<div class="description">
+    <p>Save learning data to local storage.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line172">line 172</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="selectProvider"><span class="type-signature"></span>selectProvider<span class="signature">(provider)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Select provider.</p>
+    
+
+
+
+<div class="description">
+    <p>Select provider.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>provider</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1057">line 1057</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setupAnalytics"><span class="type-signature"></span>setupAnalytics<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Setup analytics tracking.</p>
+    
+
+
+
+<div class="description">
+    <p>Setup analytics tracking.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line219">line 219</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setupProviderDetection"><span class="type-signature"></span>setupProviderDetection<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Setup provider detection.</p>
+    
+
+
+
+<div class="description">
+    <p>Setup provider detection.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line188">line 188</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const result = await authService.login(credentials);
+// Returns: { success: true, user: {...}, tokens: {...} }</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setupTouchGestures"><span class="type-signature"></span>setupTouchGestures<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Setup touch gestures for mobile.</p>
+    
+
+
+
+<div class="description">
+    <p>Setup touch gestures for mobile.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1313">line 1313</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Example usage:
+// const result = await methodName(params);
+// Returns appropriate result based on operation</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="setupUIInteractions"><span class="type-signature"></span>setupUIInteractions<span class="signature">()</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Setup UI interactions.</p>
+    
+
+
+
+<div class="description">
+    <p>Setup UI interactions.</p>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1292">line 1292</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Example usage:
+// const result = await methodName(params);
+// Returns appropriate result based on operation</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="showSuggestion"><span class="type-signature"></span>showSuggestion<span class="signature">(suggestion)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Show suggestion.</p>
+    
+
+
+
+<div class="description">
+    <p>Show suggestion.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>suggestion</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line947">line 947</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="trackProviderSelection"><span class="type-signature"></span>trackProviderSelection<span class="signature">(detail)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Track provider selection.</p>
+    
+
+
+
+<div class="description">
+    <p>Track provider selection.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>detail</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1369">line 1369</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="trackSuggestionInteraction"><span class="type-signature"></span>trackSuggestionInteraction<span class="signature">(detail)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Track suggestion interaction.</p>
+    
+
+
+
+<div class="description">
+    <p>Track suggestion interaction.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>detail</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1357">line 1357</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Example usage:
+// const result = await methodName(params);
+// Returns appropriate result based on operation</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="trackSuggestionShown"><span class="type-signature"></span>trackSuggestionShown<span class="signature">(suggestion)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Track suggestion shown.</p>
+    
+
+
+
+<div class="description">
+    <p>Track suggestion shown.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>suggestion</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1344">line 1344</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// Example usage:
+// const result = await methodName(params);
+// Returns appropriate result based on operation</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="updateAlternativesDisplay"><span class="type-signature"></span>updateAlternativesDisplay<span class="signature">(excludeProvider)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Update alternatives display.</p>
+    
+
+
+
+<div class="description">
+    <p>Update alternatives display.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+        <th>Default</th>
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>excludeProvider</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+                <td class="default">
+                
+                    null
+                
+                </td>
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1136">line 1136</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="updateConfiguration"><span class="type-signature"></span>updateConfiguration<span class="signature">(newConfig)</span><span class="type-signature"></span></h4>
+    
+
+    
+    <p class="summary">Public methods.</p>
+    
+
+
+
+<div class="description">
+    <p>Public methods.</p>
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>newConfig</code></td>
+            
+
+            <td class="type">
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="views_components_oauth_IntelligentProviderSelector.js.html">views/components/oauth/IntelligentProviderSelector.js</a>, <a href="views_components_oauth_IntelligentProviderSelector.js.html#line1462">line 1462</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>// const provider = new OAuthProvider(config);
+// const authUrl = await provider.getAuthorizationUrl(options);</code></pre>
+
+
+
+        
+    
+
+    
+
+    
+</article>
+
+</section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

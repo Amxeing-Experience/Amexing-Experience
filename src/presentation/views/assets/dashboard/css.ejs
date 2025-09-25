@@ -1,0 +1,360 @@
+<!-- Flexy Bootstrap Lite 1.0.0 Dashboard Styles -->
+<link rel="shortcut icon" type="image/png" href="/flexy-bootstrap-lite-1.0.0/assets/images/logos/favicon.png" />
+<link rel="stylesheet" href="/flexy-bootstrap-lite-1.0.0/assets/css/styles.min.css" />
+
+<!-- Custom Dashboard Enhancements -->
+<style>
+    /* Remove top strip for clean dashboard look */
+    .app-topstrip {
+        display: none;
+    }
+
+    /* DataTables Integration with Flexy Theme */
+    .table-responsive {
+        border-radius: 12px;
+        box-shadow: 0 3px 20px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        margin-top: 1rem;
+        border: 1px solid #e0e6ed;
+        background: #fff;
+    }
+
+    /* DataTables custom styling to match Flexy */
+    .dataTables_wrapper {
+        padding: 1.5rem;
+        background: #fff;
+        border-radius: 12px;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    .dataTables_wrapper .row {
+        margin: 0;
+    }
+
+    .dataTables_wrapper .row > div {
+        padding: 0 0.75rem;
+    }
+
+    .dataTables_wrapper .dataTables_length,
+    .dataTables_wrapper .dataTables_filter {
+        margin-bottom: 1.5rem;
+    }
+
+    .dataTables_wrapper .dataTables_filter input {
+        border: 1px solid #e0e6ed;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        font-size: 0.875rem;
+        background: #fafbfe;
+        transition: all 0.2s ease;
+    }
+
+    .dataTables_wrapper .dataTables_filter input:focus {
+        border-color: #5d87ff;
+        box-shadow: 0 0 0 0.2rem rgba(93, 135, 255, 0.15);
+        outline: none;
+        background: #fff;
+    }
+
+    .dataTables_wrapper .dataTables_length select {
+        border: 1px solid #e0e6ed;
+        border-radius: 8px;
+        padding: 0.75rem 2.5rem 0.75rem 1rem;
+        font-size: 0.875rem;
+        background: #fafbfe url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%236c757d' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e") no-repeat right 0.75rem center;
+        background-size: 16px 12px;
+        appearance: none;
+        transition: all 0.2s ease;
+    }
+
+    .dataTables_wrapper .dataTables_length select:focus {
+        border-color: #5d87ff;
+        box-shadow: 0 0 0 0.2rem rgba(93, 135, 255, 0.15);
+        outline: none;
+        background-color: #fff;
+    }
+
+    /* Table styling to match Flexy */
+    .table {
+        --bs-table-bg: #fff;
+        margin-bottom: 0;
+    }
+
+    .table thead th {
+        background: linear-gradient(135deg, #f8f9fb, #fafbfe);
+        border-bottom: 2px solid #e0e6ed;
+        font-weight: 600;
+        color: #2a3547;
+        padding: 1.25rem 1rem;
+        font-size: 0.875rem;
+        text-transform: none;
+        letter-spacing: 0;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+
+    .table thead th:first-child {
+        border-top-left-radius: 8px;
+    }
+
+    .table thead th:last-child {
+        border-top-right-radius: 8px;
+    }
+
+    /* Sortable columns */
+    .table thead th.sorting,
+    .table thead th.sorting_asc,
+    .table thead th.sorting_desc {
+        cursor: pointer;
+        position: relative;
+        user-select: none;
+    }
+
+    .table thead th.sorting:hover,
+    .table thead th.sorting_asc:hover,
+    .table thead th.sorting_desc:hover {
+        background: linear-gradient(135deg, #ecf2ff, #f0f5ff);
+        color: #5d87ff;
+    }
+
+    .table tbody tr {
+        border-bottom: 1px solid #f4f5f7;
+        transition: background-color 0.15s ease-in-out;
+    }
+
+    .table tbody tr:hover {
+        background: linear-gradient(135deg, rgba(93, 135, 255, 0.04), rgba(73, 190, 255, 0.04));
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .table tbody tr {
+        transition: all 0.2s ease;
+    }
+
+    .table tbody td {
+        padding: 1rem;
+        border-bottom: 1px solid #f4f5f7;
+        vertical-align: middle;
+        color: #2a3547;
+        font-size: 0.875rem;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        line-height: 1.5;
+    }
+
+    /* Specific column styling */
+    .table tbody td:first-child {
+        font-weight: 500;
+    }
+
+    .table tbody td.text-center {
+        text-align: center;
+    }
+
+    /* Action buttons in table */
+    .table .btn {
+        font-size: 0.75rem;
+        padding: 0.375rem 0.75rem;
+        border-radius: 6px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        margin: 0 0.125rem;
+    }
+
+    /* DataTables Buttons matching Flexy style */
+    .dt-buttons {
+        margin-bottom: 1.5rem;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: flex-end;
+    }
+
+    .dt-buttons .dt-button-collection {
+        background: linear-gradient(135deg, #5d87ff, #49beff) !important;
+        border: none !important;
+        box-shadow: 0 3px 10px rgba(93, 135, 255, 0.2) !important;
+    }
+
+    .dt-button {
+        background: linear-gradient(135deg, #5d87ff, #49beff) !important;
+        border: none !important;
+        color: white !important;
+        padding: 0.625rem 1.25rem !important;
+        border-radius: 8px !important;
+        font-size: 0.875rem !important;
+        font-weight: 500 !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 3px 10px rgba(93, 135, 255, 0.2) !important;
+        font-family: 'Plus Jakarta Sans', sans-serif !important;
+        text-transform: none !important;
+        letter-spacing: 0 !important;
+    }
+
+    .dt-button:hover {
+        background: linear-gradient(135deg, #4570ea, #3ba3d9) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 5px 15px rgba(93, 135, 255, 0.3) !important;
+    }
+
+    .dt-button:active {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 2px 8px rgba(93, 135, 255, 0.4) !important;
+    }
+
+    /* Status badges matching Flexy style */
+    .badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.375rem 0.75rem;
+        border-radius: 6px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .badge-status.badge-active {
+        background-color: rgba(19, 206, 102, 0.1);
+        color: #13ce66;
+        border: 1px solid rgba(19, 206, 102, 0.2);
+    }
+
+    .badge-status.badge-inactive {
+        background-color: rgba(255, 73, 97, 0.1);
+        color: #ff4961;
+        border: 1px solid rgba(255, 73, 97, 0.2);
+    }
+
+    /* Action buttons in Flexy style */
+    .btn-group .btn {
+        border-radius: 6px;
+        font-size: 0.75rem;
+        padding: 0.375rem 0.75rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .btn-outline-info {
+        border-color: #49beff;
+        color: #49beff;
+    }
+
+    .btn-outline-info:hover {
+        background-color: #49beff;
+        border-color: #49beff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(73, 190, 255, 0.3);
+    }
+
+    .btn-outline-primary {
+        border-color: #5d87ff;
+        color: #5d87ff;
+    }
+
+    .btn-outline-primary:hover {
+        background-color: #5d87ff;
+        border-color: #5d87ff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(93, 135, 255, 0.3);
+    }
+
+    .btn-outline-danger {
+        border-color: #ff4961;
+        color: #ff4961;
+    }
+
+    .btn-outline-danger:hover {
+        background-color: #ff4961;
+        border-color: #ff4961;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(255, 73, 97, 0.3);
+    }
+
+    /* Card improvements */
+    .card {
+        border: 1px solid #e0e6ed;
+        border-radius: 12px;
+        box-shadow: 0 3px 20px rgba(0, 0, 0, 0.08);
+        transition: all 0.2s ease;
+    }
+
+    .card:hover {
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, #5d87ff, #49beff);
+        color: white;
+        border-bottom: none;
+        border-radius: 12px 12px 0 0 !important;
+        padding: 1.5rem;
+    }
+
+    .card-title {
+        margin-bottom: 0;
+        font-weight: 600;
+        font-size: 1.125rem;
+    }
+
+    /* Custom search components */
+    .input-group .input-group-text {
+        background: #fafbfe;
+        border: 1px solid #e0e6ed;
+        border-right: none;
+        color: #6c757d;
+    }
+
+    .input-group .form-control {
+        border-left: none;
+        background: #fafbfe;
+    }
+
+    .input-group .form-control:focus {
+        border-color: #5d87ff;
+        box-shadow: 0 0 0 0.2rem rgba(93, 135, 255, 0.15);
+    }
+
+    .input-group .form-control:focus + .input-group-text,
+    .input-group .input-group-text:focus + .form-control {
+        border-color: #5d87ff;
+    }
+
+    /* Responsive improvements */
+    @media (max-width: 768px) {
+        .dataTables_wrapper {
+            padding: 1rem;
+        }
+
+        .dataTables_wrapper .dataTables_length,
+        .dataTables_wrapper .dataTables_filter {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        .dt-buttons {
+            justify-content: center;
+        }
+
+        .dt-button {
+            font-size: 0.75rem !important;
+            padding: 0.5rem 1rem !important;
+        }
+
+        .table thead th,
+        .table tbody td {
+            font-size: 0.8125rem;
+            padding: 0.75rem 0.5rem;
+        }
+
+        .dataTables_wrapper .dataTables_info {
+            font-size: 0.8125rem;
+            margin-top: 0.5rem;
+        }
+
+        .dataTables_wrapper .dataTables_paginate {
+            margin-top: 0.5rem;
+        }
+    }
+</style>

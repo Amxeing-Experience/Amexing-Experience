@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
+ * @example
+ * // Service method usage
+ * const result = await permissioninheritanceservice.require({ 'parse/node': 'example' });
+ * // Returns: { success: true, data: {...} }
  */
 
 const Parse = require('parse/node');
@@ -35,6 +39,8 @@ const logger = require('../../infrastructure/logger');
  * @version 1.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize inheritance service
  * const inheritanceService = new PermissionInheritanceService();
  *
@@ -75,24 +81,30 @@ class PermissionInheritanceService {
    * @param {AmexingUser} user - User to process.
    * @param {object} oauthProfile - OAuth profile with groups.
    * @param {string} provider - OAuth provider.
+   * @param _provider
    * @param {object} corporateConfig - Corporate configuration.
-   * @returns {Promise<object>} Complete inheritance result.
+   * @returns {Promise<object>} - Complete inheritance result.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.processCompleteInheritance({ user: 'example', oauthProfile: 'example', provider: 'example', corporateConfig: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionInheritanceService();
    * const result = await service.processCompleteInheritance(user, oauthProfile, 'microsoft', corporateConfig);
    */
-  async processCompleteInheritance(user, oauthProfile, provider, corporateConfig) {
+  async processCompleteInheritance(user, oauthProfile, _provider, corporateConfig) {
     try {
       const userId = user.id;
 
       logger.logSecurityEvent('PERMISSION_INHERITANCE_STARTED', userId, {
-        provider,
+        provider: _provider,
         corporateClient: corporateConfig?.clientName,
         email: OAuthPermissionService.maskEmail(user.get('email')),
       });
 
       // Step 1: Inherit permissions from OAuth groups
-      const oauthInheritance = await OAuthPermissionService.inheritPermissionsFromOAuth(user, oauthProfile, provider);
+      const oauthInheritance = await OAuthPermissionService.inheritPermissionsFromOAuth(user, oauthProfile, _provider);
 
       // Step 2: Add department-specific permissions
       const departmentPermissions = await this.addDepartmentPermissions(user, oauthProfile, corporateConfig);
@@ -115,7 +127,7 @@ class PermissionInheritanceService {
         departmentPermissions,
         overrides,
         finalPermissions,
-        provider,
+        _provider,
         corporateConfig,
       });
 
@@ -148,8 +160,13 @@ class PermissionInheritanceService {
    * @param {AmexingUser} user - User object.
    * @param {object} oauthProfile - OAuth profile.
    * @param {object} corporateConfig - Corporate configuration.
-   * @returns {Promise<Array>} Department permissions.
+   * @returns {Promise<Array>} - Department permissions.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.addDepartmentPermissions({ user: 'example', oauthProfile: 'example', corporateConfig: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionInheritanceService();
    * const deptPerms = await service.addDepartmentPermissions(user, oauthProfile, corporateConfig);
    */
@@ -207,8 +224,13 @@ class PermissionInheritanceService {
    * Extracts department information from OAuth profile.
    * @param {object} oauthProfile - OAuth profile.
    * @param {object} corporateConfig - Corporate configuration.
-   * @returns {Promise<string|null>} Department ID or null.
+   * @returns {Promise<string|null>} - Department ID or null.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.extractDepartmentFromOAuth({ oauthProfile: 'example', corporateConfig: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionInheritanceService();
    * const deptId = await service.extractDepartmentFromOAuth(oauthProfile, corporateConfig);
    */
@@ -225,8 +247,13 @@ class PermissionInheritanceService {
    * Applies individual permission overrides for a user
    * Implements OAUTH-3-03: Override Permisos Individuales Manteniendo OAuth.
    * @param {AmexingUser} user - User object.
-   * @returns {Promise<Array>} Applied overrides.
+   * @returns {Promise<Array>} - Applied overrides.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.applyIndividualOverrides({ user: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionInheritanceService();
    * const overrides = await service.applyIndividualOverrides(user);
    */
@@ -300,8 +327,13 @@ class PermissionInheritanceService {
    * @param {Array} oauthPermissions - OAuth inherited permissions.
    * @param {Array} departmentPermissions - Department permissions.
    * @param {Array} overrides - Individual overrides.
-   * @returns {Promise<Array>} Final resolved permissions.
+   * @returns {Promise<Array>} - Final resolved permissions.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.validateAndResolvePermissions({ user: 'example', oauthPermissions: 'example', departmentPermissions: 'example', overrides: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const service = new PermissionInheritanceService();
    * const finalPerms = await service.validateAndResolvePermissions(user, oauthPerms, deptPerms, overrides);
    */
@@ -365,8 +397,13 @@ class PermissionInheritanceService {
   /**
    * Validates permission hierarchy consistency.
    * @param {Array} permissions - Permissions to validate.
-   * @returns {Array} Validated permissions.
+   * @returns {Array} - Array of results Validated permissions.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.validatePermissionHierarchy({ permissions: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionInheritanceService();
    * const validatedPerms = service.validatePermissionHierarchy(['admin_full', 'basic_access']);
    */
@@ -398,8 +435,13 @@ class PermissionInheritanceService {
    * Checks if a higher-level permission includes a lower-level one.
    * @param {string} higherPermission - Higher-level permission.
    * @param {string} lowerPermission - Lower-level permission.
-   * @returns {boolean} True if higher includes lower.
+   * @returns {boolean} - Boolean result True if higher includes lower.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.permissionIncludes({ higherPermission: 'example', lowerPermission: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionInheritanceService();
    * const includes = service.permissionIncludes('admin_full', 'basic_access'); // Returns true
    */
@@ -420,8 +462,13 @@ class PermissionInheritanceService {
   /**
    * Creates comprehensive master inheritance record.
    * @param {object} data - Inheritance data.
-   * @returns {Promise<Parse.Object>} Created record.
+   * @returns {Promise<Parse.Object>} - Created record.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.createMasterInheritanceRecord({ data: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionInheritanceService();
    * const record = await service.createMasterInheritanceRecord(inheritanceData);
    */
@@ -452,8 +499,13 @@ class PermissionInheritanceService {
   /**
    * Creates department permission record.
    * @param {object} data - Department permission data.
-   * @returns {Promise<Parse.Object>} Created record.
+   * @returns {Promise<Parse.Object>} - Created record.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.createDepartmentPermissionRecord({ data: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionInheritanceService();
    * const record = await service.createDepartmentPermissionRecord(deptPermissionData);
    */
@@ -482,11 +534,16 @@ class PermissionInheritanceService {
   /**
    * Creates individual permission override.
    * @param {object} overrideData - Override data.
-   * @returns {Promise<Parse.Object>} Created override.
+   * @returns {Promise<Parse.Object>} - Created override.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.createPermissionOverride({ overrideData: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionInheritanceService();
    * const override = await service.createPermissionOverride({
-   *   userId: 'user123',
+   *   userId: 'user123' ,
    *   type: 'grant',
    *   permission: 'admin_access'
    * });
@@ -531,8 +588,13 @@ class PermissionInheritanceService {
   /**
    * Gets complete permission inheritance status for a user.
    * @param {string} userId - User ID.
-   * @returns {Promise<object>} Complete inheritance status.
+   * @returns {Promise<object>} - Complete inheritance status.
    * @example
+   * // Service method usage
+   * const result = await permissioninheritanceservice.getInheritanceStatus({ userId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * const service = new PermissionInheritanceService();
    * const status = await service.getInheritanceStatus('user123');
    */

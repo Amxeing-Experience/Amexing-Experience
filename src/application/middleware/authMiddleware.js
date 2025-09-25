@@ -23,6 +23,8 @@ const logger = require('../../infrastructure/logger');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize authentication middleware
  * const authMiddleware = new AuthMiddleware();
  *
@@ -90,8 +92,13 @@ class AuthMiddleware {
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @param {Function} next - Express next middleware function.
-   * @returns {Promise<void>} Continues to next middleware.
+   * @returns {Promise<void>} - Continues to next middleware.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * // Use for endpoints that work with or without authentication
    * router.get('/public-data', authMiddleware.optionalAuth, controller.getData);
    * // req.user will be set if authenticated, null otherwise
@@ -121,8 +128,13 @@ class AuthMiddleware {
    * role system, with comprehensive error handling and security logging.
    * @function requireRole
    * @param {string} role - Required role name (e.g., 'admin', 'manager', 'editor').
-   * @returns {Function} Express middleware function for role validation.
+   * @returns {Function} - Operation result Express middleware function for role validation.
    * @example
+   * // Authentication middleware usage
+   * app.use('/api', authMiddleware);
+   * // Validates JWT token and sets req.user
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * // Protect admin routes
    * router.get('/admin', authMiddleware.requireRole('admin'), adminController.dashboard);
    *

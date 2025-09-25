@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: views/components/oauth/mobile-oauth-optimizer.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: views/components/oauth/mobile-oauth-optimizer.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/* eslint-disable max-lines */
+/**
+ * Mobile OAuth Experience Optimizer - Sprint 04
+ * Optimizes OAuth flows for mobile devices with enhanced UX
+ * Integrates with component-based OAuth architecture.
+ */
+
+class MobileOAuthOptimizer {
+  constructor(options = {}) {
+    this.options = {
+      touchDelay: 300,
+      fastTapThreshold: 200,
+      vibrationEnabled: true,
+      adaptiveLoading: true,
+      biometricSupport: true,
+      orientationAware: true,
+      ...options,
+    };
+
+    this.isMobile = this.detectMobileDevice();
+    this.isTablet = this.detectTabletDevice();
+    this.orientation = this.detectOrientation();
+    this.touchCapable = 'ontouchstart' in window;
+
+    this.init();
+  }
+
+  init() {
+    if (!this.isMobile &amp;&amp; !this.isTablet) return;
+
+    this.setupViewport();
+    this.optimizeLoadingExperience();
+    this.setupTouchOptimization();
+    this.setupOrientationHandling();
+    this.setupKeyboardHandling();
+    this.setupBiometricSupport();
+    this.setupAccessibility();
+
+    // eslint-disable-next-line no-console
+    console.log('Mobile OAuth Optimizer initialized for', this.getDeviceType());
+  }
+
+  detectMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+               || window.innerWidth &lt;= 768;
+  }
+
+  detectTabletDevice() {
+    return /iPad|Android/i.test(navigator.userAgent) &amp;&amp; window.innerWidth >= 768 &amp;&amp; window.innerWidth &lt;= 1024;
+  }
+
+  detectOrientation() {
+    return window.innerHeight > window.innerWidth ? 'portrait' : 'landscape';
+  }
+
+  getDeviceType() {
+    if (this.isTablet) return 'tablet';
+    if (this.isMobile) return 'mobile';
+    return 'desktop';
+  }
+
+  setupViewport() {
+    let viewport = document.querySelector('meta[name="viewport"]');
+    if (!viewport) {
+      viewport = document.createElement('meta');
+      viewport.name = 'viewport';
+      document.head.appendChild(viewport);
+    }
+
+    viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+  }
+
+  optimizeLoadingExperience() {
+    if (!this.options.adaptiveLoading) return;
+
+    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
+    if (!oauthContainer) return;
+
+    const skeleton = this.createMobileLoadingSkeleton();
+    oauthContainer.appendChild(skeleton);
+
+    const removeLoading = () => {
+      if (skeleton &amp;&amp; skeleton.parentNode) {
+        skeleton.remove();
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(removeLoading, 100);
+    });
+
+    window.addEventListener('load', removeLoading);
+  }
+
+  createMobileLoadingSkeleton() {
+    const skeleton = document.createElement('div');
+    skeleton.className = 'oauth-mobile-skeleton';
+    skeleton.innerHTML = `
+            &lt;div class="skeleton-header">&lt;/div>
+            &lt;div class="skeleton-providers">
+                &lt;div class="skeleton-provider">&lt;/div>
+                &lt;div class="skeleton-provider">&lt;/div>
+                &lt;div class="skeleton-provider">&lt;/div>
+            &lt;/div>
+            &lt;div class="skeleton-form">
+                &lt;div class="skeleton-input">&lt;/div>
+                &lt;div class="skeleton-button">&lt;/div>
+            &lt;/div>
+        `;
+
+    const style = document.createElement('style');
+    style.textContent = `
+            .oauth-mobile-skeleton {
+                padding: 20px;
+                animation: fadeIn 0.3s ease-in;
+            }
+            .oauth-mobile-skeleton > div {
+                background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+                background-size: 200% 100%;
+                animation: loading 1.5s infinite;
+                border-radius: 8px;
+                margin-bottom: 16px;
+            }
+            .skeleton-header { height: 32px; }
+            .skeleton-provider { height: 48px; margin-bottom: 12px; }
+            .skeleton-input { height: 44px; }
+            .skeleton-button { height: 48px; }
+            @keyframes loading {
+                0% { background-position: 200% 0; }
+                100% { background-position: -200% 0; }
+            }
+            @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+            }
+        `;
+    document.head.appendChild(style);
+
+    return skeleton;
+  }
+
+  setupTouchOptimization() {
+    if (!this.touchCapable) return;
+
+    this.optimizeButtonTouchTargets();
+    this.setupFastTapHandling();
+    this.setupTouchFeedback();
+    this.preventTouchCallouts();
+  }
+
+  optimizeButtonTouchTargets() {
+    const buttons = document.querySelectorAll('.oauth-btn, .btn, button[type="submit"]');
+    buttons.forEach((button) => {
+      const computedStyle = window.getComputedStyle(button);
+      const minSize = 44;
+
+      if (parseInt(computedStyle.height) &lt; minSize) {
+        button.style.minHeight = `${minSize}px`;
+        button.style.display = 'flex';
+        button.style.alignItems = 'center';
+        button.style.justifyContent = 'center';
+      }
+
+      if (parseInt(computedStyle.paddingTop) + parseInt(computedStyle.paddingBottom) &lt; 12) {
+        button.style.padding = `12px ${computedStyle.paddingLeft || '16px'}`;
+      }
+    });
+  }
+
+  setupFastTapHandling() {
+    let touchStartTime = 0;
+    let touchStartTarget = null;
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartTime = Date.now();
+      touchStartTarget = e.target.closest('.oauth-btn, .btn, button');
+
+      if (touchStartTarget) {
+        touchStartTarget.classList.add('touch-active');
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', (e) => {
+      const touchEndTime = Date.now();
+      const touchDuration = touchEndTime - touchStartTime;
+
+      if (touchStartTarget) {
+        setTimeout(() => {
+          touchStartTarget.classList.remove('touch-active');
+        }, 150);
+      }
+
+      if (touchDuration &lt; this.options.fastTapThreshold &amp;&amp; touchStartTarget) {
+        e.preventDefault();
+        this.triggerFastTap(touchStartTarget);
+      }
+    }, { passive: false });
+
+    document.addEventListener('touchcancel', () => {
+      if (touchStartTarget) {
+        touchStartTarget.classList.remove('touch-active');
+      }
+    });
+  }
+
+  triggerFastTap(element) {
+    if (this.options.vibrationEnabled &amp;&amp; 'vibrate' in navigator) {
+      navigator.vibrate(50);
+    }
+
+    element.click();
+  }
+
+  setupTouchFeedback() {
+    const style = document.createElement('style');
+    style.textContent = `
+            .oauth-btn.touch-active,
+            .btn.touch-active,
+            button.touch-active {
+                transform: scale(0.98);
+                opacity: 0.8;
+                transition: all 0.1s ease;
+            }
+            
+            @media (hover: none) and (pointer: coarse) {
+                .oauth-btn:hover,
+                .btn:hover,
+                button:hover {
+                    transform: none;
+                    opacity: 1;
+                }
+            }
+        `;
+    document.head.appendChild(style);
+  }
+
+  preventTouchCallouts() {
+    const style = document.createElement('style');
+    style.textContent = `
+            .oauth-container,
+            .oauth-container * {
+                -webkit-touch-callout: none;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+            }
+            
+            .oauth-container input,
+            .oauth-container textarea {
+                -webkit-user-select: text;
+                -moz-user-select: text;
+                -ms-user-select: text;
+                user-select: text;
+            }
+        `;
+    document.head.appendChild(style);
+  }
+
+  setupOrientationHandling() {
+    if (!this.options.orientationAware) return;
+
+    const handleOrientationChange = () => {
+      const newOrientation = this.detectOrientation();
+      if (newOrientation !== this.orientation) {
+        this.orientation = newOrientation;
+        this.adjustForOrientation(newOrientation);
+      }
+    };
+
+    window.addEventListener('orientationchange', () => {
+      setTimeout(handleOrientationChange, 100);
+    });
+
+    window.addEventListener('resize', handleOrientationChange);
+
+    this.adjustForOrientation(this.orientation);
+  }
+
+  adjustForOrientation(orientation) {
+    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
+    if (!oauthContainer) return;
+
+    oauthContainer.classList.remove('portrait', 'landscape');
+    oauthContainer.classList.add(orientation);
+
+    if (orientation === 'landscape' &amp;&amp; this.isMobile) {
+      this.optimizeForLandscape();
+    } else {
+      this.optimizeForPortrait();
+    }
+  }
+
+  optimizeForLandscape() {
+    const style = document.createElement('style');
+    style.id = 'oauth-landscape-optimizations';
+
+    const existingStyle = document.getElementById('oauth-landscape-optimizations');
+    if (existingStyle) existingStyle.remove();
+
+    style.textContent = `
+            @media screen and (orientation: landscape) and (max-height: 500px) {
+                .oauth-container.landscape {
+                    padding: 10px 20px;
+                    max-height: 90vh;
+                    overflow-y: auto;
+                }
+                
+                .oauth-providers.landscape {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                }
+                
+                .oauth-btn.landscape {
+                    flex: 1;
+                    min-width: calc(50% - 4px);
+                    padding: 8px 12px;
+                    font-size: 14px;
+                }
+                
+                .oauth-header.landscape h1,
+                .oauth-header.landscape h2 {
+                    font-size: 1.2rem;
+                    margin-bottom: 8px;
+                }
+            }
+        `;
+    document.head.appendChild(style);
+  }
+
+  optimizeForPortrait() {
+    const landscapeStyle = document.getElementById('oauth-landscape-optimizations');
+    if (landscapeStyle) {
+      landscapeStyle.remove();
+    }
+  }
+
+  setupKeyboardHandling() {
+    const initialViewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    let keyboardVisible = false;
+
+    const handleViewportChange = () => {
+      const currentHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      const heightDifference = initialViewportHeight - currentHeight;
+
+      const wasKeyboardVisible = keyboardVisible;
+      keyboardVisible = heightDifference > 150;
+
+      if (keyboardVisible &amp;&amp; !wasKeyboardVisible) {
+        this.adjustForKeyboard(true);
+      } else if (!keyboardVisible &amp;&amp; wasKeyboardVisible) {
+        this.adjustForKeyboard(false);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+    } else {
+      window.addEventListener('resize', handleViewportChange);
+    }
+
+    document.addEventListener('focusin', (e) => {
+      if (e.target.matches('input, textarea, select')) {
+        setTimeout(() => this.scrollToInput(e.target), 300);
+      }
+    });
+  }
+
+  adjustForKeyboard(visible) {
+    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
+    if (!oauthContainer) return;
+
+    if (visible) {
+      oauthContainer.classList.add('keyboard-visible');
+      document.body.classList.add('oauth-keyboard-active');
+    } else {
+      oauthContainer.classList.remove('keyboard-visible');
+      document.body.classList.remove('oauth-keyboard-active');
+    }
+  }
+
+  scrollToInput(inputElement) {
+    if (!inputElement || !this.isMobile) return;
+
+    const rect = inputElement.getBoundingClientRect();
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+
+    if (rect.bottom > viewportHeight * 0.6) {
+      inputElement.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+      });
+    }
+  }
+
+  setupBiometricSupport() {
+    if (!this.options.biometricSupport || !('credentials' in navigator)) return;
+
+    this.detectBiometricCapabilities();
+  }
+
+  async detectBiometricCapabilities() {
+    try {
+      const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+      if (available) {
+        this.addBiometricOption();
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log('Biometric detection not supported:', error);
+    }
+  }
+
+  addBiometricOption() {
+    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
+    const providersContainer = oauthContainer?.querySelector('.oauth-providers');
+
+    if (!providersContainer) return;
+
+    const biometricBtn = document.createElement('button');
+    biometricBtn.className = 'oauth-btn biometric-auth';
+    biometricBtn.innerHTML = `
+            &lt;span class="oauth-btn-icon">👆&lt;/span>
+            &lt;span class="oauth-btn-text">Use Biometric&lt;/span>
+        `;
+
+    biometricBtn.addEventListener('click', () => {
+      this.initiateBiometricAuth();
+    });
+
+    providersContainer.appendChild(biometricBtn);
+  }
+
+  async initiateBiometricAuth() {
+    // eslint-disable-next-line no-console
+    console.log('Biometric authentication would be initiated here');
+  }
+
+  setupAccessibility() {
+    const style = document.createElement('style');
+    style.textContent = `
+            @media (prefers-reduced-motion: reduce) {
+                .oauth-container *,
+                .oauth-container *::before,
+                .oauth-container *::after {
+                    animation-duration: 0.01ms !important;
+                    animation-iteration-count: 1 !important;
+                    transition-duration: 0.01ms !important;
+                }
+            }
+            
+            @media (prefers-color-scheme: dark) {
+                .oauth-container {
+                    color-scheme: dark;
+                }
+            }
+            
+            .oauth-btn:focus-visible {
+                outline: 2px solid #007AFF;
+                outline-offset: 2px;
+            }
+            
+            @media (max-width: 768px) {
+                .oauth-container {
+                    font-size: 16px;
+                }
+                
+                .oauth-btn {
+                    font-size: 16px;
+                    line-height: 1.4;
+                }
+                
+                input, textarea, select {
+                    font-size: 16px;
+                }
+            }
+        `;
+    document.head.appendChild(style);
+
+    this.addAriaLabels();
+    this.setupKeyboardNavigation();
+  }
+
+  addAriaLabels() {
+    const oauthButtons = document.querySelectorAll('.oauth-btn');
+    oauthButtons.forEach((button) => {
+      const provider = button.dataset.provider || 'Unknown';
+      if (!button.getAttribute('aria-label')) {
+        button.setAttribute('aria-label', `Sign in with ${provider}`);
+      }
+    });
+  }
+
+  setupKeyboardNavigation() {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab') {
+        document.body.classList.add('keyboard-navigation');
+      }
+    });
+
+    document.addEventListener('mousedown', () => {
+      document.body.classList.remove('keyboard-navigation');
+    });
+  }
+
+  optimizePerformance() {
+    if ('serviceWorker' in navigator) {
+      this.registerOAuthServiceWorker();
+    }
+
+    this.preloadCriticalResources();
+    this.optimizeImages();
+    this.deferNonCriticalScripts();
+  }
+
+  async registerOAuthServiceWorker() {
+    try {
+      const registration = await navigator.serviceWorker.register('/oauth-sw.js');
+      // eslint-disable-next-line no-console
+      console.log('OAuth ServiceWorker registered:', registration);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.log('ServiceWorker registration failed:', error);
+    }
+  }
+
+  preloadCriticalResources() {
+    const criticalResources = [
+      '/assets/css/oauth-mobile.css',
+      '/assets/js/oauth-provider.js',
+    ];
+
+    criticalResources.forEach((resource) => {
+      const link = document.createElement('link');
+      link.rel = 'preload';
+      link.href = resource;
+      link.as = resource.endsWith('.css') ? 'style' : 'script';
+      document.head.appendChild(link);
+    });
+  }
+
+  optimizeImages() {
+    const images = document.querySelectorAll('.oauth-provider-logo, .oauth-btn img');
+
+    images.forEach((img) => {
+      if (!img.loading) {
+        img.loading = 'lazy';
+      }
+
+      if (!img.decoding) {
+        img.decoding = 'async';
+      }
+    });
+  }
+
+  deferNonCriticalScripts() {
+    const nonCriticalScripts = document.querySelectorAll('script[data-defer-mobile]');
+
+    if (this.isMobile || this.isTablet) {
+      nonCriticalScripts.forEach((script) => {
+        script.defer = true;
+      });
+    }
+  }
+
+  getOptimizationMetrics() {
+    return {
+      deviceType: this.getDeviceType(),
+      orientation: this.orientation,
+      touchCapable: this.touchCapable,
+      biometricAvailable: 'credentials' in navigator,
+      viewportSize: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+      },
+      optimizationsActive: {
+        touchOptimization: this.touchCapable,
+        orientationHandling: this.options.orientationAware,
+        keyboardHandling: true,
+        accessibilityEnhanced: true,
+      },
+    };
+  }
+
+  destroy() {
+    const styles = document.querySelectorAll('style[id*="oauth-"], style[id*="mobile-oauth"]');
+    styles.forEach((style) => style.remove());
+
+    // eslint-disable-next-line no-console
+    console.log('Mobile OAuth Optimizer destroyed');
+  }
+}
+
+if (typeof module !== 'undefined' &amp;&amp; module.exports) {
+  module.exports = MobileOAuthOptimizer;
+} else if (typeof window !== 'undefined') {
+  window.MobileOAuthOptimizer = MobileOAuthOptimizer;
+}
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

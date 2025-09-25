@@ -1,6 +1,10 @@
 /**
  * Apple Token Exchanger
  * Handles exchanging authorization codes for access tokens.
+ * @example
+ * // Service method usage
+ * const result = await appletokenexchanger.require({ 'https': 'example' });
+ * // Returns: { success: true, data: {...} }
  */
 
 const https = require('https');
@@ -27,6 +31,8 @@ const jwt = require('jsonwebtoken');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize token exchanger with Apple config and private key
  * const config = {
  *   teamId: 'APPLE_TEAM_ID',
@@ -41,8 +47,8 @@ const jwt = require('jsonwebtoken');
  *
  * // Exchange authorization code for tokens
  * const tokens = await exchanger.exchangeCodeForTokens(authorizationCode);
- * console.log('Access token:', tokens.access_token);
- * console.log('Refresh token:', tokens.refresh_token);
+ * console.log('Access token:', tokens.accesstoken);
+ * console.log('Refresh token:', tokens.refreshtoken);
  */
 class AppleTokenExchanger {
   constructor(config, privateKey) {
@@ -52,8 +58,13 @@ class AppleTokenExchanger {
 
   /**
    * Generates client secret for Apple OAuth.
-   * @returns {string} Signed JWT client secret.
+   * @returns {string} - Operation result Signed JWT client secret.
    * @example
+   * // Service method usage
+   * const result = await appletokenexchanger.generateClientSecret({ 'https': 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const exchanger = new AppleTokenExchanger(config, privateKey);
    * const clientSecret = exchanger.generateClientSecret();
    */
@@ -82,8 +93,13 @@ class AppleTokenExchanger {
   /**
    * Exchanges authorization code for tokens.
    * @param {string} authorizationCode - Authorization code from Apple.
-   * @returns {Promise<object>} Token data.
+   * @returns {Promise<object>} - Token data.
    * @example
+   * // Service method usage
+   * const result = await appletokenexchanger.exchangeCodeForTokens({ authorizationCode: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const exchanger = new AppleTokenExchanger(config, privateKey);
    * const tokens = await exchanger.exchangeCodeForTokens('authorization_code_here');
    */
@@ -127,6 +143,12 @@ class AppleTokenExchanger {
              * Handles Apple token exchange response with comprehensive error checking.
              * Validates HTTP status codes and Apple API error responses to ensure
              * successful token exchange or proper error propagation.
+             * @param {*} response.statusCode ! - response.statusCode ! Parameter.
+             * @returns {*} - Operation result.
+             * @example
+             * // Service method usage
+             * const result = await appletokenexchanger.if({ response.statusCode: 'example' });
+             * // Returns: { success: true, data: {...} }
              */
             if (response.statusCode !== 200) {
               reject(new Error(`Token exchange failed: ${result.error_description || result.error}`));

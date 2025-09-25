@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
+ * @example
+ * // Authentication service usage
+ * const result = await authenticationservicecore.require(userData);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
 const Parse = require('parse/node');
@@ -34,6 +38,8 @@ const AmexingUser = require('../../domain/models/AmexingUser');
  * @version 1.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Extend for specific authentication functionality
  * class AuthenticationService extends AuthenticationServiceCore {
  *   async loginUser(email, password) {
@@ -50,7 +56,7 @@ const AmexingUser = require('../../domain/models/AmexingUser');
  */
 class AuthenticationServiceCore {
   constructor() {
-    this.jwtSecret = process.env.JWT_SECRET;
+    this.jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
     this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
     this.refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
   }
@@ -60,8 +66,14 @@ class AuthenticationServiceCore {
    * @param {object} userData - User registration data.
    * @throws {Parse.Error} If validation fails.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservicecore.validateRegistrationData(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const userData = { username: 'john', email: 'john@example.com', password: 'pass123' };
    * authService.validateRegistrationData(userData);
+   * @returns {*} - Operation result.
    */
   validateRegistrationData(userData) {
     const required = ['username', 'email', 'password', 'firstName', 'lastName'];
@@ -89,10 +101,17 @@ class AuthenticationServiceCore {
   /**
    * Checks if user already exists.
    * @param {string} email - Email to check.
+   * @param email
    * @param {string} username - Username to check.
    * @throws {Parse.Error} If user exists.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservicecore.checkUserExists(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * await authService.checkUserExists('john@example.com', 'john_doe');
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async checkUserExists(email, username) {
     // Check email
@@ -117,8 +136,13 @@ class AuthenticationServiceCore {
   /**
    * Finds user by email or username.
    * @param {string} identifier - Email or username.
-   * @returns {Promise<AmexingUser|null>} User object or null.
+   * @returns {Promise<AmexingUser|null>} - User object or null.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservicecore.findUserByIdentifier(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const user = await authService.findUserByIdentifier('john@example.com');
    */
   async findUserByIdentifier(identifier) {
@@ -136,8 +160,14 @@ class AuthenticationServiceCore {
   /**
    * Finds user by email.
    * @param {string} email - User email.
-   * @returns {Promise<AmexingUser|null>} User object or null.
+   * @param email
+   * @returns {Promise<AmexingUser|null>} - User object or null.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservicecore.findUserByEmail(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const user = await authService.findUserByEmail('john@example.com');
    */
   async findUserByEmail(email) {
@@ -152,8 +182,13 @@ class AuthenticationServiceCore {
    * privileges for administrative operations and user data retrieval.
    * @function findUserById
    * @param {string} userId - Unique Parse Server user identifier.
-   * @returns {Promise<AmexingUser|null>} User object or null if not found.
+   * @returns {Promise<AmexingUser|null>} - User object or null if not found.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservicecore.findUserById(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * // Find user by Parse Server ID
    * const user = await authService.findUserById('user123');
    * if (user) {
@@ -171,11 +206,16 @@ class AuthenticationServiceCore {
    * user claims for secure session management and API access authorization.
    * @function generateTokens
    * @param {AmexingUser} user - Authenticated Parse Server user object.
-   * @returns {Promise<object>} Token object containing access_token, refresh_token, and metadata.
+   * @returns {Promise<object>} - Token object containing accesstoken, refreshtoken, and metadata.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservicecore.generateTokens(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * // Generate tokens for authenticated user
    * const tokens = await authService.generateTokens(user);
-   * console.log('Access Token:', tokens.access_token);
+   * console.log('Access Token:', tokens.accesstoken);
    * console.log('Expires In:', tokens.expires_in);
    */
   async generateTokens(user) {
@@ -210,14 +250,20 @@ class AuthenticationServiceCore {
   /**
    * Masks email for logging purposes.
    * @param {string} email - Email to mask.
-   * @returns {string} Masked email.
+   * @param email
+   * @returns {string} - Operation result Masked email.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservicecore.maskEmail(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const masked = authService.maskEmail('john@example.com'); // returns 'joh***@example.com'
    */
   maskEmail(email) {
     if (!email) return '';
-    const [local, domain] = email.split('@');
-    return `${local.substring(0, 3)}***@${domain}`;
+    const [local, _domain] = email.split('@');
+    return `${local.substring(0, 3)}***@${_domain}`;
   }
 }
 

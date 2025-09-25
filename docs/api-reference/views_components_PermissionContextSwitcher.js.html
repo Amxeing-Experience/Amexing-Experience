@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: views/components/PermissionContextSwitcher.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: views/components/PermissionContextSwitcher.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * Permission Context Switcher Component
+ * Frontend component for switching between permission contexts.
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @created Sprint 03 - Frontend Permission Context
+ */
+
+const Parse = require('parse/node');
+
+class PermissionContextSwitcher {
+  constructor(containerId, options = {}) {
+    this.container = document.getElementById(containerId);
+    this.currentUser = null;
+    this.availableContexts = [];
+    this.currentContext = null;
+
+    this.options = {
+      theme: 'default',
+      position: 'top-right',
+      showIcons: true,
+      autoRefresh: 30000, // 30 seconds
+      ...options,
+    };
+
+    this.init();
+  }
+
+  /**
+   * Initializes the context switcher.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  async init() {
+    try {
+      // Get current user
+      this.currentUser = Parse.User.current();
+      if (!this.currentUser) {
+        throw new Error('User not authenticated');
+      }
+
+      // Load available contexts
+      await this.loadAvailableContexts();
+
+      // Render the component
+      this.render();
+
+      // Set up event listeners
+      this.setupEventListeners();
+
+      // Set up auto-refresh
+      if (this.options.autoRefresh > 0) {
+        this.setupAutoRefresh();
+      }
+
+      console.log('PermissionContextSwitcher initialized successfully');
+    } catch (error) {
+      console.error('Error initializing PermissionContextSwitcher:', error);
+      this.renderError(error.message);
+    }
+  }
+
+  /**
+   * Loads available contexts from the server.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  async loadAvailableContexts() {
+    try {
+      const response = await Parse.Cloud.run('getAvailableContexts', {
+        userId: this.currentUser.id,
+      });
+
+      if (response.success) {
+        this.availableContexts = response.contexts;
+
+        // Set current context if available
+        if (this.availableContexts.length > 0) {
+          this.currentContext = this.availableContexts[0]; // Default to first context
+        }
+      } else {
+        throw new Error('Failed to load available contexts');
+      }
+    } catch (error) {
+      console.error('Error loading available contexts:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Renders the context switcher component.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  render() {
+    if (!this.container) {
+      console.error('Container element not found');
+      return;
+    }
+
+    // Clear container and create DOM elements securely
+    while (this.container.firstChild) {
+      this.container.removeChild(this.container.firstChild);
+    }
+
+    // Create main container element using DOM methods
+    const mainDiv = document.createElement('div');
+    mainDiv.className = `permission-context-switcher ${this.options.theme}`;
+    mainDiv.setAttribute('data-position', this.options.position);
+
+    // Create header section
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'context-switcher-header';
+
+    const h3 = document.createElement('h3');
+    if (this.options.showIcons) {
+      const iconEl = document.createElement('i');
+      iconEl.className = 'icon-context';
+      h3.appendChild(iconEl);
+    }
+    h3.appendChild(document.createTextNode('Context de Permisos'));
+
+    const refreshBtn = document.createElement('button');
+    refreshBtn.className = 'refresh-btn';
+    refreshBtn.title = 'Actualizar contextos';
+    const refreshIcon = document.createElement('i');
+    refreshIcon.className = 'icon-refresh';
+    refreshBtn.appendChild(refreshIcon);
+
+    headerDiv.appendChild(h3);
+    headerDiv.appendChild(refreshBtn);
+
+    // Create current context section
+    const currentContextDiv = document.createElement('div');
+    currentContextDiv.className = 'current-context';
+
+    const currentLabel = document.createElement('label');
+    currentLabel.textContent = 'Contexto Actual:';
+
+    const currentDisplay = document.createElement('div');
+    currentDisplay.className = 'current-context-display';
+    currentDisplay.textContent = this.getCurrentContextText();
+
+    currentContextDiv.appendChild(currentLabel);
+    currentContextDiv.appendChild(currentDisplay);
+
+    // Create available contexts section
+    const availableContextsDiv = document.createElement('div');
+    availableContextsDiv.className = 'available-contexts';
+
+    const availableLabel = document.createElement('label');
+    availableLabel.textContent = 'Cambiar a:';
+
+    const contextList = document.createElement('div');
+    contextList.className = 'context-list';
+    this.appendContextListElements(contextList);
+
+    availableContextsDiv.appendChild(availableLabel);
+    availableContextsDiv.appendChild(contextList);
+
+    // Create context info section
+    const contextInfoDiv = document.createElement('div');
+    contextInfoDiv.className = 'context-info';
+    this.appendContextInfoElements(contextInfoDiv);
+
+    // Create actions section
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'context-actions';
+
+    const switchBtn = document.createElement('button');
+    switchBtn.className = 'switch-btn';
+    switchBtn.disabled = true;
+    switchBtn.textContent = 'Cambiar Contexto';
+
+    const viewPermissionsBtn = document.createElement('button');
+    viewPermissionsBtn.className = 'view-permissions-btn';
+    viewPermissionsBtn.textContent = 'Ver Permisos';
+
+    actionsDiv.appendChild(switchBtn);
+    actionsDiv.appendChild(viewPermissionsBtn);
+
+    // Assemble the complete component
+    mainDiv.appendChild(headerDiv);
+    mainDiv.appendChild(currentContextDiv);
+    mainDiv.appendChild(availableContextsDiv);
+    mainDiv.appendChild(contextInfoDiv);
+    mainDiv.appendChild(actionsDiv);
+    this.container.appendChild(mainDiv);
+    this.applyStyles();
+  }
+
+  /**
+   * Renders current context display.
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  renderCurrentContext() {
+    if (!this.currentContext) {
+      return '&lt;span class="no-context">Sin contexto activo&lt;/span>';
+    }
+
+    const iconHtml = this.options.showIcons ? `&lt;i class="icon-${this.currentContext.icon}">&lt;/i>` : '';
+    const colorStyle = `style="border-left: 4px solid ${this.currentContext.color}"`;
+
+    return `
+      &lt;div class="context-item current" ${colorStyle}>
+        ${iconHtml}
+        &lt;div class="context-details">
+          &lt;div class="context-name">${this.currentContext.displayName}&lt;/div>
+          &lt;div class="context-description">${this.currentContext.description}&lt;/div>
+          &lt;div class="context-permissions">${this.currentContext.permissions.length} permisos&lt;/div>
+        &lt;/div>
+      &lt;/div>
+    `;
+  }
+
+  /**
+   * Renders list of available contexts.
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  renderContextList() {
+    if (this.availableContexts.length === 0) {
+      return '&lt;div class="no-contexts">No hay contextos disponibles&lt;/div>';
+    }
+
+    return this.availableContexts.map((context) => {
+      const isActive = this.currentContext &amp;&amp; this.currentContext.id === context.id;
+      const iconHtml = this.options.showIcons ? `&lt;i class="icon-${context.icon}">&lt;/i>` : '';
+      const activeClass = isActive ? 'active' : '';
+      const colorStyle = `style="border-left: 3px solid ${context.color}"`;
+
+      return `
+        &lt;div class="context-item ${activeClass}" 
+             data-context-id="${context.id}" 
+             ${colorStyle}>
+          ${iconHtml}
+          &lt;div class="context-details">
+            &lt;div class="context-name">${context.displayName}&lt;/div>
+            &lt;div class="context-description">${context.description}&lt;/div>
+            &lt;div class="context-meta">
+              &lt;span class="context-type">${context.type}&lt;/span>
+              &lt;span class="context-permissions">${context.permissions.length} permisos&lt;/span>
+            &lt;/div>
+          &lt;/div>
+          ${isActive ? '&lt;i class="icon-check current-indicator">&lt;/i>' : ''}
+        &lt;/div>
+      `;
+    }).join('');
+  }
+
+  /**
+   * Renders context information panel.
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  renderContextInfo() {
+    if (!this.currentContext) {
+      return '&lt;div class="no-info">Selecciona un contexto para ver información&lt;/div>';
+    }
+
+    const permissionsList = this.currentContext.permissions.map((permission) => `&lt;li class="permission-item">${permission}&lt;/li>`).join('');
+
+    return `
+      &lt;div class="context-info-panel">
+        &lt;h4>Información del Contexto&lt;/h4>
+        &lt;div class="info-grid">
+          &lt;div class="info-item">
+            &lt;label>Tipo:&lt;/label>
+            &lt;span class="info-value">${this.currentContext.type}&lt;/span>
+          &lt;/div>
+          &lt;div class="info-item">
+            &lt;label>Permisos Activos:&lt;/label>
+            &lt;span class="info-value">${this.currentContext.permissions.length}&lt;/span>
+          &lt;/div>
+        &lt;/div>
+        
+        &lt;div class="permissions-list">
+          &lt;h5>Permisos Disponibles:&lt;/h5>
+          &lt;ul class="permission-list">
+            ${permissionsList}
+          &lt;/ul>
+        &lt;/div>
+      &lt;/div>
+    `;
+  }
+
+  /**
+   * Sets up event listeners.
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  setupEventListeners() {
+    // Context selection
+    this.container.querySelectorAll('.context-item:not(.current)').forEach((item) => {
+      item.addEventListener('click', (e) => {
+        const { contextId } = e.currentTarget.dataset;
+        this.selectContext(contextId);
+      });
+    });
+
+    // Switch button
+    const switchBtn = this.container.querySelector('.switch-btn');
+    if (switchBtn) {
+      switchBtn.addEventListener('click', () => {
+        this.switchContext();
+      });
+    }
+
+    // View permissions button
+    const viewPermissionsBtn = this.container.querySelector('.view-permissions-btn');
+    if (viewPermissionsBtn) {
+      viewPermissionsBtn.addEventListener('click', () => {
+        this.showPermissionsModal();
+      });
+    }
+
+    // Refresh button
+    const refreshBtn = this.container.querySelector('.refresh-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        this.refresh();
+      });
+    }
+  }
+
+  /**
+   * Selects a context for switching.
+   * @param contextId
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  selectContext(contextId) {
+    const context = this.availableContexts.find((ctx) => ctx.id === contextId);
+    if (!context) {
+      console.error('Context not found:', contextId);
+      return;
+    }
+
+    // Update UI to show selected context
+    this.container.querySelectorAll('.context-item').forEach((item) => {
+      item.classList.remove('selected');
+    });
+
+    const selectedItem = this.container.querySelector(`[data-context-id="${contextId}"]`);
+    if (selectedItem) {
+      selectedItem.classList.add('selected');
+    }
+
+    // Enable switch button
+    const switchBtn = this.container.querySelector('.switch-btn');
+    if (switchBtn) {
+      switchBtn.disabled = false;
+      switchBtn.textContent = `Cambiar a ${context.displayName}`;
+    }
+
+    this.selectedContext = context;
+  }
+
+  /**
+   * Switches to the selected context.
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  async switchContext() {
+    if (!this.selectedContext) {
+      alert('Por favor selecciona un contexto primero');
+      return;
+    }
+
+    // Get button reference and original text
+    const switchBtn = this.container.querySelector('.switch-btn');
+    const originalText = switchBtn.textContent;
+
+    try {
+      // Show loading state
+      switchBtn.textContent = 'Cambiando...';
+      switchBtn.disabled = true;
+
+      // Call cloud function to switch context
+      const response = await Parse.Cloud.run('switchPermissionContext', {
+        contextId: this.selectedContext.id,
+      });
+
+      if (response.success) {
+        // Update current context
+        this.currentContext = this.selectedContext;
+        this.selectedContext = null;
+
+        // Re-render component
+        this.render();
+        this.setupEventListeners();
+
+        // Show success message
+        this.showMessage('Contexto cambiado exitosamente', 'success');
+
+        // Trigger context changed event
+        this.triggerContextChangedEvent();
+      } else {
+        throw new Error(response.message || 'Error switching context');
+      }
+    } catch (error) {
+      console.error('Error switching context:', error);
+      this.showMessage(`Error: ${error.message}`, 'error');
+
+      // Restore button state
+      switchBtn.textContent = originalText;
+      switchBtn.disabled = false;
+    }
+  }
+
+  /**
+   * Shows permissions modal.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  showPermissionsModal() {
+    if (!this.currentContext) {
+      alert('No hay contexto activo');
+      return;
+    }
+
+    const modal = document.createElement('div');
+    modal.className = 'permissions-modal';
+
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
+
+    // Create modal header
+    const modalHeader = document.createElement('div');
+    modalHeader.className = 'modal-header';
+
+    const h3 = document.createElement('h3');
+    h3.textContent = `Permisos del Contexto: ${this.currentContext.displayName}`;
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'close-modal';
+    closeBtn.textContent = '×';
+
+    modalHeader.appendChild(h3);
+    modalHeader.appendChild(closeBtn);
+
+    // Create modal body
+    const modalBody = document.createElement('div');
+    modalBody.className = 'modal-body';
+
+    const permissionsGrid = document.createElement('div');
+    permissionsGrid.className = 'permissions-grid';
+
+    this.currentContext.permissions.forEach((permission) => {
+      const badge = document.createElement('div');
+      badge.className = 'permission-badge';
+      badge.textContent = permission;
+      permissionsGrid.appendChild(badge);
+    });
+
+    modalBody.appendChild(permissionsGrid);
+    modalContent.appendChild(modalHeader);
+    modalContent.appendChild(modalBody);
+    modal.appendChild(modalContent);
+
+    document.body.appendChild(modal);
+
+    // Close modal event
+    modal.querySelector('.close-modal').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+  }
+
+  /**
+   * Refreshes the context switcher.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  async refresh() {
+    try {
+      const refreshBtn = this.container.querySelector('.refresh-btn');
+      refreshBtn.innerHTML = '&lt;i class="icon-loading">&lt;/i>';
+
+      await this.loadAvailableContexts();
+      this.render();
+      this.setupEventListeners();
+
+      this.showMessage('Contextos actualizados', 'success');
+    } catch (error) {
+      console.error('Error refreshing contexts:', error);
+      this.showMessage(`Error: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Sets up auto-refresh.
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  setupAutoRefresh() {
+    setInterval(() => {
+      this.refresh();
+    }, this.options.autoRefresh);
+  }
+
+  /**
+   * Shows a message to the user.
+   * @param message
+   * @param type
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  showMessage(message, type = 'info') {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `context-message ${type}`;
+    messageDiv.textContent = message;
+
+    this.container.appendChild(messageDiv);
+
+    setTimeout(() => {
+      if (messageDiv.parentNode) {
+        messageDiv.parentNode.removeChild(messageDiv);
+      }
+    }, 3000);
+  }
+
+  /**
+   * Triggers context changed event.
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  triggerContextChangedEvent() {
+    const event = new CustomEvent('contextChanged', {
+      detail: {
+        newContext: this.currentContext,
+        userId: this.currentUser.id,
+        timestamp: new Date(),
+      },
+    });
+
+    document.dispatchEvent(event);
+  }
+
+  /**
+   * Renders error state.
+   * @param message
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  renderError(message) {
+    if (!this.container) return;
+
+    // Clear container
+    while (this.container.firstChild) {
+      this.container.removeChild(this.container.firstChild);
+    }
+
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'permission-context-switcher error';
+
+    const errorMessage = document.createElement('div');
+    errorMessage.className = 'error-message';
+
+    const icon = document.createElement('i');
+    icon.className = 'icon-error';
+    errorMessage.appendChild(icon);
+
+    const h3 = document.createElement('h3');
+    h3.textContent = 'Error';
+    errorMessage.appendChild(h3);
+
+    const p = document.createElement('p');
+    p.textContent = message;
+    errorMessage.appendChild(p);
+
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'retry-btn';
+    retryBtn.textContent = 'Reintentar';
+    retryBtn.addEventListener('click', () => {
+      this.init();
+    });
+    errorMessage.appendChild(retryBtn);
+
+    errorDiv.appendChild(errorMessage);
+    this.container.appendChild(errorDiv);
+  }
+
+  /**
+   * Applies CSS styles to the component.
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  applyStyles() {
+    // Check if styles are already applied
+    if (document.getElementById('permission-context-switcher-styles')) {
+      return;
+    }
+
+    const styles = `
+      &lt;style id="permission-context-switcher-styles">
+        .permission-context-switcher {
+          background: #fff;
+          border: 1px solid #ddd;
+          border-radius: 8px;
+          padding: 16px;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          max-width: 400px;
+        }
+
+        .permission-context-switcher[data-position="top-right"] {
+          position: fixed;
+          top: 20px;
+          right: 20px;
+          z-index: 1000;
+        }
+
+        .context-switcher-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid #eee;
+        }
+
+        .context-switcher-header h3 {
+          margin: 0;
+          font-size: 16px;
+          color: #333;
+        }
+
+        .refresh-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 4px;
+          border-radius: 4px;
+        }
+
+        .refresh-btn:hover {
+          background: #f5f5f5;
+        }
+
+        .current-context, .available-contexts {
+          margin-bottom: 16px;
+        }
+
+        .current-context label, .available-contexts label {
+          display: block;
+          font-weight: 600;
+          margin-bottom: 8px;
+          color: #555;
+        }
+
+        .context-item {
+          display: flex;
+          align-items: center;
+          padding: 12px;
+          border: 1px solid #eee;
+          border-radius: 6px;
+          margin-bottom: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .context-item:hover {
+          border-color: #007bff;
+          background: #f8f9fa;
+        }
+
+        .context-item.selected {
+          border-color: #007bff;
+          background: #e3f2fd;
+        }
+
+        .context-item.current {
+          background: #d4edda;
+          border-color: #28a745;
+        }
+
+        .context-details {
+          flex: 1;
+          margin-left: 8px;
+        }
+
+        .context-name {
+          font-weight: 600;
+          margin-bottom: 4px;
+        }
+
+        .context-description {
+          font-size: 12px;
+          color: #666;
+          margin-bottom: 4px;
+        }
+
+        .context-meta {
+          display: flex;
+          gap: 12px;
+          font-size: 11px;
+          color: #888;
+        }
+
+        .context-actions {
+          display: flex;
+          gap: 8px;
+          margin-top: 16px;
+        }
+
+        .context-actions button {
+          flex: 1;
+          padding: 8px 16px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          background: #fff;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .context-actions button:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+        }
+
+        .switch-btn {
+          background: #007bff !important;
+          color: white !important;
+          border-color: #007bff !important;
+        }
+
+        .switch-btn:hover:not(:disabled) {
+          background: #0056b3 !important;
+        }
+
+        .context-message {
+          padding: 8px 12px;
+          border-radius: 4px;
+          margin-top: 8px;
+          font-size: 14px;
+        }
+
+        .context-message.success {
+          background: #d4edda;
+          color: #155724;
+          border: 1px solid #c3e6cb;
+        }
+
+        .context-message.error {
+          background: #f8d7da;
+          color: #721c24;
+          border: 1px solid #f5c6cb;
+        }
+
+        .permissions-modal {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0,0,0,0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 2000;
+        }
+
+        .modal-content {
+          background: #fff;
+          border-radius: 8px;
+          padding: 24px;
+          max-width: 500px;
+          width: 90%;
+          max-height: 80vh;
+          overflow-y: auto;
+        }
+
+        .modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 16px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid #eee;
+        }
+
+        .close-modal {
+          background: none;
+          border: none;
+          font-size: 24px;
+          cursor: pointer;
+        }
+
+        .permissions-grid {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+
+        .permission-badge {
+          background: #e9ecef;
+          padding: 4px 8px;
+          border-radius: 4px;
+          font-size: 12px;
+          color: #495057;
+        }
+
+        .no-contexts, .no-context, .no-info {
+          text-align: center;
+          color: #666;
+          font-style: italic;
+          padding: 20px;
+        }
+
+        .error-message {
+          text-align: center;
+          padding: 20px;
+        }
+
+        .error-message i {
+          font-size: 48px;
+          color: #dc3545;
+          margin-bottom: 16px;
+        }
+
+        .retry-btn {
+          background: #007bff;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 4px;
+          cursor: pointer;
+          margin-top: 16px;
+        }
+      &lt;/style>
+    `;
+
+    document.head.insertAdjacentHTML('beforeend', styles);
+  }
+
+  /**
+   * Gets current context.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  getCurrentContext() {
+    return this.currentContext;
+  }
+
+  /**
+   * Destroys the component.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  destroy() {
+    if (this.container) {
+      this.container.innerHTML = '';
+    }
+
+    // Remove styles
+    const styles = document.getElementById('permission-context-switcher-styles');
+    if (styles) {
+      styles.remove();
+    }
+  }
+
+  /**
+   * Gets current context as plain text.
+   * @returns {string} Current context text.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  getCurrentContextText() {
+    if (this.currentContext) {
+      return `${this.currentContext.name} (${this.currentContext.type})`;
+    }
+    return 'No context selected';
+  }
+
+  /**
+   * Appends context list elements to a container.
+   * @param {HTMLElement} container - Container to append elements to.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  appendContextListElements(container) {
+    if (!this.availableContexts || this.availableContexts.length === 0) {
+      const noContextsMsg = document.createElement('p');
+      noContextsMsg.textContent = 'No contexts available';
+      container.appendChild(noContextsMsg);
+      return;
+    }
+
+    this.availableContexts.forEach((context) => {
+      const contextItem = document.createElement('div');
+      contextItem.className = 'context-item';
+      contextItem.setAttribute('data-context-id', context.id);
+
+      const contextName = document.createElement('span');
+      contextName.className = 'context-name';
+      contextName.textContent = context.name;
+
+      const contextType = document.createElement('span');
+      contextType.className = 'context-type';
+      contextType.textContent = context.type;
+
+      contextItem.appendChild(contextName);
+      contextItem.appendChild(contextType);
+      container.appendChild(contextItem);
+    });
+  }
+
+  /**
+   * Appends context info elements to a container.
+   * @param {HTMLElement} container - Container to append elements to.
+   * @example
+   * // const instance = new ModelName(data);
+   * // const result = await instance.save();
+   */
+  appendContextInfoElements(container) {
+    if (!this.currentContext) {
+      const noInfoMsg = document.createElement('p');
+      noInfoMsg.textContent = 'No context information available';
+      container.appendChild(noInfoMsg);
+      return;
+    }
+
+    const infoTitle = document.createElement('h4');
+    infoTitle.textContent = 'Context Information';
+
+    const infoList = document.createElement('ul');
+
+    const nameItem = document.createElement('li');
+    nameItem.textContent = `Name: ${this.currentContext.name}`;
+
+    const typeItem = document.createElement('li');
+    typeItem.textContent = `Type: ${this.currentContext.type}`;
+
+    const permissionsItem = document.createElement('li');
+    permissionsItem.textContent = `Permissions: ${this.currentContext.permissions?.length || 0}`;
+
+    infoList.appendChild(nameItem);
+    infoList.appendChild(typeItem);
+    infoList.appendChild(permissionsItem);
+
+    container.appendChild(infoTitle);
+    container.appendChild(infoList);
+  }
+}
+
+// Make available globally
+window.PermissionContextSwitcher = PermissionContextSwitcher;
+
+// Auto-initialize if container exists
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.getElementById('permission-context-switcher');
+  if (container) {
+    new PermissionContextSwitcher('permission-context-switcher');
+  }
+});
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

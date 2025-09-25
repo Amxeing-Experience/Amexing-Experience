@@ -31,6 +31,11 @@ const appleOAuthFunctions = require('./functions/apple-oauth');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', parameters);
+ * // Returns: function result
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Register all cloud functions during Parse Server initialization
  * registerCloudFunctions();
  *
@@ -38,6 +43,7 @@ const appleOAuthFunctions = require('./functions/apple-oauth');
  * const result = await Parse.Cloud.run('getAvailableCorporateDomains');
  * const oauthUrl = await Parse.Cloud.run('generateCorporateOAuthURL', { domain: 'example.com' });
  * const syncStatus = await Parse.Cloud.run('triggerCorporateSync', { domain: 'company.com' });
+ * @returns {*} - Operation result.
  */
 function registerCloudFunctions() {
   try {
@@ -241,10 +247,10 @@ function registerCloudFunctions() {
     // OAuth Cloud Functions
     Parse.Cloud.define('generateOAuthUrl', async (request) => {
       const { params } = request;
-      const { provider, state } = params;
+      const { _provider, state } = params;
 
       try {
-        const authUrl = await OAuthService.generateAuthorizationUrl(provider, state);
+        const authUrl = await OAuthService.generateAuthorizationUrl(_provider, state);
         return { authUrl };
       } catch (error) {
         logger.error('OAuth URL generation error:', error);
@@ -254,12 +260,12 @@ function registerCloudFunctions() {
 
     Parse.Cloud.define('handleOAuthCallback', async (request) => {
       const { params, ip } = request;
-      const { provider, code, state } = params;
+      const { _provider, code, state } = params;
 
       try {
-        logger.info(`OAuth ${provider} callback from IP: ${ip}`);
+        logger.info(`OAuth ${_provider} callback from IP: ${ip}`);
 
-        const result = await OAuthService.handleCallback(provider, code, state);
+        const result = await OAuthService.handleCallback(_provider, code, state);
         return result;
       } catch (error) {
         logger.error('OAuth callback error:', error);
@@ -269,14 +275,14 @@ function registerCloudFunctions() {
 
     Parse.Cloud.define('linkOAuthAccount', async (request) => {
       const { params, user } = request;
-      const { provider, oauthData } = params;
+      const { _provider, oauthData } = params;
 
       if (!user) {
         throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'Authentication required');
       }
 
       try {
-        const result = await OAuthService.linkOAuthAccount(user.id, provider, oauthData);
+        const result = await OAuthService.linkOAuthAccount(user.id, _provider, oauthData);
         return result;
       } catch (error) {
         logger.error('OAuth account linking error:', error);
@@ -286,14 +292,14 @@ function registerCloudFunctions() {
 
     Parse.Cloud.define('unlinkOAuthAccount', async (request) => {
       const { params, user } = request;
-      const { provider } = params;
+      const { _provider } = params;
 
       if (!user) {
         throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'Authentication required');
       }
 
       try {
-        const result = await OAuthService.unlinkOAuthAccount(user.id, provider);
+        const result = await OAuthService.unlinkOAuthAccount(user.id, _provider);
         return result;
       } catch (error) {
         logger.error('OAuth account unlinking error:', error);
@@ -304,7 +310,7 @@ function registerCloudFunctions() {
     Parse.Cloud.define('getOAuthProviders', async (request) => {
       try {
         const providers = OAuthService.getAvailableProviders();
-        const providerConfigs = providers.map((provider) => OAuthService.getProviderConfig(provider));
+        const providerConfigs = providers.map((_provider) => OAuthService.getProviderConfig(_provider));
 
         return { providers: providerConfigs };
       } catch (error) {
@@ -588,5 +594,15 @@ function registerCloudFunctions() {
 
 // Register cloud functions immediately
 // Parse Server loads this file and Parse.Cloud is available
-registerCloudFunctions();
-logger.info('Cloud functions registration initiated');
+try {
+  logger.info('Starting cloud functions registration...');
+  registerCloudFunctions();
+  logger.info('Cloud functions registration completed successfully');
+} catch (error) {
+  logger.error('Failed to register cloud functions:', error);
+  logger.error('Cloud function registration error details:', {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+  });
+}

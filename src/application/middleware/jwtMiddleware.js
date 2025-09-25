@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
+ * @example
+ * // Middleware usage
+ * app.use('/path', middlewareFunction);
+ * // Processes request before route handler
  */
 
 const expressRateLimit = require('express-rate-limit');
@@ -15,9 +19,14 @@ const logger = require('../../infrastructure/logger');
  * @param {object} req - Express request object.
  * @param {object} res - Express response object.
  * @param {Function} next - Express next function.
- * @returns {Promise<void>} Promise that resolves when authentication is complete.
+ * @returns {Promise<void>} - Promise that resolves when authentication is complete.
  * @throws {Error} Throws error if token validation fails.
  * @example
+ * // Middleware usage
+ * app.use('/path', middlewareFunction);
+ * // Processes request before route handler
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Use as middleware in route
  * app.get('/protected', authenticateToken, (req, res) => {
  *   res.json({ user: req.user });
@@ -28,28 +37,37 @@ const authenticateToken = async (req, res, next) => {
     // Extract token from cookies (preferred) or Authorization header
     let token = req.cookies?.accessToken;
 
+    logger.debug('JWT Middleware - Cookie token:', { tokenPresent: !!token });
+
     if (!token) {
       const authHeader = req.headers.authorization;
+      logger.debug('JWT Middleware - Auth header:', { headerPresent: !!authHeader });
       token = authHeader && authHeader.startsWith('Bearer ')
         ? authHeader.slice(7)
         : null;
     }
 
     if (!token) {
+      logger.debug('JWT Middleware - No token found, returning 401');
       return res.status(401).json({
         success: false,
         error: 'Access token required',
       });
     }
 
+    logger.debug('JWT Middleware - Token found, validating..');
+
     // Validate token using AuthenticationService
     const result = await AuthenticationService.validateToken(token);
+
+    logger.debug('JWT Middleware - Validation result:', { success: !!result });
 
     // Attach user information to request
     req.user = result.user;
     req.userId = result.userId;
     req.userRole = result.role;
 
+    logger.debug('JWT Middleware - User attached:', { userId: req.userId, role: req.userRole });
     next();
   } catch (error) {
     logger.error('JWT authentication error:', error);
@@ -74,8 +92,13 @@ const authenticateToken = async (req, res, next) => {
  * @param {object} req - Express request object.
  * @param {object} res - Express response object.
  * @param {Function} next - Express next function.
- * @returns {Promise<void>} Promise that resolves when optional authentication check is complete.
+ * @returns {Promise<void>} - Promise that resolves when optional authentication check is complete.
  * @example
+ * // Middleware usage
+ * app.use('/path', middlewareFunction);
+ * // Processes request before route handler
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Use for routes that work with or without authentication
  * app.get('/content', authenticateOptional, (req, res) => {
  *   const isAuthenticated = !!req.user;
@@ -117,9 +140,11 @@ const authenticateOptional = async (req, res, next) => {
 /**
  * Middleware to check if user has specific role.
  * @param {string|Array<string>} allowedRoles - Single role or array of allowed roles.
- * @returns {Function} Express middleware function that validates user roles.
+ * @returns {Function} - Operation result Express middleware function that validates user roles.
  * @throws {Error} Throws error if user lacks required permissions.
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Require admin role
  * app.delete('/users/:id', authenticateToken, requireRole('admin'), deleteUser);
  *
@@ -159,8 +184,13 @@ const requireRole = (allowedRoles) => {
  * @param {object} req - Express request object.
  * @param {object} res - Express response object.
  * @param {Function} next - Express next function.
- * @returns {Promise<void>} Promise that resolves when token refresh attempt is complete.
+ * @returns {Promise<void>} - Promise that resolves when token refresh attempt is complete.
  * @example
+ * // Middleware usage
+ * app.use('/path', middlewareFunction);
+ * // Processes request before route handler
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Use before authentication middleware to auto-refresh tokens
  * app.use('/api', autoRefreshToken, authenticateToken);
  */
@@ -208,8 +238,10 @@ const autoRefreshToken = async (req, res, next) => {
  * @param {object} req - Express request object.
  * @param {object} res - Express response object.
  * @param {Function} next - Express next function.
- * @returns {void} Synchronously extracts user data from session.
+ * @returns {void} - No return value Synchronously extracts user data from session.
  * @example
+ * // app.use(middlewareName);
+ * // Middleware protects routes with validation/authentication
  * // Use for web routes that rely on session data
  * app.get('/profile', extractUser, (req, res) => {
  *   if (req.user) {
@@ -237,6 +269,10 @@ const extractUser = (req, res, next) => {
 
 /**
  * Rate limiting specifically for authentication endpoints.
+ * @example
+ * // Middleware usage
+ * app.use('/path', middlewareFunction);
+ * // Processes request before route handler
  */
 const authRateLimit = expressRateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

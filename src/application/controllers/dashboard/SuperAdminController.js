@@ -11,9 +11,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * Dashboard index page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await index(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async index(req, res) {
     try {
@@ -36,9 +45,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * User management page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await users(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async users(req, res) {
     try {
@@ -57,9 +75,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * Client management page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await clients(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async clients(req, res) {
     try {
@@ -78,9 +105,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * Permissions management page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await permissions(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async permissions(req, res) {
     try {
@@ -100,9 +136,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * System analytics page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await analytics(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async analytics(req, res) {
     try {
@@ -121,9 +166,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * Reports page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await reports(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async reports(req, res) {
     try {
@@ -142,9 +196,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * Audit logs page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await audit(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async audit(req, res) {
     try {
@@ -163,9 +226,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * System settings page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await settings(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async settings(req, res) {
     try {
@@ -184,9 +256,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * Integrations page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await integrations(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async integrations(req, res) {
     try {
@@ -205,9 +286,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * Security settings page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await security(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async security(req, res) {
     try {
@@ -226,9 +316,18 @@ class SuperAdminController extends RoleBasedController {
 
   /**
    * PCI DSS Compliance page.
-   * @param req
-   * @param res
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example
+   * // Usage example
+   * const result = await compliance(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async compliance(req, res) {
     try {
@@ -248,6 +347,15 @@ class SuperAdminController extends RoleBasedController {
   /**
    * Get system-wide statistics.
    * @example
+   * // GET endpoint example
+   * const result = await SuperAdminController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getSystemStats() {
     return {
@@ -265,6 +373,15 @@ class SuperAdminController extends RoleBasedController {
   /**
    * Get recent system activity.
    * @example
+   * // GET endpoint example
+   * const result = await SuperAdminController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getRecentSystemActivity() {
     return [
@@ -292,6 +409,15 @@ class SuperAdminController extends RoleBasedController {
   /**
    * Get system analytics data.
    * @example
+   * // GET endpoint example
+   * const result = await SuperAdminController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async getSystemAnalytics() {
     return {

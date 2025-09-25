@@ -11,6 +11,11 @@ const logger = require('../../infrastructure/logger');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Error handling middleware usage
+ * app.use(errorHandler);
+ * // Catches and formats application errors
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Log authentication error with user context
  * const authError = new Error('Invalid credentials');
  * logError(authError, req);
@@ -22,6 +27,7 @@ const logger = require('../../infrastructure/logger');
  *   logError(error, req);
  *   res.status(500).json({ error: 'Payment processing failed' });
  * }
+ * @returns {*} - Operation result.
  */
 function logError(err, req) {
   logger.error('Error Handler:', {
@@ -41,11 +47,16 @@ function logError(err, req) {
  * session management, and data validation scenarios.
  * @function handleParseError
  * @param {Error} err - The Parse Server error object containing error code and message.
- * @returns {object|null} Status and message object with HTTP status code and user message, or null if not a Parse error.
+ * @returns {object|null} - Operation result Status and message object with HTTP status code and user message, or null if not a Parse error.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Error handling middleware usage
+ * app.use(errorHandler);
+ * // Catches and formats application errors
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Handle authentication error
  * const authError = { code: 101, message: 'Invalid username/password.' };
  * const result = handleParseError(authError);
@@ -83,11 +94,16 @@ function handleParseError(err) {
  * connection failures, and database operational errors with PCI DSS compliance.
  * @function handleMongoError
  * @param {Error} err - The MongoDB error object containing name, code, and message properties.
- * @returns {object|null} Status and message object with HTTP status code and user message, or null if not a MongoDB error.
+ * @returns {object|null} - Operation result Status and message object with HTTP status code and user message, or null if not a MongoDB error.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Error handling middleware usage
+ * app.use(errorHandler);
+ * // Catches and formats application errors
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Handle duplicate key error (unique constraint violation)
  * const duplicateError = { name: 'MongoError', code: 11000, message: 'E11000 duplicate key error' };
  * const result = handleMongoError(duplicateError);
@@ -122,11 +138,16 @@ function handleMongoError(err) {
  * custom validation scenarios with detailed field-level error reporting.
  * @function handleValidationError
  * @param {Error} err - The validation error object containing name and details array.
- * @returns {object|null} Status and message object with HTTP status code and aggregated validation messages, or null if not a validation error.
+ * @returns {object|null} - Operation result Status and message object with HTTP status code and aggregated validation messages, or null if not a validation error.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Error handling middleware usage
+ * app.use(errorHandler);
+ * // Catches and formats application errors
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Handle Joi validation error with multiple field violations
  * const validationError = {
  *   name: 'ValidationError',
@@ -167,11 +188,16 @@ function handleValidationError(err) {
  * Parse Server, MongoDB, validation, and generic error scenarios.
  * @function getErrorDetails
  * @param {Error} err - The error object containing various error properties (code, name, status, message).
- * @returns {object} Status and message object with HTTP status code and user-friendly error message.
+ * @returns {object} - Operation result Status and message object with HTTP status code and user-friendly error message.
  * @author Amexing Development Team
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Error handling middleware usage
+ * app.use(errorHandler);
+ * // Catches and formats application errors
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Handle Parse Server authentication error
  * const parseError = { code: 101, message: 'Invalid username/password.' };
  * const result = getErrorDetails(parseError);
@@ -201,6 +227,10 @@ function getErrorDetails(err) {
   /**
    * Attempts Parse Server error handling with specific error code mapping.
    * Processes Parse Server specific errors and returns appropriate HTTP status.
+   * @example
+   * // Error handling middleware usage
+   * app.use(errorHandler);
+   * // Catches and formats application errors
    */
   let result = handleParseError(err);
   if (result) {
@@ -210,6 +240,10 @@ function getErrorDetails(err) {
   /**
    * Attempts MongoDB error handling for database operation failures.
    * Handles duplicate key errors and other MongoDB specific error conditions.
+   * @example
+   * // Error handling middleware usage
+   * app.use(errorHandler);
+   * // Catches and formats application errors
    */
   result = handleMongoError(err);
   if (result) {
@@ -219,6 +253,10 @@ function getErrorDetails(err) {
   /**
    * Attempts validation error handling for input validation failures.
    * Processes Joi validation errors and other input validation scenarios.
+   * @example
+   * // Error handling middleware usage
+   * app.use(errorHandler);
+   * // Catches and formats application errors
    */
   result = handleValidationError(err);
   if (result) {
@@ -236,9 +274,12 @@ function getErrorDetails(err) {
  * @param {Error} err - The error object.
  * @param {object} req - Express request object.
  * @param {object} res - Express response object.
- * @param {Function} _next - Express next function.
- * @returns {void} No return value.
+ * @param {*} next - Express next function.
+ * @param _next
+ * @returns {void} - No return value.
  * @example
+ * // app.use(middlewareName);
+ * // Middleware protects routes with validation/authentication
  * // Express error handling middleware
  * app.use(errorHandler);
  */

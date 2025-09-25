@@ -32,10 +32,13 @@ class DashboardAuthMiddleware {
 
   /**
    * Simple authentication middleware for dashboard routes with guard conditions.
-   * @param req
-   * @param res
-   * @param next
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Next middleware function.
    * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {void} - No return value Operation result.
    */
   requireAuth = (req, res, next) => {
     // Skip authentication for logout requests
@@ -86,14 +89,18 @@ class DashboardAuthMiddleware {
     res.locals.userRole = user.role;
     res.locals.userName = user.name || user.username;
     res.locals.userId = user.id;
+    res.locals.accessToken = accessToken; // Pass token to templates
 
     next();
   };
 
   /**
    * Role-based access control middleware with redirect prevention.
-   * @param requiredRole
+   * @param {*} requiredRole - RequiredRole parameter.
    * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   * @returns {void} - No return value Operation result.
    */
   requireRole = (requiredRole) => (req, res, next) => {
     // Guard condition: prevent redirects during logout
@@ -133,10 +140,13 @@ class DashboardAuthMiddleware {
 
   /**
    * Dashboard-specific role validation with redirect loop prevention.
-   * @param req
-   * @param res
-   * @param next
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Next middleware function.
    * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {void} - No return value Operation result.
    */
   requireDashboardAccess = (req, res, next) => {
     if (!req.user) {
@@ -181,10 +191,13 @@ class DashboardAuthMiddleware {
 
   /**
    * Optional middleware - inject user context even if not authenticated.
-   * @param req
-   * @param res
-   * @param next
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Next middleware function.
    * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   injectUserContext = (req, res, next) => {
     const accessToken = req.cookies?.accessToken;
@@ -220,10 +233,13 @@ class DashboardAuthMiddleware {
 
   /**
    * Logout middleware - clear all authentication tokens.
-   * @param req
-   * @param res
-   * @param next
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Next middleware function.
    * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   logout = (req, res, next) => {
     // Clear authentication cookies with proper options
@@ -266,10 +282,13 @@ class DashboardAuthMiddleware {
 
   /**
    * Redirect authenticated users away from auth pages with improved guards.
-   * @param req
-   * @param res
-   * @param next
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Next middleware function.
    * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {void} - No return value Operation result.
    */
   redirectIfAuthenticated = (req, res, next) => {
     // Skip redirect check if this is a logout request

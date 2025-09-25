@@ -7,6 +7,143 @@
     <link rel="shortcut icon" type="image/png" href="/dashboard/images/logos/favicon.png" />
     <link rel="stylesheet" href="/dashboard/css/styles.min.css" />
     <%- include('../blocks/css') %>
+
+    <!-- Custom Dashboard Layout Styles -->
+    <style>
+        /* Ensure full height layout */
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+        }
+
+        /* Main wrapper takes full height */
+        .page-wrapper {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: row;
+        }
+
+        /* Sidebar fixed height and scroll */
+        .left-sidebar {
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 270px;
+            z-index: 1000;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Sidebar content container */
+        .left-sidebar > div {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Brand logo area fixed */
+        .brand-logo {
+            flex-shrink: 0;
+            padding: 1rem;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        /* Sidebar navigation scrollable */
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 1rem 0;
+        }
+
+        /* Custom scrollbar for sidebar */
+        .sidebar-nav::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar-nav::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .sidebar-nav::-webkit-scrollbar-thumb {
+            background: rgba(0,0,0,0.2);
+            border-radius: 3px;
+        }
+
+        .sidebar-nav::-webkit-scrollbar-thumb:hover {
+            background: rgba(0,0,0,0.3);
+        }
+
+        /* Body wrapper takes remaining space */
+        .body-wrapper {
+            margin-left: 270px;
+            min-height: 100vh;
+            width: calc(100% - 270px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header fixed at top */
+        .app-header {
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 999;
+            background: #fff;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        /* Main content area takes remaining height */
+        .body-wrapper-inner {
+            flex: 1;
+            padding: 1rem;
+            overflow-y: auto;
+        }
+
+        /* Container fluid no extra padding */
+        .body-wrapper-inner .container-fluid {
+            height: 100%;
+            padding: 0;
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 1199.98px) {
+            .left-sidebar {
+                margin-left: -270px;
+                transition: margin-left 0.3s ease;
+            }
+
+            .left-sidebar.show {
+                margin-left: 0;
+            }
+
+            .body-wrapper {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+
+        /* Additional mobile responsive */
+        @media (max-width: 767.98px) {
+            .body-wrapper-inner {
+                padding: 0.5rem;
+            }
+        }
+
+        /* Ensure cards and content scale properly */
+        .card {
+            margin-bottom: 1.5rem;
+        }
+
+        /* Fix for breadcrumb spacing */
+        .card.bg-info-subtle {
+            margin-bottom: 1.5rem;
+        }
+    </style>
 </head>
 
 <body>
@@ -93,6 +230,91 @@
     <script src="/dashboard/js/sidebarmenu.js"></script>
     <script src="/dashboard/js/app.min.js"></script>
     <script src="/dashboard/js/dashboard.js"></script>
+
+    <!-- Custom Dashboard Layout Scripts -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mobile sidebar toggle functionality
+            const sidebarToggle = document.getElementById('sidebarCollapse');
+            const headerToggle = document.getElementById('headerCollapse');
+            const sidebar = document.querySelector('.left-sidebar');
+            const overlay = document.createElement('div');
+
+            // Create overlay for mobile
+            overlay.className = 'sidebar-overlay';
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
+                display: none;
+            `;
+            document.body.appendChild(overlay);
+
+            // Toggle function
+            function toggleSidebar() {
+                if (window.innerWidth <= 1199) {
+                    sidebar.classList.toggle('show');
+                    if (sidebar.classList.contains('show')) {
+                        overlay.style.display = 'block';
+                        document.body.style.overflow = 'hidden';
+                    } else {
+                        overlay.style.display = 'none';
+                        document.body.style.overflow = '';
+                    }
+                }
+            }
+
+            // Event listeners
+            if (sidebarToggle) {
+                sidebarToggle.addEventListener('click', toggleSidebar);
+            }
+
+            if (headerToggle) {
+                headerToggle.addEventListener('click', toggleSidebar);
+            }
+
+            // Close sidebar when clicking overlay
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('show');
+                overlay.style.display = 'none';
+                document.body.style.overflow = '';
+            });
+
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 1199) {
+                    sidebar.classList.remove('show');
+                    overlay.style.display = 'none';
+                    document.body.style.overflow = '';
+                }
+            });
+
+            // Smooth scrolling for sidebar navigation
+            const sidebarNav = document.querySelector('.sidebar-nav');
+            if (sidebarNav) {
+                sidebarNav.style.scrollBehavior = 'smooth';
+            }
+
+            // Auto-hide mobile sidebar after navigation click
+            const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
+            sidebarLinks.forEach(link => {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 1199 && sidebar.classList.contains('show')) {
+                        setTimeout(() => {
+                            sidebar.classList.remove('show');
+                            overlay.style.display = 'none';
+                            document.body.style.overflow = '';
+                        }, 150);
+                    }
+                });
+            });
+        });
+    </script>
+
     <%- include('../blocks/scripts') %>
 </body>
 </html>

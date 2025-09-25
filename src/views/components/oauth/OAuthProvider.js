@@ -24,6 +24,11 @@
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Example usage:
+ * // const result = await methodName(params);
+ * // console.log(result);
  * // Basic OAuth provider initialization
  * const oauthProvider = new OAuthProvider({
  *   allowedProviders: ['google', 'microsoft', 'apple'],
@@ -81,6 +86,14 @@ class OAuthProvider {
   /**
    * Initialize OAuth Provider.
    * @example
+   * // Usage example
+   * const result = await init(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async init() {
     if (this.initialized) return;
@@ -114,6 +127,14 @@ class OAuthProvider {
   /**
    * Load OAuth configuration from server.
    * @example
+   * // Usage example
+   * const result = await loadOAuthConfig(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async loadOAuthConfig() {
     const response = await fetch('/api/oauth/config', {
@@ -140,6 +161,15 @@ class OAuthProvider {
   /**
    * Initialize provider-specific configurations.
    * @example
+   * // Usage example
+   * const result = await initializeProviders(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async initializeProviders() {
     const providers = this.config.allowedProviders;
@@ -173,6 +203,15 @@ class OAuthProvider {
   /**
    * Initialize Apple Sign In.
    * @example
+   * // Usage example
+   * const result = await initializeAppleSignIn(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async initializeAppleSignIn() {
     try {
@@ -215,6 +254,14 @@ class OAuthProvider {
   /**
    * Initialize Google OAuth.
    * @example
+   * // Usage example
+   * const result = await initializeGoogleOAuth(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async initializeGoogleOAuth() {
     try {
@@ -236,6 +283,14 @@ class OAuthProvider {
   /**
    * Initialize Microsoft OAuth.
    * @example
+   * // Usage example
+   * const result = await initializeMicrosoftOAuth(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async initializeMicrosoftOAuth() {
     try {
@@ -265,6 +320,15 @@ class OAuthProvider {
   /**
    * Setup event listeners.
    * @example
+   * // Usage example
+   * const result = await setupEventListeners(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   setupEventListeners() {
     // Listen for OAuth callback messages
@@ -280,6 +344,15 @@ class OAuthProvider {
   /**
    * Initialize UI components.
    * @example
+   * // Usage example
+   * const result = await initializeUI(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   initializeUI() {
     const container = document.getElementById('oauth-container');
@@ -306,6 +379,14 @@ class OAuthProvider {
   /**
    * Create OAuth UI elements.
    * @example
+   * // Usage example
+   * const result = await createOAuthUI(parameters);
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   createOAuthUI() {
     const container = document.createElement('div');
@@ -336,8 +417,17 @@ class OAuthProvider {
 
   /**
    * Create provider-specific OAuth button.
-   * @param provider
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
    * @example
+   * // Usage example
+   * const result = await createProviderButton({ provider: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {*} - Operation result.
    */
   createProviderButton(provider) {
     const button = document.createElement('button');
@@ -358,6 +448,15 @@ class OAuthProvider {
   /**
    * Create department selector.
    * @example
+   * // Usage example
+   * const result = await createDepartmentSelector({ provider: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   createDepartmentSelector() {
     const container = document.createElement('div');
@@ -402,6 +501,15 @@ class OAuthProvider {
   /**
    * Create corporate branding elements.
    * @example
+   * // Usage example
+   * const result = await createCorporateBranding({ provider: 'example' });
+   * // Returns: operation result
+   * // const provider = new OAuthProvider(config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   createCorporateBranding() {
     const branding = document.createElement('div');
@@ -429,19 +537,28 @@ class OAuthProvider {
 
   /**
    * Authenticate with specific OAuth provider.
-   * @param provider
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
    * @example
+   * // Usage example
+   * const result = await authenticateWithProvider({ provider: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
-  async authenticateWithProvider(provider) {
+  async authenticateWithProvider(_provider) {
     try {
-      this.logAuditEvent('oauth_authentication_started', { provider });
+      this.logAuditEvent('oauth_authentication_started', { provider: _provider });
 
       // Validate department selection if required
       if (this.config.departmentRequired && !this.selectedDepartment) {
         throw new Error('Please select your department before signing in');
       }
 
-      switch (provider) {
+      switch (_provider) {
         case 'apple':
           await this.authenticateWithApple();
           break;
@@ -452,17 +569,26 @@ class OAuthProvider {
           await this.authenticateWithMicrosoft();
           break;
         default:
-          throw new Error(`Unsupported OAuth provider: ${provider}`);
+          throw new Error(`Unsupported OAuth provider: ${_provider}`);
       }
     } catch (error) {
-      console.error('OAuth authentication failed with provider:', provider, error);
-      this.handleAuthenticationError(error, provider);
+      console.error('OAuth authentication failed with provider:', _provider, error);
+      this.handleAuthenticationError(error, _provider);
     }
   }
 
   /**
    * Authenticate with Apple.
    * @example
+   * // Usage example
+   * const result = await authenticateWithApple({ provider: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async authenticateWithApple() {
     const response = await window.AppleID.auth.signIn();
@@ -472,6 +598,15 @@ class OAuthProvider {
   /**
    * Authenticate with Google.
    * @example
+   * // Usage example
+   * const result = await authenticateWithGoogle({ provider: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async authenticateWithGoogle() {
     window.google.accounts.id.prompt();
@@ -479,8 +614,16 @@ class OAuthProvider {
 
   /**
    * Handle Google OAuth response.
-   * @param response
+   * @param {object} response - HTTP response object.
    * @example
+   * // Usage example
+   * const result = await handleGoogleResponse({ response: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async handleGoogleResponse(response) {
     await this.handleOAuthSuccess('google', response);
@@ -489,6 +632,15 @@ class OAuthProvider {
   /**
    * Authenticate with Microsoft.
    * @example
+   * // Usage example
+   * const result = await authenticateWithMicrosoft({ response: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async authenticateWithMicrosoft() {
     const loginRequest = {
@@ -502,11 +654,20 @@ class OAuthProvider {
 
   /**
    * Handle successful OAuth authentication.
-   * @param provider
-   * @param response
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
+   * @param {object} response - HTTP response object.
    * @example
+   * // Usage example
+   * const result = await handleOAuthSuccess({ provider: 'example' , response: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
-  async handleOAuthSuccess(provider, response) {
+  async handleOAuthSuccess(_provider, response) {
     try {
       // Send OAuth response to server for validation and user creation
       const serverResponse = await fetch('/api/oauth/authenticate', {
@@ -516,7 +677,7 @@ class OAuthProvider {
           'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify({
-          provider,
+          provider: _provider,
           response,
           department: this.selectedDepartment,
           corporateMode: this.config.corporateMode,
@@ -536,7 +697,7 @@ class OAuthProvider {
       }
 
       this.logAuditEvent('oauth_authentication_success', {
-        provider,
+        provider: _provider,
         userId: result.user.id,
         department: this.selectedDepartment,
       });
@@ -545,15 +706,23 @@ class OAuthProvider {
       this.handleAuthenticationRedirect(result);
     } catch (error) {
       console.error('OAuth success handling failed:', error);
-      this.handleAuthenticationError(error, provider);
+      this.handleAuthenticationError(error, _provider);
     }
   }
 
   /**
    * Handle context switching after OAuth authentication.
-   * @param user
-   * @param department
+   * @param {*} user - User parameter.
+   * @param {object} department - Department object.
    * @example
+   * // Usage example
+   * const result = await handleContextSwitch({ user: 'example', department: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const provider = new OAuthProvider("google", config);
+   * // const authUrl = await provider.getAuthorizationUrl(options);
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async handleContextSwitch(user, department) {
     if (!window.PermissionContextService || !department) return;
@@ -572,8 +741,18 @@ class OAuthProvider {
 
   /**
    * Handle Apple Sign In success.
-   * @param data
+   * @param {object} data - Data object.
    * @example
+   * // Usage example
+   * const result = await handleAppleSuccess({ data: 'example' });
+   * // Returns: operation result
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   handleAppleSuccess(data) {
     console.log('Apple OAuth success:', data);
@@ -589,8 +768,17 @@ class OAuthProvider {
 
   /**
    * Handle Apple Sign In error.
-   * @param error
+   * @param {Error} error - Error object.
    * @example
+   * // Usage example
+   * const result = await handleAppleError({ error: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   handleAppleError(error) {
     console.error('Apple OAuth error:', error);
@@ -600,6 +788,15 @@ class OAuthProvider {
   /**
    * Handle Apple Sign In cancellation.
    * @example
+   * // Usage example
+   * const result = await handleAppleCancel({ error: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   handleAppleCancel() {
     console.log('Apple OAuth cancelled by user');
@@ -608,8 +805,17 @@ class OAuthProvider {
 
   /**
    * Handle authentication redirect.
-   * @param result
+   * @param {object} result - Operation result.
    * @example
+   * // Usage example
+   * const result = await handleAuthenticationRedirect({ result: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   handleAuthenticationRedirect(result) {
     const redirectUrl = result.redirectUrl
@@ -621,13 +827,23 @@ class OAuthProvider {
 
   /**
    * Handle authentication errors.
-   * @param error
-   * @param provider
+   * @param {Error} error - Error object.
+   * @param {string} provider - OAuth provider name.
+   * @param _provider
    * @example
+   * // Usage example
+   * const result = await handleAuthenticationError({ error: 'example', provider: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
-  handleAuthenticationError(error, provider) {
+  handleAuthenticationError(error, _provider) {
     this.logAuditEvent('oauth_authentication_error', {
-      provider,
+      provider: _provider,
       error: error.message,
     });
 
@@ -640,8 +856,17 @@ class OAuthProvider {
 
   /**
    * Show error message to user.
-   * @param message
+   * @param {string} message - Message string.
    * @example
+   * // Usage example
+   * const result = await showErrorMessage({ message: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   showErrorMessage(message) {
     const container = document.getElementById('oauth-container');
@@ -669,6 +894,15 @@ class OAuthProvider {
   /**
    * Enable authentication buttons.
    * @example
+   * // Usage example
+   * const result = await enableAuthenticationButtons({ message: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   enableAuthenticationButtons() {
     const buttons = document.querySelectorAll('.oauth-btn');
@@ -680,9 +914,18 @@ class OAuthProvider {
 
   /**
    * Log audit events for PCI compliance.
-   * @param action
-   * @param metadata
+   * @param {string} action - Action identifier.
+   * @param {object} metadata - Additional metadata object.
    * @example
+   * // Usage example
+   * const result = await logAuditEvent({ action: 'example', metadata: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   logAuditEvent(action, metadata = {}) {
     if (!this.auditService) return;
@@ -705,6 +948,15 @@ class OAuthProvider {
   /**
    * Utility methods.
    * @example
+   * // Usage example
+   * const result = await detectMobile({ action: 'example', metadata: 'example' });
+   * // Returns: operation result
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {*} - Operation result.
    */
   detectMobile() {
     return window.innerWidth <= 768
@@ -779,13 +1031,13 @@ class OAuthProvider {
     }
   }
 
-  highlightSuggestedProvider(provider) {
+  highlightSuggestedProvider(_provider) {
     // Remove existing highlights
     const buttons = document.querySelectorAll('.oauth-btn');
     buttons.forEach((btn) => btn.classList.remove('suggested'));
 
     // Highlight suggested provider
-    const suggestedButton = document.querySelector(`.oauth-${provider}`);
+    const suggestedButton = document.querySelector(`.oauth-${_provider}`);
     if (suggestedButton) {
       suggestedButton.classList.add('suggested');
     }

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: application/middleware/validationMiddleware.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: application/middleware/validationMiddleware.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const Joi = require('joi');
+const logger = require('../../infrastructure/logger');
+
+/**
+ * Validation Middleware - Provides comprehensive request validation using Joi schemas.
+ * Validates request data (body, query, params) against predefined schemas with
+ * detailed error reporting and security-focused input sanitization.
+ *
+ * This middleware implements robust input validation to prevent injection attacks,
+ * ensure data integrity, and provide clear validation error messages for API consumers.
+ * It supports validation of multiple request properties with flexible schema definitions.
+ *
+ * Features:
+ * - Joi schema-based validation for body, query, and params
+ * - Input sanitization and unknown property stripping
+ * - Detailed validation error reporting with field-specific messages
+ * - Security-focused validation property allowlisting
+ * - Comprehensive logging of validation failures
+ * - PCI DSS compliant input validation
+ * - Support for complex nested object validation
+ * - Integration with authentication and authorization flows.
+ * @class ValidationMiddleware
+ * @author Amexing Development Team
+ * @version 2.0.0
+ * @since 1.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Initialize validation middleware
+ * const validationMiddleware = new ValidationMiddleware();
+ *
+ * // Define Joi schemas
+ * const userRegistrationSchema = Joi.object({
+ *   username: Joi.string().min(3).max(30).required(),
+ *   email: Joi.string().email().required(),
+ *   password: Joi.string().min(8).required()
+ * });
+ *
+ * // Apply validation to routes
+ * router.post('/register',
+ *   validationMiddleware.validateRequest(userRegistrationSchema, 'body'),
+ *   authController.register
+ * );
+ *
+ * // Query parameter validation
+ * const searchSchema = Joi.object({
+ *   q: Joi.string().min(1).max(100).required(),
+ *   limit: Joi.number().min(1).max(50).default(10)
+ * });
+ * router.get('/search',
+ *   validationMiddleware.validateRequest(searchSchema, 'query'),
+ *   searchController.search
+ * );
+ */
+class ValidationMiddleware {
+  /**
+   * Creates dynamic validation middleware for request data validation.
+   * Returns Express middleware function that validates specified request property
+   * against Joi schema with comprehensive error handling and security measures.
+   * @function validateRequest
+   * @param {object} schema - Joi validation schema object.
+   * @param {string} [property] - Request property to validate ('body', 'query', 'params').
+   * @returns {Function} Express middleware function for request validation.
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   * // Validate request body
+   * const middleware = validationMiddleware.validateRequest(userSchema, 'body');
+   * router.post('/users', middleware, userController.create);
+   *
+   * // Validate query parameters
+   * const queryMiddleware = validationMiddleware.validateRequest(searchSchema, 'query');
+   * router.get('/search', queryMiddleware, searchController.find);
+   */
+  validateRequest(schema, property = 'body') {
+    return (req, res, next) => {
+      // Validate property name to prevent injection
+      const allowedProperties = ['body', 'query', 'params'];
+      if (!allowedProperties.includes(property)) {
+        return res.status(500).json({
+          error: 'Internal Server Error',
+          message: 'Invalid validation property',
+        });
+      }
+
+      // Get data to validate based on property
+      const dataToValidate = this.getRequestProperty(req, property);
+      const { error, value } = schema.validate(dataToValidate, {
+        abortEarly: false,
+        stripUnknown: true,
+      });
+
+      if (error) {
+        logger.warn('Validation error:', {
+          path: req.path,
+          errors: error.details,
+        });
+
+        return res.status(400).json({
+          error: 'Validation Error',
+          message: 'Invalid request data',
+          details: error.details.map((detail) => ({
+            field: detail.path.join('.'),
+            message: detail.message,
+          })),
+        });
+      }
+
+      // Replace request property with validated value
+      this.setRequestProperty(req, property, value);
+      next();
+    };
+  }
+
+  /**
+   * Safely retrieves request property data with type validation.
+   * Provides secure access to request properties with proper validation
+   * to prevent injection attacks and ensure data integrity.
+   * @function getRequestProperty
+   * @param {object} req - Express request object.
+   * @param {string} property - Property name to retrieve ('body', 'query', 'params').
+   * @returns {object} Request property data or empty object if invalid.
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   * // Get request body data
+   * const bodyData = this.getRequestProperty(req, 'body');
+   */
+  getRequestProperty(req, property) {
+    switch (property) {
+      case 'body':
+        return req.body;
+      case 'query':
+        return req.query;
+      case 'params':
+        return req.params;
+      default:
+        return {};
+    }
+  }
+
+  /**
+   * Safely sets validated request property data with security measures.
+   * Updates request properties with validated and sanitized data after
+   * successful Joi schema validation, preventing data corruption.
+   * @function setRequestProperty
+   * @param {object} req - Express request object.
+   * @param {string} property - Property name to set ('body', 'query', 'params').
+   * @param {object} value - Validated data to set.
+   * @returns {void} Updates request object in place.
+   * @example
+   * // app.use(middlewareName);
+   * // Middleware protects routes with validation/authentication
+   * // Set validated body data
+   * this.setRequestProperty(req, 'body', validatedData);
+   */
+  setRequestProperty(req, property, value) {
+    switch (property) {
+      case 'body':
+        req.body = value;
+        break;
+      case 'query':
+        req.query = value;
+        break;
+      case 'params':
+        req.params = value;
+        break;
+      default:
+        // Do nothing for invalid properties
+        break;
+    }
+  }
+
+  /**
+   * Validates user profile update data with optional field validation.
+   * Ensures profile updates meet security requirements with proper input sanitization
+   * and data type validation for user account modifications.
+   * @function validateUpdateProfile
+   * @param {object} req - Express request object with profile data in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
+   * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+   * // POST /profile/update
+   * // Body: { username: 'newusername', email: 'new@email.com' }
+   */
+  validateUpdateProfile(req, res, next) {
+    const schema = Joi.object({
+      username: Joi.string().alphanum().min(3).max(30)
+        .optional(),
+      email: Joi.string().email().optional(),
+    });
+
+    const validationMiddleware = new ValidationMiddleware();
+    return validationMiddleware.validateRequest(schema)(req, res, next);
+  }
+
+  /**
+   * Validates user registration data with comprehensive security requirements.
+   * Enforces password complexity, email format validation, and username constraints
+   * with PCI DSS compliant input validation for new user accounts.
+   * @function validateRegistration
+   * @param {object} req - Express request object with registration data in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
+   * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+   * // POST /register
+   * // Body: { username: 'user123', email: 'user@example.com', password: 'user-password', confirmPassword: 'user-password' }
+   */
+  validateRegistration(req, res, next) {
+    const schema = Joi.object({
+      username: Joi.string().alphanum().min(3).max(30)
+        .required(),
+      email: Joi.string().email().required(),
+      password: Joi.string()
+        .min(parseInt(process.env.PASSWORD_MIN_LENGTH, 10) || 12)
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&amp;*])/)
+        .required()
+        .messages({
+          'string.pattern.base':
+            'Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character',
+          'string.min': `Password must be at least ${process.env.PASSWORD_MIN_LENGTH || 12} characters long`,
+        }),
+      confirmPassword: Joi.string()
+        .valid(Joi.ref('password'))
+        .required()
+        .messages({
+          'any.only': 'Passwords must match',
+        }),
+    });
+
+    const validationMiddleware = new ValidationMiddleware();
+    return validationMiddleware.validateRequest(schema)(req, res, next);
+  }
+
+  /**
+   * Validates user login credentials with security requirements.
+   * Ensures login requests contain required username and password fields
+   * with proper data type validation for authentication processing.
+   * @function validateLogin
+   * @param {object} req - Express request object with login credentials in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
+   * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+   * // POST /login
+   * // Body: { username: 'user@example.com', password: 'user-password' }
+   */
+  validateLogin(req, res, next) {
+    const schema = Joi.object({
+      username: Joi.string().required(),
+      password: Joi.string().required(),
+    });
+
+    const validationMiddleware = new ValidationMiddleware();
+    return validationMiddleware.validateRequest(schema)(req, res, next);
+  }
+
+  /**
+   * Validates password reset request with email format verification.
+   * Ensures password reset requests contain a valid email address format
+   * for sending password recovery instructions to users.
+   * @function validatePasswordReset
+   * @param {object} req - Express request object with email in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
+   * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+   * // POST /auth/forgot-password
+   * // Body: { email: 'user@example.com' }
+   */
+  validatePasswordReset(req, res, next) {
+    const schema = Joi.object({
+      email: Joi.string().email().required(),
+    });
+
+    const validationMiddleware = new ValidationMiddleware();
+    return validationMiddleware.validateRequest(schema)(req, res, next);
+  }
+
+  /**
+   * Validates new password during password reset process with security requirements.
+   * Enforces password complexity rules, confirmation matching, and token validation
+   * with PCI DSS compliant security standards for password recovery completion.
+   * @function validateNewPassword
+   * @param {object} req - Express request object with password, confirmPassword, and token in body.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function.
+   * @returns {void} Continues to next middleware or returns validation error.
+   * @example
+   * // POST /api/endpoint
+   * // Body: { "data": "value" }
+   * // Response: { "success": true, "message": "Created" }
+   * // POST /auth/reset-password
+   * // Body: { password: 'new-password', confirmPassword: 'new-password', token: 'reset-token-abc123' }
+   */
+  validateNewPassword(req, res, next) {
+    const schema = Joi.object({
+      password: Joi.string()
+        .min(parseInt(process.env.PASSWORD_MIN_LENGTH, 10) || 12)
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&amp;*])/)
+        .required()
+        .messages({
+          'string.pattern.base':
+            'Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character',
+          'string.min': `Password must be at least ${process.env.PASSWORD_MIN_LENGTH || 12} characters long`,
+        }),
+      confirmPassword: Joi.string()
+        .valid(Joi.ref('password'))
+        .required()
+        .messages({
+          'any.only': 'Passwords must match',
+        }),
+      token: Joi.string().required(),
+    });
+
+    const validationMiddleware = new ValidationMiddleware();
+    return validationMiddleware.validateRequest(schema)(req, res, next);
+  }
+}
+
+module.exports = new ValidationMiddleware();
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

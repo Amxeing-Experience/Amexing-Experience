@@ -1,0 +1,228 @@
+<!-- Admin Dashboard - Client Management -->
+<div class="row">
+    <!-- Page Header -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-sm-flex d-block align-items-center justify-content-between mb-3">
+                    <div class="mb-3 mb-sm-0">
+                        <h5 class="card-title fw-semibold">Client Management</h5>
+                        <p class="card-subtitle mb-0">Manage your client companies and their configurations</p>
+                    </div>
+                    <div>
+                        <span class="badge bg-light-info text-info fs-2">
+                            Admin View
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="row">
+                    <div class="col-md-3">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-building',
+                            title: 'Total Clients',
+                            value: typeof stats !== 'undefined' ? stats.totalClients : '42',
+                            color: 'primary',
+                            trend: '+2 this month',
+                            trendColor: 'success'
+                        }) %>
+                    </div>
+                    <div class="col-md-3">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-users',
+                            title: 'Client Employees',
+                            value: typeof stats !== 'undefined' ? stats.clientEmployees : '287',
+                            color: 'info',
+                            trend: '+15 this month',
+                            trendColor: 'success'
+                        }) %>
+                    </div>
+                    <div class="col-md-3">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-calendar-check',
+                            title: 'Active Bookings',
+                            value: typeof stats !== 'undefined' ? stats.activeBookings : '156',
+                            color: 'success',
+                            trend: '92% completion',
+                            trendColor: 'success'
+                        }) %>
+                    </div>
+                    <div class="col-md-3">
+                        <%- include('../../components/cards/stats', {
+                            icon: 'ti ti-brand-oauth',
+                            title: 'OAuth Enabled',
+                            value: typeof stats !== 'undefined' ? stats.oauthClients : '28',
+                            color: 'warning',
+                            trend: '67% adoption',
+                            trendColor: 'info'
+                        }) %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Client Table -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <!-- Navigation Tabs -->
+                <ul class="nav nav-pills mb-3" id="clientTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="active-clients-tab" data-bs-toggle="pill" data-bs-target="#active-clients" type="button" role="tab">
+                            <i class="ti ti-building me-2"></i>Active Clients
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="pending-clients-tab" data-bs-toggle="pill" data-bs-target="#pending-clients" type="button" role="tab">
+                            <i class="ti ti-clock me-2"></i>Pending Approval
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="oauth-setup-tab" data-bs-toggle="pill" data-bs-target="#oauth-setup" type="button" role="tab">
+                            <i class="ti ti-brand-oauth me-2"></i>OAuth Configuration
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content" id="clientTabsContent">
+                    <!-- Active Clients Tab -->
+                    <div class="tab-pane fade show active" id="active-clients" role="tabpanel">
+                        <div id="clientTableContainer"></div>
+                    </div>
+
+                    <!-- Pending Clients Tab -->
+                    <div class="tab-pane fade" id="pending-clients" role="tabpanel">
+                        <div id="pendingClientTableContainer"></div>
+                    </div>
+
+                    <!-- OAuth Setup Tab -->
+                    <div class="tab-pane fade" id="oauth-setup" role="tabpanel">
+                        <div id="oauthClientTableContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include CSS -->
+<link rel="stylesheet" href="/css/components/user-management.css">
+
+<!-- JavaScript -->
+<script src="/js/components/UserTableManager.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get current user context
+    const currentUser = {
+        id: '<%= user.id %>',
+        role: '<%= user.role %>',
+        email: '<%= user.email %>'
+    };
+
+    // Initialize Active Clients Table
+    window.activeClientsTable = new UserTableManager('clientTableContainer', {
+        userRole: 'client',
+        userId: currentUser.id,
+        currentUserRole: currentUser.role,
+        pageSize: 25,
+        apiBaseUrl: '/api',
+        permissions: {
+            canCreateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canDeactivateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
+        },
+        filters: {
+            role: 'client',
+            active: true
+        },
+        customizations: {
+            title: 'Active Client Companies',
+            showBulkActions: true,
+            showExport: true,
+            showFilters: true
+        }
+    });
+
+    // Initialize Pending Clients Table
+    window.pendingClientsTable = new UserTableManager('pendingClientTableContainer', {
+        userRole: 'client',
+        userId: currentUser.id,
+        currentUserRole: currentUser.role,
+        pageSize: 25,
+        apiBaseUrl: '/api',
+        permissions: {
+            canCreateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canDeactivateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
+        },
+        filters: {
+            role: 'client',
+            active: false
+        },
+        customizations: {
+            title: 'Pending Client Approvals',
+            showBulkActions: true,
+            showExport: false,
+            showFilters: false
+        }
+    });
+
+    // Initialize OAuth Clients Table
+    window.oauthClientsTable = new UserTableManager('oauthClientTableContainer', {
+        userRole: 'client',
+        userId: currentUser.id,
+        currentUserRole: currentUser.role,
+        pageSize: 25,
+        apiBaseUrl: '/api',
+        permissions: {
+            canCreateUsers: false,
+            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
+            canDeactivateUsers: false,
+            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
+        },
+        filters: {
+            role: 'client',
+            active: true,
+            hasOAuth: true
+        },
+        customizations: {
+            title: 'OAuth-Enabled Client Companies',
+            showBulkActions: false,
+            showExport: true,
+            showFilters: true
+        }
+    });
+
+    // Tab switching logic
+    const tabs = document.querySelectorAll('[data-bs-toggle="pill"]');
+    tabs.forEach(tab => {
+        tab.addEventListener('shown.bs.tab', function(event) {
+            const targetTab = event.target.getAttribute('data-bs-target');
+
+            // Refresh the appropriate table when tab is shown
+            switch(targetTab) {
+                case '#active-clients':
+                    window.activeClientsTable.refresh();
+                    break;
+                case '#pending-clients':
+                    window.pendingClientsTable.refresh();
+                    break;
+                case '#oauth-setup':
+                    window.oauthClientsTable.refresh();
+                    break;
+            }
+        });
+    });
+
+    // Load initial data
+    window.activeClientsTable.loadUsers();
+});
+</script>

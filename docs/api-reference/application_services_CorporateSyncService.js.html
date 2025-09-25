@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: application/services/CorporateSyncService.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: application/services/CorporateSyncService.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/* eslint-disable max-lines */
+/**
+ * Corporate Sync Service - Handles periodic synchronization of corporate employee data
+ * Implements OAuth-2-05 and OAuth-2-06 user stories for Sprint 2.
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 2.0.0
+ */
+
+const Parse = require('parse/node');
+const CorporateOAuthService = require('./CorporateOAuthService');
+// const OAuthService = require('./OAuthService'); // TODO: Remove unused import
+const AmexingUser = require('../../domain/models/AmexingUser');
+const logger = require('../../infrastructure/logger');
+
+/**
+ * Corporate Sync Service - Manages periodic synchronization of corporate employee data.
+ * Handles automated synchronization of employee information, permissions, and organizational
+ * structure from corporate OAuth providers (Google Workspace, Microsoft Azure AD).
+ *
+ * This service ensures that the Amexing platform stays synchronized with corporate
+ * directory changes, automatically updating user permissions, department assignments,
+ * and employee status based on changes in the corporate systems.
+ *
+ * Features:
+ * - Periodic employee data synchronization
+ * - Automated permission updates based on corporate changes
+ * - Department and organizational structure sync
+ * - Employee onboarding and offboarding automation
+ * - Sync scheduling and interval management
+ * - Comprehensive sync reporting and logging
+ * - Error handling and retry mechanisms
+ * - Incremental and full sync capabilities.
+ * @class CorporateSyncService
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 2.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Initialize corporate sync service
+ * const syncService = new CorporateSyncService();
+ *
+ * // Start periodic sync for a corporate client
+ * const corporateClient = await Parse.Query('CorporateClient').get('client123');
+ * await syncService.startPeriodicSync(corporateClient, 30); // Sync every 30 minutes
+ *
+ * // Perform manual sync
+ * const syncResult = await syncService.syncCorporateClient('client123');
+ *
+ * // Sync specific employee
+ * const employeeSync = await syncService.syncSingleEmployee(
+ *   'user123', 'microsoft', corporateConfig
+ * );
+ *
+ * // Get sync status and statistics
+ * const syncStatus = await syncService.getSyncStatus('client123');
+ */
+class CorporateSyncService {
+  constructor() {
+    this.syncIntervals = new Map(); // Track running sync intervals
+    this.lastSyncTimes = new Map(); // Track last sync times per client
+  }
+
+  /**
+   * Starts periodic sync for a corporate client.
+   * @param {Parse.Object} client - Corporate client object.
+   * @param {number} intervalMinutes - Sync interval in minutes (default: 60).
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const syncService = require('./CorporateSyncService');
+   * await syncService.startPeriodicSync(clientObject, 30);
+   */
+  startPeriodicSync(client, intervalMinutes = 60) {
+    const clientId = client.id;
+
+    // Stop existing sync if running
+    this.stopPeriodicSync(clientId);
+
+    // Start new interval
+    const intervalMs = intervalMinutes * 60 * 1000;
+    const intervalId = setInterval(async () => {
+      try {
+        await this.syncCorporateClient(clientId);
+      } catch (error) {
+        logger.error(`Periodic sync failed for client ${clientId}:`, error);
+      }
+    }, intervalMs);
+
+    this.syncIntervals.set(clientId, intervalId);
+
+    logger.logSecurityEvent('CORPORATE_SYNC_STARTED', null, {
+      clientId,
+      clientName: client.get('name'),
+      intervalMinutes,
+    });
+  }
+
+  /**
+   * Stops periodic sync for a corporate client.
+   * @param {string} clientId - Client ID.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const syncService = require('./CorporateSyncService');
+   * syncService.stopPeriodicSync('clientId123');
+   */
+  stopPeriodicSync(clientId) {
+    const intervalId = this.syncIntervals.get(clientId);
+    if (intervalId) {
+      clearInterval(intervalId);
+      this.syncIntervals.delete(clientId);
+
+      logger.logSecurityEvent('CORPORATE_SYNC_STOPPED', null, {
+        clientId,
+      });
+    }
+  }
+
+  /**
+   * Performs one-time sync for a corporate client.
+   * @param {string} clientId - Corporate client ID.
+   * @returns {Promise&lt;object>} Sync result.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const syncService = require('./CorporateSyncService');
+   * const result = await syncService.syncCorporateClient('clientId123');
+   */
+  // eslint-disable-next-line max-lines-per-function
+  async syncCorporateClient(clientId) {
+    try {
+      // Get client information
+      const clientQuery = new Parse.Query('Client');
+      clientQuery.equalTo('objectId', clientId);
+
+      const client = await clientQuery.first({ useMasterKey: true });
+
+      if (!client) {
+        throw new Error(`Client ${clientId} not found`);
+      }
+
+      if (!client.get('isCorporate') || !client.get('oauthEnabled')) {
+        throw new Error(`Client ${clientId} is not configured for OAuth sync`);
+      }
+
+      const corporateDomain = client.get('corporateDomain');
+      const primaryProvider = client.get('primaryOAuthProvider');
+
+      if (!corporateDomain || !primaryProvider) {
+        throw new Error(`Client ${clientId} missing OAuth configuration`);
+      }
+
+      logger.logSecurityEvent('CORPORATE_SYNC_STARTED', null, {
+        clientId,
+        clientName: client.get('name'),
+        corporateDomain,
+        provider: primaryProvider,
+      });
+
+      // Get all employees for this client
+      const employeeQuery = new Parse.Query('ClientEmployee');
+      employeeQuery.equalTo('clientId', clientId);
+      employeeQuery.equalTo('active', true);
+      employeeQuery.include('userId');
+
+      const employees = await employeeQuery.find({ useMasterKey: true });
+
+      let syncedCount = 0;
+      let errorCount = 0;
+      let deactivatedCount = 0;
+      const syncErrors = [];
+
+      // Sync each employee
+      // Process employees using for...of loop for async operations
+      // eslint-disable-next-line no-restricted-syntax
+      for (const employee of employees) {
+        try {
+          const user = employee.get('userId');
+          if (user &amp;&amp; user.get('isOAuthUser') &amp;&amp; user.get('oauthProvider') === primaryProvider) {
+            // eslint-disable-next-line no-await-in-loop
+            const syncResult = await this.syncEmployeeData(user, employee, client, primaryProvider);
+
+            if (syncResult.success) {
+              // eslint-disable-next-line no-plusplus
+              syncedCount++;
+              // eslint-disable-next-line max-depth
+              if (syncResult.deactivated) {
+                // eslint-disable-next-line no-plusplus
+                deactivatedCount++;
+              }
+            } else {
+              // eslint-disable-next-line no-plusplus
+              errorCount++;
+              syncErrors.push({
+                userId: user.id,
+                email: CorporateOAuthService.maskEmail(user.get('email')),
+                error: syncResult.error,
+              });
+            }
+          }
+        } catch (error) {
+          // eslint-disable-next-line no-plusplus
+          errorCount++;
+          syncErrors.push({
+            employeeId: employee.id,
+            error: error.message,
+          });
+        }
+      }
+
+      // Update last sync time
+      this.lastSyncTimes.set(clientId, new Date());
+
+      const syncResult = {
+        success: true,
+        clientId,
+        syncedCount,
+        errorCount,
+        deactivatedCount,
+        totalEmployees: employees.length,
+        lastSyncTime: new Date(),
+        errors: syncErrors,
+      };
+
+      logger.logSecurityEvent('CORPORATE_SYNC_COMPLETED', null, {
+        clientId,
+        clientName: client.get('name'),
+        syncedCount,
+        errorCount,
+        deactivatedCount,
+        totalEmployees: employees.length,
+      });
+
+      return syncResult;
+    } catch (error) {
+      logger.error(`Corporate sync failed for client ${clientId}:`, error);
+
+      logger.logSecurityEvent('CORPORATE_SYNC_FAILED', null, {
+        clientId,
+        error: error.message,
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Syncs individual employee data from OAuth provider.
+   * @param {AmexingUser} user - User object.
+   * @param {Parse.Object} employee - ClientEmployee object.
+   * @param {Parse.Object} client - Client object.
+   * @param {string} provider - OAuth provider.
+   * @returns {Promise&lt;object>} Sync result.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const syncService = require('./CorporateSyncService');
+   * const result = await syncService.syncEmployeeData(user, employee, client, 'microsoft');
+   */
+  // eslint-disable-next-line max-params, max-lines-per-function
+  async syncEmployeeData(user, employee, client, provider) {
+    try {
+      const oauthProfile = user.get('oauthProfile');
+      let refreshedProfile = null;
+
+      // Try to refresh user data from provider (if we have refresh token)
+      try {
+        if (provider === 'microsoft' &amp;&amp; user.get('refreshToken')) {
+          // Microsoft refresh token flow
+          refreshedProfile = await this.refreshMicrosoftUserData(user.get('refreshToken'));
+        } else if (provider === 'google' &amp;&amp; user.get('refreshToken')) {
+          // Google refresh token flow
+          refreshedProfile = await this.refreshGoogleUserData(user.get('refreshToken'));
+        }
+      } catch (refreshError) {
+        // If refresh fails, we'll continue with existing data
+        logger.logSecurityEvent('OAUTH_REFRESH_FAILED', user.id, {
+          provider,
+          error: refreshError.message,
+        });
+      }
+
+      // Use refreshed profile or existing profile
+      const currentProfile = refreshedProfile || JSON.parse(oauthProfile || '{}');
+
+      // Check if user still exists in corporate directory
+      let userStillActive = true;
+      if (currentProfile.error &amp;&amp; currentProfile.error.includes('user not found')) {
+        userStillActive = false;
+      }
+
+      // Update employee information
+      let updated = false;
+
+      // Update department if changed
+      const corporateConfig = CorporateOAuthService.corporateDomains.get(
+        CorporateOAuthService.extractEmailDomain(user.get('email'))
+      );
+
+      if (corporateConfig &amp;&amp; refreshedProfile) {
+        const newDepartment = await CorporateOAuthService.mapDepartmentFromOAuth(
+          refreshedProfile,
+          corporateConfig
+        );
+
+        if (newDepartment &amp;&amp; newDepartment !== employee.get('departmentId')) {
+          employee.set('departmentId', newDepartment);
+          updated = true;
+        }
+
+        // Update access level if changed
+        const newAccessLevel = CorporateOAuthService.determineAccessLevel(
+          refreshedProfile,
+          corporateConfig
+        );
+
+        if (newAccessLevel !== employee.get('accessLevel')) {
+          employee.set('accessLevel', newAccessLevel);
+          updated = true;
+        }
+      }
+
+      // Update sync timestamp
+      employee.set('lastOAuthSync', new Date());
+      updated = true;
+
+      // If user is no longer active in directory, deactivate
+      if (!userStillActive) {
+        employee.set('active', false);
+        employee.set('deactivationReason', 'oauth_sync_user_not_found');
+        employee.set('deactivatedAt', new Date());
+        updated = true;
+      }
+
+      if (updated) {
+        await employee.save(null, { useMasterKey: true });
+      }
+
+      // Update user profile if we got refreshed data
+      if (refreshedProfile) {
+        user.set('oauthProfile', CorporateOAuthService.encryptOAuthProfile(refreshedProfile));
+        user.set('lastOAuthSync', new Date());
+        await user.save(null, { useMasterKey: true });
+      }
+
+      return {
+        success: true,
+        updated,
+        deactivated: !userStillActive,
+        userId: user.id,
+      };
+    } catch (error) {
+      logger.error(`Employee sync failed for user ${user.id}:`, error);
+
+      return {
+        success: false,
+        error: error.message,
+        userId: user.id,
+      };
+    }
+  }
+
+  /**
+   * Refreshes Microsoft user data using refresh token.
+   * @param {string} refreshToken - Microsoft refresh token.
+   * @returns {Promise&lt;object>} Updated user profile.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const syncService = require('./CorporateSyncService');
+   * const profile = await syncService.refreshMicrosoftUserData('refresh_token_here');
+   */
+  async refreshMicrosoftUserData(refreshToken) {
+    try {
+      const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || 'common';
+
+      // Exchange refresh token for new access token
+      const tokenResponse = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: process.env.MICROSOFT_OAUTH_CLIENT_ID,
+          client_secret: process.env.MICROSOFT_OAUTH_CLIENT_SECRET,
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+          scope: 'openid profile email User.Read Directory.Read.All',
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error(`Microsoft token refresh failed: ${tokenResponse.status}`);
+      }
+
+      const tokenData = await tokenResponse.json();
+
+      // Get updated user profile
+      const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      });
+
+      if (!profileResponse.ok) {
+        throw new Error(`Microsoft profile refresh failed: ${profileResponse.status}`);
+      }
+
+      const profileData = await profileResponse.json();
+
+      return {
+        ...profileData,
+        organizationUnit: profileData.department,
+        refreshed: true,
+        refreshedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      throw new Error(`Microsoft refresh failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Refreshes Google user data using refresh token.
+   * @param {string} refreshToken - Google refresh token.
+   * @returns {Promise&lt;object>} Updated user profile.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const syncService = require('./CorporateSyncService');
+   * const profile = await syncService.refreshGoogleUserData('refresh_token_here');
+   */
+  async refreshGoogleUserData(refreshToken) {
+    try {
+      // Exchange refresh token for new access token
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
+          client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
+          grant_type: 'refresh_token',
+          refresh_token: refreshToken,
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error(`Google token refresh failed: ${tokenResponse.status}`);
+      }
+
+      const tokenData = await tokenResponse.json();
+
+      // Get updated user profile
+      const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: {
+          Authorization: `Bearer ${tokenData.access_token}`,
+        },
+      });
+
+      if (!profileResponse.ok) {
+        throw new Error(`Google profile refresh failed: ${profileResponse.status}`);
+      }
+
+      const profileData = await profileResponse.json();
+
+      return {
+        ...profileData,
+        refreshed: true,
+        refreshedAt: new Date().toISOString(),
+      };
+    } catch (error) {
+      throw new Error(`Google refresh failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Gets sync status for all corporate clients.
+   * @returns {Promise&lt;Array>} Array of sync statuses.
+   * @example
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const syncService = require('./CorporateSyncService');
+   * const statuses = await syncService.getAllSyncStatuses();
+   */
+  async getAllSyncStatuses() {
+    try {
+      // Get all corporate clients with OAuth enabled
+      const clientQuery = new Parse.Query('Client');
+      clientQuery.equalTo('isCorporate', true);
+      clientQuery.equalTo('oauthEnabled', true);
+      clientQuery.equalTo('active', true);
+
+      const clients = await clientQuery.find({ useMasterKey: true });
+
+      const statuses = clients.map((client) => {
+        const clientId = client.id;
+        return {
+          clientId,
+          clientName: client.get('name'),
+          corporateDomain: client.get('corporateDomain'),
+          primaryProvider: client.get('primaryOAuthProvider'),
+          syncActive: this.syncIntervals.has(clientId),
+          lastSync: this.lastSyncTimes.get(clientId) || null,
+        };
+      });
+
+      return statuses;
+    } catch (error) {
+      logger.error('Error getting sync statuses:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Stops all periodic syncs (cleanup method).
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const syncService = require('./CorporateSyncService');
+   * syncService.stopAllSyncs();
+   */
+  stopAllSyncs() {
+    for (const [clientId, intervalId] of this.syncIntervals) {
+      clearInterval(intervalId);
+      logger.logSecurityEvent('CORPORATE_SYNC_STOPPED', null, { clientId });
+    }
+
+    this.syncIntervals.clear();
+    this.lastSyncTimes.clear();
+  }
+}
+
+module.exports = new CorporateSyncService();
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

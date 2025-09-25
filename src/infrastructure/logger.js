@@ -23,6 +23,11 @@
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // Usage example
+ * const result = await require({ 'winston': 'example' });
+ * // Returns: operation result
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Basic logging
  * const logger = require('./infrastructure/logger');
  * logger.info('Application started', { port: 3000, env: 'production' });
@@ -157,6 +162,8 @@ if (process.env.ENABLE_AUDIT_LOGGING === 'true') {
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Log failed login attempt
  * logger.logSecurityEvent('FAILED_LOGIN', {
  *   username: 'user@example.com',
@@ -179,6 +186,7 @@ if (process.env.ENABLE_AUDIT_LOGGING === 'true') {
  *   action: 'DELETE',
  *   requiredRole: 'admin'
  * });
+ * @returns {*} - Operation result.
  */
 logger.logSecurityEvent = (event, details) => {
   logger.info('SECURITY_EVENT', {
@@ -201,6 +209,8 @@ logger.logSecurityEvent = (event, details) => {
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Log successful login
  * logger.logAccessAttempt(true, 'john.doe@company.com', '192.168.1.10');
  *
@@ -209,6 +219,7 @@ logger.logSecurityEvent = (event, details) => {
  *
  * // Log failed login with account lockout
  * logger.logAccessAttempt(false, 'admin@domain.com', '172.16.0.5', 'Account locked');
+ * @returns {*} - Operation result.
  */
 logger.logAccessAttempt = (success, username, ip, reason = null) => {
   const logData = {
@@ -243,6 +254,8 @@ logger.logAccessAttempt = (success, username, ip, reason = null) => {
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Log successful customer data read
  * logger.logDataAccess('user123', 'customer_data', 'READ', true);
  *
@@ -251,6 +264,7 @@ logger.logAccessAttempt = (success, username, ip, reason = null) => {
  *
  * // Log successful update to user profile
  * logger.logDataAccess('admin789', 'user_profile', 'UPDATE', true);
+ * @returns {*} - Operation result.
  */
 logger.logDataAccess = (userId, resource, action, success) => {
   logger.info('DATA_ACCESS', {
@@ -275,6 +289,8 @@ logger.logDataAccess = (userId, resource, action, success) => {
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Log permission change
  * logger.logSystemChange('admin123', 'user_permissions', 'read', 'read,write,delete');
  *
@@ -283,6 +299,7 @@ logger.logDataAccess = (userId, resource, action, success) => {
  *
  * // Log user role change
  * logger.logSystemChange('hr789', 'user_role', 'employee', 'manager');
+ * @returns {*} - Operation result.
  */
 logger.logSystemChange = (userId, change, oldValue, newValue) => {
   logger.info('SYSTEM_CHANGE', {

@@ -12,11 +12,7 @@ Supports white-label branding and department-specific flows
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     
     <%# Dynamic title based on corporate configuration %>
-    <title><%= corporateConfig && corporateConfig.metadata && corporateConfig.metadata.title ? 
-               corporateConfig.metadata.title : 
-               (corporateConfig && corporateConfig.name ?
-                'Sign in to ' + corporateConfig.name :
-                'Corporate Sign In - AmexingWeb') %></title>
+    <title><%= corporateConfig && corporateConfig.metadata && corporateConfig.metadata.title ? corporateConfig.metadata.title : (corporateConfig && corporateConfig.name ? 'Sign in to ' + corporateConfig.name : 'Corporate Sign In - AmexingWeb') %></title>
     
     <%# Dynamic meta description %>
     <% if (corporateConfig && corporateConfig.metadata && corporateConfig.metadata.description) { %>
@@ -48,16 +44,11 @@ Supports white-label branding and department-specific flows
     <%# Base styles %>
     <style>
         :root {
-            --primary-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.primaryColor ? 
-                                corporateConfig.theme.primaryColor : '#667eea' %>;
-            --secondary-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.secondaryColor ? 
-                                  corporateConfig.theme.secondaryColor : '#764ba2' %>;
-            --background-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.backgroundColor ? 
-                                  corporateConfig.theme.backgroundColor : '#ffffff' %>;
-            --text-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.textColor ? 
-                            corporateConfig.theme.textColor : '#1f2937' %>;
-            --font-primary: <%= corporateConfig && corporateConfig.fonts && corporateConfig.fonts.primaryFont ? 
-                              corporateConfig.fonts.primaryFont : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' %>;
+            --primary-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.primaryColor ? corporateConfig.theme.primaryColor : '#667eea' %>;
+            --secondary-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.secondaryColor ? corporateConfig.theme.secondaryColor : '#764ba2' %>;
+            --background-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.backgroundColor ? corporateConfig.theme.backgroundColor : '#ffffff' %>;
+            --text-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.textColor ? corporateConfig.theme.textColor : '#1f2937' %>;
+            --font-primary: <%= corporateConfig && corporateConfig.fonts && corporateConfig.fonts.primaryFont ? corporateConfig.fonts.primaryFont : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' %>;
         }
         
         * {
@@ -70,9 +61,7 @@ Supports white-label branding and department-specific flows
             font-family: var(--font-primary);
             line-height: 1.6;
             color: var(--text-color);
-            background: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.gradientBackground ? 
-                           corporateConfig.theme.gradientBackground : 
-                           'linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)' %>;
+            background: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.gradientBackground ? corporateConfig.theme.gradientBackground : 'linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)' %>;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -99,9 +88,7 @@ Supports white-label branding and department-specific flows
         .corporate-header {
             text-align: center;
             padding: 2rem 2rem 1rem 2rem;
-            background: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.headerBackground ? 
-                           corporateConfig.theme.headerBackground : 
-                           'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)' %>;
+            background: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.headerBackground ? corporateConfig.theme.headerBackground : 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)' %>;
             position: relative;
         }
         
@@ -247,8 +234,7 @@ Supports white-label branding and department-specific flows
     <% if (corporateConfig && corporateConfig.fonts && corporateConfig.fonts.googleFonts) { %>
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?<%= corporateConfig.fonts.googleFonts.map(font =>
-            'family=' + encodeURIComponent(font)).join('&') %>&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?<%= corporateConfig.fonts.googleFonts.map(font => 'family=' + encodeURIComponent(font)).join('&') %>&display=swap" rel="stylesheet">
     <% } %>
     
     <%# OAuth Component Styles %>
@@ -292,9 +278,7 @@ Supports white-label branding and department-specific flows
             
             <%# Enhanced OAuth Component %>
             <%- include('../partials/oauth-enhanced', { 
-                title: corporateConfig && corporateConfig.welcomeMessage ? 
-                       corporateConfig.welcomeMessage : 
-                       'Welcome back',
+                title: corporateConfig && corporateConfig.welcomeMessage ? corporateConfig.welcomeMessage : 'Welcome back',
                 error: typeof error !== 'undefined' ? error : null,
                 success: typeof success !== 'undefined' ? success : null,
                 corporateConfig: corporateConfig,
@@ -305,9 +289,7 @@ Supports white-label branding and department-specific flows
                     { name: 'microsoft', displayName: 'Microsoft 365' },
                     { name: 'apple', displayName: 'Apple' }
                 ],
-                allowedProviders: corporateConfig && corporateConfig.allowedProviders ? 
-                                corporateConfig.allowedProviders : 
-                                ['google', 'microsoft', 'apple'],
+                allowedProviders: corporateConfig && corporateConfig.allowedProviders ? corporateConfig.allowedProviders : ['google', 'microsoft', 'apple'],
                 intelligentSelection: true,
                 mobile: typeof mobile !== 'undefined' ? mobile : false,
                 theme: corporateConfig && corporateConfig.theme ? corporateConfig.theme.name : 'corporate',
@@ -320,9 +302,7 @@ Supports white-label branding and department-specific flows
         <%# Corporate Footer %>
         <div class="footer">
             <% if (corporateConfig && corporateConfig.supportInfo) { %>
-                <p>Need help? Contact <a href="<%= corporateConfig.supportInfo.url || ('mailto:' + corporateConfig.supportInfo.email) %>">
-                    <%= corporateConfig.supportInfo.name || 'IT Support' %>
-                </a></p>
+                <p>Need help? Contact <a href="<%= corporateConfig.supportInfo.url || ('mailto:' + corporateConfig.supportInfo.email) %>"><%= corporateConfig.supportInfo.name || 'IT Support' %></a></p>
             <% } else { %>
                 <p>For technical support, contact your system administrator</p>
             <% } %>

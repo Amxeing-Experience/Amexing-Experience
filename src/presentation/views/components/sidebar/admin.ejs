@@ -1,7 +1,7 @@
 <ul id="sidebarnav">
     <li class="nav-small-cap">
         <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-        <span class="hide-menu">Operations</span>
+        <span class="hide-menu">Overview</span>
     </li>
     <li class="sidebar-item">
         <a class="sidebar-link" href="/dashboard/admin" aria-expanded="false">
@@ -11,37 +11,52 @@
             <span class="hide-menu">Dashboard</span>
         </a>
     </li>
-    <li class="sidebar-item">
-        <a class="sidebar-link" href="/dashboard/admin/clients" aria-expanded="false">
-            <span>
-                <i class="ti ti-building"></i>
-            </span>
-            <span class="hide-menu">Clients</span>
-        </a>
+
+    <li class="nav-small-cap">
+        <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
+        <span class="hide-menu">User Management</span>
     </li>
     <li class="sidebar-item">
-        <a class="sidebar-link" href="/dashboard/admin/departments" aria-expanded="false">
-            <span>
-                <i class="ti ti-sitemap"></i>
-            </span>
-            <span class="hide-menu">Departments</span>
-        </a>
-    </li>
-    <li class="sidebar-item">
-        <a class="sidebar-link" href="/dashboard/admin/employees" aria-expanded="false">
-            <span>
+        <a class="sidebar-link has-arrow" href="javascript:void(0)" aria-expanded="false">
+            <span class="d-flex">
                 <i class="ti ti-users"></i>
             </span>
-            <span class="hide-menu">Employees</span>
+            <span class="hide-menu">User Management</span>
         </a>
-    </li>
-    <li class="sidebar-item">
-        <a class="sidebar-link" href="/dashboard/admin/drivers" aria-expanded="false">
-            <span>
-                <i class="ti ti-car"></i>
-            </span>
-            <span class="hide-menu">Drivers</span>
-        </a>
+        <ul aria-expanded="false" class="collapse first-level">
+            <li class="sidebar-item">
+                <a href="/dashboard/admin/clients" class="sidebar-link">
+                    <div class="round-16 d-flex align-items-center justify-content-center">
+                        <i class="ti ti-building"></i>
+                    </div>
+                    <span class="hide-menu">Clients</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/dashboard/admin/departments" class="sidebar-link">
+                    <div class="round-16 d-flex align-items-center justify-content-center">
+                        <i class="ti ti-sitemap"></i>
+                    </div>
+                    <span class="hide-menu">Departments</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/dashboard/admin/employees" class="sidebar-link">
+                    <div class="round-16 d-flex align-items-center justify-content-center">
+                        <i class="ti ti-user-check"></i>
+                    </div>
+                    <span class="hide-menu">Employees</span>
+                </a>
+            </li>
+            <li class="sidebar-item">
+                <a href="/dashboard/admin/drivers" class="sidebar-link">
+                    <div class="round-16 d-flex align-items-center justify-content-center">
+                        <i class="ti ti-car"></i>
+                    </div>
+                    <span class="hide-menu">Drivers</span>
+                </a>
+            </li>
+        </ul>
     </li>
 
     <li class="nav-small-cap">

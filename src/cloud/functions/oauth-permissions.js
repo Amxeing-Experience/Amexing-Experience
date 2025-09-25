@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @created Sprint 03 - OAuth Permission Management
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { 'parse/node': 'example' });
+ * // Returns: function result
  */
 
 const Parse = require('parse/node');
@@ -18,7 +22,12 @@ const logger = require('../../infrastructure/logger');
  * Gets user permission inheritance status
  * Endpoint: GET /functions/getUserPermissionInheritance
  * Access: User can view own permissions, admins can view any.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getUserPermissionInheritance = async (request) => {
   try {
@@ -62,7 +71,12 @@ const getUserPermissionInheritance = async (request) => {
  * Gets available contexts for a user
  * Endpoint: GET /functions/getAvailableContexts
  * Access: User can view own contexts.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getAvailableContexts = async (request) => {
   try {
@@ -101,7 +115,12 @@ const getAvailableContexts = async (request) => {
  * Switches user to a specific permission context
  * Endpoint: POST /functions/switchPermissionContext
  * Access: User can switch own context.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const switchPermissionContext = async (request) => {
   try {
@@ -117,7 +136,11 @@ const switchPermissionContext = async (request) => {
       throw new Parse.Error(Parse.Error.INVALID_QUERY, 'contextId is required');
     }
 
-    const switchResult = await PermissionContextService.switchToContext(userId, contextId, sessionToken);
+    const switchResult = await PermissionContextService.switchToContext(
+      userId,
+      contextId,
+      sessionToken
+    );
 
     // Record audit event
     await PermissionAuditService.recordPermissionAudit({
@@ -148,7 +171,12 @@ const switchPermissionContext = async (request) => {
  * Creates permission delegation from manager to employee
  * Endpoint: POST /functions/createPermissionDelegation
  * Access: Requires manager role or higher.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const createPermissionDelegation = async (request) => {
   try {
@@ -222,7 +250,12 @@ const createPermissionDelegation = async (request) => {
  * Revokes permission delegation
  * Endpoint: POST /functions/revokePermissionDelegation
  * Access: Original manager or admin.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const revokePermissionDelegation = async (request) => {
   try {
@@ -258,7 +291,12 @@ const revokePermissionDelegation = async (request) => {
  * Creates emergency permission elevation
  * Endpoint: POST /functions/createEmergencyElevation
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const createEmergencyElevation = async (request) => {
   try {
@@ -330,7 +368,12 @@ const createEmergencyElevation = async (request) => {
  * Creates individual permission override
  * Endpoint: POST /functions/createPermissionOverride
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const createPermissionOverride = async (request) => {
   try {
@@ -408,7 +451,12 @@ const createPermissionOverride = async (request) => {
  * Checks if user has specific permission
  * Endpoint: GET /functions/checkUserPermission
  * Access: User can check own permissions, admins can check any.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const checkUserPermission = async (request) => {
   try {
@@ -437,7 +485,11 @@ const checkUserPermission = async (request) => {
       }
     }
 
-    const hasPermission = await OAuthPermissionService.hasPermission(userId, permission, context);
+    const hasPermission = await OAuthPermissionService.hasPermission(
+      userId,
+      permission,
+      context
+    );
 
     return {
       success: true,
@@ -457,7 +509,12 @@ const checkUserPermission = async (request) => {
  * Gets active delegations for a manager
  * Endpoint: GET /functions/getActiveDelegations
  * Access: Manager can view own delegations.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getActiveDelegations = async (request) => {
   try {
@@ -496,7 +553,12 @@ const getActiveDelegations = async (request) => {
  * Gets delegated permissions for an employee
  * Endpoint: GET /functions/getDelegatedPermissions
  * Access: Employee can view own delegated permissions.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getDelegatedPermissions = async (request) => {
   try {
@@ -535,7 +597,12 @@ const getDelegatedPermissions = async (request) => {
  * Gets permission audit report
  * Endpoint: GET /functions/getPermissionAuditReport
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getPermissionAuditReport = async (request) => {
   try {
@@ -590,7 +657,12 @@ const getPermissionAuditReport = async (request) => {
  * Gets permission audit statistics
  * Endpoint: GET /functions/getPermissionAuditStats
  * Access: Requires admin role.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getPermissionAuditStats = async (request) => {
   try {
@@ -632,7 +704,12 @@ const getPermissionAuditStats = async (request) => {
  * Gets all available permissions in the system
  * Endpoint: GET /functions/getAvailablePermissions
  * Access: Requires manager role or higher.
- * @param request
+ * @param {object} request - HTTP request object.
+ * @returns {Promise<object>} - Promise resolving to operation result.
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
  */
 const getAvailablePermissions = async (request) => {
   try {
@@ -648,11 +725,11 @@ const getAvailablePermissions = async (request) => {
       );
     }
 
-    const { provider } = request.params;
+    const { _provider } = request.params;
 
     let permissions;
-    if (provider) {
-      permissions = OAuthPermissionService.getProviderPermissionMappings(provider);
+    if (_provider) {
+      permissions = OAuthPermissionService.getProviderPermissionMappings(_provider);
     } else {
       permissions = OAuthPermissionService.getAllAvailablePermissions();
     }
@@ -660,7 +737,7 @@ const getAvailablePermissions = async (request) => {
     return {
       success: true,
       permissions,
-      provider: provider || 'all',
+      provider: _provider || 'all',
       count: Array.isArray(permissions) ? permissions.length : Object.keys(permissions).length,
     };
   } catch (error) {

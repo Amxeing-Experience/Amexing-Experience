@@ -11,6 +11,10 @@
  * @author Claude Code + Technical Team
  * @version 2.0
  * @since 2025-09-11
+ * @example
+ * // Service method usage
+ * const result = await permissionservice.require({ '../infrastructure/logger': 'example' });
+ * // Returns: { success: true, data: {...} }
  */
 
 const logger = require('../infrastructure/logger');
@@ -38,6 +42,8 @@ const logger = require('../infrastructure/logger');
  * @version 2.0
  * @since 2025-09-11
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize permission service with database
  * const permissionService = new PermissionService();
  * permissionService.initialize(mongoDatabase);
@@ -71,8 +77,13 @@ class PermissionService {
    * in-memory caching system for high-performance permission resolution.
    * @function initialize
    * @param {object} database - MongoDB database connection instance.
-   * @returns {void} Service initialization completed.
+   * @returns {void} - No return value Service initialization completed.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.initialize({ database: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * // Initialize with MongoDB connection
    * const permissionService = new PermissionService();
    * permissionService.initialize(mongoDatabase);
@@ -93,8 +104,13 @@ class PermissionService {
    * @function getUserEffectivePermissions
    * @param {string} userId - Unique user identifier.
    * @param {object} [context] - Optional context (departmentId, clientId, etc.).
-   * @returns {Promise<Array<string>>} Array of effective permission codes.
+   * @returns {Promise<Array<string>>} - Array of effective permission codes.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.getUserEffectivePermissions({ userId: 'example' , context: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * // Get basic user permissions
    * const permissions = await permissionService.getUserEffectivePermissions('user123');
    *
@@ -175,8 +191,13 @@ class PermissionService {
    * @param {string} userId - Unique user identifier.
    * @param {string} permissionCode - Permission code to validate (e.g., 'admin_access', 'department_read').
    * @param {object} [context] - Optional context for permission checking.
-   * @returns {Promise<boolean>} True if user has permission, false otherwise.
+   * @returns {Promise<boolean>} - True if user has permission, false otherwise.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.hasPermission({ userId: 'example' , permissionCode: 'example', context: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * // Check basic permission
    * const hasAccess = await permissionService.hasPermission('user123', 'admin_access');
    *
@@ -230,8 +251,13 @@ class PermissionService {
    * removal for comprehensive role permission resolution.
    * @function getRolePermissions
    * @param {string} roleCode - Role code identifier (e.g., 'admin', 'manager', 'user').
-   * @returns {Promise<Array<string>>} Array of permission codes for the role.
+   * @returns {Promise<Array<string>>} - Array of permission codes for the role.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.getRolePermissions({ roleCode: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * // Get admin role permissions
    * const adminPerms = await permissionService.getRolePermissions('admin');
    *
@@ -275,8 +301,13 @@ class PermissionService {
    * @function getDepartmentPermissions
    * @param {string} departmentId - Department identifier.
    * @param {string} userId - User identifier for department access validation.
-   * @returns {Promise<Array<string>>} Array of department permission codes.
+   * @returns {Promise<Array<string>>} - Array of department permission codes.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.getDepartmentPermissions({ departmentId: 'example', userId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    * // Get department permissions for user
    * const deptPerms = await permissionService.getDepartmentPermissions('dept_finance', 'user123');
    */
@@ -313,8 +344,13 @@ class PermissionService {
    * Get user-specific permissions.
    * @param {string} userId - User ID.
    * @param {object} context - Context for permission lookup.
-   * @returns {Array} User permission objects.
+   * @returns {Array} - Array of results User permission objects.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.getUserSpecificPermissions({ userId: 'example' , context: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async getUserSpecificPermissions(userId, context) {
     const query = {
@@ -360,8 +396,13 @@ class PermissionService {
   /**
    * Resolve permission dependencies and implications.
    * @param {Array} permissionCodes - Base permission codes.
-   * @returns {Array} Resolved permission codes including dependencies.
+   * @returns {Array} - Array of results Resolved permission codes including dependencies.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.resolvePermissionDependencies({ permissionCodes: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async resolvePermissionDependencies(permissionCodes) {
     const resolvedPermissions = new Set(permissionCodes);
@@ -394,8 +435,13 @@ class PermissionService {
    * @param {string} userId - User ID.
    * @param {string} permissionCode - Permission code.
    * @param {object} context - Context for evaluation.
-   * @returns {boolean} Has contextual permission.
+   * @returns {boolean} - Boolean result Has contextual permission.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.checkContextualPermission({ userId: 'example' , permissionCode: 'example', context: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async checkContextualPermission(userId, permissionCode, context) {
     // Get user permissions with conditions
@@ -427,8 +473,13 @@ class PermissionService {
    * Evaluate permission conditions against context.
    * @param {object} conditions - Permission conditions.
    * @param {object} context - Current context.
-   * @returns {boolean} Conditions met.
+   * @returns {boolean} - Boolean result Conditions met.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.evaluatePermissionConditions({ conditions: 'example', context: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   evaluatePermissionConditions(conditions, context) {
     try {
@@ -488,8 +539,13 @@ class PermissionService {
    * @param {string} userId - User ID.
    * @param {string} permissionCode - Permission code.
    * @param {object} options - Grant options.
-   * @returns {object} Created user permission.
+   * @returns {object} - Operation result Created user permission.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.grantPermission({ userId: 'example' , permissionCode: 'example', options: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async grantPermission(userId, permissionCode, options = {}) {
     try {
@@ -559,6 +615,12 @@ class PermissionService {
    * @param {string} permissionCode - Permission code.
    * @param {object} options - Revoke options.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.revokePermission({ userId: 'example' , permissionCode: 'example', options: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async revokePermission(userId, permissionCode, options = {}) {
     try {
@@ -618,6 +680,12 @@ class PermissionService {
    * @param {string} templateId - Permission template ID.
    * @param {object} options - Assignment options.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.assignPermissionTemplate({ userId: 'example' , templateId: 'example', options: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async assignPermissionTemplate(userId, templateId, options = {}) {
     try {
@@ -665,8 +733,13 @@ class PermissionService {
    * Check if department permission applies to user.
    * @param {object} deptPermission - Department permission object.
    * @param {object} employee - Employee object.
-   * @returns {boolean} Permission applies.
+   * @returns {boolean} - Boolean result Permission applies.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.doesDepartmentPermissionApply({ deptPermission: 'example', employee: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   doesDepartmentPermissionApply(deptPermission, employee) {
     if (!employee) return false;
@@ -690,21 +763,33 @@ class PermissionService {
    * Clear permission cache for user.
    * @param {string} userId - User ID.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.clearUserPermissionCache({ userId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
    */
   clearUserPermissionCache(userId) {
     const keysToDelete = [];
-    for (const [key] of this.permissionCache) {
-      if (key.startsWith(`user_permissions:${userId}:`)) {
-        keysToDelete.push(key);
+    for (const [_key] of this.permissionCache) {
+      if (_key.startsWith(`user_permissions:${userId}:`)) {
+        keysToDelete.push(_key);
       }
     }
-    keysToDelete.forEach((key) => this.permissionCache.delete(key));
+    keysToDelete.forEach((_key) => this.permissionCache.delete(_key));
   }
 
   /**
    * Log permission change for audit.
    * @param {object} changeData - Change details.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.logPermissionChange({ changeData: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async logPermissionChange(changeData) {
     const auditLog = {
@@ -727,8 +812,13 @@ class PermissionService {
 
   /**
    * Get permission hierarchy for admin dashboard.
-   * @returns {object} Permission hierarchy tree.
+   * @returns {object} - Operation result Permission hierarchy tree.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.getPermissionHierarchy({ changeData: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async getPermissionHierarchy() {
     const permissions = await this.db.collection('Permission').find({
@@ -763,8 +853,13 @@ class PermissionService {
   /**
    * Get user permission summary for admin view.
    * @param {string} userId - User ID.
-   * @returns {object} Permission summary.
+   * @returns {object} - Operation result Permission summary.
    * @example
+   * // Service method usage
+   * const result = await permissionservice.getUserPermissionSummary({ userId: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async getUserPermissionSummary(userId) {
     const effectivePermissions = await this.getUserEffectivePermissions(userId);

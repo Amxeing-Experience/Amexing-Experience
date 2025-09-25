@@ -23,6 +23,8 @@ const logger = require('../../infrastructure/logger');
  * @version 2.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize API controller
  * const apiController = new ApiController();
  *
@@ -44,8 +46,13 @@ class ApiController {
    * @function getStatus
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} JSON response with system status and timestamp.
+   * @returns {Promise<void>} - JSON response with system status and timestamp.
    * @example
+   * // GET endpoint example
+   * const result = await ApiController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
    * // GET /api/status
    * // Response: { status: 'operational', timestamp: '2025-01-15T10:30:00Z', environment: 'production' }
    */
@@ -64,8 +71,13 @@ class ApiController {
    * @function getVersion
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} JSON response with version information.
+   * @returns {Promise<void>} - JSON response with version information.
    * @example
+   * // GET endpoint example
+   * const result = await ApiController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
    * // GET /api/version
    * // Response: { version: '1.0.0', parseVersion: '5.0.0', nodeVersion: 'v18.0.0', api: {...} }
    */
@@ -89,8 +101,13 @@ class ApiController {
    * @param {object} req - Express request object with authenticated user.
    * @param {object} res - Express response object.
    * @param {Function} next - Express next middleware function.
-   * @returns {Promise<void>} JSON response with user profile data.
+   * @returns {Promise<void>} - JSON response with user profile data.
    * @example
+   * // GET endpoint example
+   * const result = await ApiController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
    * // GET /api/user/profile (with authentication)
    * // Response: { id: 'user123', username: 'john_doe', email: 'john@example.com', emailVerified: true, ... }
    */
@@ -127,8 +144,15 @@ class ApiController {
    * @param {object} req - Express request object with user and profile data in body.
    * @param {object} res - Express response object.
    * @param {Function} next - Express next middleware function.
-   * @returns {Promise<void>} JSON response with updated profile data.
+   * @returns {Promise<void>} - JSON response with updated profile data.
    * @example
+   * // POST endpoint example
+   * const result = await ApiController.updateUserProfile(req, res);
+   * // Body: { data: 'example' }
+   * // Returns: { success: true, data: {...} }
+   * // PUT /api/endpoint/123
+   * // Body: { "field": "updated value" }
+   * // Response: { "success": true, "data": {...} }
    * // PUT /api/user/profile (with authentication)
    * // Body: { email: 'newemail@example.com', username: 'newusername' }
    * // Response: { success: true, message: 'Profile updated successfully', user: {...} }
@@ -183,8 +207,13 @@ class ApiController {
    * @function getData
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
-   * @returns {Promise<void>} JSON response with sample data items.
+   * @returns {Promise<void>} - JSON response with sample data items.
    * @example
+   * // GET endpoint example
+   * const result = await ApiController.getNotifications(req, res);
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
    * // GET /api/data
    * // Response: { items: [{id: 1, name: 'Item 1', price: 29.99}, ...], total: 3, timestamp: '...' }
    */

@@ -11,6 +11,10 @@
  * @author Claude Code + Technical Team
  * @version 2.0
  * @since 2025-09-11
+ * @example
+ * // Authentication service usage
+ * const result = await amexingauthservice.require(userData);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
 const Parse = require('parse/node');
@@ -45,6 +49,8 @@ const logger = require('../infrastructure/logger');
  * @version 2.0
  * @since 2025-09-11
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Initialize authentication service
  * const authService = new AmexingAuthService();
  * authService.initialize();
@@ -80,6 +86,12 @@ class AmexingAuthService {
   /**
    * Initialize the service (Parse Objects).
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.initialize(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {*} - Operation result.
    */
   initialize() {
     // Parse SDK is already initialized globally
@@ -93,8 +105,13 @@ class AmexingAuthService {
   /**
    * Create new AmexingUser with email/password.
    * @param {object} userData - User creation data.
-   * @returns {object} Created user and tokens.
+   * @returns {object} - Operation result Created user and tokens.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.createUser(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async createUser(userData) {
     try {
@@ -127,7 +144,7 @@ class AmexingAuthService {
       const userId = uuidv4();
       newUser.set('id', userId);
       newUser.set('email', email.toLowerCase().trim());
-      newUser.set('username', this.generateUsername(email));
+      newUser.set('username', email.toLowerCase().trim()); // Use email as username for consistency
       newUser.set('passwordHash', passwordHash);
       newUser.set('emailVerified', false);
       newUser.set('phoneVerified', false);
@@ -196,9 +213,15 @@ class AmexingAuthService {
   /**
    * Authenticate user with email/password.
    * @param {string} email - User email.
+   * @param email
    * @param {string} password - User password.
-   * @returns {object} User and tokens.
+   * @returns {object} - Operation result User and tokens.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.authenticateUser(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async authenticateUser(email, password) {
     try {
@@ -257,14 +280,20 @@ class AmexingAuthService {
   /**
    * Handle OAuth authentication flow.
    * @param {string} provider - OAuth provider (google, microsoft, apple).
+   * @param _provider
    * @param {object} oauthProfile - OAuth user profile.
    * @param {object} tokens - OAuth tokens.
-   * @returns {object} User and session tokens.
+   * @returns {object} - Operation result User and session tokens.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.handleOAuthUser(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async handleOAuthUser(provider, oauthProfile, tokens) {
+  async handleOAuthUser(_provider, oauthProfile, tokens) {
     try {
-      let user = await this.findUserByOAuth(provider, oauthProfile.id);
+      let user = await this.findUserByOAuth(_provider, oauthProfile.id);
 
       if (!user) {
         // Try to find by email for account linking
@@ -272,14 +301,14 @@ class AmexingAuthService {
 
         if (user) {
           // Link OAuth to existing account
-          await this.linkOAuthAccount(user, provider, oauthProfile, tokens);
+          await this.linkOAuthAccount(user, _provider, oauthProfile, tokens);
         } else {
           // Create new OAuth user
-          user = await this.createOAuthUser(provider, oauthProfile, tokens);
+          user = await this.createOAuthUser(_provider, oauthProfile, tokens);
         }
       } else {
         // Update existing OAuth user
-        await this.updateOAuthUser(user, provider, oauthProfile, tokens);
+        await this.updateOAuthUser(user, _provider, oauthProfile, tokens);
       }
 
       // Handle corporate integration if applicable
@@ -292,11 +321,11 @@ class AmexingAuthService {
       await this.createSession({
         userId: user.id,
         authMethod: 'oauth',
-        oauthProvider: provider,
+        oauthProvider: _provider,
         tokens: sessionTokens.accessToken,
       });
 
-      logger.info(`OAuth user authenticated: ${oauthProfile.email} via ${provider}`);
+      logger.info(`OAuth user authenticated: ${oauthProfile.email} via ${_provider}`);
 
       return {
         user: this.sanitizeUser(user),
@@ -310,13 +339,19 @@ class AmexingAuthService {
 
   /**
    * Create new user from OAuth profile.
-   * @param {string} provider - OAuth provider.
+   * @param {string} provider - OAuth _provider.
+   * @param _provider
    * @param {object} profile - OAuth profile.
    * @param {object} tokens - OAuth tokens.
-   * @returns {object} Created user.
+   * @returns {object} - Operation result Created user.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.createOAuthUser(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async createOAuthUser(provider, profile, tokens) {
+  async createOAuthUser(_provider, profile, tokens) {
     const userId = uuidv4();
 
     // Determine role based on profile and domain
@@ -325,13 +360,13 @@ class AmexingAuthService {
     const newUser = {
       id: userId,
       email: profile.email.toLowerCase().trim(),
-      username: this.generateUsername(profile.email),
+      username: profile.email.toLowerCase().trim(), // Use email as username for OAuth users
       emailVerified: profile.verified || true, // OAuth emails are pre-verified
       phoneVerified: false,
 
       // OAuth specific
       oauthAccounts: [{
-        provider,
+        provider: _provider,
         providerId: profile.id,
         email: profile.email,
         profile,
@@ -343,7 +378,7 @@ class AmexingAuthService {
         lastUsed: new Date(),
         isPrimary: true,
       }],
-      primaryOAuthProvider: provider,
+      primaryOAuthProvider: _provider,
       lastAuthMethod: 'oauth',
 
       // Profile
@@ -392,21 +427,28 @@ class AmexingAuthService {
     const savedUser = await parseUser.save(null, { useMasterKey: true });
     const userObject = this.parseObjectToPlain(savedUser);
 
-    logger.info(`OAuth user created: ${profile.email} via ${provider}`);
+    logger.info(`OAuth user created: ${profile.email} via ${_provider}`);
     return userObject;
   }
 
   /**
    * Link OAuth account to existing user.
    * @param {object} user - Existing user.
-   * @param {string} provider - OAuth provider.
+   * @param {string} provider - OAuth _provider.
+   * @param _provider
    * @param {object} profile - OAuth profile.
    * @param {object} tokens - OAuth tokens.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.linkOAuthAccount(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
-  async linkOAuthAccount(user, provider, profile, tokens) {
+  async linkOAuthAccount(user, _provider, profile, tokens) {
     const oauthAccount = {
-      provider,
+      provider: _provider,
       providerId: profile.id,
       email: profile.email,
       profile,
@@ -429,7 +471,7 @@ class AmexingAuthService {
       existingAccounts.push(oauthAccount);
 
       parseUser.set('oauthAccounts', existingAccounts);
-      parseUser.set('primaryOAuthProvider', user.primaryOAuthProvider || provider);
+      parseUser.set('primaryOAuthProvider', user.primaryOAuthProvider || _provider);
       parseUser.set('lastOAuthSync', new Date());
       parseUser.set('updatedAt', new Date());
 
@@ -442,15 +484,22 @@ class AmexingAuthService {
   /**
    * Update existing OAuth user profile and tokens.
    * @param {object} user - Existing user.
-   * @param {string} provider - OAuth provider.
+   * @param {string} provider - OAuth _provider.
+   * @param _provider
    * @param {object} profile - Updated OAuth profile.
    * @param {object} tokens - New OAuth tokens.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.updateOAuthUser(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
-  async updateOAuthUser(user, provider, profile, tokens) {
+  async updateOAuthUser(user, _provider, profile, tokens) {
     // Find the OAuth account to update
     const oauthAccountIndex = user.oauthAccounts.findIndex(
-      (account) => account.provider === provider && account.providerId === profile.id
+      (account) => account.provider === _provider && account.providerId === profile.id
     );
 
     if (oauthAccountIndex === -1) {
@@ -489,7 +538,7 @@ class AmexingAuthService {
       await parseUser.save(null, { useMasterKey: true });
     }
 
-    logger.info(`OAuth user updated: ${profile.email} via ${provider}`);
+    logger.info(`OAuth user updated: ${profile.email} via ${_provider}`);
   }
 
   /**
@@ -497,6 +546,12 @@ class AmexingAuthService {
    * @param {object} user - User object.
    * @param {object} profile - OAuth profile.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.handleCorporateIntegration(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async handleCorporateIntegration(user, profile) {
     const domain = profile.domain || profile.email?.split('@')[1];
@@ -527,8 +582,13 @@ class AmexingAuthService {
   /**
    * Generate JWT access and refresh tokens.
    * @param {object} user - User object.
-   * @returns {object} Token pair.
+   * @returns {object} - Operation result Token pair.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.generateTokens(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async generateTokens(user) {
     const payload = {
@@ -578,6 +638,12 @@ class AmexingAuthService {
    * Create new session record.
    * @param {object} sessionData - Session creation data.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.createSession(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async createSession(sessionData) {
     const sessionId = uuidv4();
@@ -609,8 +675,13 @@ class AmexingAuthService {
   /**
    * Validate and refresh access token.
    * @param {string} refreshToken - Refresh token.
-   * @returns {object} New token pair.
+   * @returns {object} - Operation result New token pair.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.refreshAccessToken(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async refreshAccessToken(refreshToken) {
     try {
@@ -653,6 +724,12 @@ class AmexingAuthService {
    * @param {string} userId - User ID.
    * @param {string} sessionId - Optional specific session ID.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.revokeSession(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async revokeSession(userId, sessionId = null) {
     try {
@@ -701,9 +778,15 @@ class AmexingAuthService {
   /**
    * Get user's effective permissions (role + department + individual).
    * @param {string} userId - User ID.
+   * @param {*} userId - _userId parameter.
    * @param _userId
-   * @returns {Array} Array of permission codes.
+   * @returns {Array} - Array of results Array of permission codes.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.getUserPermissions(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async getUserPermissions(_userId) {
     // Note: PermissionService needs to be imported or implemented
@@ -716,15 +799,22 @@ class AmexingAuthService {
    * @param {string} userId - User ID.
    * @param {string} permissionCode - Permission code to check.
    * @param {object} context - Optional context (department, client, etc.).
-   * @param _userId
+   * @param {*} userId - _userId parameter.
+   * @param {*} permissionCode - _permissionCode parameter.
+   * @param {*} context - _context parameter.
    * @param _permissionCode
    * @param _context
-   * @returns {boolean} Has permission.
+   * @returns {boolean} - Boolean result Has permission.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.hasPermission(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
-  async hasPermission(_userId, _permissionCode, _context = {}) {
+  async hasPermission(userId /* unused */, _permissionCode, _context = {}) {
     // Note: PermissionService needs to be imported or implemented
-    // return PermissionService.hasPermission(userId, permissionCode, context);
+    // return PermissionService.hasPermission(userId , permissionCode, context);
     throw new Error('PermissionService not yet implemented');
   }
 
@@ -735,13 +825,19 @@ class AmexingAuthService {
   /**
    * Find user by email.
    * @param {string} email - User email.
-   * @returns {object | null} User object or null.
+   * @param email
+   * @returns {object | null} - Operation result User object or null.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.findUserByEmail(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async findUserByEmail(email) {
     const query = new Parse.Query('AmexingUser');
     query.equalTo('email', email.toLowerCase().trim());
-    query.equalTo('deleted', false);
+    query.equalTo('exists', true); // Only find existing users (not soft deleted)
 
     const parseUser = await query.first({ useMasterKey: true });
     return parseUser ? this.parseObjectToPlain(parseUser) : null;
@@ -750,13 +846,18 @@ class AmexingAuthService {
   /**
    * Find user by ID.
    * @param {string} userId - User ID.
-   * @returns {object | null} User object or null.
+   * @returns {object | null} - Operation result User object or null.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.findUserById(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async findUserById(userId) {
     const query = new Parse.Query('AmexingUser');
     query.equalTo('id', userId);
-    query.equalTo('deleted', false);
+    query.equalTo('exists', true); // Only find existing users (not soft deleted)
 
     const parseUser = await query.first({ useMasterKey: true });
     return parseUser ? this.parseObjectToPlain(parseUser) : null;
@@ -764,16 +865,22 @@ class AmexingAuthService {
 
   /**
    * Find user by OAuth provider and ID.
-   * @param {string} provider - OAuth provider.
+   * @param {string} provider - OAuth _provider.
+   * @param _provider
    * @param {string} providerId - Provider user ID.
-   * @returns {object | null} User object or null.
+   * @returns {object | null} - Operation result User object or null.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.findUserByOAuth(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async findUserByOAuth(provider, providerId) {
+  async findUserByOAuth(_provider, providerId) {
     const query = new Parse.Query('AmexingUser');
-    query.equalTo('oauthAccounts.provider', provider);
+    query.equalTo('oauthAccounts.provider', _provider);
     query.equalTo('oauthAccounts.providerId', providerId);
-    query.equalTo('deleted', false);
+    query.equalTo('exists', true); // Only find existing users (not soft deleted)
 
     const parseUser = await query.first({ useMasterKey: true });
     return parseUser ? this.parseObjectToPlain(parseUser) : null;
@@ -782,8 +889,13 @@ class AmexingAuthService {
   /**
    * Determine user role based on OAuth profile.
    * @param {object} profile - OAuth profile.
-   * @returns {string} Role code.
+   * @returns {string} - Operation result Role code.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.determineUserRole(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async determineUserRole(profile) {
     const domain = profile.domain || profile.email?.split('@')[1];
@@ -805,13 +917,19 @@ class AmexingAuthService {
    * @param {string} password - Password to validate.
    * @throws {Error} If password doesn't meet security requirements.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.validatePasswordStrength(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
    */
   validatePasswordStrength(password) {
     if (!password) {
       throw new Error('Password is required');
     }
 
-    const minLength = parseInt(process.env.PASSWORD_MIN_LENGTH) || 12;
+    const minLength = parseInt(process.env.PASSWORD_MIN_LENGTH, 10) || 12;
     const requireUppercase = process.env.PASSWORD_REQUIRE_UPPERCASE === 'true';
     const requireLowercase = process.env.PASSWORD_REQUIRE_LOWERCASE === 'true';
     const requireNumbers = process.env.PASSWORD_REQUIRE_NUMBERS === 'true';
@@ -866,8 +984,13 @@ class AmexingAuthService {
   /**
    * Get default permissions for role.
    * @param {string} role - Role code.
-   * @returns {Array} Permission codes.
+   * @returns {Array} - Array of results Permission codes.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.getDefaultPermissions(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   async getDefaultPermissions(role) {
     // Implementación simplificada para validación
@@ -895,22 +1018,34 @@ class AmexingAuthService {
   }
 
   /**
-   * Generate unique username from email.
+   * Generate username from email (deprecated - now uses email directly).
    * @param {string} email - Email address.
-   * @returns {string} Generated username.
+   * @param email
+   * @returns {string} - Operation result Email as username.
+   * @deprecated Use email directly as username for consistency.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.generateUsername(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   generateUsername(email) {
-    const baseUsername = email.split('@')[0].toLowerCase();
-    const randomSuffix = crypto.randomBytes(4).toString('hex');
-    return `${baseUsername}_${randomSuffix}`;
+    // Simplified: just return email as username for consistency
+    return email.toLowerCase().trim();
   }
 
   /**
    * Check if email domain is personal (non-corporate).
    * @param {string} domain - Email domain.
-   * @returns {boolean} Is personal domain.
+   * @param domain
+   * @returns {boolean} - Boolean result Is personal domain.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.isPersonalEmailDomain(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   isPersonalEmailDomain(domain) {
     const personalDomains = [
@@ -924,6 +1059,12 @@ class AmexingAuthService {
    * Validate account status.
    * @param {object} user - User object.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.validateAccountStatus(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * @returns {*} - Operation result.
    */
   validateAccountStatus(user) {
     if (!user.active) {
@@ -941,6 +1082,12 @@ class AmexingAuthService {
    * Handle failed login attempt.
    * @param {string} userId - User ID.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.handleFailedLogin(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async handleFailedLogin(userId) {
     const maxAttempts = 5;
@@ -971,6 +1118,12 @@ class AmexingAuthService {
    * Reset failed login attempts.
    * @param {string} userId - User ID.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.resetFailedLoginAttempts(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async resetFailedLoginAttempts(userId) {
     const query = new Parse.Query('AmexingUser');
@@ -991,6 +1144,12 @@ class AmexingAuthService {
    * Update last login timestamp.
    * @param {string} userId - User ID.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.updateLastLogin(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async updateLastLogin(userId) {
     const query = new Parse.Query('AmexingUser');
@@ -1009,10 +1168,16 @@ class AmexingAuthService {
   /**
    * Encrypt sensitive token for storage.
    * @param {string} token - Token to encrypt.
-   * @returns {string} Encrypted token.
+   * @param token
+   * @returns {string} - Operation result Encrypted token.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.encryptToken(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async encryptToken(token) {
+  async encryptToken(token /* unused */) {
     // Implementación simplificada para validación
     try {
       const algorithm = 'aes-256-cbc';
@@ -1043,6 +1208,12 @@ class AmexingAuthService {
    * @param {string} jti - JWT ID.
    * @param {string} refreshToken - Refresh token.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.storeRefreshToken(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async storeRefreshToken(userId, jti, refreshToken) {
     // Store refresh token using Parse Objects
@@ -1064,6 +1235,12 @@ class AmexingAuthService {
    * Invalidate refresh token.
    * @param {string} jti - JWT ID.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.invalidateRefreshToken(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result.
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async invalidateRefreshToken(jti) {
     const query = new Parse.Query('RefreshToken');
@@ -1080,15 +1257,21 @@ class AmexingAuthService {
   /**
    * Find corporate client by domain.
    * @param {string} domain - Email domain.
-   * @returns {object | null} Client object or null.
+   * @param domain
+   * @returns {object | null} - Operation result Client object or null.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.findCorporateClientByDomain(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async findCorporateClientByDomain(domain) {
     const query = new Parse.Query('Client');
     query.equalTo('oauthDomain', domain);
     query.equalTo('isCorporate', true);
     query.equalTo('active', true);
-    query.equalTo('deleted', false);
+    query.equalTo('exists', true); // Only find existing clients (not soft deleted)
 
     const parseClient = await query.first({ useMasterKey: true });
     return parseClient ? this.parseObjectToPlain(parseClient) : null;
@@ -1099,8 +1282,15 @@ class AmexingAuthService {
    * @param {object} user - User object.
    * @param {object} client - Corporate client.
    * @param {object} profile - OAuth profile.
+   * @param {*} profile - _profile parameter.
    * @param _profile
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.provisionCorporateEmployee(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async provisionCorporateEmployee(user, client, _profile) {
     // Implementation will be added in corporate provisioning service
@@ -1121,8 +1311,13 @@ class AmexingAuthService {
   /**
    * Convert Parse Object to plain JavaScript object.
    * @param {Parse.Object} parseObject - Parse Object to convert.
-   * @returns {object} Plain JavaScript object.
+   * @returns {object} - Operation result Plain JavaScript object.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.parseObjectToPlain(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   parseObjectToPlain(parseObject) {
     if (!parseObject) return null;
@@ -1142,8 +1337,13 @@ class AmexingAuthService {
   /**
    * Sanitize user object for response (remove sensitive data).
    * @param {object} user - User object.
-   * @returns {object} Sanitized user object.
+   * @returns {object} - Operation result Sanitized user object.
    * @example
+   * // Authentication service usage
+   * const result = await amexingauthservice.sanitizeUser(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
    */
   sanitizeUser(user) {
     const sanitized = { ...user };

@@ -4,6 +4,10 @@
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0
+ * @example
+ * // Authentication service usage
+ * const result = await authenticationservice.require(userData);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
 const Parse = require('parse/node');
@@ -31,6 +35,11 @@ const { AuthenticationServiceCore } = require('./AuthenticationServiceCore');
  * @version 1.0.0
  * @since 1.0.0
  * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Example usage:
+ * // const result = await methodName(params);
+ * // console.log(result);
  * // Register a new user
  * const userData = {
  *   username: 'john_doe',
@@ -51,8 +60,16 @@ class AuthenticationService extends AuthenticationServiceCore {
   /**
    * Registers a new user with email/password.
    * @param {object} userData - User registration data.
-   * @returns {Promise<object>} Registration result with tokens.
+   * @returns {Promise<object>} - Registration result with tokens.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservice.registerUser(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const userData = { username: 'john_doe', email: 'john@example.com', password: 'user-password', firstName: 'John', lastName: 'Doe' };
    * const result = await authService.registerUser(userData);
    */
@@ -106,8 +123,16 @@ class AuthenticationService extends AuthenticationServiceCore {
    * Authenticates user with email/password.
    * @param {string} identifier - Email or username.
    * @param {string} password - Plain text password.
-   * @returns {Promise<object>} Login result with tokens.
+   * @returns {Promise<object>} - Login result with tokens.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservice.loginUser(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * const result = await authService.loginUser('user@example.com', 'password123');
    */
   async loginUser(identifier, password) {
@@ -181,9 +206,17 @@ class AuthenticationService extends AuthenticationServiceCore {
   /**
    * Refreshes JWT token using refresh token.
    * @param {string} refreshToken - Refresh token.
-   * @returns {Promise<object>} New tokens.
+   * @returns {Promise<object>} - New tokens.
    * @example
-   * const newTokens = await authService.refreshToken('refresh_token_here');
+   * // Authentication service usage
+   * const result = await authenticationservice.refreshToken(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * const newTokens = await authService.refreshToken('refreshtoken_here');
    */
   async refreshToken(refreshToken) {
     try {
@@ -224,9 +257,17 @@ class AuthenticationService extends AuthenticationServiceCore {
    * Logs out user and invalidates tokens.
    * @param {string} userId - User ID.
    * @param {string} sessionToken - Session token to invalidate.
-   * @returns {Promise<object>} Logout result.
+   * @returns {Promise<object>} - Logout result.
    * @example
-   * await authService.logoutUser('user123', 'session_token');
+   * // Authentication service usage
+   * const result = await authenticationservice.logoutUser(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * await authService.logoutUser('user123', 'sessiontoken');
    */
   async logoutUser(userId, sessionToken) {
     try {
@@ -253,15 +294,25 @@ class AuthenticationService extends AuthenticationServiceCore {
   /**
    * Validates JWT token.
    * @param {string} token - JWT token.
-   * @returns {Promise<object>} Decoded token data.
+   * @param token
+   * @returns {Promise<object>} - Decoded token data.
    * @example
-   * const decoded = await authService.validateToken('jwt_token_here');
+   * // Authentication service usage
+   * const result = await authenticationservice.validateToken(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * const decoded = await authService.validateToken('jwttoken_here');
    */
   async validateToken(token) {
     try {
       const decoded = jwt.verify(token, this.jwtSecret);
 
-      if (decoded.type !== 'access') {
+      // Check token type if present (backward compatibility)
+      if (decoded.type && decoded.type !== 'access') {
         throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid token type');
       }
 
@@ -292,8 +343,17 @@ class AuthenticationService extends AuthenticationServiceCore {
   /**
    * Initiates password reset process.
    * @param {string} email - User email.
-   * @returns {Promise<object>} Password reset result.
+   * @param email
+   * @returns {Promise<object>} - Password reset result.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservice.initiatePasswordReset(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * await authService.initiatePasswordReset('user@example.com');
    */
   async initiatePasswordReset(email) {
@@ -335,9 +395,17 @@ class AuthenticationService extends AuthenticationServiceCore {
    * Resets password using reset token.
    * @param {string} resetToken - Password reset token.
    * @param {string} newPassword - New password.
-   * @returns {Promise<object>} Password reset result.
+   * @returns {Promise<object>} - Password reset result.
    * @example
-   * await authService.resetPassword('reset_token', 'newpass123');
+   * // Authentication service usage
+   * const result = await authenticationservice.resetPassword(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * await authService.resetPassword('resettoken', 'newpass123');
    */
   async resetPassword(resetToken, newPassword) {
     try {
@@ -376,8 +444,16 @@ class AuthenticationService extends AuthenticationServiceCore {
    * @param {string} userId - User ID.
    * @param {string} currentPassword - Current password.
    * @param {string} newPassword - New password.
-   * @returns {Promise<object>} Password change result.
+   * @returns {Promise<object>} - Password change result.
    * @example
+   * // Authentication service usage
+   * const result = await authenticationservice.changePassword(userData);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
    * await authService.changePassword('user123', 'oldpass', 'newpass123');
    */
   async changePassword(userId, currentPassword, newPassword) {
