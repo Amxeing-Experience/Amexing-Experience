@@ -56,6 +56,11 @@ class Permission extends BaseModel {
       throw new Error('Resource and action are required');
     }
 
+    // Validate conditions structure if provided
+    if (permissionData.conditions && typeof permissionData.conditions !== 'object') {
+      throw new Error('Conditions must be an object');
+    }
+
     const permission = new Permission();
 
     // Auto-generate name if not provided
@@ -182,6 +187,16 @@ class Permission extends BaseModel {
    */
   impliesPermission(permissionName) {
     return this.includes(permissionName);
+  }
+
+  /**
+   * Check if given timestamp is during business hours.
+   * @param {Date} timestamp - Timestamp to check.
+   * @returns {boolean} - True if during business hours.
+   * @example
+   */
+  isBusinessHours(timestamp = new Date()) {
+    return Permission.isBusinessHours(timestamp);
   }
 
   /**
