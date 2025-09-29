@@ -97,31 +97,6 @@ const formattedRole = formatRoleName(menuUserRole);
   <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-0 user-dropdown-menu"
        style="width: 250px;">
 
-    <!-- User Info Header in Dropdown -->
-    <div class="p-3 border-bottom bg-light user-menu-header">
-      <div class="d-flex align-items-center">
-        <div class="user-avatar me-3">
-          <% if (menuUserAvatar) { %>
-            <img src="<%= menuUserAvatar %>"
-                 alt="<%= menuUserName %>"
-                 class="rounded-circle"
-                 width="40"
-                 height="40"
-                 style="object-fit: cover;">
-          <% } else { %>
-            <div class="avatar-placeholder rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                 style="width: 40px; height: 40px; background: <%= menuColors.primary %>;">
-              <%= menuUserInitials %>
-            </div>
-          <% } %>
-        </div>
-        <div class="flex-grow-1 min-w-0">
-          <div class="fw-semibold text-truncate"><%= menuUserName %></div>
-          <div class="text-muted small text-truncate"><%= menuUserEmail %></div>
-        </div>
-      </div>
-    </div>
-
     <!-- Menu Items -->
     <div class="p-1 user-menu-items">
       <a class="dropdown-item d-flex align-items-center py-2"
@@ -209,10 +184,6 @@ const formattedRole = formatRoleName(menuUserRole);
     box-shadow: 0 4px 20px rgba(0,0,0,0.15);
     border: none;
     margin-top: 0.5rem;
-  }
-
-  .user-menu-header {
-    border-radius: 8px 8px 0 0;
   }
 
   .user-menu-items .dropdown-item {
