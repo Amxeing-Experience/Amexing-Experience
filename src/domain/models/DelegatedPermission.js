@@ -57,21 +57,47 @@ class DelegatedPermission extends BaseModel {
    * });
    */
   static create(delegationData) {
+    // Validate required fields
+    const hasPermission = delegationData.permission || delegationData.permissions;
+    if (!delegationData.fromUserId || !delegationData.toUserId || !hasPermission) {
+      throw new Error('From user, to user, and permission are required');
+    }
+
+    // Prevent self-delegation
+    if (delegationData.fromUserId === delegationData.toUserId) {
+      throw new Error('Cannot delegate permission to yourself');
+    }
+
     const delegation = new DelegatedPermission();
 
     // Core delegation information
     delegation.set('fromUserId', delegationData.fromUserId);
     delegation.set('toUserId', delegationData.toUserId);
-    delegation.set('permissions', delegationData.permissions || []);
 
-    // Delegation conditions and restrictions
-    delegation.set('conditions', delegationData.conditions || {});
+    // Handle both single permission and array of permissions
+    if (delegationData.permission) {
+      delegation.set('permission', delegationData.permission);
+      delegation.set('permissions', [delegationData.permission]);
+    } else {
+      delegation.set('permissions', delegationData.permissions || []);
+      // Set single permission for backward compatibility
+      if (delegationData.permissions && delegationData.permissions.length > 0) {
+        delegation.set('permission', delegationData.permissions[0]);
+      }
+    }
+
+    // Delegation conditions and restrictions (support both 'context' and 'conditions')
+    const contextData = delegationData.context || delegationData.conditions || {};
+    delegation.set('context', contextData);
+    delegation.set('conditions', contextData);
     delegation.set('restrictions', delegationData.restrictions || {});
 
-    // Time constraints
+    // Time constraints (support both 'expiresAt' and 'validUntil')
+    const expirationDate = delegationData.expiresAt || delegationData.validUntil || null;
     delegation.set('validFrom', delegationData.validFrom || new Date());
-    delegation.set('validUntil', delegationData.validUntil || null);
-    delegation.set('isPermanent', delegationData.validUntil === null);
+    delegation.set('validUntil', expirationDate);
+    delegation.set('expiresAt', expirationDate);
+    delegation.set('isPermanent', expirationDate === null);
 
     // Metadata
     delegation.set('reason', delegationData.reason || '');
@@ -84,7 +110,9 @@ class DelegatedPermission extends BaseModel {
     // Status tracking
     delegation.set('status', 'active'); // 'active', 'expired', 'revoked', 'suspended'
     delegation.set('usageCount', 0);
+    delegation.set('usageLimit', delegationData.usageLimit || null);
     delegation.set('lastUsedAt', null);
+    delegation.set('delegatedAt', new Date());
 
     // Audit information
     delegation.set('createdBy', delegationData.fromUserId);
@@ -128,64 +156,280 @@ class DelegatedPermission extends BaseModel {
   }
 
   /**
+   * Check if delegation has expired.
+   * @returns {boolean} - True if delegation has expired.
+   * @example
+   */
+  isExpired() {
+    const expiresAt = this.get('expiresAt') || this.get('validUntil');
+    if (!expiresAt) {
+      return false;
+    }
+    return new Date() > expiresAt;
+  }
+
+  /**
+   * Check if delegation is active.
+   * @returns {boolean} - True if delegation is active.
+   * @example
+   */
+  isActive() {
+    return this.get('active') === true && this.get('status') === 'active';
+  }
+
+  /**
    * Check if specific permission is delegated with context validation.
    * @param {string} permission - Permission to check.
    * @param {object} context - Context for conditional validation.
-   * @returns {Promise<object>} - Result { allowed: boolean, reason?: string }.
+   * @returns {boolean} - Returns true if permission is delegated and valid.
    * @example
    */
-  async hasPermission(permission, context = {}) {
-    try {
-      // Check if delegation is valid
-      if (!this.isValid()) {
-        return {
-          allowed: false,
-          reason: 'Delegation is not currently valid',
-        };
-      }
-
-      // Check if permission is in delegated list
-      const delegatedPermissions = this.get('permissions') || [];
-      if (!delegatedPermissions.includes(permission)) {
-        return {
-          allowed: false,
-          reason: 'Permission not included in delegation',
-        };
-      }
-
-      // Validate conditions
-      const conditions = this.get('conditions') || {};
-      const conditionResult = await this.validateConditions(conditions, context);
-      if (!conditionResult.valid) {
-        return {
-          allowed: false,
-          reason: conditionResult.reason,
-        };
-      }
-
-      // Validate restrictions
-      const restrictions = this.get('restrictions') || {};
-      const restrictionResult = await this.validateRestrictions(restrictions, context);
-      if (!restrictionResult.valid) {
-        return {
-          allowed: false,
-          reason: restrictionResult.reason,
-        };
-      }
-
-      return { allowed: true };
-    } catch (error) {
-      logger.error('Error checking delegated permission', {
-        delegationId: this.id,
-        permission,
-        context,
-        error: error.message,
-      });
-      return {
-        allowed: false,
-        reason: 'Error validating delegated permission',
-      };
+  hasPermission(permission, context = {}) {
+    // Check if delegation is valid
+    if (!this.isValid()) {
+      return false;
     }
+
+    // Check if permission matches (support both single and array)
+    const singlePermission = this.get('permission');
+    const delegatedPermissions = this.get('permissions') || [];
+
+    const hasPermissionMatch = (singlePermission === permission) || delegatedPermissions.includes(permission);
+    if (!hasPermissionMatch) {
+      return false;
+    }
+
+    // Validate context constraints
+    const delegationContext = this.get('context') || this.get('conditions') || {};
+
+    // Check amount constraint
+    if (delegationContext.maxAmount && context.amount) {
+      if (context.amount > delegationContext.maxAmount) {
+        return false;
+      }
+    }
+
+    // Check department constraint
+    if (delegationContext.departmentId && context.departmentId) {
+      if (context.departmentId !== delegationContext.departmentId) {
+        return false;
+      }
+    }
+
+    // Check time constraint
+    if (delegationContext.timeRestriction && context.timestamp) {
+      const time = new Date(context.timestamp);
+      const hour = time.getHours();
+      if (delegationContext.timeRestriction === 'business' && (hour < 9 || hour > 17)) {
+        return false;
+      }
+    }
+
+    // Check expiration
+    const expiresAt = this.get('expiresAt') || this.get('validUntil');
+    if (expiresAt && new Date() > expiresAt) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Track usage of delegated permission.
+   * @param {object} context - Context of the usage.
+   * @returns {boolean} - Returns true if usage was tracked successfully.
+   * @example
+   */
+  trackUsage(context = {}) {
+    const currentCount = this.get('usageCount') || 0;
+    const usageLimit = this.get('usageLimit');
+
+    // Check usage limit
+    if (usageLimit && currentCount >= usageLimit) {
+      return false;
+    }
+
+    // Update usage count
+    this.set('usageCount', currentCount + 1);
+    this.set('lastUsedAt', new Date());
+
+    // Track usage history
+    const usageHistory = this.get('usageHistory') || [];
+    usageHistory.push({
+      timestamp: new Date(),
+      context,
+      userId: this.get('toUserId'),
+    });
+    this.set('usageHistory', usageHistory);
+
+    return true;
+  }
+
+  /**
+   * Check if usage limit has been reached.
+   * @returns {boolean} - True if limit reached or exceeded.
+   * @example
+   */
+  hasReachedUsageLimit() {
+    const usageCount = this.get('usageCount') || 0;
+    const usageLimit = this.get('usageLimit');
+
+    if (!usageLimit) {
+      return false; // No limit set
+    }
+
+    return usageCount >= usageLimit;
+  }
+
+  /**
+   * Revoke this delegation.
+   * @param {string} revokedBy - ID of user revoking the delegation.
+   * @param {string} reason - Reason for revocation.
+   * @returns {void}
+   * @example
+   */
+  revoke(revokedBy, reason = '') {
+    this.set('status', 'revoked');
+    this.set('active', false);
+    this.set('revokedBy', revokedBy);
+    this.set('revokedAt', new Date());
+    this.set('revocationReason', reason);
+  }
+
+  /**
+   * Extend delegation expiration.
+   * @param {Date} newExpiration - New expiration date.
+   * @returns {void}
+   * @example
+   */
+  extendExpiration(newExpiration) {
+    if (newExpiration <= new Date()) {
+      throw new Error('Cannot extend to a past date');
+    }
+
+    const currentExpiry = this.get('expiresAt') || this.get('validUntil');
+    const extensionHistory = this.get('extensionHistory') || [];
+
+    extensionHistory.push({
+      previousExpiry: currentExpiry,
+      newExpiry: newExpiration,
+      extendedAt: new Date(),
+      extendedBy: this.get('fromUserId'),
+    });
+
+    this.set('validUntil', newExpiration);
+    this.set('expiresAt', newExpiration);
+    this.set('extensionHistory', extensionHistory);
+    this.set('isPermanent', false);
+  }
+
+  /**
+   * Validate context against delegation constraints.
+   * @param {object} context - Context to validate.
+   * @returns {boolean} - True if context is valid.
+   * @example
+   */
+  validateContext(context = {}) {
+    const delegationContext = this.get('context') || this.get('conditions') || {};
+
+    // If amount is required but not provided
+    if (delegationContext.maxAmount !== undefined && context.amount === undefined) {
+      return false;
+    }
+
+    // Check amount constraint
+    if (delegationContext.maxAmount && context.amount) {
+      if (context.amount > delegationContext.maxAmount) {
+        return false;
+      }
+    }
+
+    // Check department constraint
+    if (delegationContext.departmentId) {
+      if (!context.departmentId || context.departmentId !== delegationContext.departmentId) {
+        return false;
+      }
+    }
+
+    // Check time restrictions
+    if (delegationContext.timeRestrictions) {
+      const now = context.timestamp ? new Date(context.timestamp) : new Date();
+      const restrictions = delegationContext.timeRestrictions;
+
+      // Check day of week
+      if (restrictions.daysOfWeek) {
+        const dayOfWeek = now.getDay();
+        if (!restrictions.daysOfWeek.includes(dayOfWeek)) {
+          return false;
+        }
+      }
+
+      // Check time of day
+      if (restrictions.startTime && restrictions.endTime) {
+        const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+        if (currentTime < restrictions.startTime || currentTime > restrictions.endTime) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Generate audit report for this delegation.
+   * @returns {object} - Audit report data.
+   * @example
+   */
+  generateAuditReport() {
+    return {
+      delegationId: this.id,
+      fromUserId: this.get('fromUserId'),
+      toUserId: this.get('toUserId'),
+      permission: this.get('permission'),
+      permissions: this.get('permissions'),
+      status: this.get('status'),
+      createdAt: this.get('createdAt'),
+      delegatedAt: this.get('delegatedAt'),
+      expiresAt: this.get('expiresAt'),
+      usageCount: this.get('usageCount'),
+      usageLimit: this.get('usageLimit'),
+      lastUsedAt: this.get('lastUsedAt'),
+      revokedAt: this.get('revokedAt'),
+      revokedBy: this.get('revokedBy'),
+      revocationReason: this.get('revocationReason'),
+    };
+  }
+
+  /**
+   * Find delegations for a specific user.
+   * @param {string} userId - User ID to search for.
+   * @returns {Promise<Array>} - List of delegations.
+   * @example
+   */
+  static async findForUser(userId) {
+    const query = new Parse.Query(DelegatedPermission);
+    query.equalTo('toUserId', userId);
+    query.equalTo('active', true);
+    query.equalTo('exists', true);
+    query.equalTo('status', 'active');
+
+    return query.find({ useMasterKey: true });
+  }
+
+  /**
+   * Find delegations by delegator.
+   * @param {string} delegatorId - Delegator user ID.
+   * @returns {Promise<Array>} - List of delegations.
+   * @example
+   */
+  static async findByDelegator(delegatorId) {
+    const query = new Parse.Query(DelegatedPermission);
+    query.equalTo('fromUserId', delegatorId);
+    query.equalTo('active', true);
+    query.equalTo('exists', true);
+
+    return query.find({ useMasterKey: true });
   }
 
   /**
@@ -316,43 +560,6 @@ class DelegatedPermission extends BaseModel {
         permission,
         error: error.message,
       });
-    }
-  }
-
-  /**
-   * Revoke delegation before expiration.
-   * @param {string} revokedBy - User ID who revoked the delegation.
-   * @param {string} reason - Reason for revocation.
-   * @returns {Promise<boolean>} - Success status.
-   * @example
-   */
-  async revoke(revokedBy, reason = '') {
-    try {
-      this.set('status', 'revoked');
-      this.set('revokedBy', revokedBy);
-      this.set('revokedAt', new Date());
-      this.set('revocationReason', reason);
-      this.set('active', false);
-
-      await this.save(null, { useMasterKey: true });
-
-      logger.info('Delegation revoked', {
-        delegationId: this.id,
-        fromUserId: this.get('fromUserId'),
-        toUserId: this.get('toUserId'),
-        revokedBy,
-        reason,
-      });
-
-      return true;
-    } catch (error) {
-      logger.error('Error revoking delegation', {
-        delegationId: this.id,
-        revokedBy,
-        reason,
-        error: error.message,
-      });
-      return false;
     }
   }
 

@@ -51,10 +51,18 @@ class Permission extends BaseModel {
    * });
    */
   static create(permissionData) {
+    // Validate required fields
+    if (!permissionData.resource || !permissionData.action) {
+      throw new Error('Resource and action are required');
+    }
+
     const permission = new Permission();
 
+    // Auto-generate name if not provided
+    const name = permissionData.name || `${permissionData.resource}.${permissionData.action}`;
+
     // Core permission identification
-    permission.set('name', permissionData.name);
+    permission.set('name', name);
     permission.set('resource', permissionData.resource);
     permission.set('action', permissionData.action);
     permission.set('description', permissionData.description || '');
@@ -69,6 +77,7 @@ class Permission extends BaseModel {
     permission.set('priority', permissionData.priority || 0);
     permission.set('isSystemPermission', permissionData.isSystemPermission || false);
     permission.set('requiresApproval', permissionData.requiresApproval || false);
+    permission.set('delegatable', permissionData.delegatable !== undefined ? permissionData.delegatable : true);
 
     // Validation rules
     permission.set('validationRules', permissionData.validationRules || {});
@@ -79,6 +88,185 @@ class Permission extends BaseModel {
     permission.set('exists', permissionData.exists !== undefined ? permissionData.exists : true);
 
     return permission;
+  }
+
+  /**
+   * Validates context against permission conditions.
+   * @param {object} context - Context to validate.
+   * @returns {boolean} - True if context is valid.
+   * @example
+   */
+  validateContext(context = {}) {
+    const conditions = this.get('conditions') || {};
+
+    // Check amount conditions
+    if (conditions.maxAmount !== undefined) {
+      if (!context.amount) {
+        return false; // Amount required but not provided
+      }
+      if (context.amount > conditions.maxAmount) {
+        return false;
+      }
+    }
+
+    // Check business hours
+    if (conditions.businessHoursOnly) {
+      const timestamp = context.timestamp || new Date();
+      const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+      const hour = date.getHours();
+      const day = date.getDay();
+
+      if (day === 0 || day === 6 || hour < 9 || hour > 17) {
+        return false;
+      }
+    }
+
+    // Check department scope
+    if (conditions.departmentScope === 'own') {
+      if (!context.departmentId || !context.userDepartmentId) {
+        return false;
+      }
+      if (context.departmentId !== context.userDepartmentId) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if permission is a system permission.
+   * @returns {boolean} - True if system permission.
+   * @example
+   */
+  isSystemPermission() {
+    return this.get('isSystemPermission') === true || this.get('category') === 'system';
+  }
+
+  /**
+   * Check if permission can be delegated.
+   * @returns {boolean} - True if delegatable.
+   * @example
+   */
+  isDelegatable() {
+    return this.get('delegatable') !== false;
+  }
+
+  /**
+   * Check if permission inherits from another permission.
+   * @param {string} parentPermission - Permission name to check.
+   * @returns {boolean} - True if inherits from parent.
+   * @example
+   */
+  inheritsFrom(parentPermission) {
+    const name = this.get('name');
+
+    // Check direct match
+    if (name === parentPermission) {
+      return true;
+    }
+
+    // Check wildcard inheritance (e.g., 'users.*' includes 'users.read')
+    if (parentPermission.endsWith('.*')) {
+      const parentBase = parentPermission.slice(0, -2);
+      return name.startsWith(`${parentBase}.`);
+    }
+
+    // Check hierarchical inheritance
+    const nameParts = name.split('.');
+    const parentParts = parentPermission.split('.');
+
+    if (parentParts.length < nameParts.length) {
+      return nameParts.slice(0, parentParts.length).join('.') === parentPermission;
+    }
+
+    return false;
+  }
+
+  /**
+   * Validate permission name format.
+   * @param {string} name - Permission name.
+   * @returns {boolean} - True if valid format.
+   * @example
+   */
+  static isValidPermissionName(name) {
+    if (!name || typeof name !== 'string') {
+      return false;
+    }
+
+    // Must be in resource.action format
+    const parts = name.split('.');
+    if (parts.length < 2) {
+      return false;
+    }
+
+    // Each part must be alphanumeric (with underscores allowed)
+    const validPartRegex = /^[a-z][a-z0-9_]*$/;
+    return parts.every((part) => validPartRegex.test(part));
+  }
+
+  /**
+   * Validate condition structure.
+   * @param {object} conditions - Conditions to validate.
+   * @returns {boolean} - True if valid structure.
+   * @example
+   */
+  static validateConditionStructure(conditions) {
+    if (!conditions || typeof conditions !== 'object') {
+      return false;
+    }
+
+    // Check known condition types
+    const validConditions = [
+      'maxAmount', 'minAmount', 'businessHoursOnly',
+      'departmentScope', 'organizationScope', 'timeRestriction',
+    ];
+
+    for (const key in conditions) {
+      if (!validConditions.includes(key)) {
+        return false;
+      }
+    }
+
+    // Validate specific condition values
+    if (conditions.maxAmount !== undefined && typeof conditions.maxAmount !== 'number') {
+      return false;
+    }
+
+    if (conditions.businessHoursOnly !== undefined && typeof conditions.businessHoursOnly !== 'boolean') {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Check if current time is during business hours.
+   * @param {Date} timestamp - Timestamp to check.
+   * @returns {boolean} - True if during business hours.
+   * @example
+   */
+  static isBusinessHours(timestamp = new Date()) {
+    const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    const hour = date.getHours();
+    const day = date.getDay();
+
+    // Monday-Friday, 9 AM - 5 PM
+    return day >= 1 && day <= 5 && hour >= 9 && hour < 17;
+  }
+
+  /**
+   * Create system permissions with proper structure.
+   * @param {object} config - Permission configuration.
+   * @returns {Permission} - Created permission.
+   * @example
+   */
+  static createSystemPermission(config) {
+    return Permission.create({
+      ...config,
+      isSystemPermission: true,
+      delegatable: config.delegatable !== false,
+    });
   }
 
   /**
