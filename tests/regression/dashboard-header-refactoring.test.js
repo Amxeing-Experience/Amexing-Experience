@@ -356,7 +356,7 @@ describe('Dashboard Header Refactoring Regression Tests', () => {
       });
 
       expect(refactoredHtml).toContainText('Complex User');
-      expect(refactoredHtml).toContainText('complex@test.com');
+      // Email no longer displayed in dropdown header (removed in simplification)
       expect(refactoredHtml).toContain('/avatar.jpg');
     });
   });

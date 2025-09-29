@@ -280,7 +280,7 @@ describe('Dashboard Header Organism - Baseline Tests', () => {
       });
 
       expect(html).toContainText('John Smith');
-      expect(html).toContainText('john@test.com');
+      // Email no longer displayed in dropdown header (removed in user-menu refactoring)
       expect(html).toContain('/avatar.jpg');
     });
   });

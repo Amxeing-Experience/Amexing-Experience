@@ -24,7 +24,7 @@ describe('User Menu Molecule Component', () => {
       };
       const html = await renderComponent(componentPath, params);
       expect(html).toContainText('John Doe');
-      expect(html).toContainText('john@test.com');
+      // Email no longer displayed (dropdown header removed)
       expect(html).toContainText('Admin');
     });
 
@@ -135,14 +135,14 @@ describe('User Menu Molecule Component', () => {
       expect(html).toContain('title="Online"');
     });
 
-    test('should have avatar in dropdown header', async () => {
+    test('should have avatar in trigger button', async () => {
       const html = await renderComponent(componentPath, {
         userName: 'Test User'
       });
 
-      // Should have avatar in main trigger and dropdown header
+      // Should have avatar in main trigger only (dropdown header removed)
       const avatarCount = (html.match(/avatar-placeholder|user-avatar/g) || []).length;
-      expect(avatarCount).toBeGreaterThanOrEqual(2);
+      expect(avatarCount).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -325,7 +325,7 @@ describe('User Menu Molecule Component', () => {
       });
 
       expect(html).toContainText('John Smith');
-      expect(html).toContainText('john@test.com');
+      // Email no longer displayed in dropdown header (removed)
       expect(html).toContain('/avatar.jpg');
     });
   });
