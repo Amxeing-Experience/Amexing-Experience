@@ -28,9 +28,9 @@ const colors = roleColors[sidebarUserRole] || roleColors.guest;
 
 // Helper function to determine if menu item is active
 function isActiveMenuItem(itemPath, currentPath) {
-    if (itemPath === currentPath) return true;
-    if (currentPath.startsWith(itemPath) && itemPath !== '/') return true;
-    return false;
+    // Exact match only - no prefix matching
+    // This prevents '/dashboard/superadmin' from matching '/dashboard/superadmin/users'
+    return itemPath === currentPath;
 }
 %>
 

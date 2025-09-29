@@ -1,0 +1,589 @@
+<%
+/**
+ * Header Navigation Organism
+ * Horizontal navigation bar with role-based mega-menu structure
+ * Replaces sidebar navigation with full-width header navigation
+ *
+ * @param {string} userRole - Current user role
+ * @param {string} currentPath - Current page path for active states
+ * @param {object} user - Current user object
+ * @param {object} colors - Role-specific color scheme (optional)
+ */
+
+// Default parameters with null safety
+const headerNavUserRole = typeof userRole !== 'undefined' && userRole !== null ? userRole : 'guest';
+const headerNavCurrentPath = typeof currentPath !== 'undefined' && currentPath !== null ? currentPath : '';
+const headerNavUser = typeof user !== 'undefined' && user !== null ? user : {};
+
+// Role-based branding colors (consistent with sidebar)
+const headerRoleColors = {
+    superadmin: { primary: '#ff6b6b', secondary: '#4ecdc4' },
+    admin: { primary: '#5d87ff', secondary: '#49beff' },
+    client: { primary: '#8b5cf6', secondary: '#ec4899' },
+    department_manager: { primary: '#10b981', secondary: '#3b82f6' },
+    employee: { primary: '#06b6d4', secondary: '#8b5cf6' },
+    driver: { primary: '#f59e0b', secondary: '#ef4444' },
+    guest: { primary: '#6b7280', secondary: '#9ca3af' }
+};
+
+const headerColors = (typeof colors !== 'undefined' && colors !== null) ? colors : headerRoleColors[headerNavUserRole] || headerRoleColors.guest;
+
+// Helper function to determine if menu item is active
+function isActiveMenuItem(itemPath, currentPath) {
+    if (itemPath === currentPath) return true;
+    if (currentPath.startsWith(itemPath) && itemPath !== '/') return true;
+    return false;
+}
+
+// Navigation items based on role (migrated from sidebar-menu)
+const navigationItems = {
+    superadmin: [
+        // System Management Section
+        { section: 'System Management', icon: 'ti-settings', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/superadmin', id: 'dashboard' },
+            { name: 'User Management', icon: 'users', path: '/dashboard/superadmin/users', id: 'users' },
+            { name: 'Client Management', icon: 'building', path: '/dashboard/superadmin/clients', id: 'clients' },
+            { name: 'Permissions & Roles', icon: 'shield-lock', path: '/dashboard/superadmin/permissions', id: 'permissions' }
+        ]},
+        // Analytics Section
+        { section: 'Analytics & Reports', icon: 'ti-chart-bar', items: [
+            { name: 'System Analytics', icon: 'chart-bar', path: '/dashboard/superadmin/analytics', id: 'analytics' },
+            { name: 'Reports', icon: 'file-analytics', path: '/dashboard/superadmin/reports', id: 'reports' },
+            { name: 'Audit Logs', icon: 'file-search', path: '/dashboard/superadmin/audit', id: 'audit' }
+        ]},
+        // System Configuration
+        { section: 'System Configuration', icon: 'ti-settings-2', items: [
+            { name: 'System Settings', icon: 'settings', path: '/dashboard/superadmin/settings', id: 'settings' },
+            { name: 'Integrations', icon: 'plug', path: '/dashboard/superadmin/integrations', id: 'integrations' },
+            { name: 'Security Settings', icon: 'lock', path: '/dashboard/superadmin/security', id: 'security' },
+            { name: 'PCI DSS Compliance', icon: 'certificate', path: '/dashboard/superadmin/compliance', id: 'compliance' }
+        ]}
+    ],
+    admin: [
+        { section: 'Operations', icon: 'ti-dashboard', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/admin', id: 'dashboard' },
+            { name: 'Events Management', icon: 'calendar-event', path: '/dashboard/admin/events', id: 'events' },
+            { name: 'Client Management', icon: 'users', path: '/dashboard/admin/clients', id: 'clients' },
+            { name: 'Bookings', icon: 'car', path: '/dashboard/admin/bookings', id: 'bookings' }
+        ]},
+        { section: 'Resources', icon: 'ti-car', items: [
+            { name: 'Vehicle Management', icon: 'car-garage', path: '/dashboard/admin/vehicles', id: 'vehicles' },
+            { name: 'Driver Management', icon: 'user-check', path: '/dashboard/admin/drivers', id: 'drivers' },
+            { name: 'Schedule Calendar', icon: 'calendar', path: '/dashboard/admin/schedule', id: 'schedule' },
+            { name: 'Reports', icon: 'report', path: '/dashboard/admin/reports', id: 'reports' }
+        ]}
+    ],
+    client: [
+        { section: 'My Business', icon: 'ti-building', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/client', id: 'dashboard' },
+            { name: 'My Events', icon: 'calendar-event', path: '/dashboard/client/events', id: 'events' },
+            { name: 'Landing Pages', icon: 'world', path: '/dashboard/client/landing-pages', id: 'landing-pages' },
+            { name: 'My Bookings', icon: 'car', path: '/dashboard/client/bookings', id: 'bookings' }
+        ]},
+        { section: 'Services & Billing', icon: 'ti-credit-card', items: [
+            { name: 'Services', icon: 'list', path: '/dashboard/client/services', id: 'services' },
+            { name: 'Billing & Payments', icon: 'receipt', path: '/dashboard/client/billing', id: 'billing' }
+        ]}
+    ],
+    department_manager: [
+        { section: 'Team Management', icon: 'ti-users', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/department-manager', id: 'dashboard' },
+            { name: 'My Team', icon: 'users', path: '/dashboard/department-manager/team', id: 'team' },
+            { name: 'Team Bookings', icon: 'car', path: '/dashboard/department-manager/bookings', id: 'bookings' },
+            { name: 'Approvals', icon: 'check', path: '/dashboard/department-manager/approvals', id: 'approvals' }
+        ]},
+        { section: 'Budget & Reports', icon: 'ti-chart-line', items: [
+            { name: 'Budget Management', icon: 'coin', path: '/dashboard/department-manager/budget', id: 'budget' },
+            { name: 'Department Reports', icon: 'report', path: '/dashboard/department-manager/reports', id: 'reports' }
+        ]}
+    ],
+    employee: [
+        { section: 'My Services', icon: 'ti-user', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/employee', id: 'dashboard' },
+            { name: 'My Bookings', icon: 'car', path: '/dashboard/employee/bookings', id: 'bookings' },
+            { name: 'Available Services', icon: 'list', path: '/dashboard/employee/services', id: 'services' },
+            { name: 'My Profile', icon: 'user', path: '/dashboard/employee/profile', id: 'profile' }
+        ]}
+    ],
+    driver: [
+        { section: 'My Trips', icon: 'ti-car', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/driver', id: 'dashboard' },
+            { name: 'Active Trips', icon: 'route', path: '/dashboard/driver/trips', id: 'trips' },
+            { name: 'My Schedule', icon: 'calendar', path: '/dashboard/driver/schedule', id: 'schedule' },
+            { name: 'My Vehicle', icon: 'car', path: '/dashboard/driver/vehicle', id: 'vehicle' },
+            { name: 'Trip History', icon: 'history', path: '/dashboard/driver/history', id: 'history' }
+        ]}
+    ],
+    guest: [
+        { section: 'Welcome', icon: 'ti-home', items: [
+            { name: 'Home', icon: 'home', path: '/', id: 'home' }
+        ]}
+    ]
+};
+
+const menuSections = navigationItems[headerNavUserRole] || navigationItems.guest;
+
+// Role display name formatting
+function formatRoleName(role) {
+  const safeRole = String(role || 'guest');
+  if (safeRole === 'department_manager') return 'Jefe de Departamento';
+  if (safeRole === 'superadmin') return 'Super Administrador';
+  return safeRole.charAt(0).toUpperCase() + safeRole.slice(1);
+}
+
+const formattedRole = formatRoleName(headerNavUserRole);
+%>
+
+<!-- Header Navigation Start -->
+<nav class="header-navigation bg-white border-bottom shadow-sm">
+    <div class="container-fluid px-4">
+        <div class="d-flex align-items-center justify-content-between h-100">
+
+            <!-- Left Section: Logo + Role Badge -->
+            <div class="d-flex align-items-center header-nav-left">
+                <!-- Brand Logo -->
+                <a href="/dashboard/<%= headerNavUserRole %>" class="brand-logo-link me-4">
+                    <img src="/dashboard/images/logos/amexing-logo.svg" width="120" alt="Amexing Logo" class="img-fluid" />
+                </a>
+
+                <!-- Role Badge -->
+                <div class="role-badge-header px-3 py-1 rounded-pill"
+                     style="background: linear-gradient(135deg, <%= headerColors.primary %>, <%= headerColors.secondary %>);">
+                    <small class="text-white fw-bold">
+                        <%= formattedRole %>
+                    </small>
+                </div>
+            </div>
+
+            <!-- Center Section: Main Navigation (Desktop) -->
+            <div class="header-nav-center d-none d-lg-flex flex-grow-1 justify-content-center">
+                <div class="header-nav-menu d-flex align-items-center">
+                    <% menuSections.forEach(function(section, sectionIndex) { %>
+                        <div class="nav-section-dropdown dropdown me-4">
+                            <button class="btn nav-section-trigger d-flex align-items-center"
+                                    type="button"
+                                    data-bs-toggle="dropdown"
+                                    aria-expanded="false"
+                                    id="section-<%= sectionIndex %>">
+                                <i class="<%= section.icon %> me-2" style="color: <%= headerColors.primary %>;"></i>
+                                <span class="nav-section-name"><%= section.section %></span>
+                                <i class="ti ti-chevron-down ms-2 nav-chevron"></i>
+                            </button>
+
+                            <!-- Mega Menu Dropdown -->
+                            <div class="dropdown-menu mega-menu shadow-lg border-0 p-0"
+                                 aria-labelledby="section-<%= sectionIndex %>">
+                                <div class="mega-menu-content p-4">
+                                    <div class="row g-0">
+                                        <div class="col-12">
+                                            <h6 class="mega-menu-title mb-3 pb-2 border-bottom"
+                                                style="color: <%= headerColors.primary %>;">
+                                                <i class="<%= section.icon %> me-2"></i>
+                                                <%= section.section %>
+                                            </h6>
+                                            <div class="row">
+                                                <% section.items.forEach(function(item, itemIndex) { %>
+                                                    <div class="col-md-6 col-lg-4 mb-3">
+                                                        <a href="<%= item.path %>"
+                                                           class="mega-menu-item d-flex align-items-center p-2 rounded text-decoration-none <%= isActiveMenuItem(item.path, headerNavCurrentPath) ? 'active' : '' %>"
+                                                           data-nav-item="<%= item.id %>">
+                                                            <div class="mega-menu-icon me-3 p-2 rounded-circle"
+                                                                 style="background: <%= headerColors.primary %>15;">
+                                                                <i class="ti ti-<%= item.icon %>"
+                                                                   style="color: <%= headerColors.primary %>;"></i>
+                                                            </div>
+                                                            <div class="mega-menu-text">
+                                                                <div class="fw-semibold text-dark"><%= item.name %></div>
+                                                                <small class="text-muted">Acceder a <%= item.name.toLowerCase() %></small>
+                                                            </div>
+                                                        </a>
+                                                    </div>
+                                                <% }); %>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <% }); %>
+                </div>
+            </div>
+
+            <!-- Right Section: Mobile Toggle + Quick Actions -->
+            <div class="header-nav-right d-flex align-items-center">
+                <!-- Mobile Navigation Toggle -->
+                <button class="btn btn-link d-lg-none mobile-nav-toggle p-2 me-2"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#mobileNavCollapse"
+                        aria-controls="mobileNavCollapse"
+                        aria-expanded="false"
+                        aria-label="Toggle mobile navigation">
+                    <i class="ti ti-menu-2 fs-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Mobile Navigation Collapse -->
+        <div class="collapse d-lg-none mobile-nav-collapse" id="mobileNavCollapse">
+            <div class="mobile-nav-content py-3">
+                <% menuSections.forEach(function(section, sectionIndex) { %>
+                    <div class="mobile-nav-section mb-4">
+                        <h6 class="mobile-section-title mb-3 fw-bold d-flex align-items-center"
+                            style="color: <%= headerColors.primary %>;">
+                            <i class="<%= section.icon %> me-2"></i>
+                            <%= section.section %>
+                        </h6>
+                        <div class="mobile-nav-items">
+                            <% section.items.forEach(function(item, itemIndex) { %>
+                                <a href="<%= item.path %>"
+                                   class="mobile-nav-item d-flex align-items-center p-3 text-decoration-none border-bottom <%= isActiveMenuItem(item.path, headerNavCurrentPath) ? 'active' : '' %>"
+                                   data-nav-item="<%= item.id %>">
+                                    <div class="mobile-nav-icon me-3 p-2 rounded-circle"
+                                         style="background: <%= headerColors.primary %>15;">
+                                        <i class="ti ti-<%= item.icon %>"
+                                           style="color: <%= headerColors.primary %>;"></i>
+                                    </div>
+                                    <div class="mobile-nav-text">
+                                        <div class="fw-semibold text-dark"><%= item.name %></div>
+                                        <small class="text-muted">Acceder a <%= item.name.toLowerCase() %></small>
+                                    </div>
+                                </a>
+                            <% }); %>
+                        </div>
+                    </div>
+                <% }); %>
+            </div>
+        </div>
+    </div>
+</nav>
+<!-- Header Navigation End -->
+
+<style>
+    /* Header Navigation Base Styles */
+    .header-navigation {
+        height: 70px;
+        position: sticky;
+        top: 0;
+        z-index: 1040;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-bottom: 1px solid #e0e6ed !important;
+    }
+
+    /* Brand Logo */
+    .brand-logo-link {
+        text-decoration: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .brand-logo-link:hover {
+        opacity: 0.8;
+    }
+
+    /* Role Badge */
+    .role-badge-header {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        border: 1px solid rgba(255,255,255,0.2);
+        transition: transform 0.2s ease;
+    }
+
+    .role-badge-header:hover {
+        transform: translateY(-1px);
+    }
+
+    /* Navigation Sections */
+    .nav-section-trigger {
+        background: transparent !important;
+        border: none !important;
+        color: #6c757d;
+        font-weight: 500;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        box-shadow: none !important;
+    }
+
+    .nav-section-trigger:hover,
+    .nav-section-trigger:focus,
+    .nav-section-trigger.show {
+        background: #f8f9fa !important;
+        color: #495057;
+        transform: translateY(-1px);
+    }
+
+    .nav-section-trigger .nav-chevron {
+        transition: transform 0.3s ease;
+        font-size: 0.875rem;
+    }
+
+    .nav-section-trigger.show .nav-chevron {
+        transform: rotate(180deg);
+    }
+
+    /* Mega Menu */
+    .mega-menu {
+        min-width: 600px;
+        max-width: 800px;
+        border-radius: 12px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        border: 1px solid #e0e6ed;
+        margin-top: 0.5rem;
+        animation: fadeInDown 0.3s ease-out;
+    }
+
+    .mega-menu-content {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .mega-menu-title {
+        font-size: 1rem;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #f1f3f4;
+    }
+
+    .mega-menu-item {
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+
+    .mega-menu-item:hover {
+        background: #f8f9fa;
+        border-color: #e0e6ed;
+        transform: translateY(-1px);
+    }
+
+    .mega-menu-item.active {
+        background: linear-gradient(135deg, var(--bs-primary), var(--bs-info));
+        background-size: 200% 200%;
+        animation: gradientShift 3s ease infinite;
+        border-color: var(--bs-primary);
+    }
+
+    .mega-menu-item.active .mega-menu-text .fw-semibold {
+        color: white !important;
+    }
+
+    .mega-menu-item.active .mega-menu-text small {
+        color: rgba(255,255,255,0.8) !important;
+    }
+
+    .mega-menu-item.active .mega-menu-icon {
+        background: rgba(255,255,255,0.2) !important;
+    }
+
+    .mega-menu-item.active .mega-menu-icon i {
+        color: white !important;
+    }
+
+    /* Mobile Navigation */
+    .mobile-nav-toggle {
+        border: none !important;
+        box-shadow: none !important;
+        color: #6c757d;
+    }
+
+    .mobile-nav-toggle:hover,
+    .mobile-nav-toggle:focus {
+        color: #495057;
+    }
+
+    .mobile-nav-collapse {
+        border-top: 1px solid #e0e6ed;
+        background: #f8f9fa;
+        margin-top: 1rem;
+        border-radius: 0 0 12px 12px;
+    }
+
+    .mobile-section-title {
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .mobile-nav-item {
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s ease;
+    }
+
+    .mobile-nav-item:hover {
+        background: #e9ecef;
+        transform: translateX(5px);
+    }
+
+    .mobile-nav-item.active {
+        background: var(--bs-primary);
+        color: white;
+    }
+
+    .mobile-nav-item.active .mobile-nav-text .fw-semibold,
+    .mobile-nav-item.active .mobile-nav-text small {
+        color: white !important;
+    }
+
+    .mobile-nav-item.active .mobile-nav-icon {
+        background: rgba(255,255,255,0.2) !important;
+    }
+
+    .mobile-nav-item.active .mobile-nav-icon i {
+        color: white !important;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 991.98px) {
+        .header-navigation {
+            height: auto;
+            min-height: 60px;
+        }
+
+        .brand-logo-link img {
+            width: 100px;
+        }
+
+        .role-badge-header {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.75rem !important;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .header-navigation .container-fluid {
+            padding: 0.75rem 1rem;
+        }
+
+        .brand-logo-link img {
+            width: 80px;
+        }
+    }
+
+    /* Animations */
+    @keyframes fadeInDown {
+        0% {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+
+    /* Accessibility */
+    .nav-section-trigger:focus,
+    .mobile-nav-toggle:focus,
+    .mega-menu-item:focus,
+    .mobile-nav-item:focus {
+        outline: 2px solid var(--bs-primary);
+        outline-offset: 2px;
+    }
+
+    /* Print Styles */
+    @media print {
+        .header-navigation {
+            display: none !important;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Header navigation initialization
+    const mobileToggle = document.querySelector('.mobile-nav-toggle');
+    const mobileCollapse = document.querySelector('#mobileNavCollapse');
+    const dropdownTriggers = document.querySelectorAll('.nav-section-trigger');
+
+    // Mobile navigation toggle
+    if (mobileToggle && mobileCollapse) {
+        mobileToggle.addEventListener('click', function() {
+            const isExpanded = this.getAttribute('aria-expanded') === 'true';
+            this.setAttribute('aria-expanded', !isExpanded);
+
+            // Update icon
+            const icon = this.querySelector('i');
+            if (icon) {
+                icon.className = isExpanded ? 'ti ti-menu-2 fs-5' : 'ti ti-x fs-5';
+            }
+        });
+
+        // Close mobile menu on item click
+        mobileCollapse.querySelectorAll('.mobile-nav-item').forEach(item => {
+            item.addEventListener('click', function() {
+                const collapse = new bootstrap.Collapse(mobileCollapse, { hide: true });
+                mobileToggle.setAttribute('aria-expanded', 'false');
+                mobileToggle.querySelector('i').className = 'ti ti-menu-2 fs-5';
+            });
+        });
+    }
+
+    // Desktop dropdown hover effects
+    dropdownTriggers.forEach(trigger => {
+        const dropdown = trigger.closest('.nav-section-dropdown');
+        if (dropdown) {
+            let hoverTimeout;
+
+            dropdown.addEventListener('mouseenter', function() {
+                clearTimeout(hoverTimeout);
+                if (!trigger.classList.contains('show')) {
+                    trigger.click();
+                }
+            });
+
+            dropdown.addEventListener('mouseleave', function() {
+                hoverTimeout = setTimeout(() => {
+                    if (trigger.classList.contains('show')) {
+                        trigger.click();
+                    }
+                }, 300);
+            });
+        }
+    });
+
+    // Keyboard navigation enhancement
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            // Close all open dropdowns
+            dropdownTriggers.forEach(trigger => {
+                if (trigger.classList.contains('show')) {
+                    trigger.click();
+                }
+            });
+
+            // Close mobile menu
+            if (mobileCollapse && mobileCollapse.classList.contains('show')) {
+                const collapse = new bootstrap.Collapse(mobileCollapse, { hide: true });
+                mobileToggle.setAttribute('aria-expanded', 'false');
+                mobileToggle.querySelector('i').className = 'ti ti-menu-2 fs-5';
+            }
+        }
+    });
+
+    // Analytics tracking for navigation
+    document.querySelectorAll('[data-nav-item]').forEach(item => {
+        item.addEventListener('click', function() {
+            const navItem = this.getAttribute('data-nav-item');
+            const userRole = '<%= headerNavUserRole %>';
+
+            // Track navigation usage
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'navigation_click', {
+                    'custom_parameter_1': navItem,
+                    'custom_parameter_2': userRole
+                });
+            }
+
+            console.log('🧭 Navigation:', navItem, 'Role:', userRole);
+        });
+    });
+
+    console.log('🧭 Header navigation initialized for role:', '<%= headerNavUserRole %>');
+});
+</script>

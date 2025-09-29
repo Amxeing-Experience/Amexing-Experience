@@ -12,25 +12,13 @@
 // Navigation items based on role
 const navigationItems = {
     superadmin: [
-        // System Management Section
+        // System Management Section - Only Dashboard
         { section: 'System Management', icon: 'ti-settings', items: [
-            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/superadmin', id: 'dashboard' },
-            { name: 'User Management', icon: 'users', path: '/dashboard/superadmin/users', id: 'users' },
-            { name: 'Client Management', icon: 'building', path: '/dashboard/superadmin/clients', id: 'clients' },
-            { name: 'Permissions & Roles', icon: 'shield-lock', path: '/dashboard/superadmin/permissions', id: 'permissions' }
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/superadmin', id: 'dashboard' }
         ]},
-        // Analytics Section
-        { section: 'Analytics & Reports', icon: 'ti-chart-bar', items: [
-            { name: 'System Analytics', icon: 'chart-bar', path: '/dashboard/superadmin/analytics', id: 'analytics' },
-            { name: 'Reports', icon: 'file-analytics', path: '/dashboard/superadmin/reports', id: 'reports' },
-            { name: 'Audit Logs', icon: 'file-search', path: '/dashboard/superadmin/audit', id: 'audit' }
-        ]},
-        // System Configuration
-        { section: 'System Configuration', icon: 'ti-settings-2', items: [
-            { name: 'System Settings', icon: 'settings', path: '/dashboard/superadmin/settings', id: 'settings' },
-            { name: 'Integrations', icon: 'plug', path: '/dashboard/superadmin/integrations', id: 'integrations' },
-            { name: 'Security Settings', icon: 'lock', path: '/dashboard/superadmin/security', id: 'security' },
-            { name: 'PCI DSS Compliance', icon: 'certificate', path: '/dashboard/superadmin/compliance', id: 'compliance' }
+        // Users System Section - Only User Management
+        { section: 'Users System', icon: 'ti-users', items: [
+            { name: 'User Management', icon: 'users', path: '/dashboard/superadmin/users', id: 'users' }
         ]}
     ],
     admin: [
@@ -122,45 +110,6 @@ const menuSections = navigationItems[userRole] || navigationItems.guest;
             }) %>
         <% }); %>
     <% }); %>
-
-    <!-- System Tools Section (for admins and superadmins) -->
-    <% if (['superadmin', 'admin'].includes(userRole)) { %>
-        <li class="nav-small-cap">
-            <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-            <span class="hide-menu">System Tools</span>
-        </li>
-
-        <li class="sidebar-item">
-            <a class="sidebar-link" href="/api/docs" target="_blank" rel="noopener noreferrer">
-                <span class="nav-icon">
-                    <i class="ti ti-api"></i>
-                </span>
-                <span class="hide-menu nav-text">API Documentation</span>
-                <i class="ti ti-external-link ms-auto nav-external"></i>
-            </a>
-        </li>
-
-        <li class="sidebar-item">
-            <a class="sidebar-link" href="/dashboard/system/health">
-                <span class="nav-icon">
-                    <i class="ti ti-heart"></i>
-                </span>
-                <span class="hide-menu nav-text">System Health</span>
-                <span class="badge bg-success-subtle text-success ms-auto">
-                    <i class="ti ti-circle-filled"></i>
-                </span>
-            </a>
-        </li>
-
-        <li class="sidebar-item">
-            <a class="sidebar-link" href="/dashboard/system/logs">
-                <span class="nav-icon">
-                    <i class="ti ti-file-text"></i>
-                </span>
-                <span class="hide-menu nav-text">System Logs</span>
-            </a>
-        </li>
-    <% } %>
 
     <!-- User Section -->
     <%- include('./sidebar-footer', {

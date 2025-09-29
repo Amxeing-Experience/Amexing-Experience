@@ -43,37 +43,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     </div>
 
     <div class="card-body">
-        <!-- Search and Filter Controls -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="input-group">
-                    <span class="input-group-text">
-                        <i class="ti ti-search"></i>
-                    </span>
-                    <input type="text" class="form-control dt-search-custom" placeholder="Buscar usuarios..." data-table="<%= dtTableId %>">
-                </div>
-            </div>
-            <div class="col-md-3">
-                <select class="form-select" id="role-filter">
-                    <option value="">Todos los roles</option>
-                    <option value="superadmin">Super Admin</option>
-                    <option value="admin">Admin</option>
-                    <option value="client">Cliente</option>
-                    <option value="department_manager">Jefe Departamento</option>
-                    <option value="employee">Empleado</option>
-                    <option value="driver">Conductor</option>
-                    <option value="guest">Invitado</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select class="form-select" id="status-filter">
-                    <option value="">Todos los estados</option>
-                    <option value="active">Activos</option>
-                    <option value="inactive">Inactivos</option>
-                </select>
-            </div>
-        </div>
-
         <!-- DataTable Container -->
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
@@ -310,30 +279,6 @@ function initializeDataTableWithData(usersData) {
             const info = usersTable.page.info();
             console.log('🔄 Table info after redraw:', info);
         }, 100);
-
-        // Setup custom filters
-        $('#role-filter').on('change', function() {
-            const value = this.value;
-            usersTable.column(4).search(value).draw(); // Role column
-        });
-
-        $('#status-filter').on('change', function() {
-            const value = this.value;
-            if (value === '') {
-                usersTable.column(5).search('').draw(); // Clear filter
-            } else if (value === 'active') {
-                usersTable.column(5).search('Activo').draw();
-            } else if (value === 'inactive') {
-                usersTable.column(5).search('Inactivo').draw();
-            }
-        });
-
-        // Custom search
-        $('.dt-search-custom').on('keyup', function() {
-            usersTable.search(this.value).draw();
-        });
-
-        console.log('✅ All filters and events configured');
 
     } catch (error) {
         console.error('❌ Failed to initialize DataTable:', error);
