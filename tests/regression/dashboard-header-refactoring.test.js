@@ -60,7 +60,7 @@ describe('Dashboard Header Refactoring Regression Tests', () => {
       const expectedItems = [
         { text: 'My Profile', href: '/dashboard/admin/profile' },
         { text: 'Settings', href: '/dashboard/admin/settings' },
-        { text: 'Help & Support', href: '/dashboard/admin/help' },
+        // Help & Support removed from menu for simplification
         { text: 'Sign Out', href: '/logout' }
       ];
 

@@ -98,7 +98,7 @@ describe('Dashboard Header Organism - Baseline Tests', () => {
 
       expect(html).toContain('My Profile');
       expect(html).toContain('Settings');
-      expect(html).toContain('Help & Support');
+      // Help & Support removed from menu
       expect(html).toContain('Sign Out');
     });
 
