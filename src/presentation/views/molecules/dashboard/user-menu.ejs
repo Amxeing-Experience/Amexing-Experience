@@ -140,14 +140,12 @@ const formattedRole = formatRoleName(menuUserRole);
         <span>Help & Support</span>
       </a>
       <hr class="dropdown-divider my-2">
-      <form method="POST" action="/logout" style="margin: 0;">
-        <button type="submit"
-                class="dropdown-item d-flex align-items-center py-2 text-danger border-0 bg-transparent w-100 text-start"
-                onclick="return confirm('Are you sure you want to sign out?')">
-          <i class="ti ti-logout me-3"></i>
-          <span>Sign Out</span>
-        </button>
-      </form>
+      <a class="dropdown-item d-flex align-items-center py-2 text-danger"
+         href="/logout"
+         onclick="return confirm('Are you sure you want to sign out?')">
+        <i class="ti ti-logout me-3"></i>
+        <span>Sign Out</span>
+      </a>
     </div>
   </div>
 </div>
