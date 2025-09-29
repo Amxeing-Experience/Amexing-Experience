@@ -7,39 +7,23 @@ const ejs = require('ejs');
 const path = require('path');
 const fs = require('fs');
 
-// Try to require cheerio, fallback to simple HTML parsing if not available
-let cheerio;
-try {
-  cheerio = require('cheerio');
-} catch (e) {
-  // Simple mock for cheerio if not installed
-  cheerio = {
-    load: (html) => {
-      const $ = (selector) => {
-        // Very basic DOM simulation for testing
-        if (selector === ':first') {
-          return [{
-            length: 1,
-            get: () => ({ attribs: {} }),
-            attr: () => undefined,
-            text: () => '',
-            hasClass: () => false
-          }];
-        }
-        return {
-          length: 0,
-          each: () => {},
-          attr: () => undefined,
-          text: () => '',
-          html: () => '',
-          hasClass: () => false
-        };
+// Simple HTML parsing without external dependencies
+const cheerio = {
+  load: (html) => {
+    const $ = (selector) => {
+      // Very basic DOM simulation for testing without external deps
+      return {
+        length: html.includes(selector.replace('.', '').replace('[', '').replace(']', '')) ? 1 : 0,
+        each: () => {},
+        attr: () => undefined,
+        text: () => '',
+        html: () => '',
+        hasClass: () => false
       };
-      $.prototype = $;
-      return $;
-    }
-  };
-}
+    };
+    return $;
+  }
+};
 
 /**
  * Base path for component views
@@ -115,6 +99,118 @@ function createSimpleHtmlParser(html) {
           tagName: tagName,
           attribs: attribs
         });
+      }
+    } else if (selector.startsWith('.')) {
+      // CSS class selector (e.g., .user-info-section)
+      const className = selector.substring(1); // Remove the dot
+      const regex = new RegExp(`<([^>]+)\\s+class=["']([^"']*)["'][^>]*>`, 'gi');
+      const matches = html.matchAll(regex);
+
+      for (const match of matches) {
+        const fullMatch = match[0];
+        const tagWithAttribs = match[1];
+        const classAttr = match[2];
+        const classes = classAttr.split(/\s+/);
+
+        if (classes.includes(className)) {
+          // Extract tag name and all attributes
+          const tagMatch = fullMatch.match(/<(\w+)([^>]*?)>/);
+          if (tagMatch) {
+            const tagName = tagMatch[1];
+            const attributes = tagMatch[2];
+            const attribs = {};
+
+            if (attributes) {
+              const attrMatches = attributes.matchAll(/([\w-]+)(?:=["']([^"']*?)["'])?/g);
+              for (const attrMatch of attrMatches) {
+                attribs[attrMatch[1]] = attrMatch[2] || '';
+              }
+            }
+
+            // Get text content
+            let textContent = '';
+            const startPos = html.indexOf(fullMatch) + fullMatch.length;
+            const endTag = `</${tagName}>`;
+            const endPos = html.indexOf(endTag, startPos);
+
+            if (endPos !== -1) {
+              textContent = html.substring(startPos, endPos).trim();
+              textContent = textContent.replace(/<[^>]*>/g, '').trim();
+              textContent = textContent
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#x27;/g, "'")
+                .replace(/&#x2F;/g, '/');
+            }
+
+            elements.push({
+              tagName: tagName,
+              attribs: attribs,
+              textContent: textContent
+            });
+          }
+        }
+      }
+    } else if (selector.startsWith('[') && selector.endsWith(']')) {
+      // Attribute selector (e.g., [data-bs-toggle="dropdown"])
+      const attrMatch = selector.match(/\[([^=\]]+)(?:=["']([^"']*)["'])?\]/);
+      if (attrMatch) {
+        const attrName = attrMatch[1];
+        const attrValue = attrMatch[2];
+
+        const regex = new RegExp(`<([^>]+)\\s+${attrName.replace('-', '\\-')}(?:=["']([^"']*)["'])?[^>]*>`, 'gi');
+        const matches = html.matchAll(regex);
+
+        for (const match of matches) {
+          const fullMatch = match[0];
+          const foundAttrValue = match[2];
+
+          // If we're looking for a specific value, check it matches
+          if (attrValue && foundAttrValue !== attrValue) {
+            continue;
+          }
+
+          // Extract tag name and all attributes
+          const tagMatch = fullMatch.match(/<(\w+)([^>]*?)>/);
+          if (tagMatch) {
+            const tagName = tagMatch[1];
+            const attributes = tagMatch[2];
+            const attribs = {};
+
+            if (attributes) {
+              const attrMatches = attributes.matchAll(/([\w-]+)(?:=["']([^"']*?)["'])?/g);
+              for (const attrMatch of attrMatches) {
+                attribs[attrMatch[1]] = attrMatch[2] || '';
+              }
+            }
+
+            // Get text content
+            let textContent = '';
+            const startPos = html.indexOf(fullMatch) + fullMatch.length;
+            const endTag = `</${tagName}>`;
+            const endPos = html.indexOf(endTag, startPos);
+
+            if (endPos !== -1) {
+              textContent = html.substring(startPos, endPos).trim();
+              textContent = textContent.replace(/<[^>]*>/g, '').trim();
+              textContent = textContent
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#x27;/g, "'")
+                .replace(/&#x2F;/g, '/');
+            }
+
+            elements.push({
+              tagName: tagName,
+              attribs: attribs,
+              textContent: textContent
+            });
+          }
+        }
       }
     } else if (selector.startsWith('[class]')) {
       // Find elements with class attribute

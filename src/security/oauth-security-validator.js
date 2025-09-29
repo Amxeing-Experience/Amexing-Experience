@@ -232,6 +232,15 @@ class OAuthSecurityValidator {
     };
 
     try {
+      // Check if token is null or undefined
+      if (!token || typeof token !== 'string') {
+        results.valid = false;
+        results.issues.push('Token is null, undefined, or not a string');
+        results.checks.structure = false;
+        results.checks.decodable = false;
+        return results;
+      }
+
       // Check token structure
       const tokenParts = token.split('.');
       if (tokenParts.length !== 3) {
@@ -313,14 +322,33 @@ class OAuthSecurityValidator {
    */
   auditTokenStructure(token /* unused */) {
     try {
+      // Check if token is null or undefined
+      if (!token || typeof token !== 'string') {
+        return null;
+      }
+
       const parts = token.split('.');
       if (parts.length !== 3) {
         return null;
       }
 
       // Manually decode JWT parts for security analysis
-      const header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      let header; let
+        payload;
+
+      try {
+        header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
+      } catch (error) {
+        this.auditLogger.error('Failed to decode JWT header', { error: error.message });
+        return null;
+      }
+
+      try {
+        payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
+      } catch (error) {
+        this.auditLogger.error('Failed to decode JWT payload', { error: error.message });
+        return null;
+      }
 
       return {
         header,
@@ -559,9 +587,9 @@ class OAuthSecurityValidator {
     const stateAge = Date.now() - timestamp;
     if (stateAge > 600000) {
       results.valid = false;
-      results.checks.timeout = false;
+      results.checks.timeout = false; // timeout check failed - state has expired
     } else {
-      results.checks.timeout = true;
+      results.checks.timeout = true; // timeout check passed - state is still valid
     }
 
     return results;

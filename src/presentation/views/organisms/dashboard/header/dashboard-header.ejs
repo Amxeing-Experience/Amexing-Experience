@@ -10,13 +10,13 @@
 
 // Default parameters
 const headerUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
-const headerUser = typeof user !== 'undefined' ? user : {};
+const headerUser = (typeof user !== 'undefined' && user !== null) ? user : {};
 const headerTitle = typeof title !== 'undefined' ? title : 'Dashboard';
 
-// User data extraction
-const userName = headerUser.name || headerUser.fullName || 'User';
-const userEmail = headerUser.email || '';
-const userAvatar = headerUser.avatar || headerUser.profilePicture || '';
+// User data extraction with null safety
+const userName = (headerUser && (headerUser.name || headerUser.fullName)) || 'User';
+const userEmail = (headerUser && headerUser.email) || '';
+const userAvatar = (headerUser && (headerUser.avatar || headerUser.profilePicture)) || '';
 
 // Generate user initials
 function getInitials(name) {
@@ -56,62 +56,14 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
                     <i class="ti ti-menu-2 fs-6"></i>
                 </button>
 
-                <!-- Page Title -->
-                <div class="page-title">
-                    <h5 class="mb-0 fw-semibold text-dark">
-                        <%= headerTitle %>
-                    </h5>
-                    <small class="text-muted">
-                        <%= new Date().toLocaleDateString('es-ES', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        }) %>
-                    </small>
-                </div>
             </div>
 
-            <!-- Center Section - Search -->
-            <div class="flex-grow-1 mx-4 d-none d-md-block">
-                <div class="search-container position-relative" style="max-width: 400px;">
-                    <div class="input-group">
-                        <span class="input-group-text bg-light border-end-0">
-                            <i class="ti ti-search text-muted"></i>
-                        </span>
-                        <input type="text"
-                               class="form-control border-start-0 bg-light"
-                               id="global-search"
-                               placeholder="Search anything..."
-                               autocomplete="off">
-                    </div>
-
-                    <!-- Search Results Dropdown -->
-                    <div class="search-results position-absolute w-100 bg-white shadow-lg rounded-3 mt-1 d-none"
-                         id="search-results"
-                         style="z-index: 1050; max-height: 400px; overflow-y: auto;">
-                        <div class="p-3">
-                            <div class="text-center text-muted">
-                                <i class="ti ti-search fs-3 d-block mb-2"></i>
-                                <p class="mb-0">Start typing to search...</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Right Section -->
             <div class="d-flex align-items-center">
-                <!-- Theme Toggle -->
-                <button class="btn btn-link p-0 me-3"
-                        id="theme-toggle"
-                        type="button"
-                        data-bs-toggle="tooltip"
-                        title="Toggle theme">
-                    <i class="ti ti-moon fs-6 text-muted"></i>
-                </button>
 
-                <!-- Notifications -->
+                <!-- TODO: Implementar notificaciones en el futuro -->
+                <!--
                 <div class="dropdown me-3">
                     <button class="btn btn-link p-0 position-relative"
                             type="button"
@@ -138,7 +90,6 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
                         </div>
 
                         <div class="notifications-list" style="max-height: 300px; overflow-y: auto;">
-                            <!-- Notification items will be loaded dynamically -->
                             <div class="p-3 text-center text-muted">
                                 <i class="ti ti-bell-off fs-3 d-block mb-2"></i>
                                 <p class="mb-0">No notifications</p>
@@ -153,144 +104,19 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
                         </div>
                     </div>
                 </div>
+                -->
 
-                <!-- Quick Actions -->
-                <% if (['superadmin', 'admin'].includes(headerUserRole)) { %>
-                <div class="dropdown me-3">
-                    <button class="btn btn-primary btn-sm dropdown-toggle"
-                            type="button"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false">
-                        <i class="ti ti-plus me-1"></i>Quick Actions
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li>
-                            <a class="dropdown-item" href="/dashboard/<%= headerUserRole %>/users/create">
-                                <i class="ti ti-user-plus me-2"></i>Add User
-                            </a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="/dashboard/<%= headerUserRole %>/events/create">
-                                <i class="ti ti-calendar-plus me-2"></i>Create Event
-                            </a>
-                        </li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li>
-                            <a class="dropdown-item" href="/dashboard/<%= headerUserRole %>/reports">
-                                <i class="ti ti-report me-2"></i>Generate Report
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-                <% } %>
 
-                <!-- User Menu -->
-                <div class="dropdown">
-                    <button class="btn btn-link p-0 d-flex align-items-center"
-                            type="button"
-                            data-bs-toggle="dropdown"
-                            aria-expanded="false">
-                        <!-- User Avatar -->
-                        <div class="user-avatar me-2 position-relative">
-                            <% if (userAvatar) { %>
-                                <img src="<%= userAvatar %>"
-                                     alt="<%= userName %>"
-                                     class="rounded-circle"
-                                     width="36"
-                                     height="36"
-                                     style="object-fit: cover;"
-                                     onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                <div class="avatar-placeholder rounded-circle d-none align-items-center justify-content-center text-white fw-bold"
-                                     style="width: 36px; height: 36px; background: <%= colors.primary %>; display: none !important;">
-                                    <%= userInitials %>
-                                </div>
-                            <% } else { %>
-                                <div class="avatar-placeholder rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                                     style="width: 36px; height: 36px; background: <%= colors.primary %>;">
-                                    <%= userInitials %>
-                                </div>
-                            <% } %>
-
-                            <!-- Online Status -->
-                            <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle"
-                                  style="width: 10px; height: 10px;"
-                                  data-bs-toggle="tooltip"
-                                  title="Online"></span>
-                        </div>
-
-                        <!-- User Info (Hidden on mobile) -->
-                        <div class="d-none d-sm-block text-start me-2">
-                            <div class="fw-semibold text-dark" style="font-size: 0.875rem;">
-                                <%= userName %>
-                            </div>
-                            <div class="text-muted" style="font-size: 0.75rem;">
-                                <% if (headerUserRole === 'department_manager') { %>
-                                    Dept. Manager
-                                <% } else if (headerUserRole === 'superadmin') { %>
-                                    Super Admin
-                                <% } else { %>
-                                    <%= headerUserRole.charAt(0).toUpperCase() + headerUserRole.slice(1) %>
-                                <% } %>
-                            </div>
-                        </div>
-
-                        <i class="ti ti-chevron-down fs-7 text-muted"></i>
-                    </button>
-
-                    <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-0"
-                         style="width: 250px;">
-                        <!-- User Info Header -->
-                        <div class="p-3 border-bottom bg-light">
-                            <div class="d-flex align-items-center">
-                                <div class="user-avatar me-3">
-                                    <% if (userAvatar) { %>
-                                        <img src="<%= userAvatar %>"
-                                             alt="<%= userName %>"
-                                             class="rounded-circle"
-                                             width="40"
-                                             height="40"
-                                             style="object-fit: cover;">
-                                    <% } else { %>
-                                        <div class="avatar-placeholder rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
-                                             style="width: 40px; height: 40px; background: <%= colors.primary %>;">
-                                            <%= userInitials %>
-                                        </div>
-                                    <% } %>
-                                </div>
-                                <div class="flex-grow-1 min-w-0">
-                                    <div class="fw-semibold text-truncate"><%= userName %></div>
-                                    <div class="text-muted small text-truncate"><%= userEmail %></div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Menu Items -->
-                        <div class="p-1">
-                            <a class="dropdown-item d-flex align-items-center py-2"
-                               href="/dashboard/<%= headerUserRole %>/profile">
-                                <i class="ti ti-user me-3 text-primary"></i>
-                                <span>My Profile</span>
-                            </a>
-                            <a class="dropdown-item d-flex align-items-center py-2"
-                               href="/dashboard/<%= headerUserRole %>/settings">
-                                <i class="ti ti-settings me-3 text-muted"></i>
-                                <span>Settings</span>
-                            </a>
-                            <a class="dropdown-item d-flex align-items-center py-2"
-                               href="/dashboard/<%= headerUserRole %>/help">
-                                <i class="ti ti-help me-3 text-muted"></i>
-                                <span>Help & Support</span>
-                            </a>
-                            <hr class="dropdown-divider my-2">
-                            <a class="dropdown-item d-flex align-items-center py-2 text-danger"
-                               href="/auth/logout"
-                               onclick="return confirm('Are you sure you want to sign out?')">
-                                <i class="ti ti-logout me-3"></i>
-                                <span>Sign Out</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
+                <!-- User Menu (Refactored to use Molecular Component) -->
+                <%- include('../../../molecules/dashboard/user-menu', {
+                    user: headerUser,
+                    userRole: headerUserRole,
+                    colors: colors,
+                    userName: userName,
+                    userEmail: userEmail,
+                    userAvatar: userAvatar,
+                    userInitials: userInitials
+                }) %>
             </div>
         </div>
     </nav>
@@ -304,47 +130,9 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
         -webkit-backdrop-filter: blur(10px);
     }
 
-    .page-title h5 {
-        font-size: 1.125rem;
-        line-height: 1.2;
-    }
 
-    .page-title small {
-        font-size: 0.75rem;
-        text-transform: capitalize;
-    }
 
-    /* Search Styles */
-    .search-container .input-group-text {
-        border: 1px solid #e0e6ed;
-    }
-
-    .search-container .form-control {
-        border: 1px solid #e0e6ed;
-        transition: all 0.3s ease;
-    }
-
-    .search-container .form-control:focus {
-        border-color: var(--primary-color, #5d87ff);
-        box-shadow: 0 0 0 0.2rem rgba(93, 135, 255, 0.25);
-    }
-
-    .search-results {
-        border: 1px solid #e0e6ed;
-        border-top: none;
-    }
-
-    /* Avatar Styles */
-    .user-avatar {
-        flex-shrink: 0;
-    }
-
-    .avatar-placeholder {
-        font-size: 0.75rem;
-        font-weight: 600;
-    }
-
-    /* Notification Badge */
+    /* Notification Badge (preserved for future use) */
     #notification-count {
         transform: translate(50%, -50%);
         min-width: 16px;
@@ -352,62 +140,11 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
         line-height: 1;
     }
 
-    /* Dropdown Styles */
-    .dropdown-menu {
-        border-radius: 8px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-        border: none;
-    }
-
-    .dropdown-item {
-        padding: 0.5rem 1rem;
-        transition: all 0.2s ease;
-    }
-
-    .dropdown-item:hover {
-        background-color: rgba(93, 135, 255, 0.1);
-        color: var(--primary-color, #5d87ff);
-    }
-
-    .dropdown-item:hover i {
-        color: var(--primary-color, #5d87ff) !important;
-    }
-
-    .dropdown-item.text-danger:hover {
-        background-color: rgba(220, 53, 69, 0.1);
-        color: #dc3545;
-    }
-
-    .dropdown-item.text-danger:hover i {
-        color: #dc3545 !important;
-    }
-
     /* Mobile Responsive */
     @media (max-width: 991.98px) {
         .app-header .navbar {
             padding: 1rem;
         }
-
-        .page-title h5 {
-            font-size: 1rem;
-        }
-
-        .page-title small {
-            display: none;
-        }
-
-        .search-container {
-            display: none !important;
-        }
-    }
-
-    /* Theme Toggle Animation */
-    #theme-toggle i {
-        transition: transform 0.3s ease;
-    }
-
-    #theme-toggle:hover i {
-        transform: rotate(20deg);
     }
 
     /* Loading states */
@@ -438,77 +175,7 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Search functionality
-    const searchInput = document.getElementById('global-search');
-    const searchResults = document.getElementById('search-results');
-    let searchTimeout;
-
-    if (searchInput && searchResults) {
-        searchInput.addEventListener('input', function(e) {
-            clearTimeout(searchTimeout);
-            const query = e.target.value.trim();
-
-            if (query.length < 2) {
-                searchResults.classList.add('d-none');
-                return;
-            }
-
-            searchTimeout = setTimeout(() => {
-                performSearch(query);
-            }, 300);
-        });
-
-        searchInput.addEventListener('focus', function() {
-            if (this.value.length >= 2) {
-                searchResults.classList.remove('d-none');
-            }
-        });
-
-        document.addEventListener('click', function(e) {
-            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-                searchResults.classList.add('d-none');
-            }
-        });
-    }
-
-    function performSearch(query) {
-        searchResults.innerHTML = '<div class="p-3 text-center"><div class="spinner-border spinner-border-sm text-primary"></div></div>';
-        searchResults.classList.remove('d-none');
-
-        // Simulate API call
-        fetch(`/api/v1/search?q=${encodeURIComponent(query)}`)
-            .then(response => response.json())
-            .then(data => {
-                displaySearchResults(data);
-            })
-            .catch(error => {
-                console.error('Search error:', error);
-                searchResults.innerHTML = '<div class="p-3 text-center text-muted">Search unavailable</div>';
-            });
-    }
-
-    function displaySearchResults(results) {
-        if (!results.success || !results.data || results.data.length === 0) {
-            searchResults.innerHTML = '<div class="p-3 text-center text-muted">No results found</div>';
-            return;
-        }
-
-        let html = '';
-        results.data.forEach(item => {
-            html += `
-                <a href="${item.url}" class="dropdown-item d-flex align-items-center py-2">
-                    <i class="ti ti-${item.icon || 'circle'} me-3 text-muted"></i>
-                    <div class="flex-grow-1 min-w-0">
-                        <div class="fw-semibold text-truncate">${item.title}</div>
-                        <div class="text-muted small text-truncate">${item.description}</div>
-                    </div>
-                </a>
-            `;
-        });
-
-        searchResults.innerHTML = html;
-    }
-
+    /* TODO: Implementar notificaciones en el futuro
     // Load notifications
     loadNotifications();
 
@@ -607,6 +274,7 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('Mark as read error:', error);
         });
     };
+    */
 
     console.log('📱 Dashboard header initialized for:', '<%= headerUserRole %>');
 });

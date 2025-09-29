@@ -45,9 +45,9 @@ class AtomicController {
       const componentStats = {
         dashboard: {
           atoms: 4, // styles, scripts, metric-card, stats-card
-          molecules: 2, // nav-item, user-card
+          molecules: 3, // nav-item, user-card, user-menu
           organisms: 5, // sidebar-nav, sidebar-menu, sidebar-footer, dashboard-header, datatable
-          total: 11,
+          total: 12,
         },
         auth: {
           atoms: 4, // success-icon, auth-input, oauth-button, password-input
@@ -183,6 +183,14 @@ class AtomicController {
             path: 'molecules/dashboard/user-card',
             params: ['user', 'showActions', 'layout', 'size'],
             usage: 'Display user information in dashboard',
+          },
+          {
+            name: 'User Menu',
+            file: 'user-menu.ejs',
+            description: 'Dropdown user menu with profile and navigation options. User info displays first, then avatar as clickable trigger (no chevron).',
+            path: 'molecules/dashboard/user-menu',
+            params: ['user', 'userRole', 'colors', 'userName', 'userEmail', 'userAvatar', 'userInitials'],
+            usage: 'Header user menu dropdown with modern UX design',
           },
         ],
         organisms: [

@@ -1,0 +1,308 @@
+<%
+/**
+ * User Menu Molecule
+ * Reusable dropdown menu component for user profile and navigation options
+ *
+ * @param {object} user - User object with name, email, avatar
+ * @param {string} userRole - Current user role for menu links
+ * @param {object} colors - Role-specific color scheme
+ * @param {string} userInitials - Pre-calculated user initials
+ * @param {string} userName - User display name
+ * @param {string} userEmail - User email address
+ * @param {string} userAvatar - User avatar URL (optional)
+ */
+
+// Parameter validation and defaults
+const menuUser = typeof user !== 'undefined' && user !== null ? user : {};
+const menuUserRole = typeof userRole !== 'undefined' && userRole !== null ? String(userRole) : 'guest';
+const menuColors = typeof colors !== 'undefined' && colors !== null ? colors : { primary: '#6b7280', secondary: '#9ca3af' };
+const menuUserName = typeof userName !== 'undefined' && userName !== null ? String(userName) : (menuUser.name || menuUser.fullName || 'User');
+const menuUserEmail = typeof userEmail !== 'undefined' && userEmail !== null ? userEmail : (menuUser.email || '');
+const menuUserAvatar = typeof userAvatar !== 'undefined' && userAvatar !== null ? userAvatar : (menuUser.avatar || menuUser.profilePicture || '');
+
+// Safe initials generation with null/undefined checking
+let menuUserInitials;
+if (typeof userInitials !== 'undefined' && userInitials !== null) {
+  menuUserInitials = userInitials;
+} else {
+  const safeName = String(menuUserName || 'User');
+  menuUserInitials = safeName.split(' ')
+    .map(word => word.charAt(0))
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
+}
+
+// Role display name formatting
+function formatRoleName(role) {
+  const safeRole = String(role || 'guest');
+  if (safeRole === 'department_manager') return 'Dept. Manager';
+  if (safeRole === 'superadmin') return 'Super Admin';
+  return safeRole.charAt(0).toUpperCase() + safeRole.slice(1);
+}
+
+const formattedRole = formatRoleName(menuUserRole);
+%>
+
+<!-- User Menu Dropdown -->
+<div class="dropdown user-menu-molecule">
+  <button class="btn btn-link p-0 d-flex align-items-center user-menu-trigger"
+          type="button"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+          aria-label="User menu">
+
+    <!-- User Info (First Position) -->
+    <div class="d-none d-sm-block text-start me-3 user-info-section">
+      <div class="fw-semibold text-dark" style="font-size: 0.875rem;">
+        <%= menuUserName %>
+      </div>
+      <div class="text-muted" style="font-size: 0.75rem;">
+        <%= formattedRole %>
+      </div>
+    </div>
+
+    <!-- User Avatar (Second Position - Clickable) -->
+    <div class="user-avatar position-relative user-avatar-trigger"
+         role="button"
+         tabindex="0">
+      <% if (menuUserAvatar) { %>
+        <img src="<%= menuUserAvatar %>"
+             alt="<%= menuUserName %>"
+             class="rounded-circle"
+             width="36"
+             height="36"
+             style="object-fit: cover; cursor: pointer;"
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="avatar-placeholder rounded-circle d-none align-items-center justify-content-center text-white fw-bold"
+             style="width: 36px; height: 36px; background: <%= menuColors.primary %>; display: none !important; cursor: pointer;">
+          <%= menuUserInitials %>
+        </div>
+      <% } else { %>
+        <div class="avatar-placeholder rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+             style="width: 36px; height: 36px; background: <%= menuColors.primary %>; cursor: pointer;">
+          <%= menuUserInitials %>
+        </div>
+      <% } %>
+
+      <!-- Online Status Indicator -->
+      <span class="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle"
+            style="width: 10px; height: 10px;"
+            data-bs-toggle="tooltip"
+            title="Online"></span>
+    </div>
+  </button>
+
+  <!-- Dropdown Menu -->
+  <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-0 user-dropdown-menu"
+       style="width: 250px;">
+
+    <!-- User Info Header in Dropdown -->
+    <div class="p-3 border-bottom bg-light user-menu-header">
+      <div class="d-flex align-items-center">
+        <div class="user-avatar me-3">
+          <% if (menuUserAvatar) { %>
+            <img src="<%= menuUserAvatar %>"
+                 alt="<%= menuUserName %>"
+                 class="rounded-circle"
+                 width="40"
+                 height="40"
+                 style="object-fit: cover;">
+          <% } else { %>
+            <div class="avatar-placeholder rounded-circle d-flex align-items-center justify-content-center text-white fw-bold"
+                 style="width: 40px; height: 40px; background: <%= menuColors.primary %>;">
+              <%= menuUserInitials %>
+            </div>
+          <% } %>
+        </div>
+        <div class="flex-grow-1 min-w-0">
+          <div class="fw-semibold text-truncate"><%= menuUserName %></div>
+          <div class="text-muted small text-truncate"><%= menuUserEmail %></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Menu Items -->
+    <div class="p-1 user-menu-items">
+      <a class="dropdown-item d-flex align-items-center py-2"
+         href="/dashboard/<%= menuUserRole %>/profile">
+        <i class="ti ti-user me-3 text-primary"></i>
+        <span>My Profile</span>
+      </a>
+      <a class="dropdown-item d-flex align-items-center py-2"
+         href="/dashboard/<%= menuUserRole %>/settings">
+        <i class="ti ti-settings me-3 text-muted"></i>
+        <span>Settings</span>
+      </a>
+      <a class="dropdown-item d-flex align-items-center py-2"
+         href="/dashboard/<%= menuUserRole %>/help">
+        <i class="ti ti-help me-3 text-muted"></i>
+        <span>Help & Support</span>
+      </a>
+      <hr class="dropdown-divider my-2">
+      <a class="dropdown-item d-flex align-items-center py-2 text-danger"
+         href="/auth/logout"
+         onclick="return confirm('Are you sure you want to sign out?')">
+        <i class="ti ti-logout me-3"></i>
+        <span>Sign Out</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* User Menu Molecule Styles */
+  .user-menu-molecule {
+    flex-shrink: 0;
+  }
+
+  .user-menu-trigger {
+    transition: all 0.2s ease;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .user-menu-trigger:focus {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
+  }
+
+  .user-menu-trigger:hover .user-avatar-trigger {
+    transform: scale(1.05);
+  }
+
+  /* User Info Section */
+  .user-info-section {
+    text-align: right;
+    min-width: 0;
+  }
+
+  /* Avatar Styles */
+  .user-avatar {
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+  }
+
+  .user-avatar-trigger {
+    transition: all 0.2s ease;
+  }
+
+  .user-avatar-trigger:hover {
+    transform: scale(1.05);
+  }
+
+  .user-avatar-trigger:focus {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
+    border-radius: 50%;
+  }
+
+  .avatar-placeholder {
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+  }
+
+  /* Dropdown Menu Styles */
+  .user-dropdown-menu {
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    border: none;
+    margin-top: 0.5rem;
+  }
+
+  .user-menu-header {
+    border-radius: 8px 8px 0 0;
+  }
+
+  .user-menu-items .dropdown-item {
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+    margin: 0 0.25rem;
+  }
+
+  .user-menu-items .dropdown-item:hover {
+    background-color: rgba(93, 135, 255, 0.1);
+    color: var(--bs-primary);
+  }
+
+  .user-menu-items .dropdown-item:hover i {
+    color: var(--bs-primary) !important;
+  }
+
+  .user-menu-items .dropdown-item.text-danger:hover {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+  }
+
+  .user-menu-items .dropdown-item.text-danger:hover i {
+    color: #dc3545 !important;
+  }
+
+  /* Responsive Adjustments */
+  @media (max-width: 575.98px) {
+    .user-info-section {
+      display: none !important;
+    }
+
+    .user-menu-trigger {
+      padding: 0.25rem !important;
+    }
+  }
+
+  /* Loading state */
+  .user-menu-loading {
+    pointer-events: none;
+    opacity: 0.7;
+  }
+
+  /* Accessibility enhancements */
+  .user-avatar-trigger:focus-visible {
+    outline: 2px solid var(--bs-primary);
+    outline-offset: 2px;
+  }
+
+  /* Animation for dropdown */
+  .user-dropdown-menu {
+    animation: fadeInScale 0.15s ease-out;
+  }
+
+  @keyframes fadeInScale {
+    0% {
+      opacity: 0;
+      transform: scale(0.95) translateY(-10px);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+    }
+  }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const userMenuTrigger = document.querySelector('.user-menu-trigger');
+  const avatarTrigger = document.querySelector('.user-avatar-trigger');
+
+  if (userMenuTrigger && avatarTrigger) {
+    // Enhanced keyboard navigation
+    avatarTrigger.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        userMenuTrigger.click();
+      }
+    });
+
+    // Improve accessibility by ensuring proper focus management
+    userMenuTrigger.addEventListener('shown.bs.dropdown', function() {
+      const firstMenuItem = document.querySelector('.user-menu-items .dropdown-item');
+      if (firstMenuItem) {
+        firstMenuItem.focus();
+      }
+    });
+
+    console.log('👤 User menu initialized for role:', '<%= menuUserRole %>');
+  }
+});
+</script>
