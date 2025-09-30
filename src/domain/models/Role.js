@@ -23,9 +23,9 @@
  * });
  */
 
-const Parse = require("parse/node");
-const BaseModel = require("./BaseModel");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const BaseModel = require('./BaseModel');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Role Class - Advanced RBAC implementation
@@ -33,7 +33,7 @@ const logger = require("../../infrastructure/logger");
  */
 class Role extends BaseModel {
   constructor() {
-    super("Role");
+    super('Role');
   }
 
   /**
@@ -56,54 +56,54 @@ class Role extends BaseModel {
 
     // Validate required fields
     if (!roleData.name) {
-      throw new Error("Role name is required");
+      throw new Error('Role name is required');
     }
 
     // Validate role name format
     if (!/^[a-z_]+$/.test(roleData.name)) {
       throw new Error(
-        "Role name must contain only lowercase letters and underscores",
+        'Role name must contain only lowercase letters and underscores'
       );
     }
 
     // Validate level
     if (
-      roleData.level !== undefined &&
-      (roleData.level < 1 || roleData.level > 7)
+      roleData.level !== undefined
+      && (roleData.level < 1 || roleData.level > 7)
     ) {
-      throw new Error("Role level must be between 1 and 7");
+      throw new Error('Role level must be between 1 and 7');
     }
 
     // Core role identification
-    role.set("name", roleData.name);
-    role.set("displayName", roleData.displayName || roleData.name);
-    role.set("description", roleData.description || "");
+    role.set('name', roleData.name);
+    role.set('displayName', roleData.displayName || roleData.name);
+    role.set('description', roleData.description || '');
 
     // Hierarchical structure
-    role.set("level", roleData.level || 1);
-    role.set("scope", roleData.scope || "department"); // 'system', 'organization', 'department', 'operations', 'public'
-    role.set("organization", roleData.organization || "client"); // 'amexing', 'client', 'external'
+    role.set('level', roleData.level || 1);
+    role.set('scope', roleData.scope || 'department'); // 'system', 'organization', 'department', 'operations', 'public'
+    role.set('organization', roleData.organization || 'client'); // 'amexing', 'client', 'external'
 
     // Permission system
-    role.set("basePermissions", roleData.basePermissions || []);
+    role.set('basePermissions', roleData.basePermissions || []);
     role.set(
-      "delegatable",
-      roleData.delegatable !== undefined ? roleData.delegatable : false,
+      'delegatable',
+      roleData.delegatable !== undefined ? roleData.delegatable : false
     );
-    role.set("inheritsFrom", roleData.inheritsFrom || null);
+    role.set('inheritsFrom', roleData.inheritsFrom || null);
 
     // Contextual restrictions
-    role.set("conditions", roleData.conditions || {});
-    role.set("maxDelegationLevel", roleData.maxDelegationLevel || 0);
+    role.set('conditions', roleData.conditions || {});
+    role.set('maxDelegationLevel', roleData.maxDelegationLevel || 0);
 
     // Metadata
-    role.set("isSystemRole", roleData.isSystemRole || false);
-    role.set("color", roleData.color || "#6B7280"); // UI color
-    role.set("icon", roleData.icon || "user");
+    role.set('isSystemRole', roleData.isSystemRole || false);
+    role.set('color', roleData.color || '#6B7280'); // UI color
+    role.set('icon', roleData.icon || 'user');
 
     // Base model fields
-    role.set("active", roleData.active !== undefined ? roleData.active : true);
-    role.set("exists", roleData.exists !== undefined ? roleData.exists : true);
+    role.set('active', roleData.active !== undefined ? roleData.active : true);
+    role.set('exists', roleData.exists !== undefined ? roleData.exists : true);
 
     return role;
   }
@@ -115,10 +115,10 @@ class Role extends BaseModel {
    */
   async getAllPermissions() {
     try {
-      let allPermissions = [...(this.get("basePermissions") || [])];
+      let allPermissions = [...(this.get('basePermissions') || [])];
 
       // Add inherited permissions
-      const inheritsFrom = this.get("inheritsFrom");
+      const inheritsFrom = this.get('inheritsFrom');
       if (inheritsFrom) {
         const parentRole = await this.getParentRole();
         if (parentRole) {
@@ -131,12 +131,12 @@ class Role extends BaseModel {
 
       return allPermissions;
     } catch (error) {
-      logger.error("Error getting all permissions for role", {
+      logger.error('Error getting all permissions for role', {
         roleId: this.id,
-        roleName: this.get("name"),
+        roleName: this.get('name'),
         error: error.message,
       });
-      return this.get("basePermissions") || [];
+      return this.get('basePermissions') || [];
     }
   }
 
@@ -146,17 +146,17 @@ class Role extends BaseModel {
    * @example
    */
   async getParentRole() {
-    const parentRoleName = this.get("inheritsFrom");
+    const parentRoleName = this.get('inheritsFrom');
     if (!parentRoleName) {
       return null;
     }
 
     try {
-      const query = BaseModel.queryActive("Role");
-      query.equalTo("name", parentRoleName);
+      const query = BaseModel.queryActive('Role');
+      query.equalTo('name', parentRoleName);
       return await query.first({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching parent role", {
+      logger.error('Error fetching parent role', {
         roleId: this.id,
         parentRoleName,
         error: error.message,
@@ -172,12 +172,12 @@ class Role extends BaseModel {
    * @example
    */
   canDelegateTo(_targetRoleName) {
-    if (!this.get("delegatable")) {
+    if (!this.get('delegatable')) {
       return false;
     }
 
     // Can only delegate to roles with lower or equal level
-    const maxLevel = this.get("maxDelegationLevel") || this.get("level");
+    const maxLevel = this.get('maxDelegationLevel') || this.get('level');
     return true; // Will be validated against target role level in service
   }
 
@@ -193,9 +193,9 @@ class Role extends BaseModel {
       const allPermissions = await this.getAllPermissions();
 
       // Check for wildcard permission
-      if (allPermissions.includes("*")) {
+      if (allPermissions.includes('*')) {
         // Wildcard grants all permissions
-        const conditions = this.get("conditions") || {};
+        const conditions = this.get('conditions') || {};
         return this.evaluateConditions(conditions, context);
       }
 
@@ -205,10 +205,10 @@ class Role extends BaseModel {
       }
 
       // Check contextual conditions
-      const conditions = this.get("conditions") || {};
+      const conditions = this.get('conditions') || {};
       return this.evaluateConditions(conditions, context);
     } catch (error) {
-      logger.error("Error checking permission", {
+      logger.error('Error checking permission', {
         roleId: this.id,
         permission,
         context,
@@ -269,7 +269,7 @@ class Role extends BaseModel {
    * @example
    */
   getLevel() {
-    return this.get("level") || 1;
+    return this.get('level') || 1;
   }
 
   /**
@@ -299,9 +299,9 @@ class Role extends BaseModel {
    * @example
    */
   hasSystemPermission(permission) {
-    const basePermissions = this.get("basePermissions") || [];
+    const basePermissions = this.get('basePermissions') || [];
     return (
-      basePermissions.includes(permission) || basePermissions.includes("*")
+      basePermissions.includes(permission) || basePermissions.includes('*')
     );
   }
 
@@ -313,15 +313,15 @@ class Role extends BaseModel {
    * @example
    */
   hasContextualPermission(permission, context = {}) {
-    const contextualPermissions = this.get("contextualPermissions") || {};
+    const contextualPermissions = this.get('contextualPermissions') || {};
     const permissionConfig = contextualPermissions[permission];
 
     if (!permissionConfig) {
       // Fall back to regular permission check
-      const basePermissions = this.get("basePermissions") || [];
+      const basePermissions = this.get('basePermissions') || [];
       if (
-        !basePermissions.includes(permission) &&
-        !basePermissions.includes("*")
+        !basePermissions.includes(permission)
+        && !basePermissions.includes('*')
       ) {
         return false;
       }
@@ -342,23 +342,23 @@ class Role extends BaseModel {
    * @example
    */
   canDelegatePermission(permission) {
-    if (!this.get("delegatable")) {
+    if (!this.get('delegatable')) {
       return false;
     }
 
-    const delegatablePermissions = this.get("delegatablePermissions") || [];
+    const delegatablePermissions = this.get('delegatablePermissions') || [];
 
     // If no specific delegatable permissions are set, allow delegation of all base permissions
     if (delegatablePermissions.length === 0) {
-      const basePermissions = this.get("basePermissions") || [];
+      const basePermissions = this.get('basePermissions') || [];
       return (
-        basePermissions.includes(permission) || basePermissions.includes("*")
+        basePermissions.includes(permission) || basePermissions.includes('*')
       );
     }
 
     return (
-      delegatablePermissions.includes(permission) ||
-      delegatablePermissions.includes("*")
+      delegatablePermissions.includes(permission)
+      || delegatablePermissions.includes('*')
     );
   }
 
@@ -370,15 +370,14 @@ class Role extends BaseModel {
    * @example
    */
   canAccessOrganization(userOrg, targetOrg) {
-    const organizationScope =
-      this.get("organizationScope") || this.get("organization");
+    const organizationScope = this.get('organizationScope') || this.get('organization');
 
     switch (organizationScope) {
-      case "system":
+      case 'system':
         return true; // System roles can access any organization
-      case "client":
-        return userOrg === "amexing" || userOrg === targetOrg; // Amexing can access any client, clients can access themselves
-      case "own":
+      case 'client':
+        return userOrg === 'amexing' || userOrg === targetOrg; // Amexing can access any client, clients can access themselves
+      case 'own':
         return userOrg === targetOrg; // Only own organization
       default:
         return userOrg === targetOrg;
@@ -393,20 +392,20 @@ class Role extends BaseModel {
   toSafeJSON() {
     return {
       id: this.id,
-      name: this.get("name"),
-      displayName: this.get("displayName"),
-      description: this.get("description"),
-      level: this.get("level"),
-      scope: this.get("scope"),
-      organization: this.get("organization"),
-      delegatable: this.get("delegatable"),
-      inheritsFrom: this.get("inheritsFrom"),
-      color: this.get("color"),
-      icon: this.get("icon"),
-      isSystemRole: this.get("isSystemRole"),
-      active: this.get("active"),
-      createdAt: this.get("createdAt"),
-      updatedAt: this.get("updatedAt"),
+      name: this.get('name'),
+      displayName: this.get('displayName'),
+      description: this.get('description'),
+      level: this.get('level'),
+      scope: this.get('scope'),
+      organization: this.get('organization'),
+      delegatable: this.get('delegatable'),
+      inheritsFrom: this.get('inheritsFrom'),
+      color: this.get('color'),
+      icon: this.get('icon'),
+      isSystemRole: this.get('isSystemRole'),
+      active: this.get('active'),
+      createdAt: this.get('createdAt'),
+      updatedAt: this.get('updatedAt'),
     };
   }
 
@@ -418,174 +417,174 @@ class Role extends BaseModel {
   static getSystemRoles() {
     return [
       {
-        name: "superadmin",
-        displayName: "Super Administrator",
-        description: "Full system access and administration",
+        name: 'superadmin',
+        displayName: 'Super Administrator',
+        description: 'Full system access and administration',
         level: 7,
-        scope: "system",
-        organization: "amexing",
-        basePermissions: ["*"], // All permissions
+        scope: 'system',
+        organization: 'amexing',
+        basePermissions: ['*'], // All permissions
         delegatable: true,
         maxDelegationLevel: 6,
         isSystemRole: true,
-        color: "#DC2626",
-        icon: "shield-check",
+        color: '#DC2626',
+        icon: 'shield-check',
       },
       {
-        name: "admin",
-        displayName: "Administrator",
-        description: "System administration and client management",
+        name: 'admin',
+        displayName: 'Administrator',
+        description: 'System administration and client management',
         level: 6,
-        scope: "system",
-        organization: "amexing",
+        scope: 'system',
+        organization: 'amexing',
         basePermissions: [
-          "users.read",
-          "users.create",
-          "users.update",
-          "clients.read",
-          "clients.create",
-          "clients.update",
-          "events.read",
-          "events.create",
-          "events.update",
-          "bookings.read",
-          "bookings.create",
-          "bookings.update",
-          "bookings.approve",
-          "reports.read",
-          "reports.generate",
+          'users.read',
+          'users.create',
+          'users.update',
+          'clients.read',
+          'clients.create',
+          'clients.update',
+          'events.read',
+          'events.create',
+          'events.update',
+          'bookings.read',
+          'bookings.create',
+          'bookings.update',
+          'bookings.approve',
+          'reports.read',
+          'reports.generate',
         ],
         delegatable: true,
         maxDelegationLevel: 5,
         isSystemRole: true,
-        color: "#DC2626",
-        icon: "shield",
+        color: '#DC2626',
+        icon: 'shield',
       },
       {
-        name: "client",
-        displayName: "Client Administrator",
-        description: "Organization administrator for client companies",
+        name: 'client',
+        displayName: 'Client Administrator',
+        description: 'Organization administrator for client companies',
         level: 5,
-        scope: "organization",
-        organization: "client",
+        scope: 'organization',
+        organization: 'client',
         basePermissions: [
-          "users.read",
-          "users.create",
-          "users.update",
-          "departments.read",
-          "departments.create",
-          "departments.update",
-          "events.read",
-          "events.create",
-          "events.update",
-          "bookings.read",
-          "bookings.create",
-          "bookings.approve",
-          "services.read",
-          "pricing.read",
+          'users.read',
+          'users.create',
+          'users.update',
+          'departments.read',
+          'departments.create',
+          'departments.update',
+          'events.read',
+          'events.create',
+          'events.update',
+          'bookings.read',
+          'bookings.create',
+          'bookings.approve',
+          'services.read',
+          'pricing.read',
         ],
         delegatable: true,
         maxDelegationLevel: 4,
         isSystemRole: true,
         conditions: {
-          organizationScope: "own", // Only within their organization
+          organizationScope: 'own', // Only within their organization
         },
-        color: "#059669",
-        icon: "building-office",
+        color: '#059669',
+        icon: 'building-office',
       },
       {
-        name: "department_manager",
-        displayName: "Department Manager",
-        description: "Department supervisor with delegation capabilities",
+        name: 'department_manager',
+        displayName: 'Department Manager',
+        description: 'Department supervisor with delegation capabilities',
         level: 4,
-        scope: "department",
-        organization: "client",
+        scope: 'department',
+        organization: 'client',
         basePermissions: [
-          "users.read",
-          "users.update",
-          "bookings.read",
-          "bookings.create",
-          "bookings.approve",
-          "services.read",
-          "pricing.read",
-          "reports.read",
+          'users.read',
+          'users.update',
+          'bookings.read',
+          'bookings.create',
+          'bookings.approve',
+          'services.read',
+          'pricing.read',
+          'reports.read',
         ],
         delegatable: true,
         maxDelegationLevel: 3,
         isSystemRole: true,
         conditions: {
           maxAmount: 10000, // Can approve up to $10,000 MXN
-          departmentScope: "own", // Only within their department
+          departmentScope: 'own', // Only within their department
         },
-        color: "#0891B2",
-        icon: "user-group",
+        color: '#0891B2',
+        icon: 'user-group',
       },
       {
-        name: "employee",
-        displayName: "Employee",
-        description: "Corporate client employee with departmental access",
+        name: 'employee',
+        displayName: 'Employee',
+        description: 'Corporate client employee with departmental access',
         level: 3,
-        scope: "department",
-        organization: "client",
+        scope: 'department',
+        organization: 'client',
         basePermissions: [
-          "bookings.read",
-          "bookings.create",
-          "services.read",
-          "pricing.read",
+          'bookings.read',
+          'bookings.create',
+          'services.read',
+          'pricing.read',
         ],
         delegatable: false,
         isSystemRole: true,
         conditions: {
           maxAmount: 2000, // Can self-approve up to $2,000 MXN
           businessHoursOnly: true,
-          departmentScope: "own",
+          departmentScope: 'own',
         },
-        color: "#7C3AED",
-        icon: "user",
+        color: '#7C3AED',
+        icon: 'user',
       },
       {
-        name: "employee_amexing",
-        displayName: "Amexing Employee",
-        description: "Internal Amexing staff (drivers, operators)",
+        name: 'employee_amexing',
+        displayName: 'Amexing Employee',
+        description: 'Internal Amexing staff (drivers, operators)',
         level: 3,
-        scope: "operations",
-        organization: "amexing",
+        scope: 'operations',
+        organization: 'amexing',
         basePermissions: [
-          "bookings.read",
-          "bookings.update",
-          "vehicles.read",
-          "vehicles.update",
-          "schedules.read",
-          "schedules.update",
-          "routes.read",
+          'bookings.read',
+          'bookings.update',
+          'vehicles.read',
+          'vehicles.update',
+          'schedules.read',
+          'schedules.update',
+          'routes.read',
         ],
         delegatable: false,
         isSystemRole: true,
         conditions: {
           operationsOnly: true, // No access to financial data
-          scheduleScope: "assigned", // Only assigned bookings/vehicles
+          scheduleScope: 'assigned', // Only assigned bookings/vehicles
         },
-        color: "#EA580C",
-        icon: "truck",
+        color: '#EA580C',
+        icon: 'truck',
       },
       {
-        name: "guest",
-        displayName: "Guest",
-        description: "Public access for service requests",
+        name: 'guest',
+        displayName: 'Guest',
+        description: 'Public access for service requests',
         level: 1,
-        scope: "public",
-        organization: "external",
-        basePermissions: ["services.read", "requests.create", "quotes.read"],
+        scope: 'public',
+        organization: 'external',
+        basePermissions: ['services.read', 'requests.create', 'quotes.read'],
         delegatable: false,
         isSystemRole: true,
-        color: "#6B7280",
-        icon: "user-circle",
+        color: '#6B7280',
+        icon: 'user-circle',
       },
     ];
   }
 }
 
 // Register the subclass
-Parse.Object.registerSubclass("Role", Role);
+Parse.Object.registerSubclass('Role', Role);
 
 module.exports = Role;

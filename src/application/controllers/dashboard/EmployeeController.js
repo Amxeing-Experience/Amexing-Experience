@@ -1,17 +1,17 @@
-const RoleBasedController = require("./base/RoleBasedController");
+const RoleBasedController = require('./base/RoleBasedController');
 
 /**
  * EmployeeController - Implements employee-specific dashboard functionality.
  */
 class EmployeeController extends RoleBasedController {
   constructor() {
-    super("employee");
+    super('employee');
   }
 
   async index(req, res) {
     try {
-      await this.renderRoleView(req, res, "index", {
-        title: "Employee Dashboard",
+      await this.renderRoleView(req, res, 'index', {
+        title: 'Employee Dashboard',
         stats: await this.getEmployeeStats(),
         breadcrumb: null,
       });
@@ -22,12 +22,12 @@ class EmployeeController extends RoleBasedController {
 
   async bookings(req, res) {
     try {
-      await this.renderRoleView(req, res, "bookings", {
-        title: "My Bookings",
+      await this.renderRoleView(req, res, 'bookings', {
+        title: 'My Bookings',
         bookings: [],
         breadcrumb: {
-          title: "Bookings",
-          items: [{ name: "Bookings", active: true }],
+          title: 'Bookings',
+          items: [{ name: 'Bookings', active: true }],
         },
       });
     } catch (error) {
@@ -37,12 +37,12 @@ class EmployeeController extends RoleBasedController {
 
   async history(req, res) {
     try {
-      await this.renderRoleView(req, res, "history", {
-        title: "Trip History",
+      await this.renderRoleView(req, res, 'history', {
+        title: 'Trip History',
         trips: [],
         breadcrumb: {
-          title: "History",
-          items: [{ name: "History", active: true }],
+          title: 'History',
+          items: [{ name: 'History', active: true }],
         },
       });
     } catch (error) {
@@ -52,12 +52,12 @@ class EmployeeController extends RoleBasedController {
 
   async profile(req, res) {
     try {
-      await this.renderRoleView(req, res, "profile", {
-        title: "My Profile",
+      await this.renderRoleView(req, res, 'profile', {
+        title: 'My Profile',
         profile: {},
         breadcrumb: {
-          title: "Profile",
-          items: [{ name: "Profile", active: true }],
+          title: 'Profile',
+          items: [{ name: 'Profile', active: true }],
         },
       });
     } catch (error) {

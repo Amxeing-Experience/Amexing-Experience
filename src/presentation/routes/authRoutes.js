@@ -10,15 +10,15 @@
  * // Returns: operation result
  */
 
-const Parse = require("parse/node");
-const express = require("express");
-const rateLimit = require("express-rate-limit");
-const jwt = require("jsonwebtoken");
+const Parse = require('parse/node');
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const jwt = require('jsonwebtoken');
 // bcrypt is handled by AmexingUser model, not needed here
 // const AuthenticationService = require('../../application/services/AuthenticationService'); // Unused import
 // const OAuthService = require('../../application/services/OAuthService'); // Unused import
-const jwtMiddleware = require("../../application/middleware/jwtMiddleware");
-const logger = require("../../infrastructure/logger");
+const jwtMiddleware = require('../../application/middleware/jwtMiddleware');
+const logger = require('../../infrastructure/logger');
 
 const router = express.Router();
 
@@ -26,7 +26,7 @@ const router = express.Router();
 const authRateLimit = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 900000, // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 50,
-  message: "Too many authentication attempts, please try again later",
+  message: 'Too many authentication attempts, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -34,7 +34,7 @@ const authRateLimit = rateLimit({
 const strictAuthRateLimit = rateLimit({
   windowMs: 300000, // 5 minutes
   max: 10,
-  message: "Too many password reset attempts, please try again later",
+  message: 'Too many password reset attempts, please try again later',
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -43,20 +43,20 @@ const strictAuthRateLimit = rateLimit({
 router.use(authRateLimit);
 
 // Login endpoint
-router.post("/login", async (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { identifier, password, returnTo } = req.body;
 
     // Validate required fields
     if (!identifier || !password) {
-      if (req.accepts("html")) {
+      if (req.accepts('html')) {
         return res.redirect(
-          `/login?error=${encodeURIComponent("Email and password are required")}`,
+          `/login?error=${encodeURIComponent('Email and password are required')}`
         );
       }
       return res.status(400).json({
         success: false,
-        error: "Email and password are required",
+        error: 'Email and password are required',
       });
     }
 
@@ -69,72 +69,72 @@ router.post("/login", async (req, res) => {
 
       if (parseUser) {
         // Get role name from the new Role relationship for Parse User too
-        let roleName = "guest";
-        const roleId = parseUser.get("roleId");
+        let roleName = 'guest';
+        const roleId = parseUser.get('roleId');
         if (roleId) {
           try {
-            const roleQuery = new Parse.Query("Role");
-            roleQuery.equalTo("objectId", roleId);
+            const roleQuery = new Parse.Query('Role');
+            roleQuery.equalTo('objectId', roleId);
             const roleObject = await roleQuery.first({ useMasterKey: true });
             if (roleObject) {
-              roleName = roleObject.get("name");
+              roleName = roleObject.get('name');
             }
           } catch (roleError) {
             logger.warn(
-              "Failed to fetch role for Parse user, defaulting to guest",
+              'Failed to fetch role for Parse user, defaulting to guest',
               {
                 userId: parseUser.id,
                 roleId,
                 error: roleError.message,
-              },
+              }
             );
             // Fall back to old role field if new relationship fails
-            roleName = parseUser.get("role") || "guest";
+            roleName = parseUser.get('role') || 'guest';
           }
         } else {
           // Fall back to old role field if no roleId
-          roleName = parseUser.get("role") || "guest";
+          roleName = parseUser.get('role') || 'guest';
         }
 
         // Convert Parse user to standardized user object for JWT
         authenticatedUser = {
           id: parseUser.id,
-          username: parseUser.get("username"),
-          email: parseUser.get("email"),
+          username: parseUser.get('username'),
+          email: parseUser.get('email'),
           role: roleName,
           roleId,
-          organizationId: parseUser.get("organizationId"),
-          name: parseUser.get("displayName") || parseUser.get("username"),
+          organizationId: parseUser.get('organizationId'),
+          name: parseUser.get('displayName') || parseUser.get('username'),
         };
 
-        logger.info("Parse authentication successful", {
+        logger.info('Parse authentication successful', {
           userId: authenticatedUser.id,
           role: authenticatedUser.role,
         });
       }
     } catch (parseError) {
       logger.warn(
-        "Parse authentication failed, falling back to Parse Object auth:",
-        parseError.message,
+        'Parse authentication failed, falling back to Parse Object auth:',
+        parseError.message
       );
       // Fallback to Parse Object authentication using AmexingUser model
-      const AmexingUser = require("../../domain/models/AmexingUser");
+      const AmexingUser = require('../../domain/models/AmexingUser');
 
       try {
         // Query AmexingUser using Parse SDK - email only lookup
         const query = new Parse.Query(AmexingUser);
-        query.equalTo("email", identifier.toLowerCase().trim());
+        query.equalTo('email', identifier.toLowerCase().trim());
         const user = await query.first({ useMasterKey: true });
 
         if (!user) {
-          if (req.accepts("html")) {
+          if (req.accepts('html')) {
             return res.redirect(
-              `/login?error=${encodeURIComponent("Invalid email or password")}`,
+              `/login?error=${encodeURIComponent('Invalid email or password')}`
             );
           }
           return res.status(401).json({
             success: false,
-            error: "Invalid email or password",
+            error: 'Invalid email or password',
           });
         }
 
@@ -145,82 +145,82 @@ router.post("/login", async (req, res) => {
           // Record failed login attempt
           await user.recordFailedLogin();
 
-          if (req.accepts("html")) {
+          if (req.accepts('html')) {
             return res.redirect(
-              `/login?error=${encodeURIComponent("Invalid email or password")}`,
+              `/login?error=${encodeURIComponent('Invalid email or password')}`
             );
           }
           return res.status(401).json({
             success: false,
-            error: "Invalid email or password",
+            error: 'Invalid email or password',
           });
         }
 
         // Check if account is locked
         if (user.isAccountLocked()) {
-          if (req.accepts("html")) {
+          if (req.accepts('html')) {
             return res.redirect(
-              `/login?error=${encodeURIComponent("Account is temporarily locked")}`,
+              `/login?error=${encodeURIComponent('Account is temporarily locked')}`
             );
           }
           return res.status(401).json({
             success: false,
-            error: "Account is temporarily locked",
+            error: 'Account is temporarily locked',
           });
         }
 
         // Get role name from the new Role relationship
-        let roleName = "guest";
-        const roleId = user.get("roleId");
+        let roleName = 'guest';
+        const roleId = user.get('roleId');
         if (roleId) {
           try {
-            const roleQuery = new Parse.Query("Role");
-            roleQuery.equalTo("objectId", roleId);
+            const roleQuery = new Parse.Query('Role');
+            roleQuery.equalTo('objectId', roleId);
             const roleObject = await roleQuery.first({ useMasterKey: true });
             if (roleObject) {
-              roleName = roleObject.get("name");
+              roleName = roleObject.get('name');
             }
           } catch (roleError) {
-            logger.warn("Failed to fetch role for user, defaulting to guest", {
+            logger.warn('Failed to fetch role for user, defaulting to guest', {
               userId: user.id,
               roleId,
               error: roleError.message,
             });
             // Fall back to old role field if new relationship fails
-            roleName = user.get("role") || "guest";
+            roleName = user.get('role') || 'guest';
           }
         } else {
           // Fall back to old role field if no roleId
-          roleName = user.get("role") || "guest";
+          roleName = user.get('role') || 'guest';
         }
 
         // Convert Parse Object user to standardized user object
         authenticatedUser = {
           id: user.id,
-          username: user.get("username"),
-          email: user.get("email"),
+          username: user.get('username'),
+          email: user.get('email'),
           role: roleName,
           roleId,
-          organizationId: user.get("organizationId"),
+          organizationId: user.get('organizationId'),
           name: user.getDisplayName(),
         };
 
         // Record successful login
-        await user.recordSuccessfulLogin("password");
+        await user.recordSuccessfulLogin('password');
 
-        logger.info("Parse Object authentication successful", {
+        logger.info('Parse Object authentication successful', {
           userId: authenticatedUser.id,
           role: authenticatedUser.role,
         });
       } catch (fallbackError) {
-        logger.error("Parse Object authentication failed:", fallbackError);
+        logger.error('Parse Object authentication failed:', fallbackError);
         throw fallbackError;
       }
     }
 
     // Create standardized JWT token for authenticated user
     if (authenticatedUser) {
-      const jwtSecret = process.env.JWT_SECRET || "your-secret-key";
+      const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
       const accessToken = jwt.sign(
         {
           userId: authenticatedUser.id,
@@ -233,28 +233,28 @@ router.post("/login", async (req, res) => {
           iat: Math.floor(Date.now() / 1000),
         },
         jwtSecret,
-        { expiresIn: "8h" },
+        { expiresIn: '8h' }
       );
 
       // Set secure HTTP-only cookie for JWT token
-      res.cookie("accessToken", accessToken, {
+      res.cookie('accessToken', accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
         maxAge: 8 * 60 * 60 * 1000, // 8 hours
       });
 
-      logger.info("JWT token created for user", {
+      logger.info('JWT token created for user', {
         userId: authenticatedUser.id,
         role: authenticatedUser.role,
       });
 
       // Handle different response types
-      if (req.accepts("html")) {
+      if (req.accepts('html')) {
         // For web form submissions, redirect to role-specific dashboard
         const redirectUrl = returnTo || `/dashboard/${authenticatedUser.role}`;
-        logger.info("Redirecting user to dashboard", {
-          from: "/auth/login",
+        logger.info('Redirecting user to dashboard', {
+          from: '/auth/login',
           to: redirectUrl,
           role: authenticatedUser.role,
         });
@@ -270,47 +270,48 @@ router.post("/login", async (req, res) => {
           role: authenticatedUser.role,
           name: authenticatedUser.name,
         },
-        message: "Login successful",
+        message: 'Login successful',
       });
     }
 
     // If we reach here, authentication failed
-    if (req.accepts("html")) {
+    if (req.accepts('html')) {
       return res.redirect(
-        `/login?error=${encodeURIComponent("Authentication failed")}`,
+        `/login?error=${encodeURIComponent('Authentication failed')}`
       );
     }
 
     res.status(401).json({
       success: false,
-      error: "Authentication failed",
+      error: 'Authentication failed',
     });
   } catch (error) {
-    logger.error("Login route error:", error);
+    logger.error('Login route error:', error);
 
-    if (req.accepts("html")) {
-      const errorMessage = error.message || "Login failed";
+    if (req.accepts('html')) {
+      const errorMessage = error.message || 'Login failed';
       return res.redirect(`/login?error=${encodeURIComponent(errorMessage)}`);
     }
 
     res.status(400).json({
       success: false,
-      error: error.message || "Login failed",
+      error: error.message || 'Login failed',
     });
   }
 });
 
 // Register endpoint
-router.post("/register", async (req, res) => {
+router.post('/register', async (req, res) => {
   try {
-    const { username, email, password, confirmPassword, firstName, lastName } =
-      req.body;
+    const {
+      username, email, password, confirmPassword, firstName, lastName,
+    } = req.body;
 
     // Validate required fields
     if (!username || !email || !password || !firstName || !lastName) {
       return res.status(400).json({
         success: false,
-        error: "All fields are required",
+        error: 'All fields are required',
       });
     }
 
@@ -319,39 +320,39 @@ router.post("/register", async (req, res) => {
     if (password !== confirmPassword) {
       return res.status(400).json({
         success: false,
-        error: "Passwords do not match",
+        error: 'Passwords do not match',
       });
     }
 
     // Attempt registration
-    const result = await Parse.Cloud.run("registerUser", {
+    const result = await Parse.Cloud.run('registerUser', {
       username,
       email,
       password,
       firstName,
       lastName,
-      role: "user",
+      role: 'user',
     });
 
     // Set secure HTTP-only cookies for tokens
-    res.cookie("accessToken", result.tokens.accessToken, {
+    res.cookie('accessToken', result.tokens.accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
-    res.cookie("refreshToken", result.tokens.refreshToken, {
+    res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
     // Handle different response types for registration
-    if (req.accepts("html")) {
+    if (req.accepts('html')) {
       // For web form submissions, redirect to role-specific dashboard
-      const userRole = result.user?.role || "user";
+      const userRole = result.user?.role || 'user';
       return res.redirect(`/dashboard/${userRole}`);
     }
 
@@ -362,60 +363,60 @@ router.post("/register", async (req, res) => {
       message: result.message,
     });
   } catch (error) {
-    logger.error("Registration route error:", error);
+    logger.error('Registration route error:', error);
     res.status(400).json({
       success: false,
-      error: error.message || "Registration failed",
+      error: error.message || 'Registration failed',
     });
   }
 });
 
 // Logout endpoint
-router.post("/logout", async (req, res) => {
+router.post('/logout', async (req, res) => {
   try {
     // Clear authentication cookies
-    res.clearCookie("accessToken");
-    res.clearCookie("refreshToken");
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
 
     res.json({
       success: true,
-      message: "Logged out successfully",
+      message: 'Logged out successfully',
     });
   } catch (error) {
-    logger.error("Logout route error:", error);
+    logger.error('Logout route error:', error);
     res.status(500).json({
       success: false,
-      error: "Logout failed",
+      error: 'Logout failed',
     });
   }
 });
 
 // Token refresh endpoint
-router.post("/refresh", async (req, res) => {
+router.post('/refresh', async (req, res) => {
   try {
     const { refreshToken } = req.cookies;
 
     if (!refreshToken) {
       return res.status(401).json({
         success: false,
-        error: "Refresh token required",
+        error: 'Refresh token required',
       });
     }
 
-    const result = await Parse.Cloud.run("refreshToken", { refreshToken });
+    const result = await Parse.Cloud.run('refreshToken', { refreshToken });
 
     // Set new tokens in cookies
-    res.cookie("accessToken", result.tokens.accessToken, {
+    res.cookie('accessToken', result.tokens.accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
-    res.cookie("refreshToken", result.tokens.refreshToken, {
+    res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -424,48 +425,48 @@ router.post("/refresh", async (req, res) => {
       user: result.user,
     });
   } catch (error) {
-    logger.error("Token refresh route error:", error);
-    res.clearCookie("refreshToken");
+    logger.error('Token refresh route error:', error);
+    res.clearCookie('refreshToken');
     res.status(401).json({
       success: false,
-      error: "Token refresh failed",
+      error: 'Token refresh failed',
     });
   }
 });
 
 // Password reset request (apply stricter rate limiting)
-router.post("/forgot-password", strictAuthRateLimit, async (req, res) => {
+router.post('/forgot-password', strictAuthRateLimit, async (req, res) => {
   try {
     const { email } = req.body;
 
     if (!email) {
       return res.status(400).json({
         success: false,
-        error: "Email is required",
+        error: 'Email is required',
       });
     }
 
-    const result = await Parse.Cloud.run("initiatePasswordReset", { email });
+    const result = await Parse.Cloud.run('initiatePasswordReset', { email });
 
     res.json(result);
   } catch (error) {
-    logger.error("Forgot password route error:", error);
+    logger.error('Forgot password route error:', error);
     res.status(500).json({
       success: false,
-      error: "Password reset request failed",
+      error: 'Password reset request failed',
     });
   }
 });
 
 // Password reset completion
-router.post("/reset-password", strictAuthRateLimit, async (req, res) => {
+router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
   try {
     const { token, password, confirmPassword } = req.body;
 
     if (!token || !password) {
       return res.status(400).json({
         success: false,
-        error: "Token and password are required",
+        error: 'Token and password are required',
       });
     }
 
@@ -473,28 +474,28 @@ router.post("/reset-password", strictAuthRateLimit, async (req, res) => {
     if (password !== confirmPassword) {
       return res.status(400).json({
         success: false,
-        error: "Passwords do not match",
+        error: 'Passwords do not match',
       });
     }
 
-    const result = await Parse.Cloud.run("resetPassword", {
+    const result = await Parse.Cloud.run('resetPassword', {
       resetToken: token,
       newPassword: password,
     });
 
     res.json(result);
   } catch (error) {
-    logger.error("Reset password route error:", error);
+    logger.error('Reset password route error:', error);
     res.status(400).json({
       success: false,
-      error: error.message || "Password reset failed",
+      error: error.message || 'Password reset failed',
     });
   }
 });
 
 // Change password (for authenticated users)
 router.post(
-  "/change-password",
+  '/change-password',
   jwtMiddleware.authenticateToken,
   async (req, res) => {
     try {
@@ -505,113 +506,113 @@ router.post(
       if (!currentPassword || !newPassword) {
         return res.status(400).json({
           success: false,
-          error: "Current password and new password are required",
+          error: 'Current password and new password are required',
         });
       }
 
       if (newPassword !== confirmPassword) {
         return res.status(400).json({
           success: false,
-          error: "New passwords do not match",
+          error: 'New passwords do not match',
         });
       }
 
       const result = await Parse.Cloud.run(
-        "changePassword",
+        'changePassword',
         {
           currentPassword,
           newPassword,
         },
         {
           user: { id: user.id },
-        },
+        }
       );
 
       res.json(result);
     } catch (error) {
-      logger.error("Change password route error:", error);
+      logger.error('Change password route error:', error);
       res.status(400).json({
         success: false,
-        error: error.message || "Password change failed",
+        error: error.message || 'Password change failed',
       });
     }
-  },
+  }
 );
 
 // OAuth provider list
-router.get("/oauth/providers", async (req, res) => {
+router.get('/oauth/providers', async (req, res) => {
   try {
-    const result = await Parse.Cloud.run("getOAuthProviders");
+    const result = await Parse.Cloud.run('getOAuthProviders');
     res.json(result);
   } catch (error) {
-    logger.error("OAuth providers route error:", error);
+    logger.error('OAuth providers route error:', error);
     res.status(500).json({
       success: false,
-      error: "Failed to get OAuth providers",
+      error: 'Failed to get OAuth providers',
     });
   }
 });
 
 // OAuth initiation
-router.get("/oauth/:provider", async (req, res) => {
+router.get('/oauth/:provider', async (req, res) => {
   try {
     const { _provider } = req.params;
-    const state = req.query.state || "default";
+    const state = req.query.state || 'default';
 
-    const result = await Parse.Cloud.run("generateOAuthUrl", {
+    const result = await Parse.Cloud.run('generateOAuthUrl', {
       provider: _provider,
       state,
     });
 
     res.redirect(result.authUrl);
   } catch (error) {
-    logger.error("OAuth initiation route error:", error);
-    res.redirect(`/login?error=${encodeURIComponent("OAuth login failed")}`);
+    logger.error('OAuth initiation route error:', error);
+    res.redirect(`/login?error=${encodeURIComponent('OAuth login failed')}`);
   }
 });
 
 // OAuth callback
-router.get("/oauth/:provider/callback", async (req, res) => {
+router.get('/oauth/:provider/callback', async (req, res) => {
   try {
     const { provider: _provider } = req.params;
     const { code, state, error } = req.query;
 
     if (error) {
-      logger.error("OAuth callback error:", error);
+      logger.error('OAuth callback error:', error);
       return res.redirect(
-        `/login?error=${encodeURIComponent("OAuth authentication was cancelled")}`,
+        `/login?error=${encodeURIComponent('OAuth authentication was cancelled')}`
       );
     }
 
     if (!code) {
       return res.redirect(
-        `/login?error=${encodeURIComponent("OAuth authentication failed")}`,
+        `/login?error=${encodeURIComponent('OAuth authentication failed')}`
       );
     }
 
-    const result = await Parse.Cloud.run("handleOAuthCallback", {
+    const result = await Parse.Cloud.run('handleOAuthCallback', {
       provider: _provider,
       code,
       state,
     });
 
     // Set secure HTTP-only cookies for tokens
-    res.cookie("accessToken", result.tokens.accessToken, {
+    res.cookie('accessToken', result.tokens.accessToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 8 * 60 * 60 * 1000, // 8 hours
     });
 
-    res.cookie("refreshToken", result.tokens.refreshToken, {
+    res.cookie('refreshToken', result.tokens.refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
     // Redirect to role-specific dashboard or intended destination
-    let userRole = "guest";
+    let userRole = 'guest';
     if (result.user && result.user.role) {
       userRole = result.user.role;
     }
@@ -620,16 +621,16 @@ router.get("/oauth/:provider/callback", async (req, res) => {
     delete req.session.returnTo;
     res.redirect(redirectUrl);
   } catch (error) {
-    logger.error("OAuth callback route error:", error);
+    logger.error('OAuth callback route error:', error);
     res.redirect(
-      `/login?error=${encodeURIComponent(error.message || "OAuth authentication failed")}`,
+      `/login?error=${encodeURIComponent(error.message || 'OAuth authentication failed')}`
     );
   }
 });
 
 // Link OAuth account (for authenticated users)
 router.post(
-  "/oauth/:provider/link",
+  '/oauth/:provider/link',
   jwtMiddleware.authenticateToken,
   async (req, res) => {
     try {
@@ -639,30 +640,30 @@ router.post(
       const { oauthData } = req.body;
 
       const result = await Parse.Cloud.run(
-        "linkOAuthAccount",
+        'linkOAuthAccount',
         {
           provider: _provider,
           oauthData,
         },
         {
           user: { id: user.id },
-        },
+        }
       );
 
       res.json(result);
     } catch (error) {
-      logger.error("OAuth link route error:", error);
+      logger.error('OAuth link route error:', error);
       res.status(400).json({
         success: false,
-        error: error.message || "OAuth account linking failed",
+        error: error.message || 'OAuth account linking failed',
       });
     }
-  },
+  }
 );
 
 // Unlink OAuth account (for authenticated users)
 router.delete(
-  "/oauth/:provider/unlink",
+  '/oauth/:provider/unlink',
   jwtMiddleware.authenticateToken,
   async (req, res) => {
     try {
@@ -671,24 +672,24 @@ router.delete(
       const { provider: _provider } = req.params;
 
       const result = await Parse.Cloud.run(
-        "unlinkOAuthAccount",
+        'unlinkOAuthAccount',
         {
           provider: _provider,
         },
         {
           user: { id: user.id },
-        },
+        }
       );
 
       res.json(result);
     } catch (error) {
-      logger.error("OAuth unlink route error:", error);
+      logger.error('OAuth unlink route error:', error);
       res.status(400).json({
         success: false,
-        error: error.message || "OAuth account unlinking failed",
+        error: error.message || 'OAuth account unlinking failed',
       });
     }
-  },
+  }
 );
 
 module.exports = router;

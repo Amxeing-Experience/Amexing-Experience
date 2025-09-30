@@ -8,14 +8,14 @@
  * // Returns: function result
  */
 
-const Parse = require("parse/node");
+const Parse = require('parse/node');
 const {
   DepartmentOAuthFlowService,
-} = require("../../application/services/DepartmentOAuthFlowService");
+} = require('../../application/services/DepartmentOAuthFlowService');
 const {
   PermissionAuditService,
-} = require("../../application/services/PermissionAuditService");
-const logger = require("../../infrastructure/logger");
+} = require('../../application/services/PermissionAuditService');
+const logger = require('../../infrastructure/logger');
 
 // Initialize services
 const departmentOAuthService = new DepartmentOAuthFlowService();
@@ -42,23 +42,21 @@ const getAvailableDepartments = async (request) => {
     let filteredDepartments = departments;
     if (user) {
       // User might have restricted department access
-      const userDepartments =
-        user.get("departments") || [user.get("department")].filter(Boolean);
+      const userDepartments = user.get('departments') || [user.get('department')].filter(Boolean);
       filteredDepartments = departments.filter(
-        (dept) =>
-          !userDepartments.length || userDepartments.includes(dept.code),
+        (dept) => !userDepartments.length || userDepartments.includes(dept.code)
       );
     }
 
     // Log audit event
     await auditService.recordPermissionAudit({
-      userId: user?.id || "anonymous",
-      action: "departments_list_requested",
-      resource: "department_oauth",
-      performedBy: user?.id || "anonymous",
+      userId: user?.id || 'anonymous',
+      action: 'departments_list_requested',
+      resource: 'department_oauth',
+      performedBy: user?.id || 'anonymous',
       metadata: {
         availableDepartments: filteredDepartments.length,
-        userDepartments: user?.get("departments"),
+        userDepartments: user?.get('departments'),
         timestamp: new Date(),
       },
     });
@@ -68,10 +66,10 @@ const getAvailableDepartments = async (request) => {
       departments: filteredDepartments,
     };
   } catch (error) {
-    logger.error("Get available departments failed:", error);
+    logger.error('Get available departments failed:', error);
     throw new Parse.Error(
       Parse.Error.INTERNAL_SERVER_ERROR,
-      "Failed to get departments",
+      'Failed to get departments'
     );
   }
 };
@@ -87,19 +85,21 @@ const getAvailableDepartments = async (request) => {
  */
 const initiateDepartmentOAuth = async (request) => {
   const { params, ip } = request;
-  const { department, _provider, corporateConfigId, redirectUri } = params;
+  const {
+    department, _provider, corporateConfigId, redirectUri,
+  } = params;
 
   try {
     // Validate required parameters
     if (!department || !_provider) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Department and provider are required",
+        'Department and provider are required'
       );
     }
 
     // Generate state for OAuth flow
-    const state = require("crypto").randomBytes(32).toString("hex");
+    const state = require('crypto').randomBytes(32).toString('hex');
 
     // Initiate OAuth flow
     const result = await departmentOAuthService.initiateDepartmentOAuth({
@@ -107,27 +107,27 @@ const initiateDepartmentOAuth = async (request) => {
       _provider,
       corporateConfigId,
       redirectUri:
-        redirectUri ||
-        `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/callback`,
+        redirectUri
+        || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/callback`,
       state,
       headers: request.headers,
       ip,
     });
 
     // Store OAuth state for validation
-    const OAuthState = Parse.Object.extend("OAuthState");
+    const OAuthState = Parse.Object.extend('OAuthState');
     const stateRecord = new OAuthState();
-    stateRecord.set("state", state);
-    stateRecord.set("department", department);
-    stateRecord.set("provider", _provider);
-    stateRecord.set("corporateConfigId", corporateConfigId);
-    stateRecord.set("expiresAt", new Date(Date.now() + 10 * 60 * 1000)); // 10 minutes
-    stateRecord.set("ipAddress", ip);
-    stateRecord.set("userAgent", request.headers["user-agent"]);
+    stateRecord.set('state', state);
+    stateRecord.set('department', department);
+    stateRecord.set('provider', _provider);
+    stateRecord.set('corporateConfigId', corporateConfigId);
+    stateRecord.set('expiresAt', new Date(Date.now() + 10 * 60 * 1000)); // 10 minutes
+    stateRecord.set('ipAddress', ip);
+    stateRecord.set('userAgent', request.headers['user-agent']);
     await stateRecord.save(null, { useMasterKey: true });
 
     logger.info(
-      `Department OAuth initiated: ${department}/${_provider} from IP: ${ip}`,
+      `Department OAuth initiated: ${department}/${_provider} from IP: ${ip}`
     );
 
     return {
@@ -137,7 +137,7 @@ const initiateDepartmentOAuth = async (request) => {
       expiresIn: result.expiresIn,
     };
   } catch (error) {
-    logger.error("Initiate department OAuth failed:", error);
+    logger.error('Initiate department OAuth failed:', error);
     throw error;
   }
 };
@@ -168,22 +168,22 @@ const handleDepartmentOAuthCallback = async (request) => {
     const { _provider, department, originalState } = stateData;
 
     // Validate OAuth state
-    const OAuthState = Parse.Object.extend("OAuthState");
+    const OAuthState = Parse.Object.extend('OAuthState');
     const stateQuery = new Parse.Query(OAuthState);
-    stateQuery.equalTo("state", originalState || state);
-    stateQuery.greaterThan("expiresAt", new Date());
+    stateQuery.equalTo('state', originalState || state);
+    stateQuery.greaterThan('expiresAt', new Date());
 
     const stateRecord = await stateQuery.first({ useMasterKey: true });
     if (!stateRecord) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Invalid or expired OAuth state",
+        'Invalid or expired OAuth state'
       );
     }
 
     // Use provider from state record if not in parsed data
-    const finalProvider = _provider || stateRecord.get("provider");
-    const finalDepartment = department || stateRecord.get("department");
+    const finalProvider = _provider || stateRecord.get('provider');
+    const finalDepartment = department || stateRecord.get('department');
 
     // Handle OAuth callback
     const result = await departmentOAuthService.handleDepartmentOAuthCallback({
@@ -192,7 +192,7 @@ const handleDepartmentOAuthCallback = async (request) => {
       provider: finalProvider,
       department: finalDepartment,
       error,
-      corporateConfigId: stateRecord.get("corporateConfigId"),
+      corporateConfigId: stateRecord.get('corporateConfigId'),
       ip,
     });
 
@@ -200,12 +200,12 @@ const handleDepartmentOAuthCallback = async (request) => {
     await stateRecord.destroy({ useMasterKey: true });
 
     logger.info(
-      `Department OAuth callback successful: ${finalDepartment}/${finalProvider} for user: ${result.user.id}`,
+      `Department OAuth callback successful: ${finalDepartment}/${finalProvider} for user: ${result.user.id}`
     );
 
     return result;
   } catch (callbackError) {
-    logger.error("Department OAuth callback failed:", callbackError);
+    logger.error('Department OAuth callback failed:', callbackError);
     throw callbackError;
   }
 };
@@ -227,7 +227,7 @@ const getDepartmentOAuthConfig = async (request) => {
     if (!department) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Department is required",
+        'Department is required'
       );
     }
 
@@ -236,18 +236,17 @@ const getDepartmentOAuthConfig = async (request) => {
     if (!deptConfig) {
       throw new Parse.Error(
         Parse.Error.OBJECT_NOT_FOUND,
-        `Department not found: ${department}`,
+        `Department not found: ${department}`
       );
     }
 
     // Check if user has access to this department info
     if (user) {
-      const userDepartments =
-        user.get("departments") || [user.get("department")].filter(Boolean);
+      const userDepartments = user.get('departments') || [user.get('department')].filter(Boolean);
       if (userDepartments.length > 0 && !userDepartments.includes(department)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Access denied to department configuration",
+          'Access denied to department configuration'
         );
       }
     }
@@ -263,10 +262,10 @@ const getDepartmentOAuthConfig = async (request) => {
 
     // Log audit event
     await auditService.recordPermissionAudit({
-      userId: user?.id || "anonymous",
-      action: "department_config_requested",
-      resource: "department_oauth_config",
-      performedBy: user?.id || "anonymous",
+      userId: user?.id || 'anonymous',
+      action: 'department_config_requested',
+      resource: 'department_oauth_config',
+      performedBy: user?.id || 'anonymous',
       metadata: {
         department,
         timestamp: new Date(),
@@ -278,7 +277,7 @@ const getDepartmentOAuthConfig = async (request) => {
       config: publicConfig,
     };
   } catch (error) {
-    logger.error("Get department OAuth config failed:", error);
+    logger.error('Get department OAuth config failed:', error);
     throw error;
   }
 };
@@ -299,7 +298,7 @@ const switchToDepartmentContext = async (request) => {
   if (!user) {
     throw new Parse.Error(
       Parse.Error.INVALID_SESSION_TOKEN,
-      "Authentication required",
+      'Authentication required'
     );
   }
 
@@ -307,39 +306,38 @@ const switchToDepartmentContext = async (request) => {
     if (!department) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Department is required",
+        'Department is required'
       );
     }
 
     // Verify user has access to this department
-    const userDepartments =
-      user.get("departments") || [user.get("department")].filter(Boolean);
+    const userDepartments = user.get('departments') || [user.get('department')].filter(Boolean);
     if (!userDepartments.includes(department)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        "Access denied to department",
+        'Access denied to department'
       );
     }
 
     // Switch to department context using Sprint 03 system
     const {
       PermissionContextService,
-    } = require("../../application/services/PermissionContextService");
+    } = require('../../application/services/PermissionContextService');
     const contextService = new PermissionContextService();
 
     const contextId = `dept-${department}`;
     const result = await contextService.switchToContext(
       user.id,
       contextId,
-      sessionId,
+      sessionId
     );
 
     // Log context switch
     await auditService.recordPermissionAudit({
       userId: user.id,
       sessionId,
-      action: "department_context_switch",
-      resource: "permission_context",
+      action: 'department_context_switch',
+      resource: 'permission_context',
       performedBy: user.id,
       metadata: {
         department,
@@ -356,7 +354,7 @@ const switchToDepartmentContext = async (request) => {
       department,
     };
   } catch (error) {
-    logger.error("Switch to department context failed:", error);
+    logger.error('Switch to department context failed:', error);
     throw error;
   }
 };
@@ -378,7 +376,7 @@ const getDepartmentOAuthProviders = async (request) => {
     if (!department) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Department is required",
+        'Department is required'
       );
     }
 
@@ -387,7 +385,7 @@ const getDepartmentOAuthProviders = async (request) => {
     if (!deptConfig) {
       throw new Parse.Error(
         Parse.Error.OBJECT_NOT_FOUND,
-        `Department not found: ${department}`,
+        `Department not found: ${department}`
       );
     }
 
@@ -396,7 +394,7 @@ const getDepartmentOAuthProviders = async (request) => {
       deptConfig.allowedProviders.map(async (providerName) => {
         const scopes = departmentOAuthService.getDepartmentScopes(
           department,
-          providerName,
+          providerName
         );
 
         return {
@@ -406,7 +404,7 @@ const getDepartmentOAuthProviders = async (request) => {
           departmentSpecific: true,
           available: true,
         };
-      }),
+      })
     );
 
     return {
@@ -418,7 +416,7 @@ const getDepartmentOAuthProviders = async (request) => {
       providers,
     };
   } catch (error) {
-    logger.error("Get department OAuth providers failed:", error);
+    logger.error('Get department OAuth providers failed:', error);
     throw error;
   }
 };
@@ -440,7 +438,7 @@ const validateDepartmentOAuthAccess = async (request) => {
     if (!department || !_provider) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Department and provider are required",
+        'Department and provider are required'
       );
     }
 
@@ -449,7 +447,7 @@ const validateDepartmentOAuthAccess = async (request) => {
     if (!deptConfig) {
       throw new Parse.Error(
         Parse.Error.OBJECT_NOT_FOUND,
-        `Department not found: ${department}`,
+        `Department not found: ${department}`
       );
     }
 
@@ -457,14 +455,14 @@ const validateDepartmentOAuthAccess = async (request) => {
     if (!deptConfig.allowedProviders.includes(_provider)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        `Provider ${_provider} not allowed for department ${department}`,
+        `Provider ${_provider} not allowed for department ${department}`
       );
     }
 
     // Email domain validation if provided
     let emailValidation = { valid: true, reason: null };
     if (email && deptConfig.emailDomain) {
-      const emailDomain = email.split("@")[1];
+      const emailDomain = email.split('@')[1];
       if (emailDomain !== deptConfig.emailDomain) {
         emailValidation = {
           valid: false,
@@ -477,15 +475,15 @@ const validateDepartmentOAuthAccess = async (request) => {
     const approvalInfo = {
       required: deptConfig.approvalRequired,
       workflow: deptConfig.approvalWorkflow,
-      estimatedTime: deptConfig.approvalRequired ? "1-2 business days" : null,
+      estimatedTime: deptConfig.approvalRequired ? '1-2 business days' : null,
     };
 
     // Log validation attempt
     await auditService.recordPermissionAudit({
-      userId: user?.id || "anonymous",
-      action: "department_oauth_validation",
-      resource: "department_oauth_access",
-      performedBy: user?.id || "anonymous",
+      userId: user?.id || 'anonymous',
+      action: 'department_oauth_validation',
+      resource: 'department_oauth_access',
+      performedBy: user?.id || 'anonymous',
       metadata: {
         department,
         _provider,
@@ -512,7 +510,7 @@ const validateDepartmentOAuthAccess = async (request) => {
       approval: approvalInfo,
     };
   } catch (error) {
-    logger.error("Validate department OAuth access failed:", error);
+    logger.error('Validate department OAuth access failed:', error);
     throw error;
   }
 };
@@ -528,33 +526,32 @@ const validateDepartmentOAuthAccess = async (request) => {
  */
 const getDepartmentOAuthAnalytics = async (request) => {
   const { params, user } = request;
-  const { department, timeRange = "30d" } = params;
+  const { department, timeRange = '30d' } = params;
 
   if (!user) {
     throw new Parse.Error(
       Parse.Error.INVALID_SESSION_TOKEN,
-      "Authentication required",
+      'Authentication required'
     );
   }
 
   try {
     // Check if user has analytics access
-    const userRole = user.get("role");
-    if (!["admin", "superadmin", "manager"].includes(userRole)) {
+    const userRole = user.get('role');
+    if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        "Analytics access denied",
+        'Analytics access denied'
       );
     }
 
     // If department specified, check access
     if (department) {
-      const userDepartments =
-        user.get("departments") || [user.get("department")].filter(Boolean);
-      if (userRole !== "superadmin" && !userDepartments.includes(department)) {
+      const userDepartments = user.get('departments') || [user.get('department')].filter(Boolean);
+      if (userRole !== 'superadmin' && !userDepartments.includes(department)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Department access denied",
+          'Department access denied'
         );
       }
     }
@@ -563,13 +560,13 @@ const getDepartmentOAuthAnalytics = async (request) => {
     const endDate = new Date();
     const startDate = new Date();
     switch (timeRange) {
-      case "7d":
+      case '7d':
         startDate.setDate(endDate.getDate() - 7);
         break;
-      case "30d":
+      case '30d':
         startDate.setDate(endDate.getDate() - 30);
         break;
-      case "90d":
+      case '90d':
         startDate.setDate(endDate.getDate() - 90);
         break;
       default:
@@ -577,13 +574,13 @@ const getDepartmentOAuthAnalytics = async (request) => {
     }
 
     // Query audit logs for department OAuth activity
-    const auditQuery = new Parse.Query("PermissionAudit");
-    auditQuery.greaterThanOrEqualTo("timestamp", startDate);
-    auditQuery.lessThanOrEqualTo("timestamp", endDate);
-    auditQuery.containsAll("action", ["department_oauth"]);
+    const auditQuery = new Parse.Query('PermissionAudit');
+    auditQuery.greaterThanOrEqualTo('timestamp', startDate);
+    auditQuery.lessThanOrEqualTo('timestamp', endDate);
+    auditQuery.containsAll('action', ['department_oauth']);
 
     if (department) {
-      auditQuery.equalTo("metadata.department", department);
+      auditQuery.equalTo('metadata.department', department);
     }
 
     auditQuery.limit(1000);
@@ -602,37 +599,36 @@ const getDepartmentOAuthAnalytics = async (request) => {
     };
 
     auditEntries.forEach((entry) => {
-      const metadata = entry.get("metadata") || {};
-      const action = entry.get("action");
-      const timestamp = entry.get("timestamp");
-      const date = timestamp.toISOString().split("T")[0];
+      const metadata = entry.get('metadata') || {};
+      const action = entry.get('action');
+      const timestamp = entry.get('timestamp');
+      const date = timestamp.toISOString().split('T')[0];
 
       // Count by action type
-      if (action.includes("oauth_success")) {
+      if (action.includes('oauth_success')) {
         analytics.successfulLogins++;
-      } else if (action.includes("oauth_failed")) {
+      } else if (action.includes('oauth_failed')) {
         analytics.failedLogins++;
       }
       analytics.totalLogins++;
 
       // Provider breakdown
       if (metadata.provider) {
-        analytics.providerBreakdown[metadata.provider] =
-          (analytics.providerBreakdown[metadata.provider] || 0) + 1;
+        analytics.providerBreakdown[metadata.provider] = (analytics.providerBreakdown[metadata.provider] || 0) + 1;
       }
 
       // Department breakdown
       if (metadata.department) {
-        analytics.departmentBreakdown[metadata.department] =
-          (analytics.departmentBreakdown[metadata.department] || 0) + 1;
+        const dept = metadata.department;
+        analytics.departmentBreakdown[dept] = (analytics.departmentBreakdown[dept] || 0) + 1;
       }
 
       // Daily activity
       analytics.dailyActivity[date] = (analytics.dailyActivity[date] || 0) + 1;
 
       // Top users
-      const userId = entry.get("userId");
-      if (userId && userId !== "anonymous") {
+      const userId = entry.get('userId');
+      if (userId && userId !== 'anonymous') {
         analytics.topUsers[userId] = (analytics.topUsers[userId] || 0) + 1;
       }
 
@@ -656,8 +652,8 @@ const getDepartmentOAuthAnalytics = async (request) => {
     // Log analytics access
     await auditService.recordPermissionAudit({
       userId: user.id,
-      action: "department_oauth_analytics_accessed",
-      resource: "analytics",
+      action: 'department_oauth_analytics_accessed',
+      resource: 'analytics',
       performedBy: user.id,
       metadata: {
         department,
@@ -677,7 +673,7 @@ const getDepartmentOAuthAnalytics = async (request) => {
       analytics,
     };
   } catch (error) {
-    logger.error("Get department OAuth analytics failed:", error);
+    logger.error('Get department OAuth analytics failed:', error);
     throw error;
   }
 };
@@ -696,10 +692,10 @@ const getDepartmentOAuthAnalytics = async (request) => {
  */
 function getProviderDisplayName(provider) {
   const displayNames = {
-    google: "Google Workspace",
-    microsoft: "Microsoft 365",
-    apple: "Apple ID",
-    github: "GitHub",
+    google: 'Google Workspace',
+    microsoft: 'Microsoft 365',
+    apple: 'Apple ID',
+    github: 'GitHub',
   };
 
   return displayNames[provider] || provider;

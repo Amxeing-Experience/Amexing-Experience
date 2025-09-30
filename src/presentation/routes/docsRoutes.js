@@ -7,27 +7,27 @@
  * // Returns: operation result
  */
 
-const express = require("express");
-const swaggerUi = require("swagger-ui-express");
-const yaml = require("js-yaml");
-const fs = require("fs");
-const path = require("path");
+const express = require('express');
+const swaggerUi = require('swagger-ui-express');
+const yaml = require('js-yaml');
+const fs = require('fs');
+const path = require('path');
 
 const router = express.Router();
 
 // Load OpenAPI specification
 const swaggerDocument = yaml.load(
   fs.readFileSync(
-    path.join(__dirname, "../../../docs/api/openapi.yaml"),
-    "utf8",
-  ),
+    path.join(__dirname, '../../../docs/api/openapi.yaml'),
+    'utf8'
+  )
 );
 
 // Swagger UI options
 const swaggerOptions = {
   explorer: true,
   swaggerOptions: {
-    docExpansion: "none",
+    docExpansion: 'none',
     filter: true,
     showRequestHeaders: true,
     showCommonExtensions: true,
@@ -35,7 +35,7 @@ const swaggerOptions = {
     tryItOutEnabled: true,
     requestInterceptor: (req) => {
       // Add default headers
-      req.headers["Content-Type"] = "application/json";
+      req.headers['Content-Type'] = 'application/json';
       return req;
     },
   },
@@ -45,28 +45,28 @@ const swaggerOptions = {
     .swagger-ui .scheme-container { background: #fafafa; padding: 30px 0; }
     .swagger-ui .info .title { color: #3b4151; }
   `,
-  customSiteTitle: "AmexingWeb API Documentation",
-  customfavIcon: "/public/images/favicon.ico",
+  customSiteTitle: 'AmexingWeb API Documentation',
+  customfavIcon: '/public/images/favicon.ico',
 };
 
 // API Documentation endpoint
-router.use("/api-docs", swaggerUi.serve);
-router.get("/api-docs", swaggerUi.setup(swaggerDocument, swaggerOptions));
+router.use('/api-docs', swaggerUi.serve);
+router.get('/api-docs', swaggerUi.setup(swaggerDocument, swaggerOptions));
 
 // JSON endpoint for the OpenAPI spec
-router.get("/api-docs.json", (req, res) => {
-  res.setHeader("Content-Type", "application/json");
+router.get('/api-docs.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
   res.send(swaggerDocument);
 });
 
 // YAML endpoint for the OpenAPI spec
-router.get("/api-docs.yaml", (req, res) => {
-  res.setHeader("Content-Type", "text/yaml");
-  res.sendFile(path.join(__dirname, "../../../docs/api/openapi.yaml"));
+router.get('/api-docs.yaml', (req, res) => {
+  res.setHeader('Content-Type', 'text/yaml');
+  res.sendFile(path.join(__dirname, '../../../docs/api/openapi.yaml'));
 });
 
 // Redoc alternative documentation (if preferred)
-router.get("/redoc", (req, res) => {
+router.get('/redoc', (req, res) => {
   const redocHTML = `
 <!DOCTYPE html>
 <html>
@@ -89,13 +89,13 @@ router.get("/redoc", (req, res) => {
 });
 
 // Documentation index page
-router.get("/docs", (req, res) => {
-  res.render("docs/index", {
-    title: "AmexingWeb Documentation",
-    apiDocsUrl: "/api-docs",
-    redocUrl: "/redoc",
-    specJsonUrl: "/api-docs.json",
-    specYamlUrl: "/api-docs.yaml",
+router.get('/docs', (req, res) => {
+  res.render('docs/index', {
+    title: 'AmexingWeb Documentation',
+    apiDocsUrl: '/api-docs',
+    redocUrl: '/redoc',
+    specJsonUrl: '/api-docs.json',
+    specYamlUrl: '/api-docs.yaml',
   });
 });
 

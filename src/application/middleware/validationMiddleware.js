@@ -1,5 +1,5 @@
-const Joi = require("joi");
-const logger = require("../../infrastructure/logger");
+const Joi = require('joi');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Validation Middleware - Provides comprehensive request validation using Joi schemas.
@@ -75,14 +75,14 @@ class ValidationMiddleware {
    * const queryMiddleware = validationMiddleware.validateRequest(searchSchema, 'query');
    * router.get('/search', queryMiddleware, searchController.find);
    */
-  validateRequest(schema, property = "body") {
+  validateRequest(schema, property = 'body') {
     return (req, res, next) => {
       // Validate property name to prevent injection
-      const allowedProperties = ["body", "query", "params"];
+      const allowedProperties = ['body', 'query', 'params'];
       if (!allowedProperties.includes(property)) {
         return res.status(500).json({
-          error: "Internal Server Error",
-          message: "Invalid validation property",
+          error: 'Internal Server Error',
+          message: 'Invalid validation property',
         });
       }
 
@@ -94,16 +94,16 @@ class ValidationMiddleware {
       });
 
       if (error) {
-        logger.warn("Validation error:", {
+        logger.warn('Validation error:', {
           path: req.path,
           errors: error.details,
         });
 
         return res.status(400).json({
-          error: "Validation Error",
-          message: "Invalid request data",
+          error: 'Validation Error',
+          message: 'Invalid request data',
           details: error.details.map((detail) => ({
-            field: detail.path.join("."),
+            field: detail.path.join('.'),
             message: detail.message,
           })),
         });
@@ -134,11 +134,11 @@ class ValidationMiddleware {
    */
   getRequestProperty(req, property) {
     switch (property) {
-      case "body":
+      case 'body':
         return req.body;
-      case "query":
+      case 'query':
         return req.query;
-      case "params":
+      case 'params':
         return req.params;
       default:
         return {};
@@ -165,13 +165,13 @@ class ValidationMiddleware {
    */
   setRequestProperty(req, property, value) {
     switch (property) {
-      case "body":
+      case 'body':
         req.body = value;
         break;
-      case "query":
+      case 'query':
         req.query = value;
         break;
-      case "params":
+      case 'params':
         req.params = value;
         break;
       default:
@@ -201,7 +201,8 @@ class ValidationMiddleware {
    */
   validateUpdateProfile(req, res, next) {
     const schema = Joi.object({
-      username: Joi.string().alphanum().min(3).max(30).optional(),
+      username: Joi.string().alphanum().min(3).max(30)
+        .optional(),
       email: Joi.string().email().optional(),
     });
 
@@ -230,22 +231,23 @@ class ValidationMiddleware {
    */
   validateRegistration(req, res, next) {
     const schema = Joi.object({
-      username: Joi.string().alphanum().min(3).max(30).required(),
+      username: Joi.string().alphanum().min(3).max(30)
+        .required(),
       email: Joi.string().email().required(),
       password: Joi.string()
         .min(parseInt(process.env.PASSWORD_MIN_LENGTH, 10) || 12)
         .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])/)
         .required()
         .messages({
-          "string.pattern.base":
-            "Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character",
-          "string.min": `Password must be at least ${process.env.PASSWORD_MIN_LENGTH || 12} characters long`,
+          'string.pattern.base':
+            'Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character',
+          'string.min': `Password must be at least ${process.env.PASSWORD_MIN_LENGTH || 12} characters long`,
         }),
       confirmPassword: Joi.string()
-        .valid(Joi.ref("password"))
+        .valid(Joi.ref('password'))
         .required()
         .messages({
-          "any.only": "Passwords must match",
+          'any.only': 'Passwords must match',
         }),
     });
 
@@ -336,15 +338,15 @@ class ValidationMiddleware {
         .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])/)
         .required()
         .messages({
-          "string.pattern.base":
-            "Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character",
-          "string.min": `Password must be at least ${process.env.PASSWORD_MIN_LENGTH || 12} characters long`,
+          'string.pattern.base':
+            'Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character',
+          'string.min': `Password must be at least ${process.env.PASSWORD_MIN_LENGTH || 12} characters long`,
         }),
       confirmPassword: Joi.string()
-        .valid(Joi.ref("password"))
+        .valid(Joi.ref('password'))
         .required()
         .messages({
-          "any.only": "Passwords must match",
+          'any.only': 'Passwords must match',
         }),
       token: Joi.string().required(),
     });

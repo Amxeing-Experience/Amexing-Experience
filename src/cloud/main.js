@@ -1,21 +1,21 @@
 /* eslint-disable no-unused-vars */
-const Parse = require("parse/node");
-const logger = require("../infrastructure/logger");
+const Parse = require('parse/node');
+const logger = require('../infrastructure/logger');
 
 // Import models and services
-const AmexingUser = require("../domain/models/AmexingUser");
-const AuthenticationService = require("../application/services/AuthenticationService");
-const OAuthService = require("../application/services/OAuthService");
+const AmexingUser = require('../domain/models/AmexingUser');
+const AuthenticationService = require('../application/services/AuthenticationService');
+const OAuthService = require('../application/services/OAuthService');
 
 // Import cloud functions
-const helloWorldFunction = require("./functions/helloWorld");
-const testFunction = require("./functions/test");
-const oauthAdminFunctions = require("./functions/oauth-admin");
-const corporateLandingFunctions = require("./functions/corporate-landing");
-const corporateSyncFunctions = require("./functions/corporate-sync");
-const oauthPermissionsFunctions = require("./functions/oauth-permissions");
-const departmentOAuthFunctions = require("./functions/department-oauth");
-const appleOAuthFunctions = require("./functions/apple-oauth");
+const helloWorldFunction = require('./functions/helloWorld');
+const testFunction = require('./functions/test');
+const oauthAdminFunctions = require('./functions/oauth-admin');
+const corporateLandingFunctions = require('./functions/corporate-landing');
+const corporateSyncFunctions = require('./functions/corporate-sync');
+const oauthPermissionsFunctions = require('./functions/oauth-permissions');
+const departmentOAuthFunctions = require('./functions/department-oauth');
+const appleOAuthFunctions = require('./functions/apple-oauth');
 
 /**
  * Registers all Parse Cloud Functions for the Amexing platform.
@@ -48,254 +48,254 @@ const appleOAuthFunctions = require("./functions/apple-oauth");
 function registerCloudFunctions() {
   try {
     // Register Cloud Functions
-    Parse.Cloud.define("hello", helloWorldFunction);
-    Parse.Cloud.define("test", testFunction);
+    Parse.Cloud.define('hello', helloWorldFunction);
+    Parse.Cloud.define('test', testFunction);
 
     // Register OAuth Admin Functions
     Parse.Cloud.define(
-      "getAvailableCorporateDomains",
-      oauthAdminFunctions.getAvailableCorporateDomains,
+      'getAvailableCorporateDomains',
+      oauthAdminFunctions.getAvailableCorporateDomains
     );
     Parse.Cloud.define(
-      "addCorporateDomain",
-      oauthAdminFunctions.addCorporateDomain,
+      'addCorporateDomain',
+      oauthAdminFunctions.addCorporateDomain
     );
     Parse.Cloud.define(
-      "getOAuthProviderStatus",
-      oauthAdminFunctions.getOAuthProviderStatus,
+      'getOAuthProviderStatus',
+      oauthAdminFunctions.getOAuthProviderStatus
     );
     Parse.Cloud.define(
-      "testCorporateDomain",
-      oauthAdminFunctions.testCorporateDomain,
+      'testCorporateDomain',
+      oauthAdminFunctions.testCorporateDomain
     );
     Parse.Cloud.define(
-      "getOAuthAuditLogs",
-      oauthAdminFunctions.getOAuthAuditLogs,
+      'getOAuthAuditLogs',
+      oauthAdminFunctions.getOAuthAuditLogs
     );
 
     // Register Corporate Landing Functions
     Parse.Cloud.define(
-      "getCorporateLandingConfig",
-      corporateLandingFunctions.getCorporateLandingConfig,
+      'getCorporateLandingConfig',
+      corporateLandingFunctions.getCorporateLandingConfig
     );
     Parse.Cloud.define(
-      "generateCorporateOAuthURL",
-      corporateLandingFunctions.generateCorporateOAuthURL,
+      'generateCorporateOAuthURL',
+      corporateLandingFunctions.generateCorporateOAuthURL
     );
     Parse.Cloud.define(
-      "validateCorporateLandingAccess",
-      corporateLandingFunctions.validateCorporateLandingAccess,
+      'validateCorporateLandingAccess',
+      corporateLandingFunctions.validateCorporateLandingAccess
     );
     Parse.Cloud.define(
-      "getCorporateClientDepartments",
-      corporateLandingFunctions.getCorporateClientDepartments,
+      'getCorporateClientDepartments',
+      corporateLandingFunctions.getCorporateClientDepartments
     );
 
     // Register Corporate Sync Functions
     Parse.Cloud.define(
-      "triggerCorporateSync",
-      corporateSyncFunctions.triggerCorporateSync,
+      'triggerCorporateSync',
+      corporateSyncFunctions.triggerCorporateSync
     );
     Parse.Cloud.define(
-      "startPeriodicSync",
-      corporateSyncFunctions.startPeriodicSync,
+      'startPeriodicSync',
+      corporateSyncFunctions.startPeriodicSync
     );
     Parse.Cloud.define(
-      "stopPeriodicSync",
-      corporateSyncFunctions.stopPeriodicSync,
+      'stopPeriodicSync',
+      corporateSyncFunctions.stopPeriodicSync
     );
     Parse.Cloud.define(
-      "getAllSyncStatuses",
-      corporateSyncFunctions.getAllSyncStatuses,
+      'getAllSyncStatuses',
+      corporateSyncFunctions.getAllSyncStatuses
     );
     Parse.Cloud.define(
-      "getCorporateSyncHistory",
-      corporateSyncFunctions.getCorporateSyncHistory,
+      'getCorporateSyncHistory',
+      corporateSyncFunctions.getCorporateSyncHistory
     );
 
     // Register OAuth Permissions Functions
     Parse.Cloud.define(
-      "getUserPermissionInheritance",
-      oauthPermissionsFunctions.getUserPermissionInheritance,
+      'getUserPermissionInheritance',
+      oauthPermissionsFunctions.getUserPermissionInheritance
     );
     Parse.Cloud.define(
-      "getAvailableContexts",
-      oauthPermissionsFunctions.getAvailableContexts,
+      'getAvailableContexts',
+      oauthPermissionsFunctions.getAvailableContexts
     );
     Parse.Cloud.define(
-      "switchPermissionContext",
-      oauthPermissionsFunctions.switchPermissionContext,
+      'switchPermissionContext',
+      oauthPermissionsFunctions.switchPermissionContext
     );
     Parse.Cloud.define(
-      "createPermissionDelegation",
-      oauthPermissionsFunctions.createPermissionDelegation,
+      'createPermissionDelegation',
+      oauthPermissionsFunctions.createPermissionDelegation
     );
     Parse.Cloud.define(
-      "revokePermissionDelegation",
-      oauthPermissionsFunctions.revokePermissionDelegation,
+      'revokePermissionDelegation',
+      oauthPermissionsFunctions.revokePermissionDelegation
     );
     Parse.Cloud.define(
-      "createEmergencyElevation",
-      oauthPermissionsFunctions.createEmergencyElevation,
+      'createEmergencyElevation',
+      oauthPermissionsFunctions.createEmergencyElevation
     );
     Parse.Cloud.define(
-      "createPermissionOverride",
-      oauthPermissionsFunctions.createPermissionOverride,
+      'createPermissionOverride',
+      oauthPermissionsFunctions.createPermissionOverride
     );
     Parse.Cloud.define(
-      "checkUserPermission",
-      oauthPermissionsFunctions.checkUserPermission,
+      'checkUserPermission',
+      oauthPermissionsFunctions.checkUserPermission
     );
     Parse.Cloud.define(
-      "getActiveDelegations",
-      oauthPermissionsFunctions.getActiveDelegations,
+      'getActiveDelegations',
+      oauthPermissionsFunctions.getActiveDelegations
     );
     Parse.Cloud.define(
-      "getDelegatedPermissions",
-      oauthPermissionsFunctions.getDelegatedPermissions,
+      'getDelegatedPermissions',
+      oauthPermissionsFunctions.getDelegatedPermissions
     );
     Parse.Cloud.define(
-      "getPermissionAuditReport",
-      oauthPermissionsFunctions.getPermissionAuditReport,
+      'getPermissionAuditReport',
+      oauthPermissionsFunctions.getPermissionAuditReport
     );
     Parse.Cloud.define(
-      "getPermissionAuditStats",
-      oauthPermissionsFunctions.getPermissionAuditStats,
+      'getPermissionAuditStats',
+      oauthPermissionsFunctions.getPermissionAuditStats
     );
     Parse.Cloud.define(
-      "getAvailablePermissions",
-      oauthPermissionsFunctions.getAvailablePermissions,
+      'getAvailablePermissions',
+      oauthPermissionsFunctions.getAvailablePermissions
     );
 
     // Register Department OAuth Functions
     Parse.Cloud.define(
-      "getAvailableDepartments",
-      departmentOAuthFunctions.getAvailableDepartments,
+      'getAvailableDepartments',
+      departmentOAuthFunctions.getAvailableDepartments
     );
     Parse.Cloud.define(
-      "initiateDepartmentOAuth",
-      departmentOAuthFunctions.initiateDepartmentOAuth,
+      'initiateDepartmentOAuth',
+      departmentOAuthFunctions.initiateDepartmentOAuth
     );
     Parse.Cloud.define(
-      "handleDepartmentOAuthCallback",
-      departmentOAuthFunctions.handleDepartmentOAuthCallback,
+      'handleDepartmentOAuthCallback',
+      departmentOAuthFunctions.handleDepartmentOAuthCallback
     );
     Parse.Cloud.define(
-      "getDepartmentOAuthConfig",
-      departmentOAuthFunctions.getDepartmentOAuthConfig,
+      'getDepartmentOAuthConfig',
+      departmentOAuthFunctions.getDepartmentOAuthConfig
     );
     Parse.Cloud.define(
-      "switchToDepartmentContext",
-      departmentOAuthFunctions.switchToDepartmentContext,
+      'switchToDepartmentContext',
+      departmentOAuthFunctions.switchToDepartmentContext
     );
     Parse.Cloud.define(
-      "getDepartmentOAuthProviders",
-      departmentOAuthFunctions.getDepartmentOAuthProviders,
+      'getDepartmentOAuthProviders',
+      departmentOAuthFunctions.getDepartmentOAuthProviders
     );
     Parse.Cloud.define(
-      "validateDepartmentOAuthAccess",
-      departmentOAuthFunctions.validateDepartmentOAuthAccess,
+      'validateDepartmentOAuthAccess',
+      departmentOAuthFunctions.validateDepartmentOAuthAccess
     );
     Parse.Cloud.define(
-      "getDepartmentOAuthAnalytics",
-      departmentOAuthFunctions.getDepartmentOAuthAnalytics,
+      'getDepartmentOAuthAnalytics',
+      departmentOAuthFunctions.getDepartmentOAuthAnalytics
     );
 
     // Register Apple OAuth Functions
     Parse.Cloud.define(
-      "initiateAppleOAuth",
-      appleOAuthFunctions.initiateAppleOAuth,
+      'initiateAppleOAuth',
+      appleOAuthFunctions.initiateAppleOAuth
     );
     Parse.Cloud.define(
-      "handleAppleOAuthCallback",
-      appleOAuthFunctions.handleAppleOAuthCallback,
+      'handleAppleOAuthCallback',
+      appleOAuthFunctions.handleAppleOAuthCallback
     );
     Parse.Cloud.define(
-      "getAppleOAuthConfig",
-      appleOAuthFunctions.getAppleOAuthConfig,
+      'getAppleOAuthConfig',
+      appleOAuthFunctions.getAppleOAuthConfig
     );
     Parse.Cloud.define(
-      "revokeAppleOAuth",
-      appleOAuthFunctions.revokeAppleOAuth,
+      'revokeAppleOAuth',
+      appleOAuthFunctions.revokeAppleOAuth
     );
     Parse.Cloud.define(
-      "handleAppleWebhook",
-      appleOAuthFunctions.handleAppleWebhook,
+      'handleAppleWebhook',
+      appleOAuthFunctions.handleAppleWebhook
     );
     Parse.Cloud.define(
-      "getAppleUserData",
-      appleOAuthFunctions.getAppleUserData,
+      'getAppleUserData',
+      appleOAuthFunctions.getAppleUserData
     );
     Parse.Cloud.define(
-      "validateAppleDomain",
-      appleOAuthFunctions.validateAppleDomain,
+      'validateAppleDomain',
+      appleOAuthFunctions.validateAppleDomain
     );
     Parse.Cloud.define(
-      "getAppleOAuthAnalytics",
-      appleOAuthFunctions.getAppleOAuthAnalytics,
+      'getAppleOAuthAnalytics',
+      appleOAuthFunctions.getAppleOAuthAnalytics
     );
 
     // Authentication Cloud Functions
-    Parse.Cloud.define("getUserById", async (request) => {
+    Parse.Cloud.define('getUserById', async (request) => {
       const { params, user } = request;
       const { userId } = params;
 
       try {
         // Allow superadmin/admin to get any user, others can only get their own
         if (
-          user &&
-          (user.get("role") === "superadmin" ||
-            user.get("role") === "admin" ||
-            user.id === userId)
+          user
+          && (user.get('role') === 'superadmin'
+            || user.get('role') === 'admin'
+            || user.id === userId)
         ) {
           // Try AmexingUser first, then fallback to Parse.User
-          const AmexingUserQuery = new Parse.Query("AmexingUser");
-          AmexingUserQuery.equalTo("objectId", userId);
+          const AmexingUserQuery = new Parse.Query('AmexingUser');
+          AmexingUserQuery.equalTo('objectId', userId);
 
           let foundUser = await AmexingUserQuery.first({ useMasterKey: true });
 
           if (!foundUser) {
             const ParseUserQuery = new Parse.Query(Parse.User);
-            ParseUserQuery.equalTo("objectId", userId);
+            ParseUserQuery.equalTo('objectId', userId);
             foundUser = await ParseUserQuery.first({ useMasterKey: true });
           }
 
           if (!foundUser) {
             throw new Parse.Error(
               Parse.Error.OBJECT_NOT_FOUND,
-              "User not found",
+              'User not found'
             );
           }
 
           // Return sanitized user data
           return {
             id: foundUser.id,
-            username: foundUser.get("username"),
-            email: foundUser.get("email"),
-            firstName: foundUser.get("firstName"),
-            lastName: foundUser.get("lastName"),
-            role: foundUser.get("role") || "user",
+            username: foundUser.get('username'),
+            email: foundUser.get('email'),
+            firstName: foundUser.get('firstName'),
+            lastName: foundUser.get('lastName'),
+            role: foundUser.get('role') || 'user',
             displayName:
-              foundUser.get("displayName") ||
-              `${foundUser.get("firstName")} ${foundUser.get("lastName")}`,
-            isActive: foundUser.get("isActive") !== false,
-            emailVerified: foundUser.get("emailVerified") === true,
-            lastLoginAt: foundUser.get("lastLoginAt"),
-            createdAt: foundUser.get("createdAt"),
-            updatedAt: foundUser.get("updatedAt"),
+              foundUser.get('displayName')
+              || `${foundUser.get('firstName')} ${foundUser.get('lastName')}`,
+            isActive: foundUser.get('isActive') !== false,
+            emailVerified: foundUser.get('emailVerified') === true,
+            lastLoginAt: foundUser.get('lastLoginAt'),
+            createdAt: foundUser.get('createdAt'),
+            updatedAt: foundUser.get('updatedAt'),
           };
         }
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Not authorized to access user data",
+          'Not authorized to access user data'
         );
       } catch (error) {
-        logger.error("Get user by ID error:", error);
+        logger.error('Get user by ID error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("registerUser", async (request) => {
+    Parse.Cloud.define('registerUser', async (request) => {
       const { params, ip } = request;
 
       try {
@@ -305,12 +305,12 @@ function registerCloudFunctions() {
 
         return result;
       } catch (error) {
-        logger.error("Registration cloud function error:", error);
+        logger.error('Registration cloud function error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("loginUser", async (request) => {
+    Parse.Cloud.define('loginUser', async (request) => {
       const { params, ip } = request;
       const { identifier, password } = params;
 
@@ -319,17 +319,17 @@ function registerCloudFunctions() {
 
         const result = await AuthenticationService.loginUser(
           identifier,
-          password,
+          password
         );
 
         return result;
       } catch (error) {
-        logger.error("Login cloud function error:", error);
+        logger.error('Login cloud function error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("refreshToken", async (request) => {
+    Parse.Cloud.define('refreshToken', async (request) => {
       const { params } = request;
       const { refreshToken } = params;
 
@@ -337,19 +337,19 @@ function registerCloudFunctions() {
         const result = await AuthenticationService.refreshToken(refreshToken);
         return result;
       } catch (error) {
-        logger.error("Token refresh cloud function error:", error);
+        logger.error('Token refresh cloud function error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("changePassword", async (request) => {
+    Parse.Cloud.define('changePassword', async (request) => {
       const { params, user } = request;
       const { currentPassword, newPassword } = params;
 
       if (!user) {
         throw new Parse.Error(
           Parse.Error.INVALID_SESSION_TOKEN,
-          "Authentication required",
+          'Authentication required'
         );
       }
 
@@ -357,16 +357,16 @@ function registerCloudFunctions() {
         const result = await AuthenticationService.changePassword(
           user.id,
           currentPassword,
-          newPassword,
+          newPassword
         );
         return result;
       } catch (error) {
-        logger.error("Password change cloud function error:", error);
+        logger.error('Password change cloud function error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("initiatePasswordReset", async (request) => {
+    Parse.Cloud.define('initiatePasswordReset', async (request) => {
       const { params } = request;
       const { email } = params;
 
@@ -374,45 +374,45 @@ function registerCloudFunctions() {
         const result = await AuthenticationService.initiatePasswordReset(email);
         return result;
       } catch (error) {
-        logger.error("Password reset initiation error:", error);
+        logger.error('Password reset initiation error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("resetPassword", async (request) => {
+    Parse.Cloud.define('resetPassword', async (request) => {
       const { params } = request;
       const { resetToken, newPassword } = params;
 
       try {
         const result = await AuthenticationService.resetPassword(
           resetToken,
-          newPassword,
+          newPassword
         );
         return result;
       } catch (error) {
-        logger.error("Password reset error:", error);
+        logger.error('Password reset error:', error);
         throw error;
       }
     });
 
     // OAuth Cloud Functions
-    Parse.Cloud.define("generateOAuthUrl", async (request) => {
+    Parse.Cloud.define('generateOAuthUrl', async (request) => {
       const { params } = request;
       const { _provider, state } = params;
 
       try {
         const authUrl = await OAuthService.generateAuthorizationUrl(
           _provider,
-          state,
+          state
         );
         return { authUrl };
       } catch (error) {
-        logger.error("OAuth URL generation error:", error);
+        logger.error('OAuth URL generation error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("handleOAuthCallback", async (request) => {
+    Parse.Cloud.define('handleOAuthCallback', async (request) => {
       const { params, ip } = request;
       const { _provider, code, state } = params;
 
@@ -422,23 +422,23 @@ function registerCloudFunctions() {
         const result = await OAuthService.handleCallback(
           _provider,
           code,
-          state,
+          state
         );
         return result;
       } catch (error) {
-        logger.error("OAuth callback error:", error);
+        logger.error('OAuth callback error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("linkOAuthAccount", async (request) => {
+    Parse.Cloud.define('linkOAuthAccount', async (request) => {
       const { params, user } = request;
       const { _provider, oauthData } = params;
 
       if (!user) {
         throw new Parse.Error(
           Parse.Error.INVALID_SESSION_TOKEN,
-          "Authentication required",
+          'Authentication required'
         );
       }
 
@@ -446,48 +446,46 @@ function registerCloudFunctions() {
         const result = await OAuthService.linkOAuthAccount(
           user.id,
           _provider,
-          oauthData,
+          oauthData
         );
         return result;
       } catch (error) {
-        logger.error("OAuth account linking error:", error);
+        logger.error('OAuth account linking error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("unlinkOAuthAccount", async (request) => {
+    Parse.Cloud.define('unlinkOAuthAccount', async (request) => {
       const { params, user } = request;
       const { _provider } = params;
 
       if (!user) {
         throw new Parse.Error(
           Parse.Error.INVALID_SESSION_TOKEN,
-          "Authentication required",
+          'Authentication required'
         );
       }
 
       try {
         const result = await OAuthService.unlinkOAuthAccount(
           user.id,
-          _provider,
+          _provider
         );
         return result;
       } catch (error) {
-        logger.error("OAuth account unlinking error:", error);
+        logger.error('OAuth account unlinking error:', error);
         throw error;
       }
     });
 
-    Parse.Cloud.define("getOAuthProviders", async (request) => {
+    Parse.Cloud.define('getOAuthProviders', async (request) => {
       try {
         const providers = OAuthService.getAvailableProviders();
-        const providerConfigs = providers.map((_provider) =>
-          OAuthService.getProviderConfig(_provider),
-        );
+        const providerConfigs = providers.map((_provider) => OAuthService.getProviderConfig(_provider));
 
         return { providers: providerConfigs };
       } catch (error) {
-        logger.error("Get OAuth providers error:", error);
+        logger.error('Get OAuth providers error:', error);
         throw error;
       }
     });
@@ -504,93 +502,93 @@ function registerCloudFunctions() {
       // Set default values for new users
       if (!user.existed()) {
         // Set createdAt and updatedAt if not set
-        if (!user.get("createdAt")) {
-          user.set("createdAt", new Date());
+        if (!user.get('createdAt')) {
+          user.set('createdAt', new Date());
         }
-        user.set("updatedAt", new Date());
+        user.set('updatedAt', new Date());
 
         // Log user registration
-        logger.logSecurityEvent("AMEXING_USER_REGISTRATION", {
-          username: user.get("username"),
-          email: user.get("email")
-            ? `${user.get("email").substring(0, 3)}***`
+        logger.logSecurityEvent('AMEXING_USER_REGISTRATION', {
+          username: user.get('username'),
+          email: user.get('email')
+            ? `${user.get('email').substring(0, 3)}***`
             : undefined,
-          role: user.get("role"),
-          authMethod: user.get("primaryOAuthProvider") || "password",
+          role: user.get('role'),
+          authMethod: user.get('primaryOAuthProvider') || 'password',
         });
       } else {
         // Update the updatedAt field
-        user.set("updatedAt", new Date());
+        user.set('updatedAt', new Date());
 
-        logger.logSecurityEvent("AMEXING_USER_UPDATE", {
+        logger.logSecurityEvent('AMEXING_USER_UPDATE', {
           userId: user.id,
-          username: user.get("username"),
+          username: user.get('username'),
         });
       }
 
       // Validate required fields
       const requiredFields = [
-        "username",
-        "email",
-        "firstName",
-        "lastName",
-        "role",
+        'username',
+        'email',
+        'firstName',
+        'lastName',
+        'role',
       ];
       for (const field of requiredFields) {
         if (!user.get(field)) {
           throw new Parse.Error(
             Parse.Error.VALIDATION_ERROR,
-            `${field} is required`,
+            `${field} is required`
           );
         }
       }
 
       // Validate email format
-      const email = user.get("email");
+      const email = user.get('email');
       if (email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
           throw new Parse.Error(
             Parse.Error.VALIDATION_ERROR,
-            "Invalid email format",
+            'Invalid email format'
           );
         }
         // Normalize email to lowercase
-        user.set("email", email.toLowerCase());
+        user.set('email', email.toLowerCase());
       }
 
       // Validate username format
-      const username = user.get("username");
+      const username = user.get('username');
       if (username) {
         const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
         if (!usernameRegex.test(username)) {
           throw new Parse.Error(
             Parse.Error.VALIDATION_ERROR,
-            "Username must be 3-20 characters, alphanumeric and underscores only",
+            'Username must be 3-20 characters, alphanumeric and underscores only'
           );
         }
         // Normalize username to lowercase
-        user.set("username", username.toLowerCase());
+        user.set('username', username.toLowerCase());
       }
 
       // Validate role
-      const validRoles = ["user", "client", "employee", "admin", "superadmin"];
-      const role = user.get("role");
+      const validRoles = ['user', 'client', 'employee', 'admin', 'superadmin'];
+      const role = user.get('role');
       if (role && !validRoles.includes(role)) {
         throw new Parse.Error(
           Parse.Error.VALIDATION_ERROR,
-          `Invalid role. Must be one of: ${validRoles.join(", ")}`,
+          `Invalid role. Must be one of: ${validRoles.join(', ')}`
         );
       }
 
       // Validate OAuth accounts format
-      const oauthAccounts = user.get("oauthAccounts");
+      const oauthAccounts = user.get('oauthAccounts');
       if (oauthAccounts && Array.isArray(oauthAccounts)) {
         for (const account of oauthAccounts) {
           if (!account.provider || !account.providerId) {
             throw new Parse.Error(
               Parse.Error.VALIDATION_ERROR,
-              "OAuth accounts must have provider and providerId",
+              'OAuth accounts must have provider and providerId'
             );
           }
         }
@@ -602,7 +600,7 @@ function registerCloudFunctions() {
 
       if (!user.existed()) {
         logger.info(
-          `New AmexingUser created: ${user.id} (${user.get("username")})`,
+          `New AmexingUser created: ${user.id} (${user.get('username')})`
         );
 
         // Initialize any additional setup for new users
@@ -617,15 +615,15 @@ function registerCloudFunctions() {
       if (!master) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "AmexingUser can only be deleted with master key",
+          'AmexingUser can only be deleted with master key'
         );
       }
 
-      logger.logSecurityEvent("AMEXING_USER_DELETION", {
+      logger.logSecurityEvent('AMEXING_USER_DELETION', {
         userId: user.id,
-        username: user.get("username"),
-        email: user.get("email")
-          ? `${user.get("email").substring(0, 3)}***`
+        username: user.get('username'),
+        email: user.get('email')
+          ? `${user.get('email').substring(0, 3)}***`
           : undefined,
       });
     });
@@ -641,29 +639,29 @@ function registerCloudFunctions() {
 
       // Log legacy user operations
       if (!user.existed()) {
-        logger.logSecurityEvent("LEGACY_USER_REGISTRATION", {
-          username: user.get("username"),
-          email: user.get("email")
-            ? `${user.get("email").substring(0, 3)}***`
+        logger.logSecurityEvent('LEGACY_USER_REGISTRATION', {
+          username: user.get('username'),
+          email: user.get('email')
+            ? `${user.get('email').substring(0, 3)}***`
             : undefined,
         });
       }
 
       // Basic validation for legacy users
-      if (!user.get("username")) {
+      if (!user.get('username')) {
         throw new Parse.Error(
           Parse.Error.VALIDATION_ERROR,
-          "Username is required",
+          'Username is required'
         );
       }
 
-      const email = user.get("email");
+      const email = user.get('email');
       if (email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
           throw new Parse.Error(
             Parse.Error.VALIDATION_ERROR,
-            "Invalid email format",
+            'Invalid email format'
           );
         }
       }
@@ -689,13 +687,13 @@ function registerCloudFunctions() {
       if (!master) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Users can only be deleted with master key",
+          'Users can only be deleted with master key'
         );
       }
 
-      logger.logSecurityEvent("USER_DELETION", {
+      logger.logSecurityEvent('USER_DELETION', {
         userId: user.id,
-        username: user.get("username"),
+        username: user.get('username'),
       });
     });
 
@@ -703,10 +701,10 @@ function registerCloudFunctions() {
     Parse.Cloud.afterLogin(async (request) => {
       const { object: user } = request;
 
-      logger.logAccessAttempt(true, user.get("username"), request.ip);
+      logger.logAccessAttempt(true, user.get('username'), request.ip);
 
       // Update last login timestamp
-      user.set("lastLoginAt", new Date());
+      user.set('lastLoginAt', new Date());
       await user.save(null, { useMasterKey: true });
     });
 
@@ -714,20 +712,20 @@ function registerCloudFunctions() {
     Parse.Cloud.afterLogout(async (request) => {
       const { object: session } = request;
 
-      logger.logSecurityEvent("USER_LOGOUT", {
-        sessionToken: `${session.get("sessionToken").substring(0, 8)}***`,
+      logger.logSecurityEvent('USER_LOGOUT', {
+        sessionToken: `${session.get('sessionToken').substring(0, 8)}***`,
       });
     });
 
     // Job Functions (Scheduled Tasks)
-    Parse.Cloud.job("cleanupExpiredSessions", async (request) => {
+    Parse.Cloud.job('cleanupExpiredSessions', async (request) => {
       const { message } = request;
-      message("Starting expired sessions cleanup...");
+      message('Starting expired sessions cleanup...');
 
       try {
-        const Session = Parse.Object.extend("_Session");
+        const Session = Parse.Object.extend('_Session');
         const query = new Parse.Query(Session);
-        query.lessThan("expiresAt", new Date());
+        query.lessThan('expiresAt', new Date());
 
         const expiredSessions = await query.find({ useMasterKey: true });
 
@@ -737,33 +735,33 @@ function registerCloudFunctions() {
           });
           message(`Deleted ${expiredSessions.length} expired sessions`);
           logger.info(
-            `Cleanup job: Deleted ${expiredSessions.length} expired sessions`,
+            `Cleanup job: Deleted ${expiredSessions.length} expired sessions`
           );
         } else {
-          message("No expired sessions found");
+          message('No expired sessions found');
         }
 
         return { success: true, deletedCount: expiredSessions.length };
       } catch (error) {
-        logger.error("Error in cleanup job:", error);
+        logger.error('Error in cleanup job:', error);
         throw error;
       }
     });
 
     // Security audit job
-    Parse.Cloud.job("securityAudit", async (request) => {
+    Parse.Cloud.job('securityAudit', async (request) => {
       const { message } = request;
-      message("Running security audit...");
+      message('Running security audit...');
 
       try {
         // Check for users with weak passwords (this is a placeholder)
-        const User = Parse.Object.extend("_User");
+        const User = Parse.Object.extend('_User');
         const query = new Parse.Query(User);
         const totalUsers = await query.count({ useMasterKey: true });
 
         // Check for users without email verification
         const unverifiedQuery = new Parse.Query(User);
-        unverifiedQuery.equalTo("emailVerified", false);
+        unverifiedQuery.equalTo('emailVerified', false);
         const unverifiedUsers = await unverifiedQuery.count({
           useMasterKey: true,
         });
@@ -774,21 +772,21 @@ function registerCloudFunctions() {
           timestamp: new Date().toISOString(),
         };
 
-        logger.logSecurityEvent("SECURITY_AUDIT", auditResults);
+        logger.logSecurityEvent('SECURITY_AUDIT', auditResults);
         message(
-          `Audit complete. Total users: ${totalUsers}, Unverified: ${unverifiedUsers}`,
+          `Audit complete. Total users: ${totalUsers}, Unverified: ${unverifiedUsers}`
         );
 
         return auditResults;
       } catch (error) {
-        logger.error("Error in security audit:", error);
+        logger.error('Error in security audit:', error);
         throw error;
       }
     });
 
-    logger.info("Cloud Code loaded successfully");
+    logger.info('Cloud Code loaded successfully');
   } catch (error) {
-    logger.error("Error registering cloud functions:", error);
+    logger.error('Error registering cloud functions:', error);
   }
 }
 
@@ -798,12 +796,12 @@ function registerCloudFunctions() {
 // Register cloud functions immediately
 // Parse Server loads this file and Parse.Cloud is available
 try {
-  logger.info("Starting cloud functions registration...");
+  logger.info('Starting cloud functions registration...');
   registerCloudFunctions();
-  logger.info("Cloud functions registration completed successfully");
+  logger.info('Cloud functions registration completed successfully');
 } catch (error) {
-  logger.error("Failed to register cloud functions:", error);
-  logger.error("Cloud function registration error details:", {
+  logger.error('Failed to register cloud functions:', error);
+  logger.error('Cloud function registration error details:', {
     name: error.name,
     message: error.message,
     stack: error.stack,

@@ -7,10 +7,10 @@
  * // Returns: { success: true, data: {...} }
  */
 
-const Parse = require("parse/node");
-const jwt = require("jsonwebtoken");
-const https = require("https");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const jwt = require('jsonwebtoken');
+const https = require('https');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Apple ID Token Validator - Validates and verifies Apple Sign In ID tokens.
@@ -71,10 +71,10 @@ class AppleIdTokenValidator {
       this.validateExpiration(payload);
       return payload;
     } catch (error) {
-      logger.error("Apple ID token verification failed:", error);
+      logger.error('Apple ID token verification failed:', error);
       throw new Parse.Error(
         Parse.Error.OTHER_CAUSE,
-        "Failed to verify Apple ID token",
+        'Failed to verify Apple ID token'
       );
     }
   }
@@ -102,7 +102,7 @@ class AppleIdTokenValidator {
      * // Returns: { success: true, data: {...} }
      */
     if (!decoded || !decoded.header.kid) {
-      throw new Error("Invalid ID token format");
+      throw new Error('Invalid ID token format');
     }
 
     /**
@@ -112,13 +112,13 @@ class AppleIdTokenValidator {
      */
     const publicKey = appleKeys[decoded.header.kid];
     if (!publicKey) {
-      throw new Error("Unable to find matching public key");
+      throw new Error('Unable to find matching public key');
     }
 
     return jwt.verify(idToken, publicKey, {
-      algorithms: ["RS256"],
+      algorithms: ['RS256'],
       audience: this.config.clientId,
-      issuer: "https://appleid.apple.com",
+      issuer: 'https://appleid.apple.com',
     });
   }
 
@@ -132,7 +132,7 @@ class AppleIdTokenValidator {
    */
   validateNonce(payload, expectedNonce) {
     if (expectedNonce && payload.nonce !== expectedNonce) {
-      throw new Error("Nonce verification failed");
+      throw new Error('Nonce verification failed');
     }
   }
 
@@ -146,7 +146,7 @@ class AppleIdTokenValidator {
   validateExpiration(payload) {
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp && payload.exp < now) {
-      throw new Error("ID token has expired");
+      throw new Error('ID token has expired');
     }
   }
 
@@ -158,17 +158,17 @@ class AppleIdTokenValidator {
    */
   async getApplePublicKeys() {
     return new Promise((resolve, reject) => {
-      const url = "https://appleid.apple.com/auth/keys";
+      const url = 'https://appleid.apple.com/auth/keys';
 
       https
         .get(url, (response) => {
-          let data = "";
+          let data = '';
 
-          response.on("data", (chunk) => {
+          response.on('data', (chunk) => {
             data += chunk;
           });
 
-          response.on("end", () => {
+          response.on('end', () => {
             try {
               const keys = JSON.parse(data);
               const publicKeys = {};
@@ -184,7 +184,7 @@ class AppleIdTokenValidator {
             }
           });
         })
-        .on("error", reject);
+        .on('error', reject);
     });
   }
 
@@ -199,12 +199,12 @@ class AppleIdTokenValidator {
     // Convert JWK to PEM format for jwt.verify()
     const { kty, n } = jwk;
 
-    if (kty !== "RSA") {
-      throw new Error("Unsupported key type");
+    if (kty !== 'RSA') {
+      throw new Error('Unsupported key type');
     }
 
     // This is a simplified conversion - in production, use a proper JWK library
-    const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${Buffer.from(n, "base64").toString("base64")}\n-----END PUBLIC KEY-----`;
+    const publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${Buffer.from(n, 'base64').toString('base64')}\n-----END PUBLIC KEY-----`;
     return publicKeyPem;
   }
 }

@@ -1,4 +1,4 @@
-const logger = require("../../infrastructure/logger");
+const logger = require('../../infrastructure/logger');
 
 /**
  * Test Cloud Function.
@@ -19,7 +19,7 @@ module.exports = async (request) => {
   const { params } = request;
 
   // Log the test function call
-  logger.debug("Test function called", { params });
+  logger.debug('Test function called', { params });
 
   // Simulate some async operation
   await new Promise((resolve) => {
@@ -29,7 +29,7 @@ module.exports = async (request) => {
   // Return test response
   return {
     success: true,
-    message: "Test function executed successfully",
+    message: 'Test function executed successfully',
     echo: params,
     timestamp: new Date().toISOString(),
     random: Math.floor(Math.random() * 1000),

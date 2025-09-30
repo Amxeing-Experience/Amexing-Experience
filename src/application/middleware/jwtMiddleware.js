@@ -10,9 +10,9 @@
  * // Processes request before route handler
  */
 
-const expressRateLimit = require("express-rate-limit");
-const AuthenticationService = require("../services/AuthenticationService");
-const logger = require("../../infrastructure/logger");
+const expressRateLimit = require('express-rate-limit');
+const AuthenticationService = require('../services/AuthenticationService');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Middleware to validate JWT tokens from cookies or Authorization header.
@@ -37,33 +37,32 @@ const authenticateToken = async (req, res, next) => {
     // Extract token from cookies (preferred) or Authorization header
     let token = req.cookies?.accessToken;
 
-    logger.debug("JWT Middleware - Cookie token:", { tokenPresent: !!token });
+    logger.debug('JWT Middleware - Cookie token:', { tokenPresent: !!token });
 
     if (!token) {
       const authHeader = req.headers.authorization;
-      logger.debug("JWT Middleware - Auth header:", {
+      logger.debug('JWT Middleware - Auth header:', {
         headerPresent: !!authHeader,
       });
-      token =
-        authHeader && authHeader.startsWith("Bearer ")
-          ? authHeader.slice(7)
-          : null;
+      token = authHeader && authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7)
+        : null;
     }
 
     if (!token) {
-      logger.debug("JWT Middleware - No token found, returning 401");
+      logger.debug('JWT Middleware - No token found, returning 401');
       return res.status(401).json({
         success: false,
-        error: "Access token required",
+        error: 'Access token required',
       });
     }
 
-    logger.debug("JWT Middleware - Token found, validating..");
+    logger.debug('JWT Middleware - Token found, validating..');
 
     // Validate token using AuthenticationService
     const result = await AuthenticationService.validateToken(token);
 
-    logger.debug("JWT Middleware - Validation result:", { success: !!result });
+    logger.debug('JWT Middleware - Validation result:', { success: !!result });
 
     // Attach user information to request
     req.user = result.user;
@@ -71,26 +70,26 @@ const authenticateToken = async (req, res, next) => {
     req.userRole = result.role; // Backward compatibility
     req.roleObject = result.roleObject; // New role object
 
-    logger.debug("JWT Middleware - User attached:", {
+    logger.debug('JWT Middleware - User attached:', {
       userId: req.userId,
       role: req.userRole,
       organizationId: result.user?.organizationId,
     });
     next();
   } catch (error) {
-    logger.error("JWT authentication error:", error);
+    logger.error('JWT authentication error:', error);
 
-    if (error.message === "Token expired") {
+    if (error.message === 'Token expired') {
       return res.status(401).json({
         success: false,
-        error: "Token expired",
-        code: "TOKEN_EXPIRED",
+        error: 'Token expired',
+        code: 'TOKEN_EXPIRED',
       });
     }
 
     return res.status(401).json({
       success: false,
-      error: "Invalid or malformed token",
+      error: 'Invalid or malformed token',
     });
   }
 };
@@ -120,10 +119,9 @@ const authenticateOptional = async (req, res, next) => {
 
     if (!token) {
       const authHeader = req.headers.authorization;
-      token =
-        authHeader && authHeader.startsWith("Bearer ")
-          ? authHeader.slice(7)
-          : null;
+      token = authHeader && authHeader.startsWith('Bearer ')
+        ? authHeader.slice(7)
+        : null;
     }
 
     if (!token) {
@@ -141,7 +139,7 @@ const authenticateOptional = async (req, res, next) => {
 
     next();
   } catch (error) {
-    logger.warn("Optional JWT authentication failed:", error.message);
+    logger.warn('Optional JWT authentication failed:', error.message);
     // Continue without authentication on error
     next();
   }
@@ -168,12 +166,12 @@ const requireRole = (allowedRoles) => {
     if (!req.user || !req.userRole) {
       return res.status(401).json({
         success: false,
-        error: "Authentication required",
+        error: 'Authentication required',
       });
     }
 
     if (!roles.includes(req.userRole)) {
-      logger.warn("Insufficient permissions:", {
+      logger.warn('Insufficient permissions:', {
         userId: req.userId,
         userRole: req.userRole,
         requiredRoles: roles,
@@ -181,7 +179,7 @@ const requireRole = (allowedRoles) => {
 
       return res.status(403).json({
         success: false,
-        error: "Insufficient permissions",
+        error: 'Insufficient permissions',
       });
     }
 
@@ -205,57 +203,54 @@ const requireRole = (allowedRoles) => {
  *   approveBooking
  * );
  */
-const requirePermission =
-  (permission, contextExtractor = () => ({})) =>
-  async (req, res, next) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          error: "Authentication required",
-        });
-      }
-
-      // Extract context for permission check
-      const context =
-        typeof contextExtractor === "function"
-          ? contextExtractor(req)
-          : contextExtractor || {};
-
-      // Check if user has permission
-      const hasPermission = await req.user.hasPermission(permission, context);
-
-      if (!hasPermission) {
-        logger.warn("Permission denied:", {
-          userId: req.userId,
-          permission,
-          context,
-          userRole: req.userRole,
-        });
-
-        return res.status(403).json({
-          success: false,
-          error: "Permission denied",
-          permission,
-        });
-      }
-
-      // Attach permission context to request for use in handlers
-      req.permissionContext = context;
-      next();
-    } catch (error) {
-      logger.error("Permission check error:", {
-        userId: req.userId,
-        permission,
-        error: error.message,
-      });
-
-      return res.status(500).json({
+const requirePermission = (permission, contextExtractor = () => ({})) => async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
         success: false,
-        error: "Permission validation failed",
+        error: 'Authentication required',
       });
     }
-  };
+
+    // Extract context for permission check
+    const context = typeof contextExtractor === 'function'
+      ? contextExtractor(req)
+      : contextExtractor || {};
+
+    // Check if user has permission
+    const hasPermission = await req.user.hasPermission(permission, context);
+
+    if (!hasPermission) {
+      logger.warn('Permission denied:', {
+        userId: req.userId,
+        permission,
+        context,
+        userRole: req.userRole,
+      });
+
+      return res.status(403).json({
+        success: false,
+        error: 'Permission denied',
+        permission,
+      });
+    }
+
+    // Attach permission context to request for use in handlers
+    req.permissionContext = context;
+    next();
+  } catch (error) {
+    logger.error('Permission check error:', {
+      userId: req.userId,
+      permission,
+      error: error.message,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Permission validation failed',
+    });
+  }
+};
 
 /**
  * Middleware to check role level (hierarchical permission).
@@ -270,14 +265,14 @@ const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
     if (!req.user || !req.roleObject) {
       return res.status(401).json({
         success: false,
-        error: "Authentication required",
+        error: 'Authentication required',
       });
     }
 
     const userLevel = req.roleObject.getLevel();
 
     if (userLevel < minimumLevel) {
-      logger.warn("Insufficient role level:", {
+      logger.warn('Insufficient role level:', {
         userId: req.userId,
         userLevel,
         requiredLevel: minimumLevel,
@@ -286,7 +281,7 @@ const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
 
       return res.status(403).json({
         success: false,
-        error: "Insufficient role level",
+        error: 'Insufficient role level',
         required: minimumLevel,
         current: userLevel,
       });
@@ -294,7 +289,7 @@ const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
 
     next();
   } catch (error) {
-    logger.error("Role level check error:", {
+    logger.error('Role level check error:', {
       userId: req.userId,
       minimumLevel,
       error: error.message,
@@ -302,7 +297,7 @@ const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
 
     return res.status(500).json({
       success: false,
-      error: "Role level validation failed",
+      error: 'Role level validation failed',
     });
   }
 };
@@ -315,80 +310,77 @@ const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
  * // Only allow access to own organization data
  * app.get('/organization/:id/data', authenticateToken, requireOrganizationScope('own'), getOrgData);
  */
-const requireOrganizationScope =
-  (requiredScope = "own") =>
-  async (req, res, next) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          error: "Authentication required",
-        });
-      }
-
-      const userOrganizationId = req.user.organizationId;
-      const targetOrganizationId =
-        req.params.organizationId || req.body.organizationId;
-
-      switch (requiredScope) {
-        case "own":
-          if (
-            targetOrganizationId &&
-            userOrganizationId !== targetOrganizationId
-          ) {
-            return res.status(403).json({
-              success: false,
-              error: "Access limited to your own organization",
-            });
-          }
-          break;
-
-        case "client":
-          if (userOrganizationId === "amexing") {
-            // Amexing users can access any client organization
-            break;
-          }
-          if (
-            targetOrganizationId &&
-            userOrganizationId !== targetOrganizationId
-          ) {
-            return res.status(403).json({
-              success: false,
-              error: "Access limited to your own organization",
-            });
-          }
-          break;
-
-        case "system":
-          if (userOrganizationId !== "amexing") {
-            return res.status(403).json({
-              success: false,
-              error: "System access required",
-            });
-          }
-          break;
-
-        default:
-          return res.status(400).json({
-            success: false,
-            error: "Invalid scope configuration",
-          });
-      }
-
-      next();
-    } catch (error) {
-      logger.error("Organization scope check error:", {
-        userId: req.userId,
-        requiredScope,
-        error: error.message,
-      });
-
-      return res.status(500).json({
+const requireOrganizationScope = (requiredScope = 'own') => async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
         success: false,
-        error: "Organization scope validation failed",
+        error: 'Authentication required',
       });
     }
-  };
+
+    const userOrganizationId = req.user.organizationId;
+    const targetOrganizationId = req.params.organizationId || req.body.organizationId;
+
+    switch (requiredScope) {
+      case 'own':
+        if (
+          targetOrganizationId
+            && userOrganizationId !== targetOrganizationId
+        ) {
+          return res.status(403).json({
+            success: false,
+            error: 'Access limited to your own organization',
+          });
+        }
+        break;
+
+      case 'client':
+        if (userOrganizationId === 'amexing') {
+          // Amexing users can access any client organization
+          break;
+        }
+        if (
+          targetOrganizationId
+            && userOrganizationId !== targetOrganizationId
+        ) {
+          return res.status(403).json({
+            success: false,
+            error: 'Access limited to your own organization',
+          });
+        }
+        break;
+
+      case 'system':
+        if (userOrganizationId !== 'amexing') {
+          return res.status(403).json({
+            success: false,
+            error: 'System access required',
+          });
+        }
+        break;
+
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid scope configuration',
+        });
+    }
+
+    next();
+  } catch (error) {
+    logger.error('Organization scope check error:', {
+      userId: req.userId,
+      requiredScope,
+      error: error.message,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Organization scope validation failed',
+    });
+  }
+};
 
 /**
  * Middleware to refresh expired tokens automatically.
@@ -415,17 +407,17 @@ const autoRefreshToken = async (req, res, next) => {
       const result = await AuthenticationService.refreshToken(refreshToken);
 
       // Set new tokens in cookies
-      res.cookie("accessToken", result.tokens.accessToken, {
+      res.cookie('accessToken', result.tokens.accessToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
         maxAge: 8 * 60 * 60 * 1000, // 8 hours
       });
 
-      res.cookie("refreshToken", result.tokens.refreshToken, {
+      res.cookie('refreshToken', result.tokens.refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       });
 
@@ -437,9 +429,9 @@ const autoRefreshToken = async (req, res, next) => {
 
     next();
   } catch (error) {
-    logger.error("Auto refresh token error:", error);
+    logger.error('Auto refresh token error:', error);
     // Clear invalid refresh token
-    res.clearCookie("refreshToken");
+    res.clearCookie('refreshToken');
     next();
   }
 };
@@ -490,7 +482,7 @@ const authRateLimit = expressRateLimit({
   max: 10, // Limit each IP to 10 requests per windowMs for auth endpoints
   message: {
     success: false,
-    error: "Too many authentication attempts, please try again later",
+    error: 'Too many authentication attempts, please try again later',
   },
   standardHeaders: true,
   legacyHeaders: false,

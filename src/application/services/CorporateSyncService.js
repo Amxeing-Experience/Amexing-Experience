@@ -11,11 +11,11 @@
  * // Returns: { success: true, data: {...} }
  */
 
-const Parse = require("parse/node");
-const CorporateOAuthService = require("./CorporateOAuthService");
+const Parse = require('parse/node');
+const CorporateOAuthService = require('./CorporateOAuthService');
 // const OAuthService = require('./OAuthService'); // TODO: Remove unused import
-const AmexingUser = require("../../domain/models/AmexingUser");
-const logger = require("../../infrastructure/logger");
+const AmexingUser = require('../../domain/models/AmexingUser');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Corporate Sync Service - Manages periodic synchronization of corporate employee data.
@@ -98,9 +98,9 @@ class CorporateSyncService {
 
     this.syncIntervals.set(clientId, intervalId);
 
-    logger.logSecurityEvent("CORPORATE_SYNC_STARTED", null, {
+    logger.logSecurityEvent('CORPORATE_SYNC_STARTED', null, {
       clientId,
-      clientName: client.get("name"),
+      clientName: client.get('name'),
       intervalMinutes,
     });
   }
@@ -124,7 +124,7 @@ class CorporateSyncService {
       clearInterval(intervalId);
       this.syncIntervals.delete(clientId);
 
-      logger.logSecurityEvent("CORPORATE_SYNC_STOPPED", null, {
+      logger.logSecurityEvent('CORPORATE_SYNC_STOPPED', null, {
         clientId,
       });
     }
@@ -144,8 +144,8 @@ class CorporateSyncService {
   async syncCorporateClient(clientId) {
     try {
       // Get client information
-      const clientQuery = new Parse.Query("Client");
-      clientQuery.equalTo("objectId", clientId);
+      const clientQuery = new Parse.Query('Client');
+      clientQuery.equalTo('objectId', clientId);
 
       const client = await clientQuery.first({ useMasterKey: true });
 
@@ -153,29 +153,29 @@ class CorporateSyncService {
         throw new Error(`Client ${clientId} not found`);
       }
 
-      if (!client.get("isCorporate") || !client.get("oauthEnabled")) {
+      if (!client.get('isCorporate') || !client.get('oauthEnabled')) {
         throw new Error(`Client ${clientId} is not configured for OAuth sync`);
       }
 
-      const corporateDomain = client.get("corporateDomain");
-      const primaryProvider = client.get("primaryOAuthProvider");
+      const corporateDomain = client.get('corporateDomain');
+      const primaryProvider = client.get('primaryOAuthProvider');
 
       if (!corporateDomain || !primaryProvider) {
         throw new Error(`Client ${clientId} missing OAuth configuration`);
       }
 
-      logger.logSecurityEvent("CORPORATE_SYNC_STARTED", null, {
+      logger.logSecurityEvent('CORPORATE_SYNC_STARTED', null, {
         clientId,
-        clientName: client.get("name"),
+        clientName: client.get('name'),
         corporateDomain,
         provider: primaryProvider,
       });
 
       // Get all employees for this client
-      const employeeQuery = new Parse.Query("ClientEmployee");
-      employeeQuery.equalTo("clientId", clientId);
-      employeeQuery.equalTo("active", true);
-      employeeQuery.include("userId");
+      const employeeQuery = new Parse.Query('ClientEmployee');
+      employeeQuery.equalTo('clientId', clientId);
+      employeeQuery.equalTo('active', true);
+      employeeQuery.include('userId');
 
       const employees = await employeeQuery.find({ useMasterKey: true });
 
@@ -189,18 +189,18 @@ class CorporateSyncService {
       // eslint-disable-next-line no-restricted-syntax
       for (const employee of employees) {
         try {
-          const user = employee.get("userId");
+          const user = employee.get('userId');
           if (
-            user &&
-            user.get("isOAuthUser") &&
-            user.get("oauthProvider") === primaryProvider
+            user
+            && user.get('isOAuthUser')
+            && user.get('oauthProvider') === primaryProvider
           ) {
             // eslint-disable-next-line no-await-in-loop
             const syncResult = await this.syncEmployeeData(
               user,
               employee,
               client,
-              primaryProvider,
+              primaryProvider
             );
 
             if (syncResult.success) {
@@ -216,7 +216,7 @@ class CorporateSyncService {
               errorCount++;
               syncErrors.push({
                 userId: user.id,
-                email: CorporateOAuthService.maskEmail(user.get("email")),
+                email: CorporateOAuthService.maskEmail(user.get('email')),
                 error: syncResult.error,
               });
             }
@@ -245,9 +245,9 @@ class CorporateSyncService {
         errors: syncErrors,
       };
 
-      logger.logSecurityEvent("CORPORATE_SYNC_COMPLETED", null, {
+      logger.logSecurityEvent('CORPORATE_SYNC_COMPLETED', null, {
         clientId,
-        clientName: client.get("name"),
+        clientName: client.get('name'),
         syncedCount,
         errorCount,
         deactivatedCount,
@@ -258,7 +258,7 @@ class CorporateSyncService {
     } catch (error) {
       logger.error(`Corporate sync failed for client ${clientId}:`, error);
 
-      logger.logSecurityEvent("CORPORATE_SYNC_FAILED", null, {
+      logger.logSecurityEvent('CORPORATE_SYNC_FAILED', null, {
         clientId,
         error: error.message,
       });
@@ -284,39 +284,38 @@ class CorporateSyncService {
   // eslint-disable-next-line max-params, max-lines-per-function
   async syncEmployeeData(user, employee, client, _provider) {
     try {
-      const oauthProfile = user.get("oauthProfile");
+      const oauthProfile = user.get('oauthProfile');
       let refreshedProfile = null;
 
       // Try to refresh user data from provider (if we have refresh token)
       try {
-        if (_provider === "microsoft" && user.get("refreshToken")) {
+        if (_provider === 'microsoft' && user.get('refreshToken')) {
           // Microsoft refresh token flow
           refreshedProfile = await this.refreshMicrosoftUserData(
-            user.get("refreshToken"),
+            user.get('refreshToken')
           );
-        } else if (_provider === "google" && user.get("refreshToken")) {
+        } else if (_provider === 'google' && user.get('refreshToken')) {
           // Google refresh token flow
           refreshedProfile = await this.refreshGoogleUserData(
-            user.get("refreshToken"),
+            user.get('refreshToken')
           );
         }
       } catch (refreshError) {
         // If refresh fails, we'll continue with existing data
-        logger.logSecurityEvent("OAUTH_REFRESH_FAILED", user.id, {
+        logger.logSecurityEvent('OAUTH_REFRESH_FAILED', user.id, {
           provider, // eslint-disable-line no-undef
           error: refreshError.message,
         });
       }
 
       // Use refreshed profile or existing profile
-      const currentProfile =
-        refreshedProfile || JSON.parse(oauthProfile || "{}");
+      const currentProfile = refreshedProfile || JSON.parse(oauthProfile || '{}');
 
       // Check if user still exists in corporate directory
       let userStillActive = true;
       if (
-        currentProfile.error &&
-        currentProfile.error.includes("user not found")
+        currentProfile.error
+        && currentProfile.error.includes('user not found')
       ) {
         userStillActive = false;
       }
@@ -326,42 +325,41 @@ class CorporateSyncService {
 
       // Update department if changed
       const corporateConfig = CorporateOAuthService.corporateDomains.get(
-        CorporateOAuthService.extractEmailDomain(user.get("email")),
+        CorporateOAuthService.extractEmailDomain(user.get('email'))
       );
 
       if (corporateConfig && refreshedProfile) {
-        const newDepartment =
-          await CorporateOAuthService.mapDepartmentFromOAuth(
-            refreshedProfile,
-            corporateConfig,
-          );
+        const newDepartment = await CorporateOAuthService.mapDepartmentFromOAuth(
+          refreshedProfile,
+          corporateConfig
+        );
 
-        if (newDepartment && newDepartment !== employee.get("departmentId")) {
-          employee.set("departmentId", newDepartment);
+        if (newDepartment && newDepartment !== employee.get('departmentId')) {
+          employee.set('departmentId', newDepartment);
           updated = true;
         }
 
         // Update access level if changed
         const newAccessLevel = CorporateOAuthService.determineAccessLevel(
           refreshedProfile,
-          corporateConfig,
+          corporateConfig
         );
 
-        if (newAccessLevel !== employee.get("accessLevel")) {
-          employee.set("accessLevel", newAccessLevel);
+        if (newAccessLevel !== employee.get('accessLevel')) {
+          employee.set('accessLevel', newAccessLevel);
           updated = true;
         }
       }
 
       // Update sync timestamp
-      employee.set("lastOAuthSync", new Date());
+      employee.set('lastOAuthSync', new Date());
       updated = true;
 
       // If user is no longer active in directory, deactivate
       if (!userStillActive) {
-        employee.set("active", false);
-        employee.set("deactivationReason", "oauth_sync_user_not_found");
-        employee.set("deactivatedAt", new Date());
+        employee.set('active', false);
+        employee.set('deactivationReason', 'oauth_sync_user_not_found');
+        employee.set('deactivatedAt', new Date());
         updated = true;
       }
 
@@ -372,10 +370,10 @@ class CorporateSyncService {
       // Update user profile if we got refreshed data
       if (refreshedProfile) {
         user.set(
-          "oauthProfile",
-          CorporateOAuthService.encryptOAuthProfile(refreshedProfile),
+          'oauthProfile',
+          CorporateOAuthService.encryptOAuthProfile(refreshedProfile)
         );
-        user.set("lastOAuthSync", new Date());
+        user.set('lastOAuthSync', new Date());
         await user.save(null, { useMasterKey: true });
       }
 
@@ -411,29 +409,29 @@ class CorporateSyncService {
    */
   async refreshMicrosoftUserData(refreshToken) {
     try {
-      const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || "common";
+      const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || 'common';
 
       // Exchange refresh token for new access token
       const tokenResponse = await fetch(
         `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
         {
-          method: "POST",
+          method: 'POST',
           headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
+            'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: new URLSearchParams({
             client_id: process.env.MICROSOFT_OAUTH_CLIENT_ID,
             client_secret: process.env.MICROSOFT_OAUTH_CLIENT_SECRET,
-            grant_type: "refreshtoken",
+            grant_type: 'refreshtoken',
             refreshtoken: refreshToken,
-            scope: "openid profile email User.Read Directory.Read.All",
+            scope: 'openid profile email User.Read Directory.Read.All',
           }),
-        },
+        }
       );
 
       if (!tokenResponse.ok) {
         throw new Error(
-          `Microsoft token refresh failed: ${tokenResponse.status}`,
+          `Microsoft token refresh failed: ${tokenResponse.status}`
         );
       }
 
@@ -441,17 +439,17 @@ class CorporateSyncService {
 
       // Get updated user profile
       const profileResponse = await fetch(
-        "https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation",
+        'https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation',
         {
           headers: {
             Authorization: `Bearer ${tokenData.accesstoken}`,
           },
-        },
+        }
       );
 
       if (!profileResponse.ok) {
         throw new Error(
-          `Microsoft profile refresh failed: ${profileResponse.status}`,
+          `Microsoft profile refresh failed: ${profileResponse.status}`
         );
       }
 
@@ -484,15 +482,15 @@ class CorporateSyncService {
   async refreshGoogleUserData(refreshToken) {
     try {
       // Exchange refresh token for new access token
-      const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
           client_id: process.env.GOOGLE_OAUTH_CLIENT_ID,
           client_secret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-          grant_type: "refreshtoken",
+          grant_type: 'refreshtoken',
           refreshtoken: refreshToken,
         }),
       });
@@ -505,17 +503,17 @@ class CorporateSyncService {
 
       // Get updated user profile
       const profileResponse = await fetch(
-        "https://www.googleapis.com/oauth2/v2/userinfo",
+        'https://www.googleapis.com/oauth2/v2/userinfo',
         {
           headers: {
             Authorization: `Bearer ${tokenData.accesstoken}`,
           },
-        },
+        }
       );
 
       if (!profileResponse.ok) {
         throw new Error(
-          `Google profile refresh failed: ${profileResponse.status}`,
+          `Google profile refresh failed: ${profileResponse.status}`
         );
       }
 
@@ -546,10 +544,10 @@ class CorporateSyncService {
   async getAllSyncStatuses() {
     try {
       // Get all corporate clients with OAuth enabled
-      const clientQuery = new Parse.Query("Client");
-      clientQuery.equalTo("isCorporate", true);
-      clientQuery.equalTo("oauthEnabled", true);
-      clientQuery.equalTo("active", true);
+      const clientQuery = new Parse.Query('Client');
+      clientQuery.equalTo('isCorporate', true);
+      clientQuery.equalTo('oauthEnabled', true);
+      clientQuery.equalTo('active', true);
 
       const clients = await clientQuery.find({ useMasterKey: true });
 
@@ -557,9 +555,9 @@ class CorporateSyncService {
         const clientId = client.id;
         return {
           clientId,
-          clientName: client.get("name"),
-          corporateDomain: client.get("corporateDomain"),
-          primaryProvider: client.get("primaryOAuthProvider"),
+          clientName: client.get('name'),
+          corporateDomain: client.get('corporateDomain'),
+          primaryProvider: client.get('primaryOAuthProvider'),
           syncActive: this.syncIntervals.has(clientId),
           lastSync: this.lastSyncTimes.get(clientId) || null,
         };
@@ -567,7 +565,7 @@ class CorporateSyncService {
 
       return statuses;
     } catch (error) {
-      logger.error("Error getting sync statuses:", error);
+      logger.error('Error getting sync statuses:', error);
       throw error;
     }
   }
@@ -587,7 +585,7 @@ class CorporateSyncService {
   stopAllSyncs() {
     for (const [clientId, intervalId] of this.syncIntervals) {
       clearInterval(intervalId);
-      logger.logSecurityEvent("CORPORATE_SYNC_STOPPED", null, { clientId });
+      logger.logSecurityEvent('CORPORATE_SYNC_STOPPED', null, { clientId });
     }
 
     this.syncIntervals.clear();

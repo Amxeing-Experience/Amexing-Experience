@@ -7,8 +7,8 @@
  * // Returns: { success: true, data: {...} }
  */
 
-const https = require("https");
-const jwt = require("jsonwebtoken");
+const https = require('https');
+const jwt = require('jsonwebtoken');
 
 /**
  * Apple Token Exchanger - Handles Apple OAuth token exchange operations.
@@ -75,17 +75,17 @@ class AppleTokenExchanger {
       iss: this.config.teamId,
       iat: now,
       exp: now + 3600, // 1 hour expiration
-      aud: "https://appleid.apple.com",
+      aud: 'https://appleid.apple.com',
       sub: this.config.clientId,
     };
 
     const headers = {
       kid: this.config.keyId,
-      alg: "ES256",
+      alg: 'ES256',
     };
 
     return jwt.sign(payload, this.privateKey, {
-      algorithm: "ES256",
+      algorithm: 'ES256',
       header: headers,
     });
   }
@@ -110,7 +110,7 @@ class AppleTokenExchanger {
       client_id: this.config.clientId,
       client_secret: clientSecret,
       code: authorizationCode,
-      grant_type: "authorization_code",
+      grant_type: 'authorization_code',
       redirect_uri: this.config.redirectUri,
     });
 
@@ -118,24 +118,24 @@ class AppleTokenExchanger {
       const data = params.toString();
 
       const options = {
-        hostname: "appleid.apple.com",
+        hostname: 'appleid.apple.com',
         port: 443,
-        path: "/auth/token",
-        method: "POST",
+        path: '/auth/token',
+        method: 'POST',
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "Content-Length": Buffer.byteLength(data),
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(data),
         },
       };
 
       const req = https.request(options, (response) => {
-        let responseData = "";
+        let responseData = '';
 
-        response.on("data", (chunk) => {
+        response.on('data', (chunk) => {
           responseData += chunk;
         });
 
-        response.on("end", () => {
+        response.on('end', () => {
           try {
             const result = JSON.parse(responseData);
 
@@ -153,8 +153,8 @@ class AppleTokenExchanger {
             if (response.statusCode !== 200) {
               reject(
                 new Error(
-                  `Token exchange failed: ${result.error_description || result.error}`,
-                ),
+                  `Token exchange failed: ${result.error_description || result.error}`
+                )
               );
             } else {
               resolve(result);
@@ -165,7 +165,7 @@ class AppleTokenExchanger {
         });
       });
 
-      req.on("error", reject);
+      req.on('error', reject);
       req.write(data);
       req.end();
     });

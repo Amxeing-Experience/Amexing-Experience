@@ -1,4 +1,4 @@
-const logger = require("../../infrastructure/logger");
+const logger = require('../../infrastructure/logger');
 
 /**
  * Logs comprehensive error details for debugging, monitoring, and audit purposes.
@@ -30,7 +30,7 @@ const logger = require("../../infrastructure/logger");
  * @returns {*} - Operation result.
  */
 function logError(err, req) {
-  logger.error("Error Handler:", {
+  logger.error('Error Handler:', {
     error: err.message,
     stack: err.stack,
     url: req.url,
@@ -78,10 +78,10 @@ function handleParseError(err) {
   }
 
   const parseErrors = {
-    101: { status: 400, message: "Invalid username or password" },
-    202: { status: 400, message: "Username already taken" },
-    203: { status: 400, message: "Email already taken" },
-    209: { status: 401, message: "Invalid session token" },
+    101: { status: 400, message: 'Invalid username or password' },
+    202: { status: 400, message: 'Username already taken' },
+    203: { status: 400, message: 'Email already taken' },
+    209: { status: 401, message: 'Invalid session token' },
   };
 
   return parseErrors[err.code] || { status: 400, message: err.message };
@@ -120,15 +120,15 @@ function handleParseError(err) {
  * // Returns: null
  */
 function handleMongoError(err) {
-  if (err.name !== "MongoError" && err.name !== "MongoServerError") {
+  if (err.name !== 'MongoError' && err.name !== 'MongoServerError') {
     return null;
   }
 
   if (err.code === 11000) {
-    return { status: 400, message: "Duplicate key error" };
+    return { status: 400, message: 'Duplicate key error' };
   }
 
-  return { status: 500, message: "Database error occurred" };
+  return { status: 500, message: 'Database error occurred' };
 }
 
 /**
@@ -170,13 +170,13 @@ function handleMongoError(err) {
  * // Returns: null
  */
 function handleValidationError(err) {
-  if (err.name !== "ValidationError") {
+  if (err.name !== 'ValidationError') {
     return null;
   }
 
   const message = err.details
-    ? err.details.map((detail) => detail.message).join(", ")
-    : "Validation error";
+    ? err.details.map((detail) => detail.message).join(', ')
+    : 'Validation error';
 
   return { status: 400, message };
 }
@@ -265,7 +265,7 @@ function getErrorDetails(err) {
 
   return {
     status: err.status || err.statusCode || 500,
-    message: err.message || "Internal Server Error",
+    message: err.message || 'Internal Server Error',
   };
 }
 
@@ -286,30 +286,29 @@ function getErrorDetails(err) {
 const errorHandler = (err, req, res, _next) => {
   logError(err, req);
   const { status, message } = getErrorDetails(err);
-  const finalMessage =
-    process.env.NODE_ENV === "production" && status === 500
-      ? "An error occurred processing your request"
-      : message;
+  const finalMessage = process.env.NODE_ENV === 'production' && status === 500
+    ? 'An error occurred processing your request'
+    : message;
 
   res.status(status);
 
-  if (req.path.startsWith("/api") || req.path.startsWith("/parse")) {
+  if (req.path.startsWith('/api') || req.path.startsWith('/parse')) {
     return res.json({
       error: true,
       message: finalMessage,
       status,
-      ...(process.env.NODE_ENV === "development" && {
+      ...(process.env.NODE_ENV === 'development' && {
         stack: err.stack,
         details: err,
       }),
     });
   }
 
-  res.render("errors/error", {
-    title: "Error",
+  res.render('errors/error', {
+    title: 'Error',
     status,
     message: finalMessage,
-    error: process.env.NODE_ENV === "development" ? err : {},
+    error: process.env.NODE_ENV === 'development' ? err : {},
   });
 };
 

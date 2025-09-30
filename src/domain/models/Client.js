@@ -18,8 +18,8 @@
  * // Returns: model operation result
  */
 
-const BaseModel = require("./BaseModel");
-const logger = require("../../infrastructure/logger");
+const BaseModel = require('./BaseModel');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Client class representing business entities using the transportation services.
@@ -27,7 +27,7 @@ const logger = require("../../infrastructure/logger");
  */
 class Client extends BaseModel {
   constructor() {
-    super("Client");
+    super('Client');
   }
 
   /**
@@ -46,49 +46,49 @@ class Client extends BaseModel {
     const client = new Client();
 
     // Core business fields
-    client.set("name", clientData.name);
-    client.set("email", clientData.email);
-    client.set("phone", clientData.phone || null);
-    client.set("contactPerson", clientData.contactPerson || null);
-    client.set("companyType", clientData.companyType || "corporate");
-    client.set("taxId", clientData.taxId || null);
-    client.set("website", clientData.website || null);
-    client.set("notes", clientData.notes || "");
+    client.set('name', clientData.name);
+    client.set('email', clientData.email);
+    client.set('phone', clientData.phone || null);
+    client.set('contactPerson', clientData.contactPerson || null);
+    client.set('companyType', clientData.companyType || 'corporate');
+    client.set('taxId', clientData.taxId || null);
+    client.set('website', clientData.website || null);
+    client.set('notes', clientData.notes || '');
 
     // Address as embedded object
-    client.set("address", {
-      street: clientData.address?.street || "",
-      city: clientData.address?.city || "",
-      state: clientData.address?.state || "",
-      zipCode: clientData.address?.zipCode || "",
-      country: clientData.address?.country || "",
+    client.set('address', {
+      street: clientData.address?.street || '',
+      city: clientData.address?.city || '',
+      state: clientData.address?.state || '',
+      zipCode: clientData.address?.zipCode || '',
+      country: clientData.address?.country || '',
     });
 
     // OAuth and employee management settings
     client.set(
-      "isCorporate",
-      clientData.isCorporate !== undefined ? clientData.isCorporate : true,
+      'isCorporate',
+      clientData.isCorporate !== undefined ? clientData.isCorporate : true
     );
-    client.set("oauthDomain", clientData.oauthDomain || null);
+    client.set('oauthDomain', clientData.oauthDomain || null);
     client.set(
-      "autoProvisionEmployees",
-      clientData.autoProvisionEmployees || false,
-    );
-    client.set(
-      "defaultEmployeeRole",
-      clientData.defaultEmployeeRole || "employee",
+      'autoProvisionEmployees',
+      clientData.autoProvisionEmployees || false
     );
     client.set(
-      "employeeAccessLevel",
-      clientData.employeeAccessLevel || "basic",
+      'defaultEmployeeRole',
+      clientData.defaultEmployeeRole || 'employee'
+    );
+    client.set(
+      'employeeAccessLevel',
+      clientData.employeeAccessLevel || 'basic'
     );
 
     // Lifecycle fields are set by BaseModel constructor
     // active: true, exists: true are defaults
 
     // Audit fields
-    client.set("createdBy", clientData.createdBy || null);
-    client.set("modifiedBy", clientData.modifiedBy || null);
+    client.set('createdBy', clientData.createdBy || null);
+    client.set('modifiedBy', clientData.modifiedBy || null);
 
     return client;
   }
@@ -107,14 +107,14 @@ class Client extends BaseModel {
    */
   async getDepartments() {
     try {
-      const Department = require("./Department");
-      const query = BaseModel.queryActive("Department");
-      query.equalTo("clientId", this.id);
-      query.addOrder("name", "ascending");
+      const Department = require('./Department');
+      const query = BaseModel.queryActive('Department');
+      query.equalTo('clientId', this.id);
+      query.addOrder('name', 'ascending');
 
       return await query.find({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching client departments", {
+      logger.error('Error fetching client departments', {
         clientId: this.id,
         error: error.message,
       });
@@ -137,24 +137,24 @@ class Client extends BaseModel {
    */
   async getEmployees(role = null) {
     try {
-      const AmexingUser = require("./AmexingUser");
-      const query = BaseModel.queryActive("AmexingUser");
-      query.equalTo("clientId", this.id);
+      const AmexingUser = require('./AmexingUser');
+      const query = BaseModel.queryActive('AmexingUser');
+      query.equalTo('clientId', this.id);
 
       // Filter by role if specified
       if (role) {
-        query.equalTo("role", role);
+        query.equalTo('role', role);
       } else {
         // Get employee roles only
-        query.containedIn("role", ["employee", "department_manager"]);
+        query.containedIn('role', ['employee', 'department_manager']);
       }
 
-      query.addOrder("lastName", "ascending");
-      query.addOrder("firstName", "ascending");
+      query.addOrder('lastName', 'ascending');
+      query.addOrder('firstName', 'ascending');
 
       return await query.find({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching client employees", {
+      logger.error('Error fetching client employees', {
         clientId: this.id,
         role,
         error: error.message,
@@ -186,12 +186,12 @@ class Client extends BaseModel {
         departmentCount: departments,
         employeeCount: employees,
         activeOrderCount: activeOrders,
-        isActive: this.get("active"),
-        createdAt: this.get("createdAt"),
-        lastModified: this.get("updatedAt"),
+        isActive: this.get('active'),
+        createdAt: this.get('createdAt'),
+        lastModified: this.get('updatedAt'),
       };
     } catch (error) {
-      logger.error("Error fetching client statistics", {
+      logger.error('Error fetching client statistics', {
         clientId: this.id,
         error: error.message,
       });
@@ -199,9 +199,9 @@ class Client extends BaseModel {
         departmentCount: 0,
         employeeCount: 0,
         activeOrderCount: 0,
-        isActive: this.get("active"),
-        createdAt: this.get("createdAt"),
-        lastModified: this.get("updatedAt"),
+        isActive: this.get('active'),
+        createdAt: this.get('createdAt'),
+        lastModified: this.get('updatedAt'),
       };
     }
   }
@@ -219,8 +219,8 @@ class Client extends BaseModel {
    */
   async getDepartmentCount() {
     try {
-      const query = BaseModel.queryActive("Department");
-      query.equalTo("clientId", this.id);
+      const query = BaseModel.queryActive('Department');
+      query.equalTo('clientId', this.id);
       return await query.count({ useMasterKey: true });
     } catch (error) {
       return 0;
@@ -240,9 +240,9 @@ class Client extends BaseModel {
    */
   async getEmployeeCount() {
     try {
-      const query = BaseModel.queryActive("AmexingUser");
-      query.equalTo("clientId", this.id);
-      query.containedIn("role", ["employee", "department_manager"]);
+      const query = BaseModel.queryActive('AmexingUser');
+      query.equalTo('clientId', this.id);
+      query.containedIn('role', ['employee', 'department_manager']);
       return await query.count({ useMasterKey: true });
     } catch (error) {
       return 0;
@@ -262,9 +262,9 @@ class Client extends BaseModel {
    */
   async getActiveOrderCount() {
     try {
-      const query = BaseModel.queryActive("Order");
-      query.equalTo("clientId", this.id);
-      query.containedIn("status", ["pending", "confirmed", "in_progress"]);
+      const query = BaseModel.queryActive('Order');
+      query.equalTo('clientId', this.id);
+      query.containedIn('status', ['pending', 'confirmed', 'in_progress']);
       return await query.count({ useMasterKey: true });
     } catch (error) {
       return 0;
@@ -286,7 +286,7 @@ class Client extends BaseModel {
    */
   async createDepartment(departmentData, createdBy) {
     try {
-      const Department = require("./Department");
+      const Department = require('./Department');
       const department = Department.create({
         ...departmentData,
         clientId: this.id,
@@ -296,7 +296,7 @@ class Client extends BaseModel {
 
       await department.save(null, { useMasterKey: true });
 
-      logger.info("Department created for client", {
+      logger.info('Department created for client', {
         clientId: this.id,
         departmentId: department.id,
         departmentName: departmentData.name,
@@ -305,7 +305,7 @@ class Client extends BaseModel {
 
       return department;
     } catch (error) {
-      logger.error("Error creating department for client", {
+      logger.error('Error creating department for client', {
         clientId: this.id,
         departmentData,
         createdBy,
@@ -330,40 +330,40 @@ class Client extends BaseModel {
   async autoProvisionEmployee(userData, oauthProvider) {
     try {
       // Check if auto-provisioning is enabled
-      if (!this.get("autoProvisionEmployees")) {
+      if (!this.get('autoProvisionEmployees')) {
         return null;
       }
 
       // Validate OAuth domain
-      const oauthDomain = this.get("oauthDomain");
+      const oauthDomain = this.get('oauthDomain');
       if (
-        oauthDomain &&
-        !userData.email.toLowerCase().endsWith(`@${oauthDomain.toLowerCase()}`)
+        oauthDomain
+        && !userData.email.toLowerCase().endsWith(`@${oauthDomain.toLowerCase()}`)
       ) {
         return null;
       }
 
-      const AmexingUser = require("./AmexingUser");
+      const AmexingUser = require('./AmexingUser');
 
       // Check if user already exists
-      const existingUserQuery = BaseModel.queryExisting("AmexingUser");
-      existingUserQuery.equalTo("email", userData.email.toLowerCase());
+      const existingUserQuery = BaseModel.queryExisting('AmexingUser');
+      existingUserQuery.equalTo('email', userData.email.toLowerCase());
       const existingUser = await existingUserQuery.first({
         useMasterKey: true,
       });
 
       if (existingUser) {
         // User exists, update OAuth information if needed
-        if (!existingUser.get("active")) {
+        if (!existingUser.get('active')) {
           // Reactivate if user was deactivated
           await existingUser.activate(this.id);
         }
 
         // Update OAuth accounts
-        const oauthAccounts = existingUser.get("oauthAccounts") || [];
+        const oauthAccounts = existingUser.get('oauthAccounts') || [];
         const hasProvider = oauthAccounts.some(
-          (account) => account.__provider === oauthProvider,
-        ); // eslint-disable-line no-underscore-dangle
+          (account) => account.provider === oauthProvider
+        );
 
         if (!hasProvider) {
           oauthAccounts.push({
@@ -373,10 +373,10 @@ class Client extends BaseModel {
             connectedAt: new Date(),
           });
 
-          existingUser.set("oauthAccounts", oauthAccounts);
-          existingUser.set("primaryOAuthProvider", oauthProvider);
-          existingUser.set("lastAuthMethod", "oauth");
-          existingUser.set("modifiedBy", this.id);
+          existingUser.set('oauthAccounts', oauthAccounts);
+          existingUser.set('primaryOAuthProvider', oauthProvider);
+          existingUser.set('lastAuthMethod', 'oauth');
+          existingUser.set('modifiedBy', this.id);
 
           await existingUser.save(null, { useMasterKey: true });
         }
@@ -388,9 +388,9 @@ class Client extends BaseModel {
       const newUser = AmexingUser.create({
         username: userData.email,
         email: userData.email,
-        firstName: userData.firstName || userData.given_name || "",
-        lastName: userData.lastName || userData.family_name || "",
-        role: this.get("defaultEmployeeRole"),
+        firstName: userData.firstName || userData.given_name || '',
+        lastName: userData.lastName || userData.family_name || '',
+        role: this.get('defaultEmployeeRole'),
         clientId: this.id,
         emailVerified: true, // OAuth emails are considered verified
         active: true,
@@ -404,26 +404,26 @@ class Client extends BaseModel {
           },
         ],
         primaryOAuthProvider: oauthProvider,
-        lastAuthMethod: "oauth",
+        lastAuthMethod: 'oauth',
         createdBy: this.id,
         modifiedBy: this.id,
       });
 
       await newUser.save(null, { useMasterKey: true });
 
-      logger.info("Employee auto-provisioned for client", {
+      logger.info('Employee auto-provisioned for client', {
         clientId: this.id,
         userId: newUser.id,
         email: userData.email,
         provider: oauthProvider,
-        role: this.get("defaultEmployeeRole"),
+        role: this.get('defaultEmployeeRole'),
       });
 
       return newUser;
     } catch (error) {
-      logger.error("Error auto-provisioning employee", {
+      logger.error('Error auto-provisioning employee', {
         clientId: this.id,
-        userData: { ...userData, password: "[REDACTED]" },
+        userData: { ...userData, password: '[REDACTED]' },
         oauthProvider,
         error: error.message,
       });
@@ -446,21 +446,21 @@ class Client extends BaseModel {
   async updateSettings(updates, modifiedBy) {
     try {
       const allowedFields = [
-        "name",
-        "email",
-        "phone",
-        "contactPerson",
-        "companyType",
-        "taxId",
-        "website",
-        "notes",
-        "address",
-        "isCorporate",
-        "oauthDomain",
-        "autoProvisionEmployees",
-        "defaultEmployeeRole",
-        "employeeAccessLevel",
-        "active",
+        'name',
+        'email',
+        'phone',
+        'contactPerson',
+        'companyType',
+        'taxId',
+        'website',
+        'notes',
+        'address',
+        'isCorporate',
+        'oauthDomain',
+        'autoProvisionEmployees',
+        'defaultEmployeeRole',
+        'employeeAccessLevel',
+        'active',
       ];
 
       // Apply only allowed updates
@@ -471,22 +471,20 @@ class Client extends BaseModel {
       });
 
       // Update modification tracking
-      this.set("modifiedBy", modifiedBy);
-      this.set("updatedAt", new Date());
+      this.set('modifiedBy', modifiedBy);
+      this.set('updatedAt', new Date());
 
       await this.save(null, { useMasterKey: true });
 
-      logger.info("Client settings updated", {
+      logger.info('Client settings updated', {
         clientId: this.id,
         modifiedBy,
-        fieldsUpdated: Object.keys(updates).filter((field) =>
-          allowedFields.includes(field),
-        ),
+        fieldsUpdated: Object.keys(updates).filter((field) => allowedFields.includes(field)),
       });
 
       return true;
     } catch (error) {
-      logger.error("Error updating client settings", {
+      logger.error('Error updating client settings', {
         clientId: this.id,
         updates,
         modifiedBy,
@@ -511,24 +509,24 @@ class Client extends BaseModel {
   toSafeJSON() {
     return {
       id: this.id,
-      name: this.get("name"),
-      email: this.get("email"),
-      phone: this.get("phone"),
-      contactPerson: this.get("contactPerson"),
-      companyType: this.get("companyType"),
-      website: this.get("website"),
-      address: this.get("address"),
-      isCorporate: this.get("isCorporate"),
-      oauthDomain: this.get("oauthDomain"),
-      autoProvisionEmployees: this.get("autoProvisionEmployees"),
-      defaultEmployeeRole: this.get("defaultEmployeeRole"),
-      employeeAccessLevel: this.get("employeeAccessLevel"),
-      active: this.get("active"),
-      exists: this.get("exists"),
-      createdAt: this.get("createdAt"),
-      updatedAt: this.get("updatedAt"),
-      createdBy: this.get("createdBy"),
-      modifiedBy: this.get("modifiedBy"),
+      name: this.get('name'),
+      email: this.get('email'),
+      phone: this.get('phone'),
+      contactPerson: this.get('contactPerson'),
+      companyType: this.get('companyType'),
+      website: this.get('website'),
+      address: this.get('address'),
+      isCorporate: this.get('isCorporate'),
+      oauthDomain: this.get('oauthDomain'),
+      autoProvisionEmployees: this.get('autoProvisionEmployees'),
+      defaultEmployeeRole: this.get('defaultEmployeeRole'),
+      employeeAccessLevel: this.get('employeeAccessLevel'),
+      active: this.get('active'),
+      exists: this.get('exists'),
+      createdAt: this.get('createdAt'),
+      updatedAt: this.get('updatedAt'),
+      createdBy: this.get('createdBy'),
+      modifiedBy: this.get('modifiedBy'),
     };
   }
 
@@ -547,52 +545,51 @@ class Client extends BaseModel {
     const errors = [];
 
     // Required fields
-    if (!clientData.name || clientData.name.trim() === "") {
-      errors.push("Client name is required");
+    if (!clientData.name || clientData.name.trim() === '') {
+      errors.push('Client name is required');
     }
 
-    if (!clientData.email || clientData.email.trim() === "") {
-      errors.push("Client email is required");
+    if (!clientData.email || clientData.email.trim() === '') {
+      errors.push('Client email is required');
     }
 
     // Email format validation
     if (clientData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(clientData.email)) {
-        errors.push("Invalid email format");
+        errors.push('Invalid email format');
       }
     }
 
     // OAuth domain validation
     if (clientData.oauthDomain) {
-      const domainRegex =
-        /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
+      const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\.[a-zA-Z]{2,}$/;
       if (!domainRegex.test(clientData.oauthDomain)) {
-        errors.push("Invalid OAuth domain format");
+        errors.push('Invalid OAuth domain format');
       }
     }
 
     // Company type validation
     const allowedCompanyTypes = [
-      "corporate",
-      "government",
-      "nonprofit",
-      "individual",
+      'corporate',
+      'government',
+      'nonprofit',
+      'individual',
     ];
     if (
-      clientData.companyType &&
-      !allowedCompanyTypes.includes(clientData.companyType)
+      clientData.companyType
+      && !allowedCompanyTypes.includes(clientData.companyType)
     ) {
-      errors.push("Invalid company type");
+      errors.push('Invalid company type');
     }
 
     // Employee role validation
-    const allowedEmployeeRoles = ["employee", "department_manager"];
+    const allowedEmployeeRoles = ['employee', 'department_manager'];
     if (
-      clientData.defaultEmployeeRole &&
-      !allowedEmployeeRoles.includes(clientData.defaultEmployeeRole)
+      clientData.defaultEmployeeRole
+      && !allowedEmployeeRoles.includes(clientData.defaultEmployeeRole)
     ) {
-      errors.push("Invalid default employee role");
+      errors.push('Invalid default employee role');
     }
 
     return errors;
@@ -600,8 +597,8 @@ class Client extends BaseModel {
 }
 
 // Register the class with Parse
-if (typeof Parse !== "undefined") {
-  Parse.Object.registerSubclass("Client", Client);
+if (typeof Parse !== 'undefined') {
+  Parse.Object.registerSubclass('Client', Client);
 }
 
 module.exports = Client;

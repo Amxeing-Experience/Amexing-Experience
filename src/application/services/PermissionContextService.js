@@ -11,10 +11,10 @@
  * // Returns: { success: true, data: {...} }
  */
 
-const Parse = require("parse/node");
-const OAuthPermissionService = require("./OAuthPermissionService");
+const Parse = require('parse/node');
+const OAuthPermissionService = require('./OAuthPermissionService');
 // const AmexingUser = require('../../domain/models/AmexingUser'); // Unused import
-const logger = require("../../infrastructure/logger");
+const logger = require('../../infrastructure/logger');
 
 /**
  * Permission Context Service - Manages context-specific permissions and access control.
@@ -69,27 +69,27 @@ class PermissionContextService {
     // Context types and their metadata
     this.contextTypes = {
       department: {
-        displayName: "Departamento",
-        icon: "department",
-        color: "#007bff",
+        displayName: 'Departamento',
+        icon: 'department',
+        color: '#007bff',
         requiresValidation: true,
       },
       project: {
-        displayName: "Proyecto",
-        icon: "project",
-        color: "#28a745",
+        displayName: 'Proyecto',
+        icon: 'project',
+        color: '#28a745',
         requiresValidation: true,
       },
       client: {
-        displayName: "Cliente",
-        icon: "client",
-        color: "#ffc107",
+        displayName: 'Cliente',
+        icon: 'client',
+        color: '#ffc107',
         requiresValidation: true,
       },
       temporary: {
-        displayName: "Temporal",
-        icon: "clock",
-        color: "#dc3545",
+        displayName: 'Temporal',
+        icon: 'clock',
+        color: '#dc3545',
         requiresValidation: false,
       },
     };
@@ -131,14 +131,14 @@ class PermissionContextService {
       const tempContexts = await this.getTemporaryContexts(userId);
       contexts.push(...tempContexts);
 
-      logger.logSecurityEvent("AVAILABLE_CONTEXTS_RETRIEVED", userId, {
+      logger.logSecurityEvent('AVAILABLE_CONTEXTS_RETRIEVED', userId, {
         contextCount: contexts.length,
         contextTypes: contexts.map((c) => c.type),
       });
 
       return contexts;
     } catch (error) {
-      logger.error("Error getting available contexts:", error);
+      logger.error('Error getting available contexts:', error);
       return [];
     }
   }
@@ -159,38 +159,38 @@ class PermissionContextService {
   async getDepartmentContexts(userId) {
     try {
       // Get user's employee records (can have multiple)
-      const employeeQuery = new Parse.Query("ClientEmployee");
-      employeeQuery.equalTo("userId", userId);
-      employeeQuery.equalTo("active", true);
-      employeeQuery.include(["clientId", "departmentId"]);
+      const employeeQuery = new Parse.Query('ClientEmployee');
+      employeeQuery.equalTo('userId', userId);
+      employeeQuery.equalTo('active', true);
+      employeeQuery.include(['clientId', 'departmentId']);
 
       const employees = await employeeQuery.find({ useMasterKey: true });
 
       const departmentContexts = [];
 
       for (const employee of employees) {
-        const client = employee.get("clientId");
-        const departmentId = employee.get("departmentId");
+        const client = employee.get('clientId');
+        const departmentId = employee.get('departmentId');
 
         if (client && departmentId) {
           // Get department details
-          const deptQuery = new Parse.Query("ClientDepartment");
+          const deptQuery = new Parse.Query('ClientDepartment');
           const department = await deptQuery.get(departmentId, {
             useMasterKey: true,
           });
 
           const context = {
             id: `dept_${departmentId}`,
-            type: "department",
-            displayName: department.get("name"),
-            description: `${client.get("name")} - ${department.get("name")}`,
+            type: 'department',
+            displayName: department.get('name'),
+            description: `${client.get('name')} - ${department.get('name')}`,
             metadata: {
               clientId: client.id,
-              clientName: client.get("name"),
+              clientName: client.get('name'),
               departmentId,
-              departmentCode: department.get("departmentCode"),
+              departmentCode: department.get('departmentCode'),
               employeeId: employee.id,
-              accessLevel: employee.get("accessLevel"),
+              accessLevel: employee.get('accessLevel'),
             },
             permissions: await this.getDepartmentPermissions(departmentId),
             ...this.contextTypes.department,
@@ -202,7 +202,7 @@ class PermissionContextService {
 
       return departmentContexts;
     } catch (error) {
-      logger.error("Error getting department contexts:", error);
+      logger.error('Error getting department contexts:', error);
       return [];
     }
   }
@@ -223,31 +223,31 @@ class PermissionContextService {
   async getProjectContexts(userId) {
     try {
       // Get user's project assignments
-      const projectQuery = new Parse.Query("ProjectAssignment");
-      projectQuery.equalTo("userId", userId);
-      projectQuery.equalTo("active", true);
-      projectQuery.include("projectId");
+      const projectQuery = new Parse.Query('ProjectAssignment');
+      projectQuery.equalTo('userId', userId);
+      projectQuery.equalTo('active', true);
+      projectQuery.include('projectId');
 
       const assignments = await projectQuery.find({ useMasterKey: true });
 
       const projectContexts = [];
 
       for (const assignment of assignments) {
-        const project = assignment.get("projectId");
+        const project = assignment.get('projectId');
 
         if (project) {
           const context = {
             id: `project_${project.id}`,
-            type: "project",
-            displayName: project.get("name"),
-            description: `Proyecto: ${project.get("name")}`,
+            type: 'project',
+            displayName: project.get('name'),
+            description: `Proyecto: ${project.get('name')}`,
             metadata: {
               projectId: project.id,
               assignmentId: assignment.id,
-              role: assignment.get("role"),
-              permissions: assignment.get("permissions") || [],
+              role: assignment.get('role'),
+              permissions: assignment.get('permissions') || [],
             },
-            permissions: assignment.get("permissions") || [],
+            permissions: assignment.get('permissions') || [],
             ...this.contextTypes.project,
           };
 
@@ -257,7 +257,7 @@ class PermissionContextService {
 
       return projectContexts;
     } catch (error) {
-      logger.error("Error getting project contexts:", error);
+      logger.error('Error getting project contexts:', error);
       return [];
     }
   }
@@ -278,31 +278,31 @@ class PermissionContextService {
   async getClientContexts(userId) {
     try {
       // Get clients where user has direct access
-      const clientAccessQuery = new Parse.Query("ClientAccess");
-      clientAccessQuery.equalTo("userId", userId);
-      clientAccessQuery.equalTo("active", true);
-      clientAccessQuery.include("clientId");
+      const clientAccessQuery = new Parse.Query('ClientAccess');
+      clientAccessQuery.equalTo('userId', userId);
+      clientAccessQuery.equalTo('active', true);
+      clientAccessQuery.include('clientId');
 
       const accesses = await clientAccessQuery.find({ useMasterKey: true });
 
       const clientContexts = [];
 
       for (const access of accesses) {
-        const client = access.get("clientId");
+        const client = access.get('clientId');
 
         if (client) {
           const context = {
             id: `client_${client.id}`,
-            type: "client",
-            displayName: client.get("name"),
-            description: `Cliente: ${client.get("name")}`,
+            type: 'client',
+            displayName: client.get('name'),
+            description: `Cliente: ${client.get('name')}`,
             metadata: {
               clientId: client.id,
               accessId: access.id,
-              accessLevel: access.get("accessLevel"),
-              permissions: access.get("permissions") || [],
+              accessLevel: access.get('accessLevel'),
+              permissions: access.get('permissions') || [],
             },
-            permissions: access.get("permissions") || [],
+            permissions: access.get('permissions') || [],
             ...this.contextTypes.client,
           };
 
@@ -312,7 +312,7 @@ class PermissionContextService {
 
       return clientContexts;
     } catch (error) {
-      logger.error("Error getting client contexts:", error);
+      logger.error('Error getting client contexts:', error);
       return [];
     }
   }
@@ -333,12 +333,12 @@ class PermissionContextService {
   async getTemporaryContexts(userId) {
     try {
       // Get active temporary permissions
-      const tempQuery = new Parse.Query("PermissionOverride");
-      tempQuery.equalTo("userId", userId);
-      tempQuery.equalTo("overrideType", "elevate");
-      tempQuery.equalTo("active", true);
-      tempQuery.exists("expiresAt");
-      tempQuery.greaterThan("expiresAt", new Date());
+      const tempQuery = new Parse.Query('PermissionOverride');
+      tempQuery.equalTo('userId', userId);
+      tempQuery.equalTo('overrideType', 'elevate');
+      tempQuery.equalTo('active', true);
+      tempQuery.exists('expiresAt');
+      tempQuery.greaterThan('expiresAt', new Date());
 
       const tempPermissions = await tempQuery.find({ useMasterKey: true });
 
@@ -348,22 +348,22 @@ class PermissionContextService {
       const contextGroups = new Map();
 
       for (const tempPerm of tempPermissions) {
-        const context = tempPerm.get("context") || "general";
+        const context = tempPerm.get('context') || 'general';
 
         if (!contextGroups.has(context)) {
           contextGroups.set(context, {
             permissions: [],
-            expires: tempPerm.get("expiresAt"),
-            grantedBy: tempPerm.get("grantedBy"),
-            reason: tempPerm.get("reason"),
+            expires: tempPerm.get('expiresAt'),
+            grantedBy: tempPerm.get('grantedBy'),
+            reason: tempPerm.get('reason'),
           });
         }
 
-        contextGroups.get(context).permissions.push(tempPerm.get("permission"));
+        contextGroups.get(context).permissions.push(tempPerm.get('permission'));
 
         // Use earliest expiration time
         const currentExpires = contextGroups.get(context).expires;
-        const permExpires = tempPerm.get("expiresAt");
+        const permExpires = tempPerm.get('expiresAt');
         if (permExpires < currentExpires) {
           contextGroups.get(context).expires = permExpires;
         }
@@ -373,7 +373,7 @@ class PermissionContextService {
       for (const [contextName, data] of contextGroups) {
         const context = {
           id: `temp_${contextName}`,
-          type: "temporary",
+          type: 'temporary',
           displayName: `Temporal: ${contextName}`,
           description: `Permisos temporales hasta ${data.expires.toLocaleString()}`,
           metadata: {
@@ -393,7 +393,7 @@ class PermissionContextService {
 
       return tempContexts;
     } catch (error) {
-      logger.error("Error getting temporary contexts:", error);
+      logger.error('Error getting temporary contexts:', error);
       return [];
     }
   }
@@ -418,12 +418,12 @@ class PermissionContextService {
       // Get available contexts to validate the switch
       const availableContexts = await this.getAvailableContexts(userId);
       const targetContext = availableContexts.find(
-        (ctx) => ctx.id === contextId,
+        (ctx) => ctx.id === contextId
       );
 
       if (!targetContext) {
         throw new Error(
-          `Context ${contextId} not available for user ${userId}`,
+          `Context ${contextId} not available for user ${userId}`
         );
       }
 
@@ -435,24 +435,24 @@ class PermissionContextService {
       // Get or create permission context record
       const contextRecord = await this.getOrCreateContextRecord(
         userId,
-        sessionId,
+        sessionId
       );
 
       // Update current context
-      contextRecord.set("currentContext", contextId);
-      contextRecord.set("currentContextData", targetContext);
-      contextRecord.set("lastSwitched", new Date());
-      contextRecord.set("sessionId", sessionId);
+      contextRecord.set('currentContext', contextId);
+      contextRecord.set('currentContextData', targetContext);
+      contextRecord.set('lastSwitched', new Date());
+      contextRecord.set('sessionId', sessionId);
 
       // Store available contexts for quick access
       contextRecord.set(
-        "availableContexts",
+        'availableContexts',
         availableContexts.map((ctx) => ({
           id: ctx.id,
           type: ctx.type,
           displayName: ctx.displayName,
           description: ctx.description,
-        })),
+        }))
       );
 
       await contextRecord.save(null, { useMasterKey: true });
@@ -460,8 +460,8 @@ class PermissionContextService {
       // Apply context-specific permissions to session
       await this.applyContextPermissions(userId, sessionId, targetContext);
 
-      logger.logSecurityEvent("CONTEXT_SWITCHED", userId, {
-        fromContext: contextRecord.previous("currentContext"),
+      logger.logSecurityEvent('CONTEXT_SWITCHED', userId, {
+        fromContext: contextRecord.previous('currentContext'),
         toContext: contextId,
         contextType: targetContext.type,
         sessionId,
@@ -476,7 +476,7 @@ class PermissionContextService {
         switchedAt: new Date(),
       };
     } catch (error) {
-      logger.error("Error switching user context:", error);
+      logger.error('Error switching user context:', error);
       throw error;
     }
   }
@@ -498,25 +498,25 @@ class PermissionContextService {
   async getOrCreateContextRecord(userId, sessionId) {
     try {
       // Try to find existing context record
-      const contextQuery = new Parse.Query("PermissionContext");
-      contextQuery.equalTo("userId", userId);
-      contextQuery.equalTo("sessionId", sessionId);
+      const contextQuery = new Parse.Query('PermissionContext');
+      contextQuery.equalTo('userId', userId);
+      contextQuery.equalTo('sessionId', sessionId);
 
       let contextRecord = await contextQuery.first({ useMasterKey: true });
 
       if (!contextRecord) {
         // Create new context record
-        const ContextClass = Parse.Object.extend("PermissionContext");
+        const ContextClass = Parse.Object.extend('PermissionContext');
         contextRecord = new ContextClass();
 
-        contextRecord.set("userId", userId);
-        contextRecord.set("sessionId", sessionId);
-        contextRecord.set("createdAt", new Date());
+        contextRecord.set('userId', userId);
+        contextRecord.set('sessionId', sessionId);
+        contextRecord.set('createdAt', new Date());
       }
 
       return contextRecord;
     } catch (error) {
-      logger.error("Error getting/creating context record:", error);
+      logger.error('Error getting/creating context record:', error);
       throw error;
     }
   }
@@ -538,26 +538,26 @@ class PermissionContextService {
   async validateContextAccess(userId, context) {
     try {
       switch (context.type) {
-        case "department":
+        case 'department':
           await this.validateDepartmentAccess(
             userId,
-            context.metadata.departmentId,
+            context.metadata.departmentId
           );
           break;
-        case "project":
+        case 'project':
           await this.validateProjectAccess(userId, context.metadata.projectId);
           break;
-        case "client":
+        case 'client':
           await this.validateClientAccess(userId, context.metadata.clientId);
           break;
-        case "temporary":
+        case 'temporary':
           await this.validateTemporaryAccess(userId, context);
           break;
         default:
           throw new Error(`Unknown context type: ${context.type}`);
       }
     } catch (error) {
-      logger.error("Context access validation failed:", error);
+      logger.error('Context access validation failed:', error);
       throw error;
     }
   }
@@ -577,15 +577,15 @@ class PermissionContextService {
    * await service.validateDepartmentAccess('user123', 'dept456');
    */
   async validateDepartmentAccess(userId, departmentId) {
-    const employeeQuery = new Parse.Query("ClientEmployee");
-    employeeQuery.equalTo("userId", userId);
-    employeeQuery.equalTo("departmentId", departmentId);
-    employeeQuery.equalTo("active", true);
+    const employeeQuery = new Parse.Query('ClientEmployee');
+    employeeQuery.equalTo('userId', userId);
+    employeeQuery.equalTo('departmentId', departmentId);
+    employeeQuery.equalTo('active', true);
 
     const employee = await employeeQuery.first({ useMasterKey: true });
 
     if (!employee) {
-      throw new Error("User does not have access to this department");
+      throw new Error('User does not have access to this department');
     }
   }
 
@@ -604,15 +604,15 @@ class PermissionContextService {
    * await service.validateProjectAccess('user123', 'project456');
    */
   async validateProjectAccess(userId, projectId) {
-    const assignmentQuery = new Parse.Query("ProjectAssignment");
-    assignmentQuery.equalTo("userId", userId);
-    assignmentQuery.equalTo("projectId", projectId);
-    assignmentQuery.equalTo("active", true);
+    const assignmentQuery = new Parse.Query('ProjectAssignment');
+    assignmentQuery.equalTo('userId', userId);
+    assignmentQuery.equalTo('projectId', projectId);
+    assignmentQuery.equalTo('active', true);
 
     const assignment = await assignmentQuery.first({ useMasterKey: true });
 
     if (!assignment) {
-      throw new Error("User does not have access to this project");
+      throw new Error('User does not have access to this project');
     }
   }
 
@@ -631,15 +631,15 @@ class PermissionContextService {
    * await service.validateClientAccess('user123', 'client456');
    */
   async validateClientAccess(userId, clientId) {
-    const accessQuery = new Parse.Query("ClientAccess");
-    accessQuery.equalTo("userId", userId);
-    accessQuery.equalTo("clientId", clientId);
-    accessQuery.equalTo("active", true);
+    const accessQuery = new Parse.Query('ClientAccess');
+    accessQuery.equalTo('userId', userId);
+    accessQuery.equalTo('clientId', clientId);
+    accessQuery.equalTo('active', true);
 
     const access = await accessQuery.first({ useMasterKey: true });
 
     if (!access) {
-      throw new Error("User does not have access to this client");
+      throw new Error('User does not have access to this client');
     }
   }
 
@@ -659,7 +659,7 @@ class PermissionContextService {
    */
   async validateTemporaryAccess(userId, context) {
     if (context.expiresAt && context.expiresAt < new Date()) {
-      throw new Error("Temporary permissions have expired");
+      throw new Error('Temporary permissions have expired');
     }
   }
 
@@ -689,23 +689,23 @@ class PermissionContextService {
       });
 
       // Also store in database session record
-      const sessionQuery = new Parse.Query("_Session");
-      sessionQuery.equalTo("user", {
-        __type: "Pointer",
-        className: "_User",
+      const sessionQuery = new Parse.Query('_Session');
+      sessionQuery.equalTo('user', {
+        __type: 'Pointer',
+        className: '_User',
         objectId: userId,
       });
-      sessionQuery.equalTo("sessionToken", sessionId);
+      sessionQuery.equalTo('sessionToken', sessionId);
 
       const session = await sessionQuery.first({ useMasterKey: true });
 
       if (session) {
-        session.set("contextPermissions", context.permissions);
-        session.set("currentContext", context.id);
+        session.set('contextPermissions', context.permissions);
+        session.set('currentContext', context.id);
         await session.save(null, { useMasterKey: true });
       }
     } catch (error) {
-      logger.error("Error applying context permissions:", error);
+      logger.error('Error applying context permissions:', error);
       throw error;
     }
   }
@@ -726,22 +726,22 @@ class PermissionContextService {
    */
   async getCurrentContext(userId, sessionId) {
     try {
-      const contextQuery = new Parse.Query("PermissionContext");
-      contextQuery.equalTo("userId", userId);
-      contextQuery.equalTo("sessionId", sessionId);
+      const contextQuery = new Parse.Query('PermissionContext');
+      contextQuery.equalTo('userId', userId);
+      contextQuery.equalTo('sessionId', sessionId);
 
       const contextRecord = await contextQuery.first({ useMasterKey: true });
 
       return contextRecord
         ? {
-            contextId: contextRecord.get("currentContext"),
-            contextData: contextRecord.get("currentContextData"),
-            availableContexts: contextRecord.get("availableContexts"),
-            lastSwitched: contextRecord.get("lastSwitched"),
-          }
+          contextId: contextRecord.get('currentContext'),
+          contextData: contextRecord.get('currentContextData'),
+          availableContexts: contextRecord.get('availableContexts'),
+          lastSwitched: contextRecord.get('lastSwitched'),
+        }
         : null;
     } catch (error) {
-      logger.error("Error getting current context:", error);
+      logger.error('Error getting current context:', error);
       return null;
     }
   }
@@ -769,20 +769,20 @@ class PermissionContextService {
       }
 
       // Extract permissions based on context type
-      const [type, id] = contextId.split("_");
+      const [type, id] = contextId.split('_');
       let permissions = [];
 
       switch (type) {
-        case "dept":
+        case 'dept':
           permissions = await this.getDepartmentPermissions(id);
           break;
-        case "project":
+        case 'project':
           permissions = await this.getProjectPermissions(id);
           break;
-        case "client":
+        case 'client':
           permissions = await this.getClientPermissions(id);
           break;
-        case "temp":
+        case 'temp':
           permissions = await this.getTemporaryPermissions(id);
           break;
         default:
@@ -799,7 +799,7 @@ class PermissionContextService {
 
       return permissions;
     } catch (error) {
-      logger.error("Error getting context permissions:", error);
+      logger.error('Error getting context permissions:', error);
       return [];
     }
   }
@@ -836,12 +836,12 @@ class PermissionContextService {
    */
   async getProjectPermissions(projectId) {
     try {
-      const projectQuery = new Parse.Query("Project");
+      const projectQuery = new Parse.Query('Project');
       const project = await projectQuery.get(projectId, { useMasterKey: true });
 
-      return project.get("permissions") || [];
+      return project.get('permissions') || [];
     } catch (error) {
-      logger.error("Error getting project permissions:", error);
+      logger.error('Error getting project permissions:', error);
       return [];
     }
   }
@@ -861,12 +861,12 @@ class PermissionContextService {
    */
   async getClientPermissions(clientId) {
     try {
-      const clientQuery = new Parse.Query("Client");
+      const clientQuery = new Parse.Query('Client');
       const client = await clientQuery.get(clientId, { useMasterKey: true });
 
-      return client.get("permissions") || [];
+      return client.get('permissions') || [];
     } catch (error) {
-      logger.error("Error getting client permissions:", error);
+      logger.error('Error getting client permissions:', error);
       return [];
     }
   }
@@ -886,17 +886,17 @@ class PermissionContextService {
    */
   async getTemporaryPermissions(context) {
     try {
-      const tempQuery = new Parse.Query("PermissionOverride");
-      tempQuery.equalTo("context", context);
-      tempQuery.equalTo("overrideType", "elevate");
-      tempQuery.equalTo("active", true);
-      tempQuery.greaterThan("expiresAt", new Date());
+      const tempQuery = new Parse.Query('PermissionOverride');
+      tempQuery.equalTo('context', context);
+      tempQuery.equalTo('overrideType', 'elevate');
+      tempQuery.equalTo('active', true);
+      tempQuery.greaterThan('expiresAt', new Date());
 
       const tempPerms = await tempQuery.find({ useMasterKey: true });
 
-      return tempPerms.map((perm) => perm.get("permission"));
+      return tempPerms.map((perm) => perm.get('permission'));
     } catch (error) {
-      logger.error("Error getting temporary permissions:", error);
+      logger.error('Error getting temporary permissions:', error);
       return [];
     }
   }

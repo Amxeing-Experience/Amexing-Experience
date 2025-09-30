@@ -10,10 +10,10 @@
  * // Returns: model operation result
  */
 
-const Parse = require("parse/node");
-const bcrypt = require("bcrypt");
-const logger = require("../../infrastructure/logger");
-const BaseModel = require("./BaseModel");
+const Parse = require('parse/node');
+const bcrypt = require('bcrypt');
+const logger = require('../../infrastructure/logger');
+const BaseModel = require('./BaseModel');
 
 /**
  * AmexingUser Model - Extended Parse User with comprehensive PCI DSS compliance features.
@@ -75,7 +75,7 @@ const BaseModel = require("./BaseModel");
  */
 class AmexingUser extends BaseModel {
   constructor() {
-    super("AmexingUser");
+    super('AmexingUser');
   }
 
   /**
@@ -92,71 +92,71 @@ class AmexingUser extends BaseModel {
   static create(userData) {
     // Validate required RBAC fields
     if (!userData.roleId && !userData.role) {
-      throw new Error("Either role or roleId is required");
+      throw new Error('Either role or roleId is required');
     }
 
     // Validate organization ID format
     if (
-      userData.organizationId &&
-      !/^[a-z0-9_-]+$/i.test(userData.organizationId)
+      userData.organizationId
+      && !/^[a-z0-9_-]+$/i.test(userData.organizationId)
     ) {
-      throw new Error("Invalid organization ID format");
+      throw new Error('Invalid organization ID format');
     }
 
     // Validate contextual data structure
     if (
-      userData.contextualData &&
-      typeof userData.contextualData !== "object"
+      userData.contextualData
+      && typeof userData.contextualData !== 'object'
     ) {
-      throw new Error("Contextual data must be an object");
+      throw new Error('Contextual data must be an object');
     }
 
     const user = new AmexingUser();
 
     // Required fields
-    user.set("username", userData.username);
-    user.set("email", userData.email);
-    user.set("firstName", userData.firstName);
-    user.set("lastName", userData.lastName);
+    user.set('username', userData.username);
+    user.set('email', userData.email);
+    user.set('firstName', userData.firstName);
+    user.set('lastName', userData.lastName);
 
     // Role system (new RBAC) - Handle both Pointer objects and string IDs
     if (userData.roleId) {
       // If roleId is a Role object (Pointer), set it directly
       // If it's a string ID, we'll need to convert it to a Pointer in the service layer
-      user.set("roleId", userData.roleId);
+      user.set('roleId', userData.roleId);
     }
     if (userData.role) {
       // Backward compatibility: set legacy role field when provided
-      user.set("role", userData.role);
+      user.set('role', userData.role);
     }
-    user.set("delegatedPermissions", userData.delegatedPermissions || []); // Additional permissions
+    user.set('delegatedPermissions', userData.delegatedPermissions || []); // Additional permissions
 
     // Default values
-    user.set("active", userData.active !== undefined ? userData.active : true);
-    user.set("exists", userData.exists !== undefined ? userData.exists : true);
-    user.set("emailVerified", false);
-    user.set("loginAttempts", 0);
-    user.set("lockedUntil", null);
-    user.set("lastLoginAt", null);
-    user.set("passwordChangedAt", new Date());
-    user.set("mustChangePassword", false);
+    user.set('active', userData.active !== undefined ? userData.active : true);
+    user.set('exists', userData.exists !== undefined ? userData.exists : true);
+    user.set('emailVerified', false);
+    user.set('loginAttempts', 0);
+    user.set('lockedUntil', null);
+    user.set('lastLoginAt', null);
+    user.set('passwordChangedAt', new Date());
+    user.set('mustChangePassword', false);
 
     // OAuth fields
-    user.set("oauthAccounts", userData.oauthAccounts || []);
-    user.set("primaryOAuthProvider", userData.primaryOAuthProvider || null);
-    user.set("lastAuthMethod", userData.lastAuthMethod || "password");
+    user.set('oauthAccounts', userData.oauthAccounts || []);
+    user.set('primaryOAuthProvider', userData.primaryOAuthProvider || null);
+    user.set('lastAuthMethod', userData.lastAuthMethod || 'password');
 
     // Organizational relationships (enhanced)
-    user.set("organizationId", userData.organizationId || null); // 'amexing', 'utq', 'nuba', etc.
-    user.set("clientId", userData.clientId || null);
-    user.set("departmentId", userData.departmentId || null);
+    user.set('organizationId', userData.organizationId || null); // 'amexing', 'utq', 'nuba', etc.
+    user.set('clientId', userData.clientId || null);
+    user.set('departmentId', userData.departmentId || null);
 
     // Contextual data for permissions
-    user.set("contextualData", userData.contextualData || {});
+    user.set('contextualData', userData.contextualData || {});
 
     // Audit fields
-    user.set("createdBy", userData.createdBy || null);
-    user.set("modifiedBy", userData.modifiedBy || null);
+    user.set('createdBy', userData.createdBy || null);
+    user.set('modifiedBy', userData.modifiedBy || null);
 
     return user;
   }
@@ -181,11 +181,11 @@ class AmexingUser extends BaseModel {
     const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    this.set("passwordHash", hashedPassword);
-    this.set("passwordChangedAt", new Date());
-    this.set("mustChangePassword", false);
-    this.set("loginAttempts", 0);
-    this.set("lockedUntil", null);
+    this.set('passwordHash', hashedPassword);
+    this.set('passwordChangedAt', new Date());
+    this.set('mustChangePassword', false);
+    this.set('loginAttempts', 0);
+    this.set('lockedUntil', null);
   }
 
   /**
@@ -216,7 +216,7 @@ class AmexingUser extends BaseModel {
    * }
    */
   async validatePassword(password) {
-    const hashedPassword = this.get("passwordHash");
+    const hashedPassword = this.get('passwordHash');
     if (!hashedPassword) {
       return false;
     }
@@ -237,10 +237,10 @@ class AmexingUser extends BaseModel {
    */
   validatePasswordStrength(password) {
     const minLength = parseInt(process.env.PASSWORD_MIN_LENGTH, 10) || 12;
-    const requireUppercase = process.env.PASSWORD_REQUIRE_UPPERCASE === "true";
-    const requireLowercase = process.env.PASSWORD_REQUIRE_LOWERCASE === "true";
-    const requireNumbers = process.env.PASSWORD_REQUIRE_NUMBERS === "true";
-    const requireSpecial = process.env.PASSWORD_REQUIRE_SPECIAL === "true";
+    const requireUppercase = process.env.PASSWORD_REQUIRE_UPPERCASE === 'true';
+    const requireLowercase = process.env.PASSWORD_REQUIRE_LOWERCASE === 'true';
+    const requireNumbers = process.env.PASSWORD_REQUIRE_NUMBERS === 'true';
+    const requireSpecial = process.env.PASSWORD_REQUIRE_SPECIAL === 'true';
 
     const errors = [];
 
@@ -269,7 +269,7 @@ class AmexingUser extends BaseModel {
      * // Returns: model operation result
      */
     if (requireUppercase && !/[A-Z]/.test(password)) {
-      errors.push("Password must contain at least one uppercase letter");
+      errors.push('Password must contain at least one uppercase letter');
     }
 
     /**
@@ -283,7 +283,7 @@ class AmexingUser extends BaseModel {
      * // Returns: model operation result
      */
     if (requireLowercase && !/[a-z]/.test(password)) {
-      errors.push("Password must contain at least one lowercase letter");
+      errors.push('Password must contain at least one lowercase letter');
     }
 
     /**
@@ -297,7 +297,7 @@ class AmexingUser extends BaseModel {
      * // Returns: model operation result
      */
     if (requireNumbers && !/\d/.test(password)) {
-      errors.push("Password must contain at least one number");
+      errors.push('Password must contain at least one number');
     }
 
     /**
@@ -311,7 +311,7 @@ class AmexingUser extends BaseModel {
      * // Returns: model operation result
      */
     if (requireSpecial && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      errors.push("Password must contain at least one special character");
+      errors.push('Password must contain at least one special character');
     }
 
     /**
@@ -327,7 +327,7 @@ class AmexingUser extends BaseModel {
     if (errors.length > 0) {
       throw new Parse.Error(
         Parse.Error.VALIDATION_ERROR,
-        `Password validation failed: ${errors.join(", ")}`,
+        `Password validation failed: ${errors.join(', ')}`
       );
     }
   }
@@ -344,12 +344,11 @@ class AmexingUser extends BaseModel {
    */
   async recordFailedLogin() {
     const maxAttempts = parseInt(process.env.MAX_LOGIN_ATTEMPTS, 10) || 5;
-    const lockoutDuration =
-      parseInt(process.env.ACCOUNT_LOCKOUT_DURATION_MINUTES, 10) || 30;
+    const lockoutDuration = parseInt(process.env.ACCOUNT_LOCKOUT_DURATION_MINUTES, 10) || 30;
 
-    let attempts = this.get("loginAttempts") || 0;
+    let attempts = this.get('loginAttempts') || 0;
     attempts += 1;
-    this.set("loginAttempts", attempts);
+    this.set('loginAttempts', attempts);
 
     /**
      * Implements account lockout mechanism when max attempts exceeded.
@@ -365,11 +364,11 @@ class AmexingUser extends BaseModel {
     if (attempts >= maxAttempts) {
       const lockoutTime = new Date();
       lockoutTime.setMinutes(lockoutTime.getMinutes() + lockoutDuration);
-      this.set("lockedUntil", lockoutTime);
+      this.set('lockedUntil', lockoutTime);
 
-      logger.logSecurityEvent("ACCOUNT_LOCKED", {
+      logger.logSecurityEvent('ACCOUNT_LOCKED', {
         userId: this.id,
-        username: this.get("username"),
+        username: this.get('username'),
         attempts,
         lockoutUntil: lockoutTime.toISOString(),
       });
@@ -400,11 +399,11 @@ class AmexingUser extends BaseModel {
    * // Record successful OAuth login
    * await user.recordSuccessfulLogin('google_oauth');
    */
-  async recordSuccessfulLogin(authMethod = "password") {
-    this.set("loginAttempts", 0);
-    this.set("lockedUntil", null);
-    this.set("lastLoginAt", new Date());
-    this.set("lastAuthMethod", authMethod);
+  async recordSuccessfulLogin(authMethod = 'password') {
+    this.set('loginAttempts', 0);
+    this.set('lockedUntil', null);
+    this.set('lastLoginAt', new Date());
+    this.set('lastAuthMethod', authMethod);
 
     await this.save(null, { useMasterKey: true });
   }
@@ -420,7 +419,7 @@ class AmexingUser extends BaseModel {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   isAccountLocked() {
-    const lockedUntil = this.get("lockedUntil");
+    const lockedUntil = this.get('lockedUntil');
     if (!lockedUntil) {
       return false;
     }
@@ -439,13 +438,12 @@ class AmexingUser extends BaseModel {
    * @returns {*} - Operation result.
    */
   addOAuthAccount(oauthData) {
-    const existingAccounts = this.get("oauthAccounts") || [];
+    const existingAccounts = this.get('oauthAccounts') || [];
 
     // Check if account already exists
     const existingIndex = existingAccounts.findIndex(
-      (account) =>
-        account.provider === oauthData.provider &&
-        account.providerId === oauthData.providerId,
+      (account) => account.provider === oauthData.provider
+        && account.providerId === oauthData.providerId
     );
 
     if (existingIndex >= 0) {
@@ -464,11 +462,11 @@ class AmexingUser extends BaseModel {
       });
     }
 
-    this.set("oauthAccounts", existingAccounts);
+    this.set('oauthAccounts', existingAccounts);
 
     // Set as primary if it's the first OAuth account
-    if (!this.get("primaryOAuthProvider")) {
-      this.set("primaryOAuthProvider", oauthData.provider);
+    if (!this.get('primaryOAuthProvider')) {
+      this.set('primaryOAuthProvider', oauthData.provider);
     }
   }
 
@@ -486,19 +484,18 @@ class AmexingUser extends BaseModel {
    * @returns {*} - Operation result.
    */
   removeOAuthAccount(provider, providerId) {
-    const existingAccounts = this.get("oauthAccounts") || [];
+    const existingAccounts = this.get('oauthAccounts') || [];
     const filteredAccounts = existingAccounts.filter(
-      (account) =>
-        !(account.provider === provider && account.providerId === providerId),
+      (account) => !(account.provider === provider && account.providerId === providerId)
     );
 
-    this.set("oauthAccounts", filteredAccounts);
+    this.set('oauthAccounts', filteredAccounts);
 
     // Update primary provider if needed
-    if (this.get("primaryOAuthProvider") === provider) {
+    if (this.get('primaryOAuthProvider') === provider) {
       this.set(
-        "primaryOAuthProvider",
-        filteredAccounts.length > 0 ? filteredAccounts[0].provider : null,
+        'primaryOAuthProvider',
+        filteredAccounts.length > 0 ? filteredAccounts[0].provider : null
       );
     }
   }
@@ -516,7 +513,7 @@ class AmexingUser extends BaseModel {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   getOAuthAccount(provider) {
-    const accounts = this.get("oauthAccounts") || [];
+    const accounts = this.get('oauthAccounts') || [];
     return accounts.find((account) => account.provider === provider) || null;
   }
 
@@ -547,8 +544,8 @@ class AmexingUser extends BaseModel {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   getFullName() {
-    const firstName = this.get("firstName") || "";
-    const lastName = this.get("lastName") || "";
+    const firstName = this.get('firstName') || '';
+    const lastName = this.get('lastName') || '';
     return `${firstName} ${lastName}`.trim();
   }
 
@@ -565,7 +562,7 @@ class AmexingUser extends BaseModel {
    */
   getDisplayName() {
     const fullName = this.getFullName();
-    return fullName || this.get("username");
+    return fullName || this.get('username');
   }
 
   /**
@@ -582,19 +579,19 @@ class AmexingUser extends BaseModel {
    */
   async getClient() {
     try {
-      if (!this.get("clientId")) {
+      if (!this.get('clientId')) {
         return null;
       }
 
-      const Client = require("./Client");
-      const query = BaseModel.queryActive("Client");
-      query.equalTo("objectId", this.get("clientId"));
+      const Client = require('./Client');
+      const query = BaseModel.queryActive('Client');
+      query.equalTo('objectId', this.get('clientId'));
 
       return await query.first({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching user client", {
+      logger.error('Error fetching user client', {
         userId: this.id,
-        clientId: this.get("clientId"),
+        clientId: this.get('clientId'),
         error: error.message,
       });
       return null;
@@ -615,19 +612,19 @@ class AmexingUser extends BaseModel {
    */
   async getDepartment() {
     try {
-      if (!this.get("departmentId")) {
+      if (!this.get('departmentId')) {
         return null;
       }
 
-      const Department = require("./Department");
-      const query = BaseModel.queryActive("Department");
-      query.equalTo("objectId", this.get("departmentId"));
+      const Department = require('./Department');
+      const query = BaseModel.queryActive('Department');
+      query.equalTo('objectId', this.get('departmentId'));
 
       return await query.first({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching user department", {
+      logger.error('Error fetching user department', {
         userId: this.id,
-        departmentId: this.get("departmentId"),
+        departmentId: this.get('departmentId'),
         error: error.message,
       });
       return null;
@@ -646,7 +643,7 @@ class AmexingUser extends BaseModel {
    * // Returns: boolean or validation result object
    */
   belongsToClient(clientId) {
-    return this.get("clientId") === clientId;
+    return this.get('clientId') === clientId;
   }
 
   /**
@@ -661,7 +658,7 @@ class AmexingUser extends BaseModel {
    * // Returns: boolean or validation result object
    */
   belongsToDepartment(departmentId) {
-    return this.get("departmentId") === departmentId;
+    return this.get('departmentId') === departmentId;
   }
 
   /**
@@ -678,13 +675,13 @@ class AmexingUser extends BaseModel {
    */
   async assignToClient(clientId, modifiedBy) {
     try {
-      this.set("clientId", clientId);
-      this.set("modifiedBy", modifiedBy);
-      this.set("updatedAt", new Date());
+      this.set('clientId', clientId);
+      this.set('modifiedBy', modifiedBy);
+      this.set('updatedAt', new Date());
 
       await this.save(null, { useMasterKey: true });
 
-      logger.info("User assigned to client", {
+      logger.info('User assigned to client', {
         userId: this.id,
         clientId,
         modifiedBy,
@@ -692,7 +689,7 @@ class AmexingUser extends BaseModel {
 
       return true;
     } catch (error) {
-      logger.error("Error assigning user to client", {
+      logger.error('Error assigning user to client', {
         userId: this.id,
         clientId,
         modifiedBy,
@@ -717,13 +714,13 @@ class AmexingUser extends BaseModel {
    */
   async assignToDepartment(departmentId, modifiedBy) {
     try {
-      this.set("departmentId", departmentId);
-      this.set("modifiedBy", modifiedBy);
-      this.set("updatedAt", new Date());
+      this.set('departmentId', departmentId);
+      this.set('modifiedBy', modifiedBy);
+      this.set('updatedAt', new Date());
 
       await this.save(null, { useMasterKey: true });
 
-      logger.info("User assigned to department", {
+      logger.info('User assigned to department', {
         userId: this.id,
         departmentId,
         modifiedBy,
@@ -731,7 +728,7 @@ class AmexingUser extends BaseModel {
 
       return true;
     } catch (error) {
-      logger.error("Error assigning user to department", {
+      logger.error('Error assigning user to department', {
         userId: this.id,
         departmentId,
         modifiedBy,
@@ -748,20 +745,20 @@ class AmexingUser extends BaseModel {
    */
   async getRole() {
     try {
-      const rolePointer = this.get("roleId");
+      const rolePointer = this.get('roleId');
       if (!rolePointer) {
         return null;
       }
 
       // Check if rolePointer is already a fetched object
-      if (rolePointer.get && typeof rolePointer.get === "function") {
+      if (rolePointer.get && typeof rolePointer.get === 'function') {
         // Role object is already fetched
         return rolePointer;
       }
 
       // Handle both string IDs (backward compatibility) and Pointer objects
       let roleId;
-      if (typeof rolePointer === "string") {
+      if (typeof rolePointer === 'string') {
         roleId = rolePointer;
       } else if (rolePointer.id) {
         roleId = rolePointer.id;
@@ -769,15 +766,15 @@ class AmexingUser extends BaseModel {
         return null;
       }
 
-      const Role = require("./Role");
-      const query = BaseModel.queryActive("Role");
-      query.equalTo("objectId", roleId);
+      const Role = require('./Role');
+      const query = BaseModel.queryActive('Role');
+      query.equalTo('objectId', roleId);
 
       return await query.first({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching user role", {
+      logger.error('Error fetching user role', {
         userId: this.id,
-        roleId: this.get("roleId"),
+        roleId: this.get('roleId'),
         error: error.message,
       });
       return null;
@@ -792,13 +789,13 @@ class AmexingUser extends BaseModel {
   async getRoleName() {
     try {
       const role = await this.getRole();
-      return role ? role.get("name") : "guest";
+      return role ? role.get('name') : 'guest';
     } catch (error) {
-      logger.error("Error getting role name", {
+      logger.error('Error getting role name', {
         userId: this.id,
         error: error.message,
       });
-      return "guest";
+      return 'guest';
     }
   }
 
@@ -827,7 +824,7 @@ class AmexingUser extends BaseModel {
         // If context already has all needed data (like departmentId), use as-is
         // Otherwise, combine with user's contextual data
         let finalContext = context;
-        const userContextualData = this.get("contextualData") || {};
+        const userContextualData = this.get('contextualData') || {};
 
         // Only merge user contextual data if not already present in request context
         if (Object.keys(userContextualData).length > 0) {
@@ -839,7 +836,7 @@ class AmexingUser extends BaseModel {
 
         rolePermission = await role.hasContextualPermission(
           permission,
-          finalContext,
+          finalContext
         );
       }
 
@@ -850,11 +847,11 @@ class AmexingUser extends BaseModel {
       // Check delegated permissions
       const hasDelegatedPermission = await this.hasDelegatedPermission(
         permission,
-        context,
+        context
       );
       return hasDelegatedPermission;
     } catch (error) {
-      logger.error("Error checking user permission", {
+      logger.error('Error checking user permission', {
         userId: this.id,
         permission,
         context,
@@ -886,7 +883,7 @@ class AmexingUser extends BaseModel {
 
       return false;
     } catch (error) {
-      logger.error("Error checking delegated permissions", {
+      logger.error('Error checking delegated permissions', {
         userId: this.id,
         permission,
         context,
@@ -903,14 +900,14 @@ class AmexingUser extends BaseModel {
    */
   async getDelegatedPermissions() {
     try {
-      const DelegatedPermission = require("./DelegatedPermission");
-      const query = BaseModel.queryActive("DelegatedPermission");
-      query.equalTo("toUserId", this.id);
-      query.equalTo("status", "active");
+      const DelegatedPermission = require('./DelegatedPermission');
+      const query = BaseModel.queryActive('DelegatedPermission');
+      query.equalTo('toUserId', this.id);
+      query.equalTo('status', 'active');
 
       return await query.find({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error getting delegated permissions", {
+      logger.error('Error getting delegated permissions', {
         userId: this.id,
         error: error.message,
       });
@@ -929,42 +926,42 @@ class AmexingUser extends BaseModel {
       // Verify current user can delegate these permissions
       const role = await this.getRole();
       if (!role) {
-        throw new Error("User role cannot delegate permissions");
+        throw new Error('User role cannot delegate permissions');
       }
 
       const createdDelegations = [];
-      const DelegatedPermission = require("./DelegatedPermission");
+      const DelegatedPermission = require('./DelegatedPermission');
 
       for (const delegationData of delegationsData) {
         // Check if role can delegate this specific permission
         if (!role.canDelegatePermission(delegationData.permission)) {
           throw new Error(
-            `Role cannot delegate permission: ${delegationData.permission}`,
+            `Role cannot delegate permission: ${delegationData.permission}`
           );
         }
 
         // Verify permission can be delegated
         const hasPermission = await this.hasPermission(
           delegationData.permission,
-          delegationData.context || {},
+          delegationData.context || {}
         );
         if (!hasPermission) {
           throw new Error(
-            `Cannot delegate permission ${delegationData.permission} - user doesn't have it`,
+            `Cannot delegate permission ${delegationData.permission} - user doesn't have it`
           );
         }
 
         // Validate delegation context constraints (if specified)
         if (delegationData.context && delegationData.context.maxAmount) {
           // Check if user is trying to delegate with higher limits than they have
-          const userContextualData = this.get("contextualData") || {};
+          const userContextualData = this.get('contextualData') || {};
           if (
-            userContextualData.maxApprovalAmount &&
-            delegationData.context.maxAmount >
-              userContextualData.maxApprovalAmount
+            userContextualData.maxApprovalAmount
+            && delegationData.context.maxAmount
+              > userContextualData.maxApprovalAmount
           ) {
             throw new Error(
-              "Cannot delegate with higher limits than own permissions",
+              'Cannot delegate with higher limits than own permissions'
             );
           }
         }
@@ -978,7 +975,7 @@ class AmexingUser extends BaseModel {
         await delegation.save(null, { useMasterKey: true });
         createdDelegations.push(delegation);
 
-        logger.info("Permission delegated", {
+        logger.info('Permission delegated', {
           fromUserId: this.id,
           toUserId: delegationData.toUserId,
           permission: delegationData.permission,
@@ -988,7 +985,7 @@ class AmexingUser extends BaseModel {
 
       return createdDelegations;
     } catch (error) {
-      logger.error("Error delegating permissions", {
+      logger.error('Error delegating permissions', {
         fromUserId: this.id,
         delegationsData,
         error: error.message,
@@ -1004,7 +1001,7 @@ class AmexingUser extends BaseModel {
    */
   async getOrganization() {
     try {
-      const organizationId = this.get("organizationId");
+      const organizationId = this.get('organizationId');
       if (!organizationId) {
         return null;
       }
@@ -1014,15 +1011,15 @@ class AmexingUser extends BaseModel {
       return {
         id: organizationId,
         name:
-          organizationId === "amexing"
-            ? "Amexing"
+          organizationId === 'amexing'
+            ? 'Amexing'
             : organizationId.toUpperCase(),
-        type: organizationId === "amexing" ? "internal" : "client",
+        type: organizationId === 'amexing' ? 'internal' : 'client',
       };
     } catch (error) {
-      logger.error("Error fetching user organization", {
+      logger.error('Error fetching user organization', {
         userId: this.id,
-        organizationId: this.get("organizationId"),
+        organizationId: this.get('organizationId'),
         error: error.message,
       });
       return null;
@@ -1036,10 +1033,10 @@ class AmexingUser extends BaseModel {
    * @example
    */
   canAccessOrganization(organizationId) {
-    const userOrgId = this.get("organizationId");
+    const userOrgId = this.get('organizationId');
 
     // Amexing users can access any organization
-    if (userOrgId === "amexing") {
+    if (userOrgId === 'amexing') {
       return true;
     }
 
@@ -1069,18 +1066,18 @@ class AmexingUser extends BaseModel {
       }
 
       // Additional organization checks
-      const userOrgId = this.get("organizationId");
-      const otherUserOrgId = otherUser.get("organizationId");
+      const userOrgId = this.get('organizationId');
+      const otherUserOrgId = otherUser.get('organizationId');
 
       // Amexing users can manage users in any organization
-      if (userOrgId === "amexing") {
+      if (userOrgId === 'amexing') {
         return true;
       }
 
       // Users can only manage within their own organization
       return userOrgId === otherUserOrgId;
     } catch (error) {
-      logger.error("Error checking user management permissions", {
+      logger.error('Error checking user management permissions', {
         userId: this.id,
         otherUserId: otherUser.id,
         error: error.message,
@@ -1106,7 +1103,7 @@ class AmexingUser extends BaseModel {
 
       return currentRole.isHigherThan(otherRole);
     } catch (error) {
-      logger.error("Error comparing user hierarchy", {
+      logger.error('Error comparing user hierarchy', {
         userId: this.id,
         otherUserId: otherUser.id,
         error: error.message,
@@ -1122,7 +1119,7 @@ class AmexingUser extends BaseModel {
    * @returns {Promise<boolean>} - True if access is allowed.
    * @example
    */
-  async canAccessUserData(targetUser, scope = "own") {
+  async canAccessUserData(targetUser, scope = 'own') {
     try {
       // Same user can always access their own data
       if (this.id === targetUser.id) {
@@ -1131,27 +1128,27 @@ class AmexingUser extends BaseModel {
 
       // Check scope-based access
       switch (scope) {
-        case "own":
+        case 'own':
           return false;
 
-        case "department":
-          return this.get("departmentId") === targetUser.get("departmentId");
+        case 'department':
+          return this.get('departmentId') === targetUser.get('departmentId');
 
-        case "organization":
+        case 'organization':
           return (
-            this.get("organizationId") === targetUser.get("organizationId")
+            this.get('organizationId') === targetUser.get('organizationId')
           );
 
-        case "system": {
+        case 'system': {
           const role = await this.getRole();
-          return role && role.get("scope") === "system";
+          return role && role.get('scope') === 'system';
         }
 
         default:
           return false;
       }
     } catch (error) {
-      logger.error("Error checking user data access", {
+      logger.error('Error checking user data access', {
         userId: this.id,
         targetUserId: targetUser.id,
         scope,
@@ -1173,31 +1170,31 @@ class AmexingUser extends BaseModel {
 
       return {
         id: this.id,
-        username: this.get("username"),
-        email: this.get("email"),
-        firstName: this.get("firstName"),
-        lastName: this.get("lastName"),
+        username: this.get('username'),
+        email: this.get('email'),
+        firstName: this.get('firstName'),
+        lastName: this.get('lastName'),
         fullName: this.getFullName(),
         role: role ? role.toSafeJSON() : null,
-        roleName: role ? role.get("name") : "guest", // Backward compatibility
-        active: this.get("active"),
-        exists: this.get("exists"),
+        roleName: role ? role.get('name') : 'guest', // Backward compatibility
+        active: this.get('active'),
+        exists: this.get('exists'),
         lifecycleStatus: this.getLifecycleStatus(),
-        emailVerified: this.get("emailVerified"),
-        lastLoginAt: this.get("lastLoginAt"),
-        primaryOAuthProvider: this.get("primaryOAuthProvider"),
-        hasOAuth: (this.get("oauthAccounts") || []).length > 0,
-        organizationId: this.get("organizationId"),
+        emailVerified: this.get('emailVerified'),
+        lastLoginAt: this.get('lastLoginAt'),
+        primaryOAuthProvider: this.get('primaryOAuthProvider'),
+        hasOAuth: (this.get('oauthAccounts') || []).length > 0,
+        organizationId: this.get('organizationId'),
         organization,
-        clientId: this.get("clientId"),
-        departmentId: this.get("departmentId"),
-        createdAt: this.get("createdAt"),
-        updatedAt: this.get("updatedAt"),
-        createdBy: this.get("createdBy"),
-        modifiedBy: this.get("modifiedBy"),
+        clientId: this.get('clientId'),
+        departmentId: this.get('departmentId'),
+        createdAt: this.get('createdAt'),
+        updatedAt: this.get('updatedAt'),
+        createdBy: this.get('createdBy'),
+        modifiedBy: this.get('modifiedBy'),
       };
     } catch (error) {
-      logger.error("Error creating safe JSON for user", {
+      logger.error('Error creating safe JSON for user', {
         userId: this.id,
         error: error.message,
       });
@@ -1205,31 +1202,31 @@ class AmexingUser extends BaseModel {
       // Return basic safe JSON without role information
       return {
         id: this.id,
-        username: this.get("username"),
-        email: this.get("email"),
-        firstName: this.get("firstName"),
-        lastName: this.get("lastName"),
+        username: this.get('username'),
+        email: this.get('email'),
+        firstName: this.get('firstName'),
+        lastName: this.get('lastName'),
         fullName: this.getFullName(),
-        active: this.get("active"),
-        exists: this.get("exists"),
+        active: this.get('active'),
+        exists: this.get('exists'),
         lifecycleStatus: this.getLifecycleStatus(),
-        emailVerified: this.get("emailVerified"),
-        lastLoginAt: this.get("lastLoginAt"),
-        primaryOAuthProvider: this.get("primaryOAuthProvider"),
-        hasOAuth: (this.get("oauthAccounts") || []).length > 0,
-        organizationId: this.get("organizationId"),
-        clientId: this.get("clientId"),
-        departmentId: this.get("departmentId"),
-        createdAt: this.get("createdAt"),
-        updatedAt: this.get("updatedAt"),
-        createdBy: this.get("createdBy"),
-        modifiedBy: this.get("modifiedBy"),
+        emailVerified: this.get('emailVerified'),
+        lastLoginAt: this.get('lastLoginAt'),
+        primaryOAuthProvider: this.get('primaryOAuthProvider'),
+        hasOAuth: (this.get('oauthAccounts') || []).length > 0,
+        organizationId: this.get('organizationId'),
+        clientId: this.get('clientId'),
+        departmentId: this.get('departmentId'),
+        createdAt: this.get('createdAt'),
+        updatedAt: this.get('updatedAt'),
+        createdBy: this.get('createdBy'),
+        modifiedBy: this.get('modifiedBy'),
       };
     }
   }
 }
 
 // Register the subclass
-Parse.Object.registerSubclass("AmexingUser", AmexingUser);
+Parse.Object.registerSubclass('AmexingUser', AmexingUser);
 
 module.exports = AmexingUser;

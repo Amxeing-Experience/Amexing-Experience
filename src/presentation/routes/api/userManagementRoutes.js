@@ -18,12 +18,12 @@
  * // Returns: operation result
  */
 
-const express = require("express");
-const rateLimit = require("express-rate-limit");
-const UserManagementController = require("../../../application/controllers/api/UserManagementController");
-const jwtMiddleware = require("../../../application/middleware/jwtMiddleware");
-const securityMiddleware = require("../../../infrastructure/security/securityMiddleware");
-const logger = require("../../../infrastructure/logger");
+const express = require('express');
+const rateLimit = require('express-rate-limit');
+const UserManagementController = require('../../../application/controllers/api/UserManagementController');
+const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
+const securityMiddleware = require('../../../infrastructure/security/securityMiddleware');
+const logger = require('../../../infrastructure/logger');
 
 const router = express.Router();
 const userController = new UserManagementController();
@@ -35,8 +35,8 @@ const userApiLimiter = rateLimit({
   message: {
     success: false,
     error:
-      "Too many user management requests from this IP, please try again later.",
-    retryAfter: "15 minutes",
+      'Too many user management requests from this IP, please try again later.',
+    retryAfter: '15 minutes',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -49,8 +49,8 @@ const writeOperationsLimiter = rateLimit({
   message: {
     success: false,
     error:
-      "Too many user modification requests from this IP, please try again later.",
-    retryAfter: "15 minutes",
+      'Too many user modification requests from this IP, please try again later.',
+    retryAfter: '15 minutes',
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -76,11 +76,11 @@ router.use(jwtMiddleware.authenticateToken);
  * GET /api/users?page=1&limit=10&role=admin&active=true
  */
 router.get(
-  "/",
-  jwtMiddleware.requirePermission("users.list"),
+  '/',
+  jwtMiddleware.requirePermission('users.list'),
   async (req, res) => {
     await userController.getUsers(req, res);
-  },
+  }
 );
 
 /**
@@ -99,11 +99,11 @@ router.get(
  * GET /api/users/search?q=john&role=employee&active=true
  */
 router.get(
-  "/search",
-  jwtMiddleware.requirePermission("users.search"),
+  '/search',
+  jwtMiddleware.requirePermission('users.search'),
   async (req, res) => {
     await userController.searchUsers(req, res);
-  },
+  }
 );
 
 /**
@@ -122,11 +122,11 @@ router.get(
  * GET /api/users/statistics
  */
 router.get(
-  "/statistics",
+  '/statistics',
   jwtMiddleware.requireRoleLevel(6),
   async (req, res) => {
     await userController.getUserStatistics(req, res);
-  },
+  }
 );
 
 /**
@@ -145,11 +145,11 @@ router.get(
  * GET /api/users/abc123
  */
 router.get(
-  "/:id",
-  jwtMiddleware.requirePermission("users.read"),
+  '/:id',
+  jwtMiddleware.requirePermission('users.read'),
   async (req, res) => {
     await userController.getUserById(req, res);
-  },
+  }
 );
 
 /**
@@ -168,13 +168,13 @@ router.get(
  * POST /api/users with body: {email: 'user@example.com', firstName: 'John', lastName: 'Doe', role: 'employee'}
  */
 router.post(
-  "/",
+  '/',
   writeOperationsLimiter,
   securityMiddleware.getCsrfProtection(),
-  jwtMiddleware.requirePermission("users.create"),
+  jwtMiddleware.requirePermission('users.create'),
   async (req, res) => {
     await userController.createUser(req, res);
-  },
+  }
 );
 
 /**
@@ -194,13 +194,13 @@ router.post(
  * PUT /api/users/abc123 with body: {firstName: 'Jane', active: false}
  */
 router.put(
-  "/:id",
+  '/:id',
   writeOperationsLimiter,
   securityMiddleware.getCsrfProtection(),
-  jwtMiddleware.requirePermission("users.update"),
+  jwtMiddleware.requirePermission('users.update'),
   async (req, res) => {
     await userController.updateUser(req, res);
-  },
+  }
 );
 
 /**
@@ -220,13 +220,13 @@ router.put(
  * DELETE /api/users/abc123 with body: {reason: 'Policy violation'}
  */
 router.delete(
-  "/:id",
+  '/:id',
   writeOperationsLimiter,
   securityMiddleware.getCsrfProtection(),
-  jwtMiddleware.requirePermission("users.deactivate"),
+  jwtMiddleware.requirePermission('users.deactivate'),
   async (req, res) => {
     await userController.deactivateUser(req, res);
-  },
+  }
 );
 
 /**
@@ -246,13 +246,13 @@ router.delete(
  * PUT /api/users/abc123/reactivate with body: {reason: 'Appeal approved'}
  */
 router.put(
-  "/:id/reactivate",
+  '/:id/reactivate',
   writeOperationsLimiter,
   securityMiddleware.getCsrfProtection(),
-  jwtMiddleware.requirePermission("users.reactivate"),
+  jwtMiddleware.requirePermission('users.reactivate'),
   async (req, res) => {
     await userController.reactivateUser(req, res);
-  },
+  }
 );
 
 /**
@@ -272,13 +272,13 @@ router.put(
  * PATCH /api/users/abc123/toggle-status with body: {active: false, reason: 'Suspension'}
  */
 router.patch(
-  "/:id/toggle-status",
+  '/:id/toggle-status',
   writeOperationsLimiter,
   securityMiddleware.getCsrfProtection(),
-  jwtMiddleware.requirePermission("users.update"),
+  jwtMiddleware.requirePermission('users.update'),
   async (req, res) => {
     await userController.toggleUserStatus(req, res);
-  },
+  }
 );
 
 /**
@@ -298,13 +298,13 @@ router.patch(
  * PATCH /api/users/abc123/archive with body: {reason: 'Data retention policy'}
  */
 router.patch(
-  "/:id/archive",
+  '/:id/archive',
   writeOperationsLimiter,
   securityMiddleware.getCsrfProtection(),
   jwtMiddleware.requireRoleLevel(7),
   async (req, res) => {
     await userController.archiveUser(req, res);
-  },
+  }
 );
 
 /**
@@ -320,7 +320,7 @@ router.patch(
  * // Returns: operation result
  */
 router.use((error, req, res, _next) => {
-  logger.error("User Management API Error:", {
+  logger.error('User Management API Error:', {
     error: error.message,
     stack: error.stack,
     url: req.url,
@@ -332,7 +332,7 @@ router.use((error, req, res, _next) => {
   // Don't expose internal errors to client
   res.status(error.status || 500).json({
     success: false,
-    error: error.status === 500 ? "Internal server error" : error.message,
+    error: error.status === 500 ? 'Internal server error' : error.message,
     timestamp: new Date().toISOString(),
   });
 });

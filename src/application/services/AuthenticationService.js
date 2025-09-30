@@ -10,12 +10,12 @@
  * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
-const Parse = require("parse/node");
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
-const AmexingUser = require("../../domain/models/AmexingUser");
-const logger = require("../../infrastructure/logger");
-const { AuthenticationServiceCore } = require("./AuthenticationServiceCore");
+const Parse = require('parse/node');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const AmexingUser = require('../../domain/models/AmexingUser');
+const logger = require('../../infrastructure/logger');
+const { AuthenticationServiceCore } = require('./AuthenticationServiceCore');
 
 /**
  * Authentication Service - Handles traditional and OAuth authentication.
@@ -87,7 +87,7 @@ class AuthenticationService extends AuthenticationServiceCore {
         email: userData.email,
         firstName: userData.firstName,
         lastName: userData.lastName,
-        role: userData.role || "user",
+        role: userData.role || 'user',
       });
 
       // Set password with validation
@@ -100,21 +100,21 @@ class AuthenticationService extends AuthenticationServiceCore {
       const tokens = await this.generateTokens(savedUser);
 
       // Log registration
-      logger.logSecurityEvent("USER_REGISTRATION", {
+      logger.logSecurityEvent('USER_REGISTRATION', {
         userId: savedUser.id,
-        username: savedUser.get("username"),
-        email: this.maskEmail(savedUser.get("email")),
-        authMethod: "password",
+        username: savedUser.get('username'),
+        email: this.maskEmail(savedUser.get('email')),
+        authMethod: 'password',
       });
 
       return {
         success: true,
         user: savedUser.toSafeJSON(),
         tokens,
-        message: "User registered successfully",
+        message: 'User registered successfully',
       };
     } catch (error) {
-      logger.error("User registration error:", error);
+      logger.error('User registration error:', error);
       throw error;
     }
   }
@@ -141,34 +141,34 @@ class AuthenticationService extends AuthenticationServiceCore {
       const user = await this.findUserByIdentifier(identifier);
 
       if (!user) {
-        logger.logAccessAttempt(false, identifier, "User not found");
+        logger.logAccessAttempt(false, identifier, 'User not found');
         throw new Parse.Error(
           Parse.Error.OBJECT_NOT_FOUND,
-          "Invalid credentials",
+          'Invalid credentials'
         );
       }
 
       // Check if account is locked
       if (user.isAccountLocked()) {
-        logger.logSecurityEvent("LOGIN_ATTEMPT_LOCKED", {
+        logger.logSecurityEvent('LOGIN_ATTEMPT_LOCKED', {
           userId: user.id,
-          username: user.get("username"),
+          username: user.get('username'),
         });
         throw new Parse.Error(
           Parse.Error.OBJECT_NOT_FOUND,
-          "Account is temporarily locked",
+          'Account is temporarily locked'
         );
       }
 
       // Check if account is active
-      if (!user.get("active")) {
-        logger.logSecurityEvent("LOGIN_ATTEMPT_INACTIVE", {
+      if (!user.get('active')) {
+        logger.logSecurityEvent('LOGIN_ATTEMPT_INACTIVE', {
           userId: user.id,
-          username: user.get("username"),
+          username: user.get('username'),
         });
         throw new Parse.Error(
           Parse.Error.OBJECT_NOT_FOUND,
-          "Account is inactive",
+          'Account is inactive'
         );
       }
 
@@ -177,43 +177,43 @@ class AuthenticationService extends AuthenticationServiceCore {
 
       if (!isValidPassword) {
         const isLocked = await user.recordFailedLogin();
-        logger.logAccessAttempt(false, identifier, "Invalid password");
+        logger.logAccessAttempt(false, identifier, 'Invalid password');
 
         if (isLocked) {
           throw new Parse.Error(
             Parse.Error.OBJECT_NOT_FOUND,
-            "Account has been locked due to failed login attempts",
+            'Account has been locked due to failed login attempts'
           );
         } else {
           throw new Parse.Error(
             Parse.Error.OBJECT_NOT_FOUND,
-            "Invalid credentials",
+            'Invalid credentials'
           );
         }
       }
 
       // Record successful login
-      await user.recordSuccessfulLogin("password");
+      await user.recordSuccessfulLogin('password');
 
       // Generate tokens
       const tokens = await this.generateTokens(user);
 
       // Log successful login
-      logger.logAccessAttempt(true, identifier, "Password login");
-      logger.logSecurityEvent("USER_LOGIN", {
+      logger.logAccessAttempt(true, identifier, 'Password login');
+      logger.logSecurityEvent('USER_LOGIN', {
         userId: user.id,
-        username: user.get("username"),
-        authMethod: "password",
+        username: user.get('username'),
+        authMethod: 'password',
       });
 
       return {
         success: true,
         user: user.toSafeJSON(),
         tokens,
-        message: "Login successful",
+        message: 'Login successful',
       };
     } catch (error) {
-      logger.error("User login error:", error);
+      logger.error('User login error:', error);
       throw error;
     }
   }
@@ -238,29 +238,29 @@ class AuthenticationService extends AuthenticationServiceCore {
       // Verify refresh token
       const decoded = jwt.verify(refreshToken, this.jwtSecret);
 
-      if (decoded.type !== "refresh") {
+      if (decoded.type !== 'refresh') {
         throw new Parse.Error(
           Parse.Error.INVALID_REQUEST,
-          "Invalid refresh token",
+          'Invalid refresh token'
         );
       }
 
       // Find user
       const user = await this.findUserById(decoded.userId);
 
-      if (!user || !user.get("active")) {
+      if (!user || !user.get('active')) {
         throw new Parse.Error(
           Parse.Error.OBJECT_NOT_FOUND,
-          "User not found or inactive",
+          'User not found or inactive'
         );
       }
 
       // Generate new tokens
       const tokens = await this.generateTokens(user);
 
-      logger.logSecurityEvent("TOKEN_REFRESH", {
+      logger.logSecurityEvent('TOKEN_REFRESH', {
         userId: user.id,
-        username: user.get("username"),
+        username: user.get('username'),
       });
 
       return {
@@ -269,10 +269,10 @@ class AuthenticationService extends AuthenticationServiceCore {
         user: user.toSafeJSON(),
       };
     } catch (error) {
-      logger.error("Token refresh error:", error);
+      logger.error('Token refresh error:', error);
       throw new Parse.Error(
         Parse.Error.INVALID_REQUEST,
-        "Invalid or expired refresh token",
+        'Invalid or expired refresh token'
       );
     }
   }
@@ -298,19 +298,19 @@ class AuthenticationService extends AuthenticationServiceCore {
       const user = await this.findUserById(userId);
 
       if (user) {
-        logger.logSecurityEvent("USER_LOGOUT", {
+        logger.logSecurityEvent('USER_LOGOUT', {
           userId: user.id,
-          username: user.get("username"),
+          username: user.get('username'),
           sessionToken: `${sessionToken.substring(0, 8)}***`,
         });
       }
 
       return {
         success: true,
-        message: "Logout successful",
+        message: 'Logout successful',
       };
     } catch (error) {
-      logger.error("Logout error:", error);
+      logger.error('Logout error:', error);
       throw error;
     }
   }
@@ -336,20 +336,20 @@ class AuthenticationService extends AuthenticationServiceCore {
       const decoded = jwt.verify(token, this.jwtSecret);
 
       // Check token type if present (backward compatibility)
-      if (decoded.type && decoded.type !== "access") {
+      if (decoded.type && decoded.type !== 'access') {
         throw new Parse.Error(
           Parse.Error.INVALID_REQUEST,
-          "Invalid token type",
+          'Invalid token type'
         );
       }
 
       // Check if user still exists and is active
       const user = await this.findUserById(decoded.userId);
 
-      if (!user || !user.get("active")) {
+      if (!user || !user.get('active')) {
         throw new Parse.Error(
           Parse.Error.OBJECT_NOT_FOUND,
-          "User not found or inactive",
+          'User not found or inactive'
         );
       }
 
@@ -357,11 +357,11 @@ class AuthenticationService extends AuthenticationServiceCore {
       let roleObject = null;
       if (decoded.roleId) {
         try {
-          const roleQuery = new Parse.Query("Role");
-          roleQuery.equalTo("objectId", decoded.roleId);
+          const roleQuery = new Parse.Query('Role');
+          roleQuery.equalTo('objectId', decoded.roleId);
           roleObject = await roleQuery.first({ useMasterKey: true });
         } catch (roleError) {
-          logger.warn("Failed to fetch role object during token validation", {
+          logger.warn('Failed to fetch role object during token validation', {
             userId: decoded.userId,
             roleId: decoded.roleId,
             error: roleError.message,
@@ -381,9 +381,9 @@ class AuthenticationService extends AuthenticationServiceCore {
       };
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, "Token expired");
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Token expired');
       } else if (error instanceof jwt.JsonWebTokenError) {
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, "Invalid token");
+        throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid token');
       }
       throw error;
     }
@@ -412,30 +412,30 @@ class AuthenticationService extends AuthenticationServiceCore {
       if (!user) {
         return {
           success: true,
-          message: "If the email exists, a password reset link has been sent",
+          message: 'If the email exists, a password reset link has been sent',
         };
       }
 
-      const resetToken = crypto.randomBytes(32).toString("hex");
+      const resetToken = crypto.randomBytes(32).toString('hex');
       const resetExpires = new Date();
       resetExpires.setHours(resetExpires.getHours() + 1); // 1 hour expiration
 
-      user.set("passwordResetToken", resetToken);
-      user.set("passwordResetExpires", resetExpires);
+      user.set('passwordResetToken', resetToken);
+      user.set('passwordResetExpires', resetExpires);
       await user.save(null, { useMasterKey: true });
 
-      logger.logSecurityEvent("PASSWORD_RESET_INITIATED", {
+      logger.logSecurityEvent('PASSWORD_RESET_INITIATED', {
         userId: user.id,
         email: this.maskEmail(email),
       });
 
       return {
         success: true,
-        message: "Password reset link has been sent to your email",
+        message: 'Password reset link has been sent to your email',
         resetToken, // Remove this in production
       };
     } catch (error) {
-      logger.error("Password reset initiation error:", error);
+      logger.error('Password reset initiation error:', error);
       throw error;
     }
   }
@@ -459,34 +459,34 @@ class AuthenticationService extends AuthenticationServiceCore {
   async resetPassword(resetToken, newPassword) {
     try {
       const query = new Parse.Query(AmexingUser);
-      query.equalTo("passwordResetToken", resetToken);
-      query.greaterThan("passwordResetExpires", new Date());
+      query.equalTo('passwordResetToken', resetToken);
+      query.greaterThan('passwordResetExpires', new Date());
 
       const user = await query.first({ useMasterKey: true });
 
       if (!user) {
         throw new Parse.Error(
           Parse.Error.OBJECT_NOT_FOUND,
-          "Invalid or expired reset token",
+          'Invalid or expired reset token'
         );
       }
 
       await user.setPassword(newPassword);
-      user.unset("passwordResetToken");
-      user.unset("passwordResetExpires");
+      user.unset('passwordResetToken');
+      user.unset('passwordResetExpires');
       await user.save(null, { useMasterKey: true });
 
-      logger.logSecurityEvent("PASSWORD_RESET_COMPLETED", {
+      logger.logSecurityEvent('PASSWORD_RESET_COMPLETED', {
         userId: user.id,
-        username: user.get("username"),
+        username: user.get('username'),
       });
 
       return {
         success: true,
-        message: "Password has been reset successfully",
+        message: 'Password has been reset successfully',
       };
     } catch (error) {
-      logger.error("Password reset error:", error);
+      logger.error('Password reset error:', error);
       throw error;
     }
   }
@@ -513,7 +513,7 @@ class AuthenticationService extends AuthenticationServiceCore {
       const user = await this.findUserById(userId);
 
       if (!user) {
-        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "User not found");
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
       }
 
       const isValidPassword = await user.validatePassword(currentPassword);
@@ -521,24 +521,24 @@ class AuthenticationService extends AuthenticationServiceCore {
       if (!isValidPassword) {
         throw new Parse.Error(
           Parse.Error.OBJECT_NOT_FOUND,
-          "Current password is incorrect",
+          'Current password is incorrect'
         );
       }
 
       await user.setPassword(newPassword);
       await user.save(null, { useMasterKey: true });
 
-      logger.logSecurityEvent("PASSWORD_CHANGED", {
+      logger.logSecurityEvent('PASSWORD_CHANGED', {
         userId: user.id,
-        username: user.get("username"),
+        username: user.get('username'),
       });
 
       return {
         success: true,
-        message: "Password changed successfully",
+        message: 'Password changed successfully',
       };
     } catch (error) {
-      logger.error("Password change error:", error);
+      logger.error('Password change error:', error);
       throw error;
     }
   }

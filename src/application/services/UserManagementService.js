@@ -17,10 +17,10 @@
  * // Returns: { success: true, user: {...} }
  */
 
-const Parse = require("parse/node");
-const AmexingUser = require("../../domain/models/AmexingUser");
-const BaseModel = require("../../domain/models/BaseModel");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const AmexingUser = require('../../domain/models/AmexingUser');
+const BaseModel = require('../../domain/models/BaseModel');
+const logger = require('../../infrastructure/logger');
 
 /**
  * UserManagementService class implementing comprehensive user management
@@ -35,15 +35,15 @@ const logger = require("../../infrastructure/logger");
  */
 class UserManagementService {
   constructor() {
-    this.className = "AmexingUser";
+    this.className = 'AmexingUser';
     this.allowedRoles = [
-      "superadmin",
-      "admin",
-      "client",
-      "department_manager",
-      "employee",
-      "driver",
-      "guest",
+      'superadmin',
+      'admin',
+      'client',
+      'department_manager',
+      'employee',
+      'driver',
+      'guest',
     ];
     this.roleHierarchy = {
       superadmin: 7,
@@ -81,13 +81,13 @@ class UserManagementService {
         page = 1,
         limit = 25,
         filters = {},
-        sort = { field: "lastName", direction: "asc" },
+        sort = { field: 'lastName', direction: 'asc' },
       } = options;
 
       // Query only active and existing users
       const query = new Parse.Query(this.className);
-      query.equalTo("active", true);
-      query.equalTo("exists", true);
+      query.equalTo('active', true);
+      query.equalTo('exists', true);
 
       // Apply role-based access filtering
       await this.applyRoleBasedFiltering(query, currentUser, targetRole);
@@ -110,9 +110,7 @@ class UserManagementService {
       ]);
 
       // Transform users to safe format
-      const safeUsers = users.map((user) =>
-        this.transformUserToSafeFormat(user),
-      );
+      const safeUsers = users.map((user) => this.transformUserToSafeFormat(user));
 
       // Log activity for audit compliance
       await this.logUserQueryActivity(currentUser, {
@@ -141,7 +139,7 @@ class UserManagementService {
         },
       };
     } catch (error) {
-      logger.error("Error in UserManagementService.getUsers", {
+      logger.error('Error in UserManagementService.getUsers', {
         error: error.message,
         stack: error.stack,
         currentUser: currentUser?.id,
@@ -167,7 +165,7 @@ class UserManagementService {
     try {
       // AI Agent Rule: Use queryActive for business operations
       const query = BaseModel.queryActive(this.className);
-      query.include("roleId"); // Include role data
+      query.include('roleId'); // Include role data
       const user = await query.get(userId, { useMasterKey: true });
 
       if (!user) {
@@ -176,11 +174,11 @@ class UserManagementService {
 
       // Validate access permissions
       if (!this.canAccessUser(currentUser, user)) {
-        throw new Error("Insufficient permissions to access this user");
+        throw new Error('Insufficient permissions to access this user');
       }
 
       // Log access for audit compliance
-      await this.logUserAccessActivity(currentUser, userId, "view");
+      await this.logUserAccessActivity(currentUser, userId, 'view');
 
       return this.transformUserToSafeFormat(user);
     } catch (error) {
@@ -188,7 +186,7 @@ class UserManagementService {
         // Parse object not found
         return null;
       }
-      logger.error("Error in UserManagementService.getUserById", {
+      logger.error('Error in UserManagementService.getUserById', {
         error: error.message,
         currentUser: currentUser?.id,
         targetUserId: userId,
@@ -214,17 +212,17 @@ class UserManagementService {
       // Validate permissions
       if (!this.canCreateUser(createdBy, userData.role)) {
         throw new Error(
-          "Insufficient permissions to create user with this role",
+          'Insufficient permissions to create user with this role'
         );
       }
 
       // Validate input data
-      await this.validateUserData(userData, "create");
+      await this.validateUserData(userData, 'create');
 
       // Check for existing user with same email
       const existingUser = await this.checkExistingUser(userData.email);
       if (existingUser) {
-        throw new Error("User with this email already exists");
+        throw new Error('User with this email already exists');
       }
 
       // Prepare user data with AI agent lifecycle fields
@@ -251,12 +249,12 @@ class UserManagementService {
       await user.save(null, { useMasterKey: true });
 
       // Log creation activity
-      await this.logUserCRUDActivity(createdBy, "create", user.id, {
+      await this.logUserCRUDActivity(createdBy, 'create', user.id, {
         role: userData.role,
         email: userData.email,
       });
 
-      logger.info("User created successfully", {
+      logger.info('User created successfully', {
         userId: user.id,
         email: userData.email,
         role: userData.role,
@@ -265,9 +263,9 @@ class UserManagementService {
 
       return this.transformUserToSafeFormat(user);
     } catch (error) {
-      logger.error("Error in UserManagementService.createUser", {
+      logger.error('Error in UserManagementService.createUser', {
         error: error.message,
-        userData: { ...userData, password: "[REDACTED]" },
+        userData: { ...userData, password: '[REDACTED]' },
         createdBy: createdBy?.id,
       });
       throw error;
@@ -294,30 +292,30 @@ class UserManagementService {
       const user = await query.get(userId, { useMasterKey: true });
 
       if (!user) {
-        throw new Error("User not found or not accessible");
+        throw new Error('User not found or not accessible');
       }
 
       // Validate permissions
       if (!this.canModifyUser(modifiedBy, user)) {
-        throw new Error("Insufficient permissions to modify this user");
+        throw new Error('Insufficient permissions to modify this user');
       }
 
       // Validate update data
-      await this.validateUserData(updates, "update", user);
+      await this.validateUserData(updates, 'update', user);
 
       // Store original values for audit
       const originalValues = this.extractAuditableFields(user);
 
       // Apply updates while preserving lifecycle management
       const allowedUpdateFields = [
-        "firstName",
-        "lastName",
-        "role",
-        "active",
-        "emailVerified",
-        "mustChangePassword",
-        "oauthAccounts",
-        "primaryOAuthProvider",
+        'firstName',
+        'lastName',
+        'role',
+        'active',
+        'emailVerified',
+        'mustChangePassword',
+        'oauthAccounts',
+        'primaryOAuthProvider',
       ];
 
       allowedUpdateFields.forEach((field) => {
@@ -327,26 +325,26 @@ class UserManagementService {
       });
 
       // Update modification tracking
-      user.set("modifiedBy", modifiedBy.id);
-      user.set("updatedAt", new Date());
+      user.set('modifiedBy', modifiedBy.id);
+      user.set('updatedAt', new Date());
 
       // Handle password update separately if provided
       if (updates.password) {
         await user.setPassword(updates.password);
-        user.set("passwordChangedAt", new Date());
+        user.set('passwordChangedAt', new Date());
       }
 
       // Save changes
       await user.save(null, { useMasterKey: true });
 
       // Log update activity with field changes
-      await this.logUserCRUDActivity(modifiedBy, "update", userId, {
+      await this.logUserCRUDActivity(modifiedBy, 'update', userId, {
         originalValues,
         newValues: this.extractAuditableFields(user),
         fieldsChanged: Object.keys(updates),
       });
 
-      logger.info("User updated successfully", {
+      logger.info('User updated successfully', {
         userId,
         modifiedBy: modifiedBy.id,
         fieldsUpdated: Object.keys(updates),
@@ -354,12 +352,12 @@ class UserManagementService {
 
       return this.transformUserToSafeFormat(user);
     } catch (error) {
-      logger.error("Error in UserManagementService.updateUser", {
+      logger.error('Error in UserManagementService.updateUser', {
         error: error.message,
         userId,
         updates: {
           ...updates,
-          password: updates.password ? "[REDACTED]" : undefined,
+          password: updates.password ? '[REDACTED]' : undefined,
         },
         modifiedBy: modifiedBy?.id,
       });
@@ -381,37 +379,37 @@ class UserManagementService {
    * // const result = await service.methodName(parameters);
    * // Returns: Promise resolving to operation result
    */
-  async deactivateUser(userId, deactivatedBy, reason = "Admin action") {
+  async deactivateUser(userId, deactivatedBy, reason = 'Admin action') {
     try {
       // Get user using existing records query (includes archived)
       const query = BaseModel.queryExisting(this.className);
       const user = await query.get(userId, { useMasterKey: true });
 
       if (!user) {
-        throw new Error("User not found");
+        throw new Error('User not found');
       }
 
       // Validate permissions
       if (!this.canDeactivateUser(deactivatedBy, user)) {
-        throw new Error("Insufficient permissions to deactivate this user");
+        throw new Error('Insufficient permissions to deactivate this user');
       }
 
       // Prevent self-deactivation
       if (userId === deactivatedBy.id) {
-        throw new Error("Cannot deactivate your own account");
+        throw new Error('Cannot deactivate your own account');
       }
 
       // AI Agent Rule: Use deactivate method, never hard delete
       await user.deactivate(deactivatedBy.id);
 
       // Log deactivation activity
-      await this.logUserCRUDActivity(deactivatedBy, "deactivate", userId, {
+      await this.logUserCRUDActivity(deactivatedBy, 'deactivate', userId, {
         reason,
-        originalRole: user.get("role"),
-        originalEmail: user.get("email"),
+        originalRole: user.get('role'),
+        originalEmail: user.get('email'),
       });
 
-      logger.info("User deactivated successfully", {
+      logger.info('User deactivated successfully', {
         userId,
         deactivatedBy: deactivatedBy.id,
         reason,
@@ -419,7 +417,7 @@ class UserManagementService {
 
       return true;
     } catch (error) {
-      logger.error("Error in UserManagementService.deactivateUser", {
+      logger.error('Error in UserManagementService.deactivateUser', {
         error: error.message,
         userId,
         deactivatedBy: deactivatedBy?.id,
@@ -442,32 +440,32 @@ class UserManagementService {
    * // const result = await service.methodName(parameters);
    * // Returns: Promise resolving to operation result
    */
-  async reactivateUser(userId, reactivatedBy, reason = "Admin action") {
+  async reactivateUser(userId, reactivatedBy, reason = 'Admin action') {
     try {
       // Query archived users (deactivated but still exist)
       const query = BaseModel.queryArchived(this.className);
       const user = await query.get(userId, { useMasterKey: true });
 
       if (!user) {
-        throw new Error("User not found or permanently deleted");
+        throw new Error('User not found or permanently deleted');
       }
 
       // Validate permissions
       if (!this.canReactivateUser(reactivatedBy, user)) {
-        throw new Error("Insufficient permissions to reactivate this user");
+        throw new Error('Insufficient permissions to reactivate this user');
       }
 
       // AI Agent Rule: Use activate method for lifecycle management
       await user.activate(reactivatedBy.id);
 
       // Log reactivation activity
-      await this.logUserCRUDActivity(reactivatedBy, "reactivate", userId, {
+      await this.logUserCRUDActivity(reactivatedBy, 'reactivate', userId, {
         reason,
-        role: user.get("role"),
-        email: user.get("email"),
+        role: user.get('role'),
+        email: user.get('email'),
       });
 
-      logger.info("User reactivated successfully", {
+      logger.info('User reactivated successfully', {
         userId,
         reactivatedBy: reactivatedBy.id,
         reason,
@@ -475,7 +473,7 @@ class UserManagementService {
 
       return true;
     } catch (error) {
-      logger.error("Error in UserManagementService.reactivateUser", {
+      logger.error('Error in UserManagementService.reactivateUser', {
         error: error.message,
         userId,
         reactivatedBy: reactivatedBy?.id,
@@ -504,7 +502,7 @@ class UserManagementService {
     currentUser,
     userId,
     targetStatus,
-    reason = "Status change via API",
+    reason = 'Status change via API'
   ) {
     try {
       // Query active users to get current user data
@@ -522,7 +520,7 @@ class UserManagementService {
       if (!user) {
         return {
           success: false,
-          message: "User not found",
+          message: 'User not found',
         };
       }
 
@@ -534,34 +532,34 @@ class UserManagementService {
       if (!canPerformAction) {
         return {
           success: false,
-          message: "Insufficient permissions to change user status",
+          message: 'Insufficient permissions to change user status',
         };
       }
 
-      const previousStatus = user.get("active");
+      const previousStatus = user.get('active');
 
       // AI Agent Rule: Only change active field, maintain exists: true
-      user.set("active", targetStatus);
-      user.set("exists", true); // Ensure exists remains true
-      user.set("updatedAt", new Date());
+      user.set('active', targetStatus);
+      user.set('exists', true); // Ensure exists remains true
+      user.set('updatedAt', new Date());
 
       await user.save(null, { useMasterKey: true });
 
       // Log activity
       await this.logUserCRUDActivity(
         currentUser,
-        targetStatus ? "activate" : "deactivate",
+        targetStatus ? 'activate' : 'deactivate',
         userId,
         {
           reason,
-          role: user.get("role"),
-          email: user.get("email"),
+          role: user.get('role'),
+          email: user.get('email'),
           previousStatus,
           newStatus: targetStatus,
-        },
+        }
       );
 
-      logger.info("User status toggled successfully", {
+      logger.info('User status toggled successfully', {
         userId,
         previousStatus,
         newStatus: targetStatus,
@@ -576,7 +574,7 @@ class UserManagementService {
         newStatus: targetStatus,
       };
     } catch (error) {
-      logger.error("Error in UserManagementService.toggleUserStatus", {
+      logger.error('Error in UserManagementService.toggleUserStatus', {
         error: error.message,
         userId,
         targetStatus,
@@ -601,7 +599,7 @@ class UserManagementService {
    * // const result = await service.methodName(parameters);
    * // Returns: Promise resolving to operation result
    */
-  async archiveUser(currentUser, userId, reason = "User archived via API") {
+  async archiveUser(currentUser, userId, reason = 'User archived via API') {
     try {
       // Query active users first, then archived if not found
       const query = BaseModel.queryActive(this.className);
@@ -618,15 +616,15 @@ class UserManagementService {
       if (!user) {
         return {
           success: false,
-          message: "User not found",
+          message: 'User not found',
         };
       }
 
       // Validate permissions - only superadmin can archive
-      if (currentUser.role !== "superadmin") {
+      if (currentUser.role !== 'superadmin') {
         return {
           success: false,
-          message: "Only superadmin can archive users",
+          message: 'Only superadmin can archive users',
         };
       }
 
@@ -634,31 +632,31 @@ class UserManagementService {
       if (user.id === currentUser.id) {
         return {
           success: false,
-          message: "Cannot archive your own account",
+          message: 'Cannot archive your own account',
         };
       }
 
       // AI Agent Rule: Set both active and exists to false for archiving
-      user.set("active", false);
-      user.set("exists", false);
-      user.set("updatedAt", new Date());
+      user.set('active', false);
+      user.set('exists', false);
+      user.set('updatedAt', new Date());
 
       await user.save(null, { useMasterKey: true });
 
       // Log archiving activity
-      await this.logUserCRUDActivity(currentUser, "archive", userId, {
+      await this.logUserCRUDActivity(currentUser, 'archive', userId, {
         reason,
-        role: user.get("role"),
-        email: user.get("email"),
+        role: user.get('role'),
+        email: user.get('email'),
         archivedAt: new Date(),
       });
 
-      logger.info("User archived successfully", {
+      logger.info('User archived successfully', {
         userId,
         archivedBy: currentUser.id,
         reason,
-        role: user.get("role"),
-        email: user.get("email"),
+        role: user.get('role'),
+        email: user.get('email'),
       });
 
       return {
@@ -667,7 +665,7 @@ class UserManagementService {
         archived: true,
       };
     } catch (error) {
-      logger.error("Error in UserManagementService.archiveUser", {
+      logger.error('Error in UserManagementService.archiveUser', {
         error: error.message,
         userId,
         archivedBy: currentUser?.id,
@@ -699,7 +697,7 @@ class UserManagementService {
 
       // Get active users
       const activeUsersQuery = BaseModel.queryActive(this.className);
-      activeUsersQuery.equalTo("active", true);
+      activeUsersQuery.equalTo('active', true);
       const activeUsers = await activeUsersQuery.count({ useMasterKey: true });
 
       // Get users created this month
@@ -708,31 +706,31 @@ class UserManagementService {
       startOfMonth.setHours(0, 0, 0, 0);
 
       const newUsersQuery = BaseModel.queryActive(this.className);
-      newUsersQuery.greaterThanOrEqualTo("createdAt", startOfMonth);
+      newUsersQuery.greaterThanOrEqualTo('createdAt', startOfMonth);
       const newThisMonth = await newUsersQuery.count({ useMasterKey: true });
 
       // Get users pending email verification
       const pendingQuery = BaseModel.queryActive(this.className);
-      pendingQuery.equalTo("emailVerified", false);
+      pendingQuery.equalTo('emailVerified', false);
       const pendingVerification = await pendingQuery.count({
         useMasterKey: true,
       });
 
       // Get role distribution
       const roles = [
-        "superadmin",
-        "admin",
-        "client",
-        "department_manager",
-        "employee",
-        "driver",
-        "guest",
+        'superadmin',
+        'admin',
+        'client',
+        'department_manager',
+        'employee',
+        'driver',
+        'guest',
       ];
       const roleDistribution = {};
 
       for (const role of roles) {
         const roleQuery = BaseModel.queryActive(this.className);
-        roleQuery.equalTo("role", role);
+        roleQuery.equalTo('role', role);
         roleDistribution[role] = await roleQuery.count({ useMasterKey: true });
       }
 
@@ -747,22 +745,22 @@ class UserManagementService {
         const startDate = new Date(
           monthDate.getFullYear(),
           monthDate.getMonth(),
-          1,
+          1
         );
         const endDate = new Date(
           monthDate.getFullYear(),
           monthDate.getMonth() + 1,
-          0,
+          0
         );
 
         const monthQuery = BaseModel.queryActive(this.className);
-        monthQuery.greaterThanOrEqualTo("createdAt", startDate);
-        monthQuery.lessThanOrEqualTo("createdAt", endDate);
+        monthQuery.greaterThanOrEqualTo('createdAt', startDate);
+        monthQuery.lessThanOrEqualTo('createdAt', endDate);
 
         const count = await monthQuery.count({ useMasterKey: true });
 
         trends.push({
-          month: startDate.toLocaleDateString("en-US", { month: "short" }),
+          month: startDate.toLocaleDateString('en-US', { month: 'short' }),
           count,
         });
       }
@@ -776,7 +774,7 @@ class UserManagementService {
         registrationTrends: trends,
       };
     } catch (error) {
-      logger.error("Error getting user statistics", {
+      logger.error('Error getting user statistics', {
         error: error.message,
         stack: error.stack,
       });
@@ -787,13 +785,13 @@ class UserManagementService {
   async searchUsers(currentUser, searchParams = {}) {
     try {
       const {
-        query: searchQuery = "",
+        query: searchQuery = '',
         role = null,
         active = null,
         page = 1,
         limit = 25,
-        sortField = "lastName",
-        sortDirection = "asc",
+        sortField = 'lastName',
+        sortDirection = 'asc',
       } = searchParams;
 
       // AI Agent Rule: Query active users for search operations
@@ -808,34 +806,34 @@ class UserManagementService {
 
         // Create compound query for searching across multiple fields
         const emailQuery = new Parse.Query(this.className);
-        emailQuery.matches("email", searchTerms, "i");
+        emailQuery.matches('email', searchTerms, 'i');
 
         const firstNameQuery = new Parse.Query(this.className);
-        firstNameQuery.matches("firstName", searchTerms, "i");
+        firstNameQuery.matches('firstName', searchTerms, 'i');
 
         const lastNameQuery = new Parse.Query(this.className);
-        lastNameQuery.matches("lastName", searchTerms, "i");
+        lastNameQuery.matches('lastName', searchTerms, 'i');
 
         const compoundQuery = Parse.Query.or(
           emailQuery,
           firstNameQuery,
-          lastNameQuery,
+          lastNameQuery
         );
-        query.matchesQuery("objectId", compoundQuery);
+        query.matchesQuery('objectId', compoundQuery);
       }
 
       // Apply active filter if specified
       if (active !== null) {
-        query.equalTo("active", active);
+        query.equalTo('active', active);
       }
 
       // Apply role filter if specified
       if (role) {
-        query.equalTo("role", role);
+        query.equalTo('role', role);
       }
 
       // Apply sorting
-      if (sortDirection === "desc") {
+      if (sortDirection === 'desc') {
         query.descending(sortField);
       } else {
         query.ascending(sortField);
@@ -853,9 +851,7 @@ class UserManagementService {
       ]);
 
       // Transform results
-      const safeUsers = users.map((user) =>
-        this.transformUserToSafeFormat(user),
-      );
+      const safeUsers = users.map((user) => this.transformUserToSafeFormat(user));
 
       // Log search activity
       await this.logUserSearchActivity(currentUser, searchParams, totalCount);
@@ -878,7 +874,7 @@ class UserManagementService {
         },
       };
     } catch (error) {
-      logger.error("Error in UserManagementService.searchUsers", {
+      logger.error('Error in UserManagementService.searchUsers', {
         error: error.message,
         currentUser: currentUser?.id,
         searchParams,
@@ -905,11 +901,10 @@ class UserManagementService {
    */
   async applyRoleBasedFiltering(query, currentUser, targetRole = null) {
     // Get current user's role for permission checking
-    const currentUserRole =
-      currentUser.role || currentUser.get?.("role") || "guest";
+    const currentUserRole = currentUser.role || currentUser.get?.('role') || 'guest';
 
     switch (currentUserRole) {
-      case "superadmin":
+      case 'superadmin':
         // Superadmin can see all users - no filtering needed
         if (targetRole) {
           await this.filterByRoleName(query, targetRole);
@@ -917,23 +912,23 @@ class UserManagementService {
         // If no targetRole specified, superadmin sees ALL users (no additional filters)
         break;
 
-      case "admin":
+      case 'admin':
         // Admin can see all users except other superadmins
-        await this.excludeRoleName(query, "superadmin");
-        if (targetRole && targetRole !== "superadmin") {
+        await this.excludeRoleName(query, 'superadmin');
+        if (targetRole && targetRole !== 'superadmin') {
           await this.filterByRoleName(query, targetRole);
         }
         break;
 
-      case "client": {
+      case 'client': {
         // Client can only see users from their company
-        const allowedClientRoles = ["employee", "department_manager"];
+        const allowedClientRoles = ['employee', 'department_manager'];
         if (targetRole) {
           if (allowedClientRoles.includes(targetRole)) {
             await this.filterByRoleName(query, targetRole);
           } else {
             // Restrict to no results if requesting unauthorized role
-            query.equalTo("objectId", "non-existent-id");
+            query.equalTo('objectId', 'non-existent-id');
             return;
           }
         } else {
@@ -941,22 +936,22 @@ class UserManagementService {
         }
         // Add client filter when clientId field is available
         if (currentUser.clientId) {
-          query.equalTo("clientId", currentUser.clientId);
+          query.equalTo('clientId', currentUser.clientId);
         }
         break;
       }
 
-      case "department_manager":
+      case 'department_manager':
         // Department manager can only see their department employees
-        await this.filterByRoleName(query, "employee");
+        await this.filterByRoleName(query, 'employee');
         if (currentUser.departmentId) {
-          query.equalTo("departmentId", currentUser.departmentId);
+          query.equalTo('departmentId', currentUser.departmentId);
         }
         break;
 
       default:
         // Employee, driver, guest can only see their own profile
-        query.equalTo("objectId", currentUser.id);
+        query.equalTo('objectId', currentUser.id);
         break;
     }
   }
@@ -976,40 +971,40 @@ class UserManagementService {
    */
   applyAdvancedFilters(query, filters) {
     // Apply filters from request parameters
-    if (!filters || typeof filters !== "object") {
+    if (!filters || typeof filters !== 'object') {
       return;
     }
 
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== null && value !== undefined && value !== "") {
+      if (value !== null && value !== undefined && value !== '') {
         switch (key) {
-          case "active":
-            query.equalTo("active", value);
+          case 'active':
+            query.equalTo('active', value);
             break;
-          case "emailVerified":
-            query.equalTo("emailVerified", value);
+          case 'emailVerified':
+            query.equalTo('emailVerified', value);
             break;
-          case "role":
+          case 'role':
             // Support both Pointer and string-based role filtering
             this.filterByRoleName(query, value).catch((error) => {
               logger.warn(
-                "Failed to filter by role pointer, using string fallback",
-                { role: value, error: error.message },
+                'Failed to filter by role pointer, using string fallback',
+                { role: value, error: error.message }
               );
-              query.equalTo("role", value);
+              query.equalTo('role', value);
             });
             break;
-          case "clientId":
-            query.equalTo("clientId", value);
+          case 'clientId':
+            query.equalTo('clientId', value);
             break;
-          case "departmentId":
-            query.equalTo("departmentId", value);
+          case 'departmentId':
+            query.equalTo('departmentId', value);
             break;
-          case "createdAfter":
-            query.greaterThan("createdAt", new Date(value));
+          case 'createdAfter':
+            query.greaterThan('createdAt', new Date(value));
             break;
-          case "createdBefore":
-            query.lessThan("createdAt", new Date(value));
+          case 'createdBefore':
+            query.lessThan('createdAt', new Date(value));
             break;
           default:
             // Ignore unknown filter keys
@@ -1034,26 +1029,26 @@ class UserManagementService {
   applySorting(query, sort) {
     const { field, direction } = sort;
     const allowedSortFields = [
-      "firstName",
-      "lastName",
-      "email",
-      "role",
-      "createdAt",
-      "updatedAt",
-      "lastLoginAt",
-      "active",
+      'firstName',
+      'lastName',
+      'email',
+      'role',
+      'createdAt',
+      'updatedAt',
+      'lastLoginAt',
+      'active',
     ];
 
     if (allowedSortFields.includes(field)) {
-      if (direction === "desc") {
+      if (direction === 'desc') {
         query.descending(field);
       } else {
         query.ascending(field);
       }
     } else {
       // Default sorting - ascending by lastName, then firstName
-      query.ascending("lastName");
-      query.addAscending("firstName");
+      query.ascending('lastName');
+      query.addAscending('firstName');
     }
   }
 
@@ -1073,8 +1068,8 @@ class UserManagementService {
   async getTotalUserCount(currentUser, targetRole, filters) {
     // Apply same filters as main query for consistency
     const countQuery = new Parse.Query(this.className);
-    countQuery.equalTo("active", true);
-    countQuery.equalTo("exists", true);
+    countQuery.equalTo('active', true);
+    countQuery.equalTo('exists', true);
 
     await this.applyRoleBasedFiltering(countQuery, currentUser, targetRole);
     this.applyAdvancedFilters(countQuery, filters);
@@ -1104,24 +1099,24 @@ class UserManagementService {
     if (searchQuery?.trim()) {
       const searchTerms = searchQuery.trim().toLowerCase();
       const emailQuery = new Parse.Query(this.className);
-      emailQuery.matches("email", searchTerms, "i");
+      emailQuery.matches('email', searchTerms, 'i');
 
       const firstNameQuery = new Parse.Query(this.className);
-      firstNameQuery.matches("firstName", searchTerms, "i");
+      firstNameQuery.matches('firstName', searchTerms, 'i');
 
       const lastNameQuery = new Parse.Query(this.className);
-      lastNameQuery.matches("lastName", searchTerms, "i");
+      lastNameQuery.matches('lastName', searchTerms, 'i');
 
       const compoundQuery = Parse.Query.or(
         emailQuery,
         firstNameQuery,
-        lastNameQuery,
+        lastNameQuery
       );
-      countQuery.matchesQuery("objectId", compoundQuery);
+      countQuery.matchesQuery('objectId', compoundQuery);
     }
 
     if (active !== null) {
-      countQuery.equalTo("active", active);
+      countQuery.equalTo('active', active);
     }
 
     const count = await countQuery.count({ useMasterKey: true });
@@ -1142,18 +1137,18 @@ class UserManagementService {
    */
   transformUserToSafeFormat(user) {
     // Get role information from Pointer or fallback to string field
-    const rolePointer = user.get("roleId");
-    let roleName = user.get("role"); // Default to string role
+    const rolePointer = user.get('roleId');
+    let roleName = user.get('role'); // Default to string role
     let roleObjectId = null;
 
     // Handle rolePointer safely
     if (rolePointer) {
       try {
         // Check if it's a fetched Parse Object with .get() method
-        if (rolePointer.get && typeof rolePointer.get === "function") {
-          roleName = rolePointer.get("name") || roleName;
+        if (rolePointer.get && typeof rolePointer.get === 'function') {
+          roleName = rolePointer.get('name') || roleName;
           roleObjectId = rolePointer.id;
-        } else if (typeof rolePointer === "string") {
+        } else if (typeof rolePointer === 'string') {
           // It's a string ID, keep the string role name
           roleObjectId = rolePointer;
         } else if (rolePointer.id) {
@@ -1162,35 +1157,35 @@ class UserManagementService {
         }
       } catch (error) {
         logger.warn(
-          "Error processing role pointer in transformUserToSafeFormat",
+          'Error processing role pointer in transformUserToSafeFormat',
           {
             userId: user.id,
             error: error.message,
-          },
+          }
         );
       }
     }
 
     return {
       id: user.id,
-      email: user.get("email"),
-      username: user.get("username"),
-      firstName: user.get("firstName"),
-      lastName: user.get("lastName"),
-      role: roleName || "guest",
+      email: user.get('email'),
+      username: user.get('username'),
+      firstName: user.get('firstName'),
+      lastName: user.get('lastName'),
+      role: roleName || 'guest',
       roleId: roleObjectId,
-      active: user.get("active"),
-      exists: user.get("exists"),
-      emailVerified: user.get("emailVerified"),
-      lastLoginAt: user.get("lastLoginAt"),
-      loginAttempts: user.get("loginAttempts"),
-      mustChangePassword: user.get("mustChangePassword"),
-      primaryOAuthProvider: user.get("primaryOAuthProvider"),
-      lastAuthMethod: user.get("lastAuthMethod"),
-      createdAt: user.get("createdAt"),
-      updatedAt: user.get("updatedAt"),
-      createdBy: user.get("createdBy"),
-      modifiedBy: user.get("modifiedBy"),
+      active: user.get('active'),
+      exists: user.get('exists'),
+      emailVerified: user.get('emailVerified'),
+      lastLoginAt: user.get('lastLoginAt'),
+      loginAttempts: user.get('loginAttempts'),
+      mustChangePassword: user.get('mustChangePassword'),
+      primaryOAuthProvider: user.get('primaryOAuthProvider'),
+      lastAuthMethod: user.get('lastAuthMethod'),
+      createdAt: user.get('createdAt'),
+      updatedAt: user.get('updatedAt'),
+      createdBy: user.get('createdBy'),
+      modifiedBy: user.get('modifiedBy'),
     };
   }
 
@@ -1209,14 +1204,14 @@ class UserManagementService {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
-  async validateUserData(userData, operation = "create", _existingUser = null) {
+  async validateUserData(userData, operation = 'create', _existingUser = null) {
     const errors = [];
 
     // Required fields validation
-    if (operation === "create") {
-      const requiredFields = ["email", "firstName", "lastName", "role"];
+    if (operation === 'create') {
+      const requiredFields = ['email', 'firstName', 'lastName', 'role'];
       requiredFields.forEach((field) => {
-        if (!userData[field] || userData[field].toString().trim() === "") {
+        if (!userData[field] || userData[field].toString().trim() === '') {
           errors.push(`${field} is required`);
         }
       });
@@ -1226,7 +1221,7 @@ class UserManagementService {
     if (userData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(userData.email)) {
-        errors.push("Invalid email format");
+        errors.push('Invalid email format');
       }
     }
 
@@ -1238,12 +1233,12 @@ class UserManagementService {
     // Password validation (if provided)
     if (userData.password) {
       if (userData.password.length < 8) {
-        errors.push("Password must be at least 8 characters long");
+        errors.push('Password must be at least 8 characters long');
       }
     }
 
     if (errors.length > 0) {
-      throw new Error(`Validation failed: ${errors.join(", ")}`);
+      throw new Error(`Validation failed: ${errors.join(', ')}`);
     }
   }
 
@@ -1262,7 +1257,7 @@ class UserManagementService {
   async checkExistingUser(email) {
     try {
       const query = BaseModel.queryExisting(this.className);
-      query.equalTo("email", email.toLowerCase().trim());
+      query.equalTo('email', email.toLowerCase().trim());
       query.limit(1);
 
       const existingUser = await query.first({ useMasterKey: true });
@@ -1286,13 +1281,13 @@ class UserManagementService {
    */
   extractAuditableFields(user) {
     return {
-      email: user.get("email"),
-      firstName: user.get("firstName"),
-      lastName: user.get("lastName"),
-      role: user.get("role"),
-      active: user.get("active"),
-      emailVerified: user.get("emailVerified"),
-      mustChangePassword: user.get("mustChangePassword"),
+      email: user.get('email'),
+      firstName: user.get('firstName'),
+      lastName: user.get('lastName'),
+      role: user.get('role'),
+      active: user.get('active'),
+      emailVerified: user.get('emailVerified'),
+      mustChangePassword: user.get('mustChangePassword'),
     };
   }
 
@@ -1312,7 +1307,7 @@ class UserManagementService {
    */
   canAccessUser(currentUser, targetUser) {
     const currentLevel = this.roleHierarchy[currentUser.role] || 0;
-    const targetLevel = this.roleHierarchy[targetUser.get("role")] || 0;
+    const targetLevel = this.roleHierarchy[targetUser.get('role')] || 0;
 
     // Higher or equal level can access lower level users
     if (currentLevel >= targetLevel) {
@@ -1326,15 +1321,15 @@ class UserManagementService {
 
     // Client/Department manager specific rules
     if (
-      currentUser.role === "client" &&
-      targetUser.get("clientId") === currentUser.clientId
+      currentUser.role === 'client'
+      && targetUser.get('clientId') === currentUser.clientId
     ) {
       return true;
     }
 
     if (
-      currentUser.role === "department_manager" &&
-      targetUser.get("departmentId") === currentUser.departmentId
+      currentUser.role === 'department_manager'
+      && targetUser.get('departmentId') === currentUser.departmentId
     ) {
       return true;
     }
@@ -1376,7 +1371,7 @@ class UserManagementService {
    */
   canModifyUser(currentUser, targetUser) {
     const currentLevel = this.roleHierarchy[currentUser.role] || 0;
-    const targetLevel = this.roleHierarchy[targetUser.get("role")] || 0;
+    const targetLevel = this.roleHierarchy[targetUser.get('role')] || 0;
 
     // Cannot modify users with higher role level
     if (currentLevel < targetLevel) {
@@ -1385,8 +1380,8 @@ class UserManagementService {
 
     // Cannot modify other superadmins unless you are superadmin
     if (
-      targetUser.get("role") === "superadmin" &&
-      currentUser.role !== "superadmin"
+      targetUser.get('role') === 'superadmin'
+      && currentUser.role !== 'superadmin'
     ) {
       return false;
     }
@@ -1444,8 +1439,8 @@ class UserManagementService {
    */
   async logUserQueryActivity(currentUser, queryDetails) {
     try {
-      logger.info("User query performed", {
-        action: "user_query",
+      logger.info('User query performed', {
+        action: 'user_query',
         performedBy: currentUser.id,
         userRole: currentUser.role,
         queryDetails,
@@ -1453,7 +1448,7 @@ class UserManagementService {
       });
     } catch (error) {
       // Don't fail the main operation if logging fails
-      logger.error("Failed to log user query activity", {
+      logger.error('Failed to log user query activity', {
         error: error.message,
       });
     }
@@ -1474,7 +1469,7 @@ class UserManagementService {
    */
   async logUserAccessActivity(currentUser, targetUserId, action) {
     try {
-      logger.info("User access activity", {
+      logger.info('User access activity', {
         action: `user_${action}`,
         performedBy: currentUser.id,
         targetUser: targetUserId,
@@ -1482,7 +1477,7 @@ class UserManagementService {
         timestamp: new Date(),
       });
     } catch (error) {
-      logger.error("Failed to log user access activity", {
+      logger.error('Failed to log user access activity', {
         error: error.message,
       });
     }
@@ -1504,17 +1499,17 @@ class UserManagementService {
    */
   async logUserCRUDActivity(performedBy, action, targetUserId, details = {}) {
     try {
-      logger.info("User CRUD operation", {
+      logger.info('User CRUD operation', {
         action: `user_${action}`,
         performedBy: performedBy.id,
         performedByRole: performedBy.role,
         targetUser: targetUserId,
         details,
         timestamp: new Date(),
-        compliance: "AI_AGENT_LIFECYCLE",
+        compliance: 'AI_AGENT_LIFECYCLE',
       });
     } catch (error) {
-      logger.error("Failed to log CRUD activity", { error: error.message });
+      logger.error('Failed to log CRUD activity', { error: error.message });
     }
   }
 
@@ -1533,8 +1528,8 @@ class UserManagementService {
    */
   async logUserSearchActivity(currentUser, searchParams, resultCount) {
     try {
-      logger.info("User search performed", {
-        action: "user_search",
+      logger.info('User search performed', {
+        action: 'user_search',
         performedBy: currentUser.id,
         userRole: currentUser.role,
         searchParams: { ...searchParams, password: undefined },
@@ -1542,7 +1537,7 @@ class UserManagementService {
         timestamp: new Date(),
       });
     } catch (error) {
-      logger.error("Failed to log search activity", { error: error.message });
+      logger.error('Failed to log search activity', { error: error.message });
     }
   }
 
@@ -1554,9 +1549,9 @@ class UserManagementService {
    */
   async filterByRoleName(query, roleName) {
     try {
-      query.equalTo("role", roleName);
+      query.equalTo('role', roleName);
     } catch (error) {
-      logger.error("Failed to filter by role name", {
+      logger.error('Failed to filter by role name', {
         error: error.message,
         roleName,
       });
@@ -1572,9 +1567,9 @@ class UserManagementService {
    */
   async excludeRoleName(query, roleName) {
     try {
-      query.notEqualTo("role", roleName);
+      query.notEqualTo('role', roleName);
     } catch (error) {
-      logger.error("Failed to exclude role name", {
+      logger.error('Failed to exclude role name', {
         error: error.message,
         roleName,
       });
@@ -1590,9 +1585,9 @@ class UserManagementService {
    */
   async filterByRoleNames(query, roleNames) {
     try {
-      query.containedIn("role", roleNames);
+      query.containedIn('role', roleNames);
     } catch (error) {
-      logger.error("Failed to filter by role names", {
+      logger.error('Failed to filter by role names', {
         error: error.message,
         roleNames,
       });

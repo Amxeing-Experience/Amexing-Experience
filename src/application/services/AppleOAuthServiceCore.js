@@ -8,13 +8,13 @@
  * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
-const Parse = require("parse/node");
-const crypto = require("crypto");
-const fs = require("fs");
+const Parse = require('parse/node');
+const crypto = require('crypto');
+const fs = require('fs');
 
-const logger = require("../../infrastructure/logger");
-const { AppleIdTokenValidator } = require("./AppleIdTokenValidator");
-const { AppleTokenExchanger } = require("./AppleTokenExchanger");
+const logger = require('../../infrastructure/logger');
+const { AppleIdTokenValidator } = require('./AppleIdTokenValidator');
+const { AppleTokenExchanger } = require('./AppleTokenExchanger');
 
 /**
  * Apple OAuth Service Core - Core functionality for Apple Sign In integration.
@@ -59,11 +59,11 @@ class AppleOAuthServiceCore {
       keyId: process.env.APPLE_KEY_ID,
       privateKeyPath: process.env.APPLE_PRIVATE_KEY_PATH,
       redirectUri:
-        process.env.APPLE_REDIRECT_URI ||
-        `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/apple/callback`,
-      scope: "email name",
-      responseType: "code idtoken",
-      responseMode: "form_post",
+        process.env.APPLE_REDIRECT_URI
+        || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/apple/callback`,
+      scope: 'email name',
+      responseType: 'code idtoken',
+      responseMode: 'form_post',
     };
 
     this.validateConfig();
@@ -82,7 +82,7 @@ class AppleOAuthServiceCore {
    * @returns {*} - Operation result.
    */
   validateConfig() {
-    const required = ["teamId", "clientId", "keyId", "privateKeyPath"];
+    const required = ['teamId', 'clientId', 'keyId', 'privateKeyPath'];
     // eslint-disable-next-line security/detect-object-injection
     const missing = required.filter((_key) => !this.config[_key]); // eslint-disable-line no-underscore-dangle
 
@@ -98,15 +98,15 @@ class AppleOAuthServiceCore {
      * // Returns: { success: true, user: {...}, tokens: {...} }
      */
     if (missing.length > 0) {
-      if (process.env.NODE_ENV === "development") {
+      if (process.env.NODE_ENV === 'development') {
         logger.warn(
-          `Apple OAuth not configured in development: ${missing.join(", ")}`,
+          `Apple OAuth not configured in development: ${missing.join(', ')}`
         );
         this.disabled = true;
         return;
       }
       throw new Error(
-        `Missing Apple OAuth configuration: ${missing.join(", ")}`,
+        `Missing Apple OAuth configuration: ${missing.join(', ')}`
       );
     }
   }
@@ -146,15 +146,15 @@ class AppleOAuthServiceCore {
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       if (!fs.existsSync(this.config.privateKeyPath)) {
         throw new Error(
-          `Apple private key file not found: ${this.config.privateKeyPath}`,
+          `Apple private key file not found: ${this.config.privateKeyPath}`
         );
       }
 
       // eslint-disable-next-line security/detect-non-literal-fs-filename
-      this.privateKey = fs.readFileSync(this.config.privateKeyPath, "utf8");
-      logger.info("Apple OAuth private key loaded successfully");
+      this.privateKey = fs.readFileSync(this.config.privateKeyPath, 'utf8');
+      logger.info('Apple OAuth private key loaded successfully');
     } catch (error) {
-      logger.error("Failed to load Apple OAuth private key:", error);
+      logger.error('Failed to load Apple OAuth private key:', error);
       throw error;
     }
   }
@@ -198,8 +198,8 @@ class AppleOAuthServiceCore {
       response_type: this.config.responseType,
       scope: this.config.scope,
       response_mode: responseMode,
-      state: state || crypto.randomBytes(16).toString("hex"),
-      nonce: nonce || crypto.randomBytes(16).toString("hex"),
+      state: state || crypto.randomBytes(16).toString('hex'),
+      nonce: nonce || crypto.randomBytes(16).toString('hex'),
     });
 
     return `https://appleid.apple.com/auth/authorize?${params.toString()}`;
@@ -227,19 +227,19 @@ class AppleOAuthServiceCore {
     } = options;
 
     try {
-      const state = providedState || crypto.randomBytes(32).toString("hex");
-      const nonce = crypto.randomBytes(32).toString("hex");
+      const state = providedState || crypto.randomBytes(32).toString('hex');
+      const nonce = crypto.randomBytes(32).toString('hex');
 
       // Build authorization URL
       const authUrl = this.buildAuthUrl({
         state,
         nonce,
-        responseMode: "form_post",
+        responseMode: 'form_post',
       });
 
       // Store OAuth state with Apple-specific data
       const stateData = {
-        provider: "apple",
+        provider: 'apple',
         state,
         nonce,
         department,
@@ -247,11 +247,11 @@ class AppleOAuthServiceCore {
         redirectUri: redirectUri || this.config.redirectUri,
         timestamp: new Date(),
         ip,
-        userAgent: headers["user-agent"],
+        userAgent: headers['user-agent'],
       };
 
       logger.info(
-        `Apple OAuth initiated for department: ${department}, IP: ${ip}`,
+        `Apple OAuth initiated for department: ${department}, IP: ${ip}`
       );
 
       return {
@@ -262,10 +262,10 @@ class AppleOAuthServiceCore {
         stateData,
       };
     } catch (error) {
-      logger.error("Apple OAuth initiation failed:", error);
+      logger.error('Apple OAuth initiation failed:', error);
       throw new Parse.Error(
         Parse.Error.INTERNAL_SERVER_ERROR,
-        "Failed to initiate Apple OAuth",
+        'Failed to initiate Apple OAuth'
       );
     }
   }
@@ -318,8 +318,8 @@ class AppleOAuthServiceCore {
     const profile = {
       id: idTokenPayload.sub,
       email: idTokenPayload.email,
-      emailVerified: idTokenPayload.email_verified === "true",
-      provider: "apple",
+      emailVerified: idTokenPayload.email_verified === 'true',
+      provider: 'apple',
       privacyCompliant: true,
     };
 
@@ -339,7 +339,7 @@ class AppleOAuthServiceCore {
     }
 
     // Privacy-compliant fields
-    profile.isPrivateEmail = idTokenPayload.is_privateemail === "true";
+    profile.isPrivateEmail = idTokenPayload.is_privateemail === 'true';
     profile.realUserStatus = idTokenPayload.real_user_status;
 
     return profile;

@@ -8,9 +8,9 @@
  * // Returns: operation result
  */
 
-const crypto = require("crypto");
-const { URL } = require("url");
-const logger = require("../infrastructure/logger");
+const crypto = require('crypto');
+const { URL } = require('url');
+const logger = require('../infrastructure/logger');
 
 /**
  * OAuth Security Validator - Comprehensive security validation for OAuth implementations.
@@ -86,7 +86,7 @@ class OAuthSecurityValidator {
     return {
       tokenSecurity: {
         encryption: {
-          algorithm: "AES-256-GCM",
+          algorithm: 'AES-256-GCM',
           keyLength: 256,
           ivLength: 16,
           tagLength: 16,
@@ -107,7 +107,7 @@ class OAuthSecurityValidator {
       authenticationFlows: {
         pkce: {
           required: true,
-          challengeMethod: "S256",
+          challengeMethod: 'S256',
           verifierLength: { min: 43, max: 128 },
         },
         state: {
@@ -126,7 +126,7 @@ class OAuthSecurityValidator {
         validation: {
           exactMatch: true,
           httpsRequired: true,
-          allowedHosts: process.env.ALLOWED_REDIRECT_HOSTS?.split(",") || [],
+          allowedHosts: process.env.ALLOWED_REDIRECT_HOSTS?.split(',') || [],
           blockPrivateIPs: true,
         },
       },
@@ -139,23 +139,23 @@ class OAuthSecurityValidator {
         security: {
           httpOnly: true,
           secure: true,
-          sameSite: "strict",
+          sameSite: 'strict',
           regenerateOnLogin: true,
         },
       },
 
       dataProtection: {
         sensitiveFields: [
-          "accessToken",
-          "refreshToken",
-          "clientSecret",
-          "privateKey",
-          "password",
+          'accessToken',
+          'refreshToken',
+          'clientSecret',
+          'privateKey',
+          'password',
         ],
         encryption: {
           atRest: true,
           inTransit: true,
-          algorithm: "AES-256-GCM",
+          algorithm: 'AES-256-GCM',
         },
         masking: {
           logs: true,
@@ -180,32 +180,32 @@ class OAuthSecurityValidator {
   initializePCIRequirements() {
     return {
       requirement7: {
-        name: "Restrict access to cardholder data by business need to know",
+        name: 'Restrict access to cardholder data by business need to know',
         checks: [
-          "roleBasedAccessControl",
-          "leastPrivilege",
-          "accessReview",
-          "segregationOfDuties",
+          'roleBasedAccessControl',
+          'leastPrivilege',
+          'accessReview',
+          'segregationOfDuties',
         ],
       },
       requirement8: {
-        name: "Identify and authenticate access to system components",
+        name: 'Identify and authenticate access to system components',
         checks: [
-          "uniqueUserIds",
-          "strongAuthentication",
-          "multiFactorAuth",
-          "passwordPolicies",
-          "accountLockout",
+          'uniqueUserIds',
+          'strongAuthentication',
+          'multiFactorAuth',
+          'passwordPolicies',
+          'accountLockout',
         ],
       },
       requirement10: {
-        name: "Track and monitor all access to network resources",
+        name: 'Track and monitor all access to network resources',
         checks: [
-          "auditLogging",
-          "logRetention",
-          "logIntegrity",
-          "timeSync",
-          "logReview",
+          'auditLogging',
+          'logRetention',
+          'logIntegrity',
+          'timeSync',
+          'logReview',
         ],
       },
     };
@@ -224,7 +224,7 @@ class OAuthSecurityValidator {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
-  async validateTokenSecurity(token /* unused */, tokenType = "access") {
+  async validateTokenSecurity(token /* unused */, tokenType = 'access') {
     const results = {
       valid: true,
       issues: [],
@@ -233,19 +233,19 @@ class OAuthSecurityValidator {
 
     try {
       // Check if token is null or undefined
-      if (!token || typeof token !== "string") {
+      if (!token || typeof token !== 'string') {
         results.valid = false;
-        results.issues.push("Token is null, undefined, or not a string");
+        results.issues.push('Token is null, undefined, or not a string');
         results.checks.structure = false;
         results.checks.decodable = false;
         return results;
       }
 
       // Check token structure
-      const tokenParts = token.split(".");
+      const tokenParts = token.split('.');
       if (tokenParts.length !== 3) {
         results.valid = false;
-        results.issues.push("Invalid token structure");
+        results.issues.push('Invalid token structure');
         results.checks.structure = false;
       } else {
         results.checks.structure = true;
@@ -255,7 +255,7 @@ class OAuthSecurityValidator {
       const decoded = this.auditTokenStructure(token);
       if (!decoded || !decoded.header || !decoded.payload) {
         results.valid = false;
-        results.issues.push("Token decode failed - invalid JWT structure");
+        results.issues.push('Token decode failed - invalid JWT structure');
         results.checks.decodable = false;
         return results;
       }
@@ -263,13 +263,13 @@ class OAuthSecurityValidator {
 
       // Additional JWT structure validation
       if (!decoded.payload.iss) {
-        results.issues.push("Missing issuer (iss) claim");
+        results.issues.push('Missing issuer (iss) claim');
       }
       if (!decoded.payload.sub) {
-        results.issues.push("Missing subject (sub) claim");
+        results.issues.push('Missing subject (sub) claim');
       }
       if (!decoded.payload.aud) {
-        results.issues.push("Missing audience (aud) claim");
+        results.issues.push('Missing audience (aud) claim');
       }
 
       // Validate token claims
@@ -290,7 +290,7 @@ class OAuthSecurityValidator {
       });
 
       // Log validation attempt
-      this.auditLogger.info("Token security validation", {
+      this.auditLogger.info('Token security validation', {
         tokenType,
         valid: results.valid,
         checks: results.checks,
@@ -299,7 +299,7 @@ class OAuthSecurityValidator {
     } catch (error) {
       results.valid = false;
       results.issues.push(`Validation error: ${error.message}`);
-      this.auditLogger.error("Token validation error", error);
+      this.auditLogger.error('Token validation error', error);
     }
 
     return results;
@@ -323,11 +323,11 @@ class OAuthSecurityValidator {
   auditTokenStructure(token /* unused */) {
     try {
       // Check if token is null or undefined
-      if (!token || typeof token !== "string") {
+      if (!token || typeof token !== 'string') {
         return null;
       }
 
-      const parts = token.split(".");
+      const parts = token.split('.');
       if (parts.length !== 3) {
         return null;
       }
@@ -337,18 +337,18 @@ class OAuthSecurityValidator {
       let payload;
 
       try {
-        header = JSON.parse(Buffer.from(parts[0], "base64").toString());
+        header = JSON.parse(Buffer.from(parts[0], 'base64').toString());
       } catch (error) {
-        this.auditLogger.error("Failed to decode JWT header", {
+        this.auditLogger.error('Failed to decode JWT header', {
           error: error.message,
         });
         return null;
       }
 
       try {
-        payload = JSON.parse(Buffer.from(parts[1], "base64").toString());
+        payload = JSON.parse(Buffer.from(parts[1], 'base64').toString());
       } catch (error) {
-        this.auditLogger.error("Failed to decode JWT payload", {
+        this.auditLogger.error('Failed to decode JWT payload', {
           error: error.message,
         });
         return null;
@@ -360,7 +360,7 @@ class OAuthSecurityValidator {
         signature: parts[2],
       };
     } catch (error) {
-      this.auditLogger.error("Token structure audit failed", {
+      this.auditLogger.error('Token structure audit failed', {
         error: error.message,
       });
       return null;
@@ -385,25 +385,25 @@ class OAuthSecurityValidator {
 
     if (!exp) {
       return {
-        name: "expiration",
+        name: 'expiration',
         valid: false,
-        issue: "Missing expiration claim",
+        issue: 'Missing expiration claim',
       };
     }
 
     if (exp <= now) {
-      return { name: "expiration", valid: false, issue: "Token expired" };
+      return { name: 'expiration', valid: false, issue: 'Token expired' };
     }
 
     if (iat && iat > now) {
       return {
-        name: "expiration",
+        name: 'expiration',
         valid: false,
-        issue: "Token issued in future",
+        issue: 'Token issued in future',
       };
     }
 
-    return { name: "expiration", valid: true };
+    return { name: 'expiration', valid: true };
   }
 
   /**
@@ -418,24 +418,23 @@ class OAuthSecurityValidator {
    * @returns {object} - Operation result.
    */
   validateTokenAudience(payload) {
-    const expectedAudience =
-      process.env.OAUTH_AUDIENCE || process.env.PARSE_APPLICATION_ID;
+    const expectedAudience = process.env.OAUTH_AUDIENCE || process.env.PARSE_APPLICATION_ID;
     const audience = payload.aud;
 
     if (!audience) {
       return {
-        name: "audience",
+        name: 'audience',
         valid: false,
-        issue: "Missing audience claim",
+        issue: 'Missing audience claim',
       };
     }
 
     const audienceArray = Array.isArray(audience) ? audience : [audience];
     if (!audienceArray.includes(expectedAudience)) {
-      return { name: "audience", valid: false, issue: "Invalid audience" };
+      return { name: 'audience', valid: false, issue: 'Invalid audience' };
     }
 
-    return { name: "audience", valid: true };
+    return { name: 'audience', valid: true };
   }
 
   /**
@@ -450,18 +449,18 @@ class OAuthSecurityValidator {
    * @returns {object} - Operation result.
    */
   validateTokenIssuer(payload) {
-    const validIssuers = process.env.OAUTH_VALID_ISSUERS?.split(",") || [];
+    const validIssuers = process.env.OAUTH_VALID_ISSUERS?.split(',') || [];
     const issuer = payload.iss;
 
     if (!issuer) {
-      return { name: "issuer", valid: false, issue: "Missing issuer claim" };
+      return { name: 'issuer', valid: false, issue: 'Missing issuer claim' };
     }
 
     if (validIssuers.length > 0 && !validIssuers.includes(issuer)) {
-      return { name: "issuer", valid: false, issue: "Invalid issuer" };
+      return { name: 'issuer', valid: false, issue: 'Invalid issuer' };
     }
 
-    return { name: "issuer", valid: true };
+    return { name: 'issuer', valid: true };
   }
 
   /**
@@ -480,18 +479,18 @@ class OAuthSecurityValidator {
   async validateTokenSignature(token /* unused */, algorithm) {
     // This is a simplified signature validation
     // In production, use provider-specific public keys
-    const allowedAlgorithms = ["RS256", "ES256", "HS256"];
+    const allowedAlgorithms = ['RS256', 'ES256', 'HS256'];
 
     if (!allowedAlgorithms.includes(algorithm)) {
       return {
-        name: "signature",
+        name: 'signature',
         valid: false,
-        issue: "Invalid signature algorithm",
+        issue: 'Invalid signature algorithm',
       };
     }
 
     // Additional signature validation would go here
-    return { name: "signature", valid: true };
+    return { name: 'signature', valid: true };
   }
 
   /**
@@ -507,7 +506,7 @@ class OAuthSecurityValidator {
    * // Returns: boolean or validation result object
    * @returns {*} - Operation result.
    */
-  validatePKCE(codeVerifier, codeChallenge, challengeMethod = "S256") {
+  validatePKCE(codeVerifier, codeChallenge, challengeMethod = 'S256') {
     const results = {
       valid: true,
       checks: {},
@@ -531,7 +530,7 @@ class OAuthSecurityValidator {
     }
 
     // Validate challenge method
-    if (challengeMethod !== "S256") {
+    if (challengeMethod !== 'S256') {
       results.valid = false;
       results.checks.challengeMethod = false;
     } else {
@@ -563,12 +562,12 @@ class OAuthSecurityValidator {
    */
   generateCodeChallenge(verifier) {
     return crypto
-      .createHash("sha256")
+      .createHash('sha256')
       .update(verifier)
-      .digest("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=/g, "");
+      .digest('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
   }
 
   /**
@@ -645,19 +644,19 @@ class OAuthSecurityValidator {
       if (redirectUri !== registeredUri) {
         results.valid = false;
         results.checks.exactMatch = false;
-        results.issues.push("Redirect URI does not match registered URI");
+        results.issues.push('Redirect URI does not match registered URI');
       } else {
         results.checks.exactMatch = true;
       }
 
       // HTTPS requirement (except localhost for development)
       if (
-        providedUrl.protocol !== "https:" &&
-        providedUrl.hostname !== "localhost"
+        providedUrl.protocol !== 'https:'
+        && providedUrl.hostname !== 'localhost'
       ) {
         results.valid = false;
         results.checks.httpsRequired = false;
-        results.issues.push("HTTPS required for redirect URI");
+        results.issues.push('HTTPS required for redirect URI');
       } else {
         results.checks.httpsRequired = true;
       }
@@ -665,12 +664,12 @@ class OAuthSecurityValidator {
       // Block private IPs (except localhost)
       const privateIPRegex = /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
       if (
-        privateIPRegex.test(providedUrl.hostname) &&
-        providedUrl.hostname !== "localhost"
+        privateIPRegex.test(providedUrl.hostname)
+        && providedUrl.hostname !== 'localhost'
       ) {
         results.valid = false;
         results.checks.privateIP = false;
-        results.issues.push("Private IP addresses not allowed");
+        results.issues.push('Private IP addresses not allowed');
       } else {
         results.checks.privateIP = true;
       }
@@ -704,34 +703,33 @@ class OAuthSecurityValidator {
     if (!accessControlData.roles || accessControlData.roles.length === 0) {
       results.compliant = false;
       results.checks.rbac = false;
-      results.issues.push("Role-based access control not implemented");
+      results.issues.push('Role-based access control not implemented');
     } else {
       results.checks.rbac = true;
     }
 
     // Least privilege validation
-    const privilegedRoles =
-      accessControlData.roles?.filter((r) => r.privileged) || [];
+    const privilegedRoles = accessControlData.roles?.filter((r) => r.privileged) || [];
     if (
-      privilegedRoles.length > 0 &&
-      !accessControlData.privilegeJustification
+      privilegedRoles.length > 0
+      && !accessControlData.privilegeJustification
     ) {
       results.compliant = false;
       results.checks.leastPrivilege = false;
-      results.issues.push("Privileged access requires justification");
+      results.issues.push('Privileged access requires justification');
     } else {
       results.checks.leastPrivilege = true;
     }
 
     // Access review validation
     if (
-      !accessControlData.lastReviewDate ||
-      Date.now() - new Date(accessControlData.lastReviewDate) >
-        90 * 24 * 60 * 60 * 1000
+      !accessControlData.lastReviewDate
+      || Date.now() - new Date(accessControlData.lastReviewDate)
+        > 90 * 24 * 60 * 60 * 1000
     ) {
       results.compliant = false;
       results.checks.accessReview = false;
-      results.issues.push("Access review required (quarterly)");
+      results.issues.push('Access review required (quarterly)');
     } else {
       results.checks.accessReview = true;
     }
@@ -763,28 +761,28 @@ class OAuthSecurityValidator {
     if (userIds.length !== uniqueIds.size) {
       results.compliant = false;
       results.checks.uniqueUserIds = false;
-      results.issues.push("Duplicate user IDs detected");
+      results.issues.push('Duplicate user IDs detected');
     } else {
       results.checks.uniqueUserIds = true;
     }
 
     // Strong authentication validation
-    if (!authenticationData.authenticationMethods?.includes("oauth")) {
+    if (!authenticationData.authenticationMethods?.includes('oauth')) {
       results.compliant = false;
       results.checks.strongAuth = false;
-      results.issues.push("Strong authentication required");
+      results.issues.push('Strong authentication required');
     } else {
       results.checks.strongAuth = true;
     }
 
     // Multi-factor authentication validation
     if (
-      authenticationData.requiresMFA === false &&
-      authenticationData.privilegedAccess
+      authenticationData.requiresMFA === false
+      && authenticationData.privilegedAccess
     ) {
       results.compliant = false;
       results.checks.mfa = false;
-      results.issues.push("MFA required for privileged access");
+      results.issues.push('MFA required for privileged access');
     } else {
       results.checks.mfa = true;
     }
@@ -795,7 +793,7 @@ class OAuthSecurityValidator {
       if (policy.minLength < 8 || !policy.complexity) {
         results.compliant = false;
         results.checks.passwordPolicy = false;
-        results.issues.push("Password policy does not meet requirements");
+        results.issues.push('Password policy does not meet requirements');
       } else {
         results.checks.passwordPolicy = true;
       }
@@ -826,7 +824,7 @@ class OAuthSecurityValidator {
     if (!auditData.loggingEnabled) {
       results.compliant = false;
       results.checks.auditLogging = false;
-      results.issues.push("Audit logging not enabled");
+      results.issues.push('Audit logging not enabled');
     } else {
       results.checks.auditLogging = true;
     }
@@ -836,7 +834,7 @@ class OAuthSecurityValidator {
     if (retentionDays < 365) {
       results.compliant = false;
       results.checks.logRetention = false;
-      results.issues.push("Log retention must be at least 1 year");
+      results.issues.push('Log retention must be at least 1 year');
     } else {
       results.checks.logRetention = true;
     }
@@ -845,7 +843,7 @@ class OAuthSecurityValidator {
     if (!auditData.integrityProtection) {
       results.compliant = false;
       results.checks.logIntegrity = false;
-      results.issues.push("Log integrity protection required");
+      results.issues.push('Log integrity protection required');
     } else {
       results.checks.logIntegrity = true;
     }
@@ -854,7 +852,7 @@ class OAuthSecurityValidator {
     if (!auditData.timeSync || auditData.timeDrift > 1000) {
       results.compliant = false;
       results.checks.timeSync = false;
-      results.issues.push("Time synchronization required");
+      results.issues.push('Time synchronization required');
     } else {
       results.checks.timeSync = true;
     }
@@ -875,8 +873,8 @@ class OAuthSecurityValidator {
   async generateSecurityReport() {
     const report = {
       timestamp: new Date().toISOString(),
-      validator: "OAuthSecurityValidator",
-      version: "1.0",
+      validator: 'OAuthSecurityValidator',
+      version: '1.0',
       summary: {
         totalChecks: 0,
         passed: 0,
@@ -888,40 +886,40 @@ class OAuthSecurityValidator {
 
     // Token Security Section
     report.sections.tokenSecurity = {
-      name: "Token Security Validation",
+      name: 'Token Security Validation',
       checks: await this.runTokenSecurityChecks(),
-      status: "pending",
+      status: 'pending',
     };
 
     // Authentication Flows Section
     report.sections.authenticationFlows = {
-      name: "OAuth Flow Security",
+      name: 'OAuth Flow Security',
       checks: await this.runAuthenticationFlowChecks(),
-      status: "pending",
+      status: 'pending',
     };
 
     // PCI Compliance Section
     report.sections.pciCompliance = {
-      name: "PCI DSS Compliance",
+      name: 'PCI DSS Compliance',
       checks: await this.runPCIComplianceChecks(),
-      status: "pending",
+      status: 'pending',
     };
 
     // Calculate summary
     Object.values(report.sections).forEach((section) => {
       section.checks.forEach((check) => {
         report.summary.totalChecks++;
-        if (check.status === "pass") report.summary.passed++;
-        else if (check.status === "fail") report.summary.failed++;
-        else if (check.status === "warning") report.summary.warnings++;
+        if (check.status === 'pass') report.summary.passed++;
+        else if (check.status === 'fail') report.summary.failed++;
+        else if (check.status === 'warning') report.summary.warnings++;
       });
 
       // Determine section status based on check results
-      let sectionStatus = "warning";
-      if (section.checks.every((c) => c.status === "pass")) {
-        sectionStatus = "pass";
-      } else if (section.checks.some((c) => c.status === "fail")) {
-        sectionStatus = "fail";
+      let sectionStatus = 'warning';
+      if (section.checks.every((c) => c.status === 'pass')) {
+        sectionStatus = 'pass';
+      } else if (section.checks.some((c) => c.status === 'fail')) {
+        sectionStatus = 'fail';
       }
 
       // Update the section status without modifying the parameter
@@ -929,13 +927,13 @@ class OAuthSecurityValidator {
     });
 
     // Overall status
-    report.overallStatus = report.summary.failed === 0 ? "PASS" : "FAIL";
+    report.overallStatus = report.summary.failed === 0 ? 'PASS' : 'FAIL';
     report.complianceScore = Math.round(
-      (report.summary.passed / report.summary.totalChecks) * 100,
+      (report.summary.passed / report.summary.totalChecks) * 100
     );
 
     // Log report generation
-    this.auditLogger.info("Security validation report generated", {
+    this.auditLogger.info('Security validation report generated', {
       overallStatus: report.overallStatus,
       complianceScore: report.complianceScore,
       totalChecks: report.summary.totalChecks,
@@ -959,22 +957,22 @@ class OAuthSecurityValidator {
   async runTokenSecurityChecks() {
     return [
       {
-        name: "Token Encryption",
-        description: "Validate token encryption standards",
-        status: "pass",
-        details: "AES-256-GCM encryption verified",
+        name: 'Token Encryption',
+        description: 'Validate token encryption standards',
+        status: 'pass',
+        details: 'AES-256-GCM encryption verified',
       },
       {
-        name: "Token Expiration",
-        description: "Validate token expiration policies",
-        status: "pass",
-        details: "Appropriate expiration times configured",
+        name: 'Token Expiration',
+        description: 'Validate token expiration policies',
+        status: 'pass',
+        details: 'Appropriate expiration times configured',
       },
       {
-        name: "Token Signature",
-        description: "Validate token signature algorithms",
-        status: "pass",
-        details: "Strong signature algorithms in use",
+        name: 'Token Signature',
+        description: 'Validate token signature algorithms',
+        status: 'pass',
+        details: 'Strong signature algorithms in use',
       },
     ];
   }
@@ -992,22 +990,22 @@ class OAuthSecurityValidator {
   async runAuthenticationFlowChecks() {
     return [
       {
-        name: "PKCE Implementation",
-        description: "Validate PKCE for authorization code flow",
-        status: "pass",
-        details: "PKCE with S256 challenge method implemented",
+        name: 'PKCE Implementation',
+        description: 'Validate PKCE for authorization code flow',
+        status: 'pass',
+        details: 'PKCE with S256 challenge method implemented',
       },
       {
-        name: "State Parameter",
-        description: "Validate state parameter usage",
-        status: "pass",
-        details: "Cryptographically secure state parameter",
+        name: 'State Parameter',
+        description: 'Validate state parameter usage',
+        status: 'pass',
+        details: 'Cryptographically secure state parameter',
       },
       {
-        name: "Redirect URI Validation",
-        description: "Validate redirect URI security",
-        status: "pass",
-        details: "Strict redirect URI validation in place",
+        name: 'Redirect URI Validation',
+        description: 'Validate redirect URI security',
+        status: 'pass',
+        details: 'Strict redirect URI validation in place',
       },
     ];
   }
@@ -1025,22 +1023,22 @@ class OAuthSecurityValidator {
   async runPCIComplianceChecks() {
     return [
       {
-        name: "Requirement 7 - Access Control",
-        description: "Restrict access by business need to know",
-        status: "pass",
-        details: "Role-based access control implemented",
+        name: 'Requirement 7 - Access Control',
+        description: 'Restrict access by business need to know',
+        status: 'pass',
+        details: 'Role-based access control implemented',
       },
       {
-        name: "Requirement 8 - Authentication",
-        description: "Strong authentication mechanisms",
-        status: "pass",
-        details: "OAuth with MFA support implemented",
+        name: 'Requirement 8 - Authentication',
+        description: 'Strong authentication mechanisms',
+        status: 'pass',
+        details: 'OAuth with MFA support implemented',
       },
       {
-        name: "Requirement 10 - Audit Logging",
-        description: "Comprehensive audit trail",
-        status: "pass",
-        details: "Complete audit logging with integrity protection",
+        name: 'Requirement 10 - Audit Logging',
+        description: 'Comprehensive audit trail',
+        status: 'pass',
+        details: 'Complete audit logging with integrity protection',
       },
     ];
   }
@@ -1070,7 +1068,7 @@ class OAuthSecurityValidator {
       if (
         Object.values(monitoringResults.checks).some((check) => check.alert)
       ) {
-        this.auditLogger.warn("Security monitoring alert", monitoringResults);
+        this.auditLogger.warn('Security monitoring alert', monitoringResults);
         // Trigger security incident response
         await this.triggerSecurityAlert(monitoringResults);
       }
@@ -1089,7 +1087,7 @@ class OAuthSecurityValidator {
    */
   async checkForActiveThreats() {
     // Implement threat detection logic
-    return { status: "clear", alert: false };
+    return { status: 'clear', alert: false };
   }
 
   /**
@@ -1104,7 +1102,7 @@ class OAuthSecurityValidator {
    */
   async checkSuspiciousActivity() {
     // Implement anomaly detection
-    return { status: "normal", alert: false };
+    return { status: 'normal', alert: false };
   }
 
   /**
@@ -1119,7 +1117,7 @@ class OAuthSecurityValidator {
    */
   async checkConfigurationDrift() {
     // Implement configuration monitoring
-    return { status: "stable", alert: false };
+    return { status: 'stable', alert: false };
   }
 
   /**
@@ -1134,7 +1132,7 @@ class OAuthSecurityValidator {
    */
   async checkComplianceStatus() {
     // Implement compliance monitoring
-    return { status: "compliant", alert: false };
+    return { status: 'compliant', alert: false };
   }
 
   /**
@@ -1150,7 +1148,7 @@ class OAuthSecurityValidator {
    */
   async triggerSecurityAlert(alertData) {
     // Implement alert notification system
-    this.auditLogger.error("SECURITY ALERT", alertData);
+    this.auditLogger.error('SECURITY ALERT', alertData);
     // Send notifications to security team
   }
 }

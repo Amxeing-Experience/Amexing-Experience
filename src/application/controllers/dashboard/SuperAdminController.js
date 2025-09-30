@@ -1,4 +1,4 @@
-const RoleBasedController = require("./base/RoleBasedController");
+const RoleBasedController = require('./base/RoleBasedController');
 
 /**
  * SuperAdminController - Implements superadmin-specific dashboard functionality
@@ -6,7 +6,7 @@ const RoleBasedController = require("./base/RoleBasedController");
  */
 class SuperAdminController extends RoleBasedController {
   constructor() {
-    super("superadmin");
+    super('superadmin');
   }
 
   /**
@@ -29,12 +29,12 @@ class SuperAdminController extends RoleBasedController {
       const stats = await this.getSystemStats();
       const recentActivity = await this.getRecentSystemActivity();
 
-      await this.renderRoleView(req, res, "index", {
-        title: "System Dashboard",
+      await this.renderRoleView(req, res, 'index', {
+        title: 'System Dashboard',
         stats,
         recentActivity,
         breadcrumb: {
-          title: "Dashboard",
+          title: 'Dashboard',
           items: [],
         },
       });
@@ -60,12 +60,12 @@ class SuperAdminController extends RoleBasedController {
    */
   async users(req, res) {
     try {
-      await this.renderRoleView(req, res, "users", {
-        title: "User Management",
+      await this.renderRoleView(req, res, 'users', {
+        title: 'User Management',
         users: [], // Will be populated from database
         breadcrumb: {
-          title: "User Management",
-          items: [{ name: "User Management", active: true }],
+          title: 'User Management',
+          items: [{ name: 'User Management', active: true }],
         },
       });
     } catch (error) {
@@ -90,12 +90,12 @@ class SuperAdminController extends RoleBasedController {
    */
   async clients(req, res) {
     try {
-      await this.renderRoleView(req, res, "clients", {
-        title: "Client Management",
+      await this.renderRoleView(req, res, 'clients', {
+        title: 'Client Management',
         clients: [], // Will be populated from database
         breadcrumb: {
-          title: "Client Management",
-          items: [{ name: "Client Management", active: true }],
+          title: 'Client Management',
+          items: [{ name: 'Client Management', active: true }],
         },
       });
     } catch (error) {
@@ -120,13 +120,13 @@ class SuperAdminController extends RoleBasedController {
    */
   async permissions(req, res) {
     try {
-      await this.renderRoleView(req, res, "permissions", {
-        title: "Permissions & Roles",
+      await this.renderRoleView(req, res, 'permissions', {
+        title: 'Permissions & Roles',
         roles: [], // Will be populated from database
         permissions: [],
         breadcrumb: {
-          title: "Permissions & Roles",
-          items: [{ name: "Permissions & Roles", active: true }],
+          title: 'Permissions & Roles',
+          items: [{ name: 'Permissions & Roles', active: true }],
         },
       });
     } catch (error) {
@@ -151,12 +151,12 @@ class SuperAdminController extends RoleBasedController {
    */
   async analytics(req, res) {
     try {
-      await this.renderRoleView(req, res, "analytics", {
-        title: "System Analytics",
+      await this.renderRoleView(req, res, 'analytics', {
+        title: 'System Analytics',
         analytics: await this.getSystemAnalytics(),
         breadcrumb: {
-          title: "System Analytics",
-          items: [{ name: "Analytics", active: true }],
+          title: 'System Analytics',
+          items: [{ name: 'Analytics', active: true }],
         },
       });
     } catch (error) {
@@ -181,12 +181,12 @@ class SuperAdminController extends RoleBasedController {
    */
   async reports(req, res) {
     try {
-      await this.renderRoleView(req, res, "reports", {
-        title: "System Reports",
+      await this.renderRoleView(req, res, 'reports', {
+        title: 'System Reports',
         reports: [],
         breadcrumb: {
-          title: "Reports",
-          items: [{ name: "Reports", active: true }],
+          title: 'Reports',
+          items: [{ name: 'Reports', active: true }],
         },
       });
     } catch (error) {
@@ -211,12 +211,12 @@ class SuperAdminController extends RoleBasedController {
    */
   async audit(req, res) {
     try {
-      await this.renderRoleView(req, res, "audit", {
-        title: "Audit Logs",
+      await this.renderRoleView(req, res, 'audit', {
+        title: 'Audit Logs',
         logs: [],
         breadcrumb: {
-          title: "Audit Logs",
-          items: [{ name: "Audit Logs", active: true }],
+          title: 'Audit Logs',
+          items: [{ name: 'Audit Logs', active: true }],
         },
       });
     } catch (error) {
@@ -241,12 +241,12 @@ class SuperAdminController extends RoleBasedController {
    */
   async settings(req, res) {
     try {
-      await this.renderRoleView(req, res, "settings", {
-        title: "System Settings",
+      await this.renderRoleView(req, res, 'settings', {
+        title: 'System Settings',
         settings: {},
         breadcrumb: {
-          title: "System Settings",
-          items: [{ name: "Settings", active: true }],
+          title: 'System Settings',
+          items: [{ name: 'Settings', active: true }],
         },
       });
     } catch (error) {
@@ -271,12 +271,12 @@ class SuperAdminController extends RoleBasedController {
    */
   async integrations(req, res) {
     try {
-      await this.renderRoleView(req, res, "integrations", {
-        title: "System Integrations",
+      await this.renderRoleView(req, res, 'integrations', {
+        title: 'System Integrations',
         integrations: [],
         breadcrumb: {
-          title: "Integrations",
-          items: [{ name: "Integrations", active: true }],
+          title: 'Integrations',
+          items: [{ name: 'Integrations', active: true }],
         },
       });
     } catch (error) {
@@ -301,12 +301,12 @@ class SuperAdminController extends RoleBasedController {
    */
   async security(req, res) {
     try {
-      await this.renderRoleView(req, res, "security", {
-        title: "Security Settings",
+      await this.renderRoleView(req, res, 'security', {
+        title: 'Security Settings',
         security: {},
         breadcrumb: {
-          title: "Security Settings",
-          items: [{ name: "Security", active: true }],
+          title: 'Security Settings',
+          items: [{ name: 'Security', active: true }],
         },
       });
     } catch (error) {
@@ -331,12 +331,12 @@ class SuperAdminController extends RoleBasedController {
    */
   async compliance(req, res) {
     try {
-      await this.renderRoleView(req, res, "compliance", {
-        title: "PCI DSS Compliance",
+      await this.renderRoleView(req, res, 'compliance', {
+        title: 'PCI DSS Compliance',
         compliance: {},
         breadcrumb: {
-          title: "PCI DSS Compliance",
-          items: [{ name: "Compliance", active: true }],
+          title: 'PCI DSS Compliance',
+          items: [{ name: 'Compliance', active: true }],
         },
       });
     } catch (error) {
@@ -364,7 +364,7 @@ class SuperAdminController extends RoleBasedController {
       totalBookings: 8750,
       totalRevenue: 1250000,
       activeDrivers: 125,
-      systemUptime: "99.9%",
+      systemUptime: '99.9%',
       dailyActiveUsers: 450,
       pendingApprovals: 23,
     };
@@ -386,22 +386,22 @@ class SuperAdminController extends RoleBasedController {
   async getRecentSystemActivity() {
     return [
       {
-        type: "user_registration",
-        message: "New client registered: Acme Corp",
+        type: 'user_registration',
+        message: 'New client registered: Acme Corp',
         timestamp: new Date(),
-        severity: "info",
+        severity: 'info',
       },
       {
-        type: "system_update",
-        message: "System backup completed successfully",
+        type: 'system_update',
+        message: 'System backup completed successfully',
         timestamp: new Date(),
-        severity: "success",
+        severity: 'success',
       },
       {
-        type: "security_alert",
-        message: "Failed login attempts detected from IP 192.168.1.1",
+        type: 'security_alert',
+        message: 'Failed login attempts detected from IP 192.168.1.1',
         timestamp: new Date(),
-        severity: "warning",
+        severity: 'warning',
       },
     ];
   }

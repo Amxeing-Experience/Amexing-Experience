@@ -9,14 +9,14 @@
  * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
-const Parse = require("parse/node");
-const logger = require("../../infrastructure/logger");
-const { PermissionContextService } = require("./PermissionContextService");
+const Parse = require('parse/node');
+const logger = require('../../infrastructure/logger');
+const { PermissionContextService } = require('./PermissionContextService');
 const {
   PermissionInheritanceService,
-} = require("./PermissionInheritanceService");
-const { PermissionAuditService } = require("./PermissionAuditService");
-const { CorporateOAuthService } = require("./CorporateOAuthService");
+} = require('./PermissionInheritanceService');
+const { PermissionAuditService } = require('./PermissionAuditService');
+const { CorporateOAuthService } = require('./CorporateOAuthService');
 
 /**
  * Department OAuth Flow Service - Manages department-specific OAuth authentication flows.
@@ -41,67 +41,67 @@ class DepartmentOAuthFlowService {
 
     // Supported OAuth providers per department type
     this.defaultProviderMappings = {
-      sistemas: ["google", "microsoft", "github"],
-      rrhh: ["microsoft", "google"],
-      finanzas: ["microsoft", "google"],
-      marketing: ["google", "microsoft", "apple"],
-      ventas: ["microsoft", "google", "apple"],
-      operaciones: ["google", "microsoft"],
-      legal: ["microsoft", "google"],
-      compras: ["microsoft", "google"],
+      sistemas: ['google', 'microsoft', 'github'],
+      rrhh: ['microsoft', 'google'],
+      finanzas: ['microsoft', 'google'],
+      marketing: ['google', 'microsoft', 'apple'],
+      ventas: ['microsoft', 'google', 'apple'],
+      operaciones: ['google', 'microsoft'],
+      legal: ['microsoft', 'google'],
+      compras: ['microsoft', 'google'],
     };
 
     // Department-specific OAuth scopes
     this.departmentScopes = {
       sistemas: {
         google: [
-          "openid",
-          "email",
-          "profile",
-          "https://www.googleapis.com/auth/admin.directory.user",
+          'openid',
+          'email',
+          'profile',
+          'https://www.googleapis.com/auth/admin.directory.user',
         ],
         microsoft: [
-          "openid",
-          "email",
-          "profile",
-          "User.Read",
-          "Directory.Read.All",
+          'openid',
+          'email',
+          'profile',
+          'User.Read',
+          'Directory.Read.All',
         ],
-        github: ["user:email", "read:user", "read:org"],
+        github: ['user:email', 'read:user', 'read:org'],
       },
       rrhh: {
-        microsoft: ["openid", "email", "profile", "User.Read", "People.Read"],
+        microsoft: ['openid', 'email', 'profile', 'User.Read', 'People.Read'],
         google: [
-          "openid",
-          "email",
-          "profile",
-          "https://www.googleapis.com/auth/directory.readonly",
+          'openid',
+          'email',
+          'profile',
+          'https://www.googleapis.com/auth/directory.readonly',
         ],
       },
       finanzas: {
         microsoft: [
-          "openid",
-          "email",
-          "profile",
-          "User.Read",
-          "Financials.ReadWrite.All",
+          'openid',
+          'email',
+          'profile',
+          'User.Read',
+          'Financials.ReadWrite.All',
         ],
         google: [
-          "openid",
-          "email",
-          "profile",
-          "https://www.googleapis.com/auth/spreadsheets",
+          'openid',
+          'email',
+          'profile',
+          'https://www.googleapis.com/auth/spreadsheets',
         ],
       },
       marketing: {
         google: [
-          "openid",
-          "email",
-          "profile",
-          "https://www.googleapis.com/auth/analytics.readonly",
+          'openid',
+          'email',
+          'profile',
+          'https://www.googleapis.com/auth/analytics.readonly',
         ],
-        microsoft: ["openid", "email", "profile", "User.Read"],
-        apple: ["name", "email"],
+        microsoft: ['openid', 'email', 'profile', 'User.Read'],
+        apple: ['name', 'email'],
       },
     };
 
@@ -129,9 +129,9 @@ class DepartmentOAuthFlowService {
       await this.loadDepartmentConfigurations();
       await this.validateDepartmentSetup();
       this.initialized = true;
-      logger.info("DepartmentOAuthFlowService initialized successfully");
+      logger.info('DepartmentOAuthFlowService initialized successfully');
     } catch (error) {
-      logger.error("Failed to initialize DepartmentOAuthFlowService:", error);
+      logger.error('Failed to initialize DepartmentOAuthFlowService:', error);
       throw error;
     }
   }
@@ -169,37 +169,37 @@ class DepartmentOAuthFlowService {
       // This prevents Parse queries before Parse Server is ready
       if (!Parse.applicationId) {
         logger.warn(
-          "Parse not initialized yet, skipping department configurations load",
+          'Parse not initialized yet, skipping department configurations load'
         );
         return;
       }
 
-      const DepartmentConfig = Parse.Object.extend("DepartmentOAuthConfig");
+      const DepartmentConfig = Parse.Object.extend('DepartmentOAuthConfig');
       const query = new Parse.Query(DepartmentConfig);
-      query.equalTo("isActive", true);
+      query.equalTo('isActive', true);
 
       const configs = await query.find({ useMasterKey: true });
 
       configs.forEach((config) => {
-        this.departmentConfigurations.set(config.get("departmentCode"), {
+        this.departmentConfigurations.set(config.get('departmentCode'), {
           id: config.id,
-          name: config.get("departmentName"),
-          code: config.get("departmentCode"),
-          allowedProviders: config.get("allowedProviders") ||
-            this.defaultProviderMappings[config.get("departmentCode")] || [
-              "google",
-              "microsoft",
-            ],
-          customScopes: config.get("customScopes") || {},
-          requiredClaims: config.get("requiredClaims") || [],
-          autoProvisionRoles: config.get("autoProvisionRoles") || [],
-          permissionMappings: config.get("permissionMappings") || {},
-          contextSettings: config.get("contextSettings") || {},
-          approvalRequired: config.get("approvalRequired") || false,
-          approvalWorkflow: config.get("approvalWorkflow") || null,
-          customValidation: config.get("customValidation") || null,
-          postAuthActions: config.get("postAuthActions") || [],
-          metadata: config.get("metadata") || {},
+          name: config.get('departmentName'),
+          code: config.get('departmentCode'),
+          allowedProviders: config.get('allowedProviders')
+            || this.defaultProviderMappings[config.get('departmentCode')] || [
+            'google',
+            'microsoft',
+          ],
+          customScopes: config.get('customScopes') || {},
+          requiredClaims: config.get('requiredClaims') || [],
+          autoProvisionRoles: config.get('autoProvisionRoles') || [],
+          permissionMappings: config.get('permissionMappings') || {},
+          contextSettings: config.get('contextSettings') || {},
+          approvalRequired: config.get('approvalRequired') || false,
+          approvalWorkflow: config.get('approvalWorkflow') || null,
+          customValidation: config.get('customValidation') || null,
+          postAuthActions: config.get('postAuthActions') || [],
+          metadata: config.get('metadata') || {},
         });
       });
 
@@ -224,7 +224,7 @@ class DepartmentOAuthFlowService {
         }
       });
     } catch (error) {
-      logger.error("Failed to load department configurations:", error);
+      logger.error('Failed to load department configurations:', error);
       // Continue with default configurations
     }
   }
@@ -253,7 +253,7 @@ class DepartmentOAuthFlowService {
         if (config.permissionMappings) {
           await this.validatePermissionMappings(
             config.permissionMappings,
-            deptCode,
+            deptCode
           );
         }
       } catch (error) {
@@ -287,8 +287,9 @@ class DepartmentOAuthFlowService {
   async initiateDepartmentOAuth(request) {
     await this.ensureInitialized();
 
-    const { department, _provider, corporateConfigId, redirectUri, state } =
-      request;
+    const {
+      department, _provider, corporateConfigId, redirectUri, state,
+    } = request;
 
     try {
       // Validate department
@@ -296,7 +297,7 @@ class DepartmentOAuthFlowService {
       if (!deptConfig) {
         throw new Parse.Error(
           Parse.Error.INVALID_QUERY,
-          `Invalid department: ${department}`,
+          `Invalid department: ${department}`
         );
       }
 
@@ -304,7 +305,7 @@ class DepartmentOAuthFlowService {
       if (!deptConfig.allowedProviders.includes(_provider)) {
         throw new Parse.Error(
           Parse.Error.INVALID_QUERY,
-          `Provider ${_provider} not allowed for department ${department}`,
+          `Provider ${_provider} not allowed for department ${department}`
         );
       }
 
@@ -325,16 +326,16 @@ class DepartmentOAuthFlowService {
 
       // Log OAuth initiation for audit
       await this.auditService.recordPermissionAudit({
-        userId: "anonymous",
-        action: "department_oauth_initiated",
-        resource: "oauth_flow",
-        performedBy: "system",
+        userId: 'anonymous',
+        action: 'department_oauth_initiated',
+        resource: 'oauth_flow',
+        performedBy: 'system',
         metadata: {
           department,
           _provider,
           corporateConfigId,
           timestamp: new Date(),
-          userAgent: request.headers?.["user-agent"],
+          userAgent: request.headers?.['user-agent'],
           ipAddress: request.ip,
         },
       });
@@ -347,7 +348,7 @@ class DepartmentOAuthFlowService {
         expiresIn: 300000, // 5 minutes
       };
     } catch (error) {
-      logger.error("Failed to initiate department OAuth:", error);
+      logger.error('Failed to initiate department OAuth:', error);
       throw error;
     }
   }
@@ -375,13 +376,15 @@ class DepartmentOAuthFlowService {
    * });
    */
   async handleDepartmentOAuthCallback(request) {
-    const { code, state, _provider, department, error: oauthError } = request;
+    const {
+      code, state, _provider, department, error: oauthError,
+    } = request;
 
     try {
       if (oauthError) {
         throw new Parse.Error(
           Parse.Error.INVALID_QUERY,
-          `OAuth error: ${oauthError}`,
+          `OAuth error: ${oauthError}`
         );
       }
 
@@ -389,7 +392,7 @@ class DepartmentOAuthFlowService {
       if (!code || !_provider || !department) {
         throw new Parse.Error(
           Parse.Error.INVALID_QUERY,
-          "Missing required OAuth callback parameters",
+          'Missing required OAuth callback parameters'
         );
       }
 
@@ -398,7 +401,7 @@ class DepartmentOAuthFlowService {
       if (!deptConfig) {
         throw new Parse.Error(
           Parse.Error.INVALID_QUERY,
-          `Invalid department: ${department}`,
+          `Invalid department: ${department}`
         );
       }
 
@@ -413,7 +416,7 @@ class DepartmentOAuthFlowService {
       // Get user info from OAuth provider
       const userInfo = await this.getUserInfoFromProvider(
         _provider,
-        tokenData.accessToken,
+        tokenData.accessToken
       );
 
       // Validate department-specific claims
@@ -424,7 +427,7 @@ class DepartmentOAuthFlowService {
         return await this.handleApprovalRequired(
           userInfo,
           deptConfig,
-          tokenData,
+          tokenData
         );
       }
 
@@ -438,14 +441,14 @@ class DepartmentOAuthFlowService {
 
       return authResult;
     } catch (error) {
-      logger.error("Failed to handle department OAuth callback:", error);
+      logger.error('Failed to handle department OAuth callback:', error);
 
       // Log failed callback for audit
       await this.auditService.recordPermissionAudit({
-        userId: "anonymous",
-        action: "department_oauth_callback_failed",
-        resource: "oauth_flow",
-        performedBy: "system",
+        userId: 'anonymous',
+        action: 'department_oauth_callback_failed',
+        resource: 'oauth_flow',
+        performedBy: 'system',
         metadata: {
           department,
           _provider,
@@ -488,7 +491,7 @@ class DepartmentOAuthFlowService {
       const user = await this.findOrCreateDepartmentUser(
         userInfo,
         department,
-        _provider,
+        _provider
       );
 
       // Apply department-specific permission inheritance
@@ -496,13 +499,13 @@ class DepartmentOAuthFlowService {
         user,
         userInfo,
         department,
-        _provider,
+        _provider
       );
 
       // Initialize department context
       const contextResult = await this.initializeDepartmentContext(
         user,
-        department,
+        department
       );
 
       // Execute post-auth actions
@@ -514,16 +517,16 @@ class DepartmentOAuthFlowService {
       const sessionData = await this.createDepartmentSession(
         user,
         department,
-        contextResult,
+        contextResult
       );
 
       // Log successful authentication
       await this.auditService.recordPermissionAudit({
         userId: user.id,
         sessionId: sessionData.sessionToken,
-        action: "department_oauth_success",
-        resource: "oauth_authentication",
-        performedBy: "system",
+        action: 'department_oauth_success',
+        resource: 'oauth_authentication',
+        performedBy: 'system',
         metadata: {
           department: department.code,
           _provider,
@@ -537,19 +540,19 @@ class DepartmentOAuthFlowService {
         success: true,
         user: {
           id: user.id,
-          username: user.get("username"),
-          email: user.get("email"),
-          firstName: user.get("firstName"),
-          lastName: user.get("lastName"),
+          username: user.get('username'),
+          email: user.get('email'),
+          firstName: user.get('firstName'),
+          lastName: user.get('lastName'),
           department: department.code,
-          role: user.get("role"),
+          role: user.get('role'),
         },
         session: sessionData,
         context: contextResult,
         redirectUrl: this.determineDepartmentRedirect(user, department),
       };
     } catch (error) {
-      logger.error("Failed to process department OAuth:", error);
+      logger.error('Failed to process department OAuth:', error);
       throw error;
     }
   }
@@ -572,11 +575,11 @@ class DepartmentOAuthFlowService {
   async findOrCreateDepartmentUser(userInfo, department, _provider) {
     try {
       // Try to find existing user by OAuth provider info
-      const AmexingUser = Parse.Object.extend("AmexingUser");
+      const AmexingUser = Parse.Object.extend('AmexingUser');
       const query = new Parse.Query(AmexingUser);
 
       // Look for user with matching OAuth account
-      query.equalTo("oauthAccounts", {
+      query.equalTo('oauthAccounts', {
         $elemMatch: {
           provider: _provider,
           providerId: userInfo.id || userInfo.sub,
@@ -588,7 +591,7 @@ class DepartmentOAuthFlowService {
       if (!user) {
         // Try to find by email
         const emailQuery = new Parse.Query(AmexingUser);
-        emailQuery.equalTo("email", userInfo.email.toLowerCase());
+        emailQuery.equalTo('email', userInfo.email.toLowerCase());
         user = await emailQuery.first({ useMasterKey: true });
 
         if (user) {
@@ -607,7 +610,7 @@ class DepartmentOAuthFlowService {
 
       return user;
     } catch (error) {
-      logger.error("Failed to find or create department user:", error);
+      logger.error('Failed to find or create department user:', error);
       throw error;
     }
   }
@@ -628,27 +631,27 @@ class DepartmentOAuthFlowService {
    * const user = await service.createDepartmentUser(userInfo, deptConfig, 'microsoft');
    */
   async createDepartmentUser(userInfo, department, _provider) {
-    const AmexingUser = Parse.Object.extend("AmexingUser");
+    const AmexingUser = Parse.Object.extend('AmexingUser');
     const user = new AmexingUser();
 
     // Basic user information
-    user.set("username", this.generateDepartmentUsername(userInfo, department));
-    user.set("email", userInfo.email.toLowerCase());
-    user.set("firstName", userInfo.given_name || userInfo.first_name || "");
-    user.set("lastName", userInfo.family_name || userInfo.last_name || "");
-    user.set("emailVerified", true); // OAuth emails are considered verified
+    user.set('username', this.generateDepartmentUsername(userInfo, department));
+    user.set('email', userInfo.email.toLowerCase());
+    user.set('firstName', userInfo.given_name || userInfo.first_name || '');
+    user.set('lastName', userInfo.family_name || userInfo.last_name || '');
+    user.set('emailVerified', true); // OAuth emails are considered verified
 
     // Department-specific information
-    user.set("department", department.code);
-    user.set("primaryDepartment", department.code);
-    user.set("departments", [department.code]);
+    user.set('department', department.code);
+    user.set('primaryDepartment', department.code);
+    user.set('departments', [department.code]);
 
     // Role assignment based on department configuration
     const role = this.determineDepartmentRole(userInfo, department);
-    user.set("role", role);
+    user.set('role', role);
 
     // OAuth account information
-    user.set("oauthAccounts", [
+    user.set('oauthAccounts', [
       {
         provider: _provider,
         providerId: userInfo.id || userInfo.sub,
@@ -660,20 +663,20 @@ class DepartmentOAuthFlowService {
     ]);
 
     // Primary OAuth provider
-    user.set("primaryOAuthProvider", _provider);
+    user.set('primaryOAuthProvider', _provider);
 
     // Department-specific metadata
-    user.set("departmentMetadata", {
+    user.set('departmentMetadata', {
       joinedAt: new Date(),
-      joinedVia: "oauth",
-      approvalStatus: department.approvalRequired ? "pending" : "approved",
+      joinedVia: 'oauth',
+      approvalStatus: department.approvalRequired ? 'pending' : 'approved',
       initialProvider: _provider,
     });
 
     await user.save(null, { useMasterKey: true });
 
     logger.info(
-      `Created new department user: ${user.id} for department: ${department.code}`,
+      `Created new department user: ${user.id} for department: ${department.code}`
     );
     return user;
   }
@@ -696,7 +699,7 @@ class DepartmentOAuthFlowService {
     user,
     userInfo,
     department,
-    _provider,
+    _provider
   ) {
     try {
       // Create synthetic corporate config for department
@@ -712,18 +715,18 @@ class DepartmentOAuthFlowService {
         user,
         userInfo,
         _provider,
-        syntheticCorporateConfig,
+        syntheticCorporateConfig
       );
 
       // Apply department-specific role mappings
       if (
-        department.autoProvisionRoles &&
-        department.autoProvisionRoles.length > 0
+        department.autoProvisionRoles
+        && department.autoProvisionRoles.length > 0
       ) {
         await this.applyAutoProvisionRoles(user, userInfo, department);
       }
     } catch (error) {
-      logger.error("Failed to apply department permission inheritance:", error);
+      logger.error('Failed to apply department permission inheritance:', error);
       throw error;
     }
   }
@@ -748,7 +751,7 @@ class DepartmentOAuthFlowService {
 
       // Get available contexts for user
       const availableContexts = await this.contextService.getAvailableContexts(
-        user.id,
+        user.id
       );
 
       // Check if department context already exists
@@ -763,7 +766,7 @@ class DepartmentOAuthFlowService {
       const contextResult = await this.contextService.switchToContext(
         user.id,
         contextId,
-        null, // Session will be created separately
+        null // Session will be created separately
       );
 
       return {
@@ -773,7 +776,7 @@ class DepartmentOAuthFlowService {
         switchResult: contextResult,
       };
     } catch (error) {
-      logger.error("Failed to initialize department context:", error);
+      logger.error('Failed to initialize department context:', error);
       throw error;
     }
   }
@@ -792,25 +795,25 @@ class DepartmentOAuthFlowService {
    * const context = await service.createDepartmentContext(user, deptConfig);
    */
   async createDepartmentContext(user, department) {
-    const PermissionContext = Parse.Object.extend("PermissionContext");
+    const PermissionContext = Parse.Object.extend('PermissionContext');
     const context = new PermissionContext();
 
-    context.set("userId", user.id);
-    context.set("contextId", `dept-${department.code}`);
-    context.set("contextType", "department");
-    context.set("name", `${department.name} Department`);
-    context.set("department", department.code);
+    context.set('userId', user.id);
+    context.set('contextId', `dept-${department.code}`);
+    context.set('contextType', 'department');
+    context.set('name', `${department.name} Department`);
+    context.set('department', department.code);
     context.set(
-      "permissions",
-      this.getDepartmentBasePermissions(department.code),
+      'permissions',
+      this.getDepartmentBasePermissions(department.code)
     );
-    context.set("isDefault", user.get("primaryDepartment") === department.code);
-    context.set("metadata", {
-      createdVia: "oauth_flow",
+    context.set('isDefault', user.get('primaryDepartment') === department.code);
+    context.set('metadata', {
+      createdVia: 'oauth_flow',
       departmentConfig: department.id,
       autoCreated: true,
     });
-    context.set("isActive", true);
+    context.set('isActive', true);
 
     await context.save(null, { useMasterKey: true });
     return context;
@@ -834,27 +837,27 @@ class DepartmentOAuthFlowService {
     try {
       // Create Parse session
       const session = new Parse.Session();
-      session.set("user", user);
-      session.set("department", department.code);
-      session.set("contextId", contextResult.contextId);
-      session.set("expiresAt", new Date(Date.now() + 24 * 60 * 60 * 1000)); // 24 hours
-      session.set("metadata", {
-        createdVia: "department_oauth",
-        provider: "oauth",
+      session.set('user', user);
+      session.set('department', department.code);
+      session.set('contextId', contextResult.contextId);
+      session.set('expiresAt', new Date(Date.now() + 24 * 60 * 60 * 1000)); // 24 hours
+      session.set('metadata', {
+        createdVia: 'department_oauth',
+        provider: 'oauth',
         department: department.code,
       });
 
       await session.save(null, { useMasterKey: true });
 
       return {
-        sessionToken: session.get("sessionToken"),
-        expiresAt: session.get("expiresAt"),
+        sessionToken: session.get('sessionToken'),
+        expiresAt: session.get('expiresAt'),
         userId: user.id,
         department: department.code,
         contextId: contextResult.contextId,
       };
     } catch (error) {
-      logger.error("Failed to create department session:", error);
+      logger.error('Failed to create department session:', error);
       throw error;
     }
   }
@@ -876,7 +879,9 @@ class DepartmentOAuthFlowService {
    * const authUrl = await service.buildDepartmentOAuthUrl({ department, provider: 'google', redirectUri, state });
    */
   async buildDepartmentOAuthUrl(options) {
-    const { department, _provider, redirectUri, state } = options;
+    const {
+      department, _provider, redirectUri, state,
+    } = options;
 
     // Get provider configuration
     const providerConfig = await this.getProviderConfig(_provider);
@@ -886,34 +891,34 @@ class DepartmentOAuthFlowService {
 
     // Build OAuth URL based on provider
     switch (_provider) {
-      case "google":
+      case 'google':
         return this.buildGoogleOAuthUrl(
           providerConfig,
           scopes,
           redirectUri,
           state,
-          department,
+          department
         );
-      case "microsoft":
+      case 'microsoft':
         return this.buildMicrosoftOAuthUrl(
           providerConfig,
           scopes,
           redirectUri,
           state,
-          department,
+          department
         );
-      case "apple":
+      case 'apple':
         return this.buildAppleOAuthUrl(
           providerConfig,
           scopes,
           redirectUri,
           state,
-          department,
+          department
         );
       default:
         throw new Parse.Error(
           Parse.Error.INVALID_QUERY,
-          `Unsupported provider: ${_provider}`,
+          `Unsupported provider: ${_provider}`
         );
     }
   }
@@ -937,25 +942,25 @@ class DepartmentOAuthFlowService {
   buildGoogleOAuthUrl(config, scopes, redirectUri, state, department) {
     const params = new URLSearchParams({
       client_id: config.clientId,
-      response_type: "code",
-      scope: scopes.join(" "),
+      response_type: 'code',
+      scope: scopes.join(' '),
       redirect_uri: redirectUri,
       state: JSON.stringify({
-        provider: "google",
+        provider: 'google',
         department: department.code,
         originalState: state,
         timestamp: Date.now(),
       }),
-      access_type: "offline",
-      prompt: "consent",
+      access_type: 'offline',
+      prompt: 'consent',
       // Department-specific parameters
       hd: department.emailDomain || undefined, // Restrict to specific domain
-      include_granted_scopes: "true",
+      include_granted_scopes: 'true',
     });
 
     // Remove undefined parameters
     [...params.entries()].forEach(([_key, value]) => {
-      if (value === undefined || value === "undefined") {
+      if (value === undefined || value === 'undefined') {
         params.delete(_key);
       }
     });
@@ -982,24 +987,24 @@ class DepartmentOAuthFlowService {
   buildMicrosoftOAuthUrl(config, scopes, redirectUri, state, department) {
     const params = new URLSearchParams({
       client_id: config.clientId,
-      response_type: "code",
-      scope: scopes.join(" "),
+      response_type: 'code',
+      scope: scopes.join(' '),
       redirect_uri: redirectUri,
       state: JSON.stringify({
-        provider: "microsoft",
+        provider: 'microsoft',
         department: department.code,
         originalState: state,
         timestamp: Date.now(),
       }),
-      response_mode: "query",
-      prompt: "consent",
+      response_mode: 'query',
+      prompt: 'consent',
       // Department-specific parameters
       domain_hint: department.emailDomain || undefined,
     });
 
     // Remove undefined parameters
     [...params.entries()].forEach(([_key, value]) => {
-      if (value === undefined || value === "undefined") {
+      if (value === undefined || value === 'undefined') {
         params.delete(_key);
       }
     });
@@ -1026,12 +1031,12 @@ class DepartmentOAuthFlowService {
   buildAppleOAuthUrl(config, scopes, redirectUri, state, department) {
     const params = new URLSearchParams({
       client_id: config.clientId,
-      response_type: "code idtoken",
-      response_mode: "form_post",
-      scope: scopes.join(" "),
+      response_type: 'code idtoken',
+      response_mode: 'form_post',
+      scope: scopes.join(' '),
       redirect_uri: redirectUri,
       state: JSON.stringify({
-        provider: "apple",
+        provider: 'apple',
         department: department.code,
         originalState: state,
         timestamp: Date.now(),
@@ -1096,16 +1101,16 @@ class DepartmentOAuthFlowService {
     const deptConfig = this.departmentConfigurations.get(departmentCode);
 
     if (
-      deptConfig &&
-      deptConfig.customScopes &&
-      deptConfig.customScopes[provider]
+      deptConfig
+      && deptConfig.customScopes
+      && deptConfig.customScopes[provider]
     ) {
       return deptConfig.customScopes[provider];
     }
 
     return (
-      this.departmentScopes[departmentCode]?.[provider] ||
-      this.getDefaultScopes(provider)
+      this.departmentScopes[departmentCode]?.[provider]
+      || this.getDefaultScopes(provider)
     );
   }
 
@@ -1124,9 +1129,9 @@ class DepartmentOAuthFlowService {
    */
   getDefaultScopes(provider) {
     const defaultScopes = {
-      google: ["openid", "email", "profile"],
-      microsoft: ["openid", "email", "profile", "User.Read"],
-      apple: ["name", "email"],
+      google: ['openid', 'email', 'profile'],
+      microsoft: ['openid', 'email', 'profile', 'User.Read'],
+      apple: ['name', 'email'],
     };
 
     return defaultScopes[provider] || [];
@@ -1147,41 +1152,41 @@ class DepartmentOAuthFlowService {
   getDepartmentBasePermissions(departmentCode) {
     const basePermissions = {
       sistemas: [
-        "technical_access",
-        "system_support",
-        "user_support",
-        "dev_tools",
+        'technical_access',
+        'system_support',
+        'user_support',
+        'dev_tools',
       ],
       rrhh: [
-        "employee_management",
-        "payroll_access",
-        "benefits_admin",
-        "recruitment",
+        'employee_management',
+        'payroll_access',
+        'benefits_admin',
+        'recruitment',
       ],
       finanzas: [
-        "financial_access",
-        "budget_management",
-        "audit_read",
-        "accounting",
+        'financial_access',
+        'budget_management',
+        'audit_read',
+        'accounting',
       ],
       marketing: [
-        "marketing_access",
-        "campaign_management",
-        "social_media",
-        "analytics",
+        'marketing_access',
+        'campaign_management',
+        'social_media',
+        'analytics',
       ],
-      ventas: ["sales_access", "lead_management", "customer_data", "pipeline"],
+      ventas: ['sales_access', 'lead_management', 'customer_data', 'pipeline'],
       operaciones: [
-        "operations_access",
-        "workflow_management",
-        "quality_control",
+        'operations_access',
+        'workflow_management',
+        'quality_control',
       ],
-      legal: ["legal_access", "contract_management", "compliance_read"],
-      compras: ["purchasing_access", "vendor_management", "procurement"],
+      legal: ['legal_access', 'contract_management', 'compliance_read'],
+      compras: ['purchasing_access', 'vendor_management', 'procurement'],
     };
 
     return (
-      basePermissions[departmentCode] || ["basic_access", "department_read"]
+      basePermissions[departmentCode] || ['basic_access', 'department_read']
     );
   }
 
@@ -1199,67 +1204,67 @@ class DepartmentOAuthFlowService {
    */
   formatDepartmentName(code) {
     const names = {
-      sistemas: "Sistemas",
-      rrhh: "Recursos Humanos",
-      finanzas: "Finanzas",
-      marketing: "Marketing",
-      ventas: "Ventas",
-      operaciones: "Operaciones",
-      legal: "Legal",
-      compras: "Compras",
+      sistemas: 'Sistemas',
+      rrhh: 'Recursos Humanos',
+      finanzas: 'Finanzas',
+      marketing: 'Marketing',
+      ventas: 'Ventas',
+      operaciones: 'Operaciones',
+      legal: 'Legal',
+      compras: 'Compras',
     };
 
     return names[code] || code.charAt(0).toUpperCase() + code.slice(1);
   }
 
   generateDepartmentUsername(userInfo, department) {
-    const emailPrefix = userInfo.email.split("@")[0];
+    const emailPrefix = userInfo.email.split('@')[0];
     return `${emailPrefix}_${department.code}`.toLowerCase();
   }
 
   generateNonce() {
-    return require("crypto").randomBytes(16).toString("hex");
+    return require('crypto').randomBytes(16).toString('hex');
   }
 
   determineDepartmentRole(userInfo, department) {
     // Basic role determination logic
-    if (department.code === "sistemas") {
-      return "employee";
+    if (department.code === 'sistemas') {
+      return 'employee';
     }
 
     // Check for admin indicators in OAuth profile
     if (
-      userInfo.roles?.includes("admin") ||
-      userInfo.groups?.some((group) => group.includes("admin"))
+      userInfo.roles?.includes('admin')
+      || userInfo.groups?.some((group) => group.includes('admin'))
     ) {
-      return "admin";
+      return 'admin';
     }
 
     // Check for manager indicators
     if (
-      userInfo.job_title?.toLowerCase().includes("manager") ||
-      userInfo.department_role === "manager"
+      userInfo.job_title?.toLowerCase().includes('manager')
+      || userInfo.department_role === 'manager'
     ) {
-      return "manager";
+      return 'manager';
     }
 
-    return "employee";
+    return 'employee';
   }
 
   determineDepartmentRedirect(user, department) {
     // Department-specific redirect URLs
     const redirects = {
-      sistemas: "/dashboard/technical",
-      rrhh: "/dashboard/hr",
-      finanzas: "/dashboard/finance",
-      marketing: "/dashboard/marketing",
-      ventas: "/dashboard/sales",
-      operaciones: "/dashboard/operations",
-      legal: "/dashboard/legal",
-      compras: "/dashboard/procurement",
+      sistemas: '/dashboard/technical',
+      rrhh: '/dashboard/hr',
+      finanzas: '/dashboard/finance',
+      marketing: '/dashboard/marketing',
+      ventas: '/dashboard/sales',
+      operaciones: '/dashboard/operations',
+      legal: '/dashboard/legal',
+      compras: '/dashboard/procurement',
     };
 
-    return redirects[department.code] || "/dashboard";
+    return redirects[department.code] || '/dashboard';
   }
 
   // Additional helper methods would be implemented here...

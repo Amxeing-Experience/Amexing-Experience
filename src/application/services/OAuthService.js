@@ -11,13 +11,13 @@
  * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
-const Parse = require("parse/node");
-const crypto = require("crypto");
-const jwt = require("jsonwebtoken");
-const AmexingUser = require("../../domain/models/AmexingUser");
-const AuthenticationService = require("./AuthenticationService");
-const CorporateOAuthService = require("./CorporateOAuthService");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
+const AmexingUser = require('../../domain/models/AmexingUser');
+const AuthenticationService = require('./AuthenticationService');
+const CorporateOAuthService = require('./CorporateOAuthService');
+const logger = require('../../infrastructure/logger');
 
 /**
  * OAuth Service - Handles OAuth 2.0 authentication with multiple providers.
@@ -47,7 +47,7 @@ const logger = require("../../infrastructure/logger");
  */
 class OAuthService {
   constructor() {
-    this.mockMode = process.env.OAUTH_MOCK_MODE === "true";
+    this.mockMode = process.env.OAUTH_MOCK_MODE === 'true';
     this.providers = this.initializeProviders();
   }
 
@@ -71,36 +71,36 @@ class OAuthService {
         clientId: process.env.GOOGLE_OAUTH_CLIENT_ID,
         clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
         redirectUri: process.env.GOOGLE_OAUTH_REDIRECT_URI,
-        enabled: process.env.GOOGLE_OAUTH_ENABLED === "true",
-        mockMode: process.env.GOOGLE_OAUTH_MOCK_MODE === "true",
-        scopes: ["openid", "profile", "email"],
-        authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-        tokenUrl: "https://oauth2.googleapis.com/token",
-        userInfoUrl: "https://www.googleapis.com/oauth2/v2/userinfo",
+        enabled: process.env.GOOGLE_OAUTH_ENABLED === 'true',
+        mockMode: process.env.GOOGLE_OAUTH_MOCK_MODE === 'true',
+        scopes: ['openid', 'profile', 'email'],
+        authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenUrl: 'https://oauth2.googleapis.com/token',
+        userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
       },
       microsoft: {
         clientId: process.env.MICROSOFT_OAUTH_CLIENT_ID,
         clientSecret: process.env.MICROSOFT_OAUTH_CLIENT_SECRET,
         redirectUri: process.env.MICROSOFT_OAUTH_REDIRECT_URI,
         tenantId: process.env.MICROSOFT_OAUTH_TENANT_ID,
-        enabled: process.env.MICROSOFT_OAUTH_ENABLED === "true",
-        mockMode: process.env.MICROSOFT_OAUTH_MOCK_MODE === "true",
-        scopes: ["openid", "profile", "email"],
+        enabled: process.env.MICROSOFT_OAUTH_ENABLED === 'true',
+        mockMode: process.env.MICROSOFT_OAUTH_MOCK_MODE === 'true',
+        scopes: ['openid', 'profile', 'email'],
         authUrl:
-          "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-        tokenUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
-        userInfoUrl: "https://graph.microsoft.com/v1.0/me",
+          'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+        tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
+        userInfoUrl: 'https://graph.microsoft.com/v1.0/me',
       },
       apple: {
         clientId: process.env.APPLE_OAUTH_CLIENT_ID,
         teamId: process.env.APPLE_OAUTH_TEAM_ID,
         keyId: process.env.APPLE_OAUTH_KEY_ID,
         redirectUri: process.env.APPLE_OAUTH_REDIRECT_URI,
-        enabled: process.env.APPLE_OAUTH_ENABLED === "true",
-        mockMode: process.env.APPLE_OAUTH_MOCK_MODE === "true",
-        scopes: ["name", "email"],
-        authUrl: "https://appleid.apple.com/auth/authorize",
-        tokenUrl: "https://appleid.apple.com/auth/token",
+        enabled: process.env.APPLE_OAUTH_ENABLED === 'true',
+        mockMode: process.env.APPLE_OAUTH_MOCK_MODE === 'true',
+        scopes: ['name', 'email'],
+        authUrl: 'https://appleid.apple.com/auth/authorize',
+        tokenUrl: 'https://appleid.apple.com/auth/token',
       },
     };
   }
@@ -129,7 +129,7 @@ class OAuthService {
       if (!providerConfig) {
         throw new Parse.Error(
           Parse.Error.INVALID_REQUEST,
-          `Unsupported provider: ${_provider}`,
+          `Unsupported provider: ${_provider}`
         );
       }
 
@@ -141,35 +141,35 @@ class OAuthService {
       // Generate state if not provided
       let stateValue = state;
       if (!stateValue) {
-        stateValue = crypto.randomBytes(32).toString("hex");
+        stateValue = crypto.randomBytes(32).toString('hex');
       }
 
       // Store state for verification (in production, use Redis or database)
       await this.storeOAuthState(stateValue, {
-        provider,
+        provider: _provider,
         timestamp: Date.now(),
-      }); // eslint-disable-line no-undef
+      });
 
       const params = new URLSearchParams({
         client_id: providerConfig.clientId,
         redirect_uri: providerConfig.redirectUri,
-        response_type: "code",
-        scope: providerConfig.scopes.join(" "),
+        response_type: 'code',
+        scope: providerConfig.scopes.join(' '),
         state: stateValue,
       });
 
       // Provider-specific parameters
-      if (_provider === "microsoft" && providerConfig.tenantId) {
-        params.append("tenant", providerConfig.tenantId);
+      if (_provider === 'microsoft' && providerConfig.tenantId) {
+        params.append('tenant', providerConfig.tenantId);
       }
 
-      if (_provider === "apple") {
-        params.append("response_mode", "form_post");
+      if (_provider === 'apple') {
+        params.append('response_mode', 'form_post');
       }
 
       const authUrl = `${providerConfig.authUrl}?${params.toString()}`;
 
-      logger.logSecurityEvent("OAUTH_AUTH_URL_GENERATED", {
+      logger.logSecurityEvent('OAUTH_AUTH_URL_GENERATED', {
         provider, // eslint-disable-line no-undef
         state: `${stateValue.substring(0, 8)}***`,
       });
@@ -178,7 +178,7 @@ class OAuthService {
     } catch (error) {
       logger.error(
         `OAuth authorization URL generation error for ${_provider}:`,
-        error,
+        error
       );
       throw error;
     }
@@ -209,17 +209,16 @@ class OAuthService {
       if (!providerConfig) {
         throw new Parse.Error(
           Parse.Error.INVALID_REQUEST,
-          `Unsupported provider: ${_provider}`,
+          `Unsupported provider: ${_provider}`
         );
       }
 
       // Verify state parameter
       const stateData = await this.verifyOAuthState(state);
-      if (!stateData || stateData._provider !== _provider) {
-        // eslint-disable-line no-underscore-dangle
+      if (!stateData || stateData.provider !== _provider) {
         throw new Parse.Error(
           Parse.Error.INVALID_REQUEST,
-          "Invalid state parameter",
+          'Invalid state parameter'
         );
       }
 
@@ -233,7 +232,7 @@ class OAuthService {
         const tokens = await this.exchangeCodeForTokens(_provider, code);
 
         // Get user information
-        if (_provider === "apple" && tokens.userInfo) {
+        if (_provider === 'apple' && tokens.userInfo) {
           // For Apple, user info comes from the ID token parsed during token exchange
           const { userInfo: _userInfo } = tokens;
           userInfo = _userInfo;
@@ -246,7 +245,7 @@ class OAuthService {
       // Find or create user
       const authResult = await this.findOrCreateUser(_provider, userInfo);
 
-      logger.logSecurityEvent("OAUTH_LOGIN_SUCCESS", {
+      logger.logSecurityEvent('OAUTH_LOGIN_SUCCESS', {
         provider, // eslint-disable-line no-undef
         userId: authResult.user.id,
         email: this.maskEmail(userInfo.email),
@@ -255,7 +254,7 @@ class OAuthService {
       return authResult;
     } catch (error) {
       logger.error(`OAuth callback error for ${_provider}:`, error);
-      logger.logSecurityEvent("OAUTH_LOGIN_FAILURE", {
+      logger.logSecurityEvent('OAUTH_LOGIN_FAILURE', {
         provider, // eslint-disable-line no-undef
         error: error.message,
       });
@@ -286,7 +285,7 @@ class OAuthService {
       const user = await AuthenticationService.findUserById(userId);
 
       if (!user) {
-        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "User not found");
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
       }
 
       // Check if OAuth account is already linked to another user
@@ -294,7 +293,7 @@ class OAuthService {
       if (existingUser && existingUser.id !== userId) {
         throw new Parse.Error(
           Parse.Error.DUPLICATE_VALUE,
-          "OAuth account is already linked to another user",
+          'OAuth account is already linked to another user'
         );
       }
 
@@ -309,7 +308,7 @@ class OAuthService {
 
       await user.save(null, { useMasterKey: true });
 
-      logger.logSecurityEvent("OAUTH_ACCOUNT_LINKED", {
+      logger.logSecurityEvent('OAUTH_ACCOUNT_LINKED', {
         userId,
         _provider,
         email: this.maskEmail(oauthData.email),
@@ -317,11 +316,11 @@ class OAuthService {
 
       return {
         success: true,
-        message: "OAuth account linked successfully",
+        message: 'OAuth account linked successfully',
         user: user.toSafeJSON(),
       };
     } catch (error) {
-      logger.error("OAuth account linking error:", error);
+      logger.error('OAuth account linking error:', error);
       throw error;
     }
   }
@@ -348,14 +347,14 @@ class OAuthService {
       const user = await AuthenticationService.findUserById(userId);
 
       if (!user) {
-        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "User not found");
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
       }
 
       const oauthAccount = user.getOAuthAccount(_provider);
       if (!oauthAccount) {
         throw new Parse.Error(
           Parse.Error.OBJECT_NOT_FOUND,
-          "OAuth account not found",
+          'OAuth account not found'
         );
       }
 
@@ -363,18 +362,18 @@ class OAuthService {
       user.removeOAuthAccount(_provider, oauthAccount.providerId);
       await user.save(null, { useMasterKey: true });
 
-      logger.logSecurityEvent("OAUTH_ACCOUNT_UNLINKED", {
+      logger.logSecurityEvent('OAUTH_ACCOUNT_UNLINKED', {
         userId,
         _provider,
       });
 
       return {
         success: true,
-        message: "OAuth account unlinked successfully",
+        message: 'OAuth account unlinked successfully',
         user: user.toSafeJSON(),
       };
     } catch (error) {
-      logger.error("OAuth account unlinking error:", error);
+      logger.error('OAuth account unlinking error:', error);
       throw error;
     }
   }
@@ -400,7 +399,7 @@ class OAuthService {
    * const mockUrl = service.generateMockAuthUrl('google', 'state123');
    */
   generateMockAuthUrl(_provider, state) {
-    const mockCode = `mock_${_provider}_${crypto.randomBytes(16).toString("hex")}`;
+    const mockCode = `mock_${_provider}_${crypto.randomBytes(16).toString('hex')}`;
     return `http://localhost:1337/auth/${_provider}/mock?code=${mockCode}&state=${state}`;
   }
 
@@ -425,34 +424,34 @@ class OAuthService {
    */
   getMockUserInfo(_provider, _code) {
     const baseUser = {
-      id: `mock_${_provider}_${crypto.randomBytes(8).toString("hex")}`,
+      id: `mock_${_provider}_${crypto.randomBytes(8).toString('hex')}`,
       name: `Test User ${_provider}`,
-      given_name: "Test",
-      family_name: "User",
+      given_name: 'Test',
+      family_name: 'User',
       picture: `https://via.placeholder.com/150?text=${_provider}`,
-      locale: "en",
+      locale: 'en',
       verifiedemail: true,
     };
 
     switch (_provider) {
-      case "google":
+      case 'google':
         return {
           ...baseUser,
           email: `test.${_provider}@utq.edu.mx`, // Mock corporate domain
-          hd: "utq.edu.mx", // Hosted domain for Google Workspace
+          hd: 'utq.edu.mx', // Hosted domain for Google Workspace
         };
 
-      case "microsoft":
+      case 'microsoft':
         return {
           ...baseUser,
           email: `test.${_provider}@nuba.com.mx`, // Mock corporate domain
           mail: `test.${_provider}@nuba.com.mx`,
           userPrincipalName: `test.${_provider}@nuba.com.mx`,
-          jobTitle: "Test Employee",
-          department: "IT",
+          jobTitle: 'Test Employee',
+          department: 'IT',
         };
 
-      case "apple":
+      case 'apple':
         return {
           ...baseUser,
           email: `test.${_provider}@icloud.com`,
@@ -491,7 +490,7 @@ class OAuthService {
     if (!providerConfig) {
       throw new Parse.Error(
         Parse.Error.INVALID_REQUEST,
-        `Unsupported provider: ${_provider}`,
+        `Unsupported provider: ${_provider}`
       );
     }
 
@@ -499,10 +498,10 @@ class OAuthService {
     if (this.mockMode || providerConfig.mockMode) {
       return {
         accesstoken: `mock_accesstoken_${_provider}`,
-        token_type: "Bearer",
+        token_type: 'Bearer',
         expires_in: 3600,
         refreshtoken: `mock_refreshtoken_${_provider}`,
-        scope: providerConfig.scopes.join(" "),
+        scope: providerConfig.scopes.join(' '),
       };
     }
 
@@ -511,10 +510,10 @@ class OAuthService {
       const tokenData = await this.performTokenExchange(
         _provider,
         code,
-        providerConfig,
+        providerConfig
       );
 
-      logger.logSecurityEvent("OAUTH_TOKEN_EXCHANGE_SUCCESS", null, {
+      logger.logSecurityEvent('OAUTH_TOKEN_EXCHANGE_SUCCESS', null, {
         provider, // eslint-disable-line no-undef
         hasRefreshToken: !!tokenData.refreshtoken,
       });
@@ -522,13 +521,13 @@ class OAuthService {
       return tokenData;
     } catch (error) {
       logger.error(`OAuth token exchange failed for ${_provider}:`, error);
-      logger.logSecurityEvent("OAUTH_TOKEN_EXCHANGE_FAILURE", null, {
+      logger.logSecurityEvent('OAUTH_TOKEN_EXCHANGE_FAILURE', null, {
         provider, // eslint-disable-line no-undef
         error: error.message,
       });
       throw new Parse.Error(
         Parse.Error.OTHER_CAUSE,
-        `Token exchange failed: ${error.message}`,
+        `Token exchange failed: ${error.message}`
       );
     }
   }
@@ -554,7 +553,7 @@ class OAuthService {
    */
   async performTokenExchange(_provider, code, config) {
     const tokenPayload = {
-      grant_type: "authorization_code",
+      grant_type: 'authorization_code',
       client_id: config.clientId,
       client_secret: config.clientSecret,
       code,
@@ -565,37 +564,35 @@ class OAuthService {
     let configWithTenantUrl = null;
 
     // Microsoft Azure AD specific configuration
-    if (_provider === "microsoft") {
-      const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || "common";
+    if (_provider === 'microsoft') {
+      const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || 'common';
       const tokenUrl = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`;
       // Create updated configuration without modifying parameter
       configWithTenantUrl = { ...config, tokenUrl };
 
       // Add scope for Microsoft
       tokenPayload.scope = config.scopes
-        ? config.scopes.join(" ")
-        : "openid profile email";
+        ? config.scopes.join(' ')
+        : 'openid profile email';
     }
 
     // Apple requires JWT client assertion instead of client_secret
-    if (_provider === "apple") {
+    if (_provider === 'apple') {
       delete tokenPayload.client_secret;
-      tokenPayload.client_assertion_type =
-        "urn:ietf:params:oauth:client-assertion-type:jwt-bearer";
-      tokenPayload.client_assertion =
-        await this.createAppleClientAssertion(config);
+      tokenPayload.client_assertion_type = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+      tokenPayload.client_assertion = await this.createAppleClientAssertion(config);
     }
 
     const response = await fetch(
       configWithTenantUrl?.tokenUrl || config.tokenUrl,
       {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          Accept: "application/json",
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
         },
         body: new URLSearchParams(tokenPayload),
-      },
+      }
     );
 
     if (!response.ok) {
@@ -612,12 +609,12 @@ class OAuthService {
     const tokenData = await response.json();
 
     // Microsoft-specific token validation
-    if (_provider === "microsoft" && tokenData.accesstoken) {
+    if (_provider === 'microsoft' && tokenData.accesstoken) {
       await this.validateMicrosoftToken(tokenData.accesstoken);
     }
 
     // Apple-specific ID token processing
-    if (_provider === "apple" && tokenData.idtoken) {
+    if (_provider === 'apple' && tokenData.idtoken) {
       tokenData.userInfo = await this.parseAppleIdToken(tokenData.idtoken);
     }
 
@@ -640,14 +637,14 @@ class OAuthService {
    * const assertion = await service.createAppleClientAssertion(appleConfig);
    */
   async createAppleClientAssertion(config) {
-    const fs = require("fs").promises;
+    const fs = require('fs').promises;
 
     try {
       // Read the private key file
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       const privateKey = await fs.readFile(
         process.env.APPLE_OAUTH_PRIVATE_KEY_PATH,
-        "utf8",
+        'utf8'
       );
 
       const now = Math.floor(Date.now() / 1000);
@@ -655,20 +652,20 @@ class OAuthService {
         iss: config.teamId,
         iat: now,
         exp: now + 3600, // 1 hour
-        aud: "https://appleid.apple.com",
+        aud: 'https://appleid.apple.com',
         sub: config.clientId,
       };
 
       return jwt.sign(payload, privateKey, {
-        algorithm: "ES256",
+        algorithm: 'ES256',
         header: {
-          alg: "ES256",
+          alg: 'ES256',
           kid: config.keyId,
         },
       });
     } catch (error) {
       throw new Error(
-        `Failed to create Apple client assertion: ${error.message}`,
+        `Failed to create Apple client assertion: ${error.message}`
       );
     }
   }
@@ -693,26 +690,26 @@ class OAuthService {
    */
   async getUserInfo(_provider, accessToken) {
     if (this.mockMode) {
-      return this.getMockUserInfo(_provider, "mock_code");
+      return this.getMockUserInfo(_provider, 'mock_code');
     }
 
     const config = this.providers[provider]; // eslint-disable-line no-undef
     if (!config) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        `Unsupported provider: ${_provider}`,
+        `Unsupported provider: ${_provider}`
       );
     }
 
     try {
       let userInfo;
 
-      if (_provider === "google") {
+      if (_provider === 'google') {
         const response = await fetch(
-          "https://www.googleapis.com/oauth2/v2/userinfo",
+          'https://www.googleapis.com/oauth2/v2/userinfo',
           {
             headers: { Authorization: `Bearer ${accessToken}` },
-          },
+          }
         );
 
         if (!response.ok) {
@@ -720,19 +717,19 @@ class OAuthService {
         }
 
         userInfo = await response.json();
-      } else if (_provider === "microsoft") {
+      } else if (_provider === 'microsoft') {
         // Use specialized Microsoft method for directory information
         userInfo = await this.getMicrosoftUserProfile(accessToken);
-      } else if (_provider === "apple") {
+      } else if (_provider === 'apple') {
         // Apple returns user info in the ID token JWT
         // Access token is used for Apple's API but user info comes from ID token
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Apple user info should be extracted from ID token during token exchange",
+          'Apple user info should be extracted from ID token during token exchange'
         );
       }
 
-      logger.logSecurityEvent("OAUTH_USER_INFO_RETRIEVED", null, {
+      logger.logSecurityEvent('OAUTH_USER_INFO_RETRIEVED', null, {
         provider, // eslint-disable-line no-undef
         userId: userInfo.id || userInfo.sub,
         email: this.maskEmail(userInfo.email),
@@ -743,7 +740,7 @@ class OAuthService {
       logger.error(`Error getting user info from ${_provider}:`, error);
       throw new Parse.Error(
         Parse.Error.OTHER_CAUSE,
-        `Failed to get user information from ${_provider}`,
+        `Failed to get user information from ${_provider}`
       );
     }
   }
@@ -770,24 +767,24 @@ class OAuthService {
       // Check if this is a corporate user first
       const corporateResult = await CorporateOAuthService.mapCorporateUser(
         userInfo,
-        _provider,
+        _provider
       );
 
       if (corporateResult.isCorporateUser) {
         // Corporate user handling - generate tokens for corporate user
         const tokens = await AuthenticationService.generateTokens(
-          corporateResult.user,
+          corporateResult.user
         );
 
         logger.logSecurityEvent(
-          "CORPORATE_OAUTH_LOGIN_SUCCESS",
+          'CORPORATE_OAUTH_LOGIN_SUCCESS',
           corporateResult.user.id,
           {
             provider, // eslint-disable-line no-undef
             clientId: corporateResult.client?.id,
-            clientName: corporateResult.client?.get("name"),
+            clientName: corporateResult.client?.get('name'),
             email: this.maskEmail(userInfo.email),
-          },
+          }
         );
 
         return {
@@ -798,14 +795,14 @@ class OAuthService {
           isCorporateUser: true,
           client: corporateResult.client
             ? {
-                id: corporateResult.client.id,
-                name: corporateResult.client.get("name"),
-                type: corporateResult.client.get("type"),
-              }
+              id: corporateResult.client.id,
+              name: corporateResult.client.get('name'),
+              type: corporateResult.client.get('type'),
+            }
             : null,
           message: corporateResult.user.existed()
-            ? "Corporate OAuth login successful"
-            : "Corporate OAuth account created and login successful",
+            ? 'Corporate OAuth login successful'
+            : 'Corporate OAuth account created and login successful',
         };
       }
 
@@ -833,7 +830,7 @@ class OAuthService {
           tokens,
           isNewUser: false,
           isCorporateUser: false,
-          message: "OAuth login successful",
+          message: 'OAuth login successful',
         };
       }
 
@@ -862,7 +859,7 @@ class OAuthService {
           isNewUser: false,
           isCorporateUser: false,
           linkedAccount: true,
-          message: "OAuth account linked and login successful",
+          message: 'OAuth account linked and login successful',
         };
       }
 
@@ -871,11 +868,11 @@ class OAuthService {
         username: this.generateUsernameFromEmail(userInfo.email),
         email: userInfo.email,
         firstName:
-          userInfo.given_name || userInfo.name?.split(" ")[0] || "User",
+          userInfo.given_name || userInfo.name?.split(' ')[0] || 'User',
         lastName:
-          userInfo.family_name ||
-          userInfo.name?.split(" ").slice(1).join(" ") ||
-          "",
+          userInfo.family_name
+          || userInfo.name?.split(' ').slice(1).join(' ')
+          || '',
         role: this.determineUserRole(userInfo),
         primaryOAuthProvider: provider, // eslint-disable-line no-undef
       });
@@ -891,7 +888,7 @@ class OAuthService {
 
       // Set email as verified if provider confirms it
       if (userInfo.verifiedemail || userInfo.email_verified) {
-        user.set("emailVerified", true);
+        user.set('emailVerified', true);
       }
 
       const savedUser = await user.save(null, { useMasterKey: true });
@@ -904,10 +901,10 @@ class OAuthService {
         user: savedUser.toSafeJSON(),
         tokens,
         isNewUser: true,
-        message: "Account created and OAuth login successful",
+        message: 'Account created and OAuth login successful',
       };
     } catch (error) {
-      logger.error("Find or create OAuth user error:", error);
+      logger.error('Find or create OAuth user error:', error);
       throw error;
     }
   }
@@ -931,7 +928,7 @@ class OAuthService {
    */
   async findUserByOAuth(_provider, providerId) {
     const query = new Parse.Query(AmexingUser);
-    query.contains("oauthAccounts", {
+    query.contains('oauthAccounts', {
       provider, // eslint-disable-line no-undef
       providerId,
     });
@@ -957,8 +954,8 @@ class OAuthService {
    * const username = service.generateUsernameFromEmail('user@example.com');
    */
   generateUsernameFromEmail(email) {
-    const localPart = email.split("@")[0];
-    const sanitized = localPart.replace(/[^a-zA-Z0-9]/g, "");
+    const localPart = email.split('@')[0];
+    const sanitized = localPart.replace(/[^a-zA-Z0-9]/g, '');
     const random = Math.random().toString(36).substring(2, 6);
     return `${sanitized}_${random}`.substring(0, 20);
   }
@@ -981,21 +978,21 @@ class OAuthService {
   determineUserRole(userInfo) {
     // Corporate domains get different default roles
     if (userInfo.email) {
-      const _domain = userInfo.email.split("@")[1]; // eslint-disable-line no-underscore-dangle
+      const _domain = userInfo.email.split('@')[1]; // eslint-disable-line no-underscore-dangle
 
       // Educational institutions
-      if (_domain === "utq.edu.mx") {
-        return "employee";
+      if (_domain === 'utq.edu.mx') {
+        return 'employee';
       }
 
       // Corporate clients
-      if (_domain === "nuba.com.mx") {
-        return "client";
+      if (_domain === 'nuba.com.mx') {
+        return 'client';
       }
     }
 
     // Default role for individuals
-    return "user";
+    return 'user';
   }
 
   /**
@@ -1083,8 +1080,8 @@ class OAuthService {
    * const masked = service.maskEmail('user@example.com'); // Returns 'use***@example.com'
    */
   maskEmail(email) {
-    if (!email) return "";
-    const [local, domain] = email.split("@");
+    if (!email) return '';
+    const [local, domain] = email.split('@');
     return `${local.substring(0, 3)}***@${domain}`;
   }
 
@@ -1100,17 +1097,17 @@ class OAuthService {
    */
   async getApplePublicKey(idToken) {
     try {
-      const https = require("https");
+      const https = require('https');
 
       // Extract key ID from JWT header without full decode
-      const headerB64 = idToken.split(".")[0];
+      const headerB64 = idToken.split('.')[0];
       if (!headerB64) {
-        throw new Error("Invalid JWT format - missing header");
+        throw new Error('Invalid JWT format - missing header');
       }
 
-      const header = JSON.parse(Buffer.from(headerB64, "base64").toString());
+      const header = JSON.parse(Buffer.from(headerB64, 'base64').toString());
       if (!header.kid) {
-        throw new Error("Unable to get key ID from token header");
+        throw new Error('Unable to get key ID from token header');
       }
 
       const keyId = header.kid;
@@ -1118,12 +1115,12 @@ class OAuthService {
       // Fetch Apple's public keys
       return new Promise((resolve, reject) => {
         https
-          .get("https://appleid.apple.com/auth/keys", (res) => {
-            let data = "";
-            res.on("data", (chunk) => {
+          .get('https://appleid.apple.com/auth/keys', (res) => {
+            let data = '';
+            res.on('data', (chunk) => {
               data += chunk;
             });
-            res.on("end", () => {
+            res.on('end', () => {
               try {
                 const _keys = JSON.parse(data); // eslint-disable-line no-underscore-dangle
                 const key = _keys.keys.find((k) => k.kid === keyId);
@@ -1133,28 +1130,28 @@ class OAuthService {
                 }
 
                 // Convert JWK to PEM format using crypto
-                const nodeCrypto = require("crypto");
+                const nodeCrypto = require('crypto');
                 const keyObject = nodeCrypto.createPublicKey({
                   key,
-                  format: "jwk",
+                  format: 'jwk',
                 });
                 const publicKey = keyObject.export({
-                  type: "spki",
-                  format: "pem",
+                  type: 'spki',
+                  format: 'pem',
                 });
                 resolve(publicKey);
               } catch (error) {
                 reject(
                   new Error(
-                    `Failed to parse Apple public keys: ${error.message}`,
-                  ),
+                    `Failed to parse Apple public keys: ${error.message}`
+                  )
                 );
               }
             });
           })
-          .on("error", (error) => {
+          .on('error', (error) => {
             reject(
-              new Error(`Failed to fetch Apple public keys: ${error.message}`),
+              new Error(`Failed to fetch Apple public keys: ${error.message}`)
             );
           });
       });
@@ -1182,16 +1179,16 @@ class OAuthService {
   async parseAppleIdToken(idToken) {
     try {
       // Apple ID tokens are JWTs that contain user information
-      const jwtLib = require("jsonwebtoken");
+      const jwtLib = require('jsonwebtoken');
 
       // Get Apple's public key for verification
       const publicKey = await this.getApplePublicKey(idToken);
 
       // Verify JWT signature and validate claims
       const payload = jwtLib.verify(idToken, publicKey, {
-        issuer: "https://appleid.apple.com",
+        issuer: 'https://appleid.apple.com',
         audience: process.env.APPLE_CLIENT_ID,
-        algorithms: ["RS256"],
+        algorithms: ['RS256'],
       });
 
       // Extract user information from token payload
@@ -1200,7 +1197,7 @@ class OAuthService {
         email: payload.email,
         email_verified: payload.email_verified,
         name: payload.name
-          ? `${payload.name.firstName || ""} ${payload.name.lastName || ""}`.trim()
+          ? `${payload.name.firstName || ''} ${payload.name.lastName || ''}`.trim()
           : null,
         given_name: payload.name?.firstName,
         family_name: payload.name?.lastName,
@@ -1212,7 +1209,7 @@ class OAuthService {
 
       // Additional validation is performed by jwt.verify() above
 
-      logger.logSecurityEvent("APPLE_ID_TOKEN_PARSED", null, {
+      logger.logSecurityEvent('APPLE_ID_TOKEN_PARSED', null, {
         userId: userInfo.sub,
         email: this.maskEmail(userInfo.email),
         emailVerified: userInfo.email_verified,
@@ -1221,10 +1218,10 @@ class OAuthService {
 
       return userInfo;
     } catch (error) {
-      logger.error("Error parsing Apple ID token:", error);
+      logger.error('Error parsing Apple ID token:', error);
       throw new Parse.Error(
         Parse.Error.OTHER_CAUSE,
-        `Failed to parse Apple ID token: ${error.message}`,
+        `Failed to parse Apple ID token: ${error.message}`
       );
     }
   }
@@ -1247,26 +1244,26 @@ class OAuthService {
    */
   async validateMicrosoftToken(accessToken) {
     try {
-      const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || "common";
+      const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || 'common';
 
       // Validate token by calling Microsoft Graph API
-      const response = await fetch("https://graph.microsoft.com/v1.0/me", {
-        method: "GET",
+      const response = await fetch('https://graph.microsoft.com/v1.0/me', {
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
       });
 
       if (!response.ok) {
         throw new Error(
-          `Microsoft token validation failed: ${response.status}`,
+          `Microsoft token validation failed: ${response.status}`
         );
       }
 
       const userData = await response.json();
 
-      logger.logSecurityEvent("MICROSOFT_TOKEN_VALIDATED", null, {
+      logger.logSecurityEvent('MICROSOFT_TOKEN_VALIDATED', null, {
         userId: userData.id,
         displayName: userData.displayName,
         tenantId: userData.mailboxSettings?.timeZone || tenantId,
@@ -1278,10 +1275,10 @@ class OAuthService {
         tenantId,
       };
     } catch (error) {
-      logger.error("Microsoft token validation error:", error);
+      logger.error('Microsoft token validation error:', error);
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "Microsoft token validation failed",
+        'Microsoft token validation failed'
       );
     }
   }
@@ -1306,15 +1303,15 @@ class OAuthService {
     try {
       // Get basic profile
       const profileResponse = await fetch(
-        "https://graph.microsoft.com/v1.0/me",
+        'https://graph.microsoft.com/v1.0/me',
         {
           headers: { Authorization: `Bearer ${accessToken}` },
-        },
+        }
       );
 
       if (!profileResponse.ok) {
         throw new Error(
-          `Failed to get Microsoft profile: ${profileResponse.status}`,
+          `Failed to get Microsoft profile: ${profileResponse.status}`
         );
       }
 
@@ -1323,10 +1320,10 @@ class OAuthService {
       // Try to get additional directory information if permissions allow
       try {
         const directoryResponse = await fetch(
-          "https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation",
+          'https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation',
           {
             headers: { Authorization: `Bearer ${accessToken}` },
-          },
+          }
         );
 
         if (directoryResponse.ok) {
@@ -1343,14 +1340,14 @@ class OAuthService {
         }
       } catch (directoryError) {
         logger.info(
-          "Directory information not available, using basic profile:",
-          directoryError.message,
+          'Directory information not available, using basic profile:',
+          directoryError.message
         );
       }
 
       return profile;
     } catch (error) {
-      logger.error("Error getting Microsoft user profile:", error);
+      logger.error('Error getting Microsoft user profile:', error);
       throw error;
     }
   }
@@ -1371,8 +1368,8 @@ class OAuthService {
    */
   getAvailableProviders() {
     return Object.keys(this.providers).filter(
-      (_provider) => this.providers[provider].enabled || this.mockMode,
-    ); // eslint-disable-line no-undef
+      (providerKey) => this.providers[providerKey].enabled || this.mockMode
+    );
   }
 
   /**
@@ -1444,12 +1441,11 @@ class OAuthService {
    */
   getCorporateDomainConfig(email) {
     const _domain = CorporateOAuthService.extractEmailDomain(email); // eslint-disable-line no-underscore-dangle
-    const corporateDomains =
-      CorporateOAuthService.getAvailableCorporateDomains();
+    const corporateDomains = CorporateOAuthService.getAvailableCorporateDomains();
 
     return (
-      corporateDomains.find((config) => config._domain === _domain) || null
-    ); // eslint-disable-line no-underscore-dangle
+      corporateDomains.find((config) => config.domain === _domain) || null
+    );
   }
 
   /**

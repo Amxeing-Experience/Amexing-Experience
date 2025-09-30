@@ -1,11 +1,11 @@
-const RoleBasedController = require("./base/RoleBasedController");
+const RoleBasedController = require('./base/RoleBasedController');
 
 /**
  * AdminController - Implements admin-specific dashboard functionality.
  */
 class AdminController extends RoleBasedController {
   constructor() {
-    super("admin");
+    super('admin');
   }
 
   /**
@@ -28,8 +28,8 @@ class AdminController extends RoleBasedController {
       const stats = await this.getOperationalStats();
       const recentBookings = await this.getRecentBookings();
 
-      await this.renderRoleView(req, res, "index", {
-        title: "Admin Dashboard",
+      await this.renderRoleView(req, res, 'index', {
+        title: 'Admin Dashboard',
         stats,
         recentBookings,
         breadcrumb: null,
@@ -56,12 +56,12 @@ class AdminController extends RoleBasedController {
    */
   async clients(req, res) {
     try {
-      await this.renderRoleView(req, res, "clients", {
-        title: "Client Management",
+      await this.renderRoleView(req, res, 'clients', {
+        title: 'Client Management',
         clients: [],
         breadcrumb: {
-          title: "Clients",
-          items: [{ name: "Clients", active: true }],
+          title: 'Clients',
+          items: [{ name: 'Clients', active: true }],
         },
       });
     } catch (error) {
@@ -86,12 +86,12 @@ class AdminController extends RoleBasedController {
    */
   async departments(req, res) {
     try {
-      await this.renderRoleView(req, res, "departments", {
-        title: "Department Management",
+      await this.renderRoleView(req, res, 'departments', {
+        title: 'Department Management',
         departments: [],
         breadcrumb: {
-          title: "Departments",
-          items: [{ name: "Departments", active: true }],
+          title: 'Departments',
+          items: [{ name: 'Departments', active: true }],
         },
       });
     } catch (error) {
@@ -116,12 +116,12 @@ class AdminController extends RoleBasedController {
    */
   async employees(req, res) {
     try {
-      await this.renderRoleView(req, res, "employees", {
-        title: "Employee Management",
+      await this.renderRoleView(req, res, 'employees', {
+        title: 'Employee Management',
         employees: [],
         breadcrumb: {
-          title: "Employees",
-          items: [{ name: "Employees", active: true }],
+          title: 'Employees',
+          items: [{ name: 'Employees', active: true }],
         },
       });
     } catch (error) {
@@ -146,12 +146,12 @@ class AdminController extends RoleBasedController {
    */
   async drivers(req, res) {
     try {
-      await this.renderRoleView(req, res, "drivers", {
-        title: "Driver Management",
+      await this.renderRoleView(req, res, 'drivers', {
+        title: 'Driver Management',
         drivers: [],
         breadcrumb: {
-          title: "Drivers",
-          items: [{ name: "Drivers", active: true }],
+          title: 'Drivers',
+          items: [{ name: 'Drivers', active: true }],
         },
       });
     } catch (error) {
@@ -176,12 +176,12 @@ class AdminController extends RoleBasedController {
    */
   async bookings(req, res) {
     try {
-      await this.renderRoleView(req, res, "bookings", {
-        title: "Booking Management",
+      await this.renderRoleView(req, res, 'bookings', {
+        title: 'Booking Management',
         bookings: [],
         breadcrumb: {
-          title: "Bookings",
-          items: [{ name: "Bookings", active: true }],
+          title: 'Bookings',
+          items: [{ name: 'Bookings', active: true }],
         },
       });
     } catch (error) {
@@ -206,12 +206,12 @@ class AdminController extends RoleBasedController {
    */
   async fleet(req, res) {
     try {
-      await this.renderRoleView(req, res, "fleet", {
-        title: "Fleet Management",
+      await this.renderRoleView(req, res, 'fleet', {
+        title: 'Fleet Management',
         vehicles: [],
         breadcrumb: {
-          title: "Fleet",
-          items: [{ name: "Fleet", active: true }],
+          title: 'Fleet',
+          items: [{ name: 'Fleet', active: true }],
         },
       });
     } catch (error) {
@@ -236,12 +236,12 @@ class AdminController extends RoleBasedController {
    */
   async routes(req, res) {
     try {
-      await this.renderRoleView(req, res, "routes", {
-        title: "Routes & Zones",
+      await this.renderRoleView(req, res, 'routes', {
+        title: 'Routes & Zones',
         routes: [],
         breadcrumb: {
-          title: "Routes & Zones",
-          items: [{ name: "Routes", active: true }],
+          title: 'Routes & Zones',
+          items: [{ name: 'Routes', active: true }],
         },
       });
     } catch (error) {
@@ -266,12 +266,12 @@ class AdminController extends RoleBasedController {
    */
   async billing(req, res) {
     try {
-      await this.renderRoleView(req, res, "billing", {
-        title: "Billing Management",
+      await this.renderRoleView(req, res, 'billing', {
+        title: 'Billing Management',
         invoices: [],
         breadcrumb: {
-          title: "Billing",
-          items: [{ name: "Billing", active: true }],
+          title: 'Billing',
+          items: [{ name: 'Billing', active: true }],
         },
       });
     } catch (error) {
@@ -296,12 +296,12 @@ class AdminController extends RoleBasedController {
    */
   async reports(req, res) {
     try {
-      await this.renderRoleView(req, res, "reports", {
-        title: "Operational Reports",
+      await this.renderRoleView(req, res, 'reports', {
+        title: 'Operational Reports',
         reports: [],
         breadcrumb: {
-          title: "Reports",
-          items: [{ name: "Reports", active: true }],
+          title: 'Reports',
+          items: [{ name: 'Reports', active: true }],
         },
       });
     } catch (error) {
@@ -326,12 +326,12 @@ class AdminController extends RoleBasedController {
    */
   async settings(req, res) {
     try {
-      await this.renderRoleView(req, res, "settings", {
-        title: "Admin Settings",
+      await this.renderRoleView(req, res, 'settings', {
+        title: 'Admin Settings',
         settings: {},
         breadcrumb: {
-          title: "Settings",
-          items: [{ name: "Settings", active: true }],
+          title: 'Settings',
+          items: [{ name: 'Settings', active: true }],
         },
       });
     } catch (error) {
@@ -356,12 +356,12 @@ class AdminController extends RoleBasedController {
    */
   async notifications(req, res) {
     try {
-      await this.renderRoleView(req, res, "notifications", {
-        title: "Notification Settings",
+      await this.renderRoleView(req, res, 'notifications', {
+        title: 'Notification Settings',
         notifications: [],
         breadcrumb: {
-          title: "Notifications",
-          items: [{ name: "Notifications", active: true }],
+          title: 'Notifications',
+          items: [{ name: 'Notifications', active: true }],
         },
       });
     } catch (error) {
@@ -391,7 +391,7 @@ class AdminController extends RoleBasedController {
       availableVehicles: 65,
       pendingApprovals: 8,
       monthlyRevenue: 125000,
-      completionRate: "94%",
+      completionRate: '94%',
     };
   }
 
@@ -411,18 +411,18 @@ class AdminController extends RoleBasedController {
   async getRecentBookings() {
     return [
       {
-        id: "BK001",
-        client: "Acme Corp",
+        id: 'BK001',
+        client: 'Acme Corp',
         date: new Date(),
-        status: "confirmed",
-        driver: "John Doe",
+        status: 'confirmed',
+        driver: 'John Doe',
       },
       {
-        id: "BK002",
-        client: "Tech Solutions",
+        id: 'BK002',
+        client: 'Tech Solutions',
         date: new Date(),
-        status: "pending",
-        driver: "Pending Assignment",
+        status: 'pending',
+        driver: 'Pending Assignment',
       },
     ];
   }

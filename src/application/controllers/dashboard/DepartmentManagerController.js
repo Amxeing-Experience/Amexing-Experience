@@ -1,17 +1,17 @@
-const RoleBasedController = require("./base/RoleBasedController");
+const RoleBasedController = require('./base/RoleBasedController');
 
 /**
  * DepartmentManagerController - Implements department manager dashboard functionality.
  */
 class DepartmentManagerController extends RoleBasedController {
   constructor() {
-    super("department_manager");
+    super('department_manager');
   }
 
   async index(req, res) {
     try {
-      await this.renderRoleView(req, res, "index", {
-        title: "Department Manager Dashboard",
+      await this.renderRoleView(req, res, 'index', {
+        title: 'Department Manager Dashboard',
         stats: await this.getDepartmentStats(),
         breadcrumb: null,
       });
@@ -22,12 +22,12 @@ class DepartmentManagerController extends RoleBasedController {
 
   async team(req, res) {
     try {
-      await this.renderRoleView(req, res, "team", {
-        title: "Team Management",
+      await this.renderRoleView(req, res, 'team', {
+        title: 'Team Management',
         team: [],
         breadcrumb: {
-          title: "My Team",
-          items: [{ name: "Team", active: true }],
+          title: 'My Team',
+          items: [{ name: 'Team', active: true }],
         },
       });
     } catch (error) {
@@ -37,12 +37,12 @@ class DepartmentManagerController extends RoleBasedController {
 
   async budgets(req, res) {
     try {
-      await this.renderRoleView(req, res, "budgets", {
-        title: "Department Budget",
+      await this.renderRoleView(req, res, 'budgets', {
+        title: 'Department Budget',
         budget: {},
         breadcrumb: {
-          title: "Budget",
-          items: [{ name: "Budget", active: true }],
+          title: 'Budget',
+          items: [{ name: 'Budget', active: true }],
         },
       });
     } catch (error) {
@@ -52,12 +52,12 @@ class DepartmentManagerController extends RoleBasedController {
 
   async reports(req, res) {
     try {
-      await this.renderRoleView(req, res, "reports", {
-        title: "Department Reports",
+      await this.renderRoleView(req, res, 'reports', {
+        title: 'Department Reports',
         reports: [],
         breadcrumb: {
-          title: "Reports",
-          items: [{ name: "Reports", active: true }],
+          title: 'Reports',
+          items: [{ name: 'Reports', active: true }],
         },
       });
     } catch (error) {

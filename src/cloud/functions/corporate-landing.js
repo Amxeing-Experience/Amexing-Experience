@@ -10,10 +10,10 @@
  * // Returns: function result
  */
 
-const Parse = require("parse/node");
-const OAuthService = require("../../application/services/OAuthService");
-const CorporateOAuthService = require("../../application/services/CorporateOAuthService");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const OAuthService = require('../../application/services/OAuthService');
+const CorporateOAuthService = require('../../application/services/CorporateOAuthService');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Generates corporate landing page configuration
@@ -44,7 +44,7 @@ const getCorporateLandingConfig = async (request) => {
         suggestedProvider = _domainConfig.primaryProvider; // eslint-disable-line no-undef
         autoSSO = true;
 
-        logger.logSecurityEvent("CORPORATE_LANDING_EMAIL_DETECTED", null, {
+        logger.logSecurityEvent('CORPORATE_LANDING_EMAIL_DETECTED', null, {
           email: CorporateOAuthService.maskEmail(email),
           domain: CorporateOAuthService.extractEmailDomain(email),
           provider: suggestedProvider,
@@ -57,37 +57,36 @@ const getCorporateLandingConfig = async (request) => {
     let clientInfo = null;
     if (clientSlug) {
       try {
-        const clientQuery = new Parse.Query("Client");
-        clientQuery.equalTo("urlSlug", clientSlug);
-        clientQuery.equalTo("active", true);
+        const clientQuery = new Parse.Query('Client');
+        clientQuery.equalTo('urlSlug', clientSlug);
+        clientQuery.equalTo('active', true);
 
         const client = await clientQuery.first({ useMasterKey: true });
 
         if (client) {
           clientInfo = {
             id: client.id,
-            name: client.get("name"),
-            isCorporate: client.get("isCorporate") || false,
-            oauthEnabled: client.get("oauthEnabled") || false,
-            primaryOAuthProvider: client.get("primaryOAuthProvider"),
-            corporateDomain: client.get("corporateDomain"),
+            name: client.get('name'),
+            isCorporate: client.get('isCorporate') || false,
+            oauthEnabled: client.get('oauthEnabled') || false,
+            primaryOAuthProvider: client.get('primaryOAuthProvider'),
+            corporateDomain: client.get('corporateDomain'),
           };
 
           // If client has OAuth configured, set as corporate config
           if (clientInfo.oauthEnabled && clientInfo.corporateDomain) {
             const domainConfig = OAuthService.getCorporateDomainConfig(
-              `test@${clientInfo.corporateDomain}`,
+              `test@${clientInfo.corporateDomain}`
             );
             if (domainConfig) {
               corporateConfig = _domainConfig; // eslint-disable-line no-undef
-              suggestedProvider =
-                clientInfo.primaryOAuthProvider ||
-                _domainConfig.primaryProvider; // eslint-disable-line no-undef
+              suggestedProvider = clientInfo.primaryOAuthProvider
+                || _domainConfig.primaryProvider; // eslint-disable-line no-undef
             }
           }
         }
       } catch (error) {
-        logger.error("Error finding client by slug:", error);
+        logger.error('Error finding client by slug:', error);
       }
     }
 
@@ -116,17 +115,17 @@ const getCorporateLandingConfig = async (request) => {
     };
 
     // Log landing page access for security monitoring
-    logger.logSecurityEvent("CORPORATE_LANDING_ACCESSED", null, {
-      clientSlug: clientSlug || "none",
-      departmentCode: departmentCode || "none",
+    logger.logSecurityEvent('CORPORATE_LANDING_ACCESSED', null, {
+      clientSlug: clientSlug || 'none',
+      departmentCode: departmentCode || 'none',
       hasEmail: !!email,
       ssoEnabled: response.ssoEnabled,
-      suggestedProvider: suggestedProvider || "none",
+      suggestedProvider: suggestedProvider || 'none',
     });
 
     return response;
   } catch (error) {
-    logger.error("Error generating corporate landing config:", error);
+    logger.error('Error generating corporate landing config:', error);
     throw error;
   }
 };
@@ -147,11 +146,12 @@ const getCorporateLandingConfig = async (request) => {
  */
 const generateCorporateOAuthURL = async (request) => {
   try {
-    const { _provider, email, clientSlug, departmentCode, redirectUri } =
-      request.params;
+    const {
+      _provider, email, clientSlug, departmentCode, redirectUri,
+    } = request.params;
 
     if (!_provider) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, "Provider is required");
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Provider is required');
     }
 
     // Validate provider
@@ -159,7 +159,7 @@ const generateCorporateOAuthURL = async (request) => {
     if (!availableProviders.includes(_provider)) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        `Invalid _provider. Available: ${availableProviders.join(", ")}`,
+        `Invalid _provider. Available: ${availableProviders.join(', ')}`
       );
     }
 
@@ -176,7 +176,7 @@ const generateCorporateOAuthURL = async (request) => {
 
         // Warn if using different provider than configured
         if (domainConfig.primaryProvider !== _provider) {
-          logger.logSecurityEvent("CORPORATE_OAUTH_PROVIDER_MISMATCH", null, {
+          logger.logSecurityEvent('CORPORATE_OAUTH_PROVIDER_MISMATCH', null, {
             email: CorporateOAuthService.maskEmail(email),
             configuredProvider: domainConfig.primaryProvider,
             requestedProvider: provider, // eslint-disable-line no-undef
@@ -195,17 +195,17 @@ const generateCorporateOAuthURL = async (request) => {
 
     const authURL = await OAuthService.generateAuthorizationURL(
       _provider,
-      redirectUri ||
-        `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/${_provider}/callback`,
-      state,
+      redirectUri
+        || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/${_provider}/callback`,
+      state
     );
 
-    logger.logSecurityEvent("CORPORATE_OAUTH_URL_GENERATED", null, {
+    logger.logSecurityEvent('CORPORATE_OAUTH_URL_GENERATED', null, {
       provider, // eslint-disable-line no-undef
       hasEmail: !!email,
       hasCorporateInfo: !!corporateInfo,
-      clientSlug: clientSlug || "none",
-      departmentCode: departmentCode || "none",
+      clientSlug: clientSlug || 'none',
+      departmentCode: departmentCode || 'none',
     });
 
     return {
@@ -216,7 +216,7 @@ const generateCorporateOAuthURL = async (request) => {
       state,
     };
   } catch (error) {
-    logger.error("Error generating corporate OAuth URL:", error);
+    logger.error('Error generating corporate OAuth URL:', error);
     throw error;
   }
 };
@@ -243,19 +243,19 @@ const validateCorporateLandingAccess = async (request) => {
     if (!clientSlug) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Client slug is required",
+        'Client slug is required'
       );
     }
 
     // Find client
-    const clientQuery = new Parse.Query("Client");
-    clientQuery.equalTo("urlSlug", clientSlug);
-    clientQuery.equalTo("active", true);
+    const clientQuery = new Parse.Query('Client');
+    clientQuery.equalTo('urlSlug', clientSlug);
+    clientQuery.equalTo('active', true);
 
     const client = await clientQuery.first({ useMasterKey: true });
 
     if (!client) {
-      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Client not found");
+      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Client not found');
     }
 
     let accessGranted = true;
@@ -263,14 +263,14 @@ const validateCorporateLandingAccess = async (request) => {
     let ssoProvider = null;
 
     // Check if this is a corporate client with SSO requirements
-    if (client.get("isCorporate") && client.get("oauthEnabled")) {
+    if (client.get('isCorporate') && client.get('oauthEnabled')) {
       requiresSSO = true;
-      ssoProvider = client.get("primaryOAuthProvider");
+      ssoProvider = client.get('primaryOAuthProvider');
 
       // If email is provided and matches corporate domain, allow access
-      if (email && client.get("corporateDomain")) {
+      if (email && client.get('corporateDomain')) {
         const emailDomain = CorporateOAuthService.extractEmailDomain(email);
-        if (emailDomain !== client.get("corporateDomain")) {
+        if (emailDomain !== client.get('corporateDomain')) {
           accessGranted = false;
         }
       }
@@ -278,42 +278,42 @@ const validateCorporateLandingAccess = async (request) => {
 
     // Check department access if specified
     let departmentInfo = null;
-    if (departmentCode && client.get("isCorporate")) {
+    if (departmentCode && client.get('isCorporate')) {
       try {
-        const deptQuery = new Parse.Query("ClientDepartment");
-        deptQuery.equalTo("clientId", client.id);
-        deptQuery.equalTo("departmentCode", departmentCode);
-        deptQuery.equalTo("active", true);
+        const deptQuery = new Parse.Query('ClientDepartment');
+        deptQuery.equalTo('clientId', client.id);
+        deptQuery.equalTo('departmentCode', departmentCode);
+        deptQuery.equalTo('active', true);
 
         const department = await deptQuery.first({ useMasterKey: true });
 
         if (department) {
           departmentInfo = {
             id: department.id,
-            name: department.get("name"),
-            code: department.get("departmentCode"),
-            requiresApproval: department.get("requiresApproval") || false,
+            name: department.get('name'),
+            code: department.get('departmentCode'),
+            requiresApproval: department.get('requiresApproval') || false,
           };
         } else {
           // Department not found, but don't block access
-          logger.logSecurityEvent("DEPARTMENT_NOT_FOUND", null, {
+          logger.logSecurityEvent('DEPARTMENT_NOT_FOUND', null, {
             clientSlug,
             departmentCode,
             clientId: client.id,
           });
         }
       } catch (error) {
-        logger.error("Error finding department:", error);
+        logger.error('Error finding department:', error);
       }
     }
 
-    logger.logSecurityEvent("CORPORATE_LANDING_ACCESS_VALIDATED", null, {
+    logger.logSecurityEvent('CORPORATE_LANDING_ACCESS_VALIDATED', null, {
       clientSlug,
-      departmentCode: departmentCode || "none",
+      departmentCode: departmentCode || 'none',
       hasEmail: !!email,
       accessGranted,
       requiresSSO,
-      ssoProvider: ssoProvider || "none",
+      ssoProvider: ssoProvider || 'none',
     });
 
     return {
@@ -323,17 +323,17 @@ const validateCorporateLandingAccess = async (request) => {
       ssoProvider,
       client: {
         id: client.id,
-        name: client.get("name"),
-        isCorporate: client.get("isCorporate"),
-        corporateDomain: client.get("corporateDomain"),
+        name: client.get('name'),
+        isCorporate: client.get('isCorporate'),
+        corporateDomain: client.get('corporateDomain'),
       },
       departmentInfo,
       message: accessGranted
-        ? "Access granted to corporate landing page"
-        : "Access restricted - SSO required",
+        ? 'Access granted to corporate landing page'
+        : 'Access restricted - SSO required',
     };
   } catch (error) {
-    logger.error("Error validating corporate landing access:", error);
+    logger.error('Error validating corporate landing access:', error);
     throw error;
   }
 };
@@ -358,49 +358,49 @@ const getCorporateClientDepartments = async (request) => {
     if (!clientSlug) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Client slug is required",
+        'Client slug is required'
       );
     }
 
     // Find client
-    const clientQuery = new Parse.Query("Client");
-    clientQuery.equalTo("urlSlug", clientSlug);
-    clientQuery.equalTo("active", true);
+    const clientQuery = new Parse.Query('Client');
+    clientQuery.equalTo('urlSlug', clientSlug);
+    clientQuery.equalTo('active', true);
 
     const client = await clientQuery.first({ useMasterKey: true });
 
     if (!client) {
-      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, "Client not found");
+      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Client not found');
     }
 
     // Only return departments for corporate clients
-    if (!client.get("isCorporate")) {
+    if (!client.get('isCorporate')) {
       return {
         success: true,
         departments: [],
-        message: "Client is not configured as corporate",
+        message: 'Client is not configured as corporate',
       };
     }
 
     // Get client departments
-    const deptQuery = new Parse.Query("ClientDepartment");
-    deptQuery.equalTo("clientId", client.id);
-    deptQuery.equalTo("active", true);
-    deptQuery.ascending("name");
+    const deptQuery = new Parse.Query('ClientDepartment');
+    deptQuery.equalTo('clientId', client.id);
+    deptQuery.equalTo('active', true);
+    deptQuery.ascending('name');
 
     const departments = await deptQuery.find({ useMasterKey: true });
 
     const departmentList = departments.map((dept) => ({
       id: dept.id,
-      name: dept.get("name"),
-      code: dept.get("departmentCode"),
-      description: dept.get("description"),
-      requiresApproval: dept.get("requiresApproval") || false,
-      color: dept.get("color") || "#007bff",
-      icon: dept.get("icon") || "department",
+      name: dept.get('name'),
+      code: dept.get('departmentCode'),
+      description: dept.get('description'),
+      requiresApproval: dept.get('requiresApproval') || false,
+      color: dept.get('color') || '#007bff',
+      icon: dept.get('icon') || 'department',
     }));
 
-    logger.logSecurityEvent("CORPORATE_DEPARTMENTS_RETRIEVED", null, {
+    logger.logSecurityEvent('CORPORATE_DEPARTMENTS_RETRIEVED', null, {
       clientSlug,
       clientId: client.id,
       departmentCount: departmentList.length,
@@ -410,14 +410,14 @@ const getCorporateClientDepartments = async (request) => {
       success: true,
       client: {
         id: client.id,
-        name: client.get("name"),
+        name: client.get('name'),
         isCorporate: true,
       },
       departments: departmentList,
       count: departmentList.length,
     };
   } catch (error) {
-    logger.error("Error getting corporate client departments:", error);
+    logger.error('Error getting corporate client departments:', error);
     throw error;
   }
 };

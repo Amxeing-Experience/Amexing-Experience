@@ -18,8 +18,8 @@
  * // Returns: model operation result
  */
 
-const BaseModel = require("./BaseModel");
-const logger = require("../../infrastructure/logger");
+const BaseModel = require('./BaseModel');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Department class representing organizational units within client companies.
@@ -27,7 +27,7 @@ const logger = require("../../infrastructure/logger");
  */
 class Department extends BaseModel {
   constructor() {
-    super("Department");
+    super('Department');
   }
 
   /**
@@ -46,21 +46,21 @@ class Department extends BaseModel {
     const department = new Department();
 
     // Core business fields
-    department.set("name", departmentData.name);
-    department.set("description", departmentData.description || "");
-    department.set("managerId", departmentData.managerId || null);
-    department.set("clientId", departmentData.clientId);
+    department.set('name', departmentData.name);
+    department.set('description', departmentData.description || '');
+    department.set('managerId', departmentData.managerId || null);
+    department.set('clientId', departmentData.clientId);
 
     // Budget and cost management
-    department.set("budget", departmentData.budget || 0);
-    department.set("costCenter", departmentData.costCenter || null);
+    department.set('budget', departmentData.budget || 0);
+    department.set('costCenter', departmentData.costCenter || null);
 
     // Lifecycle fields are set by BaseModel constructor
     // active: true, exists: true are defaults
 
     // Audit fields
-    department.set("createdBy", departmentData.createdBy || null);
-    department.set("modifiedBy", departmentData.modifiedBy || null);
+    department.set('createdBy', departmentData.createdBy || null);
+    department.set('modifiedBy', departmentData.modifiedBy || null);
 
     return department;
   }
@@ -79,19 +79,19 @@ class Department extends BaseModel {
    */
   async getManager() {
     try {
-      if (!this.get("managerId")) {
+      if (!this.get('managerId')) {
         return null;
       }
 
-      const AmexingUser = require("./AmexingUser");
-      const query = BaseModel.queryActive("AmexingUser");
-      query.equalTo("objectId", this.get("managerId"));
+      const AmexingUser = require('./AmexingUser');
+      const query = BaseModel.queryActive('AmexingUser');
+      query.equalTo('objectId', this.get('managerId'));
 
       return await query.first({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching department manager", {
+      logger.error('Error fetching department manager', {
         departmentId: this.id,
-        managerId: this.get("managerId"),
+        managerId: this.get('managerId'),
         error: error.message,
       });
       return null;
@@ -115,34 +115,34 @@ class Department extends BaseModel {
     try {
       const { includeManager = true, role = null, active = true } = options;
 
-      const AmexingUser = require("./AmexingUser");
+      const AmexingUser = require('./AmexingUser');
       let query;
 
       if (active) {
-        query = BaseModel.queryActive("AmexingUser");
+        query = BaseModel.queryActive('AmexingUser');
       } else {
-        query = BaseModel.queryExisting("AmexingUser");
+        query = BaseModel.queryExisting('AmexingUser');
       }
 
-      query.equalTo("departmentId", this.id);
+      query.equalTo('departmentId', this.id);
 
       // Filter by role if specified
       if (role) {
-        query.equalTo("role", role);
+        query.equalTo('role', role);
       } else {
         // Include both employees and department managers
         const allowedRoles = includeManager
-          ? ["employee", "department_manager"]
-          : ["employee"];
-        query.containedIn("role", allowedRoles);
+          ? ['employee', 'department_manager']
+          : ['employee'];
+        query.containedIn('role', allowedRoles);
       }
 
-      query.addOrder("lastName", "ascending");
-      query.addOrder("firstName", "ascending");
+      query.addOrder('lastName', 'ascending');
+      query.addOrder('firstName', 'ascending');
 
       return await query.find({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching department employees", {
+      logger.error('Error fetching department employees', {
         departmentId: this.id,
         options,
         error: error.message,
@@ -165,19 +165,19 @@ class Department extends BaseModel {
    */
   async getClient() {
     try {
-      if (!this.get("clientId")) {
+      if (!this.get('clientId')) {
         return null;
       }
 
-      const Client = require("./Client");
-      const query = BaseModel.queryActive("Client");
-      query.equalTo("objectId", this.get("clientId"));
+      const Client = require('./Client');
+      const query = BaseModel.queryActive('Client');
+      query.equalTo('objectId', this.get('clientId'));
 
       return await query.first({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching department client", {
+      logger.error('Error fetching department client', {
         departmentId: this.id,
-        clientId: this.get("clientId"),
+        clientId: this.get('clientId'),
         error: error.message,
       });
       return null;
@@ -203,7 +203,7 @@ class Department extends BaseModel {
         this.getBudgetUsed(),
       ]);
 
-      const budget = this.get("budget") || 0;
+      const budget = this.get('budget') || 0;
       const budgetRemaining = budget - budgetUsed;
       const budgetUtilization = budget > 0 ? (budgetUsed / budget) * 100 : 0;
 
@@ -214,27 +214,27 @@ class Department extends BaseModel {
         budgetUsed,
         budgetRemaining,
         budgetUtilization: Math.round(budgetUtilization * 100) / 100,
-        isActive: this.get("active"),
+        isActive: this.get('active'),
         manager: await this.getManager(),
-        createdAt: this.get("createdAt"),
-        lastModified: this.get("updatedAt"),
+        createdAt: this.get('createdAt'),
+        lastModified: this.get('updatedAt'),
       };
     } catch (error) {
-      logger.error("Error fetching department statistics", {
+      logger.error('Error fetching department statistics', {
         departmentId: this.id,
         error: error.message,
       });
       return {
         employeeCount: 0,
         activeOrderCount: 0,
-        budget: this.get("budget") || 0,
+        budget: this.get('budget') || 0,
         budgetUsed: 0,
-        budgetRemaining: this.get("budget") || 0,
+        budgetRemaining: this.get('budget') || 0,
         budgetUtilization: 0,
-        isActive: this.get("active"),
+        isActive: this.get('active'),
         manager: null,
-        createdAt: this.get("createdAt"),
-        lastModified: this.get("updatedAt"),
+        createdAt: this.get('createdAt'),
+        lastModified: this.get('updatedAt'),
       };
     }
   }
@@ -252,9 +252,9 @@ class Department extends BaseModel {
    */
   async getEmployeeCount() {
     try {
-      const query = BaseModel.queryActive("AmexingUser");
-      query.equalTo("departmentId", this.id);
-      query.containedIn("role", ["employee", "department_manager"]);
+      const query = BaseModel.queryActive('AmexingUser');
+      query.equalTo('departmentId', this.id);
+      query.containedIn('role', ['employee', 'department_manager']);
       return await query.count({ useMasterKey: true });
     } catch (error) {
       return 0;
@@ -274,9 +274,9 @@ class Department extends BaseModel {
    */
   async getActiveOrderCount() {
     try {
-      const query = BaseModel.queryActive("Order");
-      query.equalTo("departmentId", this.id);
-      query.containedIn("status", ["pending", "confirmed", "in_progress"]);
+      const query = BaseModel.queryActive('Order');
+      query.equalTo('departmentId', this.id);
+      query.containedIn('status', ['pending', 'confirmed', 'in_progress']);
       return await query.count({ useMasterKey: true });
     } catch (error) {
       return 0;
@@ -298,17 +298,17 @@ class Department extends BaseModel {
     try {
       // This would typically aggregate from Order costs
       // For now, return 0 - implement based on Order model structure
-      const query = BaseModel.queryActive("Order");
-      query.equalTo("departmentId", this.id);
-      query.select("cost");
+      const query = BaseModel.queryActive('Order');
+      query.equalTo('departmentId', this.id);
+      query.select('cost');
 
       const orders = await query.find({ useMasterKey: true });
       return orders.reduce(
-        (total, order) => total + (order.get("cost") || 0),
-        0,
+        (total, order) => total + (order.get('cost') || 0),
+        0
       );
     } catch (error) {
-      logger.error("Error calculating budget used", {
+      logger.error('Error calculating budget used', {
         departmentId: this.id,
         error: error.message,
       });
@@ -331,45 +331,45 @@ class Department extends BaseModel {
   async assignManager(userId, assignedBy) {
     try {
       // Validate that the user exists and has appropriate role
-      const AmexingUser = require("./AmexingUser");
-      const userQuery = BaseModel.queryActive("AmexingUser");
-      userQuery.equalTo("objectId", userId);
+      const AmexingUser = require('./AmexingUser');
+      const userQuery = BaseModel.queryActive('AmexingUser');
+      userQuery.equalTo('objectId', userId);
       const user = await userQuery.first({ useMasterKey: true });
 
       if (!user) {
-        throw new Error("User not found or not active");
+        throw new Error('User not found or not active');
       }
 
       // Check if user can be a department manager
-      const allowedRoles = ["department_manager", "admin", "client"];
-      if (!allowedRoles.includes(user.get("role"))) {
-        throw new Error("User role not eligible for department management");
+      const allowedRoles = ['department_manager', 'admin', 'client'];
+      if (!allowedRoles.includes(user.get('role'))) {
+        throw new Error('User role not eligible for department management');
       }
 
       // Update user role to department_manager if they're an employee
-      if (user.get("role") === "employee") {
-        user.set("role", "department_manager");
-        user.set("modifiedBy", assignedBy);
+      if (user.get('role') === 'employee') {
+        user.set('role', 'department_manager');
+        user.set('modifiedBy', assignedBy);
         await user.save(null, { useMasterKey: true });
       }
 
       // Assign user as department manager
-      this.set("managerId", userId);
-      this.set("modifiedBy", assignedBy);
-      this.set("updatedAt", new Date());
+      this.set('managerId', userId);
+      this.set('modifiedBy', assignedBy);
+      this.set('updatedAt', new Date());
 
       await this.save(null, { useMasterKey: true });
 
-      logger.info("Department manager assigned", {
+      logger.info('Department manager assigned', {
         departmentId: this.id,
         managerId: userId,
         assignedBy,
-        managerEmail: user.get("email"),
+        managerEmail: user.get('email'),
       });
 
       return true;
     } catch (error) {
-      logger.error("Error assigning department manager", {
+      logger.error('Error assigning department manager', {
         departmentId: this.id,
         userId,
         assignedBy,
@@ -394,7 +394,7 @@ class Department extends BaseModel {
    */
   async removeManager(removedBy, demoteUser = false) {
     try {
-      const currentManagerId = this.get("managerId");
+      const currentManagerId = this.get('managerId');
 
       if (!currentManagerId) {
         return true; // No manager to remove
@@ -402,26 +402,26 @@ class Department extends BaseModel {
 
       if (demoteUser) {
         // Demote current manager to employee if requested
-        const AmexingUser = require("./AmexingUser");
-        const userQuery = BaseModel.queryActive("AmexingUser");
-        userQuery.equalTo("objectId", currentManagerId);
+        const AmexingUser = require('./AmexingUser');
+        const userQuery = BaseModel.queryActive('AmexingUser');
+        userQuery.equalTo('objectId', currentManagerId);
         const user = await userQuery.first({ useMasterKey: true });
 
-        if (user && user.get("role") === "department_manager") {
-          user.set("role", "employee");
-          user.set("modifiedBy", removedBy);
+        if (user && user.get('role') === 'department_manager') {
+          user.set('role', 'employee');
+          user.set('modifiedBy', removedBy);
           await user.save(null, { useMasterKey: true });
         }
       }
 
       // Remove manager from department
-      this.set("managerId", null);
-      this.set("modifiedBy", removedBy);
-      this.set("updatedAt", new Date());
+      this.set('managerId', null);
+      this.set('modifiedBy', removedBy);
+      this.set('updatedAt', new Date());
 
       await this.save(null, { useMasterKey: true });
 
-      logger.info("Department manager removed", {
+      logger.info('Department manager removed', {
         departmentId: this.id,
         formerManagerId: currentManagerId,
         removedBy,
@@ -430,7 +430,7 @@ class Department extends BaseModel {
 
       return true;
     } catch (error) {
-      logger.error("Error removing department manager", {
+      logger.error('Error removing department manager', {
         departmentId: this.id,
         removedBy,
         demoteUser,
@@ -454,17 +454,17 @@ class Department extends BaseModel {
    * // const result = await methodName(params);
    * // Returns appropriate result based on operation
    */
-  async updateBudget(newBudget, modifiedBy, reason = "") {
+  async updateBudget(newBudget, modifiedBy, reason = '') {
     try {
-      const oldBudget = this.get("budget") || 0;
+      const oldBudget = this.get('budget') || 0;
 
-      this.set("budget", newBudget);
-      this.set("modifiedBy", modifiedBy);
-      this.set("updatedAt", new Date());
+      this.set('budget', newBudget);
+      this.set('modifiedBy', modifiedBy);
+      this.set('updatedAt', new Date());
 
       await this.save(null, { useMasterKey: true });
 
-      logger.info("Department budget updated", {
+      logger.info('Department budget updated', {
         departmentId: this.id,
         oldBudget,
         newBudget,
@@ -474,7 +474,7 @@ class Department extends BaseModel {
 
       return true;
     } catch (error) {
-      logger.error("Error updating department budget", {
+      logger.error('Error updating department budget', {
         departmentId: this.id,
         newBudget,
         modifiedBy,
@@ -500,30 +500,30 @@ class Department extends BaseModel {
    */
   async addEmployee(userId, addedBy) {
     try {
-      const AmexingUser = require("./AmexingUser");
-      const userQuery = BaseModel.queryActive("AmexingUser");
-      userQuery.equalTo("objectId", userId);
+      const AmexingUser = require('./AmexingUser');
+      const userQuery = BaseModel.queryActive('AmexingUser');
+      userQuery.equalTo('objectId', userId);
       const user = await userQuery.first({ useMasterKey: true });
 
       if (!user) {
-        throw new Error("User not found or not active");
+        throw new Error('User not found or not active');
       }
 
       // Update user's department
-      user.set("departmentId", this.id);
-      user.set("modifiedBy", addedBy);
+      user.set('departmentId', this.id);
+      user.set('modifiedBy', addedBy);
       await user.save(null, { useMasterKey: true });
 
-      logger.info("Employee added to department", {
+      logger.info('Employee added to department', {
         departmentId: this.id,
         userId,
         addedBy,
-        userEmail: user.get("email"),
+        userEmail: user.get('email'),
       });
 
       return true;
     } catch (error) {
-      logger.error("Error adding employee to department", {
+      logger.error('Error adding employee to department', {
         departmentId: this.id,
         userId,
         addedBy,
@@ -548,30 +548,30 @@ class Department extends BaseModel {
    */
   async removeEmployee(userId, removedBy) {
     try {
-      const AmexingUser = require("./AmexingUser");
-      const userQuery = BaseModel.queryActive("AmexingUser");
-      userQuery.equalTo("objectId", userId);
+      const AmexingUser = require('./AmexingUser');
+      const userQuery = BaseModel.queryActive('AmexingUser');
+      userQuery.equalTo('objectId', userId);
       const user = await userQuery.first({ useMasterKey: true });
 
       if (!user) {
-        throw new Error("User not found or not active");
+        throw new Error('User not found or not active');
       }
 
       // Remove user from department
-      user.unset("departmentId");
-      user.set("modifiedBy", removedBy);
+      user.unset('departmentId');
+      user.set('modifiedBy', removedBy);
       await user.save(null, { useMasterKey: true });
 
-      logger.info("Employee removed from department", {
+      logger.info('Employee removed from department', {
         departmentId: this.id,
         userId,
         removedBy,
-        userEmail: user.get("email"),
+        userEmail: user.get('email'),
       });
 
       return true;
     } catch (error) {
-      logger.error("Error removing employee from department", {
+      logger.error('Error removing employee from department', {
         departmentId: this.id,
         userId,
         removedBy,
@@ -596,18 +596,18 @@ class Department extends BaseModel {
   toSafeJSON() {
     return {
       id: this.id,
-      name: this.get("name"),
-      description: this.get("description"),
-      managerId: this.get("managerId"),
-      clientId: this.get("clientId"),
-      budget: this.get("budget"),
-      costCenter: this.get("costCenter"),
-      active: this.get("active"),
-      exists: this.get("exists"),
-      createdAt: this.get("createdAt"),
-      updatedAt: this.get("updatedAt"),
-      createdBy: this.get("createdBy"),
-      modifiedBy: this.get("modifiedBy"),
+      name: this.get('name'),
+      description: this.get('description'),
+      managerId: this.get('managerId'),
+      clientId: this.get('clientId'),
+      budget: this.get('budget'),
+      costCenter: this.get('costCenter'),
+      active: this.get('active'),
+      exists: this.get('exists'),
+      createdAt: this.get('createdAt'),
+      updatedAt: this.get('updatedAt'),
+      createdBy: this.get('createdBy'),
+      modifiedBy: this.get('modifiedBy'),
     };
   }
 
@@ -626,32 +626,32 @@ class Department extends BaseModel {
     const errors = [];
 
     // Required fields
-    if (!departmentData.name || departmentData.name.trim() === "") {
-      errors.push("Department name is required");
+    if (!departmentData.name || departmentData.name.trim() === '') {
+      errors.push('Department name is required');
     }
 
-    if (!departmentData.clientId || departmentData.clientId.trim() === "") {
-      errors.push("Client ID is required");
+    if (!departmentData.clientId || departmentData.clientId.trim() === '') {
+      errors.push('Client ID is required');
     }
 
     // Budget validation
     if (departmentData.budget !== undefined && departmentData.budget !== null) {
       if (
-        typeof departmentData.budget !== "number" ||
-        departmentData.budget < 0
+        typeof departmentData.budget !== 'number'
+        || departmentData.budget < 0
       ) {
-        errors.push("Budget must be a non-negative number");
+        errors.push('Budget must be a non-negative number');
       }
     }
 
     // Name length validation
     if (departmentData.name && departmentData.name.length > 100) {
-      errors.push("Department name must be 100 characters or less");
+      errors.push('Department name must be 100 characters or less');
     }
 
     // Description length validation
     if (departmentData.description && departmentData.description.length > 500) {
-      errors.push("Description must be 500 characters or less");
+      errors.push('Description must be 500 characters or less');
     }
 
     return errors;
@@ -659,8 +659,8 @@ class Department extends BaseModel {
 }
 
 // Register the class with Parse
-if (typeof Parse !== "undefined") {
-  Parse.Object.registerSubclass("Department", Department);
+if (typeof Parse !== 'undefined') {
+  Parse.Object.registerSubclass('Department', Department);
 }
 
 module.exports = Department;

@@ -1,6 +1,6 @@
-const BaseController = require("./BaseController");
-const logger = require("../../../../infrastructure/logger");
-const AmexingUser = require("../../../../domain/models/AmexingUser");
+const BaseController = require('./BaseController');
+const logger = require('../../../../infrastructure/logger');
+const AmexingUser = require('../../../../domain/models/AmexingUser');
 
 /**
  * DashboardController - Open/Closed Principle (OCP)
@@ -90,16 +90,16 @@ class DashboardController extends BaseController {
         ...additionalData,
         stats,
         user: req.user || {
-          id: "",
-          role: "guest",
-          email: "",
-          clientId: "",
-          departmentId: "",
+          id: '',
+          role: 'guest',
+          email: '',
+          clientId: '',
+          departmentId: '',
         },
-        userRole: req.user?.role || "guest",
-        userName: req.user?.name || "Guest User",
+        userRole: req.user?.role || 'guest',
+        userName: req.user?.name || 'Guest User',
         userId: req.user?.id,
-        accessToken: res.locals.accessToken || req.cookies?.accessToken || "",
+        accessToken: res.locals.accessToken || req.cookies?.accessToken || '',
         breadcrumb: this.buildBreadcrumb(req.path, req.user?.role),
       };
 
@@ -119,7 +119,7 @@ class DashboardController extends BaseController {
    * @returns {object|null} - Breadcrumb navigation object or null if path is too short.
    */
   buildBreadcrumb(path, _role) {
-    const pathParts = path.split("/").filter((part) => part);
+    const pathParts = path.split('/').filter((part) => part);
     const breadcrumbItems = [];
 
     if (pathParts.length < 2) {
@@ -130,13 +130,13 @@ class DashboardController extends BaseController {
     for (let i = 2; i < pathParts.length; i += 1) {
       // eslint-disable-next-line security/detect-object-injection
       const name = pathParts[i]
-        .replace(/-/g, " ")
-        .replace(/_/g, " ")
+        .replace(/-/g, ' ')
+        .replace(/_/g, ' ')
         .replace(/\b\w/g, (l) => l.toUpperCase());
 
       breadcrumbItems.push({
         name,
-        link: `/${pathParts.slice(0, i + 1).join("/")}`,
+        link: `/${pathParts.slice(0, i + 1).join('/')}`,
         active: i === pathParts.length - 1,
       });
     }
@@ -198,7 +198,7 @@ class DashboardController extends BaseController {
       logger.info(`Activity: User ${userId} performed ${action}`, details);
       // In production, this would save to database
     } catch (error) {
-      logger.error("Failed to log activity:", error);
+      logger.error('Failed to log activity:', error);
     }
   }
 
@@ -220,7 +220,7 @@ class DashboardController extends BaseController {
     }
 
     // Super admin has all permissions - check both string role and role object
-    const hasSupperAdminRole = await this.hasRole(user, "superadmin");
+    const hasSupperAdminRole = await this.hasRole(user, 'superadmin');
     if (hasSupperAdminRole) {
       return true;
     }
@@ -245,16 +245,16 @@ class DashboardController extends BaseController {
 
     // Apply role-based filters
     switch (user.role) {
-      case "client":
+      case 'client':
         filters.clientId = user.clientId;
         break;
-      case "department_manager":
+      case 'department_manager':
         filters.departmentId = user.departmentId;
         break;
-      case "employee":
+      case 'employee':
         filters.employeeId = user.id;
         break;
-      case "driver":
+      case 'driver':
         filters.driverId = user.id;
         break;
       default:
@@ -285,15 +285,15 @@ class DashboardController extends BaseController {
         // If we have access to the user's role object, check it
         const amexingUser = new AmexingUser();
         amexingUser.id = user.id;
-        amexingUser.set("roleId", user.roleId);
+        amexingUser.set('roleId', user.roleId);
 
         const role = await amexingUser.getRole();
-        return role && role.get("name") === roleName;
+        return role && role.get('name') === roleName;
       }
 
       return false;
     } catch (error) {
-      logger.error("Error checking user role in DashboardController", {
+      logger.error('Error checking user role in DashboardController', {
         userId: user.id,
         roleName,
         error: error.message,

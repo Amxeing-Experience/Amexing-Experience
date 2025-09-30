@@ -1,4 +1,4 @@
-const DashboardController = require("./DashboardController");
+const DashboardController = require('./DashboardController');
 
 /**
  * RoleBasedController - Liskov Substitution Principle (LSP) & Interface Segregation Principle (ISP)
@@ -24,47 +24,47 @@ class RoleBasedController extends DashboardController {
    */
   getDefaultPermissions() {
     const permissionMap = {
-      superadmin: ["*"], // All permissions
+      superadmin: ['*'], // All permissions
       admin: [
-        "view_all_clients",
-        "manage_clients",
-        "view_all_users",
-        "manage_bookings",
-        "view_reports",
-        "manage_fleet",
-        "manage_drivers",
+        'view_all_clients',
+        'manage_clients',
+        'view_all_users',
+        'manage_bookings',
+        'view_reports',
+        'manage_fleet',
+        'manage_drivers',
       ],
       client: [
-        "view_own_company",
-        "manage_departments",
-        "manage_employees",
-        "view_company_reports",
-        "manage_budgets",
-        "approve_bookings",
+        'view_own_company',
+        'manage_departments',
+        'manage_employees',
+        'view_company_reports',
+        'manage_budgets',
+        'approve_bookings',
       ],
       department_manager: [
-        "view_department",
-        "manage_team",
-        "approve_team_bookings",
-        "view_department_budget",
-        "allocate_budget",
-        "view_department_reports",
+        'view_department',
+        'manage_team',
+        'approve_team_bookings',
+        'view_department_budget',
+        'allocate_budget',
+        'view_department_reports',
       ],
       employee: [
-        "view_own_profile",
-        "create_booking",
-        "view_own_bookings",
-        "view_own_budget",
-        "submit_feedback",
+        'view_own_profile',
+        'create_booking',
+        'view_own_bookings',
+        'view_own_budget',
+        'submit_feedback',
       ],
       driver: [
-        "view_own_profile",
-        "view_assigned_trips",
-        "update_trip_status",
-        "view_earnings",
-        "manage_vehicle",
+        'view_own_profile',
+        'view_assigned_trips',
+        'update_trip_status',
+        'view_earnings',
+        'manage_vehicle',
       ],
-      guest: ["view_event_info", "view_transport_details"],
+      guest: ['view_event_info', 'view_transport_details'],
     };
 
     return permissionMap[this.role] || [];
@@ -86,9 +86,9 @@ class RoleBasedController extends DashboardController {
       if (!req.user) {
         return this.redirectWithMessage(
           res,
-          "/login",
-          "Please login to continue",
-          "error",
+          '/login',
+          'Please login to continue',
+          'error'
         );
       }
 
@@ -109,8 +109,8 @@ class RoleBasedController extends DashboardController {
       if (userLevel < requiredLevel) {
         return this.handleError(
           res,
-          new Error("Insufficient permissions"),
-          403,
+          new Error('Insufficient permissions'),
+          403
         );
       }
 
@@ -243,7 +243,7 @@ class RoleBasedController extends DashboardController {
    * @returns {boolean} - Boolean result Operation result.
    */
   validateRoleAction(action, _user) {
-    if (this.permissions.includes("*")) {
+    if (this.permissions.includes('*')) {
       return true;
     }
 

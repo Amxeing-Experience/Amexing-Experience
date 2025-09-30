@@ -1,17 +1,17 @@
-const RoleBasedController = require("./base/RoleBasedController");
+const RoleBasedController = require('./base/RoleBasedController');
 
 /**
  * GuestController - Implements guest-specific dashboard functionality.
  */
 class GuestController extends RoleBasedController {
   constructor() {
-    super("guest");
+    super('guest');
   }
 
   async index(req, res) {
     try {
-      await this.renderRoleView(req, res, "index", {
-        title: "Guest Dashboard",
+      await this.renderRoleView(req, res, 'index', {
+        title: 'Guest Dashboard',
         eventInfo: await this.getEventInfo(),
         breadcrumb: null,
       });
@@ -22,12 +22,12 @@ class GuestController extends RoleBasedController {
 
   async event(req, res) {
     try {
-      await this.renderRoleView(req, res, "event", {
-        title: "Event Information",
+      await this.renderRoleView(req, res, 'event', {
+        title: 'Event Information',
         event: {},
         breadcrumb: {
-          title: "Event",
-          items: [{ name: "Event", active: true }],
+          title: 'Event',
+          items: [{ name: 'Event', active: true }],
         },
       });
     } catch (error) {
@@ -37,12 +37,12 @@ class GuestController extends RoleBasedController {
 
   async transport(req, res) {
     try {
-      await this.renderRoleView(req, res, "transport", {
-        title: "Transport Details",
+      await this.renderRoleView(req, res, 'transport', {
+        title: 'Transport Details',
         transport: {},
         breadcrumb: {
-          title: "Transport",
-          items: [{ name: "Transport", active: true }],
+          title: 'Transport',
+          items: [{ name: 'Transport', active: true }],
         },
       });
     } catch (error) {
@@ -52,11 +52,11 @@ class GuestController extends RoleBasedController {
 
   async getEventInfo() {
     return {
-      eventName: "Annual Company Meeting",
+      eventName: 'Annual Company Meeting',
       eventDate: new Date(),
-      transportTime: "9:00 AM",
-      pickupLocation: "Main Office",
-      dropoffLocation: "Convention Center",
+      transportTime: '9:00 AM',
+      pickupLocation: 'Main Office',
+      dropoffLocation: 'Convention Center',
     };
   }
 }

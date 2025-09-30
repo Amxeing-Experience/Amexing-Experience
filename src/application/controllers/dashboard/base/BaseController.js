@@ -1,4 +1,4 @@
-const logger = require("../../../../infrastructure/logger");
+const logger = require('../../../../infrastructure/logger');
 
 /**
  * BaseController - Single Responsibility Principle (SRP)
@@ -6,7 +6,7 @@ const logger = require("../../../../infrastructure/logger");
  */
 class BaseController {
   constructor() {
-    this.viewsPath = "dashboards/";
+    this.viewsPath = 'dashboards/';
   }
 
   /**
@@ -25,12 +25,12 @@ class BaseController {
   async render(res, view, data = {}) {
     try {
       const defaultData = {
-        title: data.title || "Dashboard",
+        title: data.title || 'Dashboard',
         ...data,
       };
 
       // Check if this is a dashboard view that needs layout
-      if (view.startsWith("dashboards/")) {
+      if (view.startsWith('dashboards/')) {
         // Render the content view first
         const contentHtml = await new Promise((resolve, reject) => {
           res.app.render(view, defaultData, (err, html) => {
@@ -45,12 +45,12 @@ class BaseController {
           body: contentHtml,
         };
 
-        return res.render("layouts/dashboard", layoutData);
+        return res.render('layouts/dashboard', layoutData);
       }
       // Regular view without layout
       return res.render(view, defaultData);
     } catch (error) {
-      logger.error("Render error:", error);
+      logger.error('Render error:', error);
       return this.handleError(res, error);
     }
   }
@@ -86,7 +86,7 @@ class BaseController {
    * @returns {*} - Operation result.
    */
   handleError(res, error, statusCode = 500) {
-    logger.error("Controller Error:", error);
+    logger.error('Controller Error:', error);
 
     if (res.headersSent) {
       return;
@@ -94,8 +94,8 @@ class BaseController {
 
     const errorResponse = {
       success: false,
-      message: error.message || "An unexpected error occurred",
-      ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
+      message: error.message || 'An unexpected error occurred',
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
     };
 
     return this.json(res, errorResponse, statusCode);
@@ -115,7 +115,7 @@ class BaseController {
    * // Handles HTTP request and sends appropriate response
    * @returns {void} - No return value Operation result.
    */
-  redirectWithMessage(res, url, message, type = "info") {
+  redirectWithMessage(res, url, message, type = 'info') {
     if (res.locals.flash) {
       res.locals.flash(type, message);
     }
@@ -145,7 +145,7 @@ class BaseController {
     });
 
     if (missing.length > 0) {
-      throw new Error(`Missing required fields: ${missing.join(", ")}`);
+      throw new Error(`Missing required fields: ${missing.join(', ')}`);
     }
 
     return true;
@@ -171,7 +171,7 @@ class BaseController {
       page,
       limit,
       skip,
-      sort: query.sort || "-createdAt",
+      sort: query.sort || '-createdAt',
     };
   }
 
@@ -187,11 +187,11 @@ class BaseController {
    * @returns {object} - Operation result.
    */
   formatDate(date) {
-    if (!date) return "";
-    return new Date(date).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     });
   }
 
@@ -207,9 +207,9 @@ class BaseController {
    * @returns {object} - Operation result.
    */
   formatCurrency(amount) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
     }).format(amount || 0);
   }
 }

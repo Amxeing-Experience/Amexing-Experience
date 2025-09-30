@@ -18,24 +18,24 @@
  * // Returns: model operation result
  */
 
-const Parse = require("parse/node");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const logger = require('../../infrastructure/logger');
 
 class BaseModel extends Parse.Object {
   constructor(className, attributes, options) {
     super(className, attributes, options);
 
     // Set default lifecycle values on creation
-    if (!this.has("active")) {
-      this.set("active", true);
+    if (!this.has('active')) {
+      this.set('active', true);
     }
-    if (!this.has("exists")) {
-      this.set("exists", true);
+    if (!this.has('exists')) {
+      this.set('exists', true);
     }
-    if (!this.has("createdAt")) {
-      this.set("createdAt", new Date());
+    if (!this.has('createdAt')) {
+      this.set('createdAt', new Date());
     }
-    this.set("updatedAt", new Date());
+    this.set('updatedAt', new Date());
   }
 
   /**
@@ -49,7 +49,7 @@ class BaseModel extends Parse.Object {
    * // const result = await instance.save();
    */
   isActive() {
-    return this.get("active") === true && this.get("exists") === true;
+    return this.get('active') === true && this.get('exists') === true;
   }
 
   /**
@@ -63,7 +63,7 @@ class BaseModel extends Parse.Object {
    * // const result = await instance.save();
    */
   isArchived() {
-    return this.get("active") === false && this.get("exists") === true;
+    return this.get('active') === false && this.get('exists') === true;
   }
 
   /**
@@ -77,7 +77,7 @@ class BaseModel extends Parse.Object {
    * // const result = await instance.save();
    */
   isSoftDeleted() {
-    return this.get("exists") === false;
+    return this.get('exists') === false;
   }
 
   /**
@@ -92,11 +92,11 @@ class BaseModel extends Parse.Object {
    * // const result = await instance.save();
    */
   async activate(modifiedBy = null) {
-    this.set("active", true);
-    this.set("exists", true);
-    this.set("updatedAt", new Date());
+    this.set('active', true);
+    this.set('exists', true);
+    this.set('updatedAt', new Date());
     if (modifiedBy) {
-      this.set("modifiedBy", modifiedBy);
+      this.set('modifiedBy', modifiedBy);
     }
 
     logger.info(`Record activated: ${this.className} ${this.id}`, {
@@ -120,11 +120,11 @@ class BaseModel extends Parse.Object {
    * // const result = await instance.save();
    */
   async deactivate(modifiedBy = null) {
-    this.set("active", false);
-    this.set("exists", true); // Keep in archive
-    this.set("updatedAt", new Date());
+    this.set('active', false);
+    this.set('exists', true); // Keep in archive
+    this.set('updatedAt', new Date());
     if (modifiedBy) {
-      this.set("modifiedBy", modifiedBy);
+      this.set('modifiedBy', modifiedBy);
     }
 
     logger.info(`Record deactivated: ${this.className} ${this.id}`, {
@@ -148,13 +148,13 @@ class BaseModel extends Parse.Object {
    * // const result = await instance.save();
    */
   async softDelete(modifiedBy = null) {
-    this.set("active", false);
-    this.set("exists", false);
-    this.set("deletedAt", new Date());
-    this.set("updatedAt", new Date());
+    this.set('active', false);
+    this.set('exists', false);
+    this.set('deletedAt', new Date());
+    this.set('updatedAt', new Date());
     if (modifiedBy) {
-      this.set("modifiedBy", modifiedBy);
-      this.set("deletedBy", modifiedBy);
+      this.set('modifiedBy', modifiedBy);
+      this.set('deletedBy', modifiedBy);
     }
 
     logger.info(`Record soft deleted: ${this.className} ${this.id}`, {
@@ -178,13 +178,13 @@ class BaseModel extends Parse.Object {
    * // const result = await instance.save();
    */
   async restore(modifiedBy = null) {
-    this.set("exists", true);
-    this.set("active", false); // Restore as inactive, let user explicitly activate
-    this.unset("deletedAt");
-    this.unset("deletedBy");
-    this.set("updatedAt", new Date());
+    this.set('exists', true);
+    this.set('active', false); // Restore as inactive, let user explicitly activate
+    this.unset('deletedAt');
+    this.unset('deletedBy');
+    this.set('updatedAt', new Date());
     if (modifiedBy) {
-      this.set("modifiedBy", modifiedBy);
+      this.set('modifiedBy', modifiedBy);
     }
 
     logger.info(`Record restored: ${this.className} ${this.id}`, {
@@ -209,7 +209,7 @@ class BaseModel extends Parse.Object {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async save(attributes, options) {
-    this.set("updatedAt", new Date());
+    this.set('updatedAt', new Date());
     return super.save(attributes, options);
   }
 
@@ -224,10 +224,10 @@ class BaseModel extends Parse.Object {
    * // const result = await instance.save();
    */
   getLifecycleStatus() {
-    if (this.isSoftDeleted()) return "deleted";
-    if (this.isArchived()) return "archived";
-    if (this.isActive()) return "active";
-    return "unknown";
+    if (this.isSoftDeleted()) return 'deleted';
+    if (this.isArchived()) return 'archived';
+    if (this.isActive()) return 'active';
+    return 'unknown';
   }
 
   /**
@@ -243,8 +243,8 @@ class BaseModel extends Parse.Object {
    */
   static queryActive(className) {
     const query = new Parse.Query(className);
-    query.equalTo("active", true);
-    query.equalTo("exists", true);
+    query.equalTo('active', true);
+    query.equalTo('exists', true);
     return query;
   }
 
@@ -261,7 +261,7 @@ class BaseModel extends Parse.Object {
    */
   static queryExisting(className) {
     const query = new Parse.Query(className);
-    query.equalTo("exists", true);
+    query.equalTo('exists', true);
     return query;
   }
 
@@ -293,8 +293,8 @@ class BaseModel extends Parse.Object {
    */
   static queryArchived(className) {
     const query = new Parse.Query(className);
-    query.equalTo("active", false);
-    query.equalTo("exists", true);
+    query.equalTo('active', false);
+    query.equalTo('exists', true);
     return query;
   }
 
@@ -311,7 +311,7 @@ class BaseModel extends Parse.Object {
    */
   static querySoftDeleted(className) {
     const query = new Parse.Query(className);
-    query.equalTo("exists", false);
+    query.equalTo('exists', false);
     return query;
   }
 }

@@ -1,7 +1,7 @@
-const express = require("express");
+const express = require('express');
 
 const router = express.Router();
-const AtomicController = require("../../application/controllers/atomicController");
+const AtomicController = require('../../application/controllers/atomicController');
 
 /**
  * Atomic Design Component Showcase Routes
@@ -22,24 +22,24 @@ const AtomicController = require("../../application/controllers/atomicController
  */
 
 // Main atomic design showcase index
-router.get("/", AtomicController.index);
+router.get('/', AtomicController.index);
 
 // Dashboard components showcase
-router.get("/dashboard", AtomicController.dashboard);
+router.get('/dashboard', AtomicController.dashboard);
 
 // Authentication components showcase
-router.get("/auth", AtomicController.auth);
+router.get('/auth', AtomicController.auth);
 
 // Common components showcase
-router.get("/common", AtomicController.common);
+router.get('/common', AtomicController.common);
 
 // Redirect legacy paths for consistency
-router.get("/components", (req, res) => {
-  res.redirect(301, "/atomic");
+router.get('/components', (req, res) => {
+  res.redirect(301, '/atomic');
 });
 
-router.get("/styleguide", (req, res) => {
-  res.redirect(301, "/atomic");
+router.get('/styleguide', (req, res) => {
+  res.redirect(301, '/atomic');
 });
 
 module.exports = router;

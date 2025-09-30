@@ -23,9 +23,9 @@
  * });
  */
 
-const Parse = require("parse/node");
-const BaseModel = require("./BaseModel");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const BaseModel = require('./BaseModel');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Permission Class - Granular permission management
@@ -33,7 +33,7 @@ const logger = require("../../infrastructure/logger");
  */
 class Permission extends BaseModel {
   constructor() {
-    super("Permission");
+    super('Permission');
   }
 
   /**
@@ -53,104 +53,103 @@ class Permission extends BaseModel {
   static create(permissionData) {
     // Validate required fields
     if (!permissionData.resource || !permissionData.action) {
-      throw new Error("Resource and action are required");
+      throw new Error('Resource and action are required');
     }
 
     // Validate resource and action format
     const validPartRegex = /^[a-z][a-z0-9_]*$/;
     if (!validPartRegex.test(permissionData.resource)) {
       throw new Error(
-        "Resource must contain only lowercase letters, numbers, and underscores, starting with a letter",
+        'Resource must contain only lowercase letters, numbers, and underscores, starting with a letter'
       );
     }
     if (!validPartRegex.test(permissionData.action)) {
       throw new Error(
-        "Action must contain only lowercase letters, numbers, and underscores, starting with a letter",
+        'Action must contain only lowercase letters, numbers, and underscores, starting with a letter'
       );
     }
 
     // Validate conditions structure if provided
     if (
-      permissionData.conditions &&
-      typeof permissionData.conditions !== "object"
+      permissionData.conditions
+      && typeof permissionData.conditions !== 'object'
     ) {
-      throw new Error("Conditions must be an object");
+      throw new Error('Conditions must be an object');
     }
 
     // Validate condition values if provided
     if (permissionData.conditions) {
       const { conditions } = permissionData;
       if (
-        conditions.maxAmount !== undefined &&
-        typeof conditions.maxAmount !== "number"
+        conditions.maxAmount !== undefined
+        && typeof conditions.maxAmount !== 'number'
       ) {
-        throw new Error("maxAmount must be a number");
+        throw new Error('maxAmount must be a number');
       }
       if (
-        conditions.minAmount !== undefined &&
-        typeof conditions.minAmount !== "number"
+        conditions.minAmount !== undefined
+        && typeof conditions.minAmount !== 'number'
       ) {
-        throw new Error("minAmount must be a number");
+        throw new Error('minAmount must be a number');
       }
       if (
-        conditions.businessHoursOnly !== undefined &&
-        typeof conditions.businessHoursOnly !== "boolean"
+        conditions.businessHoursOnly !== undefined
+        && typeof conditions.businessHoursOnly !== 'boolean'
       ) {
-        throw new Error("businessHoursOnly must be a boolean");
+        throw new Error('businessHoursOnly must be a boolean');
       }
     }
 
     const permission = new Permission();
 
     // Auto-generate name if not provided
-    const name =
-      permissionData.name ||
-      `${permissionData.resource}.${permissionData.action}`;
+    const name = permissionData.name
+      || `${permissionData.resource}.${permissionData.action}`;
 
     // Core permission identification
-    permission.set("name", name);
-    permission.set("resource", permissionData.resource);
-    permission.set("action", permissionData.action);
-    permission.set("description", permissionData.description || "");
+    permission.set('name', name);
+    permission.set('resource', permissionData.resource);
+    permission.set('action', permissionData.action);
+    permission.set('description', permissionData.description || '');
 
     // Scope and context
-    permission.set("scope", permissionData.scope || "own"); // 'own', 'department', 'organization', 'system'
-    permission.set("conditions", permissionData.conditions || {});
-    permission.set("context", permissionData.context || {});
+    permission.set('scope', permissionData.scope || 'own'); // 'own', 'department', 'organization', 'system'
+    permission.set('conditions', permissionData.conditions || {});
+    permission.set('context', permissionData.context || {});
 
     // Permission metadata
-    permission.set("category", permissionData.category || "general");
-    permission.set("priority", permissionData.priority || 0);
+    permission.set('category', permissionData.category || 'general');
+    permission.set('priority', permissionData.priority || 0);
     permission.set(
-      "isSystemPermission",
-      permissionData.isSystemPermission || false,
+      'isSystemPermission',
+      permissionData.isSystemPermission || false
     );
     permission.set(
-      "requiresApproval",
-      permissionData.requiresApproval || false,
+      'requiresApproval',
+      permissionData.requiresApproval || false
     );
     permission.set(
-      "delegatable",
+      'delegatable',
       permissionData.delegatable !== undefined
         ? permissionData.delegatable
-        : true,
+        : true
     );
 
     // Permission inheritance
-    permission.set("includes", permissionData.includes || []);
+    permission.set('includes', permissionData.includes || []);
 
     // Validation rules
-    permission.set("validationRules", permissionData.validationRules || {});
-    permission.set("prerequisites", permissionData.prerequisites || []);
+    permission.set('validationRules', permissionData.validationRules || {});
+    permission.set('prerequisites', permissionData.prerequisites || []);
 
     // Base model fields
     permission.set(
-      "active",
-      permissionData.active !== undefined ? permissionData.active : true,
+      'active',
+      permissionData.active !== undefined ? permissionData.active : true
     );
     permission.set(
-      "exists",
-      permissionData.exists !== undefined ? permissionData.exists : true,
+      'exists',
+      permissionData.exists !== undefined ? permissionData.exists : true
     );
 
     return permission;
@@ -163,7 +162,7 @@ class Permission extends BaseModel {
    * @example
    */
   validateContext(context = {}) {
-    const conditions = this.get("conditions") || {};
+    const conditions = this.get('conditions') || {};
 
     // Check amount conditions - only validate if amount is provided in context
     if (conditions.maxAmount !== undefined && context.amount !== undefined) {
@@ -186,10 +185,10 @@ class Permission extends BaseModel {
 
     // Check department scope - only validate if department info is provided in context
     if (
-      (conditions.departmentScope === "own" ||
-        conditions.departmentScope === true) &&
-      (context.departmentId !== undefined ||
-        context.userDepartmentId !== undefined)
+      (conditions.departmentScope === 'own'
+        || conditions.departmentScope === true)
+      && (context.departmentId !== undefined
+        || context.userDepartmentId !== undefined)
     ) {
       if (!context.departmentId || !context.userDepartmentId) {
         return false;
@@ -203,9 +202,9 @@ class Permission extends BaseModel {
     if (Object.keys(context).length === 0) {
       // Return false only if conditions require specific context validation
       if (
-        conditions.maxAmount !== undefined ||
-        conditions.businessHoursOnly ||
-        conditions.departmentScope
+        conditions.maxAmount !== undefined
+        || conditions.businessHoursOnly
+        || conditions.departmentScope
       ) {
         return false;
       }
@@ -221,8 +220,8 @@ class Permission extends BaseModel {
    */
   isSystemPermission() {
     return (
-      this.get("isSystemPermission") === true ||
-      this.get("category") === "system"
+      this.get('isSystemPermission') === true
+      || this.get('category') === 'system'
     );
   }
 
@@ -232,7 +231,7 @@ class Permission extends BaseModel {
    * @example
    */
   isDelegatable() {
-    return this.get("delegatable") !== false;
+    return this.get('delegatable') !== false;
   }
 
   /**
@@ -242,7 +241,7 @@ class Permission extends BaseModel {
    * @example
    */
   includes(permissionName) {
-    const includedPermissions = this.get("includes") || [];
+    const includedPermissions = this.get('includes') || [];
     return includedPermissions.includes(permissionName);
   }
 
@@ -273,7 +272,7 @@ class Permission extends BaseModel {
    * @example
    */
   inheritsFrom(parentPermission) {
-    const name = this.get("name");
+    const name = this.get('name');
 
     // Check direct match
     if (name === parentPermission) {
@@ -287,18 +286,18 @@ class Permission extends BaseModel {
     }
 
     // Check wildcard inheritance (e.g., 'users.*' includes 'users.read')
-    if (parentPermission.endsWith(".*")) {
+    if (parentPermission.endsWith('.*')) {
       const parentBase = parentPermission.slice(0, -2);
       return name.startsWith(`${parentBase}.`);
     }
 
     // Check hierarchical inheritance
-    const nameParts = name.split(".");
-    const parentParts = parentPermission.split(".");
+    const nameParts = name.split('.');
+    const parentParts = parentPermission.split('.');
 
     if (parentParts.length < nameParts.length) {
       return (
-        nameParts.slice(0, parentParts.length).join(".") === parentPermission
+        nameParts.slice(0, parentParts.length).join('.') === parentPermission
       );
     }
 
@@ -312,12 +311,12 @@ class Permission extends BaseModel {
    * @example
    */
   static isValidPermissionName(name) {
-    if (!name || typeof name !== "string") {
+    if (!name || typeof name !== 'string') {
       return false;
     }
 
     // Must be in resource.action format
-    const parts = name.split(".");
+    const parts = name.split('.');
     if (parts.length < 2) {
       return false;
     }
@@ -334,18 +333,18 @@ class Permission extends BaseModel {
    * @example
    */
   static validateConditionStructure(conditions) {
-    if (!conditions || typeof conditions !== "object") {
+    if (!conditions || typeof conditions !== 'object') {
       return false;
     }
 
     // Check known condition types
     const validConditions = [
-      "maxAmount",
-      "minAmount",
-      "businessHoursOnly",
-      "departmentScope",
-      "organizationScope",
-      "timeRestriction",
+      'maxAmount',
+      'minAmount',
+      'businessHoursOnly',
+      'departmentScope',
+      'organizationScope',
+      'timeRestriction',
     ];
 
     for (const key in conditions) {
@@ -356,15 +355,15 @@ class Permission extends BaseModel {
 
     // Validate specific condition values
     if (
-      conditions.maxAmount !== undefined &&
-      typeof conditions.maxAmount !== "number"
+      conditions.maxAmount !== undefined
+      && typeof conditions.maxAmount !== 'number'
     ) {
       return false;
     }
 
     if (
-      conditions.businessHoursOnly !== undefined &&
-      typeof conditions.businessHoursOnly !== "boolean"
+      conditions.businessHoursOnly !== undefined
+      && typeof conditions.businessHoursOnly !== 'boolean'
     ) {
       return false;
     }
@@ -408,9 +407,7 @@ class Permission extends BaseModel {
    */
   static createSystemPermissions() {
     const systemPermConfigs = this.getSystemPermissions();
-    return systemPermConfigs.map((config) =>
-      this.createSystemPermission(config),
-    );
+    return systemPermConfigs.map((config) => this.createSystemPermission(config));
   }
 
   /**
@@ -422,8 +419,8 @@ class Permission extends BaseModel {
    */
   async validateExecution(context = {}, user = null) {
     try {
-      const conditions = this.get("conditions") || {};
-      const validationRules = this.get("validationRules") || {};
+      const conditions = this.get('conditions') || {};
+      const validationRules = this.get('validationRules') || {};
 
       // Check amount-based conditions
       if (conditions.maxAmount && context.amount) {
@@ -447,35 +444,35 @@ class Permission extends BaseModel {
           return {
             valid: false,
             reason:
-              "Action only allowed during business hours (9 AM - 5 PM, Monday-Friday)",
+              'Action only allowed during business hours (9 AM - 5 PM, Monday-Friday)',
           };
         }
       }
 
       // Check department scope
       if (
-        conditions.departmentScope === "own" &&
-        user &&
-        context.departmentId
+        conditions.departmentScope === 'own'
+        && user
+        && context.departmentId
       ) {
-        if (user.get("departmentId") !== context.departmentId) {
+        if (user.get('departmentId') !== context.departmentId) {
           return {
             valid: false,
-            reason: "Action only allowed within your own department",
+            reason: 'Action only allowed within your own department',
           };
         }
       }
 
       // Check organization scope
       if (
-        conditions.organizationScope === "own" &&
-        user &&
-        context.organizationId
+        conditions.organizationScope === 'own'
+        && user
+        && context.organizationId
       ) {
-        if (user.get("organizationId") !== context.organizationId) {
+        if (user.get('organizationId') !== context.organizationId) {
           return {
             valid: false,
-            reason: "Action only allowed within your own organization",
+            reason: 'Action only allowed within your own organization',
           };
         }
       }
@@ -485,7 +482,7 @@ class Permission extends BaseModel {
         const customResult = await this.executeCustomValidator(
           validationRules.customValidator,
           context,
-          user,
+          user
         );
         if (!customResult.valid) {
           return customResult;
@@ -493,11 +490,11 @@ class Permission extends BaseModel {
       }
 
       // Check prerequisites
-      const prerequisites = this.get("prerequisites") || [];
+      const prerequisites = this.get('prerequisites') || [];
       if (prerequisites.length > 0) {
         const prerequisiteResult = await this.checkPrerequisites(
           prerequisites,
-          user,
+          user
         );
         if (!prerequisiteResult.valid) {
           return prerequisiteResult;
@@ -506,15 +503,15 @@ class Permission extends BaseModel {
 
       return { valid: true };
     } catch (error) {
-      logger.error("Error validating permission execution", {
+      logger.error('Error validating permission execution', {
         permissionId: this.id,
-        permissionName: this.get("name"),
+        permissionName: this.get('name'),
         context,
         error: error.message,
       });
       return {
         valid: false,
-        reason: "Permission validation failed",
+        reason: 'Permission validation failed',
       };
     }
   }
@@ -530,9 +527,9 @@ class Permission extends BaseModel {
   async executeCustomValidator(validatorName, context, user) {
     // This would integrate with a custom validation service
     // For now, return valid for basic implementation
-    logger.info("Custom validator execution requested", {
+    logger.info('Custom validator execution requested', {
       validator: validatorName,
-      permission: this.get("name"),
+      permission: this.get('name'),
       userId: user?.id,
     });
 
@@ -553,10 +550,10 @@ class Permission extends BaseModel {
 
     // This would check if user has prerequisite permissions
     // Implementation would depend on user's role and delegated permissions
-    logger.info("Prerequisites check requested", {
+    logger.info('Prerequisites check requested', {
       prerequisites,
       userId: user.id,
-      permission: this.get("name"),
+      permission: this.get('name'),
     });
 
     return { valid: true };
@@ -574,7 +571,7 @@ class Permission extends BaseModel {
       organization: 3,
       system: 4,
     };
-    return scopeMap[this.get("scope")] || 1;
+    return scopeMap[this.get('scope')] || 1;
   }
 
   /**
@@ -593,8 +590,8 @@ class Permission extends BaseModel {
 
     // Compare conditions if same scope
     if (thisScope === otherScope) {
-      const thisConditions = this.get("conditions") || {};
-      const otherConditions = otherPermission.get("conditions") || {};
+      const thisConditions = this.get('conditions') || {};
+      const otherConditions = otherPermission.get('conditions') || {};
 
       // Compare amount restrictions
       if (thisConditions.maxAmount && otherConditions.maxAmount) {
@@ -617,18 +614,18 @@ class Permission extends BaseModel {
   toSafeJSON() {
     return {
       id: this.id,
-      name: this.get("name"),
-      resource: this.get("resource"),
-      action: this.get("action"),
-      description: this.get("description"),
-      scope: this.get("scope"),
-      category: this.get("category"),
-      conditions: this.get("conditions"),
-      requiresApproval: this.get("requiresApproval"),
-      isSystemPermission: this.get("isSystemPermission"),
-      active: this.get("active"),
-      createdAt: this.get("createdAt"),
-      updatedAt: this.get("updatedAt"),
+      name: this.get('name'),
+      resource: this.get('resource'),
+      action: this.get('action'),
+      description: this.get('description'),
+      scope: this.get('scope'),
+      category: this.get('category'),
+      conditions: this.get('conditions'),
+      requiresApproval: this.get('requiresApproval'),
+      isSystemPermission: this.get('isSystemPermission'),
+      active: this.get('active'),
+      createdAt: this.get('createdAt'),
+      updatedAt: this.get('updatedAt'),
     };
   }
 
@@ -641,303 +638,303 @@ class Permission extends BaseModel {
     return [
       // User Management
       {
-        name: "users.create",
-        resource: "users",
-        action: "create",
-        description: "Create new users",
-        scope: "organization",
-        category: "user_management",
+        name: 'users.create',
+        resource: 'users',
+        action: 'create',
+        description: 'Create new users',
+        scope: 'organization',
+        category: 'user_management',
         isSystemPermission: true,
       },
       {
-        name: "users.read",
-        resource: "users",
-        action: "read",
-        description: "View users",
-        scope: "department",
-        category: "user_management",
+        name: 'users.read',
+        resource: 'users',
+        action: 'read',
+        description: 'View users',
+        scope: 'department',
+        category: 'user_management',
         isSystemPermission: true,
       },
       {
-        name: "users.update",
-        resource: "users",
-        action: "update",
-        description: "Update user information",
-        scope: "department",
-        category: "user_management",
+        name: 'users.update',
+        resource: 'users',
+        action: 'update',
+        description: 'Update user information',
+        scope: 'department',
+        category: 'user_management',
         isSystemPermission: true,
       },
       {
-        name: "users.delete",
-        resource: "users",
-        action: "delete",
-        description: "Deactivate users",
-        scope: "organization",
-        category: "user_management",
+        name: 'users.delete',
+        resource: 'users',
+        action: 'delete',
+        description: 'Deactivate users',
+        scope: 'organization',
+        category: 'user_management',
         isSystemPermission: true,
       },
 
       // Client Management
       {
-        name: "clients.create",
-        resource: "clients",
-        action: "create",
-        description: "Create new client organizations",
-        scope: "system",
-        category: "client_management",
+        name: 'clients.create',
+        resource: 'clients',
+        action: 'create',
+        description: 'Create new client organizations',
+        scope: 'system',
+        category: 'client_management',
         isSystemPermission: true,
       },
       {
-        name: "clients.read",
-        resource: "clients",
-        action: "read",
-        description: "View client information",
-        scope: "organization",
-        category: "client_management",
+        name: 'clients.read',
+        resource: 'clients',
+        action: 'read',
+        description: 'View client information',
+        scope: 'organization',
+        category: 'client_management',
         isSystemPermission: true,
       },
       {
-        name: "clients.update",
-        resource: "clients",
-        action: "update",
-        description: "Update client information",
-        scope: "organization",
-        category: "client_management",
+        name: 'clients.update',
+        resource: 'clients',
+        action: 'update',
+        description: 'Update client information',
+        scope: 'organization',
+        category: 'client_management',
         isSystemPermission: true,
       },
 
       // Department Management
       {
-        name: "departments.create",
-        resource: "departments",
-        action: "create",
-        description: "Create departments",
-        scope: "organization",
-        category: "department_management",
+        name: 'departments.create',
+        resource: 'departments',
+        action: 'create',
+        description: 'Create departments',
+        scope: 'organization',
+        category: 'department_management',
         isSystemPermission: true,
       },
       {
-        name: "departments.read",
-        resource: "departments",
-        action: "read",
-        description: "View departments",
-        scope: "organization",
-        category: "department_management",
+        name: 'departments.read',
+        resource: 'departments',
+        action: 'read',
+        description: 'View departments',
+        scope: 'organization',
+        category: 'department_management',
         isSystemPermission: true,
       },
       {
-        name: "departments.update",
-        resource: "departments",
-        action: "update",
-        description: "Update departments",
-        scope: "department",
-        category: "department_management",
+        name: 'departments.update',
+        resource: 'departments',
+        action: 'update',
+        description: 'Update departments',
+        scope: 'department',
+        category: 'department_management',
         isSystemPermission: true,
       },
 
       // Booking Management
       {
-        name: "bookings.create",
-        resource: "bookings",
-        action: "create",
-        description: "Create new bookings",
-        scope: "department",
-        category: "booking_management",
+        name: 'bookings.create',
+        resource: 'bookings',
+        action: 'create',
+        description: 'Create new bookings',
+        scope: 'department',
+        category: 'booking_management',
         conditions: { maxAmount: 2000, businessHoursOnly: true },
         isSystemPermission: true,
       },
       {
-        name: "bookings.read",
-        resource: "bookings",
-        action: "read",
-        description: "View bookings",
-        scope: "department",
-        category: "booking_management",
+        name: 'bookings.read',
+        resource: 'bookings',
+        action: 'read',
+        description: 'View bookings',
+        scope: 'department',
+        category: 'booking_management',
         isSystemPermission: true,
       },
       {
-        name: "bookings.update",
-        resource: "bookings",
-        action: "update",
-        description: "Update existing bookings",
-        scope: "department",
-        category: "booking_management",
+        name: 'bookings.update',
+        resource: 'bookings',
+        action: 'update',
+        description: 'Update existing bookings',
+        scope: 'department',
+        category: 'booking_management',
         isSystemPermission: true,
       },
       {
-        name: "bookings.approve",
-        resource: "bookings",
-        action: "approve",
-        description: "Approve bookings",
-        scope: "department",
-        category: "booking_management",
+        name: 'bookings.approve',
+        resource: 'bookings',
+        action: 'approve',
+        description: 'Approve bookings',
+        scope: 'department',
+        category: 'booking_management',
         conditions: { maxAmount: 10000 },
         requiresApproval: true,
         isSystemPermission: true,
       },
       {
-        name: "bookings.cancel",
-        resource: "bookings",
-        action: "cancel",
-        description: "Cancel bookings",
-        scope: "department",
-        category: "booking_management",
+        name: 'bookings.cancel',
+        resource: 'bookings',
+        action: 'cancel',
+        description: 'Cancel bookings',
+        scope: 'department',
+        category: 'booking_management',
         isSystemPermission: true,
       },
 
       // Service Management
       {
-        name: "services.read",
-        resource: "services",
-        action: "read",
-        description: "View available services",
-        scope: "department",
-        category: "service_management",
+        name: 'services.read',
+        resource: 'services',
+        action: 'read',
+        description: 'View available services',
+        scope: 'department',
+        category: 'service_management',
         isSystemPermission: true,
       },
       {
-        name: "services.create",
-        resource: "services",
-        action: "create",
-        description: "Create new services",
-        scope: "system",
-        category: "service_management",
+        name: 'services.create',
+        resource: 'services',
+        action: 'create',
+        description: 'Create new services',
+        scope: 'system',
+        category: 'service_management',
         isSystemPermission: true,
       },
       {
-        name: "services.update",
-        resource: "services",
-        action: "update",
-        description: "Update services",
-        scope: "system",
-        category: "service_management",
+        name: 'services.update',
+        resource: 'services',
+        action: 'update',
+        description: 'Update services',
+        scope: 'system',
+        category: 'service_management',
         isSystemPermission: true,
       },
 
       // Pricing Management
       {
-        name: "pricing.read",
-        resource: "pricing",
-        action: "read",
-        description: "View pricing information",
-        scope: "department",
-        category: "pricing_management",
-        conditions: { departmentScope: "own" },
+        name: 'pricing.read',
+        resource: 'pricing',
+        action: 'read',
+        description: 'View pricing information',
+        scope: 'department',
+        category: 'pricing_management',
+        conditions: { departmentScope: 'own' },
         isSystemPermission: true,
       },
       {
-        name: "pricing.update",
-        resource: "pricing",
-        action: "update",
-        description: "Update pricing",
-        scope: "organization",
-        category: "pricing_management",
+        name: 'pricing.update',
+        resource: 'pricing',
+        action: 'update',
+        description: 'Update pricing',
+        scope: 'organization',
+        category: 'pricing_management',
         isSystemPermission: true,
       },
 
       // Reporting
       {
-        name: "reports.read",
-        resource: "reports",
-        action: "read",
-        description: "View reports",
-        scope: "department",
-        category: "reporting",
+        name: 'reports.read',
+        resource: 'reports',
+        action: 'read',
+        description: 'View reports',
+        scope: 'department',
+        category: 'reporting',
         isSystemPermission: true,
       },
       {
-        name: "reports.generate",
-        resource: "reports",
-        action: "generate",
-        description: "Generate reports",
-        scope: "organization",
-        category: "reporting",
+        name: 'reports.generate',
+        resource: 'reports',
+        action: 'generate',
+        description: 'Generate reports',
+        scope: 'organization',
+        category: 'reporting',
         isSystemPermission: true,
       },
 
       // Vehicle Management (Amexing employees only)
       {
-        name: "vehicles.read",
-        resource: "vehicles",
-        action: "read",
-        description: "View vehicles",
-        scope: "system",
-        category: "vehicle_management",
-        conditions: { organizationScope: "amexing" },
+        name: 'vehicles.read',
+        resource: 'vehicles',
+        action: 'read',
+        description: 'View vehicles',
+        scope: 'system',
+        category: 'vehicle_management',
+        conditions: { organizationScope: 'amexing' },
         isSystemPermission: true,
       },
       {
-        name: "vehicles.update",
-        resource: "vehicles",
-        action: "update",
-        description: "Update vehicle status",
-        scope: "own",
-        category: "vehicle_management",
+        name: 'vehicles.update',
+        resource: 'vehicles',
+        action: 'update',
+        description: 'Update vehicle status',
+        scope: 'own',
+        category: 'vehicle_management',
         conditions: { operationsOnly: true },
         isSystemPermission: true,
       },
 
       // Schedule Management
       {
-        name: "schedules.read",
-        resource: "schedules",
-        action: "read",
-        description: "View schedules",
-        scope: "own",
-        category: "schedule_management",
+        name: 'schedules.read',
+        resource: 'schedules',
+        action: 'read',
+        description: 'View schedules',
+        scope: 'own',
+        category: 'schedule_management',
         isSystemPermission: true,
       },
       {
-        name: "schedules.update",
-        resource: "schedules",
-        action: "update",
-        description: "Update schedules",
-        scope: "own",
-        category: "schedule_management",
+        name: 'schedules.update',
+        resource: 'schedules',
+        action: 'update',
+        description: 'Update schedules',
+        scope: 'own',
+        category: 'schedule_management',
         isSystemPermission: true,
       },
 
       // Route Management
       {
-        name: "routes.read",
-        resource: "routes",
-        action: "read",
-        description: "View routes",
-        scope: "system",
-        category: "route_management",
+        name: 'routes.read',
+        resource: 'routes',
+        action: 'read',
+        description: 'View routes',
+        scope: 'system',
+        category: 'route_management',
         isSystemPermission: true,
       },
 
       // Request Management (Guest access)
       {
-        name: "requests.create",
-        resource: "requests",
-        action: "create",
-        description: "Create service requests",
-        scope: "own",
-        category: "request_management",
+        name: 'requests.create',
+        resource: 'requests',
+        action: 'create',
+        description: 'Create service requests',
+        scope: 'own',
+        category: 'request_management',
         isSystemPermission: true,
       },
 
       // Quote Management
       {
-        name: "quotes.read",
-        resource: "quotes",
-        action: "read",
-        description: "View quotes",
-        scope: "own",
-        category: "quote_management",
+        name: 'quotes.read',
+        resource: 'quotes',
+        action: 'read',
+        description: 'View quotes',
+        scope: 'own',
+        category: 'quote_management',
         isSystemPermission: true,
       },
 
       // System Administration
       {
-        name: "system.admin",
-        resource: "system",
-        action: "admin",
-        description: "Full system administration access",
-        scope: "system",
-        category: "system_management",
+        name: 'system.admin',
+        resource: 'system',
+        action: 'admin',
+        description: 'Full system administration access',
+        scope: 'system',
+        category: 'system_management',
         isSystemPermission: true,
       },
     ];
@@ -945,6 +942,6 @@ class Permission extends BaseModel {
 }
 
 // Register the subclass
-Parse.Object.registerSubclass("Permission", Permission);
+Parse.Object.registerSubclass('Permission', Permission);
 
 module.exports = Permission;

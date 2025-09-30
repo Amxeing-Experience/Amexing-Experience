@@ -1,17 +1,17 @@
-const RoleBasedController = require("./base/RoleBasedController");
+const RoleBasedController = require('./base/RoleBasedController');
 
 /**
  * ClientController - Implements client-specific dashboard functionality.
  */
 class ClientController extends RoleBasedController {
   constructor() {
-    super("client");
+    super('client');
   }
 
   async index(req, res) {
     try {
-      await this.renderRoleView(req, res, "index", {
-        title: "Client Dashboard",
+      await this.renderRoleView(req, res, 'index', {
+        title: 'Client Dashboard',
         stats: await this.getClientStats(),
         breadcrumb: null,
       });
@@ -22,12 +22,12 @@ class ClientController extends RoleBasedController {
 
   async departments(req, res) {
     try {
-      await this.renderRoleView(req, res, "departments", {
-        title: "Department Management",
+      await this.renderRoleView(req, res, 'departments', {
+        title: 'Department Management',
         departments: [],
         breadcrumb: {
-          title: "Departments",
-          items: [{ name: "Departments", active: true }],
+          title: 'Departments',
+          items: [{ name: 'Departments', active: true }],
         },
       });
     } catch (error) {
@@ -37,12 +37,12 @@ class ClientController extends RoleBasedController {
 
   async employees(req, res) {
     try {
-      await this.renderRoleView(req, res, "employees", {
-        title: "Employee Management",
+      await this.renderRoleView(req, res, 'employees', {
+        title: 'Employee Management',
         employees: [],
         breadcrumb: {
-          title: "Employees",
-          items: [{ name: "Employees", active: true }],
+          title: 'Employees',
+          items: [{ name: 'Employees', active: true }],
         },
       });
     } catch (error) {
@@ -52,12 +52,12 @@ class ClientController extends RoleBasedController {
 
   async budgets(req, res) {
     try {
-      await this.renderRoleView(req, res, "budgets", {
-        title: "Budget Management",
+      await this.renderRoleView(req, res, 'budgets', {
+        title: 'Budget Management',
         budgets: [],
         breadcrumb: {
-          title: "Budgets",
-          items: [{ name: "Budgets", active: true }],
+          title: 'Budgets',
+          items: [{ name: 'Budgets', active: true }],
         },
       });
     } catch (error) {
@@ -67,12 +67,12 @@ class ClientController extends RoleBasedController {
 
   async reports(req, res) {
     try {
-      await this.renderRoleView(req, res, "reports", {
-        title: "Company Reports",
+      await this.renderRoleView(req, res, 'reports', {
+        title: 'Company Reports',
         reports: [],
         breadcrumb: {
-          title: "Reports",
-          items: [{ name: "Reports", active: true }],
+          title: 'Reports',
+          items: [{ name: 'Reports', active: true }],
         },
       });
     } catch (error) {

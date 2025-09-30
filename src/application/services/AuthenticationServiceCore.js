@@ -10,11 +10,11 @@
  * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
-const Parse = require("parse/node");
-const jwt = require("jsonwebtoken");
+const Parse = require('parse/node');
+const jwt = require('jsonwebtoken');
 // const crypto = require('crypto'); // Not used in this file
-const AmexingUser = require("../../domain/models/AmexingUser");
-const logger = require("../../infrastructure/logger");
+const AmexingUser = require('../../domain/models/AmexingUser');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Authentication Service Core - Base functionality for authentication operations.
@@ -56,9 +56,9 @@ const logger = require("../../infrastructure/logger");
  */
 class AuthenticationServiceCore {
   constructor() {
-    this.jwtSecret = process.env.JWT_SECRET || "your-secret-key";
-    this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || "8h";
-    this.refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
+    this.jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+    this.jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
+    this.refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
   }
 
   /**
@@ -76,18 +76,18 @@ class AuthenticationServiceCore {
    * @returns {*} - Operation result.
    */
   validateRegistrationData(userData) {
-    const required = ["username", "email", "password", "firstName", "lastName"];
+    const required = ['username', 'email', 'password', 'firstName', 'lastName'];
 
     required.forEach((field) => {
       // eslint-disable-next-line security/detect-object-injection
       if (
-        !userData[field] ||
-        typeof userData[field] !== "string" ||
-        userData[field].trim() === ""
+        !userData[field]
+        || typeof userData[field] !== 'string'
+        || userData[field].trim() === ''
       ) {
         throw new Parse.Error(
           Parse.Error.VALIDATION_ERROR,
-          `${field} is required`,
+          `${field} is required`
         );
       }
     });
@@ -97,7 +97,7 @@ class AuthenticationServiceCore {
     if (!emailRegex.test(userData.email)) {
       throw new Parse.Error(
         Parse.Error.VALIDATION_ERROR,
-        "Invalid email format",
+        'Invalid email format'
       );
     }
 
@@ -106,7 +106,7 @@ class AuthenticationServiceCore {
     if (!usernameRegex.test(userData.username)) {
       throw new Parse.Error(
         Parse.Error.VALIDATION_ERROR,
-        "Username must be 3-20 characters, alphanumeric and underscores only",
+        'Username must be 3-20 characters, alphanumeric and underscores only'
       );
     }
   }
@@ -129,22 +129,22 @@ class AuthenticationServiceCore {
   async checkUserExists(email, username) {
     // Check email
     const emailQuery = new Parse.Query(AmexingUser);
-    emailQuery.equalTo("email", email.toLowerCase());
+    emailQuery.equalTo('email', email.toLowerCase());
     const existingEmail = await emailQuery.first({ useMasterKey: true });
 
     if (existingEmail) {
-      throw new Parse.Error(Parse.Error.USERNAME_TAKEN, "Email already exists");
+      throw new Parse.Error(Parse.Error.USERNAME_TAKEN, 'Email already exists');
     }
 
     // Check username
     const usernameQuery = new Parse.Query(AmexingUser);
-    usernameQuery.equalTo("username", username.toLowerCase());
+    usernameQuery.equalTo('username', username.toLowerCase());
     const existingUsername = await usernameQuery.first({ useMasterKey: true });
 
     if (existingUsername) {
       throw new Parse.Error(
         Parse.Error.USERNAME_TAKEN,
-        "Username already exists",
+        'Username already exists'
       );
     }
   }
@@ -163,10 +163,10 @@ class AuthenticationServiceCore {
    */
   async findUserByIdentifier(identifier) {
     const emailQuery = new Parse.Query(AmexingUser);
-    emailQuery.equalTo("email", identifier.toLowerCase());
+    emailQuery.equalTo('email', identifier.toLowerCase());
 
     const usernameQuery = new Parse.Query(AmexingUser);
-    usernameQuery.equalTo("username", identifier.toLowerCase());
+    usernameQuery.equalTo('username', identifier.toLowerCase());
 
     const query = Parse.Query.or(emailQuery, usernameQuery);
 
@@ -188,7 +188,7 @@ class AuthenticationServiceCore {
    */
   async findUserByEmail(email) {
     const query = new Parse.Query(AmexingUser);
-    query.equalTo("email", email.toLowerCase());
+    query.equalTo('email', email.toLowerCase());
     return query.first({ useMasterKey: true });
   }
 
@@ -236,78 +236,78 @@ class AuthenticationServiceCore {
    */
   async generateTokens(user) {
     // Get role name from the new Role relationship (Pointer)
-    let roleName = "guest";
+    let roleName = 'guest';
     let roleObjectId = null;
-    const rolePointer = user.get("roleId");
+    const rolePointer = user.get('roleId');
 
     if (rolePointer) {
       try {
         // Check if rolePointer is already a fetched object or just a pointer
-        if (rolePointer.get && typeof rolePointer.get === "function") {
+        if (rolePointer.get && typeof rolePointer.get === 'function') {
           // Role object is already fetched
-          roleName = rolePointer.get("name") || "guest";
+          roleName = rolePointer.get('name') || 'guest';
           roleObjectId = rolePointer.id;
-        } else if (typeof rolePointer === "string") {
+        } else if (typeof rolePointer === 'string') {
           // rolePointer is a string ID (backward compatibility)
-          const roleQuery = new Parse.Query("Role");
-          roleQuery.equalTo("objectId", rolePointer);
+          const roleQuery = new Parse.Query('Role');
+          roleQuery.equalTo('objectId', rolePointer);
           const roleObject = await roleQuery.first({ useMasterKey: true });
           if (roleObject) {
-            roleName = roleObject.get("name") || "guest";
+            roleName = roleObject.get('name') || 'guest';
             roleObjectId = roleObject.id;
           }
         } else {
           // rolePointer is a pointer object, fetch it
-          const roleQuery = new Parse.Query("Role");
-          roleQuery.equalTo("objectId", rolePointer.id);
+          const roleQuery = new Parse.Query('Role');
+          roleQuery.equalTo('objectId', rolePointer.id);
           const roleObject = await roleQuery.first({ useMasterKey: true });
           if (roleObject) {
-            roleName = roleObject.get("name") || "guest";
+            roleName = roleObject.get('name') || 'guest';
             roleObjectId = roleObject.id;
           }
         }
       } catch (roleError) {
         // Fall back to old role field if new relationship fails
-        roleName = user.get("role") || "guest";
+        roleName = user.get('role') || 'guest';
         logger.warn(
-          "Failed to resolve role from Pointer, falling back to string role",
+          'Failed to resolve role from Pointer, falling back to string role',
           {
             userId: user.id,
             error: roleError.message,
-          },
+          }
         );
       }
     } else {
       // Fall back to old role field if no roleId
-      roleName = user.get("role") || "guest";
+      roleName = user.get('role') || 'guest';
     }
 
     const payload = {
       userId: user.id,
-      username: user.get("username"),
-      email: user.get("email"),
+      username: user.get('username'),
+      email: user.get('email'),
       role: roleName,
       roleId: roleObjectId,
-      organizationId: user.get("organizationId"),
+      organizationId: user.get('organizationId'),
       iat: Math.floor(Date.now() / 1000),
     };
 
     const accessToken = jwt.sign(
-      { ...payload, type: "access" },
+      { ...payload, type: 'access' },
       this.jwtSecret,
-      { expiresIn: this.jwtExpiresIn },
+      { expiresIn: this.jwtExpiresIn }
     );
 
     const refreshToken = jwt.sign(
-      { ...payload, type: "refresh" },
+      { ...payload, type: 'refresh' },
       this.jwtSecret,
-      { expiresIn: this.refreshExpiresIn },
+      { expiresIn: this.refreshExpiresIn }
     );
 
     return {
       accessToken,
       refreshToken,
-      tokenType: "Bearer",
+      tokenType: 'Bearer',
       expiresIn: this.jwtExpiresIn,
     };
   }
@@ -326,8 +326,8 @@ class AuthenticationServiceCore {
    * const masked = authService.maskEmail('john@example.com'); // returns 'joh***@example.com'
    */
   maskEmail(email) {
-    if (!email) return "";
-    const [local, _domain] = email.split("@");
+    if (!email) return '';
+    const [local, _domain] = email.split('@');
     return `${local.substring(0, 3)}***@${_domain}`;
   }
 }

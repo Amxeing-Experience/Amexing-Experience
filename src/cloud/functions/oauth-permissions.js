@@ -10,15 +10,15 @@
  * // Returns: function result
  */
 
-const Parse = require("parse/node");
-const OAuthPermissionService = require("../../application/services/OAuthPermissionService");
-const PermissionInheritanceService = require("../../application/services/PermissionInheritanceService");
-const PermissionContextService = require("../../application/services/PermissionContextService");
-const PermissionDelegationService = require("../../application/services/PermissionDelegationService");
+const Parse = require('parse/node');
+const OAuthPermissionService = require('../../application/services/OAuthPermissionService');
+const PermissionInheritanceService = require('../../application/services/PermissionInheritanceService');
+const PermissionContextService = require('../../application/services/PermissionContextService');
+const PermissionDelegationService = require('../../application/services/PermissionDelegationService');
 const {
   PermissionAuditService,
-} = require("../../application/services/PermissionAuditService");
-const logger = require("../../infrastructure/logger");
+} = require('../../application/services/PermissionAuditService');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Gets user permission inheritance status
@@ -36,7 +36,7 @@ const getUserPermissionInheritance = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
@@ -44,21 +44,20 @@ const getUserPermissionInheritance = async (request) => {
 
     // Check authorization
     if (userId !== request.user.id) {
-      const userRole = request.user.get("role");
-      if (!["admin", "superadmin", "manager"].includes(userRole)) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Cannot view other users' permission inheritance",
+          "Cannot view other users' permission inheritance"
         );
       }
     }
 
-    const inheritance =
-      await PermissionInheritanceService.getInheritanceStatus(userId);
+    const inheritance = await PermissionInheritanceService.getInheritanceStatus(userId);
 
-    logger.logSecurityEvent("PERMISSION_INHERITANCE_VIEWED", request.user.id, {
+    logger.logSecurityEvent('PERMISSION_INHERITANCE_VIEWED', request.user.id, {
       targetUserId: userId,
-      viewerRole: request.user.get("role"),
+      viewerRole: request.user.get('role'),
       hasInheritance: inheritance.hasInheritance,
     });
 
@@ -68,7 +67,7 @@ const getUserPermissionInheritance = async (request) => {
       inheritance,
     };
   } catch (error) {
-    logger.error("Error getting user permission inheritance:", error);
+    logger.error('Error getting user permission inheritance:', error);
     throw error;
   }
 };
@@ -89,7 +88,7 @@ const getAvailableContexts = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
@@ -97,17 +96,16 @@ const getAvailableContexts = async (request) => {
 
     // Only allow users to view their own contexts unless admin
     if (userId !== request.user.id) {
-      const userRole = request.user.get("role");
-      if (!["admin", "superadmin"].includes(userRole)) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Cannot view other users' contexts",
+          "Cannot view other users' contexts"
         );
       }
     }
 
-    const contexts =
-      await PermissionContextService.getAvailableContexts(userId);
+    const contexts = await PermissionContextService.getAvailableContexts(userId);
 
     return {
       success: true,
@@ -116,7 +114,7 @@ const getAvailableContexts = async (request) => {
       count: contexts.length,
     };
   } catch (error) {
-    logger.error("Error getting available contexts:", error);
+    logger.error('Error getting available contexts:', error);
     throw error;
   }
 };
@@ -137,7 +135,7 @@ const switchPermissionContext = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
@@ -146,20 +144,20 @@ const switchPermissionContext = async (request) => {
     const sessionToken = request.user.getSessionToken();
 
     if (!contextId) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, "contextId is required");
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'contextId is required');
     }
 
     const switchResult = await PermissionContextService.switchToContext(
       userId,
       contextId,
-      sessionToken,
+      sessionToken
     );
 
     // Record audit event
     await PermissionAuditService.recordPermissionAudit({
       userId,
-      action: "CONTEXT_SWITCHED",
-      permission: "context_switch",
+      action: 'CONTEXT_SWITCHED',
+      permission: 'context_switch',
       performedBy: userId,
       reason: `Switched to context: ${contextId}`,
       context: contextId,
@@ -175,7 +173,7 @@ const switchPermissionContext = async (request) => {
       ...switchResult,
     };
   } catch (error) {
-    logger.error("Error switching permission context:", error);
+    logger.error('Error switching permission context:', error);
     throw error;
   }
 };
@@ -196,15 +194,15 @@ const createPermissionDelegation = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
-    const userRole = request.user.get("role");
-    if (!["manager", "admin", "superadmin"].includes(userRole)) {
+    const userRole = request.user.get('role');
+    if (!['manager', 'admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        "Insufficient permissions to create delegation",
+        'Insufficient permissions to create delegation'
       );
     }
 
@@ -221,7 +219,7 @@ const createPermissionDelegation = async (request) => {
     if (!employeeId || !permissions || !delegationType || !reason) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Missing required parameters: employeeId, permissions, delegationType, reason",
+        'Missing required parameters: employeeId, permissions, delegationType, reason'
       );
     }
 
@@ -236,14 +234,14 @@ const createPermissionDelegation = async (request) => {
         duration,
         reason,
         context,
-      },
+      }
     );
 
     // Record audit event
     await PermissionAuditService.recordPermissionAudit({
       userId: employeeId,
-      action: "PERMISSION_DELEGATED",
-      permission: permissions.join(","),
+      action: 'PERMISSION_DELEGATED',
+      permission: permissions.join(','),
       performedBy: managerId,
       reason,
       context,
@@ -259,7 +257,7 @@ const createPermissionDelegation = async (request) => {
       ...delegationResult,
     };
   } catch (error) {
-    logger.error("Error creating permission delegation:", error);
+    logger.error('Error creating permission delegation:', error);
     throw error;
   }
 };
@@ -280,7 +278,7 @@ const revokePermissionDelegation = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
@@ -289,7 +287,7 @@ const revokePermissionDelegation = async (request) => {
     if (!delegationId || !reason) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Missing required parameters: delegationId, reason",
+        'Missing required parameters: delegationId, reason'
       );
     }
 
@@ -298,16 +296,16 @@ const revokePermissionDelegation = async (request) => {
     const revocationResult = await PermissionDelegationService.revokeDelegation(
       delegationId,
       revokedBy,
-      reason,
+      reason
     );
 
     return {
       success: true,
       ...revocationResult,
-      message: "Permission delegation revoked successfully",
+      message: 'Permission delegation revoked successfully',
     };
   } catch (error) {
-    logger.error("Error revoking permission delegation:", error);
+    logger.error('Error revoking permission delegation:', error);
     throw error;
   }
 };
@@ -328,15 +326,15 @@ const createEmergencyElevation = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
-    const userRole = request.user.get("role");
-    if (!["admin", "superadmin"].includes(userRole)) {
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        "Admin access required for emergency elevation",
+        'Admin access required for emergency elevation'
       );
     }
 
@@ -345,37 +343,36 @@ const createEmergencyElevation = async (request) => {
       permissions,
       reason,
       duration = 4 * 60 * 60 * 1000, // 4 hours default
-      context = "emergency",
+      context = 'emergency',
     } = request.params;
 
     if (!userId || !permissions || !reason) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Missing required parameters: userId, permissions, reason",
+        'Missing required parameters: userId, permissions, reason'
       );
     }
 
     const elevatedBy = request.user.id;
 
-    const elevationResult =
-      await PermissionDelegationService.createEmergencyElevation({
-        userId,
-        permissions: Array.isArray(permissions) ? permissions : [permissions],
-        reason,
-        duration,
-        elevatedBy,
-        context,
-      });
+    const elevationResult = await PermissionDelegationService.createEmergencyElevation({
+      userId,
+      permissions: Array.isArray(permissions) ? permissions : [permissions],
+      reason,
+      duration,
+      elevatedBy,
+      context,
+    });
 
     // Record critical audit event
     await PermissionAuditService.recordPermissionAudit({
       userId,
-      action: "EMERGENCY_PERMISSION",
-      permission: permissions.join(","),
+      action: 'EMERGENCY_PERMISSION',
+      permission: permissions.join(','),
       performedBy: elevatedBy,
       reason,
       context,
-      severity: "critical",
+      severity: 'critical',
       metadata: {
         duration,
         expiresAt: elevationResult.expiresAt,
@@ -385,10 +382,10 @@ const createEmergencyElevation = async (request) => {
     return {
       success: true,
       ...elevationResult,
-      message: "Emergency permission elevation created",
+      message: 'Emergency permission elevation created',
     };
   } catch (error) {
-    logger.error("Error creating emergency elevation:", error);
+    logger.error('Error creating emergency elevation:', error);
     throw error;
   }
 };
@@ -409,45 +406,45 @@ const createPermissionOverride = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
-    const userRole = request.user.get("role");
-    if (!["admin", "superadmin"].includes(userRole)) {
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        "Admin access required for permission overrides",
+        'Admin access required for permission overrides'
       );
     }
 
-    const { userId, overrideType, permission, reason, context, expiresAt } =
-      request.params;
+    const {
+      userId, overrideType, permission, reason, context, expiresAt,
+    } = request.params;
 
     if (!userId || !overrideType || !permission || !reason) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Missing required parameters: userId, overrideType, permission, reason",
+        'Missing required parameters: userId, overrideType, permission, reason'
       );
     }
 
     const grantedBy = request.user.id;
 
-    const override =
-      await PermissionInheritanceService.createPermissionOverride({
-        userId,
-        type: overrideType,
-        permission,
-        reason,
-        grantedBy,
-        context,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
-      });
+    const override = await PermissionInheritanceService.createPermissionOverride({
+      userId,
+      type: overrideType,
+      permission,
+      reason,
+      grantedBy,
+      context,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+    });
 
     // Record audit event
     await PermissionAuditService.recordPermissionAudit({
       userId,
-      action: "OVERRIDE_CREATED",
+      action: 'OVERRIDE_CREATED',
       permission,
       performedBy: grantedBy,
       reason,
@@ -466,10 +463,10 @@ const createPermissionOverride = async (request) => {
       overrideType,
       permission,
       expiresAt,
-      message: "Permission override created successfully",
+      message: 'Permission override created successfully',
     };
   } catch (error) {
-    logger.error("Error creating permission override:", error);
+    logger.error('Error creating permission override:', error);
     throw error;
   }
 };
@@ -490,7 +487,7 @@ const checkUserPermission = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
@@ -499,17 +496,17 @@ const checkUserPermission = async (request) => {
     if (!permission) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "permission parameter is required",
+        'permission parameter is required'
       );
     }
 
     // Check authorization
     if (userId !== request.user.id) {
-      const userRole = request.user.get("role");
-      if (!["admin", "superadmin", "manager"].includes(userRole)) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Cannot check other users' permissions",
+          "Cannot check other users' permissions"
         );
       }
     }
@@ -517,7 +514,7 @@ const checkUserPermission = async (request) => {
     const hasPermission = await OAuthPermissionService.hasPermission(
       userId,
       permission,
-      context,
+      context
     );
 
     return {
@@ -529,7 +526,7 @@ const checkUserPermission = async (request) => {
       checkedAt: new Date(),
     };
   } catch (error) {
-    logger.error("Error checking user permission:", error);
+    logger.error('Error checking user permission:', error);
     throw error;
   }
 };
@@ -550,7 +547,7 @@ const getActiveDelegations = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
@@ -558,17 +555,16 @@ const getActiveDelegations = async (request) => {
 
     // Check authorization
     if (managerId !== request.user.id) {
-      const userRole = request.user.get("role");
-      if (!["admin", "superadmin"].includes(userRole)) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Cannot view other managers' delegations",
+          "Cannot view other managers' delegations"
         );
       }
     }
 
-    const delegations =
-      await PermissionDelegationService.getActiveDelegations(managerId);
+    const delegations = await PermissionDelegationService.getActiveDelegations(managerId);
 
     return {
       success: true,
@@ -577,7 +573,7 @@ const getActiveDelegations = async (request) => {
       count: delegations.length,
     };
   } catch (error) {
-    logger.error("Error getting active delegations:", error);
+    logger.error('Error getting active delegations:', error);
     throw error;
   }
 };
@@ -598,7 +594,7 @@ const getDelegatedPermissions = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
@@ -606,17 +602,16 @@ const getDelegatedPermissions = async (request) => {
 
     // Check authorization
     if (employeeId !== request.user.id) {
-      const userRole = request.user.get("role");
-      if (!["admin", "superadmin", "manager"].includes(userRole)) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          "Cannot view other employees' delegated permissions",
+          "Cannot view other employees' delegated permissions"
         );
       }
     }
 
-    const delegations =
-      await PermissionDelegationService.getDelegatedPermissions(employeeId);
+    const delegations = await PermissionDelegationService.getDelegatedPermissions(employeeId);
 
     return {
       success: true,
@@ -625,7 +620,7 @@ const getDelegatedPermissions = async (request) => {
       count: delegations.length,
     };
   } catch (error) {
-    logger.error("Error getting delegated permissions:", error);
+    logger.error('Error getting delegated permissions:', error);
     throw error;
   }
 };
@@ -646,15 +641,15 @@ const getPermissionAuditReport = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
-    const userRole = request.user.get("role");
-    if (!["admin", "superadmin"].includes(userRole)) {
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        "Admin access required for audit reports",
+        'Admin access required for audit reports'
       );
     }
 
@@ -662,9 +657,9 @@ const getPermissionAuditReport = async (request) => {
       startDate,
       endDate,
       userId,
-      complianceFramework = "PCI_DSS",
+      complianceFramework = 'PCI_DSS',
       includeMetadata = false,
-      format = "summary",
+      format = 'summary',
     } = request.params;
 
     const report = await PermissionAuditService.generateComplianceReport({
@@ -677,14 +672,14 @@ const getPermissionAuditReport = async (request) => {
     });
 
     logger.logSecurityEvent(
-      "PERMISSION_AUDIT_REPORT_ACCESSED",
+      'PERMISSION_AUDIT_REPORT_ACCESSED',
       request.user.id,
       {
         framework: complianceFramework,
         format,
         recordCount: report.summary.totalRecords,
-        requestedBy: request.user.get("username"),
-      },
+        requestedBy: request.user.get('username'),
+      }
     );
 
     return {
@@ -692,7 +687,7 @@ const getPermissionAuditReport = async (request) => {
       report,
     };
   } catch (error) {
-    logger.error("Error generating permission audit report:", error);
+    logger.error('Error generating permission audit report:', error);
     throw error;
   }
 };
@@ -713,20 +708,19 @@ const getPermissionAuditStats = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
-    const userRole = request.user.get("role");
-    if (!["admin", "superadmin"].includes(userRole)) {
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        "Admin access required for audit statistics",
+        'Admin access required for audit statistics'
       );
     }
 
-    const { timeFrame = "30d", complianceFramework = "PCI_DSS" } =
-      request.params;
+    const { timeFrame = '30d', complianceFramework = 'PCI_DSS' } = request.params;
 
     const stats = await PermissionAuditService.getAuditStatistics({
       timeFrame,
@@ -740,7 +734,7 @@ const getPermissionAuditStats = async (request) => {
       stats,
     };
   } catch (error) {
-    logger.error("Error getting permission audit statistics:", error);
+    logger.error('Error getting permission audit statistics:', error);
     throw error;
   }
 };
@@ -761,15 +755,15 @@ const getAvailablePermissions = async (request) => {
     if (!request.user) {
       throw new Parse.Error(
         Parse.Error.INVALID_SESSION_TOKEN,
-        "User not authenticated",
+        'User not authenticated'
       );
     }
 
-    const userRole = request.user.get("role");
-    if (!["manager", "admin", "superadmin"].includes(userRole)) {
+    const userRole = request.user.get('role');
+    if (!['manager', 'admin', 'superadmin'].includes(userRole)) {
       throw new Parse.Error(
         Parse.Error.OPERATION_FORBIDDEN,
-        "Manager access required to view available permissions",
+        'Manager access required to view available permissions'
       );
     }
 
@@ -777,8 +771,7 @@ const getAvailablePermissions = async (request) => {
 
     let permissions;
     if (_provider) {
-      permissions =
-        OAuthPermissionService.getProviderPermissionMappings(_provider);
+      permissions = OAuthPermissionService.getProviderPermissionMappings(_provider);
     } else {
       permissions = OAuthPermissionService.getAllAvailablePermissions();
     }
@@ -786,13 +779,13 @@ const getAvailablePermissions = async (request) => {
     return {
       success: true,
       permissions,
-      provider: _provider || "all",
+      provider: _provider || 'all',
       count: Array.isArray(permissions)
         ? permissions.length
         : Object.keys(permissions).length,
     };
   } catch (error) {
-    logger.error("Error getting available permissions:", error);
+    logger.error('Error getting available permissions:', error);
     throw error;
   }
 };

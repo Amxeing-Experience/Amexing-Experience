@@ -1,15 +1,15 @@
 /* eslint-disable max-lines */
-const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
-const mongoSanitize = require("express-mongo-sanitize");
-const xss = require("xss-clean");
-const hpp = require("hpp");
-const cors = require("cors");
-const session = require("express-session");
-const MongoStore = require("connect-mongo");
-const winston = require("winston");
-const csrf = require("csrf");
-const uidSafe = require("uid-safe");
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const hpp = require('hpp');
+const cors = require('cors');
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
+const winston = require('winston');
+const csrf = require('csrf');
+const uidSafe = require('uid-safe');
 
 /**
  * Security Middleware - Comprehensive security protection suite for PCI DSS compliance.
@@ -58,8 +58,8 @@ const uidSafe = require("uid-safe");
  */
 class SecurityMiddleware {
   constructor() {
-    this.isDevelopment = process.env.NODE_ENV === "development";
-    this.isProduction = process.env.NODE_ENV === "production";
+    this.isDevelopment = process.env.NODE_ENV === 'development';
+    this.isProduction = process.env.NODE_ENV === 'production';
 
     // Initialize CSRF protection
     // eslint-disable-next-line new-cap
@@ -78,46 +78,46 @@ class SecurityMiddleware {
           styleSrc: [
             "'self'",
             "'unsafe-inline'",
-            "https://fonts.googleapis.com",
-            "https://cdn.datatables.net",
-            "https://cdn.jsdelivr.net",
-            "https://cdnjs.cloudflare.com",
+            'https://fonts.googleapis.com',
+            'https://cdn.datatables.net',
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
           ],
           scriptSrc: [
             "'self'",
-            this.isDevelopment ? "'unsafe-inline'" : "",
-            this.isDevelopment ? "'unsafe-eval'" : "",
-            "https://code.jquery.com",
-            "https://cdn.datatables.net",
-            "https://cdn.jsdelivr.net",
-            "https://cdnjs.cloudflare.com",
+            this.isDevelopment ? "'unsafe-inline'" : '',
+            this.isDevelopment ? "'unsafe-eval'" : '',
+            'https://code.jquery.com',
+            'https://cdn.datatables.net',
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
           ].filter(Boolean),
-          imgSrc: ["'self'", "data:", "https:"],
-          fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+          imgSrc: ["'self'", 'data:', 'https:'],
+          fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
           connectSrc: [
             "'self'",
-            "http://localhost:1337",
-            "https://cdn.datatables.net",
-            "https://cdn.jsdelivr.net",
-            "https://cdnjs.cloudflare.com",
+            'http://localhost:1337',
+            'https://cdn.datatables.net',
+            'https://cdn.jsdelivr.net',
+            'https://cdnjs.cloudflare.com',
           ],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],
           frameSrc: ["'none'"],
-          sandbox: ["allow-forms", "allow-scripts", "allow-same-origin"],
-          reportUri: "/api/csp-report",
+          sandbox: ['allow-forms', 'allow-scripts', 'allow-same-origin'],
+          reportUri: '/api/csp-report',
           upgradeInsecureRequests: this.isProduction ? [] : null,
         },
       },
       crossOriginEmbedderPolicy: !this.isDevelopment,
-      crossOriginOpenerPolicy: { policy: "same-origin" },
-      crossOriginResourcePolicy: { policy: "same-origin" },
+      crossOriginOpenerPolicy: { policy: 'same-origin' },
+      crossOriginResourcePolicy: { policy: 'same-origin' },
       dnsPrefetchControl: { allow: false },
       expectCt: {
         enforce: true,
         maxAge: 30,
       },
-      frameguard: { action: "deny" },
+      frameguard: { action: 'deny' },
       hidePoweredBy: true,
       hsts: {
         maxAge: 31536000,
@@ -128,7 +128,7 @@ class SecurityMiddleware {
       noSniff: true,
       originAgentCluster: true,
       permittedCrossDomainPolicies: false,
-      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+      referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
       xssFilter: true,
     });
   }
@@ -139,16 +139,16 @@ class SecurityMiddleware {
       windowMs:
         parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
       max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
-      message: "Too many requests from this IP, please try again later.",
+      message: 'Too many requests from this IP, please try again later.',
       standardHeaders: true,
       legacyHeaders: false,
       skipSuccessfulRequests:
-        process.env.RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS === "true",
+        process.env.RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS === 'true',
       handler: (req, res) => {
         winston.warn(`Rate limit exceeded for IP: ${req.ip}`);
         res.status(429).json({
-          error: "Too many requests",
-          message: "Rate limit exceeded. Please try again later.",
+          error: 'Too many requests',
+          message: 'Rate limit exceeded. Please try again later.',
           retryAfter: Math.ceil(req.rateLimit.resetTime / 1000),
         });
       },
@@ -160,7 +160,7 @@ class SecurityMiddleware {
     return rateLimit({
       windowMs: 15 * 60 * 1000,
       max: this.isDevelopment ? 10 : 5, // More lenient in development
-      message: "Too many attempts. Please try again later.",
+      message: 'Too many attempts. Please try again later.',
       skipSuccessfulRequests: false,
     });
   }
@@ -170,7 +170,7 @@ class SecurityMiddleware {
     return rateLimit({
       windowMs: 1 * 60 * 1000,
       max: 30,
-      message: "API rate limit exceeded.",
+      message: 'API rate limit exceeded.',
       standardHeaders: true,
       legacyHeaders: false,
     });
@@ -179,10 +179,10 @@ class SecurityMiddleware {
   // MongoDB injection prevention
   getMongoSanitizer() {
     return mongoSanitize({
-      replaceWith: "_",
+      replaceWith: '_',
       onSanitize: ({ req, _key }) => {
         winston.warn(
-          `Attempted NoSQL injection from IP ${req.ip} on field ${_key}`,
+          `Attempted NoSQL injection from IP ${req.ip} on field ${_key}`
         );
       },
     });
@@ -196,7 +196,7 @@ class SecurityMiddleware {
   // HTTP Parameter Pollution prevention
   getHppProtection() {
     return hpp({
-      whitelist: ["sort", "fields", "page", "limit"],
+      whitelist: ['sort', 'fields', 'page', 'limit'],
     });
   }
 
@@ -205,8 +205,8 @@ class SecurityMiddleware {
     const corsOptions = {
       origin: (origin, callback) => {
         const allowedOrigins = (
-          process.env.CORS_ORIGIN || "http://localhost:3000"
-        ).split(",");
+          process.env.CORS_ORIGIN || 'http://localhost:3000'
+        ).split(',');
 
         // Allow requests without origin (server-to-server, Parse Server health checks)
         if (!origin) {
@@ -217,18 +217,18 @@ class SecurityMiddleware {
           callback(null, true);
         } else {
           winston.warn(`CORS blocked request from origin: ${origin}`);
-          callback(new Error("Not allowed by CORS"));
+          callback(new Error('Not allowed by CORS'));
         }
       },
-      credentials: process.env.CORS_CREDENTIALS === "true",
-      methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+      credentials: process.env.CORS_CREDENTIALS === 'true',
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "X-Parse-Application-Id",
-        "X-Parse-Session-Token",
+        'Content-Type',
+        'Authorization',
+        'X-Parse-Application-Id',
+        'X-Parse-Session-Token',
       ],
-      exposedHeaders: ["X-Total-Count", "X-Page", "X-Per-Page"],
+      exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page'],
       maxAge: 86400,
       preflightContinue: false,
       optionsSuccessStatus: 204,
@@ -243,23 +243,23 @@ class SecurityMiddleware {
     // Use MemoryStore for development to avoid MongoDB dependency issues
     const sessionConfig = {
       secret:
-        process.env.SESSION_SECRET || "default-secret-change-in-production",
-      name: "amexing.sid",
+        process.env.SESSION_SECRET || 'default-secret-change-in-production',
+      name: 'amexing.sid',
       resave: false,
       saveUninitialized: true, // Changed to true for CSRF initialization
     };
 
     // Only use MongoStore in production
-    if (process.env.NODE_ENV === "production") {
+    if (process.env.NODE_ENV === 'production') {
       sessionConfig.store = MongoStore.create({
         mongoUrl:
-          process.env.DATABASE_URI || "mongodb://localhost:27017/amexingdb",
-        collectionName: "sessions",
+          process.env.DATABASE_URI || 'mongodb://localhost:27017/amexingdb',
+        collectionName: 'sessions',
         ttl: parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 || 900,
-        autoRemove: "native",
+        autoRemove: 'native',
         crypto: {
           secret:
-            process.env.SESSION_SECRET || "default-secret-change-in-production",
+            process.env.SESSION_SECRET || 'default-secret-change-in-production',
         },
       });
     }
@@ -267,22 +267,22 @@ class SecurityMiddleware {
     return session({
       ...sessionConfig,
       cookie: {
-        secure: process.env.NODE_ENV === "production", // Explicit secure flag for HTTPS
+        secure: process.env.NODE_ENV === 'production', // Explicit secure flag for HTTPS
         httpOnly: true,
         maxAge:
-          parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000 ||
-          900000,
+          parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000
+          || 900000,
         expires: new Date(
-          Date.now() +
-            (parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000 ||
-              900000),
+          Date.now()
+            + (parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000
+              || 900000)
         ), // Explicit expires
-        path: "/", // Explicit path configuration
-        sameSite: this.isProduction ? "strict" : "lax",
+        path: '/', // Explicit path configuration
+        sameSite: this.isProduction ? 'strict' : 'lax',
         domain: this.isProduction ? process.env.COOKIE_DOMAIN : undefined,
       },
       rolling: true,
-      unset: "destroy",
+      unset: 'destroy',
     });
   }
 
@@ -290,21 +290,21 @@ class SecurityMiddleware {
   validateContentType() {
     return (req, res, next) => {
       if (
-        req.method === "POST" ||
-        req.method === "PUT" ||
-        req.method === "PATCH"
+        req.method === 'POST'
+        || req.method === 'PUT'
+        || req.method === 'PATCH'
       ) {
-        const contentType = req.headers["content-type"];
+        const contentType = req.headers['content-type'];
         if (
-          !contentType ||
-          (!contentType.includes("application/json") &&
-            !contentType.includes("multipart/form-data") &&
-            !contentType.includes("application/x-www-form-urlencoded"))
+          !contentType
+          || (!contentType.includes('application/json')
+            && !contentType.includes('multipart/form-data')
+            && !contentType.includes('application/x-www-form-urlencoded'))
         ) {
           return res.status(400).json({
-            error: "Invalid Content-Type",
+            error: 'Invalid Content-Type',
             message:
-              "Content-Type must be application/json, multipart/form-data, or application/x-www-form-urlencoded",
+              'Content-Type must be application/json, multipart/form-data, or application/x-www-form-urlencoded',
           });
         }
       }
@@ -315,16 +315,16 @@ class SecurityMiddleware {
   // Security headers for API responses
   apiSecurityHeaders() {
     return (req, res, next) => {
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("X-Frame-Options", "DENY");
-      res.setHeader("X-XSS-Protection", "1; mode=block");
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-XSS-Protection', '1; mode=block');
       res.setHeader(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate, proxy-revalidate",
+        'Cache-Control',
+        'no-store, no-cache, must-revalidate, proxy-revalidate'
       );
-      res.setHeader("Pragma", "no-cache");
-      res.setHeader("Expires", "0");
-      res.setHeader("Surrogate-Control", "no-store");
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
       next();
     };
   }
@@ -340,8 +340,8 @@ class SecurityMiddleware {
       if (!allowedIps.includes(clientIp)) {
         winston.warn(`Access denied for IP: ${clientIp}`);
         return res.status(403).json({
-          error: "Access denied",
-          message: "Your IP address is not authorized to access this resource",
+          error: 'Access denied',
+          message: 'Your IP address is not authorized to access this resource',
         });
       }
       next();
@@ -350,10 +350,10 @@ class SecurityMiddleware {
 
   // Request ID middleware for tracking
   requestId() {
-    const { v4: uuid } = require("uuid");
+    const { v4: uuid } = require('uuid');
     return (req, res, next) => {
-      req.id = req.headers["x-request-id"] || uuid();
-      res.setHeader("X-Request-Id", req.id);
+      req.id = req.headers['x-request-id'] || uuid();
+      res.setHeader('X-Request-Id', req.id);
       next();
     };
   }
@@ -361,7 +361,7 @@ class SecurityMiddleware {
   // Audit logging middleware
   auditLogger() {
     return (req, res, next) => {
-      if (process.env.ENABLE_AUDIT_LOGGING !== "true") {
+      if (process.env.ENABLE_AUDIT_LOGGING !== 'true') {
         return next();
       }
 
@@ -377,7 +377,7 @@ class SecurityMiddleware {
           method: req.method,
           url: req.originalUrl,
           ip: req.ip,
-          userAgent: req.headers["user-agent"],
+          userAgent: req.headers['user-agent'],
           userId: req.user?.id,
           statusCode: res.statusCode,
           responseTime: Date.now() - startTime,
@@ -388,7 +388,7 @@ class SecurityMiddleware {
           auditLog.response = data;
         }
 
-        winston.info("Audit log:", auditLog);
+        winston.info('Audit log:', auditLog);
         return res.send(data);
       };
 
@@ -404,16 +404,16 @@ class SecurityMiddleware {
       try {
         // Skip CSRF for GET, HEAD, OPTIONS requests and API endpoints
         if (
-          req.method === "GET" ||
-          req.method === "HEAD" ||
-          req.method === "OPTIONS" ||
-          req.path.startsWith("/api/")
+          req.method === 'GET'
+          || req.method === 'HEAD'
+          || req.method === 'OPTIONS'
+          || req.path.startsWith('/api/')
         ) {
           // Generate CSRF token for forms if session exists
-          if (req.session && (req.method === "GET" || req.method === "HEAD")) {
+          if (req.session && (req.method === 'GET' || req.method === 'HEAD')) {
             if (!req.session.csrfSecret) {
               req.session.csrfSecret = await uidSafe(32);
-              winston.debug("Generated CSRF secret for new session", {
+              winston.debug('Generated CSRF secret for new session', {
                 sessionID: req.session.id,
                 path: req.path,
               });
@@ -427,7 +427,7 @@ class SecurityMiddleware {
         // For state-changing requests, verify CSRF token
         const secret = req.session?.csrfSecret;
         if (!secret) {
-          winston.error("CSRF secret missing for state-changing request", {
+          winston.error('CSRF secret missing for state-changing request', {
             method: req.method,
             path: req.path,
             sessionID: req.session?.id,
@@ -435,43 +435,42 @@ class SecurityMiddleware {
             ip: req.ip,
           });
           return res.status(403).json({
-            error: "CSRF Error",
+            error: 'CSRF Error',
             message:
-              "No CSRF secret found in session. Please refresh the page and try again.",
+              'No CSRF secret found in session. Please refresh the page and try again.',
           });
         }
 
-        const token =
-          req.headers["x-csrf-token"] ||
-          req.body?.csrfToken ||
-          req.query.csrfToken;
+        const token = req.headers['x-csrf-token']
+          || req.body?.csrfToken
+          || req.query.csrfToken;
         if (!token) {
           return res.status(403).json({
-            error: "CSRF Error",
-            message: "CSRF token missing",
+            error: 'CSRF Error',
+            message: 'CSRF token missing',
           });
         }
 
         if (!this.csrfProtection.verify(secret, token)) {
-          winston.warn("CSRF token verification failed", {
+          winston.warn('CSRF token verification failed', {
             ip: req.ip,
-            userAgent: req.get("User-Agent"),
+            userAgent: req.get('User-Agent'),
             method: req.method,
             url: req.originalUrl,
           });
 
           return res.status(403).json({
-            error: "CSRF Error",
-            message: "Invalid CSRF token",
+            error: 'CSRF Error',
+            message: 'Invalid CSRF token',
           });
         }
 
         next();
       } catch (error) {
-        winston.error("CSRF middleware error:", error);
+        winston.error('CSRF middleware error:', error);
         return res.status(500).json({
-          error: "Security Error",
-          message: "CSRF validation failed",
+          error: 'Security Error',
+          message: 'CSRF validation failed',
         });
       }
     };

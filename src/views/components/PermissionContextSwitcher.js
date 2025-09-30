@@ -10,7 +10,7 @@
  * // Returns: operation result
  */
 
-const Parse = require("parse/node");
+const Parse = require('parse/node');
 
 class PermissionContextSwitcher {
   constructor(containerId, options = {}) {
@@ -20,8 +20,8 @@ class PermissionContextSwitcher {
     this.currentContext = null;
 
     this.options = {
-      theme: "default",
-      position: "top-right",
+      theme: 'default',
+      position: 'top-right',
       showIcons: true,
       autoRefresh: 30000, // 30 seconds
       ...options,
@@ -46,7 +46,7 @@ class PermissionContextSwitcher {
       // Get current user
       this.currentUser = Parse.User.current();
       if (!this.currentUser) {
-        throw new Error("User not authenticated");
+        throw new Error('User not authenticated');
       }
 
       // Load available contexts
@@ -63,9 +63,9 @@ class PermissionContextSwitcher {
         this.setupAutoRefresh();
       }
 
-      console.log("PermissionContextSwitcher initialized successfully");
+      console.log('PermissionContextSwitcher initialized successfully');
     } catch (error) {
-      console.error("Error initializing PermissionContextSwitcher:", error);
+      console.error('Error initializing PermissionContextSwitcher:', error);
       this.renderError(error.message);
     }
   }
@@ -83,7 +83,7 @@ class PermissionContextSwitcher {
    */
   async loadAvailableContexts() {
     try {
-      const response = await Parse.Cloud.run("getAvailableContexts", {
+      const response = await Parse.Cloud.run('getAvailableContexts', {
         userId: this.currentUser.id,
       });
 
@@ -95,10 +95,10 @@ class PermissionContextSwitcher {
           this.currentContext = this.availableContexts[0]; // Default to first context
         }
       } else {
-        throw new Error("Failed to load available contexts");
+        throw new Error('Failed to load available contexts');
       }
     } catch (error) {
-      console.error("Error loading available contexts:", error);
+      console.error('Error loading available contexts:', error);
       throw error;
     }
   }
@@ -116,7 +116,7 @@ class PermissionContextSwitcher {
    */
   render() {
     if (!this.container) {
-      console.error("Container element not found");
+      console.error('Container element not found');
       return;
     }
 
@@ -126,77 +126,77 @@ class PermissionContextSwitcher {
     }
 
     // Create main container element using DOM methods
-    const mainDiv = document.createElement("div");
+    const mainDiv = document.createElement('div');
     mainDiv.className = `permission-context-switcher ${this.options.theme}`;
-    mainDiv.setAttribute("data-position", this.options.position);
+    mainDiv.setAttribute('data-position', this.options.position);
 
     // Create header section
-    const headerDiv = document.createElement("div");
-    headerDiv.className = "context-switcher-header";
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'context-switcher-header';
 
-    const h3 = document.createElement("h3");
+    const h3 = document.createElement('h3');
     if (this.options.showIcons) {
-      const iconEl = document.createElement("i");
-      iconEl.className = "icon-context";
+      const iconEl = document.createElement('i');
+      iconEl.className = 'icon-context';
       h3.appendChild(iconEl);
     }
-    h3.appendChild(document.createTextNode("Context de Permisos"));
+    h3.appendChild(document.createTextNode('Context de Permisos'));
 
-    const refreshBtn = document.createElement("button");
-    refreshBtn.className = "refresh-btn";
-    refreshBtn.title = "Actualizar contextos";
-    const refreshIcon = document.createElement("i");
-    refreshIcon.className = "icon-refresh";
+    const refreshBtn = document.createElement('button');
+    refreshBtn.className = 'refresh-btn';
+    refreshBtn.title = 'Actualizar contextos';
+    const refreshIcon = document.createElement('i');
+    refreshIcon.className = 'icon-refresh';
     refreshBtn.appendChild(refreshIcon);
 
     headerDiv.appendChild(h3);
     headerDiv.appendChild(refreshBtn);
 
     // Create current context section
-    const currentContextDiv = document.createElement("div");
-    currentContextDiv.className = "current-context";
+    const currentContextDiv = document.createElement('div');
+    currentContextDiv.className = 'current-context';
 
-    const currentLabel = document.createElement("label");
-    currentLabel.textContent = "Contexto Actual:";
+    const currentLabel = document.createElement('label');
+    currentLabel.textContent = 'Contexto Actual:';
 
-    const currentDisplay = document.createElement("div");
-    currentDisplay.className = "current-context-display";
+    const currentDisplay = document.createElement('div');
+    currentDisplay.className = 'current-context-display';
     currentDisplay.textContent = this.getCurrentContextText();
 
     currentContextDiv.appendChild(currentLabel);
     currentContextDiv.appendChild(currentDisplay);
 
     // Create available contexts section
-    const availableContextsDiv = document.createElement("div");
-    availableContextsDiv.className = "available-contexts";
+    const availableContextsDiv = document.createElement('div');
+    availableContextsDiv.className = 'available-contexts';
 
-    const availableLabel = document.createElement("label");
-    availableLabel.textContent = "Cambiar a:";
+    const availableLabel = document.createElement('label');
+    availableLabel.textContent = 'Cambiar a:';
 
-    const contextList = document.createElement("div");
-    contextList.className = "context-list";
+    const contextList = document.createElement('div');
+    contextList.className = 'context-list';
     this.appendContextListElements(contextList);
 
     availableContextsDiv.appendChild(availableLabel);
     availableContextsDiv.appendChild(contextList);
 
     // Create context info section
-    const contextInfoDiv = document.createElement("div");
-    contextInfoDiv.className = "context-info";
+    const contextInfoDiv = document.createElement('div');
+    contextInfoDiv.className = 'context-info';
     this.appendContextInfoElements(contextInfoDiv);
 
     // Create actions section
-    const actionsDiv = document.createElement("div");
-    actionsDiv.className = "context-actions";
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'context-actions';
 
-    const switchBtn = document.createElement("button");
-    switchBtn.className = "switch-btn";
+    const switchBtn = document.createElement('button');
+    switchBtn.className = 'switch-btn';
     switchBtn.disabled = true;
-    switchBtn.textContent = "Cambiar Contexto";
+    switchBtn.textContent = 'Cambiar Contexto';
 
-    const viewPermissionsBtn = document.createElement("button");
-    viewPermissionsBtn.className = "view-permissions-btn";
-    viewPermissionsBtn.textContent = "Ver Permisos";
+    const viewPermissionsBtn = document.createElement('button');
+    viewPermissionsBtn.className = 'view-permissions-btn';
+    viewPermissionsBtn.textContent = 'Ver Permisos';
 
     actionsDiv.appendChild(switchBtn);
     actionsDiv.appendChild(viewPermissionsBtn);
@@ -228,7 +228,7 @@ class PermissionContextSwitcher {
 
     const iconHtml = this.options.showIcons
       ? `<i class="icon-${this.currentContext.icon}"></i>`
-      : "";
+      : '';
     const colorStyle = `style="border-left: 4px solid ${this.currentContext.color}"`;
 
     return `
@@ -260,12 +260,11 @@ class PermissionContextSwitcher {
 
     return this.availableContexts
       .map((context) => {
-        const isActive =
-          this.currentContext && this.currentContext.id === context.id;
+        const isActive = this.currentContext && this.currentContext.id === context.id;
         const iconHtml = this.options.showIcons
           ? `<i class="icon-${context.icon}"></i>`
-          : "";
-        const activeClass = isActive ? "active" : "";
+          : '';
+        const activeClass = isActive ? 'active' : '';
         const colorStyle = `style="border-left: 3px solid ${context.color}"`;
 
         return `
@@ -281,11 +280,11 @@ class PermissionContextSwitcher {
               <span class="context-permissions">${context.permissions.length} permisos</span>
             </div>
           </div>
-          ${isActive ? '<i class="icon-check current-indicator"></i>' : ""}
+          ${isActive ? '<i class="icon-check current-indicator"></i>' : ''}
         </div>
       `;
       })
-      .join("");
+      .join('');
   }
 
   /**
@@ -305,7 +304,7 @@ class PermissionContextSwitcher {
 
     const permissionsList = this.currentContext.permissions
       .map((permission) => `<li class="permission-item">${permission}</li>`)
-      .join("");
+      .join('');
 
     return `
       <div class="context-info-panel">
@@ -344,36 +343,36 @@ class PermissionContextSwitcher {
   setupEventListeners() {
     // Context selection
     this.container
-      .querySelectorAll(".context-item:not(.current)")
+      .querySelectorAll('.context-item:not(.current)')
       .forEach((item) => {
-        item.addEventListener("click", (e) => {
+        item.addEventListener('click', (e) => {
           const { contextId } = e.currentTarget.dataset;
           this.selectContext(contextId);
         });
       });
 
     // Switch button
-    const switchBtn = this.container.querySelector(".switch-btn");
+    const switchBtn = this.container.querySelector('.switch-btn');
     if (switchBtn) {
-      switchBtn.addEventListener("click", () => {
+      switchBtn.addEventListener('click', () => {
         this.switchContext();
       });
     }
 
     // View permissions button
     const viewPermissionsBtn = this.container.querySelector(
-      ".view-permissions-btn",
+      '.view-permissions-btn'
     );
     if (viewPermissionsBtn) {
-      viewPermissionsBtn.addEventListener("click", () => {
+      viewPermissionsBtn.addEventListener('click', () => {
         this.showPermissionsModal();
       });
     }
 
     // Refresh button
-    const refreshBtn = this.container.querySelector(".refresh-btn");
+    const refreshBtn = this.container.querySelector('.refresh-btn');
     if (refreshBtn) {
-      refreshBtn.addEventListener("click", () => {
+      refreshBtn.addEventListener('click', () => {
         this.refresh();
       });
     }
@@ -394,24 +393,24 @@ class PermissionContextSwitcher {
   selectContext(contextId) {
     const context = this.availableContexts.find((ctx) => ctx.id === contextId);
     if (!context) {
-      console.error("Context not found:", contextId);
+      console.error('Context not found:', contextId);
       return;
     }
 
     // Update UI to show selected context
-    this.container.querySelectorAll(".context-item").forEach((item) => {
-      item.classList.remove("selected");
+    this.container.querySelectorAll('.context-item').forEach((item) => {
+      item.classList.remove('selected');
     });
 
     const selectedItem = this.container.querySelector(
-      `[data-context-id="${contextId}"]`,
+      `[data-context-id="${contextId}"]`
     );
     if (selectedItem) {
-      selectedItem.classList.add("selected");
+      selectedItem.classList.add('selected');
     }
 
     // Enable switch button
-    const switchBtn = this.container.querySelector(".switch-btn");
+    const switchBtn = this.container.querySelector('.switch-btn');
     if (switchBtn) {
       switchBtn.disabled = false;
       switchBtn.textContent = `Cambiar a ${context.displayName}`;
@@ -432,21 +431,21 @@ class PermissionContextSwitcher {
    */
   async switchContext() {
     if (!this.selectedContext) {
-      alert("Por favor selecciona un contexto primero");
+      alert('Por favor selecciona un contexto primero');
       return;
     }
 
     // Get button reference and original text
-    const switchBtn = this.container.querySelector(".switch-btn");
+    const switchBtn = this.container.querySelector('.switch-btn');
     const originalText = switchBtn.textContent;
 
     try {
       // Show loading state
-      switchBtn.textContent = "Cambiando...";
+      switchBtn.textContent = 'Cambiando...';
       switchBtn.disabled = true;
 
       // Call cloud function to switch context
-      const response = await Parse.Cloud.run("switchPermissionContext", {
+      const response = await Parse.Cloud.run('switchPermissionContext', {
         contextId: this.selectedContext.id,
       });
 
@@ -460,16 +459,16 @@ class PermissionContextSwitcher {
         this.setupEventListeners();
 
         // Show success message
-        this.showMessage("Contexto cambiado exitosamente", "success");
+        this.showMessage('Contexto cambiado exitosamente', 'success');
 
         // Trigger context changed event
         this.triggerContextChangedEvent();
       } else {
-        throw new Error(response.message || "Error switching context");
+        throw new Error(response.message || 'Error switching context');
       }
     } catch (error) {
-      console.error("Error switching context:", error);
-      this.showMessage(`Error: ${error.message}`, "error");
+      console.error('Error switching context:', error);
+      this.showMessage(`Error: ${error.message}`, 'error');
 
       // Restore button state
       switchBtn.textContent = originalText;
@@ -490,40 +489,40 @@ class PermissionContextSwitcher {
    */
   showPermissionsModal() {
     if (!this.currentContext) {
-      alert("No hay contexto activo");
+      alert('No hay contexto activo');
       return;
     }
 
-    const modal = document.createElement("div");
-    modal.className = "permissions-modal";
+    const modal = document.createElement('div');
+    modal.className = 'permissions-modal';
 
-    const modalContent = document.createElement("div");
-    modalContent.className = "modal-content";
+    const modalContent = document.createElement('div');
+    modalContent.className = 'modal-content';
 
     // Create modal header
-    const modalHeader = document.createElement("div");
-    modalHeader.className = "modal-header";
+    const modalHeader = document.createElement('div');
+    modalHeader.className = 'modal-header';
 
-    const h3 = document.createElement("h3");
+    const h3 = document.createElement('h3');
     h3.textContent = `Permisos del Contexto: ${this.currentContext.displayName}`;
 
-    const closeBtn = document.createElement("button");
-    closeBtn.className = "close-modal";
-    closeBtn.textContent = "×";
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'close-modal';
+    closeBtn.textContent = '×';
 
     modalHeader.appendChild(h3);
     modalHeader.appendChild(closeBtn);
 
     // Create modal body
-    const modalBody = document.createElement("div");
-    modalBody.className = "modal-body";
+    const modalBody = document.createElement('div');
+    modalBody.className = 'modal-body';
 
-    const permissionsGrid = document.createElement("div");
-    permissionsGrid.className = "permissions-grid";
+    const permissionsGrid = document.createElement('div');
+    permissionsGrid.className = 'permissions-grid';
 
     this.currentContext.permissions.forEach((permission) => {
-      const badge = document.createElement("div");
-      badge.className = "permission-badge";
+      const badge = document.createElement('div');
+      badge.className = 'permission-badge';
       badge.textContent = permission;
       permissionsGrid.appendChild(badge);
     });
@@ -536,11 +535,11 @@ class PermissionContextSwitcher {
     document.body.appendChild(modal);
 
     // Close modal event
-    modal.querySelector(".close-modal").addEventListener("click", () => {
+    modal.querySelector('.close-modal').addEventListener('click', () => {
       document.body.removeChild(modal);
     });
 
-    modal.addEventListener("click", (e) => {
+    modal.addEventListener('click', (e) => {
       if (e.target === modal) {
         document.body.removeChild(modal);
       }
@@ -560,17 +559,17 @@ class PermissionContextSwitcher {
    */
   async refresh() {
     try {
-      const refreshBtn = this.container.querySelector(".refresh-btn");
+      const refreshBtn = this.container.querySelector('.refresh-btn');
       refreshBtn.innerHTML = '<i class="icon-loading"></i>';
 
       await this.loadAvailableContexts();
       this.render();
       this.setupEventListeners();
 
-      this.showMessage("Contextos actualizados", "success");
+      this.showMessage('Contextos actualizados', 'success');
     } catch (error) {
-      console.error("Error refreshing contexts:", error);
-      this.showMessage(`Error: ${error.message}`, "error");
+      console.error('Error refreshing contexts:', error);
+      this.showMessage(`Error: ${error.message}`, 'error');
     }
   }
 
@@ -602,8 +601,8 @@ class PermissionContextSwitcher {
    * // const result = await instance.save();
    * @returns {*} - Operation result.
    */
-  showMessage(message, type = "info") {
-    const messageDiv = document.createElement("div");
+  showMessage(message, type = 'info') {
+    const messageDiv = document.createElement('div');
     messageDiv.className = `context-message ${type}`;
     messageDiv.textContent = message;
 
@@ -627,7 +626,7 @@ class PermissionContextSwitcher {
    * @returns {*} - Operation result.
    */
   triggerContextChangedEvent() {
-    const event = new CustomEvent("contextChanged", {
+    const event = new CustomEvent('contextChanged', {
       detail: {
         newContext: this.currentContext,
         userId: this.currentUser.id,
@@ -658,28 +657,28 @@ class PermissionContextSwitcher {
       this.container.removeChild(this.container.firstChild);
     }
 
-    const errorDiv = document.createElement("div");
-    errorDiv.className = "permission-context-switcher error";
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'permission-context-switcher error';
 
-    const errorMessage = document.createElement("div");
-    errorMessage.className = "error-message";
+    const errorMessage = document.createElement('div');
+    errorMessage.className = 'error-message';
 
-    const icon = document.createElement("i");
-    icon.className = "icon-error";
+    const icon = document.createElement('i');
+    icon.className = 'icon-error';
     errorMessage.appendChild(icon);
 
-    const h3 = document.createElement("h3");
-    h3.textContent = "Error";
+    const h3 = document.createElement('h3');
+    h3.textContent = 'Error';
     errorMessage.appendChild(h3);
 
-    const p = document.createElement("p");
+    const p = document.createElement('p');
     p.textContent = message;
     errorMessage.appendChild(p);
 
-    const retryBtn = document.createElement("button");
-    retryBtn.className = "retry-btn";
-    retryBtn.textContent = "Reintentar";
-    retryBtn.addEventListener("click", () => {
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'retry-btn';
+    retryBtn.textContent = 'Reintentar';
+    retryBtn.addEventListener('click', () => {
       this.init();
     });
     errorMessage.appendChild(retryBtn);
@@ -700,7 +699,7 @@ class PermissionContextSwitcher {
    */
   applyStyles() {
     // Check if styles are already applied
-    if (document.getElementById("permission-context-switcher-styles")) {
+    if (document.getElementById('permission-context-switcher-styles')) {
       return;
     }
 
@@ -943,7 +942,7 @@ class PermissionContextSwitcher {
       </style>
     `;
 
-    document.head.insertAdjacentHTML("beforeend", styles);
+    document.head.insertAdjacentHTML('beforeend', styles);
   }
 
   /**
@@ -974,12 +973,12 @@ class PermissionContextSwitcher {
    */
   destroy() {
     if (this.container) {
-      this.container.innerHTML = "";
+      this.container.innerHTML = '';
     }
 
     // Remove styles
     const styles = document.getElementById(
-      "permission-context-switcher-styles",
+      'permission-context-switcher-styles'
     );
     if (styles) {
       styles.remove();
@@ -1001,7 +1000,7 @@ class PermissionContextSwitcher {
     if (this.currentContext) {
       return `${this.currentContext.name} (${this.currentContext.type})`;
     }
-    return "No context selected";
+    return 'No context selected';
   }
 
   /**
@@ -1019,23 +1018,23 @@ class PermissionContextSwitcher {
    */
   appendContextListElements(_container) {
     if (!this.availableContexts || this.availableContexts.length === 0) {
-      const noContextsMsg = document.createElement("p");
-      noContextsMsg.textContent = "No contexts available";
+      const noContextsMsg = document.createElement('p');
+      noContextsMsg.textContent = 'No contexts available';
       container.appendChild(noContextsMsg); // eslint-disable-line no-undef
       return;
     }
 
     this.availableContexts.forEach((context) => {
-      const contextItem = document.createElement("div");
-      contextItem.className = "context-item";
-      contextItem.setAttribute("data-context-id", context.id);
+      const contextItem = document.createElement('div');
+      contextItem.className = 'context-item';
+      contextItem.setAttribute('data-context-id', context.id);
 
-      const contextName = document.createElement("span");
-      contextName.className = "context-name";
+      const contextName = document.createElement('span');
+      contextName.className = 'context-name';
       contextName.textContent = context.name;
 
-      const contextType = document.createElement("span");
-      contextType.className = "context-type";
+      const contextType = document.createElement('span');
+      contextType.className = 'context-type';
       contextType.textContent = context.type;
 
       contextItem.appendChild(contextName);
@@ -1058,24 +1057,24 @@ class PermissionContextSwitcher {
    */
   appendContextInfoElements(_container) {
     if (!this.currentContext) {
-      const noInfoMsg = document.createElement("p");
-      noInfoMsg.textContent = "No context information available";
+      const noInfoMsg = document.createElement('p');
+      noInfoMsg.textContent = 'No context information available';
       container.appendChild(noInfoMsg); // eslint-disable-line no-undef
       return;
     }
 
-    const infoTitle = document.createElement("h4");
-    infoTitle.textContent = "Context Information";
+    const infoTitle = document.createElement('h4');
+    infoTitle.textContent = 'Context Information';
 
-    const infoList = document.createElement("ul");
+    const infoList = document.createElement('ul');
 
-    const nameItem = document.createElement("li");
+    const nameItem = document.createElement('li');
     nameItem.textContent = `Name: ${this.currentContext.name}`;
 
-    const typeItem = document.createElement("li");
+    const typeItem = document.createElement('li');
     typeItem.textContent = `Type: ${this.currentContext.type}`;
 
-    const permissionsItem = document.createElement("li");
+    const permissionsItem = document.createElement('li');
     permissionsItem.textContent = `Permissions: ${this.currentContext.permissions?.length || 0}`;
 
     infoList.appendChild(nameItem);
@@ -1091,9 +1090,9 @@ class PermissionContextSwitcher {
 window.PermissionContextSwitcher = PermissionContextSwitcher;
 
 // Auto-initialize if container exists
-document.addEventListener("DOMContentLoaded", () => {
-  const container = document.getElementById("permission-context-switcher");
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.getElementById('permission-context-switcher');
   if (container) {
-    new PermissionContextSwitcher("permission-context-switcher");
+    new PermissionContextSwitcher('permission-context-switcher');
   }
 });

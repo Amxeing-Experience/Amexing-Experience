@@ -11,10 +11,10 @@
  * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
-const Parse = require("parse/node");
-const AmexingUser = require("../../domain/models/AmexingUser");
-const PermissionInheritanceService = require("./PermissionInheritanceService");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const AmexingUser = require('../../domain/models/AmexingUser');
+const PermissionInheritanceService = require('./PermissionInheritanceService');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Corporate OAuth Service - Manages corporate domain OAuth integration and employee provisioning.
@@ -70,39 +70,39 @@ class CorporateOAuthService {
     this.corporateDomains = new Map([
       // Universidad UTQ (Google Workspace)
       [
-        "utq.edu.mx",
+        'utq.edu.mx',
         {
-          clientName: "Universidad UTQ",
-          type: "education",
-          primaryProvider: "google",
+          clientName: 'Universidad UTQ',
+          type: 'education',
+          primaryProvider: 'google',
           autoProvisionEmployees: true,
           departmentMapping: {
-            "eventos@utq.edu.mx": "eventos",
-            "administracion@utq.edu.mx": "administracion",
-            "sistemas@utq.edu.mx": "IT",
+            'eventos@utq.edu.mx': 'eventos',
+            'administracion@utq.edu.mx': 'administracion',
+            'sistemas@utq.edu.mx': 'IT',
           },
         },
       ],
       // Grupo NUBA (Microsoft Azure AD)
       [
-        "nuba.com.mx",
+        'nuba.com.mx',
         {
-          clientName: "Grupo NUBA",
-          type: "corporate",
-          primaryProvider: "microsoft",
+          clientName: 'Grupo NUBA',
+          type: 'corporate',
+          primaryProvider: 'microsoft',
           autoProvisionEmployees: true,
           departmentMapping: {
-            IT: "sistemas",
-            HR: "recursos-humanos",
-            "Human Resources": "recursos-humanos",
-            Finance: "finanzas",
-            Operations: "operaciones",
-            "Information Technology": "sistemas",
-            Technology: "sistemas",
-            Sistemas: "sistemas",
-            "Recursos Humanos": "recursos-humanos",
-            Finanzas: "finanzas",
-            Operaciones: "operaciones",
+            IT: 'sistemas',
+            HR: 'recursos-humanos',
+            'Human Resources': 'recursos-humanos',
+            Finance: 'finanzas',
+            Operations: 'operaciones',
+            'Information Technology': 'sistemas',
+            Technology: 'sistemas',
+            Sistemas: 'sistemas',
+            'Recursos Humanos': 'recursos-humanos',
+            Finanzas: 'finanzas',
+            Operaciones: 'operaciones',
           },
           microsoftTenantId: process.env.MICROSOFT_OAUTH_TENANT_ID,
           enableDirectorySync: true,
@@ -110,11 +110,11 @@ class CorporateOAuthService {
       ],
       // Development domains
       [
-        "amexing.local",
+        'amexing.local',
         {
-          clientName: "Amexing Internal",
-          type: "internal",
-          primaryProvider: "google",
+          clientName: 'Amexing Internal',
+          type: 'internal',
+          primaryProvider: 'google',
           autoProvisionEmployees: true,
         },
       ],
@@ -149,10 +149,10 @@ class CorporateOAuthService {
         client = await this.findOrCreateCorporateClient(
           emailDomain,
           corporateConfig,
-          _provider,
+          _provider
         );
 
-        logger.logSecurityEvent("CORPORATE_DOMAIN_DETECTED", null, {
+        logger.logSecurityEvent('CORPORATE_DOMAIN_DETECTED', null, {
           domain: emailDomain,
           _provider,
           clientName: corporateConfig.clientName,
@@ -163,7 +163,7 @@ class CorporateOAuthService {
       const user = await this.createOrUpdateOAuthUser(
         oauthUserInfo,
         _provider,
-        corporateConfig,
+        corporateConfig
       );
 
       // Create employee relationship if corporate client exists
@@ -172,7 +172,7 @@ class CorporateOAuthService {
           user,
           client,
           oauthUserInfo,
-          corporateConfig,
+          corporateConfig
         );
       }
 
@@ -183,22 +183,22 @@ class CorporateOAuthService {
             user,
             oauthUserInfo,
             _provider,
-            corporateConfig,
+            corporateConfig
           ); // eslint-disable-line max-len
 
           logger.logSecurityEvent(
-            "CORPORATE_PERMISSION_INHERITANCE_COMPLETED",
+            'CORPORATE_PERMISSION_INHERITANCE_COMPLETED',
             user.id,
             {
               clientId: client.id,
               _provider,
               clientName: corporateConfig.clientName,
-            },
+            }
           );
         } catch (permissionError) {
           logger.error(
-            "Error processing permission inheritance:",
-            permissionError,
+            'Error processing permission inheritance:',
+            permissionError
           );
           // Don't fail the entire OAuth process for permission errors
         }
@@ -206,7 +206,7 @@ class CorporateOAuthService {
 
       return { user, client, isCorporateUser: !!client };
     } catch (error) {
-      logger.error("Corporate user mapping error:", error);
+      logger.error('Corporate user mapping error:', error);
       throw error;
     }
   }
@@ -224,10 +224,10 @@ class CorporateOAuthService {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   extractEmailDomain(email) {
-    if (!email || !email.includes("@")) {
+    if (!email || !email.includes('@')) {
       return null;
     }
-    return email.split("@")[1].toLowerCase();
+    return email.split('@')[1].toLowerCase();
   }
 
   /**
@@ -249,27 +249,27 @@ class CorporateOAuthService {
   async findOrCreateCorporateClient(_domain, config, _provider) {
     try {
       // First, try to find existing client by domain
-      const clientQuery = new Parse.Query("Client");
-      clientQuery.equalTo("corporateDomain", _domain);
+      const clientQuery = new Parse.Query('Client');
+      clientQuery.equalTo('corporateDomain', _domain);
 
       let client = await clientQuery.first({ useMasterKey: true });
 
       if (!client) {
         // Create new corporate client
-        const ClientClass = Parse.Object.extend("Client");
+        const ClientClass = Parse.Object.extend('Client');
         client = new ClientClass();
 
-        client.set("name", config.clientName);
-        client.set("corporateDomain", _domain);
-        client.set("type", config.type);
-        client.set("primaryOAuthProvider", _provider);
-        client.set("oauthEnabled", true);
-        client.set("autoProvisionEmployees", config.autoProvisionEmployees);
-        client.set("active", true);
-        client.set("tier", "enterprise"); // Corporate clients get enterprise tier
+        client.set('name', config.clientName);
+        client.set('corporateDomain', _domain);
+        client.set('type', config.type);
+        client.set('primaryOAuthProvider', _provider);
+        client.set('oauthEnabled', true);
+        client.set('autoProvisionEmployees', config.autoProvisionEmployees);
+        client.set('active', true);
+        client.set('tier', 'enterprise'); // Corporate clients get enterprise tier
 
         // Set corporate-specific settings
-        client.set("corporateSettings", {
+        client.set('corporateSettings', {
           ssoEnabled: true,
           autoProvisionEmployees: config.autoProvisionEmployees,
           departmentMappingEnabled: !!config.departmentMapping,
@@ -279,7 +279,7 @@ class CorporateOAuthService {
 
         await client.save(null, { useMasterKey: true });
 
-        logger.logSecurityEvent("CORPORATE_CLIENT_CREATED", null, {
+        logger.logSecurityEvent('CORPORATE_CLIENT_CREATED', null, {
           clientId: client.id,
           domain, // eslint-disable-line no-undef
           _provider,
@@ -287,9 +287,9 @@ class CorporateOAuthService {
         });
       } else {
         // Update existing client OAuth settings
-        client.set("primaryOAuthProvider", _provider);
-        client.set("oauthEnabled", true);
-        client.set("lastOAuthSync", new Date());
+        client.set('primaryOAuthProvider', _provider);
+        client.set('oauthEnabled', true);
+        client.set('lastOAuthSync', new Date());
 
         await client.save(null, { useMasterKey: true });
       }
@@ -298,7 +298,7 @@ class CorporateOAuthService {
     } catch (error) {
       logger.error(
         `Error finding/creating corporate client for domain ${_domain}:`,
-        error,
+        error
       );
       throw error;
     }
@@ -319,27 +319,27 @@ class CorporateOAuthService {
   async createOrUpdateOAuthUser(
     oauthUserInfo,
     _provider,
-    corporateConfig = null,
+    corporateConfig = null
   ) {
     try {
       // Check if user exists by OAuth ID
       const query = new Parse.Query(AmexingUser);
-      query.equalTo("oauthProvider", _provider);
-      query.equalTo("oauthId", oauthUserInfo.sub || oauthUserInfo.id);
+      query.equalTo('oauthProvider', _provider);
+      query.equalTo('oauthId', oauthUserInfo.sub || oauthUserInfo.id);
 
       let user = await query.first({ useMasterKey: true });
 
       if (!user) {
         // Check if user exists by email (migration case)
         const emailQuery = new Parse.Query(AmexingUser);
-        emailQuery.equalTo("email", oauthUserInfo.email.toLowerCase());
+        emailQuery.equalTo('email', oauthUserInfo.email.toLowerCase());
         user = await emailQuery.first({ useMasterKey: true });
 
         if (user) {
           // Link existing user with OAuth
-          user.set("oauthProvider", _provider);
-          user.set("oauthId", oauthUserInfo.sub || oauthUserInfo.id);
-          user.set("isOAuthUser", true);
+          user.set('oauthProvider', _provider);
+          user.set('oauthId', oauthUserInfo.sub || oauthUserInfo.id);
+          user.set('isOAuthUser', true);
         }
       }
 
@@ -349,40 +349,40 @@ class CorporateOAuthService {
           username: this.generateUsernameFromEmail(oauthUserInfo.email),
           email: oauthUserInfo.email.toLowerCase(),
           firstName:
-            oauthUserInfo.given_name ||
-            oauthUserInfo.name?.split(" ")[0] ||
-            "Unknown",
+            oauthUserInfo.given_name
+            || oauthUserInfo.name?.split(' ')[0]
+            || 'Unknown',
           lastName:
-            oauthUserInfo.family_name ||
-            oauthUserInfo.name?.split(" ").slice(1).join(" ") ||
-            "User",
-          role: corporateConfig ? "employee" : "user",
+            oauthUserInfo.family_name
+            || oauthUserInfo.name?.split(' ').slice(1).join(' ')
+            || 'User',
+          role: corporateConfig ? 'employee' : 'user',
         });
 
         // Set OAuth-specific fields
-        user.set("oauthProvider", _provider);
-        user.set("oauthId", oauthUserInfo.sub || oauthUserInfo.id);
-        user.set("isOAuthUser", true);
-        user.set("emailVerified", true); // OAuth providers verify email
+        user.set('oauthProvider', _provider);
+        user.set('oauthId', oauthUserInfo.sub || oauthUserInfo.id);
+        user.set('isOAuthUser', true);
+        user.set('emailVerified', true); // OAuth providers verify email
       }
 
       // Update OAuth profile data (encrypted)
-      user.set("oauthProfile", this.encryptOAuthProfile(oauthUserInfo));
-      user.set("lastOAuthSync", new Date());
-      user.set("active", true);
+      user.set('oauthProfile', this.encryptOAuthProfile(oauthUserInfo));
+      user.set('lastOAuthSync', new Date());
+      user.set('active', true);
 
       // Set corporate-specific fields
       if (corporateConfig) {
-        user.set("isCorporateUser", true);
+        user.set('isCorporateUser', true);
         user.set(
-          "corporateDomain",
-          this.extractEmailDomain(oauthUserInfo.email),
+          'corporateDomain',
+          this.extractEmailDomain(oauthUserInfo.email)
         );
       }
 
       await user.save(null, { useMasterKey: true });
 
-      logger.logSecurityEvent("OAUTH_USER_CREATED_OR_UPDATED", user.id, {
+      logger.logSecurityEvent('OAUTH_USER_CREATED_OR_UPDATED', user.id, {
         provider, // eslint-disable-line no-undef
         email: this.maskEmail(oauthUserInfo.email),
         isCorporateUser: !!corporateConfig,
@@ -391,7 +391,7 @@ class CorporateOAuthService {
 
       return user;
     } catch (error) {
-      logger.error("Error creating/updating OAuth user:", error);
+      logger.error('Error creating/updating OAuth user:', error);
       throw error;
     }
   }
@@ -413,61 +413,61 @@ class CorporateOAuthService {
     user,
     client,
     oauthUserInfo,
-    corporateConfig,
+    corporateConfig
   ) {
     try {
       // Check if employee relationship exists
-      const employeeQuery = new Parse.Query("ClientEmployee");
-      employeeQuery.equalTo("userId", user.id);
-      employeeQuery.equalTo("clientId", client.id);
+      const employeeQuery = new Parse.Query('ClientEmployee');
+      employeeQuery.equalTo('userId', user.id);
+      employeeQuery.equalTo('clientId', client.id);
 
       let employee = await employeeQuery.first({ useMasterKey: true });
 
       if (!employee) {
         // Create new employee relationship
-        const EmployeeClass = Parse.Object.extend("ClientEmployee");
+        const EmployeeClass = Parse.Object.extend('ClientEmployee');
         employee = new EmployeeClass();
 
-        employee.set("userId", user.id);
-        employee.set("clientId", client.id);
-        employee.set("active", true);
-        employee.set("onboardingMethod", "oauth_auto_provision");
+        employee.set('userId', user.id);
+        employee.set('clientId', client.id);
+        employee.set('active', true);
+        employee.set('onboardingMethod', 'oauth_auto_provision');
       }
 
       // Map department from OAuth profile
       const department = await this.mapDepartmentFromOAuth(
         oauthUserInfo,
-        corporateConfig,
+        corporateConfig
       );
       if (department) {
-        employee.set("departmentId", department);
+        employee.set('departmentId', department);
       }
 
       // Set access level based on OAuth profile
       const accessLevel = this.determineAccessLevel(
         oauthUserInfo,
-        corporateConfig,
+        corporateConfig
       );
-      employee.set("accessLevel", accessLevel);
+      employee.set('accessLevel', accessLevel);
 
       // Set OAuth sync information
-      employee.set("lastOAuthSync", new Date());
-      employee.set("oauthProvider", user.get("oauthProvider"));
+      employee.set('lastOAuthSync', new Date());
+      employee.set('oauthProvider', user.get('oauthProvider'));
 
       await employee.save(null, { useMasterKey: true });
 
       logger.logSecurityEvent(
-        "EMPLOYEE_RELATIONSHIP_CREATED_OR_UPDATED",
+        'EMPLOYEE_RELATIONSHIP_CREATED_OR_UPDATED',
         user.id,
         {
           clientId: client.id,
           department,
           accessLevel,
-          provider: user.get("oauthProvider"),
-        },
+          provider: user.get('oauthProvider'),
+        }
       );
     } catch (error) {
-      logger.error("Error creating/updating employee relationship:", error);
+      logger.error('Error creating/updating employee relationship:', error);
       throw error;
     }
   }
@@ -502,7 +502,7 @@ class CorporateOAuthService {
     for (const field of departmentFields) {
       // eslint-disable-next-line security/detect-object-injection
       if (field && corporateConfig.departmentMapping[field]) {
-        logger.logSecurityEvent("DEPARTMENT_MAPPING_SUCCESS", null, {
+        logger.logSecurityEvent('DEPARTMENT_MAPPING_SUCCESS', null, {
           field,
           // eslint-disable-next-line security/detect-object-injection
           mappedTo: corporateConfig.departmentMapping[field],
@@ -514,26 +514,26 @@ class CorporateOAuthService {
     }
 
     // Try partial matches for Microsoft departments (case-insensitive)
-    if (corporateConfig.primaryProvider === "microsoft") {
+    if (corporateConfig.primaryProvider === 'microsoft') {
       for (const field of departmentFields) {
-        if (field && typeof field === "string") {
+        if (field && typeof field === 'string') {
           const fieldLower = field.toLowerCase();
 
           for (const [mappingKey, mappingValue] of Object.entries(
-            corporateConfig.departmentMapping,
+            corporateConfig.departmentMapping
           )) {
             const keyLower = mappingKey.toLowerCase();
 
             // Check if field contains the mapping key or vice versa
             if (
-              fieldLower.includes(keyLower) ||
-              keyLower.includes(fieldLower)
+              fieldLower.includes(keyLower)
+              || keyLower.includes(fieldLower)
             ) {
-              logger.logSecurityEvent("DEPARTMENT_MAPPING_PARTIAL", null, {
+              logger.logSecurityEvent('DEPARTMENT_MAPPING_PARTIAL', null, {
                 originalField: field,
                 matchedKey: mappingKey,
                 mappedTo: mappingValue,
-                provider: "microsoft",
+                provider: 'microsoft',
               });
               return mappingValue;
             }
@@ -543,7 +543,7 @@ class CorporateOAuthService {
     }
 
     // Log unmapped department for monitoring
-    logger.logSecurityEvent("DEPARTMENT_MAPPING_FAILED", null, {
+    logger.logSecurityEvent('DEPARTMENT_MAPPING_FAILED', null, {
       availableFields: departmentFields.filter((f) => f),
       provider: corporateConfig.primaryProvider,
       clientName: corporateConfig.clientName,
@@ -568,36 +568,35 @@ class CorporateOAuthService {
    */
   determineAccessLevel(oauthUserInfo, _corporateConfig) {
     // Default access level for corporate employees
-    let accessLevel = "standard";
+    let accessLevel = 'standard';
 
     // Check for admin indicators in OAuth profile
     const adminIndicators = [
-      "admin",
-      "administrator",
-      "manager",
-      "director",
-      "supervisor",
+      'admin',
+      'administrator',
+      'manager',
+      'director',
+      'supervisor',
     ];
 
-    const jobTitle = (oauthUserInfo.jobTitle || "").toLowerCase();
-    const department = (oauthUserInfo.department || "").toLowerCase();
+    const jobTitle = (oauthUserInfo.jobTitle || '').toLowerCase();
+    const department = (oauthUserInfo.department || '').toLowerCase();
 
     if (
       adminIndicators.some(
-        (indicator) =>
-          jobTitle.includes(indicator) || department.includes(indicator),
+        (indicator) => jobTitle.includes(indicator) || department.includes(indicator)
       )
     ) {
-      accessLevel = "elevated";
+      accessLevel = 'elevated';
     }
 
     // IT department gets elevated access by default
     if (
-      department.includes("it") ||
-      department.includes("systems") ||
-      department.includes("technology")
+      department.includes('it')
+      || department.includes('systems')
+      || department.includes('technology')
     ) {
-      accessLevel = "elevated";
+      accessLevel = 'elevated';
     }
 
     return accessLevel;
@@ -616,9 +615,9 @@ class CorporateOAuthService {
    * // Returns: Promise resolving to operation result
    */
   generateUsernameFromEmail(email) {
-    const localPart = email.split("@")[0];
+    const localPart = email.split('@')[0];
     // Replace dots and other characters with underscores
-    return localPart.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
+    return localPart.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
   }
 
   /**
@@ -633,24 +632,25 @@ class CorporateOAuthService {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   encryptOAuthProfile(profile) {
-    const crypto = require("crypto");
-    const algorithm = "aes-256-gcm";
+    const crypto = require('crypto');
+    const algorithm = 'aes-256-gcm';
+    // eslint-disable-next-line no-underscore-dangle
     const _key = Buffer.from(
       process.env.OAUTH_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY,
-      "hex",
-    ); // eslint-disable-line no-underscore-dangle
+      'hex'
+    );
     const iv = crypto.randomBytes(16);
 
     const cipher = crypto.createCipheriv(algorithm, _key, iv);
-    let encrypted = cipher.update(JSON.stringify(profile), "utf8", "hex");
-    encrypted += cipher.final("hex");
+    let encrypted = cipher.update(JSON.stringify(profile), 'utf8', 'hex');
+    encrypted += cipher.final('hex');
 
     const authTag = cipher.getAuthTag();
 
     return JSON.stringify({
       encrypted,
-      iv: iv.toString("hex"),
-      authTag: authTag.toString("hex"),
+      iv: iv.toString('hex'),
+      authTag: authTag.toString('hex'),
     });
   }
 
@@ -667,8 +667,8 @@ class CorporateOAuthService {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   maskEmail(email) {
-    if (!email) return "";
-    const [local, _domain] = email.split("@");
+    if (!email) return '';
+    const [local, _domain] = email.split('@');
     return `${local.substring(0, 3)}***@${_domain}`;
   }
 
@@ -689,7 +689,7 @@ class CorporateOAuthService {
         clientName: config.clientName,
         type: config.type,
         primaryProvider: config.primaryProvider,
-      }),
+      })
     );
   }
 
@@ -710,7 +710,7 @@ class CorporateOAuthService {
   addCorporateDomain(_domain, config) {
     this.corporateDomains.set(_domain, config);
 
-    logger.logSecurityEvent("CORPORATE_DOMAIN_CONFIGURED", null, {
+    logger.logSecurityEvent('CORPORATE_DOMAIN_CONFIGURED', null, {
       domain, // eslint-disable-line no-undef
       clientName: config.clientName,
       provider: config.primaryProvider,

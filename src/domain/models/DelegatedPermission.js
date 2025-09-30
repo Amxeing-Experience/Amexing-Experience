@@ -24,9 +24,9 @@
  * });
  */
 
-const Parse = require("parse/node");
-const BaseModel = require("./BaseModel");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const BaseModel = require('./BaseModel');
+const logger = require('../../infrastructure/logger');
 
 /**
  * DelegatedPermission Class - Permission delegation management
@@ -34,7 +34,7 @@ const logger = require("../../infrastructure/logger");
  */
 class DelegatedPermission extends BaseModel {
   constructor() {
-    super("DelegatedPermission");
+    super('DelegatedPermission');
   }
 
   /**
@@ -58,91 +58,88 @@ class DelegatedPermission extends BaseModel {
    */
   static create(delegationData) {
     // Validate required fields
-    const hasPermission =
-      delegationData.permission || delegationData.permissions;
+    const hasPermission = delegationData.permission || delegationData.permissions;
     if (
-      !delegationData.fromUserId ||
-      !delegationData.toUserId ||
-      !hasPermission
+      !delegationData.fromUserId
+      || !delegationData.toUserId
+      || !hasPermission
     ) {
-      throw new Error("From user, to user, and permission are required");
+      throw new Error('From user, to user, and permission are required');
     }
 
     // Prevent self-delegation
     if (delegationData.fromUserId === delegationData.toUserId) {
-      throw new Error("Cannot delegate permission to yourself");
+      throw new Error('Cannot delegate permission to yourself');
     }
 
     const delegation = new DelegatedPermission();
 
     // Core delegation information
-    delegation.set("fromUserId", delegationData.fromUserId);
-    delegation.set("toUserId", delegationData.toUserId);
+    delegation.set('fromUserId', delegationData.fromUserId);
+    delegation.set('toUserId', delegationData.toUserId);
 
     // Handle both single permission and array of permissions
     if (delegationData.permission) {
-      delegation.set("permission", delegationData.permission);
-      delegation.set("permissions", [delegationData.permission]);
+      delegation.set('permission', delegationData.permission);
+      delegation.set('permissions', [delegationData.permission]);
     } else {
-      delegation.set("permissions", delegationData.permissions || []);
+      delegation.set('permissions', delegationData.permissions || []);
       // Set single permission for backward compatibility
       if (delegationData.permissions && delegationData.permissions.length > 0) {
-        delegation.set("permission", delegationData.permissions[0]);
+        delegation.set('permission', delegationData.permissions[0]);
       }
     }
 
     // Delegation conditions and restrictions (support both 'context' and 'conditions')
-    const contextData =
-      delegationData.context || delegationData.conditions || {};
-    delegation.set("context", contextData);
-    delegation.set("conditions", contextData);
-    delegation.set("restrictions", delegationData.restrictions || {});
+    const contextData = delegationData.context || delegationData.conditions || {};
+    delegation.set('context', contextData);
+    delegation.set('conditions', contextData);
+    delegation.set('restrictions', delegationData.restrictions || {});
 
     // Time constraints (support both 'expiresAt' and 'validUntil')
-    const expirationDate =
-      delegationData.expiresAt || delegationData.validUntil || null;
-    delegation.set("validFrom", delegationData.validFrom || new Date());
-    delegation.set("validUntil", expirationDate);
-    delegation.set("expiresAt", expirationDate);
-    delegation.set("isPermanent", expirationDate === null);
+    const expirationDate = delegationData.expiresAt || delegationData.validUntil || null;
+    delegation.set('validFrom', delegationData.validFrom || new Date());
+    delegation.set('validUntil', expirationDate);
+    delegation.set('expiresAt', expirationDate);
+    delegation.set('isPermanent', expirationDate === null);
 
     // Metadata
-    delegation.set("reason", delegationData.reason || "");
+    delegation.set('reason', delegationData.reason || '');
     delegation.set(
-      "delegationType",
-      delegationData.delegationType || "temporary",
+      'delegationType',
+      delegationData.delegationType || 'temporary'
     ); // 'temporary', 'permanent', 'emergency'
-    delegation.set("priority", delegationData.priority || 0);
+    delegation.set('priority', delegationData.priority || 0);
     delegation.set(
-      "approvalRequired",
-      delegationData.approvalRequired || false,
+      'approvalRequired',
+      delegationData.approvalRequired || false
     );
-    delegation.set("approvedBy", delegationData.approvedBy || null);
-    delegation.set("approvedAt", delegationData.approvedAt || null);
+    delegation.set('approvedBy', delegationData.approvedBy || null);
+    delegation.set('approvedAt', delegationData.approvedAt || null);
 
     // Status tracking
-    delegation.set("status", "active"); // 'active', 'expired', 'revoked', 'suspended'
-    delegation.set("usageCount", 0);
-    delegation.set("usageLimit", delegationData.usageLimit || null);
-    delegation.set("lastUsedAt", null);
-    delegation.set("delegatedAt", new Date());
-    delegation.set("usageHistory", []); // Initialize empty usage history
-    delegation.set("extensionHistory", []); // Initialize empty extension history
+    delegation.set('status', 'active'); // 'active', 'expired', 'revoked', 'suspended'
+    delegation.set('usageCount', 0);
+    delegation.set('usageLimit', delegationData.usageLimit || null);
+    delegation.set('lastUsedAt', null);
+    delegation.set('delegatedAt', new Date());
+    delegation.set('usageHistory', []); // Initialize empty usage history
+    delegation.set('extensionHistory', []); // Initialize empty extension history
 
     // Audit information
-    delegation.set("createdBy", delegationData.fromUserId);
-    delegation.set("revokedBy", null);
-    delegation.set("revokedAt", null);
-    delegation.set("revocationReason", null);
+    delegation.set('createdBy', delegationData.fromUserId);
+    delegation.set('revokedBy', null);
+    delegation.set('revokedAt', null);
+    delegation.set('revocationReason', null);
 
     // Base model fields
     delegation.set(
-      "active",
-      delegationData.active !== undefined ? delegationData.active : true,
+      'active',
+      delegationData.active !== undefined ? delegationData.active : true
     );
     delegation.set(
-      "exists",
-      delegationData.exists !== undefined ? delegationData.exists : true,
+      'exists',
+      delegationData.exists !== undefined ? delegationData.exists : true
     );
 
     return delegation;
@@ -155,12 +152,12 @@ class DelegatedPermission extends BaseModel {
    */
   isValid() {
     const now = new Date();
-    const validFrom = this.get("validFrom");
-    const validUntil = this.get("validUntil");
-    const status = this.get("status");
+    const validFrom = this.get('validFrom');
+    const validUntil = this.get('validUntil');
+    const status = this.get('status');
 
     // Check basic status
-    if (status !== "active" || !this.get("active") || !this.get("exists")) {
+    if (status !== 'active' || !this.get('active') || !this.get('exists')) {
       return false;
     }
 
@@ -182,7 +179,7 @@ class DelegatedPermission extends BaseModel {
    * @example
    */
   isExpired() {
-    const expiresAt = this.get("expiresAt") || this.get("validUntil");
+    const expiresAt = this.get('expiresAt') || this.get('validUntil');
     if (!expiresAt) {
       return false;
     }
@@ -195,7 +192,7 @@ class DelegatedPermission extends BaseModel {
    * @example
    */
   isActive() {
-    return this.get("active") === true && this.get("status") === "active";
+    return this.get('active') === true && this.get('status') === 'active';
   }
 
   /**
@@ -217,19 +214,17 @@ class DelegatedPermission extends BaseModel {
     }
 
     // Check if permission matches (support both single and array)
-    const singlePermission = this.get("permission");
-    const delegatedPermissions = this.get("permissions") || [];
+    const singlePermission = this.get('permission');
+    const delegatedPermissions = this.get('permissions') || [];
 
-    const hasPermissionMatch =
-      singlePermission === permission ||
-      delegatedPermissions.includes(permission);
+    const hasPermissionMatch = singlePermission === permission
+      || delegatedPermissions.includes(permission);
     if (!hasPermissionMatch) {
       return false;
     }
 
     // Validate context constraints
-    const delegationContext =
-      this.get("context") || this.get("conditions") || {};
+    const delegationContext = this.get('context') || this.get('conditions') || {};
 
     // Check amount constraint
     if (delegationContext.maxAmount && context.amount) {
@@ -250,15 +245,15 @@ class DelegatedPermission extends BaseModel {
       const time = new Date(context.timestamp);
       const hour = time.getHours();
       if (
-        delegationContext.timeRestriction === "business" &&
-        (hour < 9 || hour > 17)
+        delegationContext.timeRestriction === 'business'
+        && (hour < 9 || hour > 17)
       ) {
         return false;
       }
     }
 
     // Check expiration
-    const expiresAt = this.get("expiresAt") || this.get("validUntil");
+    const expiresAt = this.get('expiresAt') || this.get('validUntil');
     if (expiresAt && new Date() > expiresAt) {
       return false;
     }
@@ -273,8 +268,8 @@ class DelegatedPermission extends BaseModel {
    * @example
    */
   trackUsage(context = {}) {
-    const currentCount = this.get("usageCount") || 0;
-    const usageLimit = this.get("usageLimit");
+    const currentCount = this.get('usageCount') || 0;
+    const usageLimit = this.get('usageLimit');
 
     // Check usage limit
     if (usageLimit && currentCount >= usageLimit) {
@@ -282,11 +277,11 @@ class DelegatedPermission extends BaseModel {
     }
 
     // Update usage count
-    this.set("usageCount", currentCount + 1);
-    this.set("lastUsedAt", new Date());
+    this.set('usageCount', currentCount + 1);
+    this.set('lastUsedAt', new Date());
 
     // Track usage history - get current array or create new one
-    let usageHistory = this.get("usageHistory") || [];
+    let usageHistory = this.get('usageHistory') || [];
 
     // Create a new array to ensure mock object detects the change
     usageHistory = [...usageHistory];
@@ -295,12 +290,12 @@ class DelegatedPermission extends BaseModel {
     const newEntry = {
       timestamp: new Date(),
       context,
-      userId: this.get("toUserId"),
+      userId: this.get('toUserId'),
     };
     usageHistory.push(newEntry);
 
     // Set the new array
-    this.set("usageHistory", usageHistory);
+    this.set('usageHistory', usageHistory);
 
     return true;
   }
@@ -321,8 +316,8 @@ class DelegatedPermission extends BaseModel {
    * @example
    */
   hasReachedUsageLimit() {
-    const usageCount = this.get("usageCount") || 0;
-    const usageLimit = this.get("usageLimit");
+    const usageCount = this.get('usageCount') || 0;
+    const usageLimit = this.get('usageLimit');
 
     if (!usageLimit) {
       return false; // No limit set
@@ -338,12 +333,12 @@ class DelegatedPermission extends BaseModel {
    * @returns {void}
    * @example
    */
-  revoke(reason = "", revokedBy = null) {
-    this.set("status", "revoked");
-    this.set("active", false);
-    this.set("revokedBy", revokedBy || this.get("fromUserId"));
-    this.set("revokedAt", new Date());
-    this.set("revocationReason", reason);
+  revoke(reason = '', revokedBy = null) {
+    this.set('status', 'revoked');
+    this.set('active', false);
+    this.set('revokedBy', revokedBy || this.get('fromUserId'));
+    this.set('revokedAt', new Date());
+    this.set('revocationReason', reason);
   }
 
   /**
@@ -354,23 +349,23 @@ class DelegatedPermission extends BaseModel {
    */
   extendExpiration(newExpiration) {
     if (newExpiration <= new Date()) {
-      throw new Error("Cannot extend to a past date");
+      throw new Error('Cannot extend to a past date');
     }
 
-    const currentExpiry = this.get("expiresAt") || this.get("validUntil");
-    const extensionHistory = this.get("extensionHistory") || [];
+    const currentExpiry = this.get('expiresAt') || this.get('validUntil');
+    const extensionHistory = this.get('extensionHistory') || [];
 
     extensionHistory.push({
       previousExpiry: currentExpiry,
       newExpiry: newExpiration,
       extendedAt: new Date(),
-      extendedBy: this.get("fromUserId"),
+      extendedBy: this.get('fromUserId'),
     });
 
-    this.set("validUntil", newExpiration);
-    this.set("expiresAt", newExpiration);
-    this.set("extensionHistory", extensionHistory);
-    this.set("isPermanent", false);
+    this.set('validUntil', newExpiration);
+    this.set('expiresAt', newExpiration);
+    this.set('extensionHistory', extensionHistory);
+    this.set('isPermanent', false);
   }
 
   /**
@@ -380,13 +375,12 @@ class DelegatedPermission extends BaseModel {
    * @example
    */
   validateContext(context = {}) {
-    const delegationContext =
-      this.get("context") || this.get("conditions") || {};
+    const delegationContext = this.get('context') || this.get('conditions') || {};
 
     // If amount is required but not provided
     if (
-      delegationContext.maxAmount !== undefined &&
-      context.amount === undefined
+      delegationContext.maxAmount !== undefined
+      && context.amount === undefined
     ) {
       return false;
     }
@@ -401,8 +395,8 @@ class DelegatedPermission extends BaseModel {
     // Check department constraint
     if (delegationContext.departmentId) {
       if (
-        !context.departmentId ||
-        context.departmentId !== delegationContext.departmentId
+        !context.departmentId
+        || context.departmentId !== delegationContext.departmentId
       ) {
         return false;
       }
@@ -423,10 +417,10 @@ class DelegatedPermission extends BaseModel {
 
       // Check time of day (using UTC to match test expectations)
       if (restrictions.startTime && restrictions.endTime) {
-        const currentTime = `${String(now.getUTCHours()).padStart(2, "0")}:${String(now.getUTCMinutes()).padStart(2, "0")}`;
+        const currentTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
         if (
-          currentTime < restrictions.startTime ||
-          currentTime > restrictions.endTime
+          currentTime < restrictions.startTime
+          || currentTime > restrictions.endTime
         ) {
           return false;
         }
@@ -454,26 +448,26 @@ class DelegatedPermission extends BaseModel {
   generateAuditReport() {
     return {
       delegationId: this.id,
-      fromUserId: this.get("fromUserId"),
-      toUserId: this.get("toUserId"),
-      permission: this.get("permission"),
-      permissions: this.get("permissions"),
-      status: this.get("status"),
-      createdAt: this.get("createdAt"),
-      delegatedAt: this.get("delegatedAt"),
-      expiresAt: this.get("expiresAt"),
-      usageCount: this.get("usageCount"),
-      totalUsages: this.get("usageCount"),
-      usageLimit: this.get("usageLimit"),
-      lastUsedAt: this.get("lastUsedAt"),
-      revokedAt: this.get("revokedAt"),
-      revokedBy: this.get("revokedBy"),
-      revocationReason: this.get("revocationReason"),
+      fromUserId: this.get('fromUserId'),
+      toUserId: this.get('toUserId'),
+      permission: this.get('permission'),
+      permissions: this.get('permissions'),
+      status: this.get('status'),
+      createdAt: this.get('createdAt'),
+      delegatedAt: this.get('delegatedAt'),
+      expiresAt: this.get('expiresAt'),
+      usageCount: this.get('usageCount'),
+      totalUsages: this.get('usageCount'),
+      usageLimit: this.get('usageLimit'),
+      lastUsedAt: this.get('lastUsedAt'),
+      revokedAt: this.get('revokedAt'),
+      revokedBy: this.get('revokedBy'),
+      revocationReason: this.get('revocationReason'),
       isActive: this.isActive(),
       timeline: {
-        delegatedAt: this.get("delegatedAt"),
-        expiresAt: this.get("expiresAt"),
-        revokedAt: this.get("revokedAt"),
+        delegatedAt: this.get('delegatedAt'),
+        expiresAt: this.get('expiresAt'),
+        revokedAt: this.get('revokedAt'),
       },
     };
   }
@@ -486,10 +480,10 @@ class DelegatedPermission extends BaseModel {
    */
   static async findForUser(userId) {
     const query = new Parse.Query(DelegatedPermission);
-    query.equalTo("toUserId", userId);
-    query.equalTo("active", true);
-    query.equalTo("exists", true);
-    query.equalTo("status", "active");
+    query.equalTo('toUserId', userId);
+    query.equalTo('active', true);
+    query.equalTo('exists', true);
+    query.equalTo('status', 'active');
 
     return query.find({ useMasterKey: true });
   }
@@ -502,9 +496,9 @@ class DelegatedPermission extends BaseModel {
    */
   static async findByDelegator(delegatorId) {
     const query = new Parse.Query(DelegatedPermission);
-    query.equalTo("fromUserId", delegatorId);
-    query.equalTo("active", true);
-    query.equalTo("exists", true);
+    query.equalTo('fromUserId', delegatorId);
+    query.equalTo('active', true);
+    query.equalTo('exists', true);
 
     return query.find({ useMasterKey: true });
   }
@@ -551,7 +545,7 @@ class DelegatedPermission extends BaseModel {
     if (conditions.departmentOnly && context.departmentId) {
       // Get delegator's department
       const fromUser = await this.getFromUser();
-      if (fromUser && fromUser.get("departmentId") !== context.departmentId) {
+      if (fromUser && fromUser.get('departmentId') !== context.departmentId) {
         return {
           valid: false,
           reason: "Delegated permission only valid for delegator's department",
@@ -568,7 +562,7 @@ class DelegatedPermission extends BaseModel {
       if (day === 0 || day === 6 || hour < 9 || hour > 17) {
         return {
           valid: false,
-          reason: "Delegated permission only valid during business hours",
+          reason: 'Delegated permission only valid during business hours',
         };
       }
     }
@@ -577,7 +571,7 @@ class DelegatedPermission extends BaseModel {
     if (conditions.customValidator) {
       const customResult = await this.executeCustomValidator(
         conditions.customValidator,
-        context,
+        context
       );
       if (!customResult.valid) {
         return customResult;
@@ -597,11 +591,11 @@ class DelegatedPermission extends BaseModel {
   async validateRestrictions(restrictions, context) {
     // Usage limit restrictions
     if (restrictions.maxUsageCount) {
-      const usageCount = this.get("usageCount") || 0;
+      const usageCount = this.get('usageCount') || 0;
       if (usageCount >= restrictions.maxUsageCount) {
         return {
           valid: false,
-          reason: "Delegation usage limit exceeded",
+          reason: 'Delegation usage limit exceeded',
         };
       }
     }
@@ -612,7 +606,7 @@ class DelegatedPermission extends BaseModel {
       if (todayUsage >= restrictions.dailyUsageLimit) {
         return {
           valid: false,
-          reason: "Daily delegation usage limit exceeded",
+          reason: 'Daily delegation usage limit exceeded',
         };
       }
     }
@@ -621,12 +615,12 @@ class DelegatedPermission extends BaseModel {
     if (restrictions.allowedIpRanges && context.ipAddress) {
       const isAllowed = this.isIpAddressAllowed(
         context.ipAddress,
-        restrictions.allowedIpRanges,
+        restrictions.allowedIpRanges
       );
       if (!isAllowed) {
         return {
           valid: false,
-          reason: "IP address not in allowed range for delegation",
+          reason: 'IP address not in allowed range for delegation',
         };
       }
     }
@@ -642,19 +636,19 @@ class DelegatedPermission extends BaseModel {
    * @returns {Promise<boolean>} - Success status.
    * @example
    */
-  async extend(newValidUntil, extendedBy, reason = "") {
+  async extend(newValidUntil, extendedBy, reason = '') {
     try {
-      const currentValidUntil = this.get("validUntil");
+      const currentValidUntil = this.get('validUntil');
 
-      this.set("validUntil", newValidUntil);
-      this.set("isPermanent", newValidUntil === null);
+      this.set('validUntil', newValidUntil);
+      this.set('isPermanent', newValidUntil === null);
 
       await this.save(null, { useMasterKey: true });
 
-      logger.info("Delegation extended", {
+      logger.info('Delegation extended', {
         delegationId: this.id,
-        fromUserId: this.get("fromUserId"),
-        toUserId: this.get("toUserId"),
+        fromUserId: this.get('fromUserId'),
+        toUserId: this.get('toUserId'),
         previousValidUntil: currentValidUntil,
         newValidUntil,
         extendedBy,
@@ -663,7 +657,7 @@ class DelegatedPermission extends BaseModel {
 
       return true;
     } catch (error) {
-      logger.error("Error extending delegation", {
+      logger.error('Error extending delegation', {
         delegationId: this.id,
         newValidUntil,
         extendedBy,
@@ -680,14 +674,14 @@ class DelegatedPermission extends BaseModel {
    */
   async getFromUser() {
     try {
-      const AmexingUser = require("./AmexingUser");
-      const query = BaseModel.queryActive("AmexingUser");
-      query.equalTo("objectId", this.get("fromUserId"));
+      const AmexingUser = require('./AmexingUser');
+      const query = BaseModel.queryActive('AmexingUser');
+      query.equalTo('objectId', this.get('fromUserId'));
       return await query.first({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching delegator user", {
+      logger.error('Error fetching delegator user', {
         delegationId: this.id,
-        fromUserId: this.get("fromUserId"),
+        fromUserId: this.get('fromUserId'),
         error: error.message,
       });
       return null;
@@ -701,14 +695,14 @@ class DelegatedPermission extends BaseModel {
    */
   async getToUser() {
     try {
-      const AmexingUser = require("./AmexingUser");
-      const query = BaseModel.queryActive("AmexingUser");
-      query.equalTo("objectId", this.get("toUserId"));
+      const AmexingUser = require('./AmexingUser');
+      const query = BaseModel.queryActive('AmexingUser');
+      query.equalTo('objectId', this.get('toUserId'));
       return await query.first({ useMasterKey: true });
     } catch (error) {
-      logger.error("Error fetching recipient user", {
+      logger.error('Error fetching recipient user', {
         delegationId: this.id,
-        toUserId: this.get("toUserId"),
+        toUserId: this.get('toUserId'),
         error: error.message,
       });
       return null;
@@ -747,7 +741,7 @@ class DelegatedPermission extends BaseModel {
    */
   async executeCustomValidator(validatorName, context) {
     // This would integrate with custom validation service
-    logger.info("Custom delegation validator requested", {
+    logger.info('Custom delegation validator requested', {
       validator: validatorName,
       delegationId: this.id,
       context,
@@ -764,25 +758,25 @@ class DelegatedPermission extends BaseModel {
   toSafeJSON() {
     return {
       id: this.id,
-      fromUserId: this.get("fromUserId"),
-      toUserId: this.get("toUserId"),
-      permissions: this.get("permissions"),
-      conditions: this.get("conditions"),
-      restrictions: this.get("restrictions"),
-      validFrom: this.get("validFrom"),
-      validUntil: this.get("validUntil"),
-      isPermanent: this.get("isPermanent"),
-      reason: this.get("reason"),
-      delegationType: this.get("delegationType"),
-      status: this.get("status"),
-      usageCount: this.get("usageCount"),
-      lastUsedAt: this.get("lastUsedAt"),
-      approvalRequired: this.get("approvalRequired"),
-      approvedBy: this.get("approvedBy"),
-      approvedAt: this.get("approvedAt"),
-      active: this.get("active"),
-      createdAt: this.get("createdAt"),
-      updatedAt: this.get("updatedAt"),
+      fromUserId: this.get('fromUserId'),
+      toUserId: this.get('toUserId'),
+      permissions: this.get('permissions'),
+      conditions: this.get('conditions'),
+      restrictions: this.get('restrictions'),
+      validFrom: this.get('validFrom'),
+      validUntil: this.get('validUntil'),
+      isPermanent: this.get('isPermanent'),
+      reason: this.get('reason'),
+      delegationType: this.get('delegationType'),
+      status: this.get('status'),
+      usageCount: this.get('usageCount'),
+      lastUsedAt: this.get('lastUsedAt'),
+      approvalRequired: this.get('approvalRequired'),
+      approvedBy: this.get('approvedBy'),
+      approvedAt: this.get('approvedAt'),
+      active: this.get('active'),
+      createdAt: this.get('createdAt'),
+      updatedAt: this.get('updatedAt'),
     };
   }
 
@@ -794,28 +788,28 @@ class DelegatedPermission extends BaseModel {
   static async cleanupExpired() {
     try {
       const now = new Date();
-      const query = BaseModel.queryActive("DelegatedPermission");
-      query.lessThan("validUntil", now);
-      query.equalTo("status", "active");
+      const query = BaseModel.queryActive('DelegatedPermission');
+      query.lessThan('validUntil', now);
+      query.equalTo('status', 'active');
 
       const expiredDelegations = await query.find({ useMasterKey: true });
 
       let cleanedCount = 0;
       for (const delegation of expiredDelegations) {
-        delegation.set("status", "expired");
-        delegation.set("active", false);
+        delegation.set('status', 'expired');
+        delegation.set('active', false);
         await delegation.save(null, { useMasterKey: true });
         cleanedCount++;
       }
 
-      logger.info("Expired delegations cleaned up", {
+      logger.info('Expired delegations cleaned up', {
         cleanedCount,
         timestamp: now,
       });
 
       return cleanedCount;
     } catch (error) {
-      logger.error("Error cleaning up expired delegations", {
+      logger.error('Error cleaning up expired delegations', {
         error: error.message,
       });
       return 0;
@@ -824,6 +818,6 @@ class DelegatedPermission extends BaseModel {
 }
 
 // Register the subclass
-Parse.Object.registerSubclass("DelegatedPermission", DelegatedPermission);
+Parse.Object.registerSubclass('DelegatedPermission', DelegatedPermission);
 
 module.exports = DelegatedPermission;

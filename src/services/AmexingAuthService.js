@@ -17,12 +17,12 @@
  * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
-const Parse = require("parse/node");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const crypto = require("crypto");
-const { v4: uuidv4 } = require("uuid");
-const logger = require("../infrastructure/logger");
+const Parse = require('parse/node');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
+const logger = require('../infrastructure/logger');
 // const PermissionService = require('./PermissionService');
 // const OAuthProviderFactory = require('./oauth/OAuthProviderFactory');
 
@@ -79,7 +79,7 @@ class AmexingAuthService {
     this.encryptionKey = process.env.ENCRYPTION_KEY;
 
     if (!this.jwtSecret || !this.encryptionKey) {
-      throw new Error("Required authentication environment variables not set");
+      throw new Error('Required authentication environment variables not set');
     }
   }
 
@@ -95,7 +95,7 @@ class AmexingAuthService {
    */
   initialize() {
     // Parse SDK is already initialized globally
-    logger.info("AmexingAuthService initialized");
+    logger.info('AmexingAuthService initialized');
   }
 
   // ============================================
@@ -115,17 +115,19 @@ class AmexingAuthService {
    */
   async createUser(userData) {
     try {
-      const { email, password, firstName, lastName, role = "guest" } = userData;
+      const {
+        email, password, firstName, lastName, role = 'guest',
+      } = userData;
 
       // Validate required fields
       if (!email || !firstName || !lastName) {
-        throw new Error("Email, firstName, and lastName are required");
+        throw new Error('Email, firstName, and lastName are required');
       }
 
       // Check if user already exists
       const existingUser = await this.findUserByEmail(email);
       if (existingUser) {
-        throw new Error("User with this email already exists");
+        throw new Error('User with this email already exists');
       }
 
       // Validate and hash password if provided
@@ -136,51 +138,51 @@ class AmexingAuthService {
       }
 
       // Create user object with Parse Objects
-      const AmexingUser = Parse.Object.extend("AmexingUser");
+      const AmexingUser = Parse.Object.extend('AmexingUser');
       const newUser = new AmexingUser();
 
       const userId = uuidv4();
-      newUser.set("id", userId);
-      newUser.set("email", email.toLowerCase().trim());
-      newUser.set("username", email.toLowerCase().trim()); // Use email as username for consistency
-      newUser.set("passwordHash", passwordHash);
-      newUser.set("emailVerified", false);
-      newUser.set("phoneVerified", false);
+      newUser.set('id', userId);
+      newUser.set('email', email.toLowerCase().trim());
+      newUser.set('username', email.toLowerCase().trim()); // Use email as username for consistency
+      newUser.set('passwordHash', passwordHash);
+      newUser.set('emailVerified', false);
+      newUser.set('phoneVerified', false);
 
       // OAuth integration
-      newUser.set("oauthAccounts", []);
-      newUser.set("primaryOAuthProvider", null);
-      newUser.set("lastAuthMethod", password ? "password" : "oauth");
+      newUser.set('oauthAccounts', []);
+      newUser.set('primaryOAuthProvider', null);
+      newUser.set('lastAuthMethod', password ? 'password' : 'oauth');
 
       // Profile information
-      newUser.set("firstName", firstName.trim());
-      newUser.set("lastName", lastName.trim());
-      newUser.set("displayName", `${firstName.trim()} ${lastName.trim()}`);
-      newUser.set("locale", "en");
-      newUser.set("timezone", "America/Mexico_City");
+      newUser.set('firstName', firstName.trim());
+      newUser.set('lastName', lastName.trim());
+      newUser.set('displayName', `${firstName.trim()} ${lastName.trim()}`);
+      newUser.set('locale', 'en');
+      newUser.set('timezone', 'America/Mexico_City');
 
       // Role and permissions
-      newUser.set("role", role);
-      newUser.set("permissions", await this.getDefaultPermissions(role));
-      newUser.set("accessLevel", "basic");
+      newUser.set('role', role);
+      newUser.set('permissions', await this.getDefaultPermissions(role));
+      newUser.set('accessLevel', 'basic');
 
       // Account status
-      newUser.set("active", true);
-      newUser.set("locked", false);
-      newUser.set("deleted", false);
+      newUser.set('active', true);
+      newUser.set('locked', false);
+      newUser.set('deleted', false);
 
       // Session management
-      newUser.set("sessionTokens", []);
-      newUser.set("refreshTokens", []);
+      newUser.set('sessionTokens', []);
+      newUser.set('refreshTokens', []);
 
       // Security features
-      newUser.set("twoFactorEnabled", false);
-      newUser.set("failedLoginAttempts", 0);
+      newUser.set('twoFactorEnabled', false);
+      newUser.set('failedLoginAttempts', 0);
 
       // Timestamps
-      newUser.set("createdAt", new Date());
-      newUser.set("updatedAt", new Date());
-      newUser.set("createdBy", userId); // Self-created
+      newUser.set('createdAt', new Date());
+      newUser.set('updatedAt', new Date());
+      newUser.set('createdBy', userId); // Self-created
 
       // Save to database with Parse Objects
       const savedUser = await newUser.save(null, { useMasterKey: true });
@@ -192,7 +194,7 @@ class AmexingAuthService {
       // Store session
       await this.createSession({
         userId,
-        authMethod: "password",
+        authMethod: 'password',
         tokens: tokens.accessToken,
       });
 
@@ -203,7 +205,7 @@ class AmexingAuthService {
         ...tokens,
       };
     } catch (error) {
-      logger.error("User creation failed:", error);
+      logger.error('User creation failed:', error);
       throw error;
     }
   }
@@ -226,7 +228,7 @@ class AmexingAuthService {
       // Find user by email
       const user = await this.findUserByEmail(email);
       if (!user) {
-        throw new Error("Invalid credentials");
+        throw new Error('Invalid credentials');
       }
 
       // Check account status
@@ -235,14 +237,14 @@ class AmexingAuthService {
       // Check password
       if (!user.passwordHash) {
         throw new Error(
-          "Password authentication not available for this account",
+          'Password authentication not available for this account'
         );
       }
 
       const isValidPassword = await bcrypt.compare(password, user.passwordHash);
       if (!isValidPassword) {
         await this.handleFailedLogin(user.id);
-        throw new Error("Invalid credentials");
+        throw new Error('Invalid credentials');
       }
 
       // Reset failed attempts on successful login
@@ -257,7 +259,7 @@ class AmexingAuthService {
       // Create session
       await this.createSession({
         userId: user.id,
-        authMethod: "password",
+        authMethod: 'password',
         tokens: tokens.accessToken,
       });
 
@@ -268,7 +270,7 @@ class AmexingAuthService {
         ...tokens,
       };
     } catch (error) {
-      logger.error("Authentication failed:", error);
+      logger.error('Authentication failed:', error);
       throw error;
     }
   }
@@ -319,13 +321,13 @@ class AmexingAuthService {
       // Create session
       await this.createSession({
         userId: user.id,
-        authMethod: "oauth",
+        authMethod: 'oauth',
         oauthProvider: _provider,
         tokens: sessionTokens.accessToken,
       });
 
       logger.info(
-        `OAuth user authenticated: ${oauthProfile.email} via ${_provider}`,
+        `OAuth user authenticated: ${oauthProfile.email} via ${_provider}`
       );
 
       return {
@@ -333,7 +335,7 @@ class AmexingAuthService {
         ...sessionTokens,
       };
     } catch (error) {
-      logger.error("OAuth authentication failed:", error);
+      logger.error('OAuth authentication failed:', error);
       throw error;
     }
   }
@@ -376,30 +378,30 @@ class AmexingAuthService {
             ? await this.encryptToken(tokens.refreshToken)
             : null,
           tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
-          scopes: tokens.scope?.split(" ") || [],
+          scopes: tokens.scope?.split(' ') || [],
           linkedAt: new Date(),
           lastUsed: new Date(),
           isPrimary: true,
         },
       ],
       primaryOAuthProvider: _provider,
-      lastAuthMethod: "oauth",
+      lastAuthMethod: 'oauth',
 
       // Profile
-      firstName: profile.firstName || profile.given_name || "",
-      lastName: profile.lastName || profile.family_name || "",
+      firstName: profile.firstName || profile.given_name || '',
+      lastName: profile.lastName || profile.family_name || '',
       displayName:
-        profile.fullName ||
-        profile.name ||
-        `${profile.firstName} ${profile.lastName}`,
+        profile.fullName
+        || profile.name
+        || `${profile.firstName} ${profile.lastName}`,
       profilePicture: profile.picture,
-      locale: profile.locale || "en",
-      timezone: "America/Mexico_City",
+      locale: profile.locale || 'en',
+      timezone: 'America/Mexico_City',
 
       // Role assignment
       role,
       permissions: await this.getDefaultPermissions(role),
-      accessLevel: "basic",
+      accessLevel: 'basic',
 
       // Status
       active: true,
@@ -423,7 +425,7 @@ class AmexingAuthService {
     };
 
     // Insert into database with Parse Objects
-    const AmexingUser = Parse.Object.extend("AmexingUser");
+    const AmexingUser = Parse.Object.extend('AmexingUser');
     const parseUser = new AmexingUser();
 
     // Set all fields on Parse Object
@@ -463,28 +465,28 @@ class AmexingAuthService {
         ? await this.encryptToken(tokens.refreshToken)
         : null,
       tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
-      scopes: tokens.scope?.split(" ") || [],
+      scopes: tokens.scope?.split(' ') || [],
       linkedAt: new Date(),
       lastUsed: new Date(),
       isPrimary: user.oauthAccounts.length === 0,
     };
 
     // Update user with new OAuth account using Parse Objects
-    const query = new Parse.Query("AmexingUser");
-    query.equalTo("id", user.id);
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('id', user.id);
     const parseUser = await query.first({ useMasterKey: true });
 
     if (parseUser) {
-      const existingAccounts = parseUser.get("oauthAccounts") || [];
+      const existingAccounts = parseUser.get('oauthAccounts') || [];
       existingAccounts.push(oauthAccount);
 
-      parseUser.set("oauthAccounts", existingAccounts);
+      parseUser.set('oauthAccounts', existingAccounts);
       parseUser.set(
-        "primaryOAuthProvider",
-        user.primaryOAuthProvider || _provider,
+        'primaryOAuthProvider',
+        user.primaryOAuthProvider || _provider
       );
-      parseUser.set("lastOAuthSync", new Date());
-      parseUser.set("updatedAt", new Date());
+      parseUser.set('lastOAuthSync', new Date());
+      parseUser.set('updatedAt', new Date());
 
       await parseUser.save(null, { useMasterKey: true });
     }
@@ -509,12 +511,11 @@ class AmexingAuthService {
   async updateOAuthUser(user, _provider, profile, tokens) {
     // Find the OAuth account to update
     const oauthAccountIndex = user.oauthAccounts.findIndex(
-      (account) =>
-        account.provider === _provider && account.providerId === profile.id,
+      (account) => account.provider === _provider && account.providerId === profile.id
     );
 
     if (oauthAccountIndex === -1) {
-      throw new Error("OAuth account not found for user");
+      throw new Error('OAuth account not found for user');
     }
 
     // Update OAuth account
@@ -526,33 +527,33 @@ class AmexingAuthService {
         ? await this.encryptToken(tokens.refreshToken)
         : null,
       tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
-      scopes: tokens.scope?.split(" ") || [],
+      scopes: tokens.scope?.split(' ') || [],
       lastUsed: new Date(),
     };
 
     // Update in database using Parse Objects
-    const query = new Parse.Query("AmexingUser");
-    query.equalTo("id", user.id);
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('id', user.id);
     const parseUser = await query.first({ useMasterKey: true });
 
     if (parseUser) {
-      const oauthAccounts = parseUser.get("oauthAccounts") || [];
+      const oauthAccounts = parseUser.get('oauthAccounts') || [];
       oauthAccounts[oauthAccountIndex] = updatedOAuthAccount;
 
-      parseUser.set("oauthAccounts", oauthAccounts);
+      parseUser.set('oauthAccounts', oauthAccounts);
       parseUser.set(
-        "firstName",
-        profile.firstName || profile.given_name || user.firstName,
+        'firstName',
+        profile.firstName || profile.given_name || user.firstName
       );
       parseUser.set(
-        "lastName",
-        profile.lastName || profile.family_name || user.lastName,
+        'lastName',
+        profile.lastName || profile.family_name || user.lastName
       );
-      parseUser.set("profilePicture", profile.picture || user.profilePicture);
-      parseUser.set("lastOAuthSync", new Date());
-      parseUser.set("lastLoginAt", new Date());
-      parseUser.set("lastActivityAt", new Date());
-      parseUser.set("updatedAt", new Date());
+      parseUser.set('profilePicture', profile.picture || user.profilePicture);
+      parseUser.set('lastOAuthSync', new Date());
+      parseUser.set('lastLoginAt', new Date());
+      parseUser.set('lastActivityAt', new Date());
+      parseUser.set('updatedAt', new Date());
 
       await parseUser.save(null, { useMasterKey: true });
     }
@@ -573,7 +574,7 @@ class AmexingAuthService {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async handleCorporateIntegration(user, profile) {
-    const domain = profile.domain || profile.email?.split("@")[1];
+    const domain = profile.domain || profile.email?.split('@')[1];
 
     if (!domain || this.isPersonalEmailDomain(domain)) {
       return; // Not a corporate user
@@ -587,11 +588,11 @@ class AmexingAuthService {
         // Auto-provision employee
         await this.provisionCorporateEmployee(user, client, profile);
         logger.info(
-          `Corporate employee provisioned: ${user.email} for client ${client.name}`,
+          `Corporate employee provisioned: ${user.email} for client ${client.name}`
         );
       }
     } catch (error) {
-      logger.error("Corporate integration failed:", error);
+      logger.error('Corporate integration failed:', error);
       // Don't fail the authentication, just log the error
     }
   }
@@ -626,22 +627,22 @@ class AmexingAuthService {
 
     const refreshPayload = {
       sub: user.id,
-      type: "refresh",
+      type: 'refresh',
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60, // 30 days
       jti: uuidv4(),
     };
 
     const accessToken = jwt.sign(payload, this.jwtSecret, {
-      algorithm: "HS256",
-      issuer: "amexing.com",
-      audience: "amexing-api",
+      algorithm: 'HS256',
+      issuer: 'amexing.com',
+      audience: 'amexing-api',
     });
 
     const refreshToken = jwt.sign(refreshPayload, this.jwtRefreshSecret, {
-      algorithm: "HS256",
-      issuer: "amexing.com",
-      audience: "amexing-api",
+      algorithm: 'HS256',
+      issuer: 'amexing.com',
+      audience: 'amexing-api',
     });
 
     // Store refresh token in database
@@ -651,7 +652,7 @@ class AmexingAuthService {
       accessToken,
       refreshToken,
       expiresIn: 3600,
-      tokenType: "Bearer",
+      tokenType: 'Bearer',
     };
   }
 
@@ -670,24 +671,24 @@ class AmexingAuthService {
     const sessionId = uuidv4();
 
     // Create session with Parse Objects
-    const UserSession = Parse.Object.extend("UserSession");
+    const UserSession = Parse.Object.extend('UserSession');
     const session = new UserSession();
 
-    session.set("id", sessionId);
-    session.set("sessionToken", await this.encryptToken(sessionData.tokens));
-    session.set("userId", sessionData.userId);
-    session.set("authMethod", sessionData.authMethod);
-    session.set("oauthProvider", sessionData.oauthProvider || null);
-    session.set("status", "active");
-    session.set("active", true); // Para compatibilidad con tests
-    session.set("expiresAt", new Date(Date.now() + 60 * 60 * 1000)); // 1 hour
-    session.set("lastActivityAt", new Date());
-    session.set("ipAddress", sessionData.ipAddress || "unknown");
-    session.set("userAgent", sessionData.userAgent || "unknown");
-    session.set("requestCount", 0);
-    session.set("activityLog", []);
-    session.set("securityAlerts", []);
-    session.set("createdAt", new Date());
+    session.set('id', sessionId);
+    session.set('sessionToken', await this.encryptToken(sessionData.tokens));
+    session.set('userId', sessionData.userId);
+    session.set('authMethod', sessionData.authMethod);
+    session.set('oauthProvider', sessionData.oauthProvider || null);
+    session.set('status', 'active');
+    session.set('active', true); // Para compatibilidad con tests
+    session.set('expiresAt', new Date(Date.now() + 60 * 60 * 1000)); // 1 hour
+    session.set('lastActivityAt', new Date());
+    session.set('ipAddress', sessionData.ipAddress || 'unknown');
+    session.set('userAgent', sessionData.userAgent || 'unknown');
+    session.set('requestCount', 0);
+    session.set('activityLog', []);
+    session.set('securityAlerts', []);
+    session.set('createdAt', new Date());
 
     const savedSession = await session.save(null, { useMasterKey: true });
     return this.parseObjectToPlain(savedSession);
@@ -710,20 +711,20 @@ class AmexingAuthService {
       const decoded = jwt.verify(refreshToken, this.jwtRefreshSecret);
 
       // Check if refresh token exists in database using Parse Objects
-      const query = new Parse.Query("RefreshToken");
-      query.equalTo("userId", decoded.sub);
-      query.equalTo("jti", decoded.jti);
-      query.equalTo("active", true);
+      const query = new Parse.Query('RefreshToken');
+      query.equalTo('userId', decoded.sub);
+      query.equalTo('jti', decoded.jti);
+      query.equalTo('active', true);
       const storedToken = await query.first({ useMasterKey: true });
 
       if (!storedToken) {
-        throw new Error("Invalid refresh token");
+        throw new Error('Invalid refresh token');
       }
 
       // Get user
       const user = await this.findUserById(decoded.sub);
       if (!user || !user.active) {
-        throw new Error("User not found or inactive");
+        throw new Error('User not found or inactive');
       }
 
       // Generate new token pair
@@ -735,8 +736,8 @@ class AmexingAuthService {
       logger.info(`Token refreshed for user: ${user.email}`);
       return tokens;
     } catch (error) {
-      logger.error("Token refresh failed:", error);
-      throw new Error("Invalid refresh token");
+      logger.error('Token refresh failed:', error);
+      throw new Error('Invalid refresh token');
     }
   }
 
@@ -760,34 +761,34 @@ class AmexingAuthService {
       }
 
       // Terminate sessions using Parse Objects
-      const sessionQuery = new Parse.Query("UserSession");
-      sessionQuery.equalTo("userId", userId);
+      const sessionQuery = new Parse.Query('UserSession');
+      sessionQuery.equalTo('userId', userId);
       if (sessionId) {
-        sessionQuery.equalTo("id", sessionId);
+        sessionQuery.equalTo('id', sessionId);
       }
       const sessions = await sessionQuery.find({ useMasterKey: true });
 
       for (const session of sessions) {
-        session.set("status", "terminated");
-        session.set("terminatedAt", new Date());
-        session.set("terminationReason", "manual_revocation");
+        session.set('status', 'terminated');
+        session.set('terminatedAt', new Date());
+        session.set('terminationReason', 'manual_revocation');
         await session.save(null, { useMasterKey: true });
       }
 
       // Invalidate refresh tokens using Parse Objects
-      const tokenQuery = new Parse.Query("RefreshToken");
-      tokenQuery.equalTo("userId", userId);
+      const tokenQuery = new Parse.Query('RefreshToken');
+      tokenQuery.equalTo('userId', userId);
       const refreshTokens = await tokenQuery.find({ useMasterKey: true });
 
       for (const token of refreshTokens) {
-        token.set("active", false);
-        token.set("revokedAt", new Date());
+        token.set('active', false);
+        token.set('revokedAt', new Date());
         await token.save(null, { useMasterKey: true });
       }
 
       logger.info(`Sessions revoked for user: ${userId}`);
     } catch (error) {
-      logger.error("Session revocation failed:", error);
+      logger.error('Session revocation failed:', error);
       throw error;
     }
   }
@@ -812,7 +813,7 @@ class AmexingAuthService {
   async getUserPermissions(_userId) {
     // Note: PermissionService needs to be imported or implemented
     // return PermissionService.getUserEffectivePermissions(userId);
-    throw new Error("PermissionService not yet implemented");
+    throw new Error('PermissionService not yet implemented');
   }
 
   /**
@@ -836,7 +837,7 @@ class AmexingAuthService {
   async hasPermission(userId /* unused */, _permissionCode, _context = {}) {
     // Note: PermissionService needs to be imported or implemented
     // return PermissionService.hasPermission(userId , permissionCode, context);
-    throw new Error("PermissionService not yet implemented");
+    throw new Error('PermissionService not yet implemented');
   }
 
   // ============================================
@@ -856,9 +857,9 @@ class AmexingAuthService {
    * // Returns: Promise resolving to operation result
    */
   async findUserByEmail(email) {
-    const query = new Parse.Query("AmexingUser");
-    query.equalTo("email", email.toLowerCase().trim());
-    query.equalTo("exists", true); // Only find existing users (not soft deleted)
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('email', email.toLowerCase().trim());
+    query.equalTo('exists', true); // Only find existing users (not soft deleted)
 
     const parseUser = await query.first({ useMasterKey: true });
     return parseUser ? this.parseObjectToPlain(parseUser) : null;
@@ -876,9 +877,9 @@ class AmexingAuthService {
    * // Returns: Promise resolving to operation result
    */
   async findUserById(userId) {
-    const query = new Parse.Query("AmexingUser");
-    query.equalTo("id", userId);
-    query.equalTo("exists", true); // Only find existing users (not soft deleted)
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('id', userId);
+    query.equalTo('exists', true); // Only find existing users (not soft deleted)
 
     const parseUser = await query.first({ useMasterKey: true });
     return parseUser ? this.parseObjectToPlain(parseUser) : null;
@@ -897,10 +898,10 @@ class AmexingAuthService {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async findUserByOAuth(_provider, providerId) {
-    const query = new Parse.Query("AmexingUser");
-    query.equalTo("oauthAccounts.provider", _provider);
-    query.equalTo("oauthAccounts.providerId", providerId);
-    query.equalTo("exists", true); // Only find existing users (not soft deleted)
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('oauthAccounts.provider', _provider);
+    query.equalTo('oauthAccounts.providerId', providerId);
+    query.equalTo('exists', true); // Only find existing users (not soft deleted)
 
     const parseUser = await query.first({ useMasterKey: true });
     return parseUser ? this.parseObjectToPlain(parseUser) : null;
@@ -918,18 +919,18 @@ class AmexingAuthService {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async determineUserRole(profile) {
-    const domain = profile.domain || profile.email?.split("@")[1];
+    const domain = profile.domain || profile.email?.split('@')[1];
 
     // Check if corporate domain
     if (domain && !this.isPersonalEmailDomain(domain)) {
       const client = await this.findCorporateClientByDomain(domain);
       if (client) {
-        return client.defaultEmployeeRole || "employee";
+        return client.defaultEmployeeRole || 'employee';
       }
     }
 
     // Default role for non-corporate users
-    return "guest";
+    return 'guest';
   }
 
   /**
@@ -946,77 +947,77 @@ class AmexingAuthService {
    */
   validatePasswordStrength(password) {
     if (!password) {
-      throw new Error("Password is required");
+      throw new Error('Password is required');
     }
 
     const minLength = parseInt(process.env.PASSWORD_MIN_LENGTH, 10) || 12;
-    const requireUppercase = process.env.PASSWORD_REQUIRE_UPPERCASE === "true";
-    const requireLowercase = process.env.PASSWORD_REQUIRE_LOWERCASE === "true";
-    const requireNumbers = process.env.PASSWORD_REQUIRE_NUMBERS === "true";
-    const requireSpecial = process.env.PASSWORD_REQUIRE_SPECIAL === "true";
+    const requireUppercase = process.env.PASSWORD_REQUIRE_UPPERCASE === 'true';
+    const requireLowercase = process.env.PASSWORD_REQUIRE_LOWERCASE === 'true';
+    const requireNumbers = process.env.PASSWORD_REQUIRE_NUMBERS === 'true';
+    const requireSpecial = process.env.PASSWORD_REQUIRE_SPECIAL === 'true';
 
     // Length validation
     if (password.length < minLength) {
       throw new Error(
-        `La contraseña debe tener al menos ${minLength} caracteres`,
+        `La contraseña debe tener al menos ${minLength} caracteres`
       );
     }
 
     // Character type validations
     if (requireUppercase && !/[A-Z]/.test(password)) {
       throw new Error(
-        "La contraseña debe contener al menos una letra mayúscula",
+        'La contraseña debe contener al menos una letra mayúscula'
       );
     }
 
     if (requireLowercase && !/[a-z]/.test(password)) {
       throw new Error(
-        "La contraseña debe contener al menos una letra minúscula",
+        'La contraseña debe contener al menos una letra minúscula'
       );
     }
 
     if (requireNumbers && !/\d/.test(password)) {
-      throw new Error("La contraseña debe contener al menos un número");
+      throw new Error('La contraseña debe contener al menos un número');
     }
 
     if (requireSpecial && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
       throw new Error(
-        "La contraseña debe contener al menos un carácter especial",
+        'La contraseña debe contener al menos un carácter especial'
       );
     }
 
     // Common password validation
     const commonPasswords = [
-      "password",
-      "12345678",
-      "123456789",
-      "1234567890",
-      "qwerty",
-      "admin",
-      "letmein",
-      "welcome",
-      "monkey",
-      "password123",
-      "123password",
-      "admin123",
-      "password1",
+      'password',
+      '12345678',
+      '123456789',
+      '1234567890',
+      'qwerty',
+      'admin',
+      'letmein',
+      'welcome',
+      'monkey',
+      'password123',
+      '123password',
+      'admin123',
+      'password1',
     ];
 
     if (commonPasswords.includes(password.toLowerCase())) {
-      throw new Error("La contraseña es demasiado común y fácil de adivinar");
+      throw new Error('La contraseña es demasiado común y fácil de adivinar');
     }
 
     // Sequential characters validation
     if (/123456|abcdef|qwerty/i.test(password)) {
       throw new Error(
-        "La contraseña no puede contener secuencias comunes de caracteres",
+        'La contraseña no puede contener secuencias comunes de caracteres'
       );
     }
 
     // Repeated characters validation
     if (/(.)\1{3,}/.test(password)) {
       throw new Error(
-        "La contraseña no puede contener más de 3 caracteres consecutivos iguales",
+        'La contraseña no puede contener más de 3 caracteres consecutivos iguales'
       );
     }
 
@@ -1037,19 +1038,19 @@ class AmexingAuthService {
   async getDefaultPermissions(role) {
     // Implementación simplificada para validación
     const defaultPermissions = {
-      guest: [{ resource: "profile", actions: ["read"] }],
+      guest: [{ resource: 'profile', actions: ['read'] }],
       client: [
-        { resource: "profile", actions: ["read", "update"] },
-        { resource: "orders", actions: ["read", "create"] },
-        { resource: "invoices", actions: ["read"] },
+        { resource: 'profile', actions: ['read', 'update'] },
+        { resource: 'orders', actions: ['read', 'create'] },
+        { resource: 'invoices', actions: ['read'] },
       ],
       employee: [
-        { resource: "profile", actions: ["read", "update"] },
-        { resource: "orders", actions: ["read", "create", "update"] },
-        { resource: "clients", actions: ["read"] },
-        { resource: "reports", actions: ["read"] },
+        { resource: 'profile', actions: ['read', 'update'] },
+        { resource: 'orders', actions: ['read', 'create', 'update'] },
+        { resource: 'clients', actions: ['read'] },
+        { resource: 'reports', actions: ['read'] },
       ],
-      admin: [{ resource: "*", actions: ["*"] }],
+      admin: [{ resource: '*', actions: ['*'] }],
     };
 
     return defaultPermissions[role] || defaultPermissions.guest;
@@ -1087,15 +1088,15 @@ class AmexingAuthService {
    */
   isPersonalEmailDomain(domain) {
     const personalDomains = [
-      "gmail.com",
-      "yahoo.com",
-      "hotmail.com",
-      "outlook.com",
-      "icloud.com",
-      "me.com",
-      "mac.com",
-      "aol.com",
-      "protonmail.com",
+      'gmail.com',
+      'yahoo.com',
+      'hotmail.com',
+      'outlook.com',
+      'icloud.com',
+      'me.com',
+      'mac.com',
+      'aol.com',
+      'protonmail.com',
     ];
     return personalDomains.includes(domain.toLowerCase());
   }
@@ -1113,13 +1114,13 @@ class AmexingAuthService {
    */
   validateAccountStatus(user) {
     if (!user.active) {
-      throw new Error("Account is deactivated");
+      throw new Error('Account is deactivated');
     }
     if (user.locked) {
-      throw new Error("Account is locked");
+      throw new Error('Account is locked');
     }
     if (user.deleted) {
-      throw new Error("Account not found");
+      throw new Error('Account not found');
     }
   }
 
@@ -1139,21 +1140,21 @@ class AmexingAuthService {
     const lockDuration = 30 * 60 * 1000; // 30 minutes
 
     // Update failed attempts using Parse Objects
-    const query = new Parse.Query("AmexingUser");
-    query.equalTo("id", userId);
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('id', userId);
     const parseUser = await query.first({ useMasterKey: true });
 
     if (parseUser) {
-      const currentAttempts = parseUser.get("failedLoginAttempts") || 0;
-      parseUser.set("failedLoginAttempts", currentAttempts + 1);
-      parseUser.set("updatedAt", new Date());
+      const currentAttempts = parseUser.get('failedLoginAttempts') || 0;
+      parseUser.set('failedLoginAttempts', currentAttempts + 1);
+      parseUser.set('updatedAt', new Date());
 
       if (currentAttempts + 1 >= maxAttempts) {
-        parseUser.set("locked", true);
-        parseUser.set("lockedUntil", new Date(Date.now() + lockDuration));
+        parseUser.set('locked', true);
+        parseUser.set('lockedUntil', new Date(Date.now() + lockDuration));
 
         logger.warn(
-          `Account locked due to failed login attempts: ${parseUser.get("email")}`,
+          `Account locked due to failed login attempts: ${parseUser.get('email')}`
         );
       }
 
@@ -1173,15 +1174,15 @@ class AmexingAuthService {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async resetFailedLoginAttempts(userId) {
-    const query = new Parse.Query("AmexingUser");
-    query.equalTo("id", userId);
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('id', userId);
     const parseUser = await query.first({ useMasterKey: true });
 
     if (parseUser) {
-      parseUser.set("failedLoginAttempts", 0);
-      parseUser.set("locked", false);
-      parseUser.unset("lockedUntil");
-      parseUser.set("updatedAt", new Date());
+      parseUser.set('failedLoginAttempts', 0);
+      parseUser.set('locked', false);
+      parseUser.unset('lockedUntil');
+      parseUser.set('updatedAt', new Date());
 
       await parseUser.save(null, { useMasterKey: true });
     }
@@ -1199,14 +1200,14 @@ class AmexingAuthService {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async updateLastLogin(userId) {
-    const query = new Parse.Query("AmexingUser");
-    query.equalTo("id", userId);
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('id', userId);
     const parseUser = await query.first({ useMasterKey: true });
 
     if (parseUser) {
-      parseUser.set("lastLoginAt", new Date());
-      parseUser.set("lastActivityAt", new Date());
-      parseUser.set("updatedAt", new Date());
+      parseUser.set('lastLoginAt', new Date());
+      parseUser.set('lastActivityAt', new Date());
+      parseUser.set('updatedAt', new Date());
 
       await parseUser.save(null, { useMasterKey: true });
     }
@@ -1227,25 +1228,25 @@ class AmexingAuthService {
   async encryptToken(token /* unused */) {
     // Implementación simplificada para validación
     try {
-      const algorithm = "aes-256-cbc";
+      const algorithm = 'aes-256-cbc';
 
       // Asegurar que la clave tenga 32 bytes
-      const keyBuffer = Buffer.from(this.encryptionKey, "base64");
+      const keyBuffer = Buffer.from(this.encryptionKey, 'base64');
       const key = keyBuffer.subarray(0, 32); // Tomar solo 32 bytes
 
       const iv = crypto.randomBytes(16);
 
       const cipher = crypto.createCipheriv(algorithm, key, iv);
-      let encrypted = cipher.update(token, "utf8", "hex");
-      encrypted += cipher.final("hex");
+      let encrypted = cipher.update(token, 'utf8', 'hex');
+      encrypted += cipher.final('hex');
 
       return JSON.stringify({
         encrypted,
-        iv: iv.toString("hex"),
+        iv: iv.toString('hex'),
       });
     } catch (error) {
       // Fallback: solo codificar en base64 para validación
-      return Buffer.from(token).toString("base64");
+      return Buffer.from(token).toString('base64');
     }
   }
 
@@ -1264,18 +1265,18 @@ class AmexingAuthService {
    */
   async storeRefreshToken(userId, jti, refreshToken) {
     // Store refresh token using Parse Objects
-    const RefreshToken = Parse.Object.extend("RefreshToken");
+    const RefreshToken = Parse.Object.extend('RefreshToken');
     const tokenRecord = new RefreshToken();
 
-    tokenRecord.set("id", uuidv4());
-    tokenRecord.set("userId", userId);
-    tokenRecord.set("jti", jti);
-    tokenRecord.set("token", await this.encryptToken(refreshToken));
-    tokenRecord.set("active", true);
-    tokenRecord.set("createdAt", new Date());
+    tokenRecord.set('id', uuidv4());
+    tokenRecord.set('userId', userId);
+    tokenRecord.set('jti', jti);
+    tokenRecord.set('token', await this.encryptToken(refreshToken));
+    tokenRecord.set('active', true);
+    tokenRecord.set('createdAt', new Date());
     tokenRecord.set(
-      "expiresAt",
-      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      'expiresAt',
+      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
     ); // 30 days
 
     await tokenRecord.save(null, { useMasterKey: true });
@@ -1293,13 +1294,13 @@ class AmexingAuthService {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async invalidateRefreshToken(jti) {
-    const query = new Parse.Query("RefreshToken");
-    query.equalTo("jti", jti);
+    const query = new Parse.Query('RefreshToken');
+    query.equalTo('jti', jti);
     const refreshToken = await query.first({ useMasterKey: true });
 
     if (refreshToken) {
-      refreshToken.set("active", false);
-      refreshToken.set("revokedAt", new Date());
+      refreshToken.set('active', false);
+      refreshToken.set('revokedAt', new Date());
       await refreshToken.save(null, { useMasterKey: true });
     }
   }
@@ -1317,11 +1318,11 @@ class AmexingAuthService {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   async findCorporateClientByDomain(domain) {
-    const query = new Parse.Query("Client");
-    query.equalTo("oauthDomain", domain);
-    query.equalTo("isCorporate", true);
-    query.equalTo("active", true);
-    query.equalTo("exists", true); // Only find existing clients (not soft deleted)
+    const query = new Parse.Query('Client');
+    query.equalTo('oauthDomain', domain);
+    query.equalTo('isCorporate', true);
+    query.equalTo('active', true);
+    query.equalTo('exists', true); // Only find existing clients (not soft deleted)
 
     const parseClient = await query.first({ useMasterKey: true });
     return parseClient ? this.parseObjectToPlain(parseClient) : null;
@@ -1345,14 +1346,14 @@ class AmexingAuthService {
   async provisionCorporateEmployee(user, client, _profile) {
     // Implementation will be added in corporate provisioning service
     // For now, just update user with client association using Parse Objects
-    const query = new Parse.Query("AmexingUser");
-    query.equalTo("id", user.id);
+    const query = new Parse.Query('AmexingUser');
+    query.equalTo('id', user.id);
     const parseUser = await query.first({ useMasterKey: true });
 
     if (parseUser) {
-      parseUser.set("clientId", client.id);
-      parseUser.set("accessLevel", client.employeeAccessLevel || "basic");
-      parseUser.set("updatedAt", new Date());
+      parseUser.set('clientId', client.id);
+      parseUser.set('accessLevel', client.employeeAccessLevel || 'basic');
+      parseUser.set('updatedAt', new Date());
 
       await parseUser.save(null, { useMasterKey: true });
     }
@@ -1375,8 +1376,8 @@ class AmexingAuthService {
     const plainObject = parseObject.toJSON();
 
     // Handle Parse Object specific fields
-    if (parseObject.get("id")) {
-      plainObject.id = parseObject.get("id");
+    if (parseObject.get('id')) {
+      plainObject.id = parseObject.get('id');
     } else {
       plainObject.id = parseObject.id;
     }

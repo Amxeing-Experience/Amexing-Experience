@@ -8,9 +8,9 @@
  * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
-const Parse = require("parse/node");
-const { AppleOAuthServiceCore } = require("./AppleOAuthServiceCore");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const { AppleOAuthServiceCore } = require('./AppleOAuthServiceCore');
+const logger = require('../../infrastructure/logger');
 
 /**
  * Apple OAuth Service - Handles Apple Sign In authentication flows.
@@ -85,7 +85,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
       const userProfile = this.buildUserProfile(
         idTokenPayload,
         userData,
-        tokenData,
+        tokenData
       );
 
       const authResult = await this.processAuthentication(userProfile, {
@@ -94,7 +94,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
       });
 
       logger.info(
-        `Apple OAuth callback successful for user: ${authResult.user.id}`,
+        `Apple OAuth callback successful for user: ${authResult.user.id}`
       );
 
       return {
@@ -107,7 +107,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
         appliedInheritance: authResult.appliedInheritance,
       };
     } catch (callbackError) {
-      logger.error("Apple OAuth callback failed:", callbackError);
+      logger.error('Apple OAuth callback failed:', callbackError);
       throw callbackError;
     }
   }
@@ -123,7 +123,9 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * service.validateCallbackData({ code: 'abc', idToken: 'token' });
    * @returns {*} - Operation result.
    */
-  validateCallbackData({ code, idToken, error, errorDescription }) {
+  validateCallbackData({
+    code, idToken, error, errorDescription,
+  }) {
     /**
      * Validates for OAuth error responses from Apple's authorization server.
      * Handles error codes and descriptions returned by Apple during failed authentication.
@@ -137,7 +139,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     if (error) {
       throw new Parse.Error(
         Parse.Error.OTHER_CAUSE,
-        `Apple OAuth error: ${error} - ${errorDescription || "Unknown error"}`,
+        `Apple OAuth error: ${error} - ${errorDescription || 'Unknown error'}`
       );
     }
 
@@ -154,7 +156,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     if (!code || !idToken) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
-        "Missing authorization code or ID token from Apple",
+        'Missing authorization code or ID token from Apple'
       );
     }
   }
@@ -172,7 +174,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     try {
       return JSON.parse(userJsonString);
     } catch (parseError) {
-      logger.warn("Failed to parse Apple user data:", parseError);
+      logger.warn('Failed to parse Apple user data:', parseError);
       return null;
     }
   }
@@ -210,7 +212,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
         appliedInheritance: inheritanceResult,
       };
     } catch (authError) {
-      logger.error("Apple OAuth authentication processing failed:", authError);
+      logger.error('Apple OAuth authentication processing failed:', authError);
       throw authError;
     }
   }
@@ -227,16 +229,16 @@ class AppleOAuthService extends AppleOAuthServiceCore {
 
     // First, try to find by Apple ID
     let userQuery = new Parse.Query(Parse.User);
-    userQuery.equalTo("appleId", id);
+    userQuery.equalTo('appleId', id);
     let user = await userQuery.first({ useMasterKey: true });
 
     if (!user && email) {
       userQuery = new Parse.Query(Parse.User);
-      userQuery.equalTo("email", email);
+      userQuery.equalTo('email', email);
       user = await userQuery.first({ useMasterKey: true });
 
       if (user) {
-        user.set("appleId", id);
+        user.set('appleId', id);
         await user.save(null, { useMasterKey: true });
       }
     }
@@ -261,21 +263,21 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     const { email, id } = userProfile;
     const user = new Parse.User();
 
-    user.set("username", email || `apple_${id}`);
-    user.set("email", email);
-    user.set("appleId", id);
+    user.set('username', email || `apple_${id}`);
+    user.set('email', email);
+    user.set('appleId', id);
 
-    if (userProfile.firstName) user.set("firstName", userProfile.firstName);
-    if (userProfile.lastName) user.set("lastName", userProfile.lastName);
+    if (userProfile.firstName) user.set('firstName', userProfile.firstName);
+    if (userProfile.lastName) user.set('lastName', userProfile.lastName);
 
-    user.set("emailVerified", userProfile.emailVerified);
-    user.set("isPrivateEmail", userProfile.isPrivateEmail);
-    user.set("oauthProviders", ["apple"]);
-    user.set("lastProvider", "apple");
+    user.set('emailVerified', userProfile.emailVerified);
+    user.set('isPrivateEmail', userProfile.isPrivateEmail);
+    user.set('oauthProviders', ['apple']);
+    user.set('lastProvider', 'apple');
 
-    const crypto = require("crypto");
-    const randomPassword = crypto.randomBytes(32).toString("hex");
-    user.set("password", randomPassword);
+    const crypto = require('crypto');
+    const randomPassword = crypto.randomBytes(32).toString('hex');
+    user.set('password', randomPassword);
 
     await user.signUp();
     logger.info(`New Apple user created: ${user.id}`);
@@ -290,13 +292,13 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * const updatedUser = await service.updateExistingUser(user);
    */
   async updateExistingUser(user) {
-    user.set("lastProvider", "apple");
-    user.set("lastLogin", new Date());
+    user.set('lastProvider', 'apple');
+    user.set('lastLogin', new Date());
 
-    const providers = user.get("oauthProviders") || [];
-    if (!providers.includes("apple")) {
-      providers.push("apple");
-      user.set("oauthProviders", providers);
+    const providers = user.get('oauthProviders') || [];
+    if (!providers.includes('apple')) {
+      providers.push('apple');
+      user.set('oauthProviders', providers);
     }
 
     await user.save(null, { useMasterKey: true });
@@ -312,7 +314,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * const config = await service.getCorporateConfig('config123');
    */
   async getCorporateConfig(corporateConfigId) {
-    const CorporateConfig = Parse.Object.extend("CorporateConfig");
+    const CorporateConfig = Parse.Object.extend('CorporateConfig');
     const query = new Parse.Query(CorporateConfig);
     return query.get(corporateConfigId, { useMasterKey: true });
   }
@@ -329,14 +331,14 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   async applyDepartmentPermissions(user, department, userProfile) {
     const {
       DepartmentOAuthFlowService,
-    } = require("./DepartmentOAuthFlowService");
+    } = require('./DepartmentOAuthFlowService');
     const departmentService = new DepartmentOAuthFlowService();
 
     await departmentService.applyDepartmentPermissionInheritance(
       user,
       userProfile,
       { code: department },
-      "apple",
+      'apple'
     );
   }
 
@@ -348,19 +350,19 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * let token = await service.createUserSession(user);
    */
   async createUserSession(user) {
-    const crypto = require("crypto");
-    const sessionToken = crypto.randomBytes(32).toString("hex");
+    const crypto = require('crypto');
+    const sessionToken = crypto.randomBytes(32).toString('hex');
 
-    const Session = Parse.Object.extend("_Session");
+    const Session = Parse.Object.extend('_Session');
     const session = new Session();
 
-    session.set("sessionToken", sessionToken);
-    session.set("user", user);
-    session.set("createdWith", {
-      action: "apple_oauth",
-      authProvider: "apple",
+    session.set('sessionToken', sessionToken);
+    session.set('user', user);
+    session.set('createdWith', {
+      action: 'apple_oauth',
+      authProvider: 'apple',
     });
-    session.set("expiresAt", new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)); // 1 year
+    session.set('expiresAt', new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)); // 1 year
 
     await session.save(null, { useMasterKey: true });
     return sessionToken;
@@ -375,18 +377,18 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    */
   async revokeTokens(user) {
     try {
-      user.unset("appleId");
+      user.unset('appleId');
 
-      const providers = user.get("oauthProviders") || [];
-      const updatedProviders = providers.filter((p) => p !== "apple");
-      user.set("oauthProviders", updatedProviders);
+      const providers = user.get('oauthProviders') || [];
+      const updatedProviders = providers.filter((p) => p !== 'apple');
+      user.set('oauthProviders', updatedProviders);
 
       await user.save(null, { useMasterKey: true });
 
       logger.info(`Apple OAuth association removed for user: ${user.id}`);
       return { success: true };
     } catch (error) {
-      logger.error("Failed to revoke Apple OAuth tokens:", error);
+      logger.error('Failed to revoke Apple OAuth tokens:', error);
       throw error;
     }
   }
@@ -402,15 +404,15 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    */
   async validateAppleWebhook(requestBody, _signature) {
     try {
-      logger.info("Apple webhook received:", requestBody.type);
+      logger.info('Apple webhook received:', requestBody.type);
 
-      if (requestBody.type === "consent-revoked") {
+      if (requestBody.type === 'consent-revoked') {
         await this.handleConsentRevoked(requestBody.sub);
       }
 
       return { success: true };
     } catch (error) {
-      logger.error("Apple webhook validation failed:", error);
+      logger.error('Apple webhook validation failed:', error);
       throw error;
     }
   }
@@ -424,26 +426,26 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    */
   async handleConsentRevoked(appleId) {
     const userQuery = new Parse.Query(Parse.User);
-    userQuery.equalTo("appleId", appleId);
+    userQuery.equalTo('appleId', appleId);
 
     const user = await userQuery.first({ useMasterKey: true });
     if (!user) return;
 
-    const providers = user.get("oauthProviders") || [];
-    const remainingProviders = providers.filter((p) => p !== "apple");
+    const providers = user.get('oauthProviders') || [];
+    const remainingProviders = providers.filter((p) => p !== 'apple');
 
     if (remainingProviders.length === 0) {
       await user.destroy({ useMasterKey: true });
       logger.info(
-        `User account deleted due to Apple consent revocation: ${user.id}`,
+        `User account deleted due to Apple consent revocation: ${user.id}`
       );
     } else {
-      user.unset("appleId");
-      user.unset("isPrivateEmail");
-      user.set("oauthProviders", remainingProviders);
+      user.unset('appleId');
+      user.unset('isPrivateEmail');
+      user.set('oauthProviders', remainingProviders);
       await user.save(null, { useMasterKey: true });
       logger.info(
-        `Apple association removed due to consent revocation: ${user.id}`,
+        `Apple association removed due to consent revocation: ${user.id}`
       );
     }
   }
@@ -458,21 +460,21 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   getPrivacyCompliantUserData(user) {
     const userData = {
       id: user.id,
-      email: user.get("isPrivateEmail") ? null : user.get("email"),
-      firstName: user.get("firstName"),
-      lastName: user.get("lastName"),
-      isPrivateEmail: user.get("isPrivateEmail"),
-      emailVerified: user.get("emailVerified"),
+      email: user.get('isPrivateEmail') ? null : user.get('email'),
+      firstName: user.get('firstName'),
+      lastName: user.get('lastName'),
+      isPrivateEmail: user.get('isPrivateEmail'),
+      emailVerified: user.get('emailVerified'),
     };
 
     // Remove null/undefined values with allowlist security
     const allowedKeys = [
-      "id",
-      "email",
-      "firstName",
-      "lastName",
-      "isPrivateEmail",
-      "emailVerified",
+      'id',
+      'email',
+      'firstName',
+      'lastName',
+      'isPrivateEmail',
+      'emailVerified',
     ];
     Object.keys(userData).forEach((key) => {
       // eslint-disable-next-line security/detect-object-injection

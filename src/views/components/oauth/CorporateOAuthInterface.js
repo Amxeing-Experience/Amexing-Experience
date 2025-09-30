@@ -55,7 +55,7 @@ class CorporateOAuthInterface {
       this.setupCorporateEventHandlers();
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.error("Corporate OAuth Interface initialization failed:", error);
+      console.error('Corporate OAuth Interface initialization failed:', error);
       if (this.config.fallbackToRegular) {
         this.fallbackToRegularOAuth();
       }
@@ -86,12 +86,12 @@ class CorporateOAuthInterface {
       const response = await fetch(
         `/api/corporate/config/${this.config.corporateConfigId}`,
         {
-          method: "GET",
+          method: 'GET',
           headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
           },
-        },
+        }
       );
 
       if (response.ok) {
@@ -99,7 +99,7 @@ class CorporateOAuthInterface {
       }
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Failed to load corporate configuration:", error);
+      console.warn('Failed to load corporate configuration:', error);
     }
   }
 
@@ -116,10 +116,9 @@ class CorporateOAuthInterface {
    */
   async detectCorporateContext() {
     const currentDomain = window.location.hostname;
-    const subdomain = currentDomain.split(".")[0];
+    const subdomain = currentDomain.split('.')[0];
     const urlParams = new URLSearchParams(window.location.search);
-    const corporateParam =
-      urlParams.get("corporate") || urlParams.get("client");
+    const corporateParam = urlParams.get('corporate') || urlParams.get('client');
 
     // Try detection methods in order of priority
     const detectionMethods = [
@@ -139,7 +138,7 @@ class CorporateOAuthInterface {
         }
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.warn("Corporate detection method failed:", error);
+        console.warn('Corporate detection method failed:', error);
       }
     }
   }
@@ -158,18 +157,18 @@ class CorporateOAuthInterface {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async detectFromCustomDomain(_domain) {
-    if (!_domain || _domain === "localhost") return null;
+    if (!_domain || _domain === 'localhost') return null;
 
     try {
       const response = await fetch(
         `/api/corporate/detect/domain/${encodeURIComponent(_domain)}`,
         {
-          method: "GET",
+          method: 'GET',
           headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
           },
-        },
+        }
       );
 
       if (response.ok) {
@@ -177,7 +176,7 @@ class CorporateOAuthInterface {
       }
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Domain detection failed:", error);
+      console.warn('Domain detection failed:', error);
     }
 
     return null;
@@ -196,19 +195,18 @@ class CorporateOAuthInterface {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async detectFromSubdomain(subdomain) {
-    if (!subdomain || subdomain === "www" || subdomain === "localhost")
-      return null;
+    if (!subdomain || subdomain === 'www' || subdomain === 'localhost') return null;
 
     try {
       const response = await fetch(
         `/api/corporate/detect/subdomain/${encodeURIComponent(subdomain)}`,
         {
-          method: "GET",
+          method: 'GET',
           headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
           },
-        },
+        }
       );
 
       if (response.ok) {
@@ -216,7 +214,7 @@ class CorporateOAuthInterface {
       }
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Subdomain detection failed:", error);
+      console.warn('Subdomain detection failed:', error);
     }
 
     return null;
@@ -241,12 +239,12 @@ class CorporateOAuthInterface {
       const response = await fetch(
         `/api/corporate/detect/param/${encodeURIComponent(param)}`,
         {
-          method: "GET",
+          method: 'GET',
           headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
           },
-        },
+        }
       );
 
       if (response.ok) {
@@ -254,7 +252,7 @@ class CorporateOAuthInterface {
       }
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Parameter detection failed:", error);
+      console.warn('Parameter detection failed:', error);
     }
 
     return null;
@@ -273,18 +271,18 @@ class CorporateOAuthInterface {
    */
   detectFromLocalStorage() {
     try {
-      const stored = localStorage.getItem("amexing_corporate_config");
+      const stored = localStorage.getItem('amexing_corporate_config');
       if (stored) {
         const parsed = JSON.parse(stored);
         // Validate that stored config is still valid (not expired)
         if (parsed.expiresAt && new Date(parsed.expiresAt) > new Date()) {
           return parsed.config;
         }
-        localStorage.removeItem("amexing_corporate_config");
+        localStorage.removeItem('amexing_corporate_config');
       }
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("LocalStorage detection failed:", error);
+      console.warn('LocalStorage detection failed:', error);
     }
 
     return null;
@@ -309,7 +307,7 @@ class CorporateOAuthInterface {
       return await this.detectFromCustomDomain(referrerDomain);
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Referrer detection failed:", error);
+      console.warn('Referrer detection failed:', error);
     }
 
     return null;
@@ -351,7 +349,7 @@ class CorporateOAuthInterface {
       this.brandingApplied = true;
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.error("Failed to apply corporate branding:", error);
+      console.error('Failed to apply corporate branding:', error);
     }
   }
 
@@ -373,27 +371,27 @@ class CorporateOAuthInterface {
     const root = document.documentElement;
 
     if (theme.primaryColor) {
-      root.style.setProperty("--primary-color", theme.primaryColor);
+      root.style.setProperty('--primary-color', theme.primaryColor);
     }
 
     if (theme.secondaryColor) {
-      root.style.setProperty("--secondary-color", theme.secondaryColor);
+      root.style.setProperty('--secondary-color', theme.secondaryColor);
     }
 
     if (theme.backgroundColor) {
-      root.style.setProperty("--brand-background", theme.backgroundColor);
+      root.style.setProperty('--brand-background', theme.backgroundColor);
     }
 
     if (theme.textColor) {
-      root.style.setProperty("--brand-text", theme.textColor);
+      root.style.setProperty('--brand-text', theme.textColor);
     }
 
     if (theme.buttonColor) {
-      root.style.setProperty("--button-color", theme.buttonColor);
+      root.style.setProperty('--button-color', theme.buttonColor);
     }
 
     if (theme.linkColor) {
-      root.style.setProperty("--link-color", theme.linkColor);
+      root.style.setProperty('--link-color', theme.linkColor);
     }
 
     // Apply gradient backgrounds if defined
@@ -419,14 +417,14 @@ class CorporateOAuthInterface {
 
     // Update main logo in header
     if (branding.logo) {
-      const logoElements = document.querySelectorAll(".logo, .corporate-logo");
+      const logoElements = document.querySelectorAll('.logo, .corporate-logo');
       logoElements.forEach((element) => {
-        if (element.tagName === "IMG") {
+        if (element.tagName === 'IMG') {
           element.src = branding.logo;
           element.alt = `${this.corporateData.name} Logo`;
         } else {
           // Replace text logo with image
-          const img = document.createElement("img");
+          const img = document.createElement('img');
           img.src = branding.logo;
           img.alt = `${this.corporateData.name} Logo`;
           img.className = `${element.className} corporate-logo-img`;
@@ -437,14 +435,13 @@ class CorporateOAuthInterface {
 
     // Update favicon
     if (branding.favicon) {
-      const favicon =
-        document.querySelector('link[rel="icon"]') ||
-        document.querySelector('link[rel="shortcut icon"]');
+      const favicon = document.querySelector('link[rel="icon"]')
+        || document.querySelector('link[rel="shortcut icon"]');
       if (favicon) {
         favicon.href = branding.favicon;
       } else {
-        const newFavicon = document.createElement("link");
-        newFavicon.rel = "icon";
+        const newFavicon = document.createElement('link');
+        newFavicon.rel = 'icon';
         newFavicon.href = branding.favicon;
         document.head.appendChild(newFavicon);
       }
@@ -453,20 +450,20 @@ class CorporateOAuthInterface {
     // Apply background imagery
     if (branding.backgroundImage) {
       document.body.style.backgroundImage = `url(${branding.backgroundImage})`;
-      document.body.style.backgroundSize = "cover";
-      document.body.style.backgroundPosition = "center";
-      document.body.style.backgroundAttachment = "fixed";
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+      document.body.style.backgroundAttachment = 'fixed';
     }
 
     // Apply corporate imagery to OAuth sections
     if (branding.oauthBackground) {
       const oauthContainers = document.querySelectorAll(
-        ".oauth-provider-container , .corporate-branding",
+        '.oauth-provider-container , .corporate-branding'
       );
       oauthContainers.forEach((container) => {
         container.style.backgroundImage = `url(${branding.oauthBackground})`;
-        container.style.backgroundSize = "cover";
-        container.style.backgroundPosition = "center";
+        container.style.backgroundSize = 'cover';
+        container.style.backgroundPosition = 'center';
       });
     }
   }
@@ -487,32 +484,32 @@ class CorporateOAuthInterface {
 
     // Load Google Fonts if specified
     if (fonts.googleFonts && fonts.googleFonts.length > 0) {
-      const fontLink = document.createElement("link");
-      fontLink.rel = "stylesheet";
-      fontLink.href = `https://fonts.googleapis.com/css2?${fonts.googleFonts.map((font) => `family=${encodeURIComponent(font)}`).join("&")}&display=swap`;
+      const fontLink = document.createElement('link');
+      fontLink.rel = 'stylesheet';
+      fontLink.href = `https://fonts.googleapis.com/css2?${fonts.googleFonts.map((font) => `family=${encodeURIComponent(font)}`).join('&')}&display=swap`;
       document.head.appendChild(fontLink);
     }
 
     // Apply font family settings
     if (fonts.primaryFont) {
       document.documentElement.style.setProperty(
-        "--font-primary",
-        fonts.primaryFont,
+        '--font-primary',
+        fonts.primaryFont
       );
     }
 
     if (fonts.secondaryFont) {
       document.documentElement.style.setProperty(
-        "--font-secondary",
-        fonts.secondaryFont,
+        '--font-secondary',
+        fonts.secondaryFont
       );
     }
 
     // Apply font sizes if specified
     if (fonts.baseFontSize) {
       document.documentElement.style.setProperty(
-        "--font-size-base",
-        fonts.baseFontSize,
+        '--font-size-base',
+        fonts.baseFontSize
       );
     }
   }
@@ -533,14 +530,14 @@ class CorporateOAuthInterface {
     if (!customCSS) return;
 
     try {
-      const style = document.createElement("style");
-      style.type = "text/css";
+      const style = document.createElement('style');
+      style.type = 'text/css';
       style.textContent = customCSS;
-      style.setAttribute("data-corporate-css", this.corporateData.id);
+      style.setAttribute('data-corporate-css', this.corporateData.id);
       document.head.appendChild(style);
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Failed to apply custom CSS:", error);
+      console.warn('Failed to apply custom CSS:', error);
     }
   }
 
@@ -568,8 +565,8 @@ class CorporateOAuthInterface {
     if (meta.description) {
       let descriptionMeta = document.querySelector('meta[name="description"]');
       if (!descriptionMeta) {
-        descriptionMeta = document.createElement("meta");
-        descriptionMeta.name = "description";
+        descriptionMeta = document.createElement('meta');
+        descriptionMeta.name = 'description';
         document.head.appendChild(descriptionMeta);
       }
       descriptionMeta.content = meta.description;
@@ -577,32 +574,32 @@ class CorporateOAuthInterface {
 
     // Update Open Graph meta tags
     if (meta.ogTitle) {
-      this.updateMetaTag("property", "og:title", meta.ogTitle);
+      this.updateMetaTag('property', 'og:title', meta.ogTitle);
     }
 
     if (meta.ogDescription) {
-      this.updateMetaTag("property", "og:description", meta.ogDescription);
+      this.updateMetaTag('property', 'og:description', meta.ogDescription);
     }
 
     if (meta.ogImage) {
-      this.updateMetaTag("property", "og:image", meta.ogImage);
+      this.updateMetaTag('property', 'og:image', meta.ogImage);
     }
 
     // Update Twitter Card meta tags
     if (meta.twitterTitle) {
-      this.updateMetaTag("name", "twitter:title", meta.twitterTitle);
+      this.updateMetaTag('name', 'twitter:title', meta.twitterTitle);
     }
 
     if (meta.twitterDescription) {
       this.updateMetaTag(
-        "name",
-        "twitter:description",
-        meta.twitterDescription,
+        'name',
+        'twitter:description',
+        meta.twitterDescription
       );
     }
 
     if (meta.twitterImage) {
-      this.updateMetaTag("name", "twitter:image", meta.twitterImage);
+      this.updateMetaTag('name', 'twitter:image', meta.twitterImage);
     }
   }
 
@@ -623,7 +620,7 @@ class CorporateOAuthInterface {
   updateMetaTag(attribute, value, content) {
     let metaTag = document.querySelector(`meta[${attribute}="${value}"]`);
     if (!metaTag) {
-      metaTag = document.createElement("meta");
+      metaTag = document.createElement('meta');
       metaTag.setAttribute(attribute, value);
       document.head.appendChild(metaTag);
     }
@@ -649,12 +646,12 @@ class CorporateOAuthInterface {
       };
 
       localStorage.setItem(
-        "amexing_corporate_config",
-        JSON.stringify(storageData),
+        'amexing_corporate_config',
+        JSON.stringify(storageData)
       );
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Failed to store corporate config:", error);
+      console.warn('Failed to store corporate config:', error);
     }
   }
 
@@ -677,9 +674,9 @@ class CorporateOAuthInterface {
       departmentRequired:
         this.corporateData?.requireDepartmentSelection || false,
       allowedProviders: this.corporateData?.allowedProviders || [
-        "google",
-        "microsoft",
-        "apple",
+        'google',
+        'microsoft',
+        'apple',
       ],
       mobile: this.detectMobile(),
     };
@@ -706,32 +703,32 @@ class CorporateOAuthInterface {
   setupCorporateEventHandlers() {
     // Handle corporate domain email detection
     document.addEventListener(
-      "emailDomainDetected",
-      this.handleEmailDomainDetection.bind(this),
+      'emailDomainDetected',
+      this.handleEmailDomainDetection.bind(this)
     );
 
     // Handle department changes
     document.addEventListener(
-      "departmentChanged",
-      this.handleDepartmentChange.bind(this),
+      'departmentChanged',
+      this.handleDepartmentChange.bind(this)
     );
 
     // Handle OAuth success with corporate context
     document.addEventListener(
-      "oauthSuccess",
-      this.handleCorporateOAuthSuccess.bind(this),
+      'oauthSuccess',
+      this.handleCorporateOAuthSuccess.bind(this)
     );
 
     // Handle corporate branding updates
     document.addEventListener(
-      "corporateBrandingUpdate",
-      this.handleBrandingUpdate.bind(this),
+      'corporateBrandingUpdate',
+      this.handleBrandingUpdate.bind(this)
     );
 
     // Handle page visibility changes (for session management)
     document.addEventListener(
-      "visibilitychange",
-      this.handleVisibilityChange.bind(this),
+      'visibilitychange',
+      this.handleVisibilityChange.bind(this)
     );
   }
 
@@ -770,34 +767,33 @@ class CorporateOAuthInterface {
    * @returns {*} - Operation result.
    */
   highlightCorporateLogin(_email) {
-    const oauthContainer = document.getElementById("oauth-container");
+    const oauthContainer = document.getElementById('oauth-container');
     if (!oauthContainer) return;
 
     // Remove existing corporate highlights
     oauthContainer
-      .querySelectorAll(".corporate-highlight")
+      .querySelectorAll('.corporate-highlight')
       .forEach((el) => el.remove());
 
     // Add corporate user notice
-    const notice = document.createElement("div");
-    notice.className = "corporate-highlight";
+    const notice = document.createElement('div');
+    notice.className = 'corporate-highlight';
     notice.style.cssText = `
       padding: 1rem;
       margin-bottom: 1rem;
-      background: linear-gradient(135deg, ${this.corporateData?.theme?.primaryColor || "#667eea"} 0%, ${this.corporateData?.theme?.secondaryColor || "#764ba2"} 100%);
+      background: linear-gradient(135deg, ${this.corporateData?.theme?.primaryColor || '#667eea'} 0%, ${this.corporateData?.theme?.secondaryColor || '#764ba2'} 100%);
       color: white;
       border-radius: 8px;
       text-align: center;
       font-weight: 500;
     `;
     // Use DOM methods to prevent XSS
-    const welcomeP = document.createElement("p");
-    welcomeP.style.cssText = "margin: 0 0 0.5rem 0;";
+    const welcomeP = document.createElement('p');
+    welcomeP.style.cssText = 'margin: 0 0 0.5rem 0;';
     welcomeP.textContent = `Welcome, ${this.corporateData.name} team member!`;
 
-    const instructionP = document.createElement("p");
-    instructionP.style.cssText =
-      "margin: 0; font-size: 0.875rem; opacity: 0.9;";
+    const instructionP = document.createElement('p');
+    instructionP.style.cssText = 'margin: 0; font-size: 0.875rem; opacity: 0.9;';
     instructionP.textContent = `Sign in with your ${this.corporateData.name} account for the best experience.`;
 
     notice.appendChild(welcomeP);
@@ -824,8 +820,8 @@ class CorporateOAuthInterface {
     const suggestedProvider = this.corporateData.domainMappings[domain];
     if (suggestedProvider) {
       // Trigger provider suggestion
-      const event = new CustomEvent("suggestProvider", {
-        detail: { provider: suggestedProvider, reason: "corporate_domain" },
+      const event = new CustomEvent('suggestProvider', {
+        detail: { provider: suggestedProvider, reason: 'corporate_domain' },
       });
       document.dispatchEvent(event);
     }
@@ -875,11 +871,11 @@ class CorporateOAuthInterface {
     const root = document.documentElement;
 
     if (theme.primaryColor) {
-      root.style.setProperty("--dept-primary-color", theme.primaryColor);
+      root.style.setProperty('--dept-primary-color', theme.primaryColor);
     }
 
     if (theme.accentColor) {
-      root.style.setProperty("--dept-accent-color", theme.accentColor);
+      root.style.setProperty('--dept-accent-color', theme.accentColor);
     }
   }
 
@@ -919,11 +915,11 @@ class CorporateOAuthInterface {
    */
   trackCorporateOAuthUsage(_provider, department) {
     try {
-      fetch("/api/analytics/corporate-oauth", {
-        method: "POST",
+      fetch('/api/analytics/corporate-oauth', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify({
           corporateId: this.corporateData.id,
@@ -935,7 +931,7 @@ class CorporateOAuthInterface {
         }),
       });
     } catch (error) {
-      console.warn("Failed to track corporate OAuth usage:", error);
+      console.warn('Failed to track corporate OAuth usage:', error);
     }
   }
 
@@ -980,7 +976,7 @@ class CorporateOAuthInterface {
    * @returns {*} - Operation result.
    */
   showWelcomeMessage(message, user) {
-    const welcomeDiv = document.createElement("div");
+    const welcomeDiv = document.createElement('div');
     welcomeDiv.style.cssText = `
       position: fixed;
       top: 20px;
@@ -991,23 +987,22 @@ class CorporateOAuthInterface {
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       z-index: 10000;
-      border-left: 4px solid ${this.corporateData?.theme?.primaryColor || "#667eea"};
+      border-left: 4px solid ${this.corporateData?.theme?.primaryColor || '#667eea'};
     `;
 
     // Use DOM methods to prevent XSS
-    const closeBtn = document.createElement("button");
-    closeBtn.textContent = "×";
-    closeBtn.style.cssText =
-      "position: absolute; top: 0.5rem; right: 0.5rem; border: none; background: none; font-size: 1.2rem; cursor: pointer;";
-    closeBtn.addEventListener("click", () => closeBtn.parentElement.remove());
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '×';
+    closeBtn.style.cssText = 'position: absolute; top: 0.5rem; right: 0.5rem; border: none; background: none; font-size: 1.2rem; cursor: pointer;';
+    closeBtn.addEventListener('click', () => closeBtn.parentElement.remove());
 
-    const welcomeH4 = document.createElement("h4");
-    welcomeH4.style.cssText = `margin: 0 0 0.5rem 0; color: ${this.corporateData?.theme?.primaryColor || "#667eea"};`;
-    welcomeH4.textContent = "Welcome!";
+    const welcomeH4 = document.createElement('h4');
+    welcomeH4.style.cssText = `margin: 0 0 0.5rem 0; color: ${this.corporateData?.theme?.primaryColor || '#667eea'};`;
+    welcomeH4.textContent = 'Welcome!';
 
-    const messageP = document.createElement("p");
-    messageP.style.cssText = "margin: 0; font-size: 0.875rem; color: #666;";
-    messageP.textContent = message.replace("{name}", user.name || user.email);
+    const messageP = document.createElement('p');
+    messageP.style.cssText = 'margin: 0; font-size: 0.875rem; color: #666;';
+    messageP.textContent = message.replace('{name}', user.name || user.email);
 
     welcomeDiv.appendChild(closeBtn);
     welcomeDiv.appendChild(welcomeH4);
@@ -1104,7 +1099,7 @@ class CorporateOAuthInterface {
       () => {
         this.checkForUpdates();
       },
-      5 * 60 * 1000,
+      5 * 60 * 1000
     ); // Check every 5 minutes
   }
 
@@ -1125,12 +1120,12 @@ class CorporateOAuthInterface {
       const response = await fetch(
         `/api/corporate/config/${this.corporateData.id}/version`,
         {
-          method: "GET",
+          method: 'GET',
           headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
           },
-        },
+        }
       );
 
       if (response.ok) {
@@ -1142,7 +1137,7 @@ class CorporateOAuthInterface {
         }
       }
     } catch (error) {
-      console.warn("Failed to check for corporate updates:", error);
+      console.warn('Failed to check for corporate updates:', error);
     }
   }
 
@@ -1157,13 +1152,13 @@ class CorporateOAuthInterface {
    * @returns {*} - Operation result.
    */
   fallbackToRegularOAuth() {
-    console.log("Falling back to regular OAuth interface");
+    console.log('Falling back to regular OAuth interface');
 
     // Initialize standard OAuth provider
     if (window.OAuthProvider) {
       this.oauthProvider = new window.OAuthProvider({
         corporateMode: false,
-        allowedProviders: ["google", "microsoft", "apple"],
+        allowedProviders: ['google', 'microsoft', 'apple'],
       });
     }
 
@@ -1183,22 +1178,22 @@ class CorporateOAuthInterface {
    */
   removeCorporateBranding() {
     // Remove corporate CSS
-    const corporateStyles = document.querySelectorAll("[data-corporate-css]");
+    const corporateStyles = document.querySelectorAll('[data-corporate-css]');
     corporateStyles.forEach((style) => style.remove());
 
     // Reset CSS custom properties
     const root = document.documentElement;
-    root.style.removeProperty("--primary-color");
-    root.style.removeProperty("--secondary-color");
-    root.style.removeProperty("--brand-background");
-    root.style.removeProperty("--brand-text");
+    root.style.removeProperty('--primary-color');
+    root.style.removeProperty('--secondary-color');
+    root.style.removeProperty('--brand-background');
+    root.style.removeProperty('--brand-text');
 
     // Remove corporate highlights
-    const highlights = document.querySelectorAll(".corporate-highlight");
+    const highlights = document.querySelectorAll('.corporate-highlight');
     highlights.forEach((highlight) => highlight.remove());
 
     // Reset document title and meta tags
-    document.title = "AmexingWeb - Sign In";
+    document.title = 'AmexingWeb - Sign In';
   }
 
   /**
@@ -1214,9 +1209,9 @@ class CorporateOAuthInterface {
    */
   detectMobile() {
     return (
-      window.innerWidth <= 768 ||
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent,
+      window.innerWidth <= 768
+      || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
       )
     );
   }
@@ -1282,8 +1277,8 @@ class CorporateOAuthInterface {
 window.CorporateOAuthInterface = CorporateOAuthInterface;
 
 // Auto-initialize if corporate context detected
-document.addEventListener("DOMContentLoaded", () => {
-  const corporateContainer = document.querySelector("[data-corporate-oauth]");
+document.addEventListener('DOMContentLoaded', () => {
+  const corporateContainer = document.querySelector('[data-corporate-oauth]');
   if (corporateContainer) {
     const config = corporateContainer.dataset.corporateConfig
       ? JSON.parse(corporateContainer.dataset.corporateConfig)

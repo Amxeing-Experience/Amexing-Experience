@@ -3,7 +3,7 @@
  * Basic implementation for notifications endpoint.
  */
 
-const logger = require("../../../infrastructure/logger");
+const logger = require('../../../infrastructure/logger');
 
 class NotificationsController {
   /**
@@ -28,14 +28,14 @@ class NotificationsController {
           unreadCount: 0,
           totalCount: 0,
         },
-        message: "Notifications retrieved successfully",
+        message: 'Notifications retrieved successfully',
       });
     } catch (error) {
-      logger.error("Error fetching notifications:", error);
+      logger.error('Error fetching notifications:', error);
       return res.status(500).json({
         success: false,
-        error: "Failed to fetch notifications",
-        message: "Error interno del servidor",
+        error: 'Failed to fetch notifications',
+        message: 'Error interno del servidor',
       });
     }
   }
@@ -58,14 +58,14 @@ class NotificationsController {
 
       return res.json({
         success: true,
-        message: "Notification marked as read",
+        message: 'Notification marked as read',
       });
     } catch (error) {
-      logger.error("Error marking notification as read:", error);
+      logger.error('Error marking notification as read:', error);
       return res.status(500).json({
         success: false,
-        error: "Failed to mark notification as read",
-        message: "Error interno del servidor",
+        error: 'Failed to mark notification as read',
+        message: 'Error interno del servidor',
       });
     }
   }
@@ -86,14 +86,14 @@ class NotificationsController {
 
       return res.json({
         success: true,
-        message: "All notifications marked as read",
+        message: 'All notifications marked as read',
       });
     } catch (error) {
-      logger.error("Error marking all notifications as read:", error);
+      logger.error('Error marking all notifications as read:', error);
       return res.status(500).json({
         success: false,
-        error: "Failed to mark all notifications as read",
-        message: "Error interno del servidor",
+        error: 'Failed to mark all notifications as read',
+        message: 'Error interno del servidor',
       });
     }
   }

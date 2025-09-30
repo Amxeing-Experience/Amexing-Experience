@@ -10,9 +10,9 @@
  * // Returns: { success: true, user: {...}, tokens: {...} }
  */
 
-const Parse = require("parse/node");
-const AmexingUser = require("../../domain/models/AmexingUser");
-const logger = require("../../infrastructure/logger");
+const Parse = require('parse/node');
+const AmexingUser = require('../../domain/models/AmexingUser');
+const logger = require('../../infrastructure/logger');
 
 /**
  * OAuth Permission Service - Manages permission inheritance from OAuth providers.
@@ -62,56 +62,56 @@ class OAuthPermissionService {
     // Permission mapping from OAuth groups/roles to Amexing permissions
     this.permissionMappings = new Map([
       // Google Workspace Groups
-      ["google_admin", ["admin_full", "user_management", "system_config"]],
+      ['google_admin', ['admin_full', 'user_management', 'system_config']],
       [
-        "google_manager",
-        ["team_management", "employee_access", "department_admin"],
+        'google_manager',
+        ['team_management', 'employee_access', 'department_admin'],
       ],
-      ["google_employee", ["basic_access", "profile_management"]],
-      ["google_hr", ["employee_management", "department_access", "audit_read"]],
-      ["google_it", ["system_admin", "user_support", "technical_access"]],
+      ['google_employee', ['basic_access', 'profile_management']],
+      ['google_hr', ['employee_management', 'department_access', 'audit_read']],
+      ['google_it', ['system_admin', 'user_support', 'technical_access']],
       [
-        "google_finance",
-        ["financial_access", "billing_management", "report_access"],
+        'google_finance',
+        ['financial_access', 'billing_management', 'report_access'],
       ],
 
       // Microsoft Azure AD Groups
       [
-        "azure_global_admin",
-        ["admin_full", "user_management", "system_config", "compliance_admin"],
+        'azure_global_admin',
+        ['admin_full', 'user_management', 'system_config', 'compliance_admin'],
       ],
       [
-        "azure_user_admin",
-        ["user_management", "employee_access", "department_admin"],
+        'azure_user_admin',
+        ['user_management', 'employee_access', 'department_admin'],
       ],
       [
-        "azure_helpdesk_admin",
-        ["user_support", "basic_admin", "password_reset"],
+        'azure_helpdesk_admin',
+        ['user_support', 'basic_admin', 'password_reset'],
       ],
       [
-        "azure_security_admin",
-        ["security_config", "audit_full", "compliance_read"],
+        'azure_security_admin',
+        ['security_config', 'audit_full', 'compliance_read'],
       ],
       [
-        "azure_billing_admin",
-        ["billing_management", "financial_access", "subscription_admin"],
+        'azure_billing_admin',
+        ['billing_management', 'financial_access', 'subscription_admin'],
       ],
 
       // Department-specific permissions
-      ["dept_sistemas", ["technical_access", "system_support", "user_support"]],
+      ['dept_sistemas', ['technical_access', 'system_support', 'user_support']],
       [
-        "dept_recursos_humanos",
-        ["employee_management", "hr_access", "compliance_read"],
+        'dept_recursos_humanos',
+        ['employee_management', 'hr_access', 'compliance_read'],
       ],
-      ["dept_finanzas", ["financial_access", "billing_read", "report_access"]],
+      ['dept_finanzas', ['financial_access', 'billing_read', 'report_access']],
       [
-        "dept_operaciones",
-        ["operations_access", "logistics_management", "vendor_access"],
+        'dept_operaciones',
+        ['operations_access', 'logistics_management', 'vendor_access'],
       ],
-      ["dept_eventos", ["event_management", "client_access", "booking_admin"]],
+      ['dept_eventos', ['event_management', 'client_access', 'booking_admin']],
       [
-        "dept_administracion",
-        ["admin_access", "document_management", "general_admin"],
+        'dept_administracion',
+        ['admin_access', 'document_management', 'general_admin'],
       ],
     ]);
 
@@ -164,7 +164,7 @@ class OAuthPermissionService {
       // Extract groups from OAuth profile based on provider
       const groups = await this.extractGroupsFromProfile(
         oauthProfile,
-        _provider,
+        _provider
       );
 
       for (const group of groups) {
@@ -172,9 +172,7 @@ class OAuthPermissionService {
         const permissions = this.permissionMappings.get(normalizedGroup);
 
         if (permissions) {
-          permissions.forEach((permission) =>
-            inheritedPermissions.add(permission),
-          );
+          permissions.forEach((permission) => inheritedPermissions.add(permission));
           sourceGroups.push({
             group: normalizedGroup,
             originalName: group,
@@ -186,7 +184,7 @@ class OAuthPermissionService {
       // Store permission inheritance record
       const inheritanceRecord = await this.createPermissionInheritance({
         userId,
-        sourceType: "oauth_group",
+        sourceType: 'oauth_group',
         sourceGroups,
         permissions: Array.from(inheritedPermissions),
         provider, // eslint-disable-line no-undef
@@ -197,15 +195,15 @@ class OAuthPermissionService {
       await this.applyPermissionsToUser(
         user,
         Array.from(inheritedPermissions),
-        "oauth_inherited",
+        'oauth_inherited'
       );
 
-      logger.logSecurityEvent("OAUTH_PERMISSIONS_INHERITED", userId, {
+      logger.logSecurityEvent('OAUTH_PERMISSIONS_INHERITED', userId, {
         provider, // eslint-disable-line no-undef
         groupCount: sourceGroups.length,
         permissionCount: inheritedPermissions.size,
         permissions: Array.from(inheritedPermissions),
-        email: this.maskEmail(user.get("email")),
+        email: this.maskEmail(user.get('email')),
       });
 
       return {
@@ -217,7 +215,7 @@ class OAuthPermissionService {
         inheritanceId: inheritanceRecord.id,
       };
     } catch (error) {
-      logger.error("Error inheriting OAuth permissions:", error);
+      logger.error('Error inheriting OAuth permissions:', error);
       throw error;
     }
   }
@@ -241,7 +239,7 @@ class OAuthPermissionService {
     try {
       let groups = [];
 
-      if (_provider === "google") {
+      if (_provider === 'google') {
         // Google Workspace groups extraction
         if (oauthProfile.groups) {
           groups = oauthProfile.groups.map((group) => group.name || group);
@@ -249,15 +247,15 @@ class OAuthPermissionService {
 
         // Try to get groups from Google Admin SDK if available
         if (
-          oauthProfile.hd &&
-          process.env.GOOGLE_ADMIN_SDK_ENABLED === "true"
+          oauthProfile.hd
+          && process.env.GOOGLE_ADMIN_SDK_ENABLED === 'true'
         ) {
           const adminGroups = await this.getGoogleAdminGroups(
-            oauthProfile.email,
+            oauthProfile.email
           );
           groups = groups.concat(adminGroups);
         }
-      } else if (_provider === "microsoft") {
+      } else if (_provider === 'microsoft') {
         // Microsoft Azure AD groups extraction
         if (oauthProfile.groups) {
           const { groups: _groups } = oauthProfile;
@@ -275,20 +273,20 @@ class OAuthPermissionService {
         // Try to get groups from Microsoft Graph API
         try {
           const graphGroups = await this.getMicrosoftGraphGroups(
-            oauthProfile.accesstoken,
+            oauthProfile.accesstoken
           );
           groups = groups.concat(graphGroups);
         } catch (graphError) {
           logger.warn(
-            "Could not fetch Microsoft Graph groups:",
-            graphError.message,
+            'Could not fetch Microsoft Graph groups:',
+            graphError.message
           );
         }
       }
 
-      return groups.filter((group) => group && typeof group === "string");
+      return groups.filter((group) => group && typeof group === 'string');
     } catch (error) {
-      logger.error("Error extracting groups from OAuth profile:", error);
+      logger.error('Error extracting groups from OAuth profile:', error);
       return [];
     }
   }
@@ -296,6 +294,7 @@ class OAuthPermissionService {
   /**
    * Gets Google Admin SDK groups for a user.
    * @param {*} email - User email (unused in current implementation).
+   * @param _email
    * @returns {Promise<Array>} - List of Google groups.
    * @example
    * // OAuth service usage
@@ -306,15 +305,15 @@ class OAuthPermissionService {
    * const service = new OAuthPermissionService();
    * const groups = await service.getGoogleAdminGroups('user@company.com');
    */
-  async getGoogleAdminGroups(email) {
-    // eslint-disable-line no-unused-vars
+  // eslint-disable-next-line no-unused-vars
+  async getGoogleAdminGroups(_email) {
     try {
       // This would require Google Admin SDK implementation
       // For now, return empty array - implement when Admin SDK is available
-      logger.info("Google Admin SDK groups extraction not implemented yet");
+      logger.info('Google Admin SDK groups extraction not implemented yet');
       return [];
     } catch (error) {
-      logger.error("Error getting Google Admin groups:", error);
+      logger.error('Error getting Google Admin groups:', error);
       return [];
     }
   }
@@ -335,13 +334,13 @@ class OAuthPermissionService {
   async getMicrosoftGraphGroups(accessToken) {
     try {
       const response = await fetch(
-        "https://graph.microsoft.com/v1.0/me/memberOf",
+        'https://graph.microsoft.com/v1.0/me/memberOf',
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
+            'Content-Type': 'application/json',
           },
-        },
+        }
       );
 
       if (!response.ok) {
@@ -350,12 +349,12 @@ class OAuthPermissionService {
 
       const data = await response.json();
       const groups = data.value
-        .filter((item) => item["@odata.type"] === "#microsoft.graph.group")
+        .filter((item) => item['@odata.type'] === '#microsoft.graph.group')
         .map((group) => group.displayName);
 
       return groups;
     } catch (error) {
-      logger.error("Error getting Microsoft Graph groups:", error);
+      logger.error('Error getting Microsoft Graph groups:', error);
       return [];
     }
   }
@@ -376,9 +375,9 @@ class OAuthPermissionService {
    * const normalized = service.normalizeGroupName('HR Managers', 'microsoft');
    */
   normalizeGroupName(groupName, _provider) {
-    if (!groupName) return "";
+    if (!groupName) return '';
 
-    const normalized = groupName.toLowerCase().replace(/\s+/g, "_");
+    const normalized = groupName.toLowerCase().replace(/\s+/g, '_');
 
     // Add provider prefix for disambiguation
     return `${_provider}_${normalized}`;
@@ -400,23 +399,23 @@ class OAuthPermissionService {
   async createPermissionInheritance(inheritanceData) {
     try {
       const PermissionInheritanceClass = Parse.Object.extend(
-        "PermissionInheritance",
+        'PermissionInheritance'
       );
       const inheritance = new PermissionInheritanceClass();
 
-      inheritance.set("userId", inheritanceData.userId);
-      inheritance.set("sourceType", inheritanceData.sourceType);
-      inheritance.set("sourceGroups", inheritanceData.sourceGroups);
-      inheritance.set("permissions", inheritanceData.permissions);
-      inheritance.set("provider", inheritanceData._provider); // eslint-disable-line no-underscore-dangle
-      inheritance.set("inheritedAt", inheritanceData.inheritedAt);
-      inheritance.set("active", true);
+      inheritance.set('userId', inheritanceData.userId);
+      inheritance.set('sourceType', inheritanceData.sourceType);
+      inheritance.set('sourceGroups', inheritanceData.sourceGroups);
+      inheritance.set('permissions', inheritanceData.permissions);
+      inheritance.set('provider', inheritanceData._provider); // eslint-disable-line no-underscore-dangle
+      inheritance.set('inheritedAt', inheritanceData.inheritedAt);
+      inheritance.set('active', true);
 
       await inheritance.save(null, { useMasterKey: true });
 
       return inheritance;
     } catch (error) {
-      logger.error("Error creating permission inheritance record:", error);
+      logger.error('Error creating permission inheritance record:', error);
       throw error;
     }
   }
@@ -438,26 +437,26 @@ class OAuthPermissionService {
    */
   async applyPermissionsToUser(user, permissions, source) {
     try {
-      const currentPermissions = user.get("permissions") || [];
+      const currentPermissions = user.get('permissions') || [];
       const userPermissions = new Set(currentPermissions);
 
       // Add new permissions
       permissions.forEach((permission) => userPermissions.add(permission));
 
       // Update user permissions
-      user.set("permissions", Array.from(userPermissions));
-      user.set("permissionsSource", source);
-      user.set("permissionsUpdatedAt", new Date());
+      user.set('permissions', Array.from(userPermissions));
+      user.set('permissionsSource', source);
+      user.set('permissionsUpdatedAt', new Date());
 
       await user.save(null, { useMasterKey: true });
 
-      logger.logSecurityEvent("USER_PERMISSIONS_APPLIED", user.id, {
+      logger.logSecurityEvent('USER_PERMISSIONS_APPLIED', user.id, {
         newPermissions: permissions,
         totalPermissions: userPermissions.size,
         source,
       });
     } catch (error) {
-      logger.error("Error applying permissions to user:", error);
+      logger.error('Error applying permissions to user:', error);
       throw error;
     }
   }
@@ -480,7 +479,7 @@ class OAuthPermissionService {
   async getDepartmentPermissions(userId, departmentId) {
     try {
       const departmentPermissions = this.permissionMappings.get(
-        `dept_${departmentId}`,
+        `dept_${departmentId}`
       );
 
       if (!departmentPermissions) {
@@ -488,14 +487,14 @@ class OAuthPermissionService {
       }
 
       // Log department permission access
-      logger.logSecurityEvent("DEPARTMENT_PERMISSIONS_ACCESSED", userId, {
+      logger.logSecurityEvent('DEPARTMENT_PERMISSIONS_ACCESSED', userId, {
         departmentId,
         permissions: departmentPermissions,
       });
 
       return departmentPermissions;
     } catch (error) {
-      logger.error("Error getting department permissions:", error);
+      logger.error('Error getting department permissions:', error);
       throw error;
     }
   }
@@ -520,7 +519,7 @@ class OAuthPermissionService {
       const user = await new Parse.Query(AmexingUser).get(userId, {
         useMasterKey: true,
       });
-      const userPermissions = user.get("permissions") || [];
+      const userPermissions = user.get('permissions') || [];
 
       // Check direct permission
       if (userPermissions.includes(permission)) {
@@ -531,7 +530,7 @@ class OAuthPermissionService {
       if (context) {
         const contextPermissions = await this.getContextPermissions(
           userId,
-          context,
+          context
         );
         if (contextPermissions.includes(permission)) {
           return true;
@@ -550,7 +549,7 @@ class OAuthPermissionService {
 
       return false;
     } catch (error) {
-      logger.error("Error checking user permission:", error);
+      logger.error('Error checking user permission:', error);
       return false;
     }
   }
@@ -571,16 +570,16 @@ class OAuthPermissionService {
    */
   async getContextPermissions(userId, context) {
     try {
-      const contextQuery = new Parse.Query("PermissionContext");
-      contextQuery.equalTo("userId", userId);
-      contextQuery.equalTo("context", context);
-      contextQuery.equalTo("active", true);
+      const contextQuery = new Parse.Query('PermissionContext');
+      contextQuery.equalTo('userId', userId);
+      contextQuery.equalTo('context', context);
+      contextQuery.equalTo('active', true);
 
       const contextRecord = await contextQuery.first({ useMasterKey: true });
 
-      return contextRecord ? contextRecord.get("permissions") || [] : [];
+      return contextRecord ? contextRecord.get('permissions') || [] : [];
     } catch (error) {
-      logger.error("Error getting context permissions:", error);
+      logger.error('Error getting context permissions:', error);
       return [];
     }
   }
@@ -600,8 +599,8 @@ class OAuthPermissionService {
    * const masked = service.maskEmail('user@example.com'); // Returns 'use***@example.com'
    */
   maskEmail(email) {
-    if (!email) return "";
-    const [local, _domain] = email.split("@");
+    if (!email) return '';
+    const [local, _domain] = email.split('@');
     return `${local.substring(0, 3)}***@${_domain}`;
   }
 

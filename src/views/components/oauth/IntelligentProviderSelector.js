@@ -8,13 +8,13 @@ class IntelligentProviderSelector {
   constructor(options = {}) {
     this.config = {
       container:
-        options.container || document.getElementById("provider-selector"),
+        options.container || document.getElementById('provider-selector'),
       corporateConfig: options.corporateConfig || null,
       department: options.department || null,
       availableProviders: options.availableProviders || [
-        "google",
-        "microsoft",
-        "apple",
+        'google',
+        'microsoft',
+        'apple',
       ],
       enableLearning: options.enableLearning !== false,
       showSuggestionReason: options.showSuggestionReason !== false,
@@ -43,7 +43,7 @@ class IntelligentProviderSelector {
   async initialize() {
     if (!this.config.container) {
       // eslint-disable-next-line no-console
-      console.warn("IntelligentProviderSelector: Container not found");
+      console.warn('IntelligentProviderSelector: Container not found');
       return;
     }
 
@@ -63,10 +63,10 @@ class IntelligentProviderSelector {
       // Initialize UI
       this.initializeUI();
 
-      logger.info("IntelligentProviderSelector initialized successfully");
+      logger.info('IntelligentProviderSelector initialized successfully');
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.error("Failed to initialize IntelligentProviderSelector:", error);
+      console.error('Failed to initialize IntelligentProviderSelector:', error);
     }
   }
 
@@ -85,86 +85,86 @@ class IntelligentProviderSelector {
       // Load common domain mappings
       const commonDomains = {
         // Google domains
-        "gmail.com": { provider: "google", confidence: 0.95, type: "consumer" },
-        "googlemail.com": {
-          provider: "google",
+        'gmail.com': { provider: 'google', confidence: 0.95, type: 'consumer' },
+        'googlemail.com': {
+          provider: 'google',
           confidence: 0.95,
-          type: "consumer",
+          type: 'consumer',
         },
-        "google.com": {
-          provider: "google",
+        'google.com': {
+          provider: 'google',
           confidence: 0.99,
-          type: "corporate",
+          type: 'corporate',
         },
 
         // Microsoft domains
-        "outlook.com": {
-          provider: "microsoft",
+        'outlook.com': {
+          provider: 'microsoft',
           confidence: 0.95,
-          type: "consumer",
+          type: 'consumer',
         },
-        "hotmail.com": {
-          provider: "microsoft",
+        'hotmail.com': {
+          provider: 'microsoft',
           confidence: 0.95,
-          type: "consumer",
+          type: 'consumer',
         },
-        "live.com": {
-          provider: "microsoft",
+        'live.com': {
+          provider: 'microsoft',
           confidence: 0.95,
-          type: "consumer",
+          type: 'consumer',
         },
-        "microsoft.com": {
-          provider: "microsoft",
+        'microsoft.com': {
+          provider: 'microsoft',
           confidence: 0.99,
-          type: "corporate",
+          type: 'corporate',
         },
 
         // Apple domains
-        "icloud.com": { provider: "apple", confidence: 0.95, type: "consumer" },
-        "me.com": { provider: "apple", confidence: 0.95, type: "consumer" },
-        "mac.com": { provider: "apple", confidence: 0.95, type: "consumer" },
-        "apple.com": { provider: "apple", confidence: 0.99, type: "corporate" },
+        'icloud.com': { provider: 'apple', confidence: 0.95, type: 'consumer' },
+        'me.com': { provider: 'apple', confidence: 0.95, type: 'consumer' },
+        'mac.com': { provider: 'apple', confidence: 0.95, type: 'consumer' },
+        'apple.com': { provider: 'apple', confidence: 0.99, type: 'corporate' },
 
         // Common corporate domains with likely providers
-        "accenture.com": {
-          provider: "microsoft",
+        'accenture.com': {
+          provider: 'microsoft',
           confidence: 0.8,
-          type: "corporate",
+          type: 'corporate',
         },
-        "deloitte.com": {
-          provider: "microsoft",
+        'deloitte.com': {
+          provider: 'microsoft',
           confidence: 0.8,
-          type: "corporate",
+          type: 'corporate',
         },
-        "pwc.com": {
-          provider: "microsoft",
+        'pwc.com': {
+          provider: 'microsoft',
           confidence: 0.8,
-          type: "corporate",
+          type: 'corporate',
         },
-        "ibm.com": {
-          provider: "microsoft",
+        'ibm.com': {
+          provider: 'microsoft',
           confidence: 0.7,
-          type: "corporate",
+          type: 'corporate',
         },
-        "amazon.com": {
-          provider: "google",
+        'amazon.com': {
+          provider: 'google',
           confidence: 0.6,
-          type: "corporate",
+          type: 'corporate',
         },
 
         // Educational domains (tend to use Google)
-        edu: { provider: "google", confidence: 0.7, type: "educational" },
-        "ac.uk": { provider: "google", confidence: 0.7, type: "educational" },
-        uni: { provider: "google", confidence: 0.6, type: "educational" },
+        edu: { provider: 'google', confidence: 0.7, type: 'educational' },
+        'ac.uk': { provider: 'google', confidence: 0.7, type: 'educational' },
+        uni: { provider: 'google', confidence: 0.6, type: 'educational' },
       };
 
       // Load from server if available
       try {
-        const response = await fetch("/api/oauth/domain-intelligence", {
-          method: "GET",
+        const response = await fetch('/api/oauth/domain-intelligence', {
+          method: 'GET',
           headers: {
-            "Content-Type": "application/json",
-            "X-Requested-With": "XMLHttpRequest",
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
           },
         });
 
@@ -174,7 +174,7 @@ class IntelligentProviderSelector {
         }
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.warn("Could not load server domain database:", error);
+        console.warn('Could not load server domain database:', error);
       }
 
       // Merge with corporate-specific mappings
@@ -184,10 +184,10 @@ class IntelligentProviderSelector {
             commonDomains[domain] = {
               provider,
               confidence: 0.99,
-              type: "corporate_verified",
+              type: 'corporate_verified',
               corporateId: this.config.corporateConfig.id,
             };
-          },
+          }
         );
       }
 
@@ -197,7 +197,7 @@ class IntelligentProviderSelector {
       });
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.error("Failed to load domain database:", error);
+      console.error('Failed to load domain database:', error);
     }
   }
 
@@ -213,13 +213,13 @@ class IntelligentProviderSelector {
    */
   loadUserLearningData() {
     try {
-      const stored = localStorage.getItem("oauth_provider_learning");
+      const stored = localStorage.getItem('oauth_provider_learning');
       if (stored) {
         this.learningData = JSON.parse(stored);
       }
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Could not load learning data:", error);
+      console.warn('Could not load learning data:', error);
       this.learningData = {
         userChoices: {},
         domainPreferences: {},
@@ -246,12 +246,12 @@ class IntelligentProviderSelector {
 
     try {
       localStorage.setItem(
-        "oauth_provider_learning",
-        JSON.stringify(this.learningData),
+        'oauth_provider_learning',
+        JSON.stringify(this.learningData)
       );
     } catch (error) {
       // eslint-disable-next-line no-console
-      console.warn("Could not save learning data:", error);
+      console.warn('Could not save learning data:', error);
     }
   }
 
@@ -268,13 +268,13 @@ class IntelligentProviderSelector {
   setupProviderDetection() {
     // Email input detection
     const emailInputs = document.querySelectorAll(
-      'input[type="email"], input[name="email"], input[name="identifier"]',
+      'input[type="email"], input[name="email"], input[name="identifier"]'
     );
 
     emailInputs.forEach((input) => {
       // Debounce email detection
       let timeout;
-      input.addEventListener("input", (e) => {
+      input.addEventListener('input', (e) => {
         clearTimeout(timeout);
         timeout = setTimeout(() => {
           this.analyzeEmailAndSuggest(e.target.value);
@@ -282,7 +282,7 @@ class IntelligentProviderSelector {
       });
 
       // Immediate detection on blur
-      input.addEventListener("blur", (e) => {
+      input.addEventListener('blur', (e) => {
         clearTimeout(timeout);
         this.analyzeEmailAndSuggest(e.target.value);
       });
@@ -304,12 +304,12 @@ class IntelligentProviderSelector {
    */
   setupAnalytics() {
     // Track provider selection events
-    document.addEventListener("providerSelected", (e) => {
+    document.addEventListener('providerSelected', (e) => {
       this.trackProviderSelection(e.detail);
     });
 
     // Track suggestion interactions
-    document.addEventListener("suggestionInteraction", (e) => {
+    document.addEventListener('suggestionInteraction', (e) => {
       this.trackSuggestionInteraction(e.detail);
     });
   }
@@ -354,35 +354,35 @@ class IntelligentProviderSelector {
     const { container } = this.config;
 
     // Create main selector container
-    const selectorDiv = document.createElement("div");
-    selectorDiv.className = "intelligent-provider-selector";
+    const selectorDiv = document.createElement('div');
+    selectorDiv.className = 'intelligent-provider-selector';
     // Build DOM structure to prevent XSS
-    const suggestionArea = document.createElement("div");
-    suggestionArea.className = "suggestion-area";
-    suggestionArea.style.display = "none";
+    const suggestionArea = document.createElement('div');
+    suggestionArea.className = 'suggestion-area';
+    suggestionArea.style.display = 'none';
 
-    const suggestionContent = document.createElement("div");
-    suggestionContent.className = "suggestion-content";
+    const suggestionContent = document.createElement('div');
+    suggestionContent.className = 'suggestion-content';
 
-    const suggestionIcon = document.createElement("div");
-    suggestionIcon.className = "suggestion-icon";
-    suggestionIcon.textContent = "💡";
+    const suggestionIcon = document.createElement('div');
+    suggestionIcon.className = 'suggestion-icon';
+    suggestionIcon.textContent = '💡';
 
-    const suggestionText = document.createElement("div");
-    suggestionText.className = "suggestion-text";
+    const suggestionText = document.createElement('div');
+    suggestionText.className = 'suggestion-text';
 
-    const suggestionActions = document.createElement("div");
-    suggestionActions.className = "suggestion-actions";
+    const suggestionActions = document.createElement('div');
+    suggestionActions.className = 'suggestion-actions';
 
-    const suggestionAccept = document.createElement("button");
-    suggestionAccept.className = "suggestion-accept";
-    suggestionAccept.type = "button";
-    suggestionAccept.textContent = "Use this";
+    const suggestionAccept = document.createElement('button');
+    suggestionAccept.className = 'suggestion-accept';
+    suggestionAccept.type = 'button';
+    suggestionAccept.textContent = 'Use this';
 
-    const suggestionDismiss = document.createElement("button");
-    suggestionDismiss.className = "suggestion-dismiss";
-    suggestionDismiss.type = "button";
-    suggestionDismiss.textContent = "×";
+    const suggestionDismiss = document.createElement('button');
+    suggestionDismiss.className = 'suggestion-dismiss';
+    suggestionDismiss.type = 'button';
+    suggestionDismiss.textContent = '×';
 
     suggestionActions.appendChild(suggestionAccept);
     suggestionActions.appendChild(suggestionDismiss);
@@ -391,19 +391,19 @@ class IntelligentProviderSelector {
     suggestionContent.appendChild(suggestionActions);
     suggestionArea.appendChild(suggestionContent);
 
-    const providerGrid = document.createElement("div");
-    providerGrid.className = "provider-grid";
+    const providerGrid = document.createElement('div');
+    providerGrid.className = 'provider-grid';
 
-    const providerAlternatives = document.createElement("div");
-    providerAlternatives.className = "provider-alternatives";
-    providerAlternatives.style.display = "none";
+    const providerAlternatives = document.createElement('div');
+    providerAlternatives.className = 'provider-alternatives';
+    providerAlternatives.style.display = 'none';
 
-    const alternativesText = document.createElement("p");
-    alternativesText.className = "alternatives-text";
-    alternativesText.textContent = "Or choose another option:";
+    const alternativesText = document.createElement('p');
+    alternativesText.className = 'alternatives-text';
+    alternativesText.textContent = 'Or choose another option:';
 
-    const alternativesGrid = document.createElement("div");
-    alternativesGrid.className = "alternatives-grid";
+    const alternativesGrid = document.createElement('div');
+    alternativesGrid.className = 'alternatives-grid';
 
     providerAlternatives.appendChild(alternativesText);
     providerAlternatives.appendChild(alternativesGrid);
@@ -417,13 +417,13 @@ class IntelligentProviderSelector {
     // Store references
     this.elements = {
       selector: selectorDiv,
-      suggestionArea: selectorDiv.querySelector(".suggestion-area"),
-      suggestionText: selectorDiv.querySelector(".suggestion-text"),
-      suggestionAccept: selectorDiv.querySelector(".suggestion-accept"),
-      suggestionDismiss: selectorDiv.querySelector(".suggestion-dismiss"),
-      providerGrid: selectorDiv.querySelector(".provider-grid"),
-      alternatives: selectorDiv.querySelector(".provider-alternatives"),
-      alternativesGrid: selectorDiv.querySelector(".alternatives-grid"),
+      suggestionArea: selectorDiv.querySelector('.suggestion-area'),
+      suggestionText: selectorDiv.querySelector('.suggestion-text'),
+      suggestionAccept: selectorDiv.querySelector('.suggestion-accept'),
+      suggestionDismiss: selectorDiv.querySelector('.suggestion-dismiss'),
+      providerGrid: selectorDiv.querySelector('.provider-grid'),
+      alternatives: selectorDiv.querySelector('.provider-alternatives'),
+      alternativesGrid: selectorDiv.querySelector('.alternatives-grid'),
     };
   }
 
@@ -439,7 +439,7 @@ class IntelligentProviderSelector {
    */
   createSuggestionDisplay() {
     // Style the suggestion area
-    const style = document.createElement("style");
+    const style = document.createElement('style');
     style.textContent = `
       .intelligent-provider-selector {
         margin: 1rem 0;
@@ -693,8 +693,8 @@ class IntelligentProviderSelector {
       }
     `;
 
-    if (!document.querySelector("#intelligent-provider-styles")) {
-      style.id = "intelligent-provider-styles";
+    if (!document.querySelector('#intelligent-provider-styles')) {
+      style.id = 'intelligent-provider-styles';
       document.head.appendChild(style);
     }
   }
@@ -712,22 +712,22 @@ class IntelligentProviderSelector {
   createProviderButtons() {
     const providerInfo = {
       google: {
-        name: "Google",
-        description: "Google Workspace, Gmail accounts",
-        icon: this.getProviderIcon("google"),
-        color: "#db4437",
+        name: 'Google',
+        description: 'Google Workspace, Gmail accounts',
+        icon: this.getProviderIcon('google'),
+        color: '#db4437',
       },
       microsoft: {
-        name: "Microsoft",
-        description: "Microsoft 365, Outlook accounts",
-        icon: this.getProviderIcon("microsoft"),
-        color: "#0078d4",
+        name: 'Microsoft',
+        description: 'Microsoft 365, Outlook accounts',
+        icon: this.getProviderIcon('microsoft'),
+        color: '#0078d4',
       },
       apple: {
-        name: "Apple",
-        description: "Apple ID, iCloud accounts",
-        icon: this.getProviderIcon("apple"),
-        color: "#000000",
+        name: 'Apple',
+        description: 'Apple ID, iCloud accounts',
+        icon: this.getProviderIcon('apple'),
+        color: '#000000',
       },
     };
 
@@ -735,7 +735,7 @@ class IntelligentProviderSelector {
       if (providerInfo[provider]) {
         const button = this.createProviderButton(
           provider,
-          providerInfo[provider],
+          providerInfo[provider]
         );
         this.elements.providerGrid.appendChild(button);
       }
@@ -759,26 +759,26 @@ class IntelligentProviderSelector {
    * @returns {*} - Operation result.
    */
   createProviderButton(provider, info) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "provider-button";
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'provider-button';
     button.dataset.provider = provider;
 
     // Use DOM methods to prevent XSS
-    const iconDiv = document.createElement("div");
-    iconDiv.className = "provider-icon";
+    const iconDiv = document.createElement('div');
+    iconDiv.className = 'provider-icon';
     // Create icon element safely using DOM methods
     iconDiv.appendChild(this.createProviderIconElement(provider));
 
-    const infoDiv = document.createElement("div");
-    infoDiv.className = "provider-info";
+    const infoDiv = document.createElement('div');
+    infoDiv.className = 'provider-info';
 
-    const nameDiv = document.createElement("div");
-    nameDiv.className = "provider-name";
+    const nameDiv = document.createElement('div');
+    nameDiv.className = 'provider-name';
     nameDiv.textContent = info.name; // Safe: using textContent
 
-    const descriptionDiv = document.createElement("div");
-    descriptionDiv.className = "provider-description";
+    const descriptionDiv = document.createElement('div');
+    descriptionDiv.className = 'provider-description';
     descriptionDiv.textContent = info.description; // Safe: using textContent
 
     infoDiv.appendChild(nameDiv);
@@ -786,7 +786,7 @@ class IntelligentProviderSelector {
     button.appendChild(iconDiv);
     button.appendChild(infoDiv);
 
-    button.addEventListener("click", () => {
+    button.addEventListener('click', () => {
       this.selectProvider(provider);
     });
 
@@ -806,12 +806,12 @@ class IntelligentProviderSelector {
    * @returns {*} - Operation result.
    */
   analyzeEmailAndSuggest(email) {
-    if (!email || !email.includes("@")) {
+    if (!email || !email.includes('@')) {
       this.hideSuggestion();
       return;
     }
 
-    const domain = email.split("@")[1].toLowerCase();
+    const domain = email.split('@')[1].toLowerCase();
     const suggestion = this.generateSuggestion(email, domain);
 
     if (suggestion) {
@@ -883,7 +883,7 @@ class IntelligentProviderSelector {
         provider: domainInfo.provider,
         confidence: domainInfo.confidence,
         reason: this.generateDomainReason(domain, domainInfo),
-        source: "domain_database",
+        source: 'domain_database',
       };
     }
 
@@ -894,7 +894,7 @@ class IntelligentProviderSelector {
           provider: info.provider,
           confidence: info.confidence * 0.8, // Reduce confidence for partial matches
           reason: `${domain} appears to be a ${info.type} domain`,
-          source: "domain_partial",
+          source: 'domain_partial',
         };
       }
     }
@@ -927,8 +927,8 @@ class IntelligentProviderSelector {
       return {
         provider: choice.provider,
         confidence: Math.min(choice.successCount * 0.2 + 0.6, 0.95),
-        reason: "Based on your previous choice for this email",
-        source: "useremail_history",
+        reason: 'Based on your previous choice for this email',
+        source: 'useremail_history',
       };
     }
 
@@ -939,13 +939,13 @@ class IntelligentProviderSelector {
         provider: pref.provider,
         confidence: Math.min(pref.count * 0.15 + 0.5, 0.85),
         reason: `You've used ${this.getProviderName(pref.provider)} for ${domain} before`,
-        source: "user_domain_history",
+        source: 'user_domain_history',
       };
     }
 
     // Check successful providers
     const successfulProvider = Object.entries(
-      learning.successfulProviders,
+      learning.successfulProviders
     ).sort(([, a], [, b]) => b.count - a.count)[0];
 
     if (successfulProvider && successfulProvider[1].count >= 3) {
@@ -953,7 +953,7 @@ class IntelligentProviderSelector {
         provider: successfulProvider[0],
         confidence: 0.4,
         reason: `${this.getProviderName(successfulProvider[0])} has worked well for you`,
-        source: "user_success_history",
+        source: 'user_success_history',
       };
     }
 
@@ -982,7 +982,7 @@ class IntelligentProviderSelector {
         provider,
         confidence: 0.95,
         reason: `${domain} is configured for ${this.getProviderName(provider)} in your organization`,
-        source: "corporate_mapping",
+        source: 'corporate_mapping',
       };
     }
 
@@ -994,7 +994,7 @@ class IntelligentProviderSelector {
           provider: preferredProvider,
           confidence: 0.8,
           reason: `Your organization prefers ${this.getProviderName(preferredProvider)}`,
-          source: "corporate_preference",
+          source: 'corporate_preference',
         };
       }
     }
@@ -1019,11 +1019,11 @@ class IntelligentProviderSelector {
 
     // Department-specific provider preferences
     const deptPreferences = {
-      sistemas: "google",
-      marketing: "google",
-      finanzas: "microsoft",
-      rrhh: "microsoft",
-      legal: "microsoft",
+      sistemas: 'google',
+      marketing: 'google',
+      finanzas: 'microsoft',
+      rrhh: 'microsoft',
+      legal: 'microsoft',
     };
 
     const preferredProvider = deptPreferences[this.config.department];
@@ -1032,7 +1032,7 @@ class IntelligentProviderSelector {
         provider: preferredProvider,
         confidence: 0.6,
         reason: `${this.getProviderName(preferredProvider)} is commonly used in ${this.config.department}`,
-        source: "department_preference",
+        source: 'department_preference',
       };
     }
 
@@ -1053,39 +1053,39 @@ class IntelligentProviderSelector {
   analyzeCommonPatterns(domain) {
     // Educational institutions typically use Google
     if (
-      domain.includes("edu") ||
-      domain.includes("school") ||
-      domain.includes("university")
+      domain.includes('edu')
+      || domain.includes('school')
+      || domain.includes('university')
     ) {
       return {
-        provider: "google",
+        provider: 'google',
         confidence: 0.7,
-        reason: "Educational institutions commonly use Google Workspace",
-        source: "pattern_education",
+        reason: 'Educational institutions commonly use Google Workspace',
+        source: 'pattern_education',
       };
     }
 
     // Government domains often use Microsoft
-    if (domain.includes("gov") || domain.includes("gob")) {
+    if (domain.includes('gov') || domain.includes('gob')) {
       return {
-        provider: "microsoft",
+        provider: 'microsoft',
         confidence: 0.65,
-        reason: "Government organizations often use Microsoft 365",
-        source: "pattern_government",
+        reason: 'Government organizations often use Microsoft 365',
+        source: 'pattern_government',
       };
     }
 
     // Tech companies often use Google
     if (
-      domain.includes("tech") ||
-      domain.includes("software") ||
-      domain.includes("dev")
+      domain.includes('tech')
+      || domain.includes('software')
+      || domain.includes('dev')
     ) {
       return {
-        provider: "google",
+        provider: 'google',
         confidence: 0.6,
-        reason: "Tech companies commonly use Google Workspace",
-        source: "pattern_tech",
+        reason: 'Tech companies commonly use Google Workspace',
+        source: 'pattern_tech',
       };
     }
 
@@ -1112,16 +1112,16 @@ class IntelligentProviderSelector {
     const providerName = this.getProviderName(suggestion.provider);
 
     // Clear and rebuild suggestion text using DOM methods
-    this.elements.suggestionText.textContent = "";
+    this.elements.suggestionText.textContent = '';
 
     const mainText = document.createTextNode(
-      `We recommend signing in with ${providerName}`,
+      `We recommend signing in with ${providerName}`
     );
     this.elements.suggestionText.appendChild(mainText);
 
     if (this.config.showSuggestionReason && suggestion.reason) {
-      const reasonDiv = document.createElement("div");
-      reasonDiv.className = "suggestion-reason";
+      const reasonDiv = document.createElement('div');
+      reasonDiv.className = 'suggestion-reason';
       reasonDiv.textContent = suggestion.reason; // Safe: using textContent
       this.elements.suggestionText.appendChild(reasonDiv);
     }
@@ -1138,7 +1138,7 @@ class IntelligentProviderSelector {
     };
 
     // Show suggestion area
-    this.elements.suggestionArea.style.display = "block";
+    this.elements.suggestionArea.style.display = 'block';
 
     // Highlight suggested provider in main grid
     this.highlightSuggestedProvider(suggestion.provider);
@@ -1162,7 +1162,7 @@ class IntelligentProviderSelector {
    */
   hideSuggestion() {
     if (this.elements.suggestionArea) {
-      this.elements.suggestionArea.style.display = "none";
+      this.elements.suggestionArea.style.display = 'none';
     }
 
     this.currentSuggestion = null;
@@ -1190,7 +1190,7 @@ class IntelligentProviderSelector {
 
     // Track acceptance
     this.trackSuggestionInteraction({
-      type: "accepted",
+      type: 'accepted',
       suggestion,
     });
   }
@@ -1215,7 +1215,7 @@ class IntelligentProviderSelector {
 
     // Track dismissal
     this.trackSuggestionInteraction({
-      type: "dismissed",
+      type: 'dismissed',
       suggestion,
     });
   }
@@ -1237,7 +1237,7 @@ class IntelligentProviderSelector {
     this.recordUserChoice(provider);
 
     // Trigger provider selection event
-    const event = new CustomEvent("providerSelected", {
+    const event = new CustomEvent('providerSelected', {
       detail: {
         provider,
         suggestion: this.currentSuggestion,
@@ -1278,14 +1278,14 @@ class IntelligentProviderSelector {
 
     // Add suggestion highlight
     const providerButton = this.elements.providerGrid.querySelector(
-      `[data-provider="${provider}"]`,
+      `[data-provider="${provider}"]`
     );
     if (providerButton) {
-      providerButton.classList.add("suggested");
+      providerButton.classList.add('suggested');
 
       // Add confidence indicator
       const confidence = this.currentSuggestion?.confidence || 0;
-      const confidenceIndicator = document.createElement("div");
+      const confidenceIndicator = document.createElement('div');
       confidenceIndicator.className = `confidence-indicator ${this.getConfidenceClass(confidence)}`;
       confidenceIndicator.textContent = `${Math.round(confidence * 100)}%`;
       confidenceIndicator.title = `${Math.round(confidence * 100)}% confidence`;
@@ -1305,11 +1305,10 @@ class IntelligentProviderSelector {
    * @returns {*} - Operation result.
    */
   clearProviderHighlights() {
-    const buttons =
-      this.elements.providerGrid.querySelectorAll(".provider-button");
+    const buttons = this.elements.providerGrid.querySelectorAll('.provider-button');
     buttons.forEach((button) => {
-      button.classList.remove("suggested");
-      const indicator = button.querySelector(".confidence-indicator");
+      button.classList.remove('suggested');
+      const indicator = button.querySelector('.confidence-indicator');
       if (indicator) {
         indicator.remove();
       }
@@ -1331,26 +1330,26 @@ class IntelligentProviderSelector {
     if (!this.elements.alternatives) return;
 
     const alternatives = this.config.availableProviders.filter(
-      (p) => p !== excludeProvider,
+      (p) => p !== excludeProvider
     );
 
     if (excludeProvider && alternatives.length > 0) {
       // Show alternatives
-      this.elements.alternatives.style.display = "block";
+      this.elements.alternatives.style.display = 'block';
 
       // Clear existing alternatives
       // Clear existing alternatives safely
       while (this.elements.alternativesGrid.firstChild) {
         this.elements.alternativesGrid.removeChild(
-          this.elements.alternativesGrid.firstChild,
+          this.elements.alternativesGrid.firstChild
         );
       }
 
       // Add alternative buttons
       alternatives.forEach((provider) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "alternative-button";
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'alternative-button';
         button.textContent = this.getProviderName(provider);
         button.onclick = () => this.selectProvider(provider);
 
@@ -1358,7 +1357,7 @@ class IntelligentProviderSelector {
       });
     } else {
       // Hide alternatives
-      this.elements.alternatives.style.display = "none";
+      this.elements.alternatives.style.display = 'none';
     }
   }
 
@@ -1381,8 +1380,8 @@ class IntelligentProviderSelector {
       this.learningData.userChoices[suggestion.email] = {
         provider: suggestion.provider,
         successCount:
-          (this.learningData.userChoices[suggestion.email]?.successCount || 0) +
-          1,
+          (this.learningData.userChoices[suggestion.email]?.successCount || 0)
+          + 1,
         lastUsed: new Date().toISOString(),
       };
     }
@@ -1445,8 +1444,7 @@ class IntelligentProviderSelector {
       this.learningData.successfulProviders[provider] = { count: 0 };
     }
     this.learningData.successfulProviders[provider].count++;
-    this.learningData.successfulProviders[provider].lastUsed =
-      new Date().toISOString();
+    this.learningData.successfulProviders[provider].lastUsed = new Date().toISOString();
 
     this.saveLearningData();
   }
@@ -1464,18 +1462,17 @@ class IntelligentProviderSelector {
   detectContextualProvider() {
     // URL-based detection
     const urlParams = new URLSearchParams(window.location.search);
-    const preferredProvider =
-      urlParams.get("provider") || urlParams.get("oauth");
+    const preferredProvider = urlParams.get('provider') || urlParams.get('oauth');
 
     if (
-      preferredProvider &&
-      this.config.availableProviders.includes(preferredProvider)
+      preferredProvider
+      && this.config.availableProviders.includes(preferredProvider)
     ) {
       this.showSuggestion({
         provider: preferredProvider,
         confidence: 0.9,
-        reason: "Selected from URL parameter",
-        source: "url_parameter",
+        reason: 'Selected from URL parameter',
+        source: 'url_parameter',
       });
     }
 
@@ -1494,7 +1491,7 @@ class IntelligentProviderSelector {
                 provider: domainInfo.provider,
                 confidence: 0.7,
                 reason: `You came from ${referrerDomain}`,
-                source: "referrer",
+                source: 'referrer',
               });
             }
           }, 1000);
@@ -1518,14 +1515,14 @@ class IntelligentProviderSelector {
    */
   setupUIInteractions() {
     // Keyboard navigation
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && this.currentSuggestion) {
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.currentSuggestion) {
         this.dismissSuggestion(this.currentSuggestion);
       }
     });
 
     // Touch gestures for mobile
-    if ("ontouchstart" in window) {
+    if ('ontouchstart' in window) {
       this.setupTouchGestures();
     }
   }
@@ -1545,12 +1542,12 @@ class IntelligentProviderSelector {
     let startX = 0;
     let startY = 0;
 
-    this.elements.suggestionArea?.addEventListener("touchstart", (e) => {
+    this.elements.suggestionArea?.addEventListener('touchstart', (e) => {
       startX = e.touches[0].clientX;
       startY = e.touches[0].clientY;
     });
 
-    this.elements.suggestionArea?.addEventListener("touchend", (e) => {
+    this.elements.suggestionArea?.addEventListener('touchend', (e) => {
       const endX = e.changedTouches[0].clientX;
       const endY = e.changedTouches[0].clientY;
 
@@ -1579,7 +1576,7 @@ class IntelligentProviderSelector {
   trackSuggestionShown(suggestion) {
     // Implementation for analytics tracking
     // eslint-disable-next-line no-console
-    console.log("Suggestion shown:", suggestion);
+    console.log('Suggestion shown:', suggestion);
   }
 
   /**
@@ -1595,7 +1592,7 @@ class IntelligentProviderSelector {
    * @returns {*} - Operation result.
    */
   trackSuggestionInteraction(detail) {
-    const event = new CustomEvent("suggestionInteraction", { detail });
+    const event = new CustomEvent('suggestionInteraction', { detail });
     document.dispatchEvent(event);
   }
 
@@ -1611,7 +1608,7 @@ class IntelligentProviderSelector {
    * @returns {*} - Operation result.
    */
   trackProviderSelection(detail) {
-    const event = new CustomEvent("providerSelected", { detail });
+    const event = new CustomEvent('providerSelected', { detail });
     document.dispatchEvent(event);
   }
 
@@ -1629,9 +1626,9 @@ class IntelligentProviderSelector {
    */
   getProviderName(provider) {
     const names = {
-      google: "Google",
-      microsoft: "Microsoft",
-      apple: "Apple",
+      google: 'Google',
+      microsoft: 'Microsoft',
+      apple: 'Apple',
     };
     return names[provider] || provider;
   }
@@ -1643,37 +1640,37 @@ class IntelligentProviderSelector {
 
   createProviderIconElement(provider) {
     // Create icon element safely using DOM methods
-    const iconElement = document.createElement("div");
-    iconElement.style.width = "32px";
-    iconElement.style.height = "32px";
-    iconElement.style.background = "#ddd";
-    iconElement.style.borderRadius = "4px";
-    iconElement.style.display = "flex";
-    iconElement.style.alignItems = "center";
-    iconElement.style.justifyContent = "center";
-    iconElement.style.fontSize = "12px";
-    iconElement.style.fontWeight = "bold";
-    iconElement.style.color = "#666";
+    const iconElement = document.createElement('div');
+    iconElement.style.width = '32px';
+    iconElement.style.height = '32px';
+    iconElement.style.background = '#ddd';
+    iconElement.style.borderRadius = '4px';
+    iconElement.style.display = 'flex';
+    iconElement.style.alignItems = 'center';
+    iconElement.style.justifyContent = 'center';
+    iconElement.style.fontSize = '12px';
+    iconElement.style.fontWeight = 'bold';
+    iconElement.style.color = '#666';
 
     // Add provider initial as text content
     switch (provider) {
-      case "google":
-        iconElement.textContent = "G";
-        iconElement.style.background = "#db4437";
-        iconElement.style.color = "#fff";
+      case 'google':
+        iconElement.textContent = 'G';
+        iconElement.style.background = '#db4437';
+        iconElement.style.color = '#fff';
         break;
-      case "microsoft":
-        iconElement.textContent = "M";
-        iconElement.style.background = "#0078d4";
-        iconElement.style.color = "#fff";
+      case 'microsoft':
+        iconElement.textContent = 'M';
+        iconElement.style.background = '#0078d4';
+        iconElement.style.color = '#fff';
         break;
-      case "apple":
-        iconElement.textContent = "🍎";
-        iconElement.style.background = "#000";
-        iconElement.style.color = "#fff";
+      case 'apple':
+        iconElement.textContent = '🍎';
+        iconElement.style.background = '#000';
+        iconElement.style.color = '#fff';
         break;
       default:
-        iconElement.textContent = "?";
+        iconElement.textContent = '?';
         break;
     }
 
@@ -1681,20 +1678,20 @@ class IntelligentProviderSelector {
   }
 
   getConfidenceClass(confidence) {
-    if (confidence >= 0.8) return "confidence-high";
-    if (confidence >= 0.6) return "confidence-medium";
-    return "confidence-low";
+    if (confidence >= 0.8) return 'confidence-high';
+    if (confidence >= 0.6) return 'confidence-medium';
+    return 'confidence-low';
   }
 
   generateDomainReason(_domain, domainInfo) {
     switch (domainInfo.type) {
-      case "corporate_verified":
+      case 'corporate_verified':
         return `${_domain} is configured in your organization`;
-      case "corporate":
+      case 'corporate':
         return `${_domain} typically uses ${this.getProviderName(domainInfo.provider)}`;
-      case "consumer":
+      case 'consumer':
         return `${_domain} accounts work with ${this.getProviderName(domainInfo.provider)}`;
-      case "educational":
+      case 'educational':
         return `Educational domains like ${_domain} commonly use ${this.getProviderName(domainInfo.provider)}`;
       default:
         return `Based on ${_domain} domain`;
@@ -1746,9 +1743,9 @@ class IntelligentProviderSelector {
 window.IntelligentProviderSelector = IntelligentProviderSelector;
 
 // Auto-initialize if container exists
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener('DOMContentLoaded', () => {
   const container = document.querySelector(
-    "[data-intelligent-provider-selector]",
+    '[data-intelligent-provider-selector]'
   );
   if (container) {
     const config = container.dataset.config
@@ -1757,7 +1754,7 @@ document.addEventListener("DOMContentLoaded", () => {
     config.container = container;
 
     window.intelligentProviderSelector = new IntelligentProviderSelector(
-      config,
+      config
     );
   }
 });

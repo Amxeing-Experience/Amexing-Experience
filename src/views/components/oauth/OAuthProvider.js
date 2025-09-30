@@ -69,13 +69,13 @@ class OAuthProvider {
       corporateConfig: options.corporateConfig || null,
       departmentRequired: options.departmentRequired || false,
       allowedProviders: options.allowedProviders || [
-        "google",
-        "microsoft",
-        "apple",
+        'google',
+        'microsoft',
+        'apple',
       ],
-      redirectUri: options.redirectUri || "/auth/oauth/callback",
+      redirectUri: options.redirectUri || '/auth/oauth/callback',
       mobile: options.mobile || this.detectMobile(),
-      theme: options.theme || "default",
+      theme: options.theme || 'default',
       ...options,
     };
 
@@ -121,9 +121,9 @@ class OAuthProvider {
       this.initializeUI();
 
       this.initialized = true;
-      this.logAuditEvent("oauth_provider_initialized");
+      this.logAuditEvent('oauth_provider_initialized');
     } catch (error) {
-      console.error("Failed to initialize OAuth Provider:", error);
+      console.error('Failed to initialize OAuth Provider:', error);
       this.handleInitializationError(error);
     }
   }
@@ -141,11 +141,11 @@ class OAuthProvider {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async loadOAuthConfig() {
-    const response = await fetch("/api/oauth/config", {
-      method: "GET",
+    const response = await fetch('/api/oauth/config', {
+      method: 'GET',
       headers: {
-        "Content-Type": "application/json",
-        "X-Requested-With": "XMLHttpRequest",
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
       },
     });
 
@@ -232,12 +232,12 @@ class OAuthProvider {
 
         this.providerConfigs.apple.initialized = true;
         this.providerConfigs.apple.component = this.appleSignIn;
-        this.logAuditEvent("apple_oauth_initialized");
+        this.logAuditEvent('apple_oauth_initialized');
       } else if (window.AppleID) {
         // Fallback initialization for legacy Apple ID SDK
         await window.AppleID.auth.init({
           clientId: this.providerConfigs.apple.clientId,
-          scope: "name email",
+          scope: 'name email',
           redirectURI: this.config.redirectUri,
           state: this.generateState(),
           nonce: this.generateNonce(),
@@ -245,12 +245,12 @@ class OAuthProvider {
         });
 
         this.providerConfigs.apple.initialized = true;
-        this.logAuditEvent("apple_oauth_initialized");
+        this.logAuditEvent('apple_oauth_initialized');
       } else {
-        throw new Error("Apple Sign In not available");
+        throw new Error('Apple Sign In not available');
       }
     } catch (error) {
-      console.error("Apple Sign In initialization failed:", error);
+      console.error('Apple Sign In initialization failed:', error);
       this.providerConfigs.apple.error = error.message;
     }
   }
@@ -277,9 +277,9 @@ class OAuthProvider {
       });
 
       this.providerConfigs.google.initialized = true;
-      this.logAuditEvent("google_oauth_initialized");
+      this.logAuditEvent('google_oauth_initialized');
     } catch (error) {
-      console.error("Google OAuth initialization failed:", error);
+      console.error('Google OAuth initialization failed:', error);
       this.providerConfigs.google.error = error.message;
     }
   }
@@ -302,12 +302,12 @@ class OAuthProvider {
         auth: {
           clientId: this.providerConfigs.microsoft.clientId,
           authority:
-            this.providerConfigs.microsoft.authority ||
-            "https://login.microsoftonline.com/common",
+            this.providerConfigs.microsoft.authority
+            || 'https://login.microsoftonline.com/common',
           redirectUri: this.config.redirectUri,
         },
         cache: {
-          cacheLocation: "sessionStorage",
+          cacheLocation: 'sessionStorage',
           storeAuthStateInCookie: false,
         },
       };
@@ -316,9 +316,9 @@ class OAuthProvider {
       await this.msalInstance.initialize();
 
       this.providerConfigs.microsoft.initialized = true;
-      this.logAuditEvent("microsoft_oauth_initialized");
+      this.logAuditEvent('microsoft_oauth_initialized');
     } catch (error) {
-      console.error("Microsoft OAuth initialization failed:", error);
+      console.error('Microsoft OAuth initialization failed:', error);
       this.providerConfigs.microsoft.error = error.message;
     }
   }
@@ -338,15 +338,15 @@ class OAuthProvider {
    */
   setupEventListeners() {
     // Listen for OAuth callback messages
-    window.addEventListener("message", this.handleOAuthMessage.bind(this));
+    window.addEventListener('message', this.handleOAuthMessage.bind(this));
 
     // Listen for page unload to clean up
-    window.addEventListener("beforeunload", this.cleanup.bind(this));
+    window.addEventListener('beforeunload', this.cleanup.bind(this));
 
     // Listen for department selection changes
     document.addEventListener(
-      "departmentChanged",
-      this.handleDepartmentChange.bind(this),
+      'departmentChanged',
+      this.handleDepartmentChange.bind(this)
     );
   }
 
@@ -364,7 +364,7 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   initializeUI() {
-    const container = document.getElementById("oauth-container");
+    const container = document.getElementById('oauth-container');
     if (!container) return;
 
     // Create OAuth UI based on configuration
@@ -398,14 +398,14 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   createOAuthUI() {
-    const container = document.createElement("div");
-    container.className = `oauth-provider-container ${this.config.mobile ? "mobile" : "desktop"}`;
+    const container = document.createElement('div');
+    container.className = `oauth-provider-container ${this.config.mobile ? 'mobile' : 'desktop'}`;
 
     // Create provider buttons
     this.config.allowedProviders.forEach((provider) => {
       if (
-        this.providerConfigs[provider] &&
-        this.providerConfigs[provider].initialized
+        this.providerConfigs[provider]
+        && this.providerConfigs[provider].initialized
       ) {
         const button = this.createProviderButton(provider);
         container.appendChild(button);
@@ -442,7 +442,7 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   createProviderButton(provider) {
-    const button = document.createElement("button");
+    const button = document.createElement('button');
     button.className = `oauth-btn oauth-${provider}`;
     button.textContent = `Sign in with ${this.getProviderDisplayName(provider)}`;
     button.onclick = () => this.authenticateWithProvider(provider);
@@ -451,10 +451,10 @@ class OAuthProvider {
     this.applyProviderStyling(button, provider);
 
     // Add accessibility attributes
-    button.setAttribute("role", "button");
+    button.setAttribute('role', 'button');
     button.setAttribute(
-      "aria-label",
-      `Sign in with ${this.getProviderDisplayName(provider)}`,
+      'aria-label',
+      `Sign in with ${this.getProviderDisplayName(provider)}`
     );
 
     return button;
@@ -474,40 +474,40 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   createDepartmentSelector() {
-    const container = document.createElement("div");
-    container.className = "department-selector";
+    const container = document.createElement('div');
+    container.className = 'department-selector';
 
-    const label = document.createElement("label");
-    label.textContent = "Select your department:";
-    label.htmlFor = "department-select";
+    const label = document.createElement('label');
+    label.textContent = 'Select your department:';
+    label.htmlFor = 'department-select';
 
-    const select = document.createElement("select");
-    select.id = "department-select";
-    select.name = "department";
+    const select = document.createElement('select');
+    select.id = 'department-select';
+    select.name = 'department';
     select.required = true;
 
     // Add default option
-    const defaultOption = document.createElement("option");
-    defaultOption.value = "";
-    defaultOption.textContent = "Choose department...";
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Choose department...';
     select.appendChild(defaultOption);
 
     // Add department options from corporate config
     if (
-      this.config.corporateConfig &&
-      this.config.corporateConfig.departments
+      this.config.corporateConfig
+      && this.config.corporateConfig.departments
     ) {
       Object.entries(this.config.corporateConfig.departments).forEach(
         ([key, dept]) => {
-          const option = document.createElement("option");
+          const option = document.createElement('option');
           option.value = key;
           option.textContent = dept.displayName || key;
           select.appendChild(option);
-        },
+        }
       );
     }
 
-    select.addEventListener("change", (e) => {
+    select.addEventListener('change', (e) => {
       this.selectedDepartment = e.target.value;
       this.updateProviderAvailability();
     });
@@ -532,23 +532,23 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   createCorporateBranding() {
-    const branding = document.createElement("div");
-    branding.className = "corporate-branding";
+    const branding = document.createElement('div');
+    branding.className = 'corporate-branding';
 
     const config = this.config.corporateConfig;
 
     if (config.logo) {
-      const logo = document.createElement("img");
+      const logo = document.createElement('img');
       logo.src = config.logo;
       logo.alt = `${config.name} Logo`;
-      logo.className = "corporate-logo";
+      logo.className = 'corporate-logo';
       branding.appendChild(logo);
     }
 
     if (config.welcomeMessage) {
-      const message = document.createElement("p");
+      const message = document.createElement('p');
       message.textContent = config.welcomeMessage;
-      message.className = "welcome-message";
+      message.className = 'welcome-message';
       branding.appendChild(message);
     }
 
@@ -571,23 +571,23 @@ class OAuthProvider {
    */
   async authenticateWithProvider(_provider) {
     try {
-      this.logAuditEvent("oauth_authentication_started", {
+      this.logAuditEvent('oauth_authentication_started', {
         provider: _provider,
       });
 
       // Validate department selection if required
       if (this.config.departmentRequired && !this.selectedDepartment) {
-        throw new Error("Please select your department before signing in");
+        throw new Error('Please select your department before signing in');
       }
 
       switch (_provider) {
-        case "apple":
+        case 'apple':
           await this.authenticateWithApple();
           break;
-        case "google":
+        case 'google':
           await this.authenticateWithGoogle();
           break;
-        case "microsoft":
+        case 'microsoft':
           await this.authenticateWithMicrosoft();
           break;
         default:
@@ -595,9 +595,9 @@ class OAuthProvider {
       }
     } catch (error) {
       console.error(
-        "OAuth authentication failed with provider:",
+        'OAuth authentication failed with provider:',
         _provider,
-        error,
+        error
       );
       this.handleAuthenticationError(error, _provider);
     }
@@ -618,7 +618,7 @@ class OAuthProvider {
    */
   async authenticateWithApple() {
     const response = await window.AppleID.auth.signIn();
-    await this.handleOAuthSuccess("apple", response);
+    await this.handleOAuthSuccess('apple', response);
   }
 
   /**
@@ -652,7 +652,7 @@ class OAuthProvider {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async handleGoogleResponse(response) {
-    await this.handleOAuthSuccess("google", response);
+    await this.handleOAuthSuccess('google', response);
   }
 
   /**
@@ -670,12 +670,12 @@ class OAuthProvider {
    */
   async authenticateWithMicrosoft() {
     const loginRequest = {
-      scopes: ["openid", "profile", "email"],
-      prompt: "select_account",
+      scopes: ['openid', 'profile', 'email'],
+      prompt: 'select_account',
     };
 
     const response = await this.msalInstance.loginPopup(loginRequest);
-    await this.handleOAuthSuccess("microsoft", response);
+    await this.handleOAuthSuccess('microsoft', response);
   }
 
   /**
@@ -696,11 +696,11 @@ class OAuthProvider {
   async handleOAuthSuccess(_provider, response) {
     try {
       // Send OAuth response to server for validation and user creation
-      const serverResponse = await fetch("/api/oauth/authenticate", {
-        method: "POST",
+      const serverResponse = await fetch('/api/oauth/authenticate', {
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
-          "X-Requested-With": "XMLHttpRequest",
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify({
           provider: _provider,
@@ -713,7 +713,7 @@ class OAuthProvider {
 
       if (!serverResponse.ok) {
         throw new Error(
-          `Server authentication failed: ${serverResponse.status}`,
+          `Server authentication failed: ${serverResponse.status}`
         );
       }
 
@@ -724,7 +724,7 @@ class OAuthProvider {
         await this.handleContextSwitch(result.user, this.selectedDepartment);
       }
 
-      this.logAuditEvent("oauth_authentication_success", {
+      this.logAuditEvent('oauth_authentication_success', {
         provider: _provider,
         userId: result.user.id,
         department: this.selectedDepartment,
@@ -733,7 +733,7 @@ class OAuthProvider {
       // Redirect to appropriate page
       this.handleAuthenticationRedirect(result);
     } catch (error) {
-      console.error("OAuth success handling failed:", error);
+      console.error('OAuth success handling failed:', error);
       this.handleAuthenticationError(error, _provider);
     }
   }
@@ -760,10 +760,10 @@ class OAuthProvider {
       await contextService.switchToContext(
         user.id,
         `dept-${department}`,
-        user.sessionId,
+        user.sessionId
       );
     } catch (error) {
-      console.warn("Context switching failed:", error);
+      console.warn('Context switching failed:', error);
     }
   }
 
@@ -783,9 +783,9 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   handleAppleSuccess(data) {
-    console.log("Apple OAuth success:", data);
-    this.logAuditEvent("apple_oauth_success", {
-      provider: "apple",
+    console.log('Apple OAuth success:', data);
+    this.logAuditEvent('apple_oauth_success', {
+      provider: 'apple',
       userId: data.user?.id,
       privacyCompliant: true,
     });
@@ -809,8 +809,8 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   handleAppleError(error) {
-    console.error("Apple OAuth error:", error);
-    this.handleAuthenticationError(error, "apple");
+    console.error('Apple OAuth error:', error);
+    this.handleAuthenticationError(error, 'apple');
   }
 
   /**
@@ -827,8 +827,8 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   handleAppleCancel() {
-    console.log("Apple OAuth cancelled by user");
-    this.logAuditEvent("apple_oauth_cancelled", { provider: "apple" });
+    console.log('Apple OAuth cancelled by user');
+    this.logAuditEvent('apple_oauth_cancelled', { provider: 'apple' });
   }
 
   /**
@@ -846,8 +846,7 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   handleAuthenticationRedirect(result) {
-    const redirectUrl =
-      result.redirectUrl || this.config.successRedirect || "/dashboard";
+    const redirectUrl = result.redirectUrl || this.config.successRedirect || '/dashboard';
 
     window.location.href = redirectUrl;
   }
@@ -869,7 +868,7 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   handleAuthenticationError(error, _provider) {
-    this.logAuditEvent("oauth_authentication_error", {
+    this.logAuditEvent('oauth_authentication_error', {
       provider: _provider,
       error: error.message,
     });
@@ -896,16 +895,16 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   showErrorMessage(message) {
-    const container = document.getElementById("oauth-container");
+    const container = document.getElementById('oauth-container');
     if (!container) return;
 
     // Remove existing error messages
-    const existingErrors = container.querySelectorAll(".oauth-error");
+    const existingErrors = container.querySelectorAll('.oauth-error');
     existingErrors.forEach((error) => error.remove());
 
     // Create new error message
-    const errorDiv = document.createElement("div");
-    errorDiv.className = "oauth-error alert alert-error";
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'oauth-error alert alert-error';
     errorDiv.textContent = message;
 
     container.insertBefore(errorDiv, container.firstChild);
@@ -932,12 +931,12 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   enableAuthenticationButtons() {
-    const buttons = document.querySelectorAll(".oauth-btn");
+    const buttons = document.querySelectorAll('.oauth-btn');
     buttons.forEach((button) => {
       button.disabled = false;
       button.textContent = button.textContent.replace(
-        "Signing in...",
-        "Sign in",
+        'Signing in...',
+        'Sign in'
       );
     });
   }
@@ -961,13 +960,13 @@ class OAuthProvider {
     if (!this.auditService) return;
 
     this.auditService.recordPermissionAudit({
-      userId: this.currentUser?.id || "anonymous",
+      userId: this.currentUser?.id || 'anonymous',
       action,
-      resource: "oauth_authentication",
-      performedBy: "oauth_provider_component",
+      resource: 'oauth_authentication',
+      performedBy: 'oauth_provider_component',
       timestamp: new Date(),
       metadata: {
-        component: "OAuthProvider",
+        component: 'OAuthProvider',
         mobile: this.config.mobile,
         corporateMode: this.config.corporateMode,
         ...metadata,
@@ -990,91 +989,91 @@ class OAuthProvider {
    */
   detectMobile() {
     return (
-      window.innerWidth <= 768 ||
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent,
+      window.innerWidth <= 768
+      || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
       )
     );
   }
 
   generateState() {
     return btoa(
-      Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15),
+      Math.random().toString(36).substring(2, 15)
+        + Math.random().toString(36).substring(2, 15)
     );
   }
 
   generateNonce() {
     return btoa(
-      Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15),
+      Math.random().toString(36).substring(2, 15)
+        + Math.random().toString(36).substring(2, 15)
     );
   }
 
   getProviderDisplayName(provider) {
     const displayNames = {
-      google: "Google",
-      microsoft: "Microsoft",
-      apple: "Apple",
+      google: 'Google',
+      microsoft: 'Microsoft',
+      apple: 'Apple',
     };
     return displayNames[provider] || provider;
   }
 
   applyProviderStyling(button, provider) {
     // Provider-specific styling will be handled by CSS
-    button.setAttribute("data-provider", provider);
+    button.setAttribute('data-provider', provider);
   }
 
   applyTheme() {
     if (this.config.corporateConfig && this.config.corporateConfig.theme) {
       const { theme } = this.config.corporateConfig;
-      const container = document.querySelector(".oauth-provider-container");
+      const container = document.querySelector('.oauth-provider-container');
       if (container && theme.primaryColor) {
-        container.style.setProperty("--primary-color", theme.primaryColor);
+        container.style.setProperty('--primary-color', theme.primaryColor);
       }
     }
   }
 
   initializeProviderSelection() {
     // Smart provider selection based on email domain
-    const emailInput = document.getElementById("identifier");
+    const emailInput = document.getElementById('identifier');
     if (emailInput) {
       emailInput.addEventListener(
-        "blur",
-        this.detectProviderFromEmail.bind(this),
+        'blur',
+        this.detectProviderFromEmail.bind(this)
       );
     }
   }
 
   detectProviderFromEmail(event) {
     const email = event.target.value;
-    if (!email.includes("@")) return;
+    if (!email.includes('@')) return;
 
-    const domain = email.split("@")[1];
+    const domain = email.split('@')[1];
     let suggestedProvider = null;
 
     // Corporate domain mapping
     if (
-      this.config.corporateConfig &&
-      this.config.corporateConfig.domainMappings
+      this.config.corporateConfig
+      && this.config.corporateConfig.domainMappings
     ) {
       suggestedProvider = this.config.corporateConfig.domainMappings[domain];
     }
 
     // Common domain detection
     if (!suggestedProvider) {
-      if (domain.includes("gmail.com") || domain.includes("google.com")) {
-        suggestedProvider = "google";
+      if (domain.includes('gmail.com') || domain.includes('google.com')) {
+        suggestedProvider = 'google';
       } else if (
-        domain.includes("outlook.com") ||
-        domain.includes("microsoft.com")
+        domain.includes('outlook.com')
+        || domain.includes('microsoft.com')
       ) {
-        suggestedProvider = "microsoft";
+        suggestedProvider = 'microsoft';
       } else if (
-        domain.includes("icloud.com") ||
-        domain.includes("apple.com")
+        domain.includes('icloud.com')
+        || domain.includes('apple.com')
       ) {
-        suggestedProvider = "apple";
+        suggestedProvider = 'apple';
       }
     }
 
@@ -1085,13 +1084,13 @@ class OAuthProvider {
 
   highlightSuggestedProvider(_provider) {
     // Remove existing highlights
-    const buttons = document.querySelectorAll(".oauth-btn");
-    buttons.forEach((btn) => btn.classList.remove("suggested"));
+    const buttons = document.querySelectorAll('.oauth-btn');
+    buttons.forEach((btn) => btn.classList.remove('suggested'));
 
     // Highlight suggested provider
     const suggestedButton = document.querySelector(`.oauth-${_provider}`);
     if (suggestedButton) {
-      suggestedButton.classList.add("suggested");
+      suggestedButton.classList.add('suggested');
     }
   }
 
@@ -1102,16 +1101,15 @@ class OAuthProvider {
   updateProviderAvailability() {
     if (!this.selectedDepartment || !this.config.corporateConfig) return;
 
-    const departmentConfig =
-      this.config.corporateConfig.departments[this.selectedDepartment];
+    const departmentConfig = this.config.corporateConfig.departments[this.selectedDepartment];
     if (!departmentConfig || !departmentConfig.allowedProviders) return;
 
     // Show/hide providers based on department configuration
-    const buttons = document.querySelectorAll(".oauth-btn");
+    const buttons = document.querySelectorAll('.oauth-btn');
     buttons.forEach((button) => {
-      const provider = button.getAttribute("data-provider");
+      const provider = button.getAttribute('data-provider');
       const allowed = departmentConfig.allowedProviders.includes(provider);
-      button.style.display = allowed ? "block" : "none";
+      button.style.display = allowed ? 'block' : 'none';
     });
   }
 
@@ -1119,7 +1117,7 @@ class OAuthProvider {
     // Handle OAuth callback messages from popup windows
     if (event.origin !== window.location.origin) return;
 
-    if (event.data.type === "oauth-callback") {
+    if (event.data.type === 'oauth-callback') {
       this.handleOAuthSuccess(event.data.provider, event.data.response);
     }
   }
@@ -1130,9 +1128,9 @@ class OAuthProvider {
   }
 
   handleInitializationError(error) {
-    console.error("OAuth Provider initialization failed:", error);
+    console.error('OAuth Provider initialization failed:', error);
     this.showErrorMessage(
-      "Failed to initialize authentication system. Please refresh the page.",
+      'Failed to initialize authentication system. Please refresh the page.'
     );
   }
 
@@ -1143,10 +1141,10 @@ class OAuthProvider {
     }
 
     // Remove event listeners
-    window.removeEventListener("message", this.handleOAuthMessage.bind(this));
+    window.removeEventListener('message', this.handleOAuthMessage.bind(this));
     document.removeEventListener(
-      "departmentChanged",
-      this.handleDepartmentChange.bind(this),
+      'departmentChanged',
+      this.handleDepartmentChange.bind(this)
     );
   }
 }
@@ -1155,9 +1153,9 @@ class OAuthProvider {
 window.OAuthProvider = OAuthProvider;
 
 // Auto-initialize if container exists
-document.addEventListener("DOMContentLoaded", () => {
-  const container = document.getElementById("oauth-container");
-  if (container && container.dataset.autoInit !== "false") {
+document.addEventListener('DOMContentLoaded', () => {
+  const container = document.getElementById('oauth-container');
+  if (container && container.dataset.autoInit !== 'false') {
     const config = container.dataset.config
       ? JSON.parse(container.dataset.config)
       : {};
