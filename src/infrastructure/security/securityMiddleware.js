@@ -413,6 +413,10 @@ class SecurityMiddleware {
           if (req.session && (req.method === 'GET' || req.method === 'HEAD')) {
             if (!req.session.csrfSecret) {
               req.session.csrfSecret = await uidSafe(32);
+              winston.debug('Generated CSRF secret for new session', {
+                sessionID: req.session.id,
+                path: req.path,
+              });
             }
             const token = this.csrfProtection.create(req.session.csrfSecret);
             res.locals.csrfToken = token;
@@ -423,9 +427,16 @@ class SecurityMiddleware {
         // For state-changing requests, verify CSRF token
         const secret = req.session?.csrfSecret;
         if (!secret) {
+          winston.error('CSRF secret missing for state-changing request', {
+            method: req.method,
+            path: req.path,
+            sessionID: req.session?.id,
+            hasSession: !!req.session,
+            ip: req.ip,
+          });
           return res.status(403).json({
             error: 'CSRF Error',
-            message: 'No CSRF secret found in session',
+            message: 'No CSRF secret found in session. Please refresh the page and try again.',
           });
         }
 

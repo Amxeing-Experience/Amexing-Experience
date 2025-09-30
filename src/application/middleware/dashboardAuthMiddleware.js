@@ -241,7 +241,7 @@ class DashboardAuthMiddleware {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    * @returns {*} - Operation result.
    */
-  logout = (req, res, next) => {
+  logout = async (req, res, next) => {
     // Clear authentication cookies with proper options
     res.clearCookie('accessToken', {
       httpOnly: true,
@@ -267,12 +267,26 @@ class DashboardAuthMiddleware {
     // Mark this request as a logout to prevent redirects
     req.isLogout = true;
 
-    // Clear session data if exists
+    // Regenerate session instead of destroying to prevent race condition
     if (req.session) {
-      req.session.destroy((err) => {
+      req.session.regenerate(async (err) => {
         if (err) {
-          logger.error('Session destruction failed:', err);
+          logger.error('Session regeneration failed during logout:', err);
+          // Fallback: destroy and continue
+          return req.session.destroy(() => next());
         }
+
+        // Initialize CSRF secret for new session
+        try {
+          const uidSafe = require('uid-safe');
+          req.session.csrfSecret = await uidSafe(32);
+          logger.debug('New CSRF secret generated after logout', {
+            sessionID: req.session.id,
+          });
+        } catch (csrfErr) {
+          logger.error('CSRF secret generation failed during logout:', csrfErr);
+        }
+
         next();
       });
     } else {
