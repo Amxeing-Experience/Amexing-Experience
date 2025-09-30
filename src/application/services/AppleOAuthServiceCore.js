@@ -58,7 +58,9 @@ class AppleOAuthServiceCore {
       clientId: process.env.APPLE_CLIENT_ID,
       keyId: process.env.APPLE_KEY_ID,
       privateKeyPath: process.env.APPLE_PRIVATE_KEY_PATH,
-      redirectUri: process.env.APPLE_REDIRECT_URI || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/apple/callback`,
+      redirectUri:
+        process.env.APPLE_REDIRECT_URI
+        || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/apple/callback`,
       scope: 'email name',
       responseType: 'code idtoken',
       responseMode: 'form_post',
@@ -97,11 +99,15 @@ class AppleOAuthServiceCore {
      */
     if (missing.length > 0) {
       if (process.env.NODE_ENV === 'development') {
-        logger.warn(`Apple OAuth not configured in development: ${missing.join(', ')}`);
+        logger.warn(
+          `Apple OAuth not configured in development: ${missing.join(', ')}`
+        );
         this.disabled = true;
         return;
       }
-      throw new Error(`Missing Apple OAuth configuration: ${missing.join(', ')}`);
+      throw new Error(
+        `Missing Apple OAuth configuration: ${missing.join(', ')}`
+      );
     }
   }
 
@@ -139,7 +145,9 @@ class AppleOAuthServiceCore {
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       if (!fs.existsSync(this.config.privateKeyPath)) {
-        throw new Error(`Apple private key file not found: ${this.config.privateKeyPath}`);
+        throw new Error(
+          `Apple private key file not found: ${this.config.privateKeyPath}`
+        );
       }
 
       // eslint-disable-next-line security/detect-non-literal-fs-filename
@@ -182,11 +190,7 @@ class AppleOAuthServiceCore {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   buildAuthUrl(options = {}) {
-    const {
-      state,
-      nonce,
-      responseMode = this.config.responseMode,
-    } = options;
+    const { state, nonce, responseMode = this.config.responseMode } = options;
 
     const params = new URLSearchParams({
       client_id: this.config.clientId,
@@ -246,7 +250,9 @@ class AppleOAuthServiceCore {
         userAgent: headers['user-agent'],
       };
 
-      logger.info(`Apple OAuth initiated for department: ${department}, IP: ${ip}`);
+      logger.info(
+        `Apple OAuth initiated for department: ${department}, IP: ${ip}`
+      );
 
       return {
         authUrl,
@@ -257,7 +263,10 @@ class AppleOAuthServiceCore {
       };
     } catch (error) {
       logger.error('Apple OAuth initiation failed:', error);
-      throw new Parse.Error(Parse.Error.INTERNAL_SERVER_ERROR, 'Failed to initiate Apple OAuth');
+      throw new Parse.Error(
+        Parse.Error.INTERNAL_SERVER_ERROR,
+        'Failed to initiate Apple OAuth'
+      );
     }
   }
 

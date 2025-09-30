@@ -1,0 +1,80 @@
+<%
+/**
+ * Divider Atom
+ * Reusable divider/separator component
+ *
+ * @param {string} type - Divider type (horizontal, vertical)
+ * @param {string} style - Divider style (solid, dashed, dotted)
+ * @param {string} color - Divider color (secondary, muted, primary, etc.)
+ * @param {string} thickness - Divider thickness (1, 2, 3, 4, 5)
+ * @param {string} spacing - Margin spacing (1, 2, 3, 4, 5)
+ * @param {string} text - Text to display in the middle of divider
+ * @param {string} additionalClasses - Additional CSS classes
+ */
+
+// Default parameters
+const dividerType = typeof type !== 'undefined' ? type : 'horizontal';
+const dividerStyle = typeof style !== 'undefined' ? style : 'solid';
+const dividerColor = typeof color !== 'undefined' ? color : 'secondary';
+const dividerThickness = typeof thickness !== 'undefined' ? thickness : '1';
+const dividerSpacing = typeof spacing !== 'undefined' ? spacing : '3';
+const dividerText = typeof text !== 'undefined' ? text : '';
+const dividerAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+
+// Build classes and styles
+let dividerClasses = [];
+let dividerStyles = [];
+
+if (dividerType === 'vertical') {
+    dividerClasses.push('border-start');
+    dividerStyles.push(`height: 100%`);
+    dividerStyles.push(`border-left-style: ${dividerStyle} !important`);
+    dividerStyles.push(`border-left-width: ${dividerThickness}px !important`);
+    dividerStyles.push(`border-left-color: var(--bs-${dividerColor}) !important`);
+    if (dividerSpacing) {
+        dividerClasses.push(`mx-${dividerSpacing}`);
+    }
+} else {
+    // Horizontal divider
+    if (dividerText) {
+        // Divider with text
+        dividerClasses.push('position-relative', 'd-flex', 'align-items-center');
+        if (dividerSpacing) {
+            dividerClasses.push(`my-${dividerSpacing}`);
+        }
+    } else {
+        // Simple horizontal rule
+        dividerClasses.push('border-bottom');
+        dividerStyles.push(`border-bottom-style: ${dividerStyle} !important`);
+        dividerStyles.push(`border-bottom-width: ${dividerThickness}px !important`);
+        dividerStyles.push(`border-bottom-color: var(--bs-${dividerColor}) !important`);
+        if (dividerSpacing) {
+            dividerClasses.push(`my-${dividerSpacing}`);
+        }
+    }
+}
+
+// Additional classes
+if (dividerAdditionalClasses) {
+    dividerClasses.push(dividerAdditionalClasses);
+}
+
+const finalClasses = dividerClasses.join(' ');
+const finalStyles = dividerStyles.join('; ');
+%>
+
+<% if (dividerType === 'horizontal' && dividerText) { %>
+    <!-- Horizontal divider with text -->
+    <div class="<%= finalClasses %>">
+        <div class="flex-grow-1"
+             style="height: <%= dividerThickness %>px; background-color: var(--bs-<%= dividerColor %>); border-style: <%= dividerStyle %>;"></div>
+        <span class="px-3 text-<%= dividerColor %> fs-7 text-uppercase fw-semibold">
+            <%= dividerText %>
+        </span>
+        <div class="flex-grow-1"
+             style="height: <%= dividerThickness %>px; background-color: var(--bs-<%= dividerColor %>); border-style: <%= dividerStyle %>;"></div>
+    </div>
+<% } else { %>
+    <!-- Simple divider -->
+    <div class="<%= finalClasses %>" <% if (finalStyles) { %>style="<%= finalStyles %>"<% } %>></div>
+<% } %>

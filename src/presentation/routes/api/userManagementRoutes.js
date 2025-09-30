@@ -34,7 +34,8 @@ const userApiLimiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   message: {
     success: false,
-    error: 'Too many user management requests from this IP, please try again later.',
+    error:
+      'Too many user management requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -47,7 +48,8 @@ const writeOperationsLimiter = rateLimit({
   max: 30, // Limit write operations
   message: {
     success: false,
-    error: 'Too many user modification requests from this IP, please try again later.',
+    error:
+      'Too many user modification requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -59,9 +61,9 @@ router.use(userApiLimiter);
 router.use(jwtMiddleware.authenticateToken);
 
 /**
- * Get users with filtering, pagination, and role-based access.
+ * Get users with filtering, pagination, and permission-based access.
  * Route: GET /api/users
- * Access: Private (authenticated users with appropriate permissions).
+ * Access: Private (requires 'users.list' permission).
  * @param {object} req - Express request object with query parameters: page, limit, role, active, search, clientId, departmentId, sortField, sortDirection.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -73,14 +75,18 @@ router.use(jwtMiddleware.authenticateToken);
  * // Response: { "success": true, "data": [...] }
  * GET /api/users?page=1&limit=10&role=admin&active=true
  */
-router.get('/', async (req, res) => {
-  await userController.getUsers(req, res);
-});
+router.get(
+  '/',
+  jwtMiddleware.requirePermission('users.list'),
+  async (req, res) => {
+    await userController.getUsers(req, res);
+  }
+);
 
 /**
  * Search users with advanced filtering.
  * Route: GET /api/users/search
- * Access: Private (authenticated users with appropriate permissions).
+ * Access: Private (requires 'users.search' permission).
  * @param {object} req - Express request object with query parameters: q (search term), role, active, page, limit, sortField, sortDirection.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -92,14 +98,18 @@ router.get('/', async (req, res) => {
  * // Response: { "success": true, "data": [...] }
  * GET /api/users/search?q=john&role=employee&active=true
  */
-router.get('/search', async (req, res) => {
-  await userController.searchUsers(req, res);
-});
+router.get(
+  '/search',
+  jwtMiddleware.requirePermission('users.search'),
+  async (req, res) => {
+    await userController.searchUsers(req, res);
+  }
+);
 
 /**
  * Get user statistics for dashboard.
  * Route: GET /api/users/statistics
- * Access: Private (superadmin, admin).
+ * Access: Private (requires 'users.statistics' permission or role level 6+).
  * @param {object} req - Express request object.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -111,14 +121,18 @@ router.get('/search', async (req, res) => {
  * // Response: { "success": true, "data": [...] }
  * GET /api/users/statistics
  */
-router.get('/statistics', async (req, res) => {
-  await userController.getUserStatistics(req, res);
-});
+router.get(
+  '/statistics',
+  jwtMiddleware.requireRoleLevel(6),
+  async (req, res) => {
+    await userController.getUserStatistics(req, res);
+  }
+);
 
 /**
  * Get specific user by ID.
  * Route: GET /api/users/:id
- * Access: Private (authenticated users with appropriate permissions).
+ * Access: Private (requires 'users.read' permission).
  * @param {object} req - Express request object with params: {id: User ID}.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -130,14 +144,18 @@ router.get('/statistics', async (req, res) => {
  * // Response: { "success": true, "data": [...] }
  * GET /api/users/abc123
  */
-router.get('/:id', async (req, res) => {
-  await userController.getUserById(req, res);
-});
+router.get(
+  '/:id',
+  jwtMiddleware.requirePermission('users.read'),
+  async (req, res) => {
+    await userController.getUserById(req, res);
+  }
+);
 
 /**
  * Create new user.
  * Route: POST /api/users
- * Access: Private (superadmin, admin, client - based on role hierarchy).
+ * Access: Private (requires 'users.create' permission).
  * @param {object} req - Express request object with body: {email, firstName, lastName, role, password?, clientId?, departmentId?, emailVerified?}.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -149,14 +167,20 @@ router.get('/:id', async (req, res) => {
  * // Response: { "success": true, "data": [...] }
  * POST /api/users with body: {email: 'user@example.com', firstName: 'John', lastName: 'Doe', role: 'employee'}
  */
-router.post('/', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
-  await userController.createUser(req, res);
-});
+router.post(
+  '/',
+  writeOperationsLimiter,
+  securityMiddleware.getCsrfProtection(),
+  jwtMiddleware.requirePermission('users.create'),
+  async (req, res) => {
+    await userController.createUser(req, res);
+  }
+);
 
 /**
  * Update existing user.
  * Route: PUT /api/users/:id
- * Access: Private (authenticated users with appropriate permissions).
+ * Access: Private (requires 'users.update' permission).
  * @param {object} req - Express request object with params: {id: User ID} and body: Partial user data to update.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -169,14 +193,20 @@ router.post('/', writeOperationsLimiter, securityMiddleware.getCsrfProtection(),
  * // Response: { "success": true, "message": "Created" }
  * PUT /api/users/abc123 with body: {firstName: 'Jane', active: false}
  */
-router.put('/:id', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
-  await userController.updateUser(req, res);
-});
+router.put(
+  '/:id',
+  writeOperationsLimiter,
+  securityMiddleware.getCsrfProtection(),
+  jwtMiddleware.requirePermission('users.update'),
+  async (req, res) => {
+    await userController.updateUser(req, res);
+  }
+);
 
 /**
  * Deactivate user (soft delete - follows AI agent rules).
  * Route: DELETE /api/users/:id
- * Access: Private (superadmin, admin, or users managing their subordinates).
+ * Access: Private (requires 'users.deactivate' permission).
  * @param {object} req - Express request object with params: {id: User ID} and body: {reason?: string}.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -189,14 +219,20 @@ router.put('/:id', writeOperationsLimiter, securityMiddleware.getCsrfProtection(
  * // Response: { "success": true, "data": {...} }
  * DELETE /api/users/abc123 with body: {reason: 'Policy violation'}
  */
-router.delete('/:id', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
-  await userController.deactivateUser(req, res);
-});
+router.delete(
+  '/:id',
+  writeOperationsLimiter,
+  securityMiddleware.getCsrfProtection(),
+  jwtMiddleware.requirePermission('users.deactivate'),
+  async (req, res) => {
+    await userController.deactivateUser(req, res);
+  }
+);
 
 /**
  * Reactivate deactivated user.
  * Route: PUT /api/users/:id/reactivate
- * Access: Private (superadmin, admin, or users managing their subordinates).
+ * Access: Private (requires 'users.reactivate' permission).
  * @param {object} req - Express request object with params: {id: User ID} and body: {reason?: string}.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -209,14 +245,20 @@ router.delete('/:id', writeOperationsLimiter, securityMiddleware.getCsrfProtecti
  * // Response: { "success": true, "data": {...} }
  * PUT /api/users/abc123/reactivate with body: {reason: 'Appeal approved'}
  */
-router.put('/:id/reactivate', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
-  await userController.reactivateUser(req, res);
-});
+router.put(
+  '/:id/reactivate',
+  writeOperationsLimiter,
+  securityMiddleware.getCsrfProtection(),
+  jwtMiddleware.requirePermission('users.reactivate'),
+  async (req, res) => {
+    await userController.reactivateUser(req, res);
+  }
+);
 
 /**
  * Toggle user active status (activate/deactivate).
  * Route: PATCH /api/users/:id/toggle-status
- * Access: Private (superadmin, admin, or users managing their subordinates).
+ * Access: Private (requires 'users.update' permission).
  * @param {object} req - Express request object with params: {id: User ID} and body: {active: boolean, reason?: string}.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -229,14 +271,20 @@ router.put('/:id/reactivate', writeOperationsLimiter, securityMiddleware.getCsrf
  * // Response: { "success": true, "data": {...} }
  * PATCH /api/users/abc123/toggle-status with body: {active: false, reason: 'Suspension'}
  */
-router.patch('/:id/toggle-status', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
-  await userController.toggleUserStatus(req, res);
-});
+router.patch(
+  '/:id/toggle-status',
+  writeOperationsLimiter,
+  securityMiddleware.getCsrfProtection(),
+  jwtMiddleware.requirePermission('users.update'),
+  async (req, res) => {
+    await userController.toggleUserStatus(req, res);
+  }
+);
 
 /**
  * Archive user (soft delete - sets active: false, exists: false).
  * Route: PATCH /api/users/:id/archive
- * Access: Private (superadmin only).
+ * Access: Private (requires role level 7 - superadmin only).
  * @param {object} req - Express request object with params: {id: User ID} and body: {reason?: string}.
  * @param {object} res - Express response object.
  * @returns {Promise<void>} - Resolves when response is sent.
@@ -249,9 +297,15 @@ router.patch('/:id/toggle-status', writeOperationsLimiter, securityMiddleware.ge
  * // Response: { "success": true, "data": {...} }
  * PATCH /api/users/abc123/archive with body: {reason: 'Data retention policy'}
  */
-router.patch('/:id/archive', writeOperationsLimiter, securityMiddleware.getCsrfProtection(), async (req, res) => {
-  await userController.archiveUser(req, res);
-});
+router.patch(
+  '/:id/archive',
+  writeOperationsLimiter,
+  securityMiddleware.getCsrfProtection(),
+  jwtMiddleware.requireRoleLevel(7),
+  async (req, res) => {
+    await userController.archiveUser(req, res);
+  }
+);
 
 /**
  * Error handling middleware for this router.

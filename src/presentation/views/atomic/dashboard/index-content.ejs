@@ -1,0 +1,323 @@
+<!-- Search and Filter Section -->
+<div class="search-section">
+    <div class="row g-3 align-items-center">
+        <div class="col-md-8">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="ti ti-search"></i>
+                </span>
+                <input type="text" class="form-control search-input" id="componentSearch"
+                       placeholder="Search dashboard components...">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="btn-group w-100" role="group">
+                <button type="button" class="btn btn-outline-primary active" data-filter="all">All</button>
+                <button type="button" class="btn btn-outline-success" data-filter="atom">Atoms</button>
+                <button type="button" class="btn btn-outline-info" data-filter="molecule">Molecules</button>
+                <button type="button" class="btn btn-outline-warning" data-filter="organism">Organisms</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Atoms Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-success mb-4">
+            <i class="ti ti-circle-dot me-2"></i>Atoms (<%= components.atoms.length %>)
+        </h3>
+        <p class="text-muted mb-4">Basic dashboard building blocks</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <% components.atoms.forEach(component => { %>
+        <div class="col-lg-6">
+            <div class="component-card fade-in" data-type="atom">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge atom">Atom</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <% if (component.name === 'Metric Card') { %>
+                        <!-- Live Preview for Metric Card -->
+                        <%- include('../../atoms/dashboard/metric-card', {
+                            title: 'Total Users',
+                            value: '1,247',
+                            icon: 'ti-users',
+                            trend: { value: '+12%', type: 'up' },
+                            color: 'primary',
+                            link: '#'
+                        }) %>
+                    <% } else if (component.name === 'Stats Card') { %>
+                        <!-- Live Preview for Stats Card -->
+                        <%- include('../../atoms/dashboard/stats-card', {
+                            title: 'Revenue Overview',
+                            mainValue: '$45,230',
+                            subStats: [
+                                { label: 'This Month', value: '$12,340' },
+                                { label: 'Growth', value: '+8.2%' }
+                            ],
+                            period: 'Monthly'
+                        }) %>
+                    <% } else { %>
+                        <!-- Placeholder for other atoms -->
+                        <div class="text-center py-4">
+                            <i class="<%= component.name === 'Styles' ? 'ti-palette' : 'ti-code' %> text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2"><%= component.usage %></p>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Example</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <% if (component.name === 'Metric Card') { %>
+                            <pre><code class="language-markup">&lt;%- include('atoms/dashboard/metric-card', {
+    title: 'Total Users',
+    value: '1,247',
+    icon: 'ti-users',
+    trend: { value: '+12%', type: 'up' },
+    color: 'primary',
+    link: '#'
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Stats Card') { %>
+                            <pre><code class="language-markup">&lt;%- include('atoms/dashboard/stats-card', {
+    title: 'Revenue Overview',
+    mainValue: '$45,230',
+    subStats: [
+        { label: 'This Month', value: '$12,340' },
+        { label: 'Growth', value: '+8.2%' }
+    ],
+    period: 'Monthly'
+}) %&gt;</code></pre>
+                        <% } else { %>
+                            <pre><code class="language-markup">&lt;%- include('atoms/dashboard/<%= component.file.replace('.ejs', '') %>', {
+<% if (component.params) { component.params.forEach((param, index) => { %>    <%= param %>: value<%= index < component.params.length - 1 ? ',' : '' %>
+<% }); } %>}) %&gt;</code></pre>
+                        <% } %>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <% if (component.params && component.params.length > 0) { %>
+                        <div class="row g-2">
+                            <% component.params.forEach(param => { %>
+                                <div class="col-md-6">
+                                    <code class="text-info"><%= param %></code>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <p class="text-muted small">No configurable parameters</p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Molecules Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-info mb-4">
+            <i class="ti ti-molecules me-2"></i>Molecules (<%= components.molecules.length %>)
+        </h3>
+        <p class="text-muted mb-4">Component combinations for dashboard interfaces</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <% components.molecules.forEach(component => { %>
+        <div class="col-12">
+            <div class="component-card fade-in" data-type="molecule">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge molecule">Molecule</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <% if (component.name === 'Navigation Item') { %>
+                        <!-- Live Preview for Navigation Item -->
+                        <div class="bg-dark p-3 rounded">
+                            <%- include('../../molecules/dashboard/nav-item', {
+                                title: 'Dashboard',
+                                icon: 'ti-layout-dashboard',
+                                url: '#',
+                                active: true,
+                                badge: { text: 'New', color: 'success' }
+                            }) %>
+                            <%- include('../../molecules/dashboard/nav-item', {
+                                title: 'Users',
+                                icon: 'ti-users',
+                                url: '#',
+                                active: false,
+                                badge: { text: '5', color: 'primary' }
+                            }) %>
+                        </div>
+                    <% } else if (component.name === 'User Card') { %>
+                        <!-- Live Preview for User Card -->
+                        <%- include('../../molecules/dashboard/user-card', {
+                            user: {
+                                name: 'John Doe',
+                                email: 'john.doe@example.com',
+                                avatar: 'https://via.placeholder.com/40',
+                                role: 'Admin',
+                                status: 'online'
+                            },
+                            showActions: true,
+                            layout: 'horizontal'
+                        }) %>
+                    <% } else { %>
+                        <div class="text-center py-4">
+                            <i class="ti-components text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2"><%= component.usage %></p>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Example</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <% if (component.name === 'Navigation Item') { %>
+                            <pre><code class="language-markup">&lt;%- include('molecules/dashboard/nav-item', {
+    title: 'Dashboard',
+    icon: 'ti-layout-dashboard',
+    url: '/dashboard',
+    active: true,
+    badge: { text: 'New', color: 'success' }
+}) %&gt;</code></pre>
+                        <% } else { %>
+                            <pre><code class="language-markup">&lt;%- include('molecules/dashboard/<%= component.file.replace('.ejs', '') %>', {
+<% if (component.params) { component.params.forEach((param, index) => { %>    <%= param %>: value<%= index < component.params.length - 1 ? ',' : '' %>
+<% }); } %>}) %&gt;</code></pre>
+                        <% } %>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <div class="row g-2">
+                        <% component.params.forEach(param => { %>
+                            <div class="col-md-4">
+                                <code class="text-info"><%= param %></code>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Organisms Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-warning mb-4">
+            <i class="ti ti-components me-2"></i>Organisms (<%= components.organisms.length %>)
+        </h3>
+        <p class="text-muted mb-4">Complex dashboard sections and layouts</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <% components.organisms.forEach(component => { %>
+        <div class="col-12">
+            <div class="component-card fade-in" data-type="organism">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge organism">Organism</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <div class="text-center py-5">
+                        <i class="ti ti-layout text-muted" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-muted">Complex Component</h5>
+                        <p class="text-muted"><%= component.usage %></p>
+                        <small class="text-muted">View in dashboard context for full preview</small>
+                    </div>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Example</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <pre><code class="language-markup">&lt;%- include('organisms/dashboard/<%= component.path.split('/').slice(-1)[0] %>', {
+<% if (component.params) { component.params.forEach((param, index) => { %>    <%= param %>: value<%= index < component.params.length - 1 ? ',' : '' %>
+<% }); } %>}) %&gt;</code></pre>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <div class="row g-2">
+                        <% component.params.forEach(param => { %>
+                            <div class="col-md-4">
+                                <code class="text-info"><%= param %></code>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>

@@ -19,7 +19,7 @@
                 <!-- Quick Stats -->
                 <div class="row">
                     <div class="col-md-3">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-hierarchy',
                             title: 'Total Departments',
                             value: typeof stats !== 'undefined' ? stats.totalDepartments : '125',
@@ -29,7 +29,7 @@
                         }) %>
                     </div>
                     <div class="col-md-3">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-crown',
                             title: 'Department Managers',
                             value: typeof stats !== 'undefined' ? stats.departmentManagers : '98',
@@ -39,7 +39,7 @@
                         }) %>
                     </div>
                     <div class="col-md-3">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-users',
                             title: 'Department Employees',
                             value: typeof stats !== 'undefined' ? stats.departmentEmployees : '1,247',
@@ -49,7 +49,7 @@
                         }) %>
                     </div>
                     <div class="col-md-3">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-chart-bar',
                             title: 'Avg Team Size',
                             value: typeof stats !== 'undefined' ? stats.avgTeamSize : '12.6',

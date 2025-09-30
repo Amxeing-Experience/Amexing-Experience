@@ -113,11 +113,7 @@ class Department extends BaseModel {
    */
   async getEmployees(options = {}) {
     try {
-      const {
-        includeManager = true,
-        role = null,
-        active = true,
-      } = options;
+      const { includeManager = true, role = null, active = true } = options;
 
       const AmexingUser = require('./AmexingUser');
       let query;
@@ -307,7 +303,10 @@ class Department extends BaseModel {
       query.select('cost');
 
       const orders = await query.find({ useMasterKey: true });
-      return orders.reduce((total, order) => total + (order.get('cost') || 0), 0);
+      return orders.reduce(
+        (total, order) => total + (order.get('cost') || 0),
+        0
+      );
     } catch (error) {
       logger.error('Error calculating budget used', {
         departmentId: this.id,
@@ -637,7 +636,10 @@ class Department extends BaseModel {
 
     // Budget validation
     if (departmentData.budget !== undefined && departmentData.budget !== null) {
-      if (typeof departmentData.budget !== 'number' || departmentData.budget < 0) {
+      if (
+        typeof departmentData.budget !== 'number'
+        || departmentData.budget < 0
+      ) {
         errors.push('Budget must be a non-negative number');
       }
     }

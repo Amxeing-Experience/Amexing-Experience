@@ -138,6 +138,7 @@ class BaseController {
     const missing = [];
 
     requiredFields.forEach((field) => {
+      // eslint-disable-next-line security/detect-object-injection
       if (!data[field]) {
         missing.push(field);
       }

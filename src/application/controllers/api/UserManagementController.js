@@ -71,10 +71,7 @@ class UserManagementController {
       // Parse and validate query parameters
       const options = this.parseUserQueryParams(req.query);
 
-      // Validate permissions for the requested operation
-      if (!this.canViewUsers(currentUser, options.targetRole)) {
-        return this.sendError(res, 'Insufficient permissions to view users', 403);
-      }
+      // Permission validation is handled by middleware
 
       // Get users from service
       const result = await this.userService.getUsers(currentUser, options);
@@ -85,7 +82,7 @@ class UserManagementController {
         requestMetadata: {
           endpoint: 'getUsers',
           requestedBy: currentUser.id,
-          requestedRole: currentUser.role,
+          requestedRole: req.userRole,
           timestamp: new Date(),
           queryParams: options,
         },
@@ -194,7 +191,11 @@ class UserManagementController {
       // Validate request body
       const validationErrors = this.validateCreateUserRequest(req.body);
       if (validationErrors.length > 0) {
-        return this.sendError(res, `Validation failed: ${validationErrors.join(', ')}`, 400);
+        return this.sendError(
+          res,
+          `Validation failed: ${validationErrors.join(', ')}`,
+          400
+        );
       }
 
       const userData = this.sanitizeUserData(req.body);
@@ -284,7 +285,11 @@ class UserManagementController {
       // Validate request body
       const validationErrors = this.validateUpdateUserRequest(req.body);
       if (validationErrors.length > 0) {
-        return this.sendError(res, `Validation failed: ${validationErrors.join(', ')}`, 400);
+        return this.sendError(
+          res,
+          `Validation failed: ${validationErrors.join(', ')}`,
+          400
+        );
       }
 
       const updates = this.sanitizeUserData(req.body);
@@ -307,7 +312,10 @@ class UserManagementController {
       logger.error('Error in UserManagementController.updateUser', {
         error: error.message,
         userId: req.params.id,
-        updates: { ...req.body, password: req.body.password ? '[REDACTED]' : undefined },
+        updates: {
+          ...req.body,
+          password: req.body.password ? '[REDACTED]' : undefined,
+        },
         modifiedBy: req.user?.id,
       });
 
@@ -372,10 +380,14 @@ class UserManagementController {
           deactivatedBy: currentUser.id,
         });
 
-        this.sendSuccess(res, {
-          deactivated: true,
-          reason,
-        }, 'User deactivated successfully');
+        this.sendSuccess(
+          res,
+          {
+            deactivated: true,
+            reason,
+          },
+          'User deactivated successfully'
+        );
       } else {
         this.sendError(res, 'Failed to deactivate user', 500);
       }
@@ -450,10 +462,14 @@ class UserManagementController {
           reactivatedBy: currentUser.id,
         });
 
-        this.sendSuccess(res, {
-          reactivated: true,
-          reason,
-        }, 'User reactivated successfully');
+        this.sendSuccess(
+          res,
+          {
+            reactivated: true,
+            reason,
+          },
+          'User reactivated successfully'
+        );
       } else {
         this.sendError(res, 'Failed to reactivate user', 500);
       }
@@ -513,7 +529,12 @@ class UserManagementController {
       const actionReason = reason || `User ${active ? 'activated' : 'deactivated'} via API`;
 
       // Toggle user status through service
-      const result = await this.userService.toggleUserStatus(currentUser, userId, active, actionReason);
+      const result = await this.userService.toggleUserStatus(
+        currentUser,
+        userId,
+        active,
+        actionReason
+      );
 
       if (result.success) {
         logger.info('User status toggled via API', {
@@ -523,14 +544,22 @@ class UserManagementController {
           actionBy: currentUser.id,
         });
 
-        this.sendSuccess(res, {
-          user: result.user,
-          previousStatus: result.previousStatus,
-          newStatus: active,
-          reason: actionReason,
-        }, `User ${active ? 'activated' : 'deactivated'} successfully`);
+        this.sendSuccess(
+          res,
+          {
+            user: result.user,
+            previousStatus: result.previousStatus,
+            newStatus: active,
+            reason: actionReason,
+          },
+          `User ${active ? 'activated' : 'deactivated'} successfully`
+        );
       } else {
-        this.sendError(res, result.message || 'Failed to toggle user status', 400);
+        this.sendError(
+          res,
+          result.message || 'Failed to toggle user status',
+          400
+        );
       }
     } catch (error) {
       logger.error('Error in UserManagementController.toggleUserStatus', {
@@ -577,7 +606,11 @@ class UserManagementController {
       const reason = req.body.reason || 'User archived via API';
 
       // Archive user through service
-      const result = await this.userService.archiveUser(currentUser, userId, reason);
+      const result = await this.userService.archiveUser(
+        currentUser,
+        userId,
+        reason
+      );
 
       if (result.success) {
         logger.info('User archived via API', {
@@ -586,11 +619,15 @@ class UserManagementController {
           archivedBy: currentUser.id,
         });
 
-        this.sendSuccess(res, {
-          user: result.user,
-          archived: true,
-          reason,
-        }, 'User archived successfully');
+        this.sendSuccess(
+          res,
+          {
+            user: result.user,
+            archived: true,
+            reason,
+          },
+          'User archived successfully'
+        );
       } else {
         this.sendError(res, result.message || 'Failed to archive user', 400);
       }
@@ -636,10 +673,7 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      // Only superadmin and admin can view statistics
-      if (!['superadmin', 'admin'].includes(currentUser.role)) {
-        return this.sendError(res, 'Insufficient permissions', 403);
-      }
+      // Permission validation is handled by middleware
 
       const stats = await this.userService.getUserStatistics(currentUser);
       this.sendSuccess(res, stats, 'Statistics retrieved successfully');
@@ -685,7 +719,10 @@ class UserManagementController {
       const searchParams = this.parseSearchParams(req.query);
 
       // Perform search through service
-      const result = await this.userService.searchUsers(currentUser, searchParams);
+      const result = await this.userService.searchUsers(
+        currentUser,
+        searchParams
+      );
 
       this.sendSuccess(res, result, 'Search completed successfully');
     } catch (error) {
@@ -728,7 +765,10 @@ class UserManagementController {
       limit,
       filters: {
         active: query.active !== undefined ? query.active === 'true' : null,
-        emailVerified: query.emailVerified !== undefined ? query.emailVerified === 'true' : null,
+        emailVerified:
+          query.emailVerified !== undefined
+            ? query.emailVerified === 'true'
+            : null,
         clientId: query.clientId || null,
         departmentId: query.departmentId || null,
         createdAfter: query.createdAfter || null,
@@ -772,50 +812,131 @@ class UserManagementController {
 
   /**
    * Validate create user request data.
-   * @param {object} data - Data object.
+   * @param {object} data - User data to validate.
+   * @returns {string[]} Array of validation error messages.
    * @example
-   * // POST endpoint example
-   * const result = await UserManagementController.validateCreateUserRequest(req, res);
-   * // Body: { data: 'example' }
-   * // Returns: { success: true, data: {...} }
-   * // controller.methodName(req, res)
-   * // Handles HTTP request and sends appropriate response
-   * // Example usage:
-   * // const result = await methodName(params);
-   * // console.log(result);
-   * @returns {*} - Operation result.
+   * // Validate user creation data
+   * const errors = this.validateCreateUserRequest({ email: 'user@test.com', firstName: 'John' });
+   * // Returns: ['Last name is required', 'Either role or roleId is required']
    */
   validateCreateUserRequest(data) {
     const errors = [];
 
-    if (!data.email || typeof data.email !== 'string' || data.email.trim() === '') {
+    // Basic required fields validation
+    errors.push(...this.validateRequiredFields(data));
+
+    // Email format validation
+    errors.push(...this.validateEmailFormat(data.email));
+
+    // Role validation
+    errors.push(...this.validateRoleData(data));
+
+    return errors;
+  }
+
+  /**
+   * Validate required fields for user creation.
+   * @param {object} data - User data to validate.
+   * @returns {string[]} Array of validation error messages.
+   * @example
+   * // Validate required fields for user creation
+   * const errors = this.validateRequiredFields({ email: 'user@test.com' });
+   * // Returns: ['First name is required', 'Last name is required']
+   */
+  validateRequiredFields(data) {
+    const errors = [];
+
+    if (
+      !data.email
+      || typeof data.email !== 'string'
+      || data.email.trim() === ''
+    ) {
       errors.push('Email is required');
     }
 
-    if (!data.firstName || typeof data.firstName !== 'string' || data.firstName.trim() === '') {
+    if (
+      !data.firstName
+      || typeof data.firstName !== 'string'
+      || data.firstName.trim() === ''
+    ) {
       errors.push('First name is required');
     }
 
-    if (!data.lastName || typeof data.lastName !== 'string' || data.lastName.trim() === '') {
+    if (
+      !data.lastName
+      || typeof data.lastName !== 'string'
+      || data.lastName.trim() === ''
+    ) {
       errors.push('Last name is required');
     }
 
-    if (!data.role || typeof data.role !== 'string' || data.role.trim() === '') {
-      errors.push('Role is required');
-    }
+    return errors;
+  }
 
-    // Email format validation
-    if (data.email) {
+  /**
+   * Validate email format.
+   * @param {string} email - Email to validate.
+   * @returns {string[]} Array of validation error messages.
+   * @example
+   * // Validate email format
+   * const errors = this.validateEmailFormat('invalid-email');
+   * // Returns: ['Invalid email format']
+   */
+  validateEmailFormat(email) {
+    const errors = [];
+
+    if (email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(data.email.trim())) {
+      if (!emailRegex.test(email.trim())) {
         errors.push('Invalid email format');
       }
     }
 
-    // Role validation
-    const allowedRoles = ['superadmin', 'admin', 'client', 'department_manager', 'employee', 'driver', 'guest'];
+    return errors;
+  }
+
+  /**
+   * Validate role data for user creation.
+   * @param {object} data - User data containing role information.
+   * @returns {string[]} Array of validation error messages.
+   * @example
+   * // Validate role data
+   * const errors = this.validateRoleData({ role: 'invalid_role' });
+   * // Returns: ['Invalid role. Allowed roles: superadmin, admin, client, ...']
+   */
+  validateRoleData(data) {
+    const errors = [];
+
+    // Role validation (for backward compatibility)
+    const allowedRoles = [
+      'superadmin',
+      'admin',
+      'client',
+      'department_manager',
+      'employee',
+      'employee_amexing',
+      'driver',
+      'guest',
+    ];
     if (data.role && !allowedRoles.includes(data.role)) {
       errors.push(`Invalid role. Allowed roles: ${allowedRoles.join(', ')}`);
+    }
+
+    // Require either role or roleId
+    if (
+      (!data.role
+        || typeof data.role !== 'string'
+        || data.role.trim() === '')
+      && (!data.roleId
+        || typeof data.roleId !== 'string'
+        || data.roleId.trim() === '')
+    ) {
+      errors.push('Either role or roleId is required');
+    }
+
+    // RoleId validation if provided
+    if (data.roleId && typeof data.roleId !== 'string') {
+      errors.push('Role ID must be a string');
     }
 
     return errors;
@@ -847,12 +968,26 @@ class UserManagementController {
       }
     }
 
-    // Role validation if provided
+    // Role validation if provided (for backward compatibility)
     if (data.role) {
-      const allowedRoles = ['superadmin', 'admin', 'client', 'department_manager', 'employee', 'driver', 'guest'];
+      const allowedRoles = [
+        'superadmin',
+        'admin',
+        'client',
+        'department_manager',
+        'employee',
+        'employee_amexing',
+        'driver',
+        'guest',
+      ];
       if (!allowedRoles.includes(data.role)) {
         errors.push(`Invalid role. Allowed roles: ${allowedRoles.join(', ')}`);
       }
+    }
+
+    // RoleId validation if provided
+    if (data.roleId && typeof data.roleId !== 'string') {
+      errors.push('Role ID must be a string');
     }
 
     return errors;
@@ -876,9 +1011,23 @@ class UserManagementController {
     const sanitized = {};
 
     // String fields that should be trimmed
-    const stringFields = ['email', 'firstName', 'lastName', 'role', 'clientId', 'departmentId'];
+    const stringFields = [
+      'email',
+      'firstName',
+      'lastName',
+      'role',
+      'roleId',
+      'clientId',
+      'departmentId',
+      'organizationId',
+    ];
     stringFields.forEach((field) => {
-      if (data[field] && typeof data[field] === 'string') {
+      // eslint-disable-next-line security/detect-object-injection
+      if (
+        Object.prototype.hasOwnProperty.call(data, field)
+        && typeof data[field] === 'string'
+      ) {
+        // eslint-disable-next-line security/detect-object-injection
         sanitized[field] = data[field].trim();
       }
     });
@@ -886,10 +1035,17 @@ class UserManagementController {
     // Boolean fields
     const booleanFields = ['active', 'emailVerified', 'mustChangePassword'];
     booleanFields.forEach((field) => {
-      if (data[field] !== undefined) {
+      // eslint-disable-next-line security/detect-object-injection
+      if (Object.prototype.hasOwnProperty.call(data, field)) {
+        // eslint-disable-next-line security/detect-object-injection
         sanitized[field] = Boolean(data[field]);
       }
     });
+
+    // Object fields (for contextual data)
+    if (data.contextualData && typeof data.contextualData === 'object') {
+      sanitized.contextualData = data.contextualData;
+    }
 
     // Password field (handled specially)
     if (data.password && typeof data.password === 'string') {
@@ -900,78 +1056,34 @@ class UserManagementController {
   }
 
   /**
-   * Check if current user can view users with specified role.
-   * @param {object} currentUser - Current authenticated user object.
-   * @param {string} targetRole - Target role for authorization check.
+   * DEPRECATED: Permission checking moved to middleware.
+   * This method is kept for backward compatibility but will be removed.
+   * @deprecated Use middleware-based permission checking instead.
+   * @returns {boolean} Always returns true as permissions are now handled by middleware.
    * @example
-   * // Usage example
-   * const result = await canViewUsers({ currentUser: 'example', targetRole: 'example' });
-   * // Returns: operation result
-   * // controller.methodName(req, res)
-   * // Handles HTTP request and sends appropriate response
-   * // Example usage:
-   * // const result = await methodName(params);
-   * // console.log(result);
-   * @returns {boolean} - Boolean result Operation result.
+   * // Legacy permission check - now handled by middleware
+   * const canView = controller.canViewUsers();
+   * // Returns: true
    */
-  canViewUsers(currentUser, targetRole) {
-    const roleHierarchy = {
-      superadmin: 7,
-      admin: 6,
-      client: 5,
-      department_manager: 4,
-      employee: 3,
-      driver: 2,
-      guest: 1,
-    };
-
-    // Role levels available for future permissions logic if needed
-    // eslint-disable-next-line no-unused-vars
-    const currentLevel = roleHierarchy[currentUser.role] || 0;
-
-    // Superadmin can view everything
-    if (currentUser.role === 'superadmin') {
-      return true;
-    }
-
-    // Admin can view all except superadmin
-    if (currentUser.role === 'admin') {
-      return !targetRole || targetRole !== 'superadmin';
-    }
-
-    // Client can view their own company employees
-    if (currentUser.role === 'client') {
-      return !targetRole || ['employee', 'department_manager'].includes(targetRole);
-    }
-
-    // Department manager can view employees
-    if (currentUser.role === 'department_manager') {
-      return !targetRole || targetRole === 'employee';
-    }
-
-    // Lower roles can only view their own profile
-    return false;
+  canViewUsers() {
+    // Permission checking now handled by middleware
+    return true;
   }
 
   /**
    * Generate secure random password.
+   * @returns {string} Generated secure password.
    * @example
-   * // Usage example
-   * const result = await generateSecurePassword({ currentUser: 'example', targetRole: 'example' });
-   * // Returns: operation result
-   * // controller.methodName(req, res)
-   * // Handles HTTP request and sends appropriate response
-   * // Example usage:
-   * // const result = await methodName(params);
-   * // console.log(result);
-   * @returns {*} - Operation result.
+   * // Generate a secure password for new user
+   * const password = controller.generateSecurePassword();
+   * // Returns: 'aBcD3fGh!jKl'
    */
   generateSecurePassword() {
     const length = 12;
     const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
     let password = '';
 
-    for (let i = 0; i < length; i++) {
+    for (let i = 0; i < length; i += 1) {
       password += charset.charAt(Math.floor(Math.random() * charset.length));
     }
 
@@ -981,19 +1093,14 @@ class UserManagementController {
   /**
    * Send successful response.
    * @param {object} res - Express response object.
-   * @param {object} data - Data object.
-   * @param {string} message - Message string.
-   * @param {*} statusCode - StatusCode parameter.
+   * @param {object} data - Response data to send.
+   * @param {string} [message] - Success message.
+   * @param {number} [statusCode] - HTTP status code.
+   * @returns {void}
    * @example
-   * // Usage example
-   * const result = await sendSuccess({ data: 'example', message: 'example', statusCode: 'example' });
-   * // Returns: operation result
-   * // controller.methodName(req, res)
-   * // Handles HTTP request and sends appropriate response
-   * // Example usage:
-   * // const result = await methodName(params);
-   * // console.log(result);
-   * @returns {*} - Operation result.
+   * // Send success response with user data
+   * this.sendSuccess(res, { user: userData }, 'User created successfully', 201);
+   * // Sends: { success: true, message: '...', data: {...}, timestamp: '...' }
    */
   sendSuccess(res, data, message = 'Success', statusCode = 200) {
     res.status(statusCode).json({
@@ -1007,19 +1114,14 @@ class UserManagementController {
   /**
    * Send error response.
    * @param {object} res - Express response object.
-   * @param {string} message - Message string.
-   * @param {*} statusCode - StatusCode parameter.
-   * @param {*} details - Details parameter.
+   * @param {string} message - Error message.
+   * @param {number} [statusCode] - HTTP status code.
+   * @param {object|null} [details] - Additional error details.
+   * @returns {void}
    * @example
-   * // Usage example
-   * const result = await sendError({ message: 'example', statusCode: 'example', details: 'example' });
-   * // Returns: operation result
-   * // controller.methodName(req, res)
-   * // Handles HTTP request and sends appropriate response
-   * // Example usage:
-   * // const result = await methodName(params);
-   * // console.log(result);
-   * @returns {*} - Operation result.
+   * // Send error response
+   * this.sendError(res, 'User not found', 404);
+   * // Sends: { success: false, error: 'User not found', timestamp: '...' }
    */
   sendError(res, message, statusCode = 500, details = null) {
     const response = {

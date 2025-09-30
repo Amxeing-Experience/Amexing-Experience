@@ -1,0 +1,281 @@
+<%
+/**
+ * Sidebar Navigation Organism
+ * Main sidebar navigation container with role-based menu structure
+ *
+ * @param {string} userRole - Current user role
+ * @param {string} currentPath - Current page path for active states
+ * @param {object} user - Current user object
+ */
+
+// Default parameters
+const sidebarUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
+const sidebarCurrentPath = typeof currentPath !== 'undefined' ? currentPath : '';
+const sidebarUser = typeof user !== 'undefined' ? user : {};
+
+// Role-based branding colors
+const roleColors = {
+    superadmin: { primary: '#ff6b6b', secondary: '#4ecdc4' },
+    admin: { primary: '#5d87ff', secondary: '#49beff' },
+    client: { primary: '#8b5cf6', secondary: '#ec4899' },
+    department_manager: { primary: '#10b981', secondary: '#3b82f6' },
+    employee: { primary: '#06b6d4', secondary: '#8b5cf6' },
+    driver: { primary: '#f59e0b', secondary: '#ef4444' },
+    guest: { primary: '#6b7280', secondary: '#9ca3af' }
+};
+
+const colors = roleColors[sidebarUserRole] || roleColors.guest;
+
+// Helper function to determine if menu item is active
+function isActiveMenuItem(itemPath, currentPath) {
+    // Exact match only - no prefix matching
+    // This prevents '/dashboard/superadmin' from matching '/dashboard/superadmin/users'
+    return itemPath === currentPath;
+}
+%>
+
+<!-- Sidebar Start -->
+<aside class="left-sidebar">
+    <!-- Sidebar scroll-->
+    <div>
+        <!-- Brand Logo -->
+        <div class="brand-logo d-flex align-items-center justify-content-between p-3">
+            <a href="/dashboard/<%= sidebarUserRole %>" class="text-nowrap brand-logo-link">
+                <img src="/dashboard/images/logos/amexing-logo.svg" width="140" alt="Amexing Logo" class="img-fluid" />
+            </a>
+            <div class="close-btn d-xl-none d-block sidebartoggler cursor-pointer" id="sidebarCollapse">
+                <i class="ti ti-x fs-8"></i>
+            </div>
+        </div>
+
+        <!-- Sidebar navigation-->
+        <nav class="sidebar-nav scroll-sidebar" data-simplebar="">
+            <!-- Include Menu Items by Role -->
+            <%- include('./sidebar-menu', {
+                userRole: sidebarUserRole,
+                currentPath: sidebarCurrentPath,
+                colors: colors,
+                isActiveMenuItem: isActiveMenuItem
+            }) %>
+        </nav>
+        <!-- End Sidebar navigation -->
+    </div>
+    <!-- End Sidebar scroll-->
+</aside>
+<!-- Sidebar End -->
+
+<style>
+    /* Sidebar Base Styles */
+    .left-sidebar {
+        background: #fff;
+        border-right: 1px solid #e0e6ed;
+        box-shadow: 2px 0 10px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+        width: 270px;
+        position: fixed;
+        top: 0;
+        left: 0;
+        height: 100vh;
+        z-index: 1030;
+        overflow: hidden;
+    }
+
+    /* Brand Logo Styles */
+    .brand-logo-link {
+        text-decoration: none;
+        transition: opacity 0.3s ease;
+    }
+
+    .brand-logo-link:hover {
+        opacity: 0.8;
+    }
+
+    /* Sidebar Navigation */
+    .sidebar-nav {
+        height: calc(100vh - 120px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-bottom: 2rem;
+    }
+
+    /* Close Button */
+    .close-btn {
+        display: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #f8f9fa;
+        border: 1px solid #e0e6ed;
+        color: #6c757d;
+        transition: all 0.3s ease;
+    }
+
+    .close-btn:hover {
+        background: #e9ecef;
+        color: #495057;
+    }
+
+    /* Responsive Sidebar */
+    @media (max-width: 991.98px) {
+        .left-sidebar {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            z-index: 1050;
+        }
+
+        .left-sidebar.show {
+            transform: translateX(0);
+        }
+
+        .close-btn {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Overlay for mobile */
+        .left-sidebar.show::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.5);
+            z-index: -1;
+        }
+    }
+
+    /* Custom Scrollbar */
+    .scroll-sidebar::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .scroll-sidebar::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scroll-sidebar::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.1);
+        border-radius: 3px;
+    }
+
+    .scroll-sidebar::-webkit-scrollbar-thumb:hover {
+        background: rgba(0,0,0,0.2);
+    }
+
+    /* Main content adjustment when sidebar is visible */
+    @media (min-width: 992px) {
+        .main-wrapper {
+            margin-left: 270px;
+        }
+
+        .main-wrapper.sidebar-collapsed {
+            margin-left: 0;
+        }
+
+        .left-sidebar.collapsed {
+            width: 80px;
+        }
+
+        .left-sidebar.collapsed .hide-menu {
+            display: none;
+        }
+
+        .left-sidebar.collapsed .brand-logo img {
+            width: 40px;
+        }
+    }
+
+    /* Sidebar themes */
+    .left-sidebar.dark-theme {
+        background: #2a3547;
+        border-right-color: #3a4553;
+    }
+
+    .left-sidebar.dark-theme .brand-logo-link {
+        color: #fff;
+    }
+
+    /* Animation improvements */
+    .sidebar-nav * {
+        transition: all 0.3s ease;
+    }
+
+    /* Loading state */
+    .sidebar-loading {
+        pointer-events: none;
+        opacity: 0.7;
+    }
+
+    .sidebar-loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 20px;
+        height: 20px;
+        border: 2px solid transparent;
+        border-top: 2px solid <%= colors.primary %>;
+        border-radius: 50%;
+        animation: sidebar-loading-spin 1s linear infinite;
+        transform: translate(-50%, -50%);
+        z-index: 10;
+    }
+
+    @keyframes sidebar-loading-spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+</style>
+
+<script>
+// Sidebar JavaScript functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebar = document.querySelector('.left-sidebar');
+    const sidebarToggle = document.querySelector('#sidebarCollapse');
+    const mainWrapper = document.querySelector('.main-wrapper');
+
+    // Sidebar toggle functionality
+    if (sidebarToggle && sidebar) {
+        sidebarToggle.addEventListener('click', function() {
+            if (window.innerWidth <= 991.98) {
+                sidebar.classList.toggle('show');
+            } else {
+                sidebar.classList.toggle('collapsed');
+                if (mainWrapper) {
+                    mainWrapper.classList.toggle('sidebar-collapsed');
+                }
+            }
+        });
+    }
+
+    // Close sidebar on overlay click (mobile)
+    document.addEventListener('click', function(e) {
+        if (window.innerWidth <= 991.98 &&
+            sidebar &&
+            !sidebar.contains(e.target) &&
+            !sidebarToggle?.contains(e.target) &&
+            sidebar.classList.contains('show')) {
+            sidebar.classList.remove('show');
+        }
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', function() {
+        if (window.innerWidth > 991.98 && sidebar) {
+            sidebar.classList.remove('show');
+        }
+    });
+
+    // Handle confirmation dialogs for logout
+    document.querySelectorAll('[data-confirm]').forEach(function(element) {
+        element.addEventListener('click', function(e) {
+            const message = this.dataset.confirm;
+            if (!confirm(message)) {
+                e.preventDefault();
+            }
+        });
+    });
+});
+</script>

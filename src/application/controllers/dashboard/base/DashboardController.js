@@ -1,5 +1,6 @@
 const BaseController = require('./BaseController');
 const logger = require('../../../../infrastructure/logger');
+const AmexingUser = require('../../../../domain/models/AmexingUser');
 
 /**
  * DashboardController - Open/Closed Principle (OCP)
@@ -47,12 +48,8 @@ class DashboardController extends BaseController {
 
   /**
    * Get dashboard statistics (to be overridden by child classes).
-   * @param {string} userId - User unique identifier.
-   * @param {*} role - Role parameter.
-   * @param {*} userId - _userId parameter.
-   * @param {*} role - _role parameter.
-   * @param _userId
-   * @param _role
+   * @param {string} _userId - User unique identifier (unused parameter).
+   * @param {*} _role - Role parameter (unused parameter).
    * @example
    * // GET endpoint example
    * const result = await DashboardController.getNotifications(req, res);
@@ -93,7 +90,11 @@ class DashboardController extends BaseController {
         ...additionalData,
         stats,
         user: req.user || {
-          id: '', role: 'guest', email: '', clientId: '', departmentId: '',
+          id: '',
+          role: 'guest',
+          email: '',
+          clientId: '',
+          departmentId: '',
         },
         userRole: req.user?.role || 'guest',
         userName: req.user?.name || 'Guest User',
@@ -110,17 +111,12 @@ class DashboardController extends BaseController {
 
   /**
    * Build breadcrumb navigation.
-   * @param {*} path - Path parameter.
-   * @param {*} role - Role parameter.
-   * @param {*} role - _role parameter.
-   * @param _role
+   * @param {string} path - The URL path to build breadcrumbs from.
+   * @param {string} _role - The user's role (unused parameter).
    * @example
-   * // Usage example
-   * const result = await buildBreadcrumb({ path: 'example', _role: 'example' });
-   * // Returns: operation result
-   * // controller.methodName(req, res)
-   * // Handles HTTP request and sends appropriate response
-   * @returns {object} - Operation result.
+   * // Build breadcrumbs for admin users page
+   * const breadcrumbs = buildBreadcrumb('/dashboard/admin/users', 'admin');
+   * @returns {object|null} - Breadcrumb navigation object or null if path is too short.
    */
   buildBreadcrumb(path, _role) {
     const pathParts = path.split('/').filter((part) => part);
@@ -131,7 +127,8 @@ class DashboardController extends BaseController {
     }
 
     // Skip 'dashboard' and role parts, build from the rest
-    for (let i = 2; i < pathParts.length; i++) {
+    for (let i = 2; i < pathParts.length; i += 1) {
+      // eslint-disable-next-line security/detect-object-injection
       const name = pathParts[i]
         .replace(/-/g, ' ')
         .replace(/_/g, ' ')
@@ -157,19 +154,12 @@ class DashboardController extends BaseController {
 
   /**
    * Get notifications for dashboard.
-   * @param {string} userId - User unique identifier.
-   * @param {*} role - Role parameter.
-   * @param {*} userId - _userId parameter.
-   * @param {*} role - _role parameter.
-   * @param _userId
-   * @param _role
+   * @param {string} _userId - User unique identifier (unused parameter).
+   * @param {string} _role - User role (unused parameter).
    * @example
-   * // GET endpoint example
-   * const result = await DashboardController.getNotifications(req, res);
-   * // Returns: { success: true, data: {...}, message: 'Success' }
-   * // controller.methodName(req, res)
-   * // Handles HTTP request and sends appropriate response
-   * @returns {Promise<object>} - Promise resolving to operation result.
+   * // Get notifications for a user
+   * const notifications = await getNotifications('user123', 'admin');
+   * @returns {Promise<Array>} - Promise resolving to array of notifications.
    */
   async getNotifications(_userId, _role) {
     // Default implementation - can be overridden
@@ -178,16 +168,11 @@ class DashboardController extends BaseController {
 
   /**
    * Get quick actions based on role.
-   * @param {*} role - Role parameter.
-   * @param {*} role - _role parameter.
-   * @param _role
+   * @param {string} _role - User role (unused parameter).
    * @example
-   * // GET endpoint example
-   * const result = await DashboardController.getNotifications(req, res);
-   * // Returns: { success: true, data: {...}, message: 'Success' }
-   * // controller.methodName(req, res)
-   * // Handles HTTP request and sends appropriate response
-   * @returns {Array} - Array of results Operation result.
+   * // Get quick actions for admin role
+   * const actions = getQuickActions('admin');
+   * @returns {Array} - Array of quick action objects.
    */
   getQuickActions(_role) {
     // Default implementation - can be overridden
@@ -229,13 +214,14 @@ class DashboardController extends BaseController {
    * // Handles HTTP request and sends appropriate response
    * @returns {boolean} - Boolean result Operation result.
    */
-  hasPermission(user, permission) {
+  async hasPermission(user, permission) {
     if (!user || !user.permissions) {
       return false;
     }
 
-    // Super admin has all permissions
-    if (user.role === 'superadmin') {
+    // Super admin has all permissions - check both string role and role object
+    const hasSupperAdminRole = await this.hasRole(user, 'superadmin');
+    if (hasSupperAdminRole) {
       return true;
     }
 
@@ -277,6 +263,44 @@ class DashboardController extends BaseController {
     }
 
     return filters;
+  }
+
+  /**
+   * Helper method to check if user has a specific role.
+   * Supports both string roles and Pointer relationships.
+   * @param {object} user - User object.
+   * @param {string} roleName - Role name to check.
+   * @returns {Promise<boolean>} - True if user has the role.
+   * @example
+   */
+  async hasRole(user, roleName) {
+    try {
+      // Check string role field (backward compatibility)
+      if (user.role === roleName) {
+        return true;
+      }
+
+      // Check roleId from AmexingUser model
+      if (user.roleId) {
+        // If we have access to the user's role object, check it
+        const amexingUser = new AmexingUser();
+        amexingUser.id = user.id;
+        amexingUser.set('roleId', user.roleId);
+
+        const role = await amexingUser.getRole();
+        return role && role.get('name') === roleName;
+      }
+
+      return false;
+    } catch (error) {
+      logger.error('Error checking user role in DashboardController', {
+        userId: user.id,
+        roleName,
+        error: error.message,
+      });
+      // Fallback to string comparison for safety
+      return user.role === roleName;
+    }
   }
 }
 

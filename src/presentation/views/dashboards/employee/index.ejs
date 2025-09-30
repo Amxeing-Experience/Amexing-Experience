@@ -23,7 +23,7 @@
 <!-- Quick Stats -->
 <div class="row">
     <div class="col-md-6 col-lg-3">
-        <%- include('../../components/cards/stats', {
+        <%- include('../../atoms/dashboard/stats-card', {
             icon: 'ti ti-calendar-event',
             title: 'Upcoming Trips',
             value: typeof stats !== 'undefined' ? stats.upcomingTrips : '3',
@@ -33,7 +33,7 @@
         }) %>
     </div>
     <div class="col-md-6 col-lg-3">
-        <%- include('../../components/cards/stats', {
+        <%- include('../../atoms/dashboard/stats-card', {
             icon: 'ti ti-route',
             title: 'Completed Trips',
             value: typeof stats !== 'undefined' ? stats.completedTrips : '45',
@@ -43,7 +43,7 @@
         }) %>
     </div>
     <div class="col-md-6 col-lg-3">
-        <%- include('../../components/cards/stats', {
+        <%- include('../../atoms/dashboard/stats-card', {
             icon: 'ti ti-wallet',
             title: 'Budget Used',
             value: '$' + (typeof stats !== 'undefined' ? stats.budgetUsed : '320'),
@@ -53,7 +53,7 @@
         }) %>
     </div>
     <div class="col-md-6 col-lg-3">
-        <%- include('../../components/cards/stats', {
+        <%- include('../../atoms/dashboard/stats-card', {
             icon: 'ti ti-bookmark',
             title: 'Saved Routes',
             value: typeof stats !== 'undefined' ? stats.savedRoutes : '5',

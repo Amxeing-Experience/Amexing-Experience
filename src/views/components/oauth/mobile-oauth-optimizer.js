@@ -37,16 +37,22 @@ class MobileOAuthOptimizer {
     this.setupAccessibility();
 
     // eslint-disable-next-line no-console
-    console.log('Mobile OAuth Optimizer initialized for', this.getDeviceType());
   }
 
   detectMobileDevice() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-               || window.innerWidth <= 768;
+    return (
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      ) || window.innerWidth <= 768
+    );
   }
 
   detectTabletDevice() {
-    return /iPad|Android/i.test(navigator.userAgent) && window.innerWidth >= 768 && window.innerWidth <= 1024;
+    return (
+      /iPad|Android/i.test(navigator.userAgent)
+      && window.innerWidth >= 768
+      && window.innerWidth <= 1024
+    );
   }
 
   detectOrientation() {
@@ -73,7 +79,9 @@ class MobileOAuthOptimizer {
   optimizeLoadingExperience() {
     if (!this.options.adaptiveLoading) return;
 
-    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
+    const oauthContainer = document.querySelector(
+      '#oauth-container, .oauth-container'
+    );
     if (!oauthContainer) return;
 
     const skeleton = this.createMobileLoadingSkeleton();
@@ -149,7 +157,9 @@ class MobileOAuthOptimizer {
   }
 
   optimizeButtonTouchTargets() {
-    const buttons = document.querySelectorAll('.oauth-btn, .btn, button[type="submit"]');
+    const buttons = document.querySelectorAll(
+      '.oauth-btn, .btn, button[type="submit"]'
+    );
     buttons.forEach((button) => {
       const computedStyle = window.getComputedStyle(button);
       const minSize = 44;
@@ -161,7 +171,11 @@ class MobileOAuthOptimizer {
         button.style.justifyContent = 'center';
       }
 
-      if (parseInt(computedStyle.paddingTop) + parseInt(computedStyle.paddingBottom) < 12) {
+      if (
+        parseInt(computedStyle.paddingTop)
+          + parseInt(computedStyle.paddingBottom)
+        < 12
+      ) {
         button.style.padding = `12px ${computedStyle.paddingLeft || '16px'}`;
       }
     });
@@ -171,30 +185,38 @@ class MobileOAuthOptimizer {
     let touchStartTime = 0;
     let touchStartTarget = null;
 
-    document.addEventListener('touchstart', (e) => {
-      touchStartTime = Date.now();
-      touchStartTarget = e.target.closest('.oauth-btn, .btn, button');
+    document.addEventListener(
+      'touchstart',
+      (e) => {
+        touchStartTime = Date.now();
+        touchStartTarget = e.target.closest('.oauth-btn, .btn, button');
 
-      if (touchStartTarget) {
-        touchStartTarget.classList.add('touch-active');
-      }
-    }, { passive: true });
+        if (touchStartTarget) {
+          touchStartTarget.classList.add('touch-active');
+        }
+      },
+      { passive: true }
+    );
 
-    document.addEventListener('touchend', (e) => {
-      const touchEndTime = Date.now();
-      const touchDuration = touchEndTime - touchStartTime;
+    document.addEventListener(
+      'touchend',
+      (e) => {
+        const touchEndTime = Date.now();
+        const touchDuration = touchEndTime - touchStartTime;
 
-      if (touchStartTarget) {
-        setTimeout(() => {
-          touchStartTarget.classList.remove('touch-active');
-        }, 150);
-      }
+        if (touchStartTarget) {
+          setTimeout(() => {
+            touchStartTarget.classList.remove('touch-active');
+          }, 150);
+        }
 
-      if (touchDuration < this.options.fastTapThreshold && touchStartTarget) {
-        e.preventDefault();
-        this.triggerFastTap(touchStartTarget);
-      }
-    }, { passive: false });
+        if (touchDuration < this.options.fastTapThreshold && touchStartTarget) {
+          e.preventDefault();
+          this.triggerFastTap(touchStartTarget);
+        }
+      },
+      { passive: false }
+    );
 
     document.addEventListener('touchcancel', () => {
       if (touchStartTarget) {
@@ -278,7 +300,9 @@ class MobileOAuthOptimizer {
   }
 
   adjustForOrientation(orientation) {
-    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
+    const oauthContainer = document.querySelector(
+      '#oauth-container, .oauth-container'
+    );
     if (!oauthContainer) return;
 
     oauthContainer.classList.remove('portrait', 'landscape');
@@ -295,7 +319,9 @@ class MobileOAuthOptimizer {
     const style = document.createElement('style');
     style.id = 'oauth-landscape-optimizations';
 
-    const existingStyle = document.getElementById('oauth-landscape-optimizations');
+    const existingStyle = document.getElementById(
+      'oauth-landscape-optimizations'
+    );
     if (existingStyle) existingStyle.remove();
 
     style.textContent = `
@@ -330,18 +356,24 @@ class MobileOAuthOptimizer {
   }
 
   optimizeForPortrait() {
-    const landscapeStyle = document.getElementById('oauth-landscape-optimizations');
+    const landscapeStyle = document.getElementById(
+      'oauth-landscape-optimizations'
+    );
     if (landscapeStyle) {
       landscapeStyle.remove();
     }
   }
 
   setupKeyboardHandling() {
-    const initialViewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const initialViewportHeight = window.visualViewport
+      ? window.visualViewport.height
+      : window.innerHeight;
     let keyboardVisible = false;
 
     const handleViewportChange = () => {
-      const currentHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      const currentHeight = window.visualViewport
+        ? window.visualViewport.height
+        : window.innerHeight;
       const heightDifference = initialViewportHeight - currentHeight;
 
       const wasKeyboardVisible = _keyboardVisible; // eslint-disable-line no-undef
@@ -368,7 +400,9 @@ class MobileOAuthOptimizer {
   }
 
   adjustForKeyboard(visible) {
-    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
+    const oauthContainer = document.querySelector(
+      '#oauth-container, .oauth-container'
+    );
     if (!oauthContainer) return;
 
     if (visible) {
@@ -384,7 +418,9 @@ class MobileOAuthOptimizer {
     if (!inputElement || !this.isMobile) return;
 
     const rect = inputElement.getBoundingClientRect();
-    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    const viewportHeight = window.visualViewport
+      ? window.visualViewport.height
+      : window.innerHeight;
 
     if (rect.bottom > viewportHeight * 0.6) {
       inputElement.scrollIntoView({
@@ -413,7 +449,9 @@ class MobileOAuthOptimizer {
   }
 
   addBiometricOption() {
-    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
+    const oauthContainer = document.querySelector(
+      '#oauth-container, .oauth-container'
+    );
     const providersContainer = oauthContainer?.querySelector('.oauth-providers');
 
     if (!providersContainer) return;
@@ -494,7 +532,7 @@ class MobileOAuthOptimizer {
 
   setupKeyboardNavigation() {
     document.addEventListener('keydown', (e) => {
-      if (e._key === 'Tab') { // eslint-disable-line no-underscore-dangle
+      if (e.key === 'Tab') {
         document.body.classList.add('keyboard-navigation');
       }
     });
@@ -541,7 +579,9 @@ class MobileOAuthOptimizer {
   }
 
   optimizeImages() {
-    const images = document.querySelectorAll('.oauth-provider-logo , .oauth-btn img');
+    const images = document.querySelectorAll(
+      '.oauth-provider-logo , .oauth-btn img'
+    );
 
     images.forEach((img) => {
       if (!img.loading) {
@@ -555,7 +595,9 @@ class MobileOAuthOptimizer {
   }
 
   deferNonCriticalScripts() {
-    const nonCriticalScripts = document.querySelectorAll('script[data-defer-mobile]');
+    const nonCriticalScripts = document.querySelectorAll(
+      'script[data-defer-mobile]'
+    );
 
     if (this.isMobile || this.isTablet) {
       nonCriticalScripts.forEach((script) => {
@@ -584,7 +626,9 @@ class MobileOAuthOptimizer {
   }
 
   destroy() {
-    const styles = document.querySelectorAll('style[id*="oauth-"], style[id*="mobile-oauth"]');
+    const styles = document.querySelectorAll(
+      'style[id*="oauth-"], style[id*="mobile-oauth"]'
+    );
     styles.forEach((style) => style.remove());
 
     // eslint-disable-next-line no-console

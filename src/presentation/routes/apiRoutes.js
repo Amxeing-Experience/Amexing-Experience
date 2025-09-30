@@ -56,20 +56,41 @@ const NotificationsController = require('../../application/controllers/api/Notif
 
 router.use('/users', userManagementRoutes);
 
-// Notifications endpoints
-router.get('/notifications', NotificationsController.getNotifications);
-router.patch('/notifications/:notificationId/read', NotificationsController.markAsRead);
-router.patch('/notifications/mark-all-read', NotificationsController.markAllAsRead);
+// Notifications endpoints - require basic user permissions
+router.get(
+  '/notifications',
+  jwtMiddleware.requirePermission('notifications.read'),
+  NotificationsController.getNotifications
+);
+router.patch(
+  '/notifications/:notificationId/read',
+  jwtMiddleware.requirePermission('notifications.update'),
+  NotificationsController.markAsRead
+);
+router.patch(
+  '/notifications/mark-all-read',
+  jwtMiddleware.requirePermission('notifications.update'),
+  NotificationsController.markAllAsRead
+);
 
-// User endpoints
-router.get('/user/profile', apiController.getUserProfile);
+// User endpoints - profile access
+router.get(
+  '/user/profile',
+  jwtMiddleware.requirePermission('profile.read'),
+  apiController.getUserProfile
+);
 router.put(
   '/user/profile',
   validationMiddleware.validateUpdateProfile,
+  jwtMiddleware.requirePermission('profile.update'),
   apiController.updateUserProfile
 );
 
-// Example data endpoint
-router.get('/data', apiController.getData);
+// Example data endpoint - basic access
+router.get(
+  '/data',
+  jwtMiddleware.requireRoleLevel(1), // Any authenticated user
+  apiController.getData
+);
 
 module.exports = router;

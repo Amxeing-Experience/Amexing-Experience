@@ -1,0 +1,79 @@
+<%
+/**
+ * Textarea Atom
+ * Reusable textarea component with consistent styling
+ *
+ * @param {string} name - Input name attribute
+ * @param {string} id - Input ID attribute
+ * @param {string} value - Textarea content
+ * @param {string} placeholder - Placeholder text
+ * @param {number} rows - Number of visible text lines
+ * @param {boolean} disabled - Whether textarea is disabled
+ * @param {boolean} readonly - Whether textarea is read-only
+ * @param {boolean} required - Whether textarea is required
+ * @param {string} size - Textarea size (sm, default, lg)
+ * @param {string} resize - Resize behavior (none, vertical, horizontal, both)
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const textareaName = typeof name !== 'undefined' ? name : '';
+const textareaId = typeof id !== 'undefined' ? id : `textarea-${Math.random().toString(36).substr(2, 9)}`;
+const textareaValue = typeof value !== 'undefined' ? value : '';
+const textareaPlaceholder = typeof placeholder !== 'undefined' ? placeholder : '';
+const textareaRows = typeof rows !== 'undefined' ? rows : 3;
+const textareaDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const textareaReadonly = typeof readonly !== 'undefined' ? readonly : false;
+const textareaRequired = typeof required !== 'undefined' ? required : false;
+const textareaSize = typeof size !== 'undefined' ? size : 'default';
+const textareaResize = typeof resize !== 'undefined' ? resize : 'vertical';
+const textareaAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const textareaAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build classes
+let textareaClasses = ['form-control'];
+
+if (textareaSize === 'sm') {
+    textareaClasses.push('form-control-sm');
+} else if (textareaSize === 'lg') {
+    textareaClasses.push('form-control-lg');
+}
+
+if (textareaAdditionalClasses) {
+    textareaClasses.push(textareaAdditionalClasses);
+}
+
+// Build style for resize
+let resizeStyle = '';
+if (textareaResize === 'none') {
+    resizeStyle = 'resize: none;';
+} else if (textareaResize === 'horizontal') {
+    resizeStyle = 'resize: horizontal;';
+} else if (textareaResize === 'both') {
+    resizeStyle = 'resize: both;';
+} else {
+    resizeStyle = 'resize: vertical;';
+}
+
+// Build attributes string
+let attributesString = '';
+if (textareaAttributes && typeof textareaAttributes === 'object') {
+    attributesString = Object.entries(textareaAttributes)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+}
+
+const finalClasses = textareaClasses.join(' ');
+%>
+
+<textarea class="<%= finalClasses %>"
+          id="<%= textareaId %>"
+          <% if (textareaName) { %>name="<%= textareaName %>"<% } %>
+          <% if (textareaPlaceholder) { %>placeholder="<%= textareaPlaceholder %>"<% } %>
+          rows="<%= textareaRows %>"
+          <% if (textareaDisabled) { %>disabled<% } %>
+          <% if (textareaReadonly) { %>readonly<% } %>
+          <% if (textareaRequired) { %>required<% } %>
+          <% if (resizeStyle) { %>style="<%= resizeStyle %>"<% } %>
+          <% if (attributesString) { %><%= attributesString %><% } %>><%= textareaValue %></textarea>

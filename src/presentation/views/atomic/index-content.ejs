@@ -1,0 +1,287 @@
+<!-- Welcome Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-preview text-center py-5">
+                <div class="mb-4">
+                    <i class="ti ti-atom" style="font-size: 4rem; color: var(--atomic-primary);"></i>
+                </div>
+                <h2 class="component-title mb-3">Welcome to the Atomic Design System</h2>
+                <p class="component-description lead">
+                    Explore our comprehensive collection of reusable components built with atomic design principles.
+                    Each component is documented with examples, parameters, and usage guidelines.
+                </p>
+                <div class="row justify-content-center mt-4">
+                    <div class="col-auto">
+                        <div class="stats-card mx-2">
+                            <div class="stats-number text-primary"><%= totalComponents %></div>
+                            <div class="stats-label">Total Components</div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="stats-card mx-2">
+                            <div class="stats-number text-success">10</div>
+                            <div class="stats-label">Atoms</div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="stats-card mx-2">
+                            <div class="stats-number text-info">8</div>
+                            <div class="stats-label">Molecules</div>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="stats-card mx-2">
+                            <div class="stats-number text-warning">7</div>
+                            <div class="stats-label">Organisms</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Categories Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="mb-4">Component Categories</h3>
+        <p class="text-muted mb-4">
+            Browse components organized by their intended use and complexity level.
+        </p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <% categories.forEach(category => { %>
+        <div class="col-lg-4 col-md-6">
+            <a href="/atomic/<%= category.slug %>" class="category-card">
+                <div class="category-icon" style="background-color: <%= category.color %>15; color: <%= category.color %>;">
+                    <i class="<%= category.icon %>"></i>
+                </div>
+                <h4 class="category-title"><%= category.name %></h4>
+                <p class="category-description"><%= category.description %></p>
+                <div class="category-stats">
+                    <div class="category-stat">
+                        <span class="number" style="color: #28a745;"><%= category.stats.atoms %></span>
+                        <span class="label">Atoms</span>
+                    </div>
+                    <div class="category-stat">
+                        <span class="number" style="color: #17a2b8;"><%= category.stats.molecules %></span>
+                        <span class="label">Molecules</span>
+                    </div>
+                    <div class="category-stat">
+                        <span class="number" style="color: #ffc107;"><%= category.stats.organisms %></span>
+                        <span class="label">Organisms</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Atomic Design Methodology -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Atomic Design Methodology</h3>
+                <p class="component-description">
+                    Understanding the hierarchy and principles behind our component system
+                </p>
+            </div>
+            <div class="component-preview">
+                <div class="row g-4">
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <div class="mb-3">
+                                <i class="ti ti-circle-dot" style="font-size: 3rem; color: #28a745;"></i>
+                            </div>
+                            <h5 style="color: #28a745;">Atoms</h5>
+                            <p class="small text-muted">
+                                Basic building blocks that can't be broken down further without losing meaning.
+                                Examples: buttons, inputs, icons, labels.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <div class="mb-3">
+                                <i class="ti ti-molecules" style="font-size: 3rem; color: #17a2b8;"></i>
+                            </div>
+                            <h5 style="color: #17a2b8;">Molecules</h5>
+                            <p class="small text-muted">
+                                Groups of atoms bonded together to create simple components.
+                                Examples: forms, navigation items, user cards.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <div class="mb-3">
+                                <i class="ti ti-components" style="font-size: 3rem; color: #ffc107;"></i>
+                            </div>
+                            <h5 style="color: #ffc107;">Organisms</h5>
+                            <p class="small text-muted">
+                                Complex components made of molecules and atoms working together.
+                                Examples: headers, sidebars, data tables.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col-lg-3 col-md-6">
+                        <div class="text-center">
+                            <div class="mb-3">
+                                <i class="ti ti-layout-2" style="font-size: 3rem; color: #667eea;"></i>
+                            </div>
+                            <h5 style="color: #667eea;">Templates</h5>
+                            <p class="small text-muted">
+                                Page-level objects that place organisms into a layout structure.
+                                Examples: auth-layout, dashboard-layout.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Start Guide -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Quick Start Guide</h3>
+                <p class="component-description">
+                    How to use and contribute to the component system
+                </p>
+            </div>
+            <div class="component-preview">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <h5 class="text-primary mb-3">
+                            <i class="ti ti-code me-2"></i>Using Components
+                        </h5>
+                        <ol class="list-group list-group-numbered list-group-flush">
+                            <li class="list-group-item border-0 px-0">
+                                <strong>Include the component:</strong>
+                                <code class="d-block mt-1 text-muted">&lt;%- include('atoms/auth/button', { text: 'Click me' }) %&gt;</code>
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <strong>Pass required parameters:</strong> Check component documentation for required and optional parameters
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <strong>Test the component:</strong> Use this showcase to verify behavior and styling
+                            </li>
+                        </ol>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="text-success mb-3">
+                            <i class="ti ti-plus me-2"></i>Creating Components
+                        </h5>
+                        <ol class="list-group list-group-numbered list-group-flush">
+                            <li class="list-group-item border-0 px-0">
+                                <strong>Choose the right level:</strong> Atom, molecule, or organism based on complexity
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <strong>Add JSDoc comments:</strong> Document parameters and usage examples
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <strong>Update showcase:</strong> Add your component to the appropriate category page
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Best Practices -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Component Best Practices</h3>
+                <p class="component-description">
+                    Guidelines for creating consistent and reusable components
+                </p>
+            </div>
+            <div class="component-preview">
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-puzzle text-primary mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Reusability</h6>
+                                <p class="card-text small">
+                                    Design components to be context-agnostic and reusable across different pages and sections.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-adjustments text-info mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Configurability</h6>
+                                <p class="card-text small">
+                                    Provide reasonable defaults but allow customization through well-defined parameters.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-accessible text-success mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Accessibility</h6>
+                                <p class="card-text small">
+                                    Include ARIA labels, proper semantic HTML, and keyboard navigation support.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Development Tools -->
+<div class="row">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Development Tools</h3>
+                <p class="component-description">
+                    Useful resources and tools for component development
+                </p>
+            </div>
+            <div class="component-preview">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <a href="https://docs.claude.com/en/docs/claude-code" class="btn btn-outline-primary w-100" target="_blank">
+                            <i class="ti ti-book me-2"></i>Documentation
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="https://tabler-icons.io/" class="btn btn-outline-info w-100" target="_blank">
+                            <i class="ti ti-icons me-2"></i>Tabler Icons
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="https://getbootstrap.com/docs/5.3" class="btn btn-outline-success w-100" target="_blank">
+                            <i class="ti ti-brand-bootstrap me-2"></i>Bootstrap 5
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="/docs" class="btn btn-outline-secondary w-100">
+                            <i class="ti ti-file-text me-2"></i>API Docs
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

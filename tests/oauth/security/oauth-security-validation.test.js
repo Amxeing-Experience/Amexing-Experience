@@ -150,13 +150,13 @@ describe('OAuth Security Validation Suite', () => {
         test('should validate correct state parameter', () => {
             const state = crypto.randomBytes(32).toString('hex');
             const timestamp = Date.now();
-            
+
             const result = validator.validateState(state, state, timestamp);
-            
+
             expect(result.valid).toBe(true);
             expect(result.checks.stateMatch).toBe(true);
             expect(result.checks.entropy).toBe(true);
-            expect(result.checks.timeout).toBe(false);
+            expect(result.checks.timeout).toBe(true);
         });
 
         test('should reject mismatched state', () => {

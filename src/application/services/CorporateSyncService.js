@@ -190,9 +190,18 @@ class CorporateSyncService {
       for (const employee of employees) {
         try {
           const user = employee.get('userId');
-          if (user && user.get('isOAuthUser') && user.get('oauthProvider') === primaryProvider) {
+          if (
+            user
+            && user.get('isOAuthUser')
+            && user.get('oauthProvider') === primaryProvider
+          ) {
             // eslint-disable-next-line no-await-in-loop
-            const syncResult = await this.syncEmployeeData(user, employee, client, primaryProvider);
+            const syncResult = await this.syncEmployeeData(
+              user,
+              employee,
+              client,
+              primaryProvider
+            );
 
             if (syncResult.success) {
               // eslint-disable-next-line no-plusplus
@@ -282,10 +291,14 @@ class CorporateSyncService {
       try {
         if (_provider === 'microsoft' && user.get('refreshToken')) {
           // Microsoft refresh token flow
-          refreshedProfile = await this.refreshMicrosoftUserData(user.get('refreshToken'));
+          refreshedProfile = await this.refreshMicrosoftUserData(
+            user.get('refreshToken')
+          );
         } else if (_provider === 'google' && user.get('refreshToken')) {
           // Google refresh token flow
-          refreshedProfile = await this.refreshGoogleUserData(user.get('refreshToken'));
+          refreshedProfile = await this.refreshGoogleUserData(
+            user.get('refreshToken')
+          );
         }
       } catch (refreshError) {
         // If refresh fails, we'll continue with existing data
@@ -300,7 +313,10 @@ class CorporateSyncService {
 
       // Check if user still exists in corporate directory
       let userStillActive = true;
-      if (currentProfile.error && currentProfile.error.includes('user not found')) {
+      if (
+        currentProfile.error
+        && currentProfile.error.includes('user not found')
+      ) {
         userStillActive = false;
       }
 
@@ -353,7 +369,10 @@ class CorporateSyncService {
 
       // Update user profile if we got refreshed data
       if (refreshedProfile) {
-        user.set('oauthProfile', CorporateOAuthService.encryptOAuthProfile(refreshedProfile));
+        user.set(
+          'oauthProfile',
+          CorporateOAuthService.encryptOAuthProfile(refreshedProfile)
+        );
         user.set('lastOAuthSync', new Date());
         await user.save(null, { useMasterKey: true });
       }
@@ -393,35 +412,45 @@ class CorporateSyncService {
       const tenantId = process.env.MICROSOFT_OAUTH_TENANT_ID || 'common';
 
       // Exchange refresh token for new access token
-      const tokenResponse = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          client_id: process.env.MICROSOFT_OAUTH_CLIENT_ID,
-          client_secret: process.env.MICROSOFT_OAUTH_CLIENT_SECRET,
-          grant_type: 'refreshtoken',
-          refreshtoken: refreshToken,
-          scope: 'openid profile email User.Read Directory.Read.All',
-        }),
-      });
+      const tokenResponse = await fetch(
+        `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            client_id: process.env.MICROSOFT_OAUTH_CLIENT_ID,
+            client_secret: process.env.MICROSOFT_OAUTH_CLIENT_SECRET,
+            grant_type: 'refreshtoken',
+            refreshtoken: refreshToken,
+            scope: 'openid profile email User.Read Directory.Read.All',
+          }),
+        }
+      );
 
       if (!tokenResponse.ok) {
-        throw new Error(`Microsoft token refresh failed: ${tokenResponse.status}`);
+        throw new Error(
+          `Microsoft token refresh failed: ${tokenResponse.status}`
+        );
       }
 
       const tokenData = await tokenResponse.json();
 
       // Get updated user profile
-      const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation', {
-        headers: {
-          Authorization: `Bearer ${tokenData.accesstoken}`,
-        },
-      });
+      const profileResponse = await fetch(
+        'https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation',
+        {
+          headers: {
+            Authorization: `Bearer ${tokenData.accesstoken}`,
+          },
+        }
+      );
 
       if (!profileResponse.ok) {
-        throw new Error(`Microsoft profile refresh failed: ${profileResponse.status}`);
+        throw new Error(
+          `Microsoft profile refresh failed: ${profileResponse.status}`
+        );
       }
 
       const profileData = await profileResponse.json();
@@ -473,14 +502,19 @@ class CorporateSyncService {
       const tokenData = await tokenResponse.json();
 
       // Get updated user profile
-      const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-        headers: {
-          Authorization: `Bearer ${tokenData.accesstoken}`,
-        },
-      });
+      const profileResponse = await fetch(
+        'https://www.googleapis.com/oauth2/v2/userinfo',
+        {
+          headers: {
+            Authorization: `Bearer ${tokenData.accesstoken}`,
+          },
+        }
+      );
 
       if (!profileResponse.ok) {
-        throw new Error(`Google profile refresh failed: ${profileResponse.status}`);
+        throw new Error(
+          `Google profile refresh failed: ${profileResponse.status}`
+        );
       }
 
       const profileData = await profileResponse.json();

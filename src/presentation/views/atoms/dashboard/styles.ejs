@@ -1,0 +1,112 @@
+<%
+/**
+ * Dashboard Styles Atom
+ * Global dashboard styles including role-specific theming
+ *
+ * @param {array} additionalStyles - Optional array of additional CSS files
+ * @param {string} userRole - Current user role for theming
+ */
+
+// Default parameters
+const dashboardAdditionalStyles = typeof additionalStyles !== 'undefined' ? additionalStyles : [];
+const dashboardUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
+
+// Role-specific color schemes
+const roleThemes = {
+    superadmin: { primary: '#ff6b6b', secondary: '#4ecdc4' },
+    admin: { primary: '#5d87ff', secondary: '#49beff' },
+    client: { primary: '#8b5cf6', secondary: '#ec4899' },
+    department_manager: { primary: '#10b981', secondary: '#3b82f6' },
+    employee: { primary: '#06b6d4', secondary: '#8b5cf6' },
+    driver: { primary: '#f59e0b', secondary: '#ef4444' },
+    guest: { primary: '#6b7280', secondary: '#9ca3af' }
+};
+
+const currentTheme = roleThemes[dashboardUserRole] || roleThemes.guest;
+%>
+
+<!-- Additional Styles -->
+<% if (dashboardAdditionalStyles && dashboardAdditionalStyles.length > 0) { %>
+    <% dashboardAdditionalStyles.forEach(function(style) { %>
+        <link rel="stylesheet" href="<%= style %>" />
+    <% }); %>
+<% } %>
+
+<style>
+    /* Dashboard Base Styles */
+    .brand-logo img {
+        max-height: 40px;
+    }
+
+    .sidebar-nav .sidebar-item .sidebar-link.active {
+        background-color: <%= currentTheme.primary %>;
+        color: white;
+    }
+
+    .card {
+        border-radius: 12px;
+    }
+
+    .btn {
+        border-radius: 8px;
+    }
+
+    /* Dashboard Layout Fixes */
+    .app-header {
+        top: 0 !important;
+    }
+
+    @media (max-width: 991.98px) {
+        .app-header {
+            top: 0 !important;
+        }
+    }
+
+    /* Body Wrapper Padding Fixes */
+    .body-wrapper .container-fluid,
+    .body-wrapper .container-sm,
+    .body-wrapper .container-md,
+    .body-wrapper .container-lg,
+    .body-wrapper .container-xl,
+    .body-wrapper .container-xxl {
+        padding-top: 90px !important;
+    }
+
+    @media (max-width: 991.98px) {
+        .body-wrapper .container-fluid,
+        .body-wrapper .container-sm,
+        .body-wrapper .container-md,
+        .body-wrapper .container-lg,
+        .body-wrapper .container-xl,
+        .body-wrapper .container-xxl {
+            padding-top: 120px !important;
+        }
+    }
+
+    /* Fixed Header Positioning */
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-fluid,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-sm,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-md,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-lg,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-xl,
+    #main-wrapper[data-layout=vertical][data-header-position=fixed] .body-wrapper > .container-xxl {
+        padding-top: 70px !important;
+    }
+
+    /* Sidebar Positioning */
+    #main-wrapper[data-layout=vertical][data-sidebar-position=fixed] .left-sidebar {
+        top: 0 !important;
+    }
+
+    @media (max-width: 991.98px) {
+        #main-wrapper[data-layout=vertical][data-sidebar-position=fixed] .left-sidebar {
+            top: 0 !important;
+        }
+    }
+
+    /* Role-specific CSS Variables */
+    :root {
+        --primary-color: <%= currentTheme.primary %>;
+        --secondary-color: <%= currentTheme.secondary %>;
+    }
+</style>

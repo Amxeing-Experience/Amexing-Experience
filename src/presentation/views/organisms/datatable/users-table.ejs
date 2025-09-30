@@ -43,37 +43,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     </div>
 
     <div class="card-body">
-        <!-- Search and Filter Controls -->
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="input-group">
-                    <span class="input-group-text">
-                        <i class="ti ti-search"></i>
-                    </span>
-                    <input type="text" class="form-control dt-search-custom" placeholder="Buscar usuarios..." data-table="<%= dtTableId %>">
-                </div>
-            </div>
-            <div class="col-md-3">
-                <select class="form-select" id="role-filter">
-                    <option value="">Todos los roles</option>
-                    <option value="superadmin">Super Admin</option>
-                    <option value="admin">Admin</option>
-                    <option value="client">Cliente</option>
-                    <option value="department_manager">Jefe Departamento</option>
-                    <option value="employee">Empleado</option>
-                    <option value="driver">Conductor</option>
-                    <option value="guest">Invitado</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <select class="form-select" id="status-filter">
-                    <option value="">Todos los estados</option>
-                    <option value="active">Activos</option>
-                    <option value="inactive">Inactivos</option>
-                </select>
-            </div>
-        </div>
-
         <!-- DataTable Container -->
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
@@ -101,22 +70,27 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 <!-- DataTable Configuration Script -->
 <script>
 // Function to load API data first, then initialize DataTable
-async function loadUsersAndInitializeTable() {
+async function loadUsersAndInitializeTable(retryCount = 0) {
+    const MAX_RETRIES = 5;
+    const BASE_DELAY = 200; // ms
+
     // Check if jQuery and DataTables are loaded
     if (typeof jQuery === 'undefined' || typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
-        console.log('⚠️ Libraries not ready, retrying in 500ms...');
-        setTimeout(loadUsersAndInitializeTable, 500);
+        if (retryCount >= MAX_RETRIES) {
+            console.error('❌ DataTables failed to load after', MAX_RETRIES, 'attempts');
+            return;
+        }
+
+        // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms
+        const delay = BASE_DELAY * Math.pow(2, retryCount);
+        setTimeout(() => loadUsersAndInitializeTable(retryCount + 1), delay);
         return;
     }
 
-    console.log('✅ Libraries loaded, loading API data...');
-
     const apiEndpoint = '<%= dtApiEndpoint %>';
-    console.log('🎯 API Endpoint:', apiEndpoint);
 
     try {
         // Load users data from API
-        console.log('📤 Fetching users data...');
         const response = await fetch(apiEndpoint, {
             method: 'GET',
             credentials: 'include', // Send cookies
@@ -126,33 +100,28 @@ async function loadUsersAndInitializeTable() {
             }
         });
 
-        console.log('📤 Response status:', response.status);
-
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            throw new Error(`HTTP ${response.status}`);
         }
 
         const data = await response.json();
-        console.log('📊 API Response:', data);
 
         if (!data.success) {
-            throw new Error(data.error || 'API returned error');
+            throw new Error(data.error || 'API error');
         }
 
         const users = data.data?.users || [];
-        console.log('📊 Users loaded:', users.length);
-
-        if (users.length > 0) {
-            console.log('📊 Sample user:', users[0]);
-        }
 
         // Initialize DataTable with the loaded data
-        console.log('🎯 About to initialize DataTable with users:', users);
-        console.log('🎯 Sample user structure:', JSON.stringify(users[0], null, 2));
         initializeDataTableWithData(users);
 
+        // Dispatch custom event for page to listen
+        document.dispatchEvent(new CustomEvent('usersTableLoaded', {
+            detail: { count: users.length, users }
+        }));
+
     } catch (error) {
-        console.error('❌ Error loading users:', error);
+        console.error('Error loading users:', error.message);
         // Initialize empty table on error
         initializeDataTableWithData([]);
     }
@@ -160,8 +129,6 @@ async function loadUsersAndInitializeTable() {
 
 // Function to initialize DataTable with pre-loaded data
 function initializeDataTableWithData(usersData) {
-    console.log('🎯 Initializing DataTable with', usersData.length, 'users');
-
     const tableId = '<%= dtTableId %>';
     const canEdit = <%= canEdit %>;
     const canDelete = <%= canDelete %>;
@@ -170,22 +137,6 @@ function initializeDataTableWithData(usersData) {
     const tableConfig = {
         data: usersData,
         columns: [
-            {
-                title: 'Foto',
-                data: 'profileImage',
-                orderable: false,
-                searchable: false,
-                render: function(data, type, row) {
-                    if (type === 'display') {
-                        const imgSrc = data || '/dashboard/images/profile/user-default.jpg';
-                        return `<div class="text-center">
-                            <img src="${imgSrc}" class="rounded-circle border" width="40" height="40"
-                                 alt="Profile" onerror="this.src='/dashboard/images/profile/user-default.jpg'">
-                        </div>`;
-                    }
-                    return data;
-                }
-            },
             { title: 'Nombre', data: 'firstName', className: 'fw-bold' },
             { title: 'Apellido', data: 'lastName' },
             { title: 'Email', data: 'email', className: 'text-muted' },
@@ -290,70 +241,31 @@ function initializeDataTableWithData(usersData) {
         // Destroy existing instance if exists
         if ($.fn.DataTable.isDataTable('#' + tableId)) {
             $('#' + tableId).DataTable().destroy();
-            console.log('🔄 Destroyed existing DataTable instance');
         }
 
         const usersTable = $('#' + tableId).DataTable(tableConfig);
-        console.log('✅ DataTable initialized successfully with', usersData.length, 'users');
-        console.log('✅ Table ID used:', tableId);
-        console.log('✅ Table element exists:', $('#' + tableId).length > 0);
-        console.log('✅ Table data loaded:', usersTable.data().count());
 
         // Store reference globally
         window.usersTable = usersTable;
-        console.log('✅ Global reference stored at window.usersTable');
-
-        // Force immediate draw to show data
-        setTimeout(() => {
-            usersTable.draw();
-            console.log('🔄 Forced redraw completed');
-            const info = usersTable.page.info();
-            console.log('🔄 Table info after redraw:', info);
-        }, 100);
-
-        // Setup custom filters
-        $('#role-filter').on('change', function() {
-            const value = this.value;
-            usersTable.column(4).search(value).draw(); // Role column
-        });
-
-        $('#status-filter').on('change', function() {
-            const value = this.value;
-            if (value === '') {
-                usersTable.column(5).search('').draw(); // Clear filter
-            } else if (value === 'active') {
-                usersTable.column(5).search('Activo').draw();
-            } else if (value === 'inactive') {
-                usersTable.column(5).search('Inactivo').draw();
-            }
-        });
-
-        // Custom search
-        $('.dt-search-custom').on('keyup', function() {
-            usersTable.search(this.value).draw();
-        });
-
-        console.log('✅ All filters and events configured');
 
     } catch (error) {
-        console.error('❌ Failed to initialize DataTable:', error);
+        console.error('Failed to initialize DataTable:', error);
     }
 }
 
 // User action functions (placeholders)
 function editUser(userId) {
-    console.log('Edit user:', userId);
     // TODO: Implement edit functionality
 }
 
 function deleteUser(userId) {
-    console.log('Delete user:', userId);
     // TODO: Implement delete functionality
 }
 
-// Wait for document ready and start loading
-$(document).ready(function() {
-    console.log('📋 Document ready, starting users table initialization...');
+// Start loading when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadUsersAndInitializeTable);
+} else {
     loadUsersAndInitializeTable();
-});
+}
 </script>

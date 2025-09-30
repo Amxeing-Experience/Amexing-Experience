@@ -73,20 +73,29 @@ class AppleOAuthService extends AppleOAuthServiceCore {
 
     try {
       this.validateCallbackData({
-        code, idToken, error, errorDescription,
+        code,
+        idToken,
+        error,
+        errorDescription,
       });
 
       const idTokenPayload = await this.verifyIdToken(idToken, expectedNonce);
       const userData = this.parseUserData(userJsonString);
       const tokenData = await this.exchangeCodeForTokens(code);
-      const userProfile = this.buildUserProfile(idTokenPayload, userData, tokenData);
+      const userProfile = this.buildUserProfile(
+        idTokenPayload,
+        userData,
+        tokenData
+      );
 
       const authResult = await this.processAuthentication(userProfile, {
         department,
         corporateConfigId,
       });
 
-      logger.info(`Apple OAuth callback successful for user: ${authResult.user.id}`);
+      logger.info(
+        `Apple OAuth callback successful for user: ${authResult.user.id}`
+      );
 
       return {
         success: true,
@@ -320,7 +329,9 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async applyDepartmentPermissions(user, department, userProfile) {
-    const { DepartmentOAuthFlowService } = require('./DepartmentOAuthFlowService');
+    const {
+      DepartmentOAuthFlowService,
+    } = require('./DepartmentOAuthFlowService');
     const departmentService = new DepartmentOAuthFlowService();
 
     await departmentService.applyDepartmentPermissionInheritance(
@@ -425,13 +436,17 @@ class AppleOAuthService extends AppleOAuthServiceCore {
 
     if (remainingProviders.length === 0) {
       await user.destroy({ useMasterKey: true });
-      logger.info(`User account deleted due to Apple consent revocation: ${user.id}`);
+      logger.info(
+        `User account deleted due to Apple consent revocation: ${user.id}`
+      );
     } else {
       user.unset('appleId');
       user.unset('isPrivateEmail');
       user.set('oauthProviders', remainingProviders);
       await user.save(null, { useMasterKey: true });
-      logger.info(`Apple association removed due to consent revocation: ${user.id}`);
+      logger.info(
+        `Apple association removed due to consent revocation: ${user.id}`
+      );
     }
   }
 
@@ -453,7 +468,14 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     };
 
     // Remove null/undefined values with allowlist security
-    const allowedKeys = ['id', 'email', 'firstName', 'lastName', 'isPrivateEmail', 'emailVerified'];
+    const allowedKeys = [
+      'id',
+      'email',
+      'firstName',
+      'lastName',
+      'isPrivateEmail',
+      'emailVerified',
+    ];
     Object.keys(userData).forEach((key) => {
       // eslint-disable-next-line security/detect-object-injection
       if (!allowedKeys.includes(key) || userData[key] == null) {

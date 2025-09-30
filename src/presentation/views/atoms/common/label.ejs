@@ -1,0 +1,41 @@
+<%
+/**
+ * Label Atom
+ * Reusable form label component with consistent styling
+ *
+ * @param {string} text - Label text content
+ * @param {string} htmlFor - ID of the associated form control
+ * @param {boolean} required - Whether the field is required (shows asterisk)
+ * @param {string} variant - Label variant (default, small, large)
+ * @param {string} color - Text color class (optional)
+ * @param {string} additionalClasses - Additional CSS classes
+ */
+
+// Default parameters
+const labelText = typeof text !== 'undefined' ? text : 'Label';
+const labelFor = typeof htmlFor !== 'undefined' ? htmlFor : '';
+const labelRequired = typeof required !== 'undefined' ? required : false;
+const labelVariant = typeof variant !== 'undefined' ? variant : 'default';
+const labelColor = typeof color !== 'undefined' && color ? `text-${color}` : '';
+const labelAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+
+// Build class string
+let labelClasses = ['form-label'];
+
+// Variant classes
+if (labelVariant === 'small') {
+    labelClasses.push('fs-7');
+} else if (labelVariant === 'large') {
+    labelClasses.push('fs-5', 'fw-semibold');
+}
+
+// Add color and additional classes
+if (labelColor) labelClasses.push(labelColor);
+if (labelAdditionalClasses) labelClasses.push(labelAdditionalClasses);
+
+const finalClasses = labelClasses.join(' ');
+%>
+
+<label class="<%= finalClasses %>" <% if (labelFor) { %>for="<%= labelFor %>"<% } %>>
+    <%= labelText %><% if (labelRequired) { %><span class="text-danger ms-1">*</span><% } %>
+</label>

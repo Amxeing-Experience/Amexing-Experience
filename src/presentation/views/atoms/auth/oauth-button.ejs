@@ -1,0 +1,417 @@
+<%
+/**
+ * OAuth Button Atom
+ * Styled OAuth provider buttons with Flexy design
+ *
+ * @param {string} provider - OAuth provider (google, microsoft, apple, github, etc.)
+ * @param {string} text - Button text (optional, auto-generated if not provided)
+ * @param {string} href - OAuth URL
+ * @param {string} size - Button size (sm, md, lg, default: 'md')
+ * @param {boolean} block - Whether button should be full width
+ * @param {string} variant - Button variant (filled, outlined, default: 'outlined')
+ * @param {object} corporate - Corporate branding config (optional)
+ */
+
+// Default parameters
+const oauthProvider = typeof provider !== 'undefined' ? provider.toLowerCase() : 'generic';
+const oauthText = typeof text !== 'undefined' ? text : '';
+const oauthHref = typeof href !== 'undefined' ? href : '#';
+const oauthSize = typeof size !== 'undefined' ? size : 'md';
+const oauthBlock = typeof block !== 'undefined' ? block : true;
+const oauthVariant = typeof variant !== 'undefined' ? variant : 'outlined';
+const oauthCorporate = typeof corporate !== 'undefined' ? corporate : null;
+
+// Provider configurations
+const providerConfig = {
+    google: {
+        name: 'Google',
+        icon: 'ti-brand-google',
+        color: '#4285F4',
+        bgColor: '#fff',
+        textColor: '#333',
+        hoverBg: '#4285F4',
+        hoverText: '#fff'
+    },
+    microsoft: {
+        name: 'Microsoft',
+        icon: 'ti-brand-microsoft',
+        color: '#0078D4',
+        bgColor: '#fff',
+        textColor: '#333',
+        hoverBg: '#0078D4',
+        hoverText: '#fff'
+    },
+    apple: {
+        name: 'Apple',
+        icon: 'ti-brand-apple',
+        color: '#000',
+        bgColor: '#fff',
+        textColor: '#333',
+        hoverBg: '#000',
+        hoverText: '#fff'
+    },
+    github: {
+        name: 'GitHub',
+        icon: 'ti-brand-github',
+        color: '#333',
+        bgColor: '#fff',
+        textColor: '#333',
+        hoverBg: '#333',
+        hoverText: '#fff'
+    },
+    linkedin: {
+        name: 'LinkedIn',
+        icon: 'ti-brand-linkedin',
+        color: '#0A66C2',
+        bgColor: '#fff',
+        textColor: '#333',
+        hoverBg: '#0A66C2',
+        hoverText: '#fff'
+    },
+    facebook: {
+        name: 'Facebook',
+        icon: 'ti-brand-facebook',
+        color: '#1877F2',
+        bgColor: '#fff',
+        textColor: '#333',
+        hoverBg: '#1877F2',
+        hoverText: '#fff'
+    },
+    generic: {
+        name: 'OAuth',
+        icon: 'ti-login',
+        color: '#667eea',
+        bgColor: '#fff',
+        textColor: '#333',
+        hoverBg: '#667eea',
+        hoverText: '#fff'
+    }
+};
+
+const config = providerConfig[oauthProvider] || providerConfig.generic;
+
+// Size configurations
+const sizeConfig = {
+    sm: { padding: 'py-2 px-3', fontSize: 'fs-7', iconSize: 'fs-6' },
+    md: { padding: 'py-3 px-4', fontSize: 'fs-6', iconSize: 'fs-5' },
+    lg: { padding: 'py-4 px-5', fontSize: 'fs-5', iconSize: 'fs-4' }
+};
+
+const sizeSettings = sizeConfig[oauthSize] || sizeConfig.md;
+
+// Generate button text
+const buttonText = oauthText || `Continue with ${config.name}`;
+
+// Corporate branding override
+if (oauthCorporate && oauthCorporate.name) {
+    const corporateText = oauthText || `Sign in to ${oauthCorporate.name}`;
+}
+
+const finalText = (oauthCorporate && oauthCorporate.name) ?
+    (oauthText || `Sign in to ${oauthCorporate.name}`) : buttonText;
+%>
+
+<a href="<%= oauthHref %>"
+   class="oauth-btn oauth-<%= oauthProvider %> btn <%= oauthBlock ? 'w-100' : '' %> <%= sizeSettings.padding %> <%= sizeSettings.fontSize %> d-flex align-items-center justify-content-center text-decoration-none position-relative overflow-hidden"
+   data-provider="<%= oauthProvider %>"
+   role="button">
+
+    <!-- Loading Spinner (Hidden by default) -->
+    <div class="oauth-loading position-absolute d-none">
+        <div class="spinner-border spinner-border-sm" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Button Content -->
+    <div class="oauth-content d-flex align-items-center justify-content-center">
+        <!-- Provider Icon -->
+        <i class="<%= config.icon %> <%= sizeSettings.iconSize %> me-3 oauth-icon flex-shrink-0"></i>
+
+        <!-- Button Text -->
+        <span class="oauth-text fw-semibold">
+            <%= finalText %>
+        </span>
+
+        <!-- Corporate Logo (if provided) -->
+        <% if (oauthCorporate && oauthCorporate.logo) { %>
+            <img src="<%= oauthCorporate.logo %>"
+                 alt="<%= oauthCorporate.name %>"
+                 class="oauth-corporate-logo ms-2 flex-shrink-0"
+                 style="height: 20px; width: auto;">
+        <% } %>
+    </div>
+
+    <!-- Hover Effect Overlay -->
+    <div class="oauth-overlay position-absolute top-0 start-0 w-100 h-100"></div>
+</a>
+
+<style>
+    .oauth-btn {
+        border: 2px solid #e0e6ed;
+        border-radius: 12px;
+        background: <%= config.bgColor %>;
+        color: <%= config.textColor %>;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 0.75rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        text-decoration: none !important;
+        font-weight: 600;
+    }
+
+    .oauth-btn:hover {
+        border-color: <%= config.color %>;
+        color: <%= config.hoverText %>;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+        text-decoration: none !important;
+    }
+
+    .oauth-btn:active {
+        transform: translateY(-1px);
+    }
+
+    .oauth-btn:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+    }
+
+    /* Provider-specific hover effects */
+    .oauth-<%= oauthProvider %>:hover .oauth-overlay {
+        background: <%= config.hoverBg %>;
+        opacity: 1;
+    }
+
+    .oauth-overlay {
+        background: <%= config.color %>;
+        opacity: 0;
+        transition: all 0.3s ease;
+        z-index: 1;
+    }
+
+    .oauth-content {
+        position: relative;
+        z-index: 2;
+        transition: all 0.3s ease;
+    }
+
+    .oauth-icon {
+        color: <%= config.color %>;
+        transition: all 0.3s ease;
+    }
+
+    .oauth-btn:hover .oauth-icon {
+        color: <%= config.hoverText %>;
+        transform: scale(1.1);
+    }
+
+    .oauth-text {
+        transition: all 0.3s ease;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Loading state */
+    .oauth-btn.loading .oauth-content {
+        opacity: 0;
+    }
+
+    .oauth-btn.loading .oauth-loading {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        z-index: 3;
+    }
+
+    /* Disabled state */
+    .oauth-btn.disabled,
+    .oauth-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none !important;
+        pointer-events: none;
+    }
+
+    /* Success state animation */
+    .oauth-btn.success {
+        border-color: #28a745;
+        background: #28a745;
+        color: white;
+    }
+
+    .oauth-btn.success .oauth-icon::before {
+        content: '\ea5b'; /* ti-check icon */
+    }
+
+    /* Error state animation */
+    .oauth-btn.error {
+        border-color: #dc3545;
+        animation: shake 0.5s ease-in-out;
+    }
+
+    @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+
+    /* Filled variant */
+    .oauth-btn.filled {
+        background: <%= config.color %>;
+        color: <%= config.hoverText %>;
+        border-color: <%= config.color %>;
+    }
+
+    .oauth-btn.filled:hover {
+        background: <%= config.hoverBg %>;
+        transform: translateY(-2px) scale(1.02);
+    }
+
+    .oauth-btn.filled .oauth-icon {
+        color: <%= config.hoverText %>;
+    }
+
+    /* Corporate branding */
+    .oauth-corporate-logo {
+        filter: grayscale(100%);
+        transition: filter 0.3s ease;
+    }
+
+    .oauth-btn:hover .oauth-corporate-logo {
+        filter: grayscale(0%);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 576px) {
+        .oauth-btn {
+            padding: 0.75rem 1rem !important;
+            font-size: 0.875rem !important;
+        }
+
+        .oauth-text {
+            font-size: 0.875rem !important;
+        }
+
+        .oauth-icon {
+            font-size: 1.1rem !important;
+            margin-right: 0.5rem !important;
+        }
+    }
+
+    /* High contrast mode */
+    @media (prefers-contrast: high) {
+        .oauth-btn {
+            border-width: 3px;
+        }
+    }
+
+    /* Reduce motion for accessibility */
+    @media (prefers-reduced-motion: reduce) {
+        .oauth-btn,
+        .oauth-icon,
+        .oauth-overlay,
+        .oauth-content {
+            transition: none;
+        }
+
+        .oauth-btn:hover {
+            transform: none;
+        }
+    }
+
+    /* Dark theme support */
+    [data-theme="dark"] .oauth-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+        color: #fff;
+    }
+
+    [data-theme="dark"] .oauth-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const oauthButtons = document.querySelectorAll('.oauth-btn');
+
+    oauthButtons.forEach(button => {
+        // Click handling with loading state
+        button.addEventListener('click', function(e) {
+            // Don't show loading for disabled buttons
+            if (this.classList.contains('disabled')) {
+                e.preventDefault();
+                return;
+            }
+
+            // Show loading state
+            this.classList.add('loading');
+
+            // Track OAuth attempt
+            const provider = this.getAttribute('data-provider');
+
+            // Optional: Analytics tracking
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'oauth_login_attempt', {
+                    provider: provider
+                });
+            }
+
+            // Prevent double-clicking
+            this.style.pointerEvents = 'none';
+
+            // Re-enable after a delay (in case user comes back)
+            setTimeout(() => {
+                this.classList.remove('loading');
+                this.style.pointerEvents = '';
+            }, 30000);
+        });
+
+        // Keyboard accessibility
+        button.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.click();
+            }
+        });
+
+        // Add focus visible support
+        button.addEventListener('focusin', function() {
+            this.classList.add('focus-visible');
+        });
+
+        button.addEventListener('focusout', function() {
+            this.classList.remove('focus-visible');
+        });
+    });
+
+    // Handle OAuth callback success/error states
+    const urlParams = new URLSearchParams(window.location.search);
+
+    if (urlParams.get('oauth') === 'success') {
+        // Show success state on relevant button
+        const provider = urlParams.get('provider');
+        if (provider) {
+            const button = document.querySelector(`.oauth-${provider}`);
+            if (button) {
+                button.classList.add('success');
+                setTimeout(() => button.classList.remove('success'), 3000);
+            }
+        }
+    } else if (urlParams.get('oauth') === 'error') {
+        // Show error state on relevant button
+        const provider = urlParams.get('provider');
+        if (provider) {
+            const button = document.querySelector(`.oauth-${provider}`);
+            if (button) {
+                button.classList.add('error');
+                setTimeout(() => button.classList.remove('error'), 3000);
+            }
+        }
+    }
+
+});
+</script>

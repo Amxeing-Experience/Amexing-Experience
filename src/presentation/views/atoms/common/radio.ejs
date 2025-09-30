@@ -1,0 +1,66 @@
+<%
+/**
+ * Radio Button Atom
+ * Reusable radio button component with consistent styling
+ *
+ * @param {string} name - Input name attribute (required for radio groups)
+ * @param {string} id - Input ID attribute
+ * @param {string} value - Input value attribute
+ * @param {boolean} checked - Whether radio is selected
+ * @param {boolean} disabled - Whether radio is disabled
+ * @param {string} label - Label text for the radio button
+ * @param {string} size - Radio size (sm, default, lg)
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const radioName = typeof name !== 'undefined' ? name : 'radio-group';
+const radioId = typeof id !== 'undefined' ? id : `radio-${Math.random().toString(36).substr(2, 9)}`;
+const radioValue = typeof value !== 'undefined' ? value : '';
+const radioChecked = typeof checked !== 'undefined' ? checked : false;
+const radioDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const radioLabel = typeof label !== 'undefined' ? label : '';
+const radioSize = typeof size !== 'undefined' ? size : 'default';
+const radioAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const radioAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build wrapper classes
+let wrapperClasses = ['form-check'];
+if (radioAdditionalClasses) wrapperClasses.push(radioAdditionalClasses);
+
+// Build input classes
+let inputClasses = ['form-check-input'];
+if (radioSize === 'sm') {
+    inputClasses.push('form-check-input-sm');
+} else if (radioSize === 'lg') {
+    inputClasses.push('form-check-input-lg');
+}
+
+// Build attributes string
+let attributesString = '';
+if (radioAttributes && typeof radioAttributes === 'object') {
+    attributesString = Object.entries(radioAttributes)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+}
+
+const finalWrapperClasses = wrapperClasses.join(' ');
+const finalInputClasses = inputClasses.join(' ');
+%>
+
+<div class="<%= finalWrapperClasses %>">
+    <input type="radio"
+           class="<%= finalInputClasses %>"
+           id="<%= radioId %>"
+           name="<%= radioName %>"
+           <% if (radioValue) { %>value="<%= radioValue %>"<% } %>
+           <% if (radioChecked) { %>checked<% } %>
+           <% if (radioDisabled) { %>disabled<% } %>
+           <% if (attributesString) { %><%= attributesString %><% } %>>
+    <% if (radioLabel) { %>
+        <label class="form-check-label" for="<%= radioId %>">
+            <%= radioLabel %>
+        </label>
+    <% } %>
+</div>

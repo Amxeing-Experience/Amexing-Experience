@@ -75,10 +75,13 @@ const getCorporateLandingConfig = async (request) => {
 
           // If client has OAuth configured, set as corporate config
           if (clientInfo.oauthEnabled && clientInfo.corporateDomain) {
-            const domainConfig = OAuthService.getCorporateDomainConfig(`test@${clientInfo.corporateDomain}`);
+            const domainConfig = OAuthService.getCorporateDomainConfig(
+              `test@${clientInfo.corporateDomain}`
+            );
             if (domainConfig) {
               corporateConfig = _domainConfig; // eslint-disable-line no-undef
-              suggestedProvider = clientInfo.primaryOAuthProvider || _domainConfig.primaryProvider; // eslint-disable-line no-undef
+              suggestedProvider = clientInfo.primaryOAuthProvider
+                || _domainConfig.primaryProvider; // eslint-disable-line no-undef
             }
           }
         }
@@ -91,14 +94,14 @@ const getCorporateLandingConfig = async (request) => {
     const availableProviders = OAuthService.getAvailableProviders();
     const providerConfigs = {};
 
-    for (const provider of availableProviders) {
+    availableProviders.forEach((provider) => {
       const config = OAuthService.getProviderConfig(_provider); // eslint-disable-line no-undef
       providerConfigs[provider] = {
         name: provider,
         enabled: config.enabled,
         mockMode: config.mockMode,
       };
-    }
+    });
 
     const response = {
       success: true,
@@ -192,7 +195,8 @@ const generateCorporateOAuthURL = async (request) => {
 
     const authURL = await OAuthService.generateAuthorizationURL(
       _provider,
-      redirectUri || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/${_provider}/callback`,
+      redirectUri
+        || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/${_provider}/callback`,
       state
     );
 
@@ -233,13 +237,14 @@ const generateCorporateOAuthURL = async (request) => {
  */
 const validateCorporateLandingAccess = async (request) => {
   try {
-    const {
-      clientSlug, departmentCode, email,
-    } = request.params;
+    const { clientSlug, departmentCode, email } = request.params;
 
     // Basic validation
     if (!clientSlug) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Client slug is required');
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'Client slug is required'
+      );
     }
 
     // Find client
@@ -351,7 +356,10 @@ const getCorporateClientDepartments = async (request) => {
     const { clientSlug } = request.params;
 
     if (!clientSlug) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Client slug is required');
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'Client slug is required'
+      );
     }
 
     // Find client

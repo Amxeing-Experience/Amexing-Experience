@@ -23,7 +23,7 @@
 <!-- Quick Stats -->
 <div class="row">
     <div class="col-md-6 col-lg-3">
-        <%- include('../../components/cards/stats', {
+        <%- include('../../atoms/dashboard/stats-card', {
             icon: 'ti ti-users',
             title: 'Team Members',
             value: typeof stats !== 'undefined' ? stats.teamMembers : '25',
@@ -33,7 +33,7 @@
         }) %>
     </div>
     <div class="col-md-6 col-lg-3">
-        <%- include('../../components/cards/stats', {
+        <%- include('../../atoms/dashboard/stats-card', {
             icon: 'ti ti-wallet',
             title: 'Department Budget',
             value: '$' + (typeof stats !== 'undefined' ? (stats.departmentBudget/1000).toFixed(0) : '15') + 'K',
@@ -43,7 +43,7 @@
         }) %>
     </div>
     <div class="col-md-6 col-lg-3">
-        <%- include('../../components/cards/stats', {
+        <%- include('../../atoms/dashboard/stats-card', {
             icon: 'ti ti-checklist',
             title: 'Pending Approvals',
             value: typeof stats !== 'undefined' ? stats.pendingApprovals : '3',
@@ -53,7 +53,7 @@
         }) %>
     </div>
     <div class="col-md-6 col-lg-3">
-        <%- include('../../components/cards/stats', {
+        <%- include('../../atoms/dashboard/stats-card', {
             icon: 'ti ti-calendar-event',
             title: 'Active Bookings',
             value: typeof stats !== 'undefined' ? stats.activeBookings : '12',

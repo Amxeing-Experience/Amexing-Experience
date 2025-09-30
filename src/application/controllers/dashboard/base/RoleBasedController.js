@@ -64,10 +64,7 @@ class RoleBasedController extends DashboardController {
         'view_earnings',
         'manage_vehicle',
       ],
-      guest: [
-        'view_event_info',
-        'view_transport_details',
-      ],
+      guest: ['view_event_info', 'view_transport_details'],
     };
 
     return permissionMap[this.role] || [];
@@ -87,7 +84,12 @@ class RoleBasedController extends DashboardController {
   requireRole(requiredRole) {
     return (req, res, next) => {
       if (!req.user) {
-        return this.redirectWithMessage(res, '/login', 'Please login to continue', 'error');
+        return this.redirectWithMessage(
+          res,
+          '/login',
+          'Please login to continue',
+          'error'
+        );
       }
 
       const roleHierarchy = {
@@ -100,11 +102,16 @@ class RoleBasedController extends DashboardController {
         guest: 1,
       };
 
+      // eslint-disable-next-line security/detect-object-injection
       const userLevel = roleHierarchy[req.user.role] || 0;
       const requiredLevel = roleHierarchy[requiredRole] || 0;
 
       if (userLevel < requiredLevel) {
-        return this.handleError(res, new Error('Insufficient permissions'), 403);
+        return this.handleError(
+          res,
+          new Error('Insufficient permissions'),
+          403
+        );
       }
 
       next();

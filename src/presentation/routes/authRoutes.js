@@ -50,7 +50,9 @@ router.post('/login', async (req, res) => {
     // Validate required fields
     if (!identifier || !password) {
       if (req.accepts('html')) {
-        return res.redirect(`/login?error=${encodeURIComponent('Email and password are required')}`);
+        return res.redirect(
+          `/login?error=${encodeURIComponent('Email and password are required')}`
+        );
       }
       return res.status(400).json({
         success: false,
@@ -66,19 +68,55 @@ router.post('/login', async (req, res) => {
       const parseUser = await Parse.User.logIn(identifier, password);
 
       if (parseUser) {
+        // Get role name from the new Role relationship for Parse User too
+        let roleName = 'guest';
+        const roleId = parseUser.get('roleId');
+        if (roleId) {
+          try {
+            const roleQuery = new Parse.Query('Role');
+            roleQuery.equalTo('objectId', roleId);
+            const roleObject = await roleQuery.first({ useMasterKey: true });
+            if (roleObject) {
+              roleName = roleObject.get('name');
+            }
+          } catch (roleError) {
+            logger.warn(
+              'Failed to fetch role for Parse user, defaulting to guest',
+              {
+                userId: parseUser.id,
+                roleId,
+                error: roleError.message,
+              }
+            );
+            // Fall back to old role field if new relationship fails
+            roleName = parseUser.get('role') || 'guest';
+          }
+        } else {
+          // Fall back to old role field if no roleId
+          roleName = parseUser.get('role') || 'guest';
+        }
+
         // Convert Parse user to standardized user object for JWT
         authenticatedUser = {
           id: parseUser.id,
           username: parseUser.get('username'),
           email: parseUser.get('email'),
-          role: parseUser.get('role') || 'guest',
+          role: roleName,
+          roleId,
+          organizationId: parseUser.get('organizationId'),
           name: parseUser.get('displayName') || parseUser.get('username'),
         };
 
-        logger.info('Parse authentication successful', { userId: authenticatedUser.id, role: authenticatedUser.role });
+        logger.info('Parse authentication successful', {
+          userId: authenticatedUser.id,
+          role: authenticatedUser.role,
+        });
       }
     } catch (parseError) {
-      logger.warn('Parse authentication failed, falling back to Parse Object auth:', parseError.message);
+      logger.warn(
+        'Parse authentication failed, falling back to Parse Object auth:',
+        parseError.message
+      );
       // Fallback to Parse Object authentication using AmexingUser model
       const AmexingUser = require('../../domain/models/AmexingUser');
 
@@ -90,7 +128,9 @@ router.post('/login', async (req, res) => {
 
         if (!user) {
           if (req.accepts('html')) {
-            return res.redirect(`/login?error=${encodeURIComponent('Invalid email or password')}`);
+            return res.redirect(
+              `/login?error=${encodeURIComponent('Invalid email or password')}`
+            );
           }
           return res.status(401).json({
             success: false,
@@ -106,7 +146,9 @@ router.post('/login', async (req, res) => {
           await user.recordFailedLogin();
 
           if (req.accepts('html')) {
-            return res.redirect(`/login?error=${encodeURIComponent('Invalid email or password')}`);
+            return res.redirect(
+              `/login?error=${encodeURIComponent('Invalid email or password')}`
+            );
           }
           return res.status(401).json({
             success: false,
@@ -117,7 +159,9 @@ router.post('/login', async (req, res) => {
         // Check if account is locked
         if (user.isAccountLocked()) {
           if (req.accepts('html')) {
-            return res.redirect(`/login?error=${encodeURIComponent('Account is temporarily locked')}`);
+            return res.redirect(
+              `/login?error=${encodeURIComponent('Account is temporarily locked')}`
+            );
           }
           return res.status(401).json({
             success: false,
@@ -125,19 +169,49 @@ router.post('/login', async (req, res) => {
           });
         }
 
+        // Get role name from the new Role relationship
+        let roleName = 'guest';
+        const roleId = user.get('roleId');
+        if (roleId) {
+          try {
+            const roleQuery = new Parse.Query('Role');
+            roleQuery.equalTo('objectId', roleId);
+            const roleObject = await roleQuery.first({ useMasterKey: true });
+            if (roleObject) {
+              roleName = roleObject.get('name');
+            }
+          } catch (roleError) {
+            logger.warn('Failed to fetch role for user, defaulting to guest', {
+              userId: user.id,
+              roleId,
+              error: roleError.message,
+            });
+            // Fall back to old role field if new relationship fails
+            roleName = user.get('role') || 'guest';
+          }
+        } else {
+          // Fall back to old role field if no roleId
+          roleName = user.get('role') || 'guest';
+        }
+
         // Convert Parse Object user to standardized user object
         authenticatedUser = {
           id: user.id,
           username: user.get('username'),
           email: user.get('email'),
-          role: user.get('role') || 'guest',
+          role: roleName,
+          roleId,
+          organizationId: user.get('organizationId'),
           name: user.getDisplayName(),
         };
 
         // Record successful login
         await user.recordSuccessfulLogin('password');
 
-        logger.info('Parse Object authentication successful', { userId: authenticatedUser.id, role: authenticatedUser.role });
+        logger.info('Parse Object authentication successful', {
+          userId: authenticatedUser.id,
+          role: authenticatedUser.role,
+        });
       } catch (fallbackError) {
         logger.error('Parse Object authentication failed:', fallbackError);
         throw fallbackError;
@@ -153,7 +227,10 @@ router.post('/login', async (req, res) => {
           username: authenticatedUser.username,
           email: authenticatedUser.email,
           role: authenticatedUser.role,
+          roleId: authenticatedUser.roleId,
+          organizationId: authenticatedUser.organizationId,
           name: authenticatedUser.name,
+          iat: Math.floor(Date.now() / 1000),
         },
         jwtSecret,
         { expiresIn: '8h' }
@@ -167,13 +244,20 @@ router.post('/login', async (req, res) => {
         maxAge: 8 * 60 * 60 * 1000, // 8 hours
       });
 
-      logger.info('JWT token created for user', { userId: authenticatedUser.id, role: authenticatedUser.role });
+      logger.info('JWT token created for user', {
+        userId: authenticatedUser.id,
+        role: authenticatedUser.role,
+      });
 
       // Handle different response types
       if (req.accepts('html')) {
         // For web form submissions, redirect to role-specific dashboard
         const redirectUrl = returnTo || `/dashboard/${authenticatedUser.role}`;
-        logger.info('Redirecting user to dashboard', { from: '/auth/login', to: redirectUrl, role: authenticatedUser.role });
+        logger.info('Redirecting user to dashboard', {
+          from: '/auth/login',
+          to: redirectUrl,
+          role: authenticatedUser.role,
+        });
         return res.redirect(redirectUrl);
       }
 
@@ -192,7 +276,9 @@ router.post('/login', async (req, res) => {
 
     // If we reach here, authentication failed
     if (req.accepts('html')) {
-      return res.redirect(`/login?error=${encodeURIComponent('Authentication failed')}`);
+      return res.redirect(
+        `/login?error=${encodeURIComponent('Authentication failed')}`
+      );
     }
 
     res.status(401).json({
@@ -408,42 +494,50 @@ router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
 });
 
 // Change password (for authenticated users)
-router.post('/change-password', jwtMiddleware.authenticateToken, async (req, res) => {
-  try {
-    const { user } = req;
+router.post(
+  '/change-password',
+  jwtMiddleware.authenticateToken,
+  async (req, res) => {
+    try {
+      const { user } = req;
 
-    const { currentPassword, newPassword, confirmPassword } = req.body;
+      const { currentPassword, newPassword, confirmPassword } = req.body;
 
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({
+          success: false,
+          error: 'Current password and new password are required',
+        });
+      }
+
+      if (newPassword !== confirmPassword) {
+        return res.status(400).json({
+          success: false,
+          error: 'New passwords do not match',
+        });
+      }
+
+      const result = await Parse.Cloud.run(
+        'changePassword',
+        {
+          currentPassword,
+          newPassword,
+        },
+        {
+          user: { id: user.id },
+        }
+      );
+
+      res.json(result);
+    } catch (error) {
+      logger.error('Change password route error:', error);
+      res.status(400).json({
         success: false,
-        error: 'Current password and new password are required',
+        error: error.message || 'Password change failed',
       });
     }
-
-    if (newPassword !== confirmPassword) {
-      return res.status(400).json({
-        success: false,
-        error: 'New passwords do not match',
-      });
-    }
-
-    const result = await Parse.Cloud.run('changePassword', {
-      currentPassword,
-      newPassword,
-    }, {
-      user: { id: user.id },
-    });
-
-    res.json(result);
-  } catch (error) {
-    logger.error('Change password route error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message || 'Password change failed',
-    });
   }
-});
+);
 
 // OAuth provider list
 router.get('/oauth/providers', async (req, res) => {
@@ -485,11 +579,15 @@ router.get('/oauth/:provider/callback', async (req, res) => {
 
     if (error) {
       logger.error('OAuth callback error:', error);
-      return res.redirect(`/login?error=${encodeURIComponent('OAuth authentication was cancelled')}`);
+      return res.redirect(
+        `/login?error=${encodeURIComponent('OAuth authentication was cancelled')}`
+      );
     }
 
     if (!code) {
-      return res.redirect(`/login?error=${encodeURIComponent('OAuth authentication failed')}`);
+      return res.redirect(
+        `/login?error=${encodeURIComponent('OAuth authentication failed')}`
+      );
     }
 
     const result = await Parse.Cloud.run('handleOAuthCallback', {
@@ -524,56 +622,74 @@ router.get('/oauth/:provider/callback', async (req, res) => {
     res.redirect(redirectUrl);
   } catch (error) {
     logger.error('OAuth callback route error:', error);
-    res.redirect(`/login?error=${encodeURIComponent(error.message || 'OAuth authentication failed')}`);
+    res.redirect(
+      `/login?error=${encodeURIComponent(error.message || 'OAuth authentication failed')}`
+    );
   }
 });
 
 // Link OAuth account (for authenticated users)
-router.post('/oauth/:provider/link', jwtMiddleware.authenticateToken, async (req, res) => {
-  try {
-    const { user } = req;
+router.post(
+  '/oauth/:provider/link',
+  jwtMiddleware.authenticateToken,
+  async (req, res) => {
+    try {
+      const { user } = req;
 
-    const { provider: _provider } = req.params;
-    const { oauthData } = req.body;
+      const { provider: _provider } = req.params;
+      const { oauthData } = req.body;
 
-    const result = await Parse.Cloud.run('linkOAuthAccount', {
-      provider: _provider,
-      oauthData,
-    }, {
-      user: { id: user.id },
-    });
+      const result = await Parse.Cloud.run(
+        'linkOAuthAccount',
+        {
+          provider: _provider,
+          oauthData,
+        },
+        {
+          user: { id: user.id },
+        }
+      );
 
-    res.json(result);
-  } catch (error) {
-    logger.error('OAuth link route error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message || 'OAuth account linking failed',
-    });
+      res.json(result);
+    } catch (error) {
+      logger.error('OAuth link route error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message || 'OAuth account linking failed',
+      });
+    }
   }
-});
+);
 
 // Unlink OAuth account (for authenticated users)
-router.delete('/oauth/:provider/unlink', jwtMiddleware.authenticateToken, async (req, res) => {
-  try {
-    const { user } = req;
+router.delete(
+  '/oauth/:provider/unlink',
+  jwtMiddleware.authenticateToken,
+  async (req, res) => {
+    try {
+      const { user } = req;
 
-    const { provider: _provider } = req.params;
+      const { provider: _provider } = req.params;
 
-    const result = await Parse.Cloud.run('unlinkOAuthAccount', {
-      provider: _provider,
-    }, {
-      user: { id: user.id },
-    });
+      const result = await Parse.Cloud.run(
+        'unlinkOAuthAccount',
+        {
+          provider: _provider,
+        },
+        {
+          user: { id: user.id },
+        }
+      );
 
-    res.json(result);
-  } catch (error) {
-    logger.error('OAuth unlink route error:', error);
-    res.status(400).json({
-      success: false,
-      error: error.message || 'OAuth account unlinking failed',
-    });
+      res.json(result);
+    } catch (error) {
+      logger.error('OAuth unlink route error:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message || 'OAuth account unlinking failed',
+      });
+    }
   }
-});
+);
 
 module.exports = router;

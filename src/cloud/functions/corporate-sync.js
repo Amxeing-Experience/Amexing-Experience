@@ -32,7 +32,10 @@ const triggerCorporateSync = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -46,7 +49,10 @@ const triggerCorporateSync = async (request) => {
     const { clientId } = request.params;
 
     if (!clientId) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'clientId parameter required');
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'clientId parameter required'
+      );
     }
 
     // Trigger sync
@@ -88,7 +94,10 @@ const startPeriodicSync = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -102,11 +111,15 @@ const startPeriodicSync = async (request) => {
     const { clientId, intervalMinutes = 60 } = request.params;
 
     if (!clientId) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'clientId parameter required');
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'clientId parameter required'
+      );
     }
 
     // Validate interval
-    if (intervalMinutes < 15 || intervalMinutes > 1440) { // 15 minutes to 24 hours
+    if (intervalMinutes < 15 || intervalMinutes > 1440) {
+      // 15 minutes to 24 hours
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
         'intervalMinutes must be between 15 and 1440'
@@ -164,7 +177,10 @@ const stopPeriodicSync = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -178,7 +194,10 @@ const stopPeriodicSync = async (request) => {
     const { clientId } = request.params;
 
     if (!clientId) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'clientId parameter required');
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'clientId parameter required'
+      );
     }
 
     // Stop periodic sync
@@ -217,7 +236,10 @@ const getAllSyncStatuses = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -264,7 +286,10 @@ const getCorporateSyncHistory = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -278,7 +303,10 @@ const getCorporateSyncHistory = async (request) => {
     const { clientId, _limit = 50, skip = 0 } = request.params;
 
     if (!clientId) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'clientId parameter required');
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'clientId parameter required'
+      );
     }
 
     // Query sync-related audit logs

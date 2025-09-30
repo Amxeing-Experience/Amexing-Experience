@@ -79,13 +79,27 @@ class PermissionAuditService {
     this.complianceFrameworks = {
       PCI_DSS: {
         name: 'PCI DSS Level 1',
-        requiredFields: ['userId', 'permission', 'action', 'timestamp', 'performedBy', 'reason'],
+        requiredFields: [
+          'userId',
+          'permission',
+          'action',
+          'timestamp',
+          'performedBy',
+          'reason',
+        ],
         retentionPeriod: 365 * 24 * 60 * 60 * 1000, // 1 year
         encryptionRequired: true,
       },
       SOX: {
         name: 'Sarbanes-Oxley Act',
-        requiredFields: ['userId', 'permission', 'action', 'timestamp', 'performedBy', 'businessJustification'],
+        requiredFields: [
+          'userId',
+          'permission',
+          'action',
+          'timestamp',
+          'performedBy',
+          'businessJustification',
+        ],
         retentionPeriod: 7 * 365 * 24 * 60 * 60 * 1000, // 7 years
         encryptionRequired: true,
       },
@@ -204,7 +218,9 @@ class PermissionAuditService {
     }
 
     if (missingFields.length > 0) {
-      throw new Error(`Missing required fields for ${framework}: ${missingFields.join(', ')}`);
+      throw new Error(
+        `Missing required fields for ${framework}: ${missingFields.join(', ')}`
+      );
     }
   }
 
@@ -280,7 +296,10 @@ class PermissionAuditService {
       // Add PCI DSS specific fields
       audit.set('pciRelevant', true);
       audit.set('dataClassification', this.classifyDataSensitivity(data));
-      audit.set('retentionDate', this.calculateRetentionDate(data.complianceFramework));
+      audit.set(
+        'retentionDate',
+        this.calculateRetentionDate(data.complianceFramework)
+      );
 
       await audit.save(null, { useMasterKey: true });
 
@@ -355,7 +374,10 @@ class PermissionAuditService {
       return 'high';
     }
 
-    if (data.action === 'EMERGENCY_PERMISSION' || data.severity === 'critical') {
+    if (
+      data.action === 'EMERGENCY_PERMISSION'
+      || data.severity === 'critical'
+    ) {
       return 'high';
     }
 
@@ -377,7 +399,9 @@ class PermissionAuditService {
    */
   calculateRetentionDate(framework) {
     const frameworkConfig = this.complianceFrameworks[framework];
-    const retentionPeriod = frameworkConfig ? frameworkConfig.retentionPeriod : 365 * 24 * 60 * 60 * 1000;
+    const retentionPeriod = frameworkConfig
+      ? frameworkConfig.retentionPeriod
+      : 365 * 24 * 60 * 60 * 1000;
 
     return new Date(Date.now() + retentionPeriod);
   }
@@ -464,12 +488,16 @@ class PermissionAuditService {
       await reviewTask.save(null, { useMasterKey: true });
 
       // Send notification (would integrate with notification system)
-      logger.logSecurityEvent('IMMEDIATE_REVIEW_TRIGGERED', auditRecord.get('userId'), {
-        auditId: auditRecord.id,
-        reviewTaskId: reviewTask.id,
-        severity: auditRecord.get('severity'),
-        action: auditRecord.get('action'),
-      });
+      logger.logSecurityEvent(
+        'IMMEDIATE_REVIEW_TRIGGERED',
+        auditRecord.get('userId'),
+        {
+          auditId: auditRecord.id,
+          reviewTaskId: reviewTask.id,
+          severity: auditRecord.get('severity'),
+          action: auditRecord.get('action'),
+        }
+      );
     } catch (error) {
       logger.error('Error triggering immediate review:', error);
     }
@@ -521,7 +549,11 @@ class PermissionAuditService {
       const auditRecords = await auditQuery.find({ useMasterKey: true });
 
       // Generate report
-      const report = await this.processAuditRecords(auditRecords, format, includeMetadata);
+      const report = await this.processAuditRecords(
+        auditRecords,
+        format,
+        includeMetadata
+      );
 
       logger.logSecurityEvent('COMPLIANCE_REPORT_GENERATED', null, {
         framework: complianceFramework,
@@ -597,7 +629,9 @@ class PermissionAuditService {
           };
 
           if (includeMetadata) {
-            recordData.metadata = this.decryptSensitiveData(record.get('metadata'));
+            recordData.metadata = this.decryptSensitiveData(
+              record.get('metadata')
+            );
             recordData.reason = record.get('reason');
             recordData.context = record.get('context');
           }
@@ -612,7 +646,8 @@ class PermissionAuditService {
 
       if (criticalCount > 0) {
         report.summary.complianceStatus = 'non-compliant';
-      } else if (highCount > 10) { // Threshold for review
+      } else if (highCount > 10) {
+        // Threshold for review
         report.summary.complianceStatus = 'requires-review';
       }
 
@@ -651,12 +686,19 @@ class PermissionAuditService {
 
       // Create decipher with explicit options for GCM mode
       const decipherOptions = { authTagLength: 16 }; // Explicit 16-byte auth tag length
-      const decipher = crypto.createDecipheriv(algorithm, key, Buffer.from(data.iv, 'hex'), decipherOptions);
+      const decipher = crypto.createDecipheriv(
+        algorithm,
+        key,
+        Buffer.from(data.iv, 'hex'),
+        decipherOptions
+      );
 
       // Set authentication tag with explicit length validation for GCM mode
       const authTag = Buffer.from(data.authTag, 'hex');
       if (authTag.length !== 16) {
-        throw new Error('Invalid authentication tag length. Expected 16 bytes for GCM mode');
+        throw new Error(
+          'Invalid authentication tag length. Expected 16 bytes for GCM mode'
+        );
       }
       decipher.setAuthTag(authTag);
 
@@ -685,10 +727,7 @@ class PermissionAuditService {
    */
   async getAuditStatistics(params = {}) {
     try {
-      const {
-        timeFrame = '30d',
-        complianceFramework = 'PCI_DSS',
-      } = params;
+      const { timeFrame = '30d', complianceFramework = 'PCI_DSS' } = params;
 
       // Calculate date range
       const endDate = new Date();
@@ -761,7 +800,10 @@ class PermissionAuditService {
       const highEvents = stats.eventsBySeverity.high;
       const { pendingReviews } = stats;
 
-      stats.complianceScore = Math.max(0, 100 - (criticalEvents * 20) - (highEvents * 5) - (pendingReviews * 2));
+      stats.complianceScore = Math.max(
+        0,
+        100 - criticalEvents * 20 - highEvents * 5 - pendingReviews * 2
+      );
 
       return stats;
     } catch (error) {

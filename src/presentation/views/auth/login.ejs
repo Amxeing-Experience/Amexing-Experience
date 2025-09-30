@@ -1,9 +1,10 @@
-<%- include('../auth-layout', {
+<%- include('../templates/auth-layout', {
     title: 'Login - Amexing',
-    body: include('../partials/dashboard-login', {
+    body: include('../molecules/auth/login-form', {
         error: typeof error !== 'undefined' ? error : null,
         message: typeof message !== 'undefined' ? message : null,
-        returnTo: typeof returnTo !== 'undefined' ? returnTo : null,
+        csrfToken: typeof csrfToken !== 'undefined' ? csrfToken : '',
+        redirectTo: typeof returnTo !== 'undefined' ? returnTo : null,
         oauthProviders: [
             { name: 'google', displayName: 'Google' },
             { name: 'microsoft', displayName: 'Microsoft' },

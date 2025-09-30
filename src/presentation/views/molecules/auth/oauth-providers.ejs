@@ -1,0 +1,512 @@
+<%
+/**
+ * OAuth Providers Molecule
+ * Collection of OAuth provider buttons with corporate branding support
+ *
+ * @param {array} providers - Array of OAuth providers to display
+ * @param {string} action - OAuth action type (login, register, connect)
+ * @param {object} corporate - Corporate branding configuration
+ * @param {boolean} showDivider - Whether to show divider with "or" text
+ * @param {string} dividerText - Custom divider text
+ * @param {string} size - Button size (sm, md, lg)
+ * @param {boolean} vertical - Stack buttons vertically
+ */
+
+// Default parameters
+const oauthProviders = typeof providers !== 'undefined' ? providers : ['google', 'microsoft', 'apple'];
+const oauthAction = typeof action !== 'undefined' ? action : 'login';
+const oauthCorporate = typeof corporate !== 'undefined' ? corporate : null;
+const oauthShowDivider = typeof showDivider !== 'undefined' ? showDivider : true;
+const oauthDividerText = typeof dividerText !== 'undefined' ? dividerText : 'or';
+const oauthSize = typeof size !== 'undefined' ? size : 'md';
+const oauthVertical = typeof vertical !== 'undefined' ? vertical : true;
+
+// Action text mapping
+const actionText = {
+    login: 'Sign in with',
+    register: 'Sign up with',
+    connect: 'Connect with',
+    continue: 'Continue with'
+};
+
+const baseText = actionText[oauthAction] || actionText.login;
+
+// Corporate OAuth configuration
+const hasCorporateOAuth = oauthCorporate && (oauthCorporate.googleDomain || oauthCorporate.microsoftTenant);
+%>
+
+<div class="oauth-providers-container">
+    <!-- Corporate OAuth Section -->
+    <% if (hasCorporateOAuth) { %>
+        <div class="corporate-oauth-section mb-4">
+            <div class="corporate-header text-center mb-3">
+                <% if (oauthCorporate.logo) { %>
+                    <img src="<%= oauthCorporate.logo %>"
+                         alt="<%= oauthCorporate.name %>"
+                         class="corporate-logo mb-2"
+                         style="height: 40px; width: auto;">
+                <% } %>
+                <h6 class="corporate-title text-muted mb-0">
+                    <%= oauthCorporate.name %> Employee Access
+                </h6>
+            </div>
+
+            <div class="corporate-buttons d-flex flex-column gap-2">
+                <!-- Corporate Google -->
+                <% if (oauthCorporate.googleDomain) { %>
+                    <%- include('../../atoms/auth/oauth-button', {
+                        provider: 'google',
+                        text: `${baseText} ${oauthCorporate.name} Google`,
+                        href: `/auth/google/corporate?domain=${oauthCorporate.googleDomain}`,
+                        size: oauthSize,
+                        variant: 'outlined',
+                        corporate: oauthCorporate
+                    }) %>
+                <% } %>
+
+                <!-- Corporate Microsoft -->
+                <% if (oauthCorporate.microsoftTenant) { %>
+                    <%- include('../../atoms/auth/oauth-button', {
+                        provider: 'microsoft',
+                        text: `${baseText} ${oauthCorporate.name} Microsoft`,
+                        href: `/auth/microsoft/corporate?tenant=${oauthCorporate.microsoftTenant}`,
+                        size: oauthSize,
+                        variant: 'outlined',
+                        corporate: oauthCorporate
+                    }) %>
+                <% } %>
+            </div>
+        </div>
+
+        <!-- Corporate Divider -->
+        <% if (oauthProviders.length > 0) { %>
+            <div class="oauth-divider corporate-divider mb-4">
+                <div class="divider-line"></div>
+                <div class="divider-text">
+                    <small class="text-muted bg-white px-3">or use personal account</small>
+                </div>
+                <div class="divider-line"></div>
+            </div>
+        <% } %>
+    <% } %>
+
+    <!-- Standard OAuth Providers -->
+    <% if (oauthProviders.length > 0) { %>
+        <div class="standard-oauth-section">
+            <div class="oauth-buttons <%= oauthVertical ? 'd-flex flex-column' : 'd-flex flex-wrap' %> gap-2">
+                <% oauthProviders.forEach(provider => { %>
+                    <%- include('../../atoms/auth/oauth-button', {
+                        provider: provider,
+                        text: `${baseText} ${provider.charAt(0).toUpperCase() + provider.slice(1)}`,
+                        href: `/auth/${provider}`,
+                        size: oauthSize,
+                        variant: 'outlined'
+                    }) %>
+                <% }) %>
+            </div>
+        </div>
+    <% } %>
+
+    <!-- Standard Divider (if requested and not corporate) -->
+    <% if (oauthShowDivider && !hasCorporateOAuth && (oauthProviders.length > 0)) { %>
+        <div class="oauth-divider standard-divider my-4">
+            <div class="divider-line"></div>
+            <div class="divider-text">
+                <small class="text-muted bg-white px-3"><%= oauthDividerText %></small>
+            </div>
+            <div class="divider-line"></div>
+        </div>
+    <% } %>
+
+    <!-- Help Text -->
+    <div class="oauth-help text-center mt-3">
+        <small class="text-muted">
+            <i class="ti ti-shield-lock me-1"></i>
+            Secure authentication powered by industry-standard OAuth 2.0
+        </small>
+    </div>
+
+    <!-- Provider Status Display -->
+    <div class="oauth-status d-none" id="oauthStatus">
+        <div class="alert alert-info d-flex align-items-center">
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="oauth-status-text">Connecting...</span>
+        </div>
+    </div>
+</div>
+
+<style>
+    .oauth-providers-container {
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    /* Corporate Section */
+    .corporate-oauth-section {
+        background: rgba(248, 249, 250, 0.8);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .corporate-logo {
+        filter: grayscale(20%);
+        transition: filter 0.3s ease;
+    }
+
+    .corporate-oauth-section:hover .corporate-logo {
+        filter: grayscale(0%);
+    }
+
+    .corporate-title {
+        font-weight: 600;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .corporate-buttons .oauth-btn {
+        margin-bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        border-color: rgba(0,0,0,0.1);
+    }
+
+    /* Dividers */
+    .oauth-divider {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        position: relative;
+    }
+
+    .divider-line {
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #e0e6ed, transparent);
+    }
+
+    .divider-text {
+        flex: 0 0 auto;
+        margin: 0 1rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    .corporate-divider .divider-text small {
+        background: rgba(248, 249, 250, 0.9) !important;
+        font-weight: 500;
+        color: #6c757d;
+    }
+
+    /* OAuth Buttons Layout */
+    .oauth-buttons:not(.flex-column) {
+        justify-content: center;
+    }
+
+    .oauth-buttons:not(.flex-column) .oauth-btn {
+        flex: 1;
+        max-width: 200px;
+    }
+
+    /* Standard OAuth Section */
+    .standard-oauth-section .oauth-btn {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .standard-oauth-section .oauth-btn:hover {
+        transform: translateY(-2px) scale(1.02);
+    }
+
+    /* Help Text */
+    .oauth-help {
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .oauth-help small {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #6c757d;
+    }
+
+    /* Status Display */
+    .oauth-status {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 250px;
+    }
+
+    .oauth-status.show {
+        display: block !important;
+        animation: slideInRight 0.3s ease-out;
+    }
+
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    /* Loading States */
+    .oauth-providers-container.loading .oauth-btn {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .oauth-providers-container.loading .oauth-btn:not(.active) {
+        opacity: 0.3;
+    }
+
+    /* Error States */
+    .oauth-providers-container.error .oauth-btn.error {
+        animation: errorShake 0.5s ease-in-out;
+        border-color: #dc3545;
+    }
+
+    @keyframes errorShake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-5px); }
+        75% { transform: translateX(5px); }
+    }
+
+    /* Success States */
+    .oauth-providers-container.success .oauth-btn.success {
+        background: #28a745;
+        border-color: #28a745;
+        color: white;
+        animation: successPulse 0.6s ease-in-out;
+    }
+
+    @keyframes successPulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+
+    /* Responsive Adjustments */
+    @media (max-width: 576px) {
+        .oauth-providers-container {
+            max-width: 100%;
+            padding: 0 0.5rem;
+        }
+
+        .corporate-oauth-section {
+            padding: 1rem;
+            margin: 0 -0.5rem;
+        }
+
+        .oauth-buttons:not(.flex-column) {
+            flex-direction: column;
+        }
+
+        .oauth-status {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            min-width: auto;
+        }
+    }
+
+    /* High Contrast Mode */
+    @media (prefers-contrast: high) {
+        .oauth-divider .divider-line {
+            background: #333;
+            height: 2px;
+        }
+
+        .corporate-oauth-section {
+            border-width: 2px;
+        }
+    }
+
+    /* Dark Theme Support */
+    [data-theme="dark"] .corporate-oauth-section {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    [data-theme="dark"] .corporate-title {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    [data-theme="dark"] .divider-text small {
+        background: rgba(33, 37, 41, 0.9) !important;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    [data-theme="dark"] .oauth-help small {
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    /* Print Styles */
+    @media print {
+        .oauth-providers-container {
+            max-width: none;
+        }
+
+        .oauth-help,
+        .oauth-status {
+            display: none;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.querySelector('.oauth-providers-container');
+    const oauthButtons = container.querySelectorAll('.oauth-btn');
+    const statusElement = document.getElementById('oauthStatus');
+
+    // Enhanced click handling for all OAuth buttons
+    oauthButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            const provider = this.getAttribute('data-provider');
+            const isCorporate = this.href.includes('/corporate');
+
+            // Show loading state
+            showOAuthStatus('connecting', provider, isCorporate);
+            container.classList.add('loading');
+            this.classList.add('active');
+
+            // Track OAuth attempt
+
+            // Optional analytics
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'oauth_login_attempt', {
+                    provider: provider,
+                    type: isCorporate ? 'corporate' : 'standard',
+                    action: '<%= oauthAction %>'
+                });
+            }
+
+            // Prevent double clicks
+            this.style.pointerEvents = 'none';
+        });
+
+        // Keyboard accessibility
+        button.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.click();
+            }
+        });
+    });
+
+    // Handle OAuth callback results
+    const urlParams = new URLSearchParams(window.location.search);
+    const oauthResult = urlParams.get('oauth');
+    const provider = urlParams.get('provider');
+
+    if (oauthResult && provider) {
+        const button = container.querySelector(`[data-provider="${provider}"]`);
+
+        if (oauthResult === 'success') {
+            showOAuthStatus('success', provider);
+            container.classList.add('success');
+            if (button) {
+                button.classList.add('success');
+                setTimeout(() => {
+                    // Redirect or show success message
+                    const redirectUrl = urlParams.get('redirect') || '/dashboard';
+                    window.location.href = redirectUrl;
+                }, 1500);
+            }
+        } else if (oauthResult === 'error') {
+            const errorMessage = urlParams.get('message') || 'Authentication failed';
+            showOAuthStatus('error', provider, false, errorMessage);
+            container.classList.add('error');
+            if (button) {
+                button.classList.add('error');
+                setTimeout(() => {
+                    button.classList.remove('error');
+                    button.style.pointerEvents = '';
+                }, 3000);
+            }
+        }
+
+        // Clean up URL
+        const cleanUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, cleanUrl);
+    }
+
+    function showOAuthStatus(type, provider, isCorporate = false, message = null) {
+        if (!statusElement) return;
+
+        const statusMessages = {
+            connecting: `Connecting to ${provider}${isCorporate ? ' (Corporate)' : ''}...`,
+            success: `Successfully connected to ${provider}!`,
+            error: message || `Failed to connect to ${provider}`
+        };
+
+        const statusIcons = {
+            connecting: 'ti-loader-2',
+            success: 'ti-check',
+            error: 'ti-alert-circle'
+        };
+
+        const statusColors = {
+            connecting: 'info',
+            success: 'success',
+            error: 'danger'
+        };
+
+        const statusText = statusElement.querySelector('.oauth-status-text');
+        const alert = statusElement.querySelector('.alert');
+        const spinner = statusElement.querySelector('.spinner-border');
+
+        if (statusText) statusText.textContent = statusMessages[type];
+
+        if (alert) {
+            alert.className = `alert alert-${statusColors[type]} d-flex align-items-center`;
+        }
+
+        if (type === 'connecting') {
+            spinner.style.display = 'inline-block';
+        } else {
+            spinner.style.display = 'none';
+            // Add icon for success/error
+            const iconHtml = `<i class="${statusIcons[type]} me-2"></i>`;
+            if (!statusText.previousElementSibling || !statusText.previousElementSibling.classList.contains('ti')) {
+                statusText.insertAdjacentHTML('beforebegin', iconHtml);
+            }
+        }
+
+        statusElement.classList.add('show');
+
+        // Auto-hide after delay
+        const hideDelay = type === 'error' ? 8000 : 3000;
+        setTimeout(() => {
+            statusElement.classList.remove('show');
+            container.classList.remove('loading', 'success', 'error');
+        }, hideDelay);
+    }
+
+    // Corporate OAuth domain validation
+    const corporateButtons = container.querySelectorAll('.corporate-buttons .oauth-btn');
+    corporateButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            // Could add domain validation here for corporate OAuth
+            const href = this.href;
+            if (href.includes('googleDomain=') || href.includes('tenant=')) {
+                // Additional corporate OAuth validation could go here
+            }
+        });
+    });
+
+        total: oauthButtons.length,
+        corporate: corporateButtons.length,
+        standard: oauthButtons.length - corporateButtons.length
+    });
+});
+</script>

@@ -13,7 +13,7 @@ class ParseTestSetup {
     this.testObjectIds = [];
     this.testPrefix = process.env.PARSE_PLATFORM_TEST_PREFIX || 'ParseTest_';
     this.testConfig = {
-      appId: process.env.PARSE_APPLICATION_ID,
+      appId: process.env.PARSE_APP_ID || process.env.PARSE_APPLICATION_ID,
       masterKey: process.env.PARSE_MASTER_KEY,
       serverURL: process.env.PARSE_SERVER_URL,
       javascriptKey: process.env.PARSE_JAVASCRIPT_KEY

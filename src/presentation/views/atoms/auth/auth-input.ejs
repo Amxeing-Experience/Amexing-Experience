@@ -1,0 +1,387 @@
+<%
+/**
+ * Auth Input Atom
+ * Specialized input component for authentication forms with Flexy styling
+ *
+ * @param {string} type - Input type (text, email, password, tel, etc.)
+ * @param {string} name - Input name attribute
+ * @param {string} id - Input id attribute
+ * @param {string} label - Input label text
+ * @param {string} placeholder - Placeholder text
+ * @param {boolean} required - Whether input is required
+ * @param {string} value - Default value
+ * @param {string} icon - Icon class (e.g., 'ti-mail', 'ti-user')
+ * @param {object} validation - Validation rules object
+ * @param {string} helpText - Help text below input
+ * @param {string} size - Input size (sm, md, lg, default: 'md')
+ * @param {boolean} floating - Whether to use floating labels
+ */
+
+// Default parameters
+const inputType = typeof type !== 'undefined' ? type : 'text';
+const inputName = typeof name !== 'undefined' ? name : '';
+const inputId = typeof id !== 'undefined' ? id : inputName || 'input_' + Math.random().toString(36).substr(2, 9);
+const inputLabel = typeof label !== 'undefined' ? label : '';
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : inputLabel;
+const inputRequired = typeof required !== 'undefined' ? required : false;
+const inputValue = typeof value !== 'undefined' ? value : '';
+const inputIcon = typeof icon !== 'undefined' ? icon : '';
+const inputValidation = typeof validation !== 'undefined' ? validation : {};
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const inputSize = typeof size !== 'undefined' ? size : 'md';
+const inputFloating = typeof floating !== 'undefined' ? floating : false;
+
+// Size configurations
+const sizeConfig = {
+    sm: { controlClass: 'form-control', inputClass: '', groupClass: 'input-group-sm' },
+    md: { controlClass: 'form-control form-control-lg', inputClass: '', groupClass: '' },
+    lg: { controlClass: 'form-control form-control-lg', inputClass: 'fs-5', groupClass: 'input-group-lg' }
+};
+
+const config = sizeConfig[inputSize] || sizeConfig.md;
+
+// Build validation attributes
+let validationAttrs = '';
+if (inputValidation.minlength) validationAttrs += ` minlength="${inputValidation.minlength}"`;
+if (inputValidation.maxlength) validationAttrs += ` maxlength="${inputValidation.maxlength}"`;
+if (inputValidation.pattern) validationAttrs += ` pattern="${inputValidation.pattern}"`;
+if (inputValidation.min) validationAttrs += ` min="${inputValidation.min}"`;
+if (inputValidation.max) validationAttrs += ` max="${inputValidation.max}"`;
+
+// Auto-complete mapping
+const autocompleteMap = {
+    email: 'email',
+    password: 'current-password',
+    'new-password': 'new-password',
+    username: 'username',
+    'first-name': 'given-name',
+    'last-name': 'family-name',
+    tel: 'tel',
+    'zip-code': 'postal-code'
+};
+
+const autocomplete = autocompleteMap[inputName] || autocompleteMap[inputType] || 'off';
+%>
+
+<div class="auth-input-wrapper mb-3">
+    <!-- Label -->
+    <% if (inputLabel && !inputFloating) { %>
+        <label for="<%= inputId %>" class="form-label text-dark fw-semibold d-flex align-items-center">
+            <% if (inputIcon) { %>
+                <i class="<%= inputIcon %> me-2 text-primary"></i>
+            <% } %>
+            <%= inputLabel %>
+            <% if (inputRequired) { %>
+                <span class="text-danger ms-1">*</span>
+            <% } %>
+        </label>
+    <% } %>
+
+    <!-- Input Group -->
+    <div class="input-group <%= config.groupClass %> auth-input-group">
+        <!-- Icon Prefix -->
+        <% if (inputIcon && !inputFloating) { %>
+            <span class="input-group-text bg-light-subtle border-end-0">
+                <i class="<%= inputIcon %> text-muted"></i>
+            </span>
+        <% } %>
+
+        <!-- Floating Label Container -->
+        <% if (inputFloating) { %>
+            <div class="form-floating flex-grow-1">
+        <% } %>
+
+        <!-- Main Input -->
+        <input
+            type="<%= inputType %>"
+            class="<%= config.controlClass %> <%= config.inputClass %> <%= inputIcon && !inputFloating ? 'border-start-0' : '' %> <%= inputFloating ? 'form-control' : '' %>"
+            id="<%= inputId %>"
+            name="<%= inputName %>"
+            placeholder="<%= inputFloating ? inputLabel : inputPlaceholder %>"
+            value="<%= inputValue %>"
+            <% if (inputRequired) { %>required<% } %>
+            autocomplete="<%= autocomplete %>"
+            <%= validationAttrs %>
+            data-auth-input="<%= inputName %>"
+        >
+
+        <!-- Floating Label -->
+        <% if (inputFloating) { %>
+            <label for="<%= inputId %>" class="text-muted">
+                <% if (inputIcon) { %>
+                    <i class="<%= inputIcon %> me-2"></i>
+                <% } %>
+                <%= inputLabel %>
+                <% if (inputRequired) { %>
+                    <span class="text-danger">*</span>
+                <% } %>
+            </label>
+            </div>
+        <% } %>
+
+        <!-- Password Toggle Button -->
+        <% if (inputType === 'password') { %>
+            <button class="btn btn-outline-secondary password-toggle"
+                    type="button"
+                    data-target="<%= inputId %>"
+                    aria-label="Toggle password visibility">
+                <i class="ti ti-eye password-toggle-icon"></i>
+            </button>
+        <% } %>
+
+        <!-- Validation Feedback -->
+        <div class="invalid-feedback">
+            <% if (inputValidation.message) { %>
+                <%= inputValidation.message %>
+            <% } else { %>
+                Please provide a valid <%= inputLabel.toLowerCase() %>.
+            <% } %>
+        </div>
+
+        <div class="valid-feedback">
+            Looks good!
+        </div>
+    </div>
+
+    <!-- Help Text -->
+    <% if (inputHelpText) { %>
+        <div class="form-text text-muted mt-1">
+            <i class="ti ti-info-circle me-1"></i>
+            <%= inputHelpText %>
+        </div>
+    <% } %>
+
+    <!-- Real-time Validation Display -->
+    <div class="validation-status mt-1 d-none">
+        <small class="validation-message"></small>
+    </div>
+</div>
+
+<style>
+    .auth-input-wrapper {
+        position: relative;
+    }
+
+    .auth-input-group .form-control {
+        transition: all 0.3s ease;
+        border: 1px solid #e0e6ed;
+        background: rgba(255, 255, 255, 0.8);
+    }
+
+    .auth-input-group .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        background: rgba(255, 255, 255, 0.95);
+        transform: translateY(-1px);
+    }
+
+    .auth-input-group .input-group-text {
+        border: 1px solid #e0e6ed;
+        background: rgba(248, 249, 250, 0.8);
+        transition: all 0.3s ease;
+    }
+
+    .auth-input-group:focus-within .input-group-text {
+        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.1);
+    }
+
+    .auth-input-group:focus-within .input-group-text i {
+        color: #667eea !important;
+    }
+
+    /* Floating Labels */
+    .form-floating .form-control:focus,
+    .form-floating .form-control:not(:placeholder-shown) {
+        padding-top: 1.625rem;
+        padding-bottom: 0.625rem;
+    }
+
+    .form-floating label {
+        transition: all 0.3s ease;
+    }
+
+    .form-floating .form-control:focus ~ label,
+    .form-floating .form-control:not(:placeholder-shown) ~ label {
+        transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+        color: #667eea;
+    }
+
+    /* Password Toggle */
+    .password-toggle {
+        border-left: none !important;
+        background: rgba(248, 249, 250, 0.8);
+        transition: all 0.3s ease;
+    }
+
+    .password-toggle:hover {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+    }
+
+    .password-toggle-icon {
+        transition: all 0.3s ease;
+    }
+
+    /* Validation States */
+    .was-validated .auth-input-group .form-control:valid,
+    .auth-input-group .form-control.is-valid {
+        border-color: #28a745;
+        background-image: none;
+    }
+
+    .was-validated .auth-input-group .form-control:invalid,
+    .auth-input-group .form-control.is-invalid {
+        border-color: #dc3545;
+        background-image: none;
+    }
+
+    .validation-status.show {
+        display: block !important;
+    }
+
+    .validation-message.valid {
+        color: #28a745;
+    }
+
+    .validation-message.invalid {
+        color: #dc3545;
+    }
+
+    /* Loading State */
+    .auth-input-wrapper.loading .form-control {
+        background-image: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.1), transparent);
+        background-size: 200% 100%;
+        animation: loading-shimmer 1.5s infinite;
+    }
+
+    @keyframes loading-shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 576px) {
+        .auth-input-group .form-control {
+            font-size: 16px; /* Prevent zoom on iOS */
+        }
+
+        .form-floating .form-control {
+            font-size: 16px !important;
+        }
+    }
+
+    /* High contrast mode support */
+    @media (prefers-contrast: high) {
+        .auth-input-group .form-control {
+            border-width: 2px;
+        }
+
+        .auth-input-group .form-control:focus {
+            border-width: 3px;
+        }
+    }
+
+    /* Dark theme support */
+    [data-theme="dark"] .auth-input-group .form-control {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    [data-theme="dark"] .auth-input-group .input-group-text {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.7);
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Password toggle functionality
+    const passwordToggles = document.querySelectorAll('.password-toggle');
+
+    passwordToggles.forEach(toggle => {
+        toggle.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const targetInput = document.getElementById(targetId);
+            const icon = this.querySelector('.password-toggle-icon');
+
+            if (targetInput.type === 'password') {
+                targetInput.type = 'text';
+                icon.className = 'ti ti-eye-off password-toggle-icon';
+            } else {
+                targetInput.type = 'password';
+                icon.className = 'ti ti-eye password-toggle-icon';
+            }
+        });
+    });
+
+    // Real-time validation
+    const authInputs = document.querySelectorAll('[data-auth-input]');
+
+    authInputs.forEach(input => {
+        const wrapper = input.closest('.auth-input-wrapper');
+        const validationStatus = wrapper.querySelector('.validation-status');
+        const validationMessage = wrapper.querySelector('.validation-message');
+
+        input.addEventListener('input', function() {
+            clearTimeout(this.validationTimeout);
+
+            this.validationTimeout = setTimeout(() => {
+                validateInput(this, validationStatus, validationMessage);
+            }, 500);
+        });
+
+        input.addEventListener('blur', function() {
+            validateInput(this, validationStatus, validationMessage);
+        });
+    });
+
+    function validateInput(input, statusElement, messageElement) {
+        const isValid = input.checkValidity();
+        const inputType = input.getAttribute('data-auth-input');
+
+        if (statusElement && messageElement) {
+            statusElement.classList.add('show');
+
+            if (isValid && input.value.length > 0) {
+                messageElement.className = 'validation-message valid';
+                messageElement.innerHTML = '<i class="ti ti-check me-1"></i>Valid ' + inputType;
+                input.classList.remove('is-invalid');
+                input.classList.add('is-valid');
+            } else if (!isValid && input.value.length > 0) {
+                messageElement.className = 'validation-message invalid';
+                messageElement.innerHTML = '<i class="ti ti-x me-1"></i>' + input.validationMessage;
+                input.classList.remove('is-valid');
+                input.classList.add('is-invalid');
+            } else {
+                statusElement.classList.remove('show');
+                input.classList.remove('is-valid', 'is-invalid');
+            }
+        }
+    }
+
+    // Auto-capitalize first letter for name fields
+    const nameInputs = document.querySelectorAll('[data-auth-input*="name"], [data-auth-input*="Name"]');
+    nameInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            if (this.value.length === 1) {
+                this.value = this.value.charAt(0).toUpperCase();
+            }
+        });
+    });
+
+    // Email validation enhancement
+    const emailInputs = document.querySelectorAll('[type="email"]');
+    emailInputs.forEach(input => {
+        input.addEventListener('blur', function() {
+            if (this.value) {
+                // Basic email format correction
+                this.value = this.value.toLowerCase().trim();
+            }
+        });
+    });
+
+});
+</script>

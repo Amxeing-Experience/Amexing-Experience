@@ -1,8 +1,32 @@
-<%- include('../layout', {
-    body: '<div style="text-align: center; padding: 3rem 0;">' +
-          '<div style="font-size: 4rem; color: #3c3; margin-bottom: 1rem;">✓</div>' +
-          '<h2 style="color: #333; margin-bottom: 1rem;">' + (typeof title !== "undefined" ? title : "Email Verified Successfully") + '</h2>' +
-          '<p style="color: #666; margin-bottom: 2rem;">' + (typeof message !== "undefined" ? message : "Your email has been successfully verified.") + '</p>' +
-          '<a href="/login" class="btn">Go to Login</a>' +
-          '</div>'
+<%- include('../templates/auth-layout', {
+    title: 'Email Verified - Amexing',
+    page: 'email-verification-success',
+    showAuthHeader: true,
+    headerConfig: {
+        title: 'Email Verification Complete',
+        subtitle: 'Your email address has been successfully verified'
+    },
+    content: include('../molecules/auth/success-message', {
+        type: 'email-verified',
+        title: typeof title !== 'undefined' ? title : 'Email Verified Successfully',
+        message: typeof message !== 'undefined' ? message : 'Your email address has been successfully verified. You can now access all features of your account.',
+        actions: [
+            {
+                text: 'Go to Login',
+                href: '/auth/login',
+                icon: 'login',
+                primary: true
+            },
+            {
+                text: 'Visit Dashboard',
+                href: '/dashboard',
+                icon: 'dashboard'
+            }
+        ],
+        autoRedirect: {
+            url: '/dashboard',
+            destination: 'dashboard',
+            delay: 10
+        }
+    })
 }) %>

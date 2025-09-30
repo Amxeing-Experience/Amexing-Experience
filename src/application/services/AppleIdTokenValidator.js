@@ -72,7 +72,10 @@ class AppleIdTokenValidator {
       return payload;
     } catch (error) {
       logger.error('Apple ID token verification failed:', error);
-      throw new Parse.Error(Parse.Error.OTHER_CAUSE, 'Failed to verify Apple ID token');
+      throw new Parse.Error(
+        Parse.Error.OTHER_CAUSE,
+        'Failed to verify Apple ID token'
+      );
     }
   }
 
@@ -157,29 +160,31 @@ class AppleIdTokenValidator {
     return new Promise((resolve, reject) => {
       const url = 'https://appleid.apple.com/auth/keys';
 
-      https.get(url, (response) => {
-        let data = '';
+      https
+        .get(url, (response) => {
+          let data = '';
 
-        response.on('data', (chunk) => {
-          data += chunk;
-        });
+          response.on('data', (chunk) => {
+            data += chunk;
+          });
 
-        response.on('end', () => {
-          try {
-            const keys = JSON.parse(data);
-            const publicKeys = {};
+          response.on('end', () => {
+            try {
+              const keys = JSON.parse(data);
+              const publicKeys = {};
 
-            keys.keys.forEach((_key) => {
-              const publicKey = this.jwkToPublicKey(_key);
-              publicKeys[_key.kid] = publicKey;
-            });
+              keys.keys.forEach((_key) => {
+                const publicKey = this.jwkToPublicKey(_key);
+                publicKeys[_key.kid] = publicKey;
+              });
 
-            resolve(publicKeys);
-          } catch (jwkError) {
-            reject(jwkError);
-          }
-        });
-      }).on('error', reject);
+              resolve(publicKeys);
+            } catch (jwkError) {
+              reject(jwkError);
+            }
+          });
+        })
+        .on('error', reject);
     });
   }
 

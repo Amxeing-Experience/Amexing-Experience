@@ -18,7 +18,7 @@
 
                 <div class="row">
                     <div class="col-md-4">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-calendar-event',
                             title: 'Today\'s Bookings',
                             value: typeof stats !== 'undefined' ? stats.todayBookings : '23',
@@ -28,7 +28,7 @@
                         }) %>
                     </div>
                     <div class="col-md-4">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-car',
                             title: 'Active Drivers',
                             value: typeof stats !== 'undefined' ? stats.activeDrivers : '87',
@@ -38,7 +38,7 @@
                         }) %>
                     </div>
                     <div class="col-md-4">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-building',
                             title: 'Active Clients',
                             value: typeof stats !== 'undefined' ? stats.activeClients : '42',

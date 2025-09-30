@@ -1,0 +1,115 @@
+<%
+/**
+ * Metric Card Atom
+ * Dashboard metric display card component
+ *
+ * @param {string} title - Card title
+ * @param {string|number} value - Main metric value
+ * @param {string} icon - Icon name for the metric
+ * @param {string} color - Color variant (primary, success, warning, danger, etc.)
+ * @param {string} trend - Trend indicator (up, down, stable, default: '')
+ * @param {string|number} trendValue - Trend percentage/value (optional)
+ * @param {string} size - Card size (sm, md, lg, default: 'md')
+ */
+
+// Default parameters
+const cardTitle = typeof title !== 'undefined' ? title : 'Metric';
+const cardValue = typeof value !== 'undefined' ? value : '0';
+const cardIcon = typeof icon !== 'undefined' ? icon : 'chart-bar';
+const cardColor = typeof color !== 'undefined' ? color : 'primary';
+const cardTrend = typeof trend !== 'undefined' ? trend : '';
+const cardTrendValue = typeof trendValue !== 'undefined' ? trendValue : '';
+const cardSize = typeof size !== 'undefined' ? size : 'md';
+
+// Size configurations
+const sizeConfig = {
+    sm: { padding: 'p-3', titleSize: 'fs-6', valueSize: 'fs-4', iconSize: '4' },
+    md: { padding: 'p-4', titleSize: 'fs-5', valueSize: 'fs-2', iconSize: '5' },
+    lg: { padding: 'p-5', titleSize: 'fs-4', valueSize: 'fs-1', iconSize: '6' }
+};
+
+const config = sizeConfig[cardSize] || sizeConfig.md;
+
+// Trend configuration
+const trendConfig = {
+    up: { icon: 'ti-trending-up', color: 'text-success', bgColor: 'bg-success' },
+    down: { icon: 'ti-trending-down', color: 'text-danger', bgColor: 'bg-danger' },
+    stable: { icon: 'ti-minus', color: 'text-warning', bgColor: 'bg-warning' }
+};
+
+const trendInfo = trendConfig[cardTrend] || {};
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body <%= config.padding %>">
+        <div class="d-flex align-items-center justify-content-between">
+            <div class="flex-grow-1">
+                <!-- Card Title -->
+                <h6 class="card-title text-muted mb-2 <%= config.titleSize %> fw-normal">
+                    <%= cardTitle %>
+                </h6>
+
+                <!-- Main Value -->
+                <div class="d-flex align-items-baseline mb-2">
+                    <h2 class="mb-0 <%= config.valueSize %> fw-bold text-dark">
+                        <%= cardValue %>
+                    </h2>
+
+                    <!-- Trend Indicator -->
+                    <% if (cardTrend && trendInfo.icon) { %>
+                        <div class="ms-2 d-flex align-items-center">
+                            <span class="badge <%= trendInfo.bgColor %>-subtle <%= trendInfo.color %> d-flex align-items-center">
+                                <i class="<%= trendInfo.icon %> me-1"></i>
+                                <% if (cardTrendValue) { %><%= cardTrendValue %><% } %>
+                            </span>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+
+            <!-- Icon -->
+            <div class="ms-3">
+                <div class="round-48 d-flex align-items-center justify-content-center bg-<%= cardColor %>-subtle">
+                    <i class="ti ti-<%= cardIcon %> fs-<%= config.iconSize %> text-<%= cardColor %>"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Optional Footer for Additional Info -->
+        <% if (typeof footer !== 'undefined' && footer) { %>
+            <div class="pt-3 border-top mt-3">
+                <small class="text-muted">
+                    <%= footer %>
+                </small>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<style>
+    /* Metric Card Specific Styles */
+    .round-48 {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+    }
+
+    /* Hover effect for metric cards */
+    .metric-card-hover {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+    .metric-card-hover:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 576px) {
+        .metric-card .round-48 {
+            width: 40px;
+            height: 40px;
+        }
+    }
+</style>

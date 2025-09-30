@@ -150,7 +150,7 @@ class SecureSecretsManager {
         const trimmedLine = line.trim();
         if (trimmedLine && !trimmedLine.startsWith('#')) {
           const [_key, encryptedValue] = trimmedLine.split('=', 2);
-          if (key && encryptedValue) { // eslint-disable-line no-undef
+          if (_key && encryptedValue) {
             secrets[_key.trim()] = this.decryptSecret(encryptedValue.trim());
             this.loadedSecrets.add(_key.trim());
           }

@@ -40,12 +40,10 @@ const AmexingAdmin = {
 
     // Initialize the application
     init: function() {
-        console.log('🚀 Amexing Admin Dashboard initializing...');
         this.setupGlobalComponents();
         this.setupEventHandlers();
         this.setupNotifications();
         this.initializeDataTables();
-        console.log('✅ Dashboard initialized successfully');
     },
 
     // Setup global UI components
@@ -169,31 +167,23 @@ const AmexingAdmin = {
 
     // Initialize DataTables
     initializeDataTables: function() {
-        // Enhanced diagnostics for CDN loading issues
         if (typeof $ === 'undefined') {
-            console.error('❌ jQuery is not loaded at all');
+            console.error('❌ jQuery not loaded');
             return;
         }
 
         if (typeof $.fn.DataTable === 'undefined') {
-            console.warn('⚠️ DataTables library not loaded, checking CDN resources...');
-
-            // Check if CDN scripts are being blocked
-            this.checkCdnStatus();
-
-            // Stop infinite retry after reasonable attempts
             this.retryCount = (this.retryCount || 0) + 1;
-            if (this.retryCount > 10) {
-                console.error('❌ DataTables CDN failed after 10 attempts, switching to fallback mode');
+
+            if (this.retryCount > 3) {
+                console.warn('⚠️ DataTables CDN failed, loading local fallback');
                 this.loadLocalDataTables();
                 return;
             }
 
-            setTimeout(() => this.initializeDataTables(), 1000);
+            setTimeout(() => this.initializeDataTables(), 300);
             return;
         }
-
-        console.log('📊 DataTables library detected, initializing tables...');
 
         // Auto-initialize tables with class 'data-table'
         $('.data-table').each(function() {
@@ -202,7 +192,6 @@ const AmexingAdmin = {
 
             // Skip if already initialized
             if ($.fn.DataTable.isDataTable($table[0])) {
-                console.log('📊 Table already initialized, skipping:', $table.attr('id'));
                 return;
             }
 
@@ -221,7 +210,6 @@ const AmexingAdmin = {
                     window.usersTable = dt;
                 }
 
-                console.log('✅ DataTable initialized successfully for:', $table.attr('id') || $table.get(0).tagName);
             } catch (error) {
                 console.error('❌ Error initializing DataTable:', error);
             }
@@ -494,26 +482,26 @@ const AmexingAdmin = {
 
     // Check CDN status for debugging
     checkCdnStatus: function() {
+        // Check if we already verified CDN this session
+        if (sessionStorage.getItem('cdnStatusChecked') === 'true') {
+            return;
+        }
+
+        sessionStorage.setItem('cdnStatusChecked', 'true');
+
         const cdnUrls = [
             'https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js',
             'https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js'
         ];
 
         cdnUrls.forEach(url => {
-            fetch(url, { method: 'HEAD' })
-                .then(response => {
-                    console.log(`CDN Status for ${url}:`, response.status, response.statusText);
-                })
-                .catch(error => {
-                    console.error(`CDN Error for ${url}:`, error);
-                });
+            fetch(url, { method: 'HEAD', cache: 'force-cache' })
+                .catch(() => {}); // Silent check, errors handled by fallback
         });
     },
 
     // Load DataTables locally as fallback
     loadLocalDataTables: function() {
-        console.log('🔄 Loading local DataTables fallback...');
-
         // Load local DataTables CSS
         const cssLink = document.createElement('link');
         cssLink.rel = 'stylesheet';
@@ -528,30 +516,23 @@ const AmexingAdmin = {
             script.src = src;
             script.onload = callback;
             script.onerror = () => {
-                console.error('❌ Failed to load local DataTables script:', src);
+                console.error('Failed to load local DataTables script:', src);
             };
             document.head.appendChild(script);
         };
 
         // Load DataTables core first, then Bootstrap integration
         loadScript('/assets/libs/datatables/jquery.dataTables.min.js', () => {
-            console.log('📥 Local DataTables core loaded');
-
             loadScript('/assets/libs/datatables/dataTables.bootstrap5.min.js', () => {
-                console.log('📥 Local DataTables Bootstrap integration loaded');
-
                 // Reset retry counter and try initialization again
                 this.retryCount = 0;
 
                 // Wait a moment for scripts to be ready, then reinitialize
                 setTimeout(() => {
-                    console.log('🔄 Reinitializing with local DataTables...');
                     this.initializeDataTables();
                 }, 500);
             });
         });
-
-        this.showNotification('info', 'Cargando DataTables desde archivos locales...');
     }
 };
 
@@ -565,8 +546,6 @@ window.AmexingAdmin = AmexingAdmin;
 
 // jQuery document ready (for DataTables and other jQuery-dependent features)
 $(document).ready(function() {
-    console.log('📋 jQuery ready - DataTables and enhanced features available');
-
     // Set global AJAX defaults for DataTables
     $.ajaxSetup({
         headers: {
@@ -578,7 +557,6 @@ $(document).ready(function() {
     // Backup DataTables initialization - retry if not initialized yet
     setTimeout(function() {
         if (typeof $.fn.DataTable !== 'undefined' && $('.data-table:not(.dataTable)').length > 0) {
-            console.log('🔄 Backup DataTables initialization triggered');
             AmexingAdmin.initializeDataTables();
         }
     }, 1000);
@@ -591,24 +569,20 @@ $(document).ready(function() {
         // Role-specific initialization
         document.addEventListener('DOMContentLoaded', function() {
             const userRole = '<%= userRole %>';
-            console.log('👤 User role detected:', userRole);
 
             // Role-specific UI adjustments
             switch(userRole) {
                 case 'superadmin':
-                    console.log('🔴 SuperAdmin features enabled');
                     // Enable advanced features for superadmin
                     break;
                 case 'admin':
-                    console.log('🔵 Admin features enabled');
                     // Standard admin features
                     break;
                 case 'client':
-                    console.log('🟣 Client features enabled');
                     // Client-specific features
                     break;
                 default:
-                    console.log('👥 Standard user features');
+                    // Standard user features
             }
         });
     </script>

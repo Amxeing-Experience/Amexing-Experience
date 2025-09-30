@@ -1,0 +1,220 @@
+<%
+/**
+ * Stats Card Atom
+ * Statistical card component for dashboard metrics
+ *
+ * @param {string} title - Card title
+ * @param {string|number} value - Main metric value
+ * @param {string} icon - Icon class (e.g., 'ti ti-users')
+ * @param {string} color - Color variant for icon background
+ * @param {string} trend - Trend text (e.g., '+12%', 'Excellent')
+ * @param {string} trendColor - Trend color (success, danger, warning, etc.)
+ * @param {string} size - Card size (sm, md, lg, default: 'md')
+ */
+
+// Default parameters
+const cardTitle = typeof title !== 'undefined' ? title : 'Metric';
+const cardValue = typeof value !== 'undefined' ? value : '0';
+const cardIcon = typeof icon !== 'undefined' ? icon : 'ti ti-chart-bar';
+const cardColor = typeof color !== 'undefined' ? color : 'primary';
+const cardTrend = typeof trend !== 'undefined' ? trend : '';
+const cardTrendColor = typeof trendColor !== 'undefined' ? trendColor : 'success';
+const cardSize = typeof size !== 'undefined' ? size : 'md';
+
+// Size configurations
+const sizeConfig = {
+    sm: { cardClass: 'mb-3', padding: 'p-3', iconSize: 'p-4', iconClass: 'fs-7' },
+    md: { cardClass: 'mb-4', padding: 'p-4', iconSize: 'p-6', iconClass: 'fs-6' },
+    lg: { cardClass: 'mb-5', padding: 'p-5', iconSize: 'p-8', iconClass: 'fs-5' }
+};
+
+const config = sizeConfig[cardSize] || sizeConfig.md;
+
+// Determine trend icon based on trend value
+function getTrendIcon(trend, color) {
+    if (!trend) return '';
+
+    const trendStr = trend.toString().toLowerCase();
+    if (trendStr.includes('+') || trendStr.includes('up') || trendStr.includes('excellent')) {
+        return 'ti-arrow-up-right';
+    } else if (trendStr.includes('-') || trendStr.includes('down') || trendStr.includes('poor')) {
+        return 'ti-arrow-down-right';
+    } else {
+        return 'ti-arrow-right';
+    }
+}
+
+const trendIcon = getTrendIcon(cardTrend, cardTrendColor);
+%>
+
+<div class="card overflow-hidden <%= config.cardClass %>">
+    <div class="card-body <%= config.padding %>">
+        <!-- Header -->
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h6 class="card-title mb-1 fw-semibold text-muted">
+                    <%= cardTitle %>
+                </h6>
+            </div>
+            <div class="stats-icon">
+                <div class="text-white bg-<%= cardColor %> rounded-circle <%= config.iconSize %> d-flex align-items-center justify-content-center">
+                    <i class="<%= cardIcon %> <%= config.iconClass %>"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Value -->
+        <div class="stats-value mb-2">
+            <h3 class="fw-bold mb-0 text-dark">
+                <%= cardValue %>
+            </h3>
+        </div>
+
+        <!-- Trend Indicator -->
+        <% if (cardTrend) { %>
+            <div class="stats-trend">
+                <div class="d-flex align-items-center">
+                    <% if (trendIcon) { %>
+                        <span class="me-2 rounded-circle bg-<%= cardTrendColor %>-subtle d-flex align-items-center justify-content-center"
+                              style="width: 24px; height: 24px;">
+                            <i class="<%= trendIcon %> text-<%= cardTrendColor %> fs-8"></i>
+                        </span>
+                    <% } %>
+                    <span class="text-<%= cardTrendColor %> fw-semibold small">
+                        <%= cardTrend %>
+                    </span>
+                </div>
+            </div>
+        <% } %>
+
+        <!-- Footer Description (Optional) -->
+        <% if (typeof description !== 'undefined' && description) { %>
+            <div class="stats-description mt-2">
+                <small class="text-muted">
+                    <%= description %>
+                </small>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<style>
+    /* Stats Card Styling */
+    .stats-card {
+        transition: all 0.3s ease;
+        border: 1px solid rgba(0,0,0,0.08);
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .stats-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+
+    .stats-icon {
+        flex-shrink: 0;
+    }
+
+    .stats-icon .rounded-circle {
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+    }
+
+    .stats-card:hover .stats-icon .rounded-circle {
+        transform: scale(1.05);
+    }
+
+    .stats-value h3 {
+        font-size: 2rem;
+        line-height: 1;
+    }
+
+    .stats-trend {
+        font-size: 0.875rem;
+    }
+
+    .stats-trend .rounded-circle {
+        flex-shrink: 0;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 576px) {
+        .stats-value h3 {
+            font-size: 1.5rem;
+        }
+
+        .stats-icon .rounded-circle {
+            width: 40px !important;
+            height: 40px !important;
+            padding: 0.5rem !important;
+        }
+
+        .stats-icon i {
+            font-size: 1rem !important;
+        }
+    }
+
+    /* Loading skeleton */
+    .stats-card.loading .stats-value h3,
+    .stats-card.loading .stats-trend span {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: stats-loading-shimmer 1.5s infinite;
+        border-radius: 4px;
+        color: transparent;
+    }
+
+    @keyframes stats-loading-shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
+
+    /* Animation entrance */
+    .stats-card {
+        opacity: 0;
+        transform: translateY(20px);
+        animation: stats-fadeInUp 0.6s ease forwards;
+    }
+
+    @keyframes stats-fadeInUp {
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Stagger animation for multiple cards */
+    .stats-card:nth-child(1) { animation-delay: 0.1s; }
+    .stats-card:nth-child(2) { animation-delay: 0.2s; }
+    .stats-card:nth-child(3) { animation-delay: 0.3s; }
+    .stats-card:nth-child(4) { animation-delay: 0.4s; }
+</style>
+
+<script>
+// Stats card interactions
+document.addEventListener('DOMContentLoaded', function() {
+    const statsCards = document.querySelectorAll('.stats-card');
+
+    // Add click interaction for stats cards
+    statsCards.forEach(card => {
+        card.style.cursor = 'pointer';
+
+        card.addEventListener('click', function() {
+            // Could trigger a modal with detailed stats
+            const title = this.querySelector('.card-title').textContent;
+            console.log('Stats card clicked:', title);
+        });
+
+        // Add tooltip for trends
+        const trendElement = card.querySelector('.stats-trend span');
+        if (trendElement) {
+            trendElement.setAttribute('data-bs-toggle', 'tooltip');
+            trendElement.setAttribute('title', 'Trend compared to previous period');
+        }
+    });
+
+    // Initialize tooltips
+    const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+    const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+});
+</script>

@@ -175,7 +175,9 @@ class PermissionContextService {
         if (client && departmentId) {
           // Get department details
           const deptQuery = new Parse.Query('ClientDepartment');
-          const department = await deptQuery.get(departmentId, { useMasterKey: true });
+          const department = await deptQuery.get(departmentId, {
+            useMasterKey: true,
+          });
 
           const context = {
             id: `dept_${departmentId}`,
@@ -415,10 +417,14 @@ class PermissionContextService {
     try {
       // Get available contexts to validate the switch
       const availableContexts = await this.getAvailableContexts(userId);
-      const targetContext = availableContexts.find((ctx) => ctx.id === contextId);
+      const targetContext = availableContexts.find(
+        (ctx) => ctx.id === contextId
+      );
 
       if (!targetContext) {
-        throw new Error(`Context ${contextId} not available for user ${userId}`);
+        throw new Error(
+          `Context ${contextId} not available for user ${userId}`
+        );
       }
 
       // Validate context access if required
@@ -427,7 +433,10 @@ class PermissionContextService {
       }
 
       // Get or create permission context record
-      const contextRecord = await this.getOrCreateContextRecord(userId, sessionId);
+      const contextRecord = await this.getOrCreateContextRecord(
+        userId,
+        sessionId
+      );
 
       // Update current context
       contextRecord.set('currentContext', contextId);
@@ -436,12 +445,15 @@ class PermissionContextService {
       contextRecord.set('sessionId', sessionId);
 
       // Store available contexts for quick access
-      contextRecord.set('availableContexts', availableContexts.map((ctx) => ({
-        id: ctx.id,
-        type: ctx.type,
-        displayName: ctx.displayName,
-        description: ctx.description,
-      })));
+      contextRecord.set(
+        'availableContexts',
+        availableContexts.map((ctx) => ({
+          id: ctx.id,
+          type: ctx.type,
+          displayName: ctx.displayName,
+          description: ctx.description,
+        }))
+      );
 
       await contextRecord.save(null, { useMasterKey: true });
 
@@ -527,7 +539,10 @@ class PermissionContextService {
     try {
       switch (context.type) {
         case 'department':
-          await this.validateDepartmentAccess(userId, context.metadata.departmentId);
+          await this.validateDepartmentAccess(
+            userId,
+            context.metadata.departmentId
+          );
           break;
         case 'project':
           await this.validateProjectAccess(userId, context.metadata.projectId);
@@ -717,12 +732,14 @@ class PermissionContextService {
 
       const contextRecord = await contextQuery.first({ useMasterKey: true });
 
-      return contextRecord ? {
-        contextId: contextRecord.get('currentContext'),
-        contextData: contextRecord.get('currentContextData'),
-        availableContexts: contextRecord.get('availableContexts'),
-        lastSwitched: contextRecord.get('lastSwitched'),
-      } : null;
+      return contextRecord
+        ? {
+          contextId: contextRecord.get('currentContext'),
+          contextData: contextRecord.get('currentContextData'),
+          availableContexts: contextRecord.get('availableContexts'),
+          lastSwitched: contextRecord.get('lastSwitched'),
+        }
+        : null;
     } catch (error) {
       logger.error('Error getting current context:', error);
       return null;
@@ -746,7 +763,8 @@ class PermissionContextService {
     try {
       // Try cache first
       const cached = this.contextPermissionsCache.get(contextId);
-      if (cached && (Date.now() - cached.timestamp) < 300000) { // 5 minute cache
+      if (cached && Date.now() - cached.timestamp < 300000) {
+        // 5 minute cache
         return cached.permissions;
       }
 

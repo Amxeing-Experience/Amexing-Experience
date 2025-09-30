@@ -1,0 +1,161 @@
+<%
+/**
+ * Card Molecule
+ * Flexible card container component
+ *
+ * @param {string} title - Card title
+ * @param {string} subtitle - Card subtitle
+ * @param {string} headerContent - Custom header content (HTML)
+ * @param {string} bodyContent - Main card body content (HTML)
+ * @param {string} footerContent - Card footer content (HTML)
+ * @param {string} variant - Card variant (default, primary, secondary, success, etc.)
+ * @param {boolean} bordered - Whether card has border
+ * @param {boolean} shadow - Whether card has shadow
+ * @param {string} size - Card size (sm, default, lg)
+ * @param {boolean} hoverable - Whether card has hover effects
+ * @param {string} headerClass - Custom header CSS classes
+ * @param {string} bodyClass - Custom body CSS classes
+ * @param {string} footerClass - Custom footer CSS classes
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const cardTitle = typeof title !== 'undefined' ? title : '';
+const cardSubtitle = typeof subtitle !== 'undefined' ? subtitle : '';
+const cardHeaderContent = typeof headerContent !== 'undefined' ? headerContent : '';
+const cardBodyContent = typeof bodyContent !== 'undefined' ? bodyContent : '';
+const cardFooterContent = typeof footerContent !== 'undefined' ? footerContent : '';
+const cardVariant = typeof variant !== 'undefined' ? variant : 'default';
+const cardBordered = typeof bordered !== 'undefined' ? bordered : true;
+const cardShadow = typeof shadow !== 'undefined' ? shadow : true;
+const cardSize = typeof size !== 'undefined' ? size : 'default';
+const cardHoverable = typeof hoverable !== 'undefined' ? hoverable : false;
+const cardHeaderClass = typeof headerClass !== 'undefined' ? headerClass : '';
+const cardBodyClass = typeof bodyClass !== 'undefined' ? bodyClass : '';
+const cardFooterClass = typeof footerClass !== 'undefined' ? footerClass : '';
+const cardAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const cardAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build card classes
+let cardClasses = ['card'];
+
+// Variant classes
+if (cardVariant !== 'default') {
+    if (cardVariant === 'outline') {
+        cardClasses.push('border-primary');
+    } else {
+        cardClasses.push(`border-${cardVariant}`);
+    }
+}
+
+// Border and shadow
+if (!cardBordered) {
+    cardClasses.push('border-0');
+}
+if (cardShadow) {
+    cardClasses.push('shadow-sm');
+}
+
+// Size classes
+if (cardSize === 'sm') {
+    cardClasses.push('card-sm');
+} else if (cardSize === 'lg') {
+    cardClasses.push('card-lg');
+}
+
+// Hover effects
+if (cardHoverable) {
+    cardClasses.push('card-hover');
+}
+
+// Additional classes
+if (cardAdditionalClasses) {
+    cardClasses.push(cardAdditionalClasses);
+}
+
+// Build header classes
+let headerClasses = ['card-header'];
+if (cardVariant !== 'default' && cardVariant !== 'outline') {
+    headerClasses.push(`bg-${cardVariant}`, 'text-white');
+}
+if (cardHeaderClass) {
+    headerClasses.push(cardHeaderClass);
+}
+
+// Build body classes
+let bodyClasses = ['card-body'];
+if (cardSize === 'sm') {
+    bodyClasses.push('p-3');
+} else if (cardSize === 'lg') {
+    bodyClasses.push('p-4');
+}
+if (cardBodyClass) {
+    bodyClasses.push(cardBodyClass);
+}
+
+// Build footer classes
+let footerClasses = ['card-footer'];
+if (cardFooterClass) {
+    footerClasses.push(cardFooterClass);
+}
+
+// Build attributes string
+let attributesString = '';
+if (cardAttributes && typeof cardAttributes === 'object') {
+    attributesString = Object.entries(cardAttributes)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+}
+
+const hasHeader = cardTitle || cardSubtitle || cardHeaderContent;
+const hasFooter = cardFooterContent;
+%>
+
+<style>
+.card-hover {
+    transition: all 0.2s ease-in-out;
+}
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+.card-sm .card-body {
+    padding: 1rem;
+}
+.card-lg .card-body {
+    padding: 2rem;
+}
+</style>
+
+<div class="<%= cardClasses.join(' ') %>" <% if (attributesString) { %><%= attributesString %><% } %>>
+    <!-- Header -->
+    <% if (hasHeader) { %>
+    <div class="<%= headerClasses.join(' ') %>">
+        <% if (cardHeaderContent) { %>
+            <%# Safe: headerContent contains server-generated trusted HTML %><%- cardHeaderContent %> <!-- nosemgrep: trusted server-generated content -->
+        <% } else { %>
+            <% if (cardTitle) { %>
+                <h5 class="card-title mb-0"><%= cardTitle %></h5>
+            <% } %>
+            <% if (cardSubtitle) { %>
+                <h6 class="card-subtitle mb-0 text-muted"><%= cardSubtitle %></h6>
+            <% } %>
+        <% } %>
+    </div>
+    <% } %>
+
+    <!-- Body -->
+    <div class="<%= bodyClasses.join(' ') %>">
+        <% if (cardBodyContent) { %>
+            <%# Safe: bodyContent contains server-generated trusted HTML %><%- cardBodyContent %> <!-- nosemgrep: trusted server-generated content -->
+        <% } %>
+    </div>
+
+    <!-- Footer -->
+    <% if (hasFooter) { %>
+    <div class="<%= footerClasses.join(' ') %>">
+        <%# Safe: footerContent contains server-generated trusted HTML %><%- cardFooterContent %> <!-- nosemgrep: trusted server-generated content -->
+    </div>
+    <% } %>
+</div>

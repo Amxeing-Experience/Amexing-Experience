@@ -49,13 +49,11 @@ const AmexingDashboard = {
 
     // Initialize dashboard
     init: function() {
-        console.log('🚀 Amexing Dashboard (Flexy) initializing...');
         this.setupGlobalComponents();
         this.setupEventHandlers();
         this.setupNotifications();
         this.initializeDataTables();
         this.enhanceFlexyComponents();
-        console.log('✅ Dashboard initialized successfully');
     },
 
     // Setup global UI components
@@ -114,7 +112,6 @@ const AmexingDashboard = {
                     const table = jQuery(this).DataTable();
                     if (table.ajax && table.ajax.url) {
                         table.ajax.reload(null, false);
-                        console.log('📊 Auto-refreshed DataTable');
                     }
                 });
             }
@@ -142,7 +139,6 @@ const AmexingDashboard = {
             // Store reference for later use
             $table.data('dt-instance', dt);
 
-            console.log('📊 DataTable initialized for:', $table.attr('id') || $table.get(0).tagName);
         });
     },
 
@@ -434,7 +430,6 @@ if (typeof window.AmexingAdmin === 'undefined') {
 // jQuery document ready (for DataTables and other jQuery-dependent features)
 if (typeof jQuery !== 'undefined') {
     jQuery(document).ready(function() {
-        console.log('📋 jQuery ready - DataTables and enhanced features available');
 
         // Set global AJAX defaults for DataTables
         jQuery.ajaxSetup({

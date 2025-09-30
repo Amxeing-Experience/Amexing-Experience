@@ -1,0 +1,59 @@
+<%
+/**
+ * Button Atom
+ * Reusable button component with Bootstrap styling
+ *
+ * @param {string} type - Button type (button, submit, reset, default: 'button')
+ * @param {string} variant - Bootstrap variant (primary, secondary, success, etc., default: 'primary')
+ * @param {string} size - Button size (sm, lg, default: '')
+ * @param {string} text - Button text content
+ * @param {string} icon - Icon name (optional)
+ * @param {string} iconPosition - Icon position (left, right, default: 'left')
+ * @param {boolean} disabled - Whether button is disabled (default: false)
+ * @param {string} href - If provided, renders as link button
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const buttonType = typeof type !== 'undefined' ? type : 'button';
+const buttonVariant = typeof variant !== 'undefined' ? variant : 'primary';
+const buttonSize = typeof size !== 'undefined' && size ? `btn-${size}` : '';
+const buttonText = typeof text !== 'undefined' ? text : 'Button';
+const buttonIcon = typeof icon !== 'undefined' ? icon : '';
+const buttonIconPosition = typeof iconPosition !== 'undefined' ? iconPosition : 'left';
+const buttonDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const buttonHref = typeof href !== 'undefined' ? href : '';
+const buttonAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const buttonAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build class string
+const buttonClasses = ['btn', `btn-${buttonVariant}`, buttonSize, buttonAdditionalClasses]
+    .filter(cls => cls.length > 0)
+    .join(' ');
+
+// Build attributes string (sanitized for security)
+let attributesString = '';
+if (buttonAttributes && typeof buttonAttributes === 'object') {
+    // Whitelist allowed attributes for security
+    const allowedAttributes = ['id', 'data-bs-toggle', 'data-bs-target', 'data-bs-dismiss', 'data-toggle', 'data-target', 'data-form', 'aria-label', 'aria-describedby', 'aria-expanded', 'tabindex', 'title', 'data-testid'];
+    attributesString = Object.entries(buttonAttributes)
+        .filter(([key]) => allowedAttributes.includes(key))
+        .map(([key, value]) => {
+            // Escape attribute values to prevent XSS
+            const escapedValue = String(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            return `${key}="${escapedValue}"`;
+        })
+        .join(' ');
+}
+
+// Icon HTML
+const iconHtml = buttonIcon ? `<i class="ti ti-${buttonIcon}"></i>` : '';
+const iconSpacing = buttonIcon && buttonText ? ' ' : '';
+%>
+
+<% if (buttonHref) { %>
+    <a href="<%= buttonHref %>" class="<%= buttonClasses %>" role="button"<% if (buttonDisabled) { %> aria-disabled="true"<% } %><% if (attributesString) { %> <%- attributesString %> <!-- nosemgrep: sanitized attributes string --><% } %>><% if (buttonIcon && buttonIconPosition === 'left') { %><%- iconHtml %> <!-- nosemgrep: safe icon HTML --><%= iconSpacing %><% } %><% if (buttonText) { %><%= buttonText %><% } %><% if (buttonIcon && buttonIconPosition === 'right') { %><%= iconSpacing %><%- iconHtml %> <!-- nosemgrep: safe icon HTML --><% } %></a>
+<% } else { %>
+    <button type="<%= buttonType %>" class="<%= buttonClasses %>"<% if (buttonDisabled) { %> disabled<% } %><% if (attributesString) { %> <%- attributesString %> <!-- nosemgrep: sanitized attributes string --><% } %>><% if (buttonIcon && buttonIconPosition === 'left') { %><%- iconHtml %> <!-- nosemgrep: safe icon HTML --><%= iconSpacing %><% } %><% if (buttonText) { %><%= buttonText %><% } %><% if (buttonIcon && buttonIconPosition === 'right') { %><%= iconSpacing %><%- iconHtml %> <!-- nosemgrep: safe icon HTML --><% } %></button>
+<% } %>

@@ -68,7 +68,11 @@ class OAuthProvider {
       corporateMode: options.corporateMode || false,
       corporateConfig: options.corporateConfig || null,
       departmentRequired: options.departmentRequired || false,
-      allowedProviders: options.allowedProviders || ['google', 'microsoft', 'apple'],
+      allowedProviders: options.allowedProviders || [
+        'google',
+        'microsoft',
+        'apple',
+      ],
       redirectUri: options.redirectUri || '/auth/oauth/callback',
       mobile: options.mobile || this.detectMobile(),
       theme: options.theme || 'default',
@@ -297,7 +301,9 @@ class OAuthProvider {
       const msalConfig = {
         auth: {
           clientId: this.providerConfigs.microsoft.clientId,
-          authority: this.providerConfigs.microsoft.authority || 'https://login.microsoftonline.com/common',
+          authority:
+            this.providerConfigs.microsoft.authority
+            || 'https://login.microsoftonline.com/common',
           redirectUri: this.config.redirectUri,
         },
         cache: {
@@ -338,7 +344,10 @@ class OAuthProvider {
     window.addEventListener('beforeunload', this.cleanup.bind(this));
 
     // Listen for department selection changes
-    document.addEventListener('departmentChanged', this.handleDepartmentChange.bind(this));
+    document.addEventListener(
+      'departmentChanged',
+      this.handleDepartmentChange.bind(this)
+    );
   }
 
   /**
@@ -394,7 +403,10 @@ class OAuthProvider {
 
     // Create provider buttons
     this.config.allowedProviders.forEach((provider) => {
-      if (this.providerConfigs[provider] && this.providerConfigs[provider].initialized) {
+      if (
+        this.providerConfigs[provider]
+        && this.providerConfigs[provider].initialized
+      ) {
         const button = this.createProviderButton(provider);
         container.appendChild(button);
       }
@@ -440,7 +452,10 @@ class OAuthProvider {
 
     // Add accessibility attributes
     button.setAttribute('role', 'button');
-    button.setAttribute('aria-label', `Sign in with ${this.getProviderDisplayName(provider)}`);
+    button.setAttribute(
+      'aria-label',
+      `Sign in with ${this.getProviderDisplayName(provider)}`
+    );
 
     return button;
   }
@@ -478,13 +493,18 @@ class OAuthProvider {
     select.appendChild(defaultOption);
 
     // Add department options from corporate config
-    if (this.config.corporateConfig && this.config.corporateConfig.departments) {
-      Object.entries(this.config.corporateConfig.departments).forEach(([key, dept]) => {
-        const option = document.createElement('option');
-        option.value = key;
-        option.textContent = dept.displayName || key;
-        select.appendChild(option);
-      });
+    if (
+      this.config.corporateConfig
+      && this.config.corporateConfig.departments
+    ) {
+      Object.entries(this.config.corporateConfig.departments).forEach(
+        ([key, dept]) => {
+          const option = document.createElement('option');
+          option.value = key;
+          option.textContent = dept.displayName || key;
+          select.appendChild(option);
+        }
+      );
     }
 
     select.addEventListener('change', (e) => {
@@ -551,7 +571,9 @@ class OAuthProvider {
    */
   async authenticateWithProvider(_provider) {
     try {
-      this.logAuditEvent('oauth_authentication_started', { provider: _provider });
+      this.logAuditEvent('oauth_authentication_started', {
+        provider: _provider,
+      });
 
       // Validate department selection if required
       if (this.config.departmentRequired && !this.selectedDepartment) {
@@ -572,7 +594,11 @@ class OAuthProvider {
           throw new Error(`Unsupported OAuth provider: ${_provider}`);
       }
     } catch (error) {
-      console.error('OAuth authentication failed with provider:', _provider, error);
+      console.error(
+        'OAuth authentication failed with provider:',
+        _provider,
+        error
+      );
       this.handleAuthenticationError(error, _provider);
     }
   }
@@ -686,7 +712,9 @@ class OAuthProvider {
       });
 
       if (!serverResponse.ok) {
-        throw new Error(`Server authentication failed: ${serverResponse.status}`);
+        throw new Error(
+          `Server authentication failed: ${serverResponse.status}`
+        );
       }
 
       const result = await serverResponse.json();
@@ -818,9 +846,7 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   handleAuthenticationRedirect(result) {
-    const redirectUrl = result.redirectUrl
-                       || this.config.successRedirect
-                       || '/dashboard';
+    const redirectUrl = result.redirectUrl || this.config.successRedirect || '/dashboard';
 
     window.location.href = redirectUrl;
   }
@@ -908,7 +934,10 @@ class OAuthProvider {
     const buttons = document.querySelectorAll('.oauth-btn');
     buttons.forEach((button) => {
       button.disabled = false;
-      button.textContent = button.textContent.replace('Signing in...', 'Sign in');
+      button.textContent = button.textContent.replace(
+        'Signing in...',
+        'Sign in'
+      );
     });
   }
 
@@ -959,16 +988,26 @@ class OAuthProvider {
    * @returns {*} - Operation result.
    */
   detectMobile() {
-    return window.innerWidth <= 768
-      || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    return (
+      window.innerWidth <= 768
+      || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      )
+    );
   }
 
   generateState() {
-    return btoa(Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
+    return btoa(
+      Math.random().toString(36).substring(2, 15)
+        + Math.random().toString(36).substring(2, 15)
+    );
   }
 
   generateNonce() {
-    return btoa(Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
+    return btoa(
+      Math.random().toString(36).substring(2, 15)
+        + Math.random().toString(36).substring(2, 15)
+    );
   }
 
   getProviderDisplayName(provider) {
@@ -999,7 +1038,10 @@ class OAuthProvider {
     // Smart provider selection based on email domain
     const emailInput = document.getElementById('identifier');
     if (emailInput) {
-      emailInput.addEventListener('blur', this.detectProviderFromEmail.bind(this));
+      emailInput.addEventListener(
+        'blur',
+        this.detectProviderFromEmail.bind(this)
+      );
     }
   }
 
@@ -1011,7 +1053,10 @@ class OAuthProvider {
     let suggestedProvider = null;
 
     // Corporate domain mapping
-    if (this.config.corporateConfig && this.config.corporateConfig.domainMappings) {
+    if (
+      this.config.corporateConfig
+      && this.config.corporateConfig.domainMappings
+    ) {
       suggestedProvider = this.config.corporateConfig.domainMappings[domain];
     }
 
@@ -1019,9 +1064,15 @@ class OAuthProvider {
     if (!suggestedProvider) {
       if (domain.includes('gmail.com') || domain.includes('google.com')) {
         suggestedProvider = 'google';
-      } else if (domain.includes('outlook.com') || domain.includes('microsoft.com')) {
+      } else if (
+        domain.includes('outlook.com')
+        || domain.includes('microsoft.com')
+      ) {
         suggestedProvider = 'microsoft';
-      } else if (domain.includes('icloud.com') || domain.includes('apple.com')) {
+      } else if (
+        domain.includes('icloud.com')
+        || domain.includes('apple.com')
+      ) {
         suggestedProvider = 'apple';
       }
     }
@@ -1078,7 +1129,9 @@ class OAuthProvider {
 
   handleInitializationError(error) {
     console.error('OAuth Provider initialization failed:', error);
-    this.showErrorMessage('Failed to initialize authentication system. Please refresh the page.');
+    this.showErrorMessage(
+      'Failed to initialize authentication system. Please refresh the page.'
+    );
   }
 
   cleanup() {
@@ -1089,7 +1142,10 @@ class OAuthProvider {
 
     // Remove event listeners
     window.removeEventListener('message', this.handleOAuthMessage.bind(this));
-    document.removeEventListener('departmentChanged', this.handleDepartmentChange.bind(this));
+    document.removeEventListener(
+      'departmentChanged',
+      this.handleDepartmentChange.bind(this)
+    );
   }
 }
 
@@ -1100,7 +1156,9 @@ window.OAuthProvider = OAuthProvider;
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('oauth-container');
   if (container && container.dataset.autoInit !== 'false') {
-    const config = container.dataset.config ? JSON.parse(container.dataset.config) : {};
+    const config = container.dataset.config
+      ? JSON.parse(container.dataset.config)
+      : {};
     new OAuthProvider(config);
   }
 });

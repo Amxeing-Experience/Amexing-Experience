@@ -75,6 +75,7 @@ uploads/
 public/uploads/
 
 # Claude Code files
+.claude
 claude.md
 CLAUDE.md
 planning/
@@ -92,3 +93,4 @@ tests/oauth/real-flow/
 reports/
 *.env.development
 *.env.local
+backups/

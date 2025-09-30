@@ -1,0 +1,256 @@
+<%
+/**
+ * Sidebar Menu Organism
+ * Role-based navigation menu items
+ *
+ * @param {string} userRole - Current user role
+ * @param {string} currentPath - Current page path for active states
+ * @param {object} colors - Role color scheme
+ * @param {function} isActiveMenuItem - Helper function to check active state
+ */
+
+// Navigation items based on role
+const navigationItems = {
+    superadmin: [
+        // System Management Section - Only Dashboard
+        { section: 'System Management', icon: 'ti-settings', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/superadmin', id: 'dashboard' }
+        ]},
+        // Users System Section - Only User Management
+        { section: 'Users System', icon: 'ti-users', items: [
+            { name: 'User Management', icon: 'users', path: '/dashboard/superadmin/users', id: 'users' }
+        ]}
+    ],
+    admin: [
+        { section: 'Operations', icon: 'ti-dashboard', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/admin', id: 'dashboard' },
+            { name: 'Events Management', icon: 'calendar-event', path: '/dashboard/admin/events', id: 'events' },
+            { name: 'Bookings', icon: 'car', path: '/dashboard/admin/bookings', id: 'bookings' }
+        ]},
+        { section: 'Users Management', icon: 'ti-users', items: [
+            { name: 'Client Management', icon: 'users', path: '/dashboard/admin/clients', id: 'clients' },
+            { name: 'Employee Management', icon: 'ti-briefcase', path: '/dashboard/admin/employees', id: 'employees' }
+        ]},
+        { section: 'Resources', icon: 'ti-car', items: [
+            { name: 'Vehicle Management', icon: 'car-garage', path: '/dashboard/admin/vehicles', id: 'vehicles' },
+            { name: 'Driver Management', icon: 'user-check', path: '/dashboard/admin/drivers', id: 'drivers' },
+            { name: 'Schedule Calendar', icon: 'calendar', path: '/dashboard/admin/schedule', id: 'schedule' },
+            { name: 'Reports', icon: 'report', path: '/dashboard/admin/reports', id: 'reports' }
+        ]}
+    ],
+    client: [
+        { section: 'My Business', icon: 'ti-building', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/client', id: 'dashboard' },
+            { name: 'My Events', icon: 'calendar-event', path: '/dashboard/client/events', id: 'events' },
+            { name: 'Landing Pages', icon: 'world', path: '/dashboard/client/landing-pages', id: 'landing-pages' },
+            { name: 'My Bookings', icon: 'car', path: '/dashboard/client/bookings', id: 'bookings' }
+        ]},
+        { section: 'Services & Billing', icon: 'ti-credit-card', items: [
+            { name: 'Services', icon: 'list', path: '/dashboard/client/services', id: 'services' },
+            { name: 'Billing & Payments', icon: 'receipt', path: '/dashboard/client/billing', id: 'billing' }
+        ]}
+    ],
+    department_manager: [
+        { section: 'Team Management', icon: 'ti-users', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/department-manager', id: 'dashboard' },
+            { name: 'My Team', icon: 'users', path: '/dashboard/department-manager/team', id: 'team' },
+            { name: 'Team Bookings', icon: 'car', path: '/dashboard/department-manager/bookings', id: 'bookings' },
+            { name: 'Approvals', icon: 'check', path: '/dashboard/department-manager/approvals', id: 'approvals' }
+        ]},
+        { section: 'Budget & Reports', icon: 'ti-chart-line', items: [
+            { name: 'Budget Management', icon: 'coin', path: '/dashboard/department-manager/budget', id: 'budget' },
+            { name: 'Department Reports', icon: 'report', path: '/dashboard/department-manager/reports', id: 'reports' }
+        ]}
+    ],
+    employee: [
+        { section: 'My Services', icon: 'ti-user', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/employee', id: 'dashboard' },
+            { name: 'My Bookings', icon: 'car', path: '/dashboard/employee/bookings', id: 'bookings' },
+            { name: 'Available Services', icon: 'list', path: '/dashboard/employee/services', id: 'services' },
+            { name: 'My Profile', icon: 'user', path: '/dashboard/employee/profile', id: 'profile' }
+        ]}
+    ],
+    driver: [
+        { section: 'My Trips', icon: 'ti-car', items: [
+            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/driver', id: 'dashboard' },
+            { name: 'Active Trips', icon: 'route', path: '/dashboard/driver/trips', id: 'trips' },
+            { name: 'My Schedule', icon: 'calendar', path: '/dashboard/driver/schedule', id: 'schedule' },
+            { name: 'My Vehicle', icon: 'car', path: '/dashboard/driver/vehicle', id: 'vehicle' },
+            { name: 'Trip History', icon: 'history', path: '/dashboard/driver/history', id: 'history' }
+        ]}
+    ],
+    guest: [
+        { section: 'Welcome', icon: 'ti-home', items: [
+            { name: 'Home', icon: 'home', path: '/', id: 'home' }
+        ]}
+    ]
+};
+
+const menuSections = navigationItems[userRole] || navigationItems.guest;
+%>
+
+<ul id="sidebarnav" class="list-unstyled">
+    <% menuSections.forEach(function(section, sectionIndex) { %>
+        <!-- Section Header -->
+        <li class="nav-small-cap">
+            <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
+            <span class="hide-menu"><%= section.section %></span>
+        </li>
+
+        <!-- Section Items -->
+        <% section.items.forEach(function(item, itemIndex) { %>
+            <% const isActive = isActiveMenuItem(item.path, currentPath); %>
+
+            <%- include('../../../molecules/dashboard/nav-item', {
+                href: item.path,
+                icon: item.icon,
+                text: item.name,
+                active: isActive,
+                badge: item.badge,
+                submenu: item.submenu,
+                id: item.id,
+                external: item.external
+            }) %>
+        <% }); %>
+    <% }); %>
+
+    <!-- User Section -->
+    <%- include('./sidebar-footer', {
+        userRole: userRole,
+        currentPath: currentPath
+    }) %>
+</ul>
+
+<style>
+    /* Section Headers */
+    .nav-small-cap {
+        color: #6c757d;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.6875rem;
+        letter-spacing: 1px;
+        margin-top: 2rem;
+        margin-bottom: 0.75rem;
+        padding: 0 20px;
+        position: relative;
+    }
+
+    .nav-small-cap:first-child {
+        margin-top: 1rem;
+    }
+
+    .nav-small-cap .nav-small-cap-icon {
+        color: <%= colors.primary %>;
+        margin-right: 8px;
+        font-size: 0.75rem;
+    }
+
+    .nav-small-cap .hide-menu {
+        position: relative;
+    }
+
+    /* Sidebar Menu Animations */
+    #sidebarnav .sidebar-item {
+        opacity: 0;
+        transform: translateX(-10px);
+        animation: slideInNav 0.3s ease forwards;
+    }
+
+    <% menuSections.forEach(function(section, sectionIndex) { %>
+        <% section.items.forEach(function(item, itemIndex) { %>
+            #sidebarnav .sidebar-item:nth-child(<%= sectionIndex * (section.items.length + 1) + itemIndex + 2 %>) {
+                animation-delay: <%= (sectionIndex * section.items.length + itemIndex) * 0.05 %>s;
+            }
+        <% }); %>
+    <% }); %>
+
+    @keyframes slideInNav {
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    /* Role-specific accent colors */
+    #sidebarnav .nav-small-cap-icon,
+    #sidebarnav .sidebar-link:hover .nav-icon,
+    #sidebarnav .sidebar-link.active .nav-icon {
+        color: <%= colors.primary %>;
+    }
+
+    #sidebarnav .sidebar-link:hover,
+    #sidebarnav .sidebar-link.active {
+        background: linear-gradient(135deg, <%= colors.primary %>10, <%= colors.secondary %>10);
+        color: <%= colors.primary %>;
+    }
+
+    /* Badge animations */
+    .nav-badge {
+        animation: badgePulse 2s infinite;
+    }
+
+    @keyframes badgePulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+    }
+
+    /* Loading state for menu items */
+    .sidebar-item.loading {
+        pointer-events: none;
+        opacity: 0.6;
+    }
+
+    .sidebar-item.loading::after {
+        content: '';
+        position: absolute;
+        right: 20px;
+        top: 50%;
+        width: 12px;
+        height: 12px;
+        border: 1px solid transparent;
+        border-top: 1px solid <%= colors.primary %>;
+        border-radius: 50%;
+        animation: nav-item-loading 1s linear infinite;
+        transform: translateY(-50%);
+    }
+
+    @keyframes nav-item-loading {
+        0% { transform: translateY(-50%) rotate(0deg); }
+        100% { transform: translateY(-50%) rotate(360deg); }
+    }
+
+    /* Hover effects for better UX */
+    .sidebar-link {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .sidebar-link::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 3px;
+        height: 100%;
+        background: <%= colors.primary %>;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar-link.active::before,
+    .sidebar-link:hover::before {
+        transform: translateX(0);
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 991.98px) {
+        .nav-small-cap {
+            padding: 0 15px;
+            font-size: 0.625rem;
+        }
+
+        #sidebarnav .sidebar-link {
+            padding: 14px 15px;
+        }
+    }
+</style>

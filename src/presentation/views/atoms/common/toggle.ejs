@@ -1,0 +1,69 @@
+<%
+/**
+ * Toggle/Switch Atom
+ * Reusable toggle switch component
+ *
+ * @param {string} name - Input name attribute
+ * @param {string} id - Input ID attribute
+ * @param {boolean} checked - Whether switch is on
+ * @param {boolean} disabled - Whether switch is disabled
+ * @param {string} label - Label text for the switch
+ * @param {string} size - Switch size (sm, default, lg)
+ * @param {string} color - Switch color variant (primary, secondary, success, etc.)
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const toggleName = typeof name !== 'undefined' ? name : '';
+const toggleId = typeof id !== 'undefined' ? id : `toggle-${Math.random().toString(36).substr(2, 9)}`;
+const toggleChecked = typeof checked !== 'undefined' ? checked : false;
+const toggleDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const toggleLabel = typeof label !== 'undefined' ? label : '';
+const toggleSize = typeof size !== 'undefined' ? size : 'default';
+const toggleColor = typeof color !== 'undefined' ? color : 'primary';
+const toggleAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const toggleAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build wrapper classes
+let wrapperClasses = ['form-check', 'form-switch'];
+if (toggleSize === 'lg') {
+    wrapperClasses.push('form-switch-lg');
+} else if (toggleSize === 'sm') {
+    wrapperClasses.push('form-switch-sm');
+}
+if (toggleAdditionalClasses) wrapperClasses.push(toggleAdditionalClasses);
+
+// Build input classes
+let inputClasses = ['form-check-input'];
+if (toggleColor !== 'primary') {
+    inputClasses.push(`bg-${toggleColor}`);
+}
+
+// Build attributes string
+let attributesString = '';
+if (toggleAttributes && typeof toggleAttributes === 'object') {
+    attributesString = Object.entries(toggleAttributes)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+}
+
+const finalWrapperClasses = wrapperClasses.join(' ');
+const finalInputClasses = inputClasses.join(' ');
+%>
+
+<div class="<%= finalWrapperClasses %>">
+    <input type="checkbox"
+           class="<%= finalInputClasses %>"
+           role="switch"
+           id="<%= toggleId %>"
+           <% if (toggleName) { %>name="<%= toggleName %>"<% } %>
+           <% if (toggleChecked) { %>checked<% } %>
+           <% if (toggleDisabled) { %>disabled<% } %>
+           <% if (attributesString) { %><%= attributesString %><% } %>>
+    <% if (toggleLabel) { %>
+        <label class="form-check-label" for="<%= toggleId %>">
+            <%= toggleLabel %>
+        </label>
+    <% } %>
+</div>

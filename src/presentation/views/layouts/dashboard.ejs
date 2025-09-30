@@ -4,200 +4,308 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><%= typeof title !== 'undefined' ? title : 'Dashboard' %> - Amexing</title>
-    <link rel="shortcut icon" type="image/png" href="/dashboard/images/logos/favicon.png" />
-    <link rel="stylesheet" href="/dashboard/css/styles.min.css" />
-    <%- include('../blocks/css') %>
 
-    <!-- Custom Dashboard Layout Styles -->
+    <!-- Favicon -->
+    <link rel="shortcut icon" type="image/png" href="/dashboard/images/logos/favicon.png" />
+
+    <!-- Core CSS -->
+    <link rel="stylesheet" href="/dashboard/css/styles.min.css" />
+
+    <!-- Tabler Icons -->
+    <link rel="stylesheet" href="/dashboard/css/icons/tabler-icons/tabler-icons.css">
+
+    <!-- Dashboard Styles Atom -->
+    <%- include('../atoms/dashboard/styles', {
+        additionalStyles: typeof additionalStyles !== 'undefined' ? additionalStyles : [],
+        userRole: typeof userRole !== 'undefined' ? userRole : 'guest'
+    }) %>
+
+    <!-- Page-specific styles -->
+    <% if (typeof pageStyles !== 'undefined' && pageStyles) { %>
+        <% pageStyles.forEach(function(style) { %>
+            <link rel="stylesheet" href="<%= style %>" />
+        <% }); %>
+    <% } %>
+
+    <!-- Custom Layout Styles -->
     <style>
-        /* Ensure full height layout */
+        /* Dashboard Layout Structure */
         html, body {
             height: 100%;
             margin: 0;
             padding: 0;
             overflow-x: hidden;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
-        /* Main wrapper takes full height */
         .page-wrapper {
             min-height: 100vh;
             display: flex;
             flex-direction: row;
+            background: #f8f9fa;
         }
 
-        /* Sidebar fixed height and scroll */
-        .left-sidebar {
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 270px;
-            z-index: 1000;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Sidebar content container */
-        .left-sidebar > div {
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Brand logo area fixed */
-        .brand-logo {
-            flex-shrink: 0;
-            padding: 1rem;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
-        }
-
-        /* Sidebar navigation scrollable */
-        .sidebar-nav {
-            flex: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 1rem 0;
-        }
-
-        /* Custom scrollbar for sidebar */
-        .sidebar-nav::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .sidebar-nav::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .sidebar-nav::-webkit-scrollbar-thumb {
-            background: rgba(0,0,0,0.2);
-            border-radius: 3px;
-        }
-
-        .sidebar-nav::-webkit-scrollbar-thumb:hover {
-            background: rgba(0,0,0,0.3);
-        }
-
-        /* Body wrapper takes remaining space */
-        .body-wrapper {
+        .main-content {
             margin-left: 270px;
             min-height: 100vh;
             width: calc(100% - 270px);
             display: flex;
             flex-direction: column;
+            transition: all 0.3s ease;
         }
 
-        /* Header fixed at top */
-        .app-header {
+        .main-content.sidebar-collapsed {
+            margin-left: 0;
+            width: 100%;
+        }
+
+        /* Header Styles */
+        .dashboard-header {
             flex-shrink: 0;
             position: sticky;
             top: 0;
-            z-index: 999;
+            z-index: 1020;
             background: #fff;
-            border-bottom: 1px solid rgba(0,0,0,0.1);
+            border-bottom: 1px solid #e0e6ed;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
 
-        /* Main content area takes remaining height */
-        .body-wrapper-inner {
+        /* Content Area */
+        .dashboard-content {
             flex: 1;
-            padding: 1rem;
+            padding: 2rem;
             overflow-y: auto;
         }
 
-        /* Container fluid no extra padding */
-        .body-wrapper-inner .container-fluid {
-            height: 100%;
+        .dashboard-content .container-fluid {
+            padding: 0;
+            max-width: 100%;
+        }
+
+        /* Breadcrumb Styles */
+        .breadcrumb-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .breadcrumb-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 150px;
+            height: 150px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+            transform: translate(30%, -30%);
+        }
+
+        .breadcrumb-card .breadcrumb {
+            background: transparent;
+            margin: 0;
             padding: 0;
         }
 
-        /* Responsive adjustments */
+        .breadcrumb-card .breadcrumb-item + .breadcrumb-item::before {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .breadcrumb-card .breadcrumb-item a {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+        }
+
+        .breadcrumb-card .breadcrumb-item.active {
+            color: white;
+        }
+
+        /* Cards */
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            margin-bottom: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        }
+
+        /* Loading States */
+        .dashboard-loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            backdrop-filter: blur(2px);
+        }
+
+        .dashboard-loading.hidden {
+            display: none;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color, #5d87ff);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
         @media (max-width: 1199.98px) {
-            .left-sidebar {
-                margin-left: -270px;
-                transition: margin-left 0.3s ease;
-            }
-
-            .left-sidebar.show {
-                margin-left: 0;
-            }
-
-            .body-wrapper {
+            .main-content {
                 margin-left: 0;
                 width: 100%;
             }
         }
 
-        /* Additional mobile responsive */
-        @media (max-width: 767.98px) {
-            .body-wrapper-inner {
-                padding: 0.5rem;
+        @media (max-width: 991.98px) {
+            .dashboard-content {
+                padding: 1rem;
             }
         }
 
-        /* Ensure cards and content scale properly */
-        .card {
-            margin-bottom: 1.5rem;
+        @media (max-width: 575.98px) {
+            .dashboard-content {
+                padding: 0.75rem;
+            }
+
+            .breadcrumb-card {
+                margin-bottom: 1rem;
+            }
         }
 
-        /* Fix for breadcrumb spacing */
-        .card.bg-info-subtle {
-            margin-bottom: 1.5rem;
+        /* Accessibility */
+        .sr-only {
+            position: absolute !important;
+            width: 1px !important;
+            height: 1px !important;
+            padding: 0 !important;
+            margin: -1px !important;
+            overflow: hidden !important;
+            clip: rect(0,0,0,0) !important;
+            white-space: nowrap !important;
+            border: 0 !important;
+        }
+
+        /* Focus States */
+        button:focus,
+        a:focus,
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: 2px solid var(--primary-color, #5d87ff);
+            outline-offset: 2px;
+        }
+
+        /* Print Styles */
+        @media print {
+            .left-sidebar,
+            .dashboard-header,
+            .breadcrumb-card {
+                display: none !important;
+            }
+
+            .main-content {
+                margin-left: 0 !important;
+                width: 100% !important;
+            }
+
+            .dashboard-content {
+                padding: 0 !important;
+            }
         }
     </style>
+
+    <!-- Additional head content -->
+    <% if (typeof headContent !== 'undefined' && headContent) { %>
+        <%- headContent %>
+    <% } %>
 </head>
 
-<body>
-    <div class="page-wrapper" id="main-wrapper" data-layout="vertical" data-navbarbg="skin6" data-sidebartype="full"
-        data-sidebar-position="fixed" data-header-position="fixed">
+<body data-role="<%= typeof userRole !== 'undefined' ? userRole : 'guest' %>"
+      data-theme="light"
+      data-layout="dashboard">
 
-        <!-- Sidebar Start -->
-        <aside class="left-sidebar">
-            <div>
-                <div class="brand-logo d-flex align-items-center justify-content-between">
-                    <a href="/dashboard/<%= userRole %>" class="text-nowrap logo-img">
-                        <img src="/dashboard/images/logos/logo.svg" alt="Amexing" />
-                    </a>
-                    <div class="close-btn d-xl-none d-block sidebartoggler cursor-pointer" id="sidebarCollapse">
-                        <i class="ti ti-x fs-8"></i>
-                    </div>
-                </div>
+    <!-- Loading Screen -->
+    <div class="dashboard-loading" id="dashboardLoader">
+        <div class="loading-spinner"></div>
+        <span class="sr-only">Loading dashboard...</span>
+    </div>
 
-                <!-- Sidebar navigation-->
-                <nav class="sidebar-nav scroll-sidebar" data-simplebar="">
-                    <%- include('../components/sidebar/' + userRole) %>
-                </nav>
-                <!-- End Sidebar navigation -->
-            </div>
-        </aside>
-        <!-- Sidebar End -->
+    <!-- Page Wrapper -->
+    <div class="page-wrapper" id="main-wrapper"
+         data-layout="vertical"
+         data-navbarbg="skin6"
+         data-sidebartype="full"
+         data-sidebar-position="fixed"
+         data-header-position="fixed">
 
-        <!-- Main wrapper -->
-        <div class="body-wrapper">
-            <!-- Header Start -->
-            <%- include('../components/topbar/dashboard') %>
-            <!-- Header End -->
+        <!-- Sidebar Navigation -->
+        <%- include('../organisms/dashboard/navigation/sidebar-nav', {
+            userRole: typeof userRole !== 'undefined' ? userRole : 'guest',
+            currentPath: typeof currentPath !== 'undefined' ? currentPath : '',
+            user: typeof user !== 'undefined' ? user : {}
+        }) %>
 
-            <div class="body-wrapper-inner">
+        <!-- Main Content Area -->
+        <div class="main-content" id="mainContent">
+            <!-- Header -->
+            <header class="dashboard-header">
+                <%- include('../organisms/dashboard/header/dashboard-header', {
+                    userRole: typeof userRole !== 'undefined' ? userRole : 'guest',
+                    user: typeof user !== 'undefined' ? user : {},
+                    title: typeof title !== 'undefined' ? title : 'Dashboard'
+                }) %>
+            </header>
+
+            <!-- Content -->
+            <main class="dashboard-content" role="main">
                 <div class="container-fluid">
                     <!-- Breadcrumb -->
                     <% if (typeof breadcrumb !== 'undefined' && breadcrumb) { %>
-                    <div class="card bg-info-subtle shadow-none position-relative overflow-hidden mb-4">
-                        <div class="card-body px-4 py-3">
+                    <div class="card breadcrumb-card">
+                        <div class="card-body p-4">
                             <div class="row align-items-center">
-                                <div class="col-9">
-                                    <h4 class="fw-semibold mb-8"><%= breadcrumb.title %></h4>
+                                <div class="col-md-8">
+                                    <h4 class="fw-bold text-white mb-3">
+                                        <i class="ti ti-<%= breadcrumb.icon || 'dashboard' %> me-2"></i>
+                                        <%= breadcrumb.title %>
+                                    </h4>
                                     <nav aria-label="breadcrumb">
                                         <ol class="breadcrumb">
                                             <li class="breadcrumb-item">
-                                                <a class="text-muted text-decoration-none" href="/dashboard/<%= userRole %>">Home</a>
+                                                <a href="/dashboard/<%= typeof userRole !== 'undefined' ? userRole : '' %>">
+                                                    <i class="ti ti-home me-1"></i>Dashboard
+                                                </a>
                                             </li>
                                             <% if (breadcrumb.items) { %>
                                                 <% breadcrumb.items.forEach(function(item) { %>
                                                     <% if (item.active) { %>
-                                                        <li class="breadcrumb-item active" aria-current="page"><%= item.name %></li>
+                                                        <li class="breadcrumb-item active" aria-current="page">
+                                                            <%= item.name %>
+                                                        </li>
                                                     <% } else { %>
                                                         <li class="breadcrumb-item">
-                                                            <a class="text-muted text-decoration-none" href="<%= item.link %>"><%= item.name %></a>
+                                                            <a href="<%= item.link %>"><%= item.name %></a>
                                                         </li>
                                                     <% } %>
                                                 <% }); %>
@@ -205,116 +313,134 @@
                                         </ol>
                                     </nav>
                                 </div>
-                                <div class="col-3">
-                                    <div class="text-center mb-n5">
-                                        <img src="/dashboard/images/breadcrumb/ChatBc.png" alt="" class="img-fluid mb-n4" />
-                                    </div>
+                                <div class="col-md-4 text-end">
+                                    <% if (breadcrumb.actions) { %>
+                                        <% breadcrumb.actions.forEach(function(action) { %>
+                                            <a href="<%= action.href %>"
+                                               class="btn btn-light btn-sm me-2">
+                                                <i class="ti ti-<%= action.icon %> me-1"></i>
+                                                <%= action.text %>
+                                            </a>
+                                        <% }); %>
+                                    <% } %>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <% } %>
 
-                    <!-- Main Content -->
-                    <!-- Security: body contains only trusted pre-rendered EJS templates -->
-                    <%- body %> <!-- semgrep-ignore -->
+                    <!-- Flash Messages -->
+                    <% if (typeof flash !== 'undefined' && flash) { %>
+                        <div class="flash-messages">
+                            <% Object.keys(flash).forEach(function(type) { %>
+                                <% if (flash[type] && flash[type].length > 0) { %>
+                                    <% flash[type].forEach(function(message) { %>
+                                        <div class="alert alert-<%= type === 'error' ? 'danger' : type %> alert-dismissible fade show" role="alert">
+                                            <i class="ti ti-<%= type === 'success' ? 'check' : type === 'error' ? 'alert-circle' : 'info-circle' %> me-2"></i>
+                                            <%= message %>
+                                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                        </div>
+                                    <% }); %>
+                                <% } %>
+                            <% }); %>
+                        </div>
+                    <% } %>
+
+                    <!-- Page Content -->
+                    <div class="page-content">
+                        <!-- Security: body contains only trusted pre-rendered EJS templates -->
+                        <%- body %> <!-- semgrep-ignore -->
+                    </div>
                 </div>
-            </div>
+            </main>
         </div>
     </div>
 
+    <!-- Core JavaScript -->
     <script src="/dashboard/libs/jquery/dist/jquery.min.js"></script>
     <script src="/dashboard/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="/dashboard/libs/apexcharts/dist/apexcharts.min.js"></script>
     <script src="/dashboard/libs/simplebar/dist/simplebar.js"></script>
+    <script src="/dashboard/libs/apexcharts/dist/apexcharts.min.js"></script>
     <script src="/dashboard/js/sidebarmenu.js"></script>
     <script src="/dashboard/js/app.min.js"></script>
-    <script src="/dashboard/js/dashboard.js"></script>
 
-    <!-- Custom Dashboard Layout Scripts -->
+    <!-- Dashboard Scripts Atom -->
+    <%- include('../atoms/dashboard/scripts', {
+        additionalScripts: typeof additionalScripts !== 'undefined' ? additionalScripts : [],
+        userRole: typeof userRole !== 'undefined' ? userRole : 'guest',
+        userId: typeof user !== 'undefined' && user.id ? user.id : null
+    }) %>
+
+    <!-- Page-specific scripts -->
+    <% if (typeof pageScripts !== 'undefined' && pageScripts) { %>
+        <% pageScripts.forEach(function(script) { %>
+            <script src="<%= script %>"></script>
+        <% }); %>
+    <% } %>
+
+    <!-- Layout initialization script -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Mobile sidebar toggle functionality
-            const sidebarToggle = document.getElementById('sidebarCollapse');
-            const headerToggle = document.getElementById('headerCollapse');
-            const sidebar = document.querySelector('.left-sidebar');
-            const overlay = document.createElement('div');
+            // Hide loading screen
+            const loader = document.getElementById('dashboardLoader');
+            if (loader) {
+                setTimeout(() => {
+                    loader.classList.add('hidden');
+                }, 500);
+            }
 
-            // Create overlay for mobile
-            overlay.className = 'sidebar-overlay';
-            overlay.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.5);
-                z-index: 999;
-                display: none;
-            `;
-            document.body.appendChild(overlay);
-
-            // Toggle function
-            function toggleSidebar() {
-                if (window.innerWidth <= 1199) {
-                    sidebar.classList.toggle('show');
-                    if (sidebar.classList.contains('show')) {
-                        overlay.style.display = 'block';
-                        document.body.style.overflow = 'hidden';
-                    } else {
-                        overlay.style.display = 'none';
-                        document.body.style.overflow = '';
+            // Auto-dismiss flash messages
+            const flashMessages = document.querySelectorAll('.flash-messages .alert');
+            flashMessages.forEach(function(alert) {
+                setTimeout(() => {
+                    if (alert.classList.contains('show')) {
+                        const bsAlert = new bootstrap.Alert(alert);
+                        bsAlert.close();
                     }
-                }
-            }
-
-            // Event listeners
-            if (sidebarToggle) {
-                sidebarToggle.addEventListener('click', toggleSidebar);
-            }
-
-            if (headerToggle) {
-                headerToggle.addEventListener('click', toggleSidebar);
-            }
-
-            // Close sidebar when clicking overlay
-            overlay.addEventListener('click', function() {
-                sidebar.classList.remove('show');
-                overlay.style.display = 'none';
-                document.body.style.overflow = '';
+                }, 5000);
             });
 
-            // Handle window resize
-            window.addEventListener('resize', function() {
-                if (window.innerWidth > 1199) {
-                    sidebar.classList.remove('show');
-                    overlay.style.display = 'none';
-                    document.body.style.overflow = '';
+            // Enhanced accessibility
+            document.addEventListener('keydown', function(e) {
+                // ESC key closes modals and dropdowns
+                if (e.key === 'Escape') {
+                    const openModal = document.querySelector('.modal.show');
+                    const openDropdown = document.querySelector('.dropdown-menu.show');
+
+                    if (openModal) {
+                        bootstrap.Modal.getInstance(openModal).hide();
+                    }
+                    if (openDropdown) {
+                        bootstrap.Dropdown.getInstance(openDropdown.previousElementSibling).hide();
+                    }
                 }
             });
 
-            // Smooth scrolling for sidebar navigation
-            const sidebarNav = document.querySelector('.sidebar-nav');
-            if (sidebarNav) {
-                sidebarNav.style.scrollBehavior = 'smooth';
-            }
-
-            // Auto-hide mobile sidebar after navigation click
-            const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
-            sidebarLinks.forEach(link => {
-                link.addEventListener('click', function() {
-                    if (window.innerWidth <= 1199 && sidebar.classList.contains('show')) {
-                        setTimeout(() => {
-                            sidebar.classList.remove('show');
-                            overlay.style.display = 'none';
-                            document.body.style.overflow = '';
-                        }, 150);
-                    }
+            // Performance monitoring (silent)
+            if ('performance' in window) {
+                window.addEventListener('load', function() {
+                    const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+                    // Performance tracked silently
                 });
-            });
+            }
+        });
+
+        // Global error handler
+        window.addEventListener('error', function(e) {
+            console.error('Dashboard error:', e.error);
+            // Could send to error tracking service
+        });
+
+        // Unhandled promise rejection handler
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Unhandled promise rejection:', e.reason);
         });
     </script>
 
-    <%- include('../blocks/scripts') %>
+    <!-- Additional scripts -->
+    <% if (typeof footerScripts !== 'undefined' && footerScripts) { %>
+        <%- footerScripts %>
+    <% } %>
+
 </body>
 </html>

@@ -28,6 +28,10 @@ const head = `
     <%- include('../../assets/admin/cdn-dependencies') %>
     <%- include('../../assets/dashboard/css') %>
 
+    <!-- Core Scripts (needed for header dropdowns) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+
     <!-- Custom CSS for better space utilization -->
     <style>
         /* Override Flexy's restrictive layout for better space usage */
@@ -110,13 +114,13 @@ const head = `
          data-sidebartype="full" data-sidebar-position="fixed" data-header-position="fixed">
 
         <!-- Sidebar Start -->
-        <%- include('../../organisms/sidebar/sidebar', { user: user, userRole: currentUserRole, currentPath: currentPath }) %>
+        <%- include('../../organisms/dashboard/navigation/sidebar-nav', { user: user, userRole: currentUserRole, currentPath: currentPath }) %>
         <!-- Sidebar End -->
 
         <!-- Main Content wrapper -->
         <div class="body-wrapper">
             <!-- Header Start -->
-            <%- include('../../organisms/header/header', { user: user, userRole: currentUserRole, currentPath: currentPath, pageTitle: 'Usuarios' }) %>
+            <%- include('../../organisms/dashboard/header/dashboard-header', { user: user, userRole: currentUserRole, currentPath: currentPath, title: 'Usuarios' }) %>
             <!-- Header End -->
 
             <!-- Main Content -->
@@ -238,117 +242,14 @@ const head = `
     <!-- Page-specific JavaScript -->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🔴 SuperAdmin Users page initialized');
-
-            // Wait for libraries and then load data
-            setTimeout(async function() {
-                if (typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
-                    console.log('⚠️ Libraries not ready, waiting longer...');
-                    setTimeout(arguments.callee, 500);
-                    return;
+            // Update total count when table loads (listen to custom event)
+            document.addEventListener('usersTableLoaded', function(e) {
+                const count = e.detail?.count || 0;
+                const countEl = document.getElementById('total-users-count');
+                if (countEl) {
+                    countEl.textContent = count;
                 }
-
-                console.log('✅ Libraries ready, loading users data...');
-
-                try {
-                    // Load users from API
-                    const response = await fetch('/api/users', {
-                        method: 'GET',
-                        credentials: 'include',
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest',
-                            'Content-Type': 'application/json'
-                        }
-                    });
-
-                    console.log('📤 API Response status:', response.status);
-
-                    if (!response.ok) {
-                        throw new Error(`HTTP ${response.status}`);
-                    }
-
-                    const data = await response.json();
-                    console.log('📊 API Data:', data);
-
-                    if (!data.success) {
-                        throw new Error(data.error || 'API error');
-                    }
-
-                    const users = data.data?.users || [];
-                    console.log('📊 Users loaded:', users.length);
-
-                    // Destroy any existing table
-                    if ($.fn.DataTable.isDataTable('#users-table')) {
-                        $('#users-table').DataTable().destroy();
-                    }
-
-                    // Initialize DataTable with data
-                    const table = $('#users-table').DataTable({
-                        data: users,
-                        columns: [
-                            { title: 'Nombre', data: 'firstName', className: 'fw-bold' },
-                            { title: 'Apellido', data: 'lastName' },
-                            { title: 'Email', data: 'email' },
-                            {
-                                title: 'Rol',
-                                data: 'role',
-                                className: 'text-center',
-                                render: function(data) {
-                                    const roleNames = {
-                                        'superadmin': { name: 'Super Admin', class: 'danger' },
-                                        'admin': { name: 'Admin', class: 'primary' },
-                                        'client': { name: 'Cliente', class: 'info' },
-                                        'department_manager': { name: 'Jefe Depto.', class: 'success' },
-                                        'employee': { name: 'Empleado', class: 'secondary' },
-                                        'driver': { name: 'Conductor', class: 'warning' },
-                                        'guest': { name: 'Invitado', class: 'light' }
-                                    };
-                                    const role = roleNames[data] || { name: data, class: 'secondary' };
-                                    return `<span class="badge bg-${role.class}">${role.name}</span>`;
-                                }
-                            },
-                            {
-                                title: 'Estado',
-                                data: 'active',
-                                className: 'text-center',
-                                render: function(data) {
-                                    const isActive = data === true;
-                                    const statusClass = isActive ? 'success' : 'danger';
-                                    const statusText = isActive ? 'Activo' : 'Inactivo';
-                                    return `<span class="badge bg-${statusClass}">${statusText}</span>`;
-                                }
-                            },
-                            {
-                                title: 'Registro',
-                                data: 'createdAt',
-                                className: 'text-center',
-                                render: function(data) {
-                                    if (data) {
-                                        const date = new Date(data);
-                                        return date.toLocaleDateString('es-ES');
-                                    }
-                                    return '';
-                                }
-                            }
-                        ],
-                        pageLength: 25,
-                        language: {
-                            url: '/assets/libs/datatables/es-ES.json'
-                        }
-                    });
-
-                    window.usersTable = table;
-
-                    // Update count
-                    document.getElementById('total-users-count').textContent = users.length;
-
-                    console.log('✅ DataTable initialized with', users.length, 'users');
-
-                } catch (error) {
-                    console.error('❌ Error loading users:', error);
-                }
-
-            }, 1000);
+            });
         });
     </script>
 </body>

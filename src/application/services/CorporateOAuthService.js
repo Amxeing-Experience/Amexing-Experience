@@ -69,46 +69,55 @@ class CorporateOAuthService {
     // Known corporate domains for auto-mapping
     this.corporateDomains = new Map([
       // Universidad UTQ (Google Workspace)
-      ['utq.edu.mx', {
-        clientName: 'Universidad UTQ',
-        type: 'education',
-        primaryProvider: 'google',
-        autoProvisionEmployees: true,
-        departmentMapping: {
-          'eventos@utq.edu.mx': 'eventos',
-          'administracion@utq.edu.mx': 'administracion',
-          'sistemas@utq.edu.mx': 'IT',
+      [
+        'utq.edu.mx',
+        {
+          clientName: 'Universidad UTQ',
+          type: 'education',
+          primaryProvider: 'google',
+          autoProvisionEmployees: true,
+          departmentMapping: {
+            'eventos@utq.edu.mx': 'eventos',
+            'administracion@utq.edu.mx': 'administracion',
+            'sistemas@utq.edu.mx': 'IT',
+          },
         },
-      }],
+      ],
       // Grupo NUBA (Microsoft Azure AD)
-      ['nuba.com.mx', {
-        clientName: 'Grupo NUBA',
-        type: 'corporate',
-        primaryProvider: 'microsoft',
-        autoProvisionEmployees: true,
-        departmentMapping: {
-          IT: 'sistemas',
-          HR: 'recursos-humanos',
-          'Human Resources': 'recursos-humanos',
-          Finance: 'finanzas',
-          Operations: 'operaciones',
-          'Information Technology': 'sistemas',
-          Technology: 'sistemas',
-          Sistemas: 'sistemas',
-          'Recursos Humanos': 'recursos-humanos',
-          Finanzas: 'finanzas',
-          Operaciones: 'operaciones',
+      [
+        'nuba.com.mx',
+        {
+          clientName: 'Grupo NUBA',
+          type: 'corporate',
+          primaryProvider: 'microsoft',
+          autoProvisionEmployees: true,
+          departmentMapping: {
+            IT: 'sistemas',
+            HR: 'recursos-humanos',
+            'Human Resources': 'recursos-humanos',
+            Finance: 'finanzas',
+            Operations: 'operaciones',
+            'Information Technology': 'sistemas',
+            Technology: 'sistemas',
+            Sistemas: 'sistemas',
+            'Recursos Humanos': 'recursos-humanos',
+            Finanzas: 'finanzas',
+            Operaciones: 'operaciones',
+          },
+          microsoftTenantId: process.env.MICROSOFT_OAUTH_TENANT_ID,
+          enableDirectorySync: true,
         },
-        microsoftTenantId: process.env.MICROSOFT_OAUTH_TENANT_ID,
-        enableDirectorySync: true,
-      }],
+      ],
       // Development domains
-      ['amexing.local', {
-        clientName: 'Amexing Internal',
-        type: 'internal',
-        primaryProvider: 'google',
-        autoProvisionEmployees: true,
-      }],
+      [
+        'amexing.local',
+        {
+          clientName: 'Amexing Internal',
+          type: 'internal',
+          primaryProvider: 'google',
+          autoProvisionEmployees: true,
+        },
+      ],
     ]);
   }
 
@@ -137,7 +146,11 @@ class CorporateOAuthService {
 
       if (corporateConfig) {
         // Find or create corporate client
-        client = await this.findOrCreateCorporateClient(emailDomain, corporateConfig, _provider);
+        client = await this.findOrCreateCorporateClient(
+          emailDomain,
+          corporateConfig,
+          _provider
+        );
 
         logger.logSecurityEvent('CORPORATE_DOMAIN_DETECTED', null, {
           domain: emailDomain,
@@ -147,25 +160,46 @@ class CorporateOAuthService {
       }
 
       // Create or update AmexingUser
-      const user = await this.createOrUpdateOAuthUser(oauthUserInfo, _provider, corporateConfig);
+      const user = await this.createOrUpdateOAuthUser(
+        oauthUserInfo,
+        _provider,
+        corporateConfig
+      );
 
       // Create employee relationship if corporate client exists
       if (client) {
-        await this.createOrUpdateEmployeeRelationship(user, client, oauthUserInfo, corporateConfig);
+        await this.createOrUpdateEmployeeRelationship(
+          user,
+          client,
+          oauthUserInfo,
+          corporateConfig
+        );
       }
 
       // Process permission inheritance for corporate users
       if (client && corporateConfig) {
         try {
-          await PermissionInheritanceService.processCompleteInheritance(user, oauthUserInfo, _provider, corporateConfig); // eslint-disable-line max-len
-
-          logger.logSecurityEvent('CORPORATE_PERMISSION_INHERITANCE_COMPLETED', user.id, {
-            clientId: client.id,
+          await PermissionInheritanceService.processCompleteInheritance(
+            user,
+            oauthUserInfo,
             _provider,
-            clientName: corporateConfig.clientName,
-          });
+            corporateConfig
+          ); // eslint-disable-line max-len
+
+          logger.logSecurityEvent(
+            'CORPORATE_PERMISSION_INHERITANCE_COMPLETED',
+            user.id,
+            {
+              clientId: client.id,
+              _provider,
+              clientName: corporateConfig.clientName,
+            }
+          );
         } catch (permissionError) {
-          logger.error('Error processing permission inheritance:', permissionError);
+          logger.error(
+            'Error processing permission inheritance:',
+            permissionError
+          );
           // Don't fail the entire OAuth process for permission errors
         }
       }
@@ -262,7 +296,10 @@ class CorporateOAuthService {
 
       return client;
     } catch (error) {
-      logger.error(`Error finding/creating corporate client for domain ${_domain}:`, error);
+      logger.error(
+        `Error finding/creating corporate client for domain ${_domain}:`,
+        error
+      );
       throw error;
     }
   }
@@ -279,7 +316,11 @@ class CorporateOAuthService {
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
   // eslint-disable-next-line complexity
-  async createOrUpdateOAuthUser(oauthUserInfo, _provider, corporateConfig = null) {
+  async createOrUpdateOAuthUser(
+    oauthUserInfo,
+    _provider,
+    corporateConfig = null
+  ) {
     try {
       // Check if user exists by OAuth ID
       const query = new Parse.Query(AmexingUser);
@@ -307,8 +348,14 @@ class CorporateOAuthService {
         user = AmexingUser.create({
           username: this.generateUsernameFromEmail(oauthUserInfo.email),
           email: oauthUserInfo.email.toLowerCase(),
-          firstName: oauthUserInfo.given_name || oauthUserInfo.name?.split(' ')[0] || 'Unknown',
-          lastName: oauthUserInfo.family_name || oauthUserInfo.name?.split(' ').slice(1).join(' ') || 'User',
+          firstName:
+            oauthUserInfo.given_name
+            || oauthUserInfo.name?.split(' ')[0]
+            || 'Unknown',
+          lastName:
+            oauthUserInfo.family_name
+            || oauthUserInfo.name?.split(' ').slice(1).join(' ')
+            || 'User',
           role: corporateConfig ? 'employee' : 'user',
         });
 
@@ -327,7 +374,10 @@ class CorporateOAuthService {
       // Set corporate-specific fields
       if (corporateConfig) {
         user.set('isCorporateUser', true);
-        user.set('corporateDomain', this.extractEmailDomain(oauthUserInfo.email));
+        user.set(
+          'corporateDomain',
+          this.extractEmailDomain(oauthUserInfo.email)
+        );
       }
 
       await user.save(null, { useMasterKey: true });
@@ -359,7 +409,12 @@ class CorporateOAuthService {
    * await service.createOrUpdateEmployeeRelationship(user, client, oauthInfo, config);
    */
   // eslint-disable-next-line max-params
-  async createOrUpdateEmployeeRelationship(user, client, oauthUserInfo, corporateConfig) {
+  async createOrUpdateEmployeeRelationship(
+    user,
+    client,
+    oauthUserInfo,
+    corporateConfig
+  ) {
     try {
       // Check if employee relationship exists
       const employeeQuery = new Parse.Query('ClientEmployee');
@@ -380,13 +435,19 @@ class CorporateOAuthService {
       }
 
       // Map department from OAuth profile
-      const department = await this.mapDepartmentFromOAuth(oauthUserInfo, corporateConfig);
+      const department = await this.mapDepartmentFromOAuth(
+        oauthUserInfo,
+        corporateConfig
+      );
       if (department) {
         employee.set('departmentId', department);
       }
 
       // Set access level based on OAuth profile
-      const accessLevel = this.determineAccessLevel(oauthUserInfo, corporateConfig);
+      const accessLevel = this.determineAccessLevel(
+        oauthUserInfo,
+        corporateConfig
+      );
       employee.set('accessLevel', accessLevel);
 
       // Set OAuth sync information
@@ -395,12 +456,16 @@ class CorporateOAuthService {
 
       await employee.save(null, { useMasterKey: true });
 
-      logger.logSecurityEvent('EMPLOYEE_RELATIONSHIP_CREATED_OR_UPDATED', user.id, {
-        clientId: client.id,
-        department,
-        accessLevel,
-        provider: user.get('oauthProvider'),
-      });
+      logger.logSecurityEvent(
+        'EMPLOYEE_RELATIONSHIP_CREATED_OR_UPDATED',
+        user.id,
+        {
+          clientId: client.id,
+          department,
+          accessLevel,
+          provider: user.get('oauthProvider'),
+        }
+      );
     } catch (error) {
       logger.error('Error creating/updating employee relationship:', error);
       throw error;
@@ -454,11 +519,16 @@ class CorporateOAuthService {
         if (field && typeof field === 'string') {
           const fieldLower = field.toLowerCase();
 
-          for (const [mappingKey, mappingValue] of Object.entries(corporateConfig.departmentMapping)) {
+          for (const [mappingKey, mappingValue] of Object.entries(
+            corporateConfig.departmentMapping
+          )) {
             const keyLower = mappingKey.toLowerCase();
 
             // Check if field contains the mapping key or vice versa
-            if (fieldLower.includes(keyLower) || keyLower.includes(fieldLower)) {
+            if (
+              fieldLower.includes(keyLower)
+              || keyLower.includes(fieldLower)
+            ) {
               logger.logSecurityEvent('DEPARTMENT_MAPPING_PARTIAL', null, {
                 originalField: field,
                 matchedKey: mappingKey,
@@ -502,19 +572,30 @@ class CorporateOAuthService {
 
     // Check for admin indicators in OAuth profile
     const adminIndicators = [
-      'admin', 'administrator', 'manager', 'director', 'supervisor',
+      'admin',
+      'administrator',
+      'manager',
+      'director',
+      'supervisor',
     ];
 
     const jobTitle = (oauthUserInfo.jobTitle || '').toLowerCase();
     const department = (oauthUserInfo.department || '').toLowerCase();
 
-    if (adminIndicators.some((indicator) => jobTitle.includes(indicator) || department.includes(indicator))) {
+    if (
+      adminIndicators.some(
+        (indicator) => jobTitle.includes(indicator) || department.includes(indicator)
+      )
+    ) {
       accessLevel = 'elevated';
     }
 
     // IT department gets elevated access by default
-    if (department.includes('it') || department.includes('systems')
-        || department.includes('technology')) {
+    if (
+      department.includes('it')
+      || department.includes('systems')
+      || department.includes('technology')
+    ) {
       accessLevel = 'elevated';
     }
 
@@ -553,7 +634,11 @@ class CorporateOAuthService {
   encryptOAuthProfile(profile) {
     const crypto = require('crypto');
     const algorithm = 'aes-256-gcm';
-    const _key = Buffer.from(process.env.OAUTH_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY, 'hex'); // eslint-disable-line no-underscore-dangle
+    // eslint-disable-next-line no-underscore-dangle
+    const _key = Buffer.from(
+      process.env.OAUTH_ENCRYPTION_KEY || process.env.ENCRYPTION_KEY,
+      'hex'
+    );
     const iv = crypto.randomBytes(16);
 
     const cipher = crypto.createCipheriv(algorithm, _key, iv);
@@ -598,12 +683,14 @@ class CorporateOAuthService {
    * // Returns: Promise resolving to operation result
    */
   getAvailableCorporateDomains() {
-    return Array.from(this.corporateDomains.entries()).map(([domain, config]) => ({
-      domain,
-      clientName: config.clientName,
-      type: config.type,
-      primaryProvider: config.primaryProvider,
-    }));
+    return Array.from(this.corporateDomains.entries()).map(
+      ([domain, config]) => ({
+        domain,
+        clientName: config.clientName,
+        type: config.type,
+        primaryProvider: config.primaryProvider,
+      })
+    );
   }
 
   /**

@@ -1,0 +1,448 @@
+<%
+/**
+ * Success Message Molecule
+ * Complete success message display with icon, title, and optional actions
+ *
+ * @param {string} type - Success type (email-sent, password-changed, account-created, etc.)
+ * @param {string} title - Main success title
+ * @param {string} message - Success message content
+ * @param {object} actions - Array of action buttons
+ * @param {boolean} showIcon - Whether to show success icon (default: true)
+ * @param {string} iconType - Icon type override
+ * @param {boolean} autoRedirect - Auto redirect configuration
+ */
+
+// Default parameters
+const successType = typeof type !== 'undefined' ? type : 'generic';
+const successTitle = typeof title !== 'undefined' ? title : 'Success!';
+const successMessage = typeof message !== 'undefined' ? message : 'Your action was completed successfully.';
+const successActions = typeof actions !== 'undefined' ? actions : [];
+const successShowIcon = typeof showIcon !== 'undefined' ? showIcon : true;
+const successIconType = typeof iconType !== 'undefined' ? iconType : 'check';
+const successAutoRedirect = typeof autoRedirect !== 'undefined' ? autoRedirect : null;
+
+// Success type configurations
+const typeConfig = {
+    'email-sent': {
+        icon: 'mail-forward',
+        color: 'primary',
+        title: 'Email Sent!',
+        defaultMessage: 'Check your inbox for further instructions.'
+    },
+    'password-changed': {
+        icon: 'shield-check',
+        color: 'success',
+        title: 'Password Updated!',
+        defaultMessage: 'Your password has been successfully changed.'
+    },
+    'account-created': {
+        icon: 'user-check',
+        color: 'success',
+        title: 'Account Created!',
+        defaultMessage: 'Your account has been created successfully.'
+    },
+    'password-reset': {
+        icon: 'key',
+        color: 'primary',
+        title: 'Password Reset!',
+        defaultMessage: 'Your password has been reset successfully.'
+    },
+    'email-verified': {
+        icon: 'circle-check',
+        color: 'success',
+        title: 'Email Verified!',
+        defaultMessage: 'Your email address has been verified.'
+    },
+    'generic': {
+        icon: 'check',
+        color: 'success',
+        title: 'Success!',
+        defaultMessage: 'Your action was completed successfully.'
+    }
+};
+
+const config = typeConfig[successType] || typeConfig.generic;
+const finalTitle = successTitle === 'Success!' ? config.title : successTitle;
+const finalMessage = successMessage === 'Your action was completed successfully.' ? config.defaultMessage : successMessage;
+const finalIcon = successIconType === 'check' ? config.icon : successIconType;
+%>
+
+<div class="success-message-container">
+    <!-- Success Icon -->
+    <% if (successShowIcon) { %>
+        <div class="text-center mb-4">
+            <%- include('../../atoms/auth/success-icon', {
+                type: finalIcon,
+                size: 'lg',
+                color: config.color,
+                animated: true
+            }) %>
+        </div>
+    <% } %>
+
+    <!-- Success Content -->
+    <div class="success-content text-center">
+        <!-- Title -->
+        <h2 class="success-title fw-bold text-dark mb-3">
+            <%= finalTitle %>
+        </h2>
+
+        <!-- Message -->
+        <div class="success-message mb-4">
+            <p class="text-muted mb-0 fs-6 lh-base">
+                <%= finalMessage %>
+            </p>
+        </div>
+
+        <!-- Additional Info (type-specific) -->
+        <% if (successType === 'email-sent') { %>
+            <div class="success-info mb-4">
+                <div class="alert alert-info d-inline-flex align-items-center border-0 bg-info-subtle">
+                    <i class="ti ti-info-circle me-2"></i>
+                    <small class="mb-0">
+                        Didn't receive the email? Check your spam folder or try again in a few minutes.
+                    </small>
+                </div>
+            </div>
+        <% } %>
+
+        <% if (successType === 'password-changed') { %>
+            <div class="success-info mb-4">
+                <div class="alert alert-success d-inline-flex align-items-center border-0 bg-success-subtle">
+                    <i class="ti ti-shield-check me-2"></i>
+                    <small class="mb-0">
+                        For your security, you've been logged out of all devices.
+                    </small>
+                </div>
+            </div>
+        <% } %>
+
+        <!-- Action Buttons -->
+        <% if (successActions && successActions.length > 0) { %>
+            <div class="success-actions d-flex flex-column flex-sm-row gap-2 justify-content-center mt-4">
+                <% successActions.forEach((action, index) => { %>
+                    <% const isPrimary = index === 0 || action.primary; %>
+                    <a href="<%= action.href %>"
+                       class="btn <%= isPrimary ? 'btn-primary' : 'btn-outline-secondary' %> <%= action.size === 'sm' ? 'btn-sm' : '' %> d-flex align-items-center justify-content-center"
+                       <% if (action.target) { %>target="<%= action.target %>"<% } %>
+                       <% if (action.download) { %>download<% } %>>
+                        <% if (action.icon) { %>
+                            <i class="ti ti-<%= action.icon %> me-2"></i>
+                        <% } %>
+                        <%= action.text %>
+                    </a>
+                <% }) %>
+            </div>
+        <% } %>
+
+        <!-- Auto Redirect Information -->
+        <% if (successAutoRedirect) { %>
+            <div class="success-redirect mt-4 pt-3 border-top">
+                <div class="d-flex align-items-center justify-content-center text-muted">
+                    <div class="spinner-border spinner-border-sm me-2" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <small>
+                        Redirecting to <%= successAutoRedirect.destination %> in
+                        <span class="redirect-countdown fw-bold"><%= successAutoRedirect.delay || 5 %></span> seconds
+                    </small>
+                </div>
+                <div class="mt-2">
+                    <small>
+                        <a href="<%= successAutoRedirect.url %>" class="text-primary text-decoration-none">
+                            Click here if you're not redirected automatically
+                        </a>
+                    </small>
+                </div>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- Help Section -->
+    <div class="success-help mt-5 pt-4 border-top text-center">
+        <small class="text-muted">
+            Need help?
+            <a href="/contact" class="text-primary text-decoration-none">Contact Support</a>
+            or visit our
+            <a href="/help" class="text-primary text-decoration-none">Help Center</a>
+        </small>
+    </div>
+</div>
+
+<style>
+    .success-message-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem;
+    }
+
+    .success-title {
+        color: #2c3e50;
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+    }
+
+    .success-message {
+        font-size: 1.1rem;
+        line-height: 1.6;
+        color: #6c757d;
+    }
+
+    .success-info .alert {
+        font-size: 0.875rem;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+    }
+
+    .success-actions {
+        gap: 0.75rem;
+    }
+
+    .success-actions .btn {
+        min-width: 140px;
+        font-weight: 600;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+
+    .success-actions .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+
+    /* Redirect countdown animation */
+    .success-redirect {
+        background: rgba(248, 249, 250, 0.6);
+        border-radius: 12px;
+        padding: 1rem;
+    }
+
+    .redirect-countdown {
+        color: #667eea;
+        font-family: monospace;
+        font-size: 1rem;
+    }
+
+    /* Progress bar for redirect */
+    .redirect-progress {
+        width: 100%;
+        height: 4px;
+        background: rgba(102, 126, 234, 0.2);
+        border-radius: 2px;
+        overflow: hidden;
+        margin-top: 0.5rem;
+    }
+
+    .redirect-progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, #667eea, #764ba2);
+        border-radius: 2px;
+        transition: width 1s linear;
+    }
+
+    /* Success animation for container */
+    .success-message-container {
+        animation: successFadeIn 0.6s ease-out;
+    }
+
+    @keyframes successFadeIn {
+        0% {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Confetti effect container (optional) */
+    .success-confetti {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        z-index: 9999;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 576px) {
+        .success-message-container {
+            padding: 1.5rem 1rem;
+        }
+
+        .success-title {
+            font-size: 1.75rem;
+        }
+
+        .success-actions {
+            flex-direction: column;
+        }
+
+        .success-actions .btn {
+            min-width: auto;
+            width: 100%;
+        }
+    }
+
+    /* Dark theme support */
+    [data-theme="dark"] .success-title {
+        color: #fff;
+    }
+
+    [data-theme="dark"] .success-message {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    [data-theme="dark"] .success-redirect {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* Print styles */
+    @media print {
+        .success-message-container {
+            max-width: none;
+            margin: 0;
+            padding: 1rem;
+        }
+
+        .success-actions,
+        .success-redirect,
+        .success-help {
+            display: none;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.querySelector('.success-message-container');
+    const redirectCountdown = document.querySelector('.redirect-countdown');
+
+    // Handle auto-redirect
+    if (redirectCountdown) {
+        let timeLeft = parseInt(redirectCountdown.textContent);
+        const redirectUrl = '<%= successAutoRedirect ? successAutoRedirect.url : "" %>';
+
+        // Create and add progress bar
+        const redirectSection = document.querySelector('.success-redirect');
+        const progressHtml = `
+            <div class="redirect-progress mt-2">
+                <div class="redirect-progress-bar" style="width: 100%;"></div>
+            </div>
+        `;
+        redirectSection.insertAdjacentHTML('beforeend', progressHtml);
+
+        const progressBar = redirectSection.querySelector('.redirect-progress-bar');
+
+        const countdownInterval = setInterval(() => {
+            timeLeft--;
+            redirectCountdown.textContent = timeLeft;
+
+            // Update progress bar
+            const progress = (timeLeft / parseInt('<%= successAutoRedirect ? successAutoRedirect.delay || 5 : 5 %>')) * 100;
+            progressBar.style.width = Math.max(0, progress) + '%';
+
+            if (timeLeft <= 0) {
+                clearInterval(countdownInterval);
+                if (redirectUrl) {
+                    window.location.href = redirectUrl;
+                }
+            }
+        }, 1000);
+
+        // Allow user to cancel redirect
+        document.addEventListener('click', () => {
+            clearInterval(countdownInterval);
+            const redirectSection = document.querySelector('.success-redirect');
+            if (redirectSection) {
+                redirectSection.style.opacity = '0.5';
+                redirectSection.querySelector('small').innerHTML =
+                    'Auto-redirect cancelled. <a href="' + redirectUrl + '" class="text-primary">Click here to continue</a>';
+            }
+        }, { once: true });
+    }
+
+    // Optional: Confetti effect for major successes
+    const successType = '<%= successType %>';
+    if (['account-created', 'password-changed', 'email-verified'].includes(successType)) {
+        // Simple confetti effect (could be enhanced with a library)
+        createConfetti();
+    }
+
+    // Action button analytics
+    const actionButtons = document.querySelectorAll('.success-actions .btn');
+    actionButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const buttonText = this.textContent.trim();
+
+            // Optional analytics
+            if (typeof gtag !== 'undefined') {
+                gtag('event', 'success_action_click', {
+                    success_type: successType,
+                    action_text: buttonText
+                });
+            }
+        });
+    });
+
+    function createConfetti() {
+        // Simple confetti animation
+        const colors = ['#667eea', '#764ba2', '#f093fb', '#f5576c', '#4facfe', '#00f2fe'];
+        const confettiContainer = document.createElement('div');
+        confettiContainer.className = 'success-confetti';
+        document.body.appendChild(confettiContainer);
+
+        for (let i = 0; i < 50; i++) {
+            createConfettiPiece(confettiContainer, colors[Math.floor(Math.random() * colors.length)]);
+        }
+
+        // Remove confetti after animation
+        setTimeout(() => {
+            if (confettiContainer.parentNode) {
+                confettiContainer.parentNode.removeChild(confettiContainer);
+            }
+        }, 3000);
+    }
+
+    function createConfettiPiece(container, color) {
+        const piece = document.createElement('div');
+        piece.style.cssText = `
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: ${color};
+            left: ${Math.random() * 100}%;
+            top: -10px;
+            opacity: 0.8;
+            border-radius: 50%;
+            animation: confettiFall ${2 + Math.random() * 3}s linear forwards;
+        `;
+
+        container.appendChild(piece);
+
+        // Add CSS animation if not already added
+        if (!document.getElementById('confetti-styles')) {
+            const style = document.createElement('style');
+            style.id = 'confetti-styles';
+            style.textContent = `
+                @keyframes confettiFall {
+                    0% {
+                        transform: translateY(-10px) rotate(0deg);
+                        opacity: 1;
+                    }
+                    100% {
+                        transform: translateY(calc(100vh + 10px)) rotate(720deg);
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+});
+</script>

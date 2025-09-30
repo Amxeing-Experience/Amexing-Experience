@@ -132,9 +132,12 @@ app.use(
 // Flexy Bootstrap template assets
 app.use(
   '/flexy-bootstrap-lite-1.0.0',
-  express.static(path.join(__dirname, '..', 'public', 'flexy-bootstrap-lite-1.0.0'), {
-    maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
-  })
+  express.static(
+    path.join(__dirname, '..', 'public', 'flexy-bootstrap-lite-1.0.0'),
+    {
+      maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+    }
+  )
 );
 
 // Initialize Parse Server
@@ -160,7 +163,9 @@ const parseServer = new ParseServer(parseServerConfig);
 
     // Wait a moment for cloud functions to register
     setTimeout(() => {
-      logger.info('Parse Server initialization completed - cloud functions should be ready');
+      logger.info(
+        'Parse Server initialization completed - cloud functions should be ready'
+      );
     }, 2000);
 
     // Cloud functions are automatically loaded by Parse Server via the config
@@ -188,9 +193,12 @@ const parseServer = new ParseServer(parseServerConfig);
 app.use('/parse', parseServer.app);
 
 // Mount Parse Dashboard (separate app for security)
+// Only start dashboard when running directly (not in tests)
 if (
-  process.env.NODE_ENV !== 'production'
-  || process.env.ENABLE_DASHBOARD === 'true'
+  require.main === module
+  && (process.env.NODE_ENV !== 'production'
+    || process.env.ENABLE_DASHBOARD === 'true')
+  && process.env.ENABLE_DASHBOARD !== 'false'
 ) {
   try {
     const dashboardApp = express();
@@ -223,7 +231,9 @@ if (
 }
 
 // Alternative: Use separate dashboard command to avoid conflict
-logger.info('Parse Dashboard disabled in main app. Use "yarn dashboard" to run separately if needed.');
+logger.info(
+  'Parse Dashboard disabled in main app. Use "yarn dashboard" to run separately if needed.'
+);
 
 // Session middleware
 app.use(securityMiddleware.getSessionConfig());
@@ -248,6 +258,11 @@ app.use('/', docsRoutes);
 const dashboardRoutes = require('./presentation/routes/dashboardRoutes');
 
 app.use('/dashboard', dashboardRoutes);
+
+// Atomic Design Routes
+const atomicRoutes = require('./presentation/routes/atomicRoutes');
+
+app.use('/atomic', atomicRoutes);
 
 // Web Routes
 app.use('/', webRoutes);
@@ -471,16 +486,19 @@ app.use((req, res) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Start server
-const server = app.listen(PORT, () => {
-  logger.info(`AmexingWeb API Server running on http://localhost:${PORT}`);
-  logger.info(`Parse Server endpoint: http://localhost:${PORT}/parse`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+// Start server only if this file is run directly (not imported for testing)
+let server;
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    logger.info(`AmexingWeb API Server running on http://localhost:${PORT}`);
+    logger.info(`Parse Server endpoint: http://localhost:${PORT}/parse`);
+    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
-  if (process.env.NODE_ENV === 'production') {
-    logger.info('Running in PRODUCTION mode with enhanced security');
-  }
-});
+    if (process.env.NODE_ENV === 'production') {
+      logger.info('Running in PRODUCTION mode with enhanced security');
+    }
+  });
+}
 
 /**
  * Handles graceful application shutdown for clean process termination.

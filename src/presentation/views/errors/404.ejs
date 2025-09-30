@@ -1,11 +1,25 @@
-<%- include('../layout', {
-    body: '<div style="text-align: center; padding: 3rem 0;">' +
-          '<h1 style="font-size: 6rem; color: #667eea; margin-bottom: 1rem;">404</h1>' +
-          '<h2 style="color: #333; margin-bottom: 1rem;">' + (typeof title !== "undefined" ? title : "Page Not Found") + '</h2>' +
-          '<p style="color: #666; margin-bottom: 2rem;">' + (typeof message !== "undefined" ? message : "The page you are looking for does not exist.") + '</p>' +
-          '<p style="color: #999; margin-bottom: 2rem;">' +
-          'Requested URL: <code style="background: #f0f0f0; padding: 0.25rem 0.5rem; border-radius: 3px;">' + (typeof url !== "undefined" ? url : "/") + '</code>' +
-          '</p>' +
-          '<a href="/" class="btn">Go to Homepage</a>' +
-          '</div>'
+<%- include('../templates/auth-layout', {
+    title: '404 - Page Not Found',
+    page: '404-error',
+    showAuthHeader: false,
+    content: include('../molecules/auth/success-message', {
+        type: 'generic',
+        iconType: 'error-404',
+        title: '404',
+        message: typeof message !== 'undefined' ? message : 'The page you are looking for does not exist.',
+        actions: [
+            {
+                text: 'Go to Homepage',
+                href: '/',
+                icon: 'home',
+                primary: true
+            },
+            {
+                text: 'Go Back',
+                href: 'javascript:history.back()',
+                icon: 'arrow-left'
+            }
+        ],
+        showIcon: true
+    })
 }) %>

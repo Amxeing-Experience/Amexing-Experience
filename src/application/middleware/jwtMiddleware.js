@@ -41,7 +41,9 @@ const authenticateToken = async (req, res, next) => {
 
     if (!token) {
       const authHeader = req.headers.authorization;
-      logger.debug('JWT Middleware - Auth header:', { headerPresent: !!authHeader });
+      logger.debug('JWT Middleware - Auth header:', {
+        headerPresent: !!authHeader,
+      });
       token = authHeader && authHeader.startsWith('Bearer ')
         ? authHeader.slice(7)
         : null;
@@ -65,9 +67,14 @@ const authenticateToken = async (req, res, next) => {
     // Attach user information to request
     req.user = result.user;
     req.userId = result.userId;
-    req.userRole = result.role;
+    req.userRole = result.role; // Backward compatibility
+    req.roleObject = result.roleObject; // New role object
 
-    logger.debug('JWT Middleware - User attached:', { userId: req.userId, role: req.userRole });
+    logger.debug('JWT Middleware - User attached:', {
+      userId: req.userId,
+      role: req.userRole,
+      organizationId: result.user?.organizationId,
+    });
     next();
   } catch (error) {
     logger.error('JWT authentication error:', error);
@@ -127,7 +134,8 @@ const authenticateOptional = async (req, res, next) => {
     // Attach user information to request
     req.user = result.user;
     req.userId = result.userId;
-    req.userRole = result.role;
+    req.userRole = result.role; // Backward compatibility
+    req.roleObject = result.roleObject; // New role object
 
     next();
   } catch (error) {
@@ -177,6 +185,201 @@ const requireRole = (allowedRoles) => {
 
     next();
   };
+};
+
+/**
+ * Middleware to check if user has specific permission with context.
+ * @param {string} permission - Permission to check (e.g., 'bookings.approve').
+ * @param {object} contextExtractor - Function to extract context from request.
+ * @returns {Function} - Express middleware function that validates permissions.
+ * @example
+ * // Check permission with dynamic context
+ * app.patch('/bookings/:id/approve', authenticateToken,
+ *   requirePermission('bookings.approve', (req) => ({
+ *     amount: req.body.amount,
+ *     departmentId: req.user.departmentId,
+ *     timestamp: new Date()
+ *   })),
+ *   approveBooking
+ * );
+ */
+const requirePermission = (permission, contextExtractor = () => ({})) => async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    // Extract context for permission check
+    const context = typeof contextExtractor === 'function'
+      ? contextExtractor(req)
+      : contextExtractor || {};
+
+    // Check if user has permission
+    const hasPermission = await req.user.hasPermission(permission, context);
+
+    if (!hasPermission) {
+      logger.warn('Permission denied:', {
+        userId: req.userId,
+        permission,
+        context,
+        userRole: req.userRole,
+      });
+
+      return res.status(403).json({
+        success: false,
+        error: 'Permission denied',
+        permission,
+      });
+    }
+
+    // Attach permission context to request for use in handlers
+    req.permissionContext = context;
+    next();
+  } catch (error) {
+    logger.error('Permission check error:', {
+      userId: req.userId,
+      permission,
+      error: error.message,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Permission validation failed',
+    });
+  }
+};
+
+/**
+ * Middleware to check role level (hierarchical permission).
+ * @param {number} minimumLevel - Minimum role level required (1-7).
+ * @returns {Function} - Express middleware function that validates role hierarchy.
+ * @example
+ * // Require manager level or higher (level 4+)
+ * app.get('/sensitive-data', authenticateToken, requireRoleLevel(4), getSensitiveData);
+ */
+const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
+  try {
+    if (!req.user || !req.roleObject) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    const userLevel = req.roleObject.getLevel();
+
+    if (userLevel < minimumLevel) {
+      logger.warn('Insufficient role level:', {
+        userId: req.userId,
+        userLevel,
+        requiredLevel: minimumLevel,
+        userRole: req.userRole,
+      });
+
+      return res.status(403).json({
+        success: false,
+        error: 'Insufficient role level',
+        required: minimumLevel,
+        current: userLevel,
+      });
+    }
+
+    next();
+  } catch (error) {
+    logger.error('Role level check error:', {
+      userId: req.userId,
+      minimumLevel,
+      error: error.message,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Role level validation failed',
+    });
+  }
+};
+
+/**
+ * Middleware to check organization scope access.
+ * @param {string} requiredScope - Required scope ('own', 'client', 'system').
+ * @returns {Function} - Express middleware function that validates organization access.
+ * @example
+ * // Only allow access to own organization data
+ * app.get('/organization/:id/data', authenticateToken, requireOrganizationScope('own'), getOrgData);
+ */
+const requireOrganizationScope = (requiredScope = 'own') => async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required',
+      });
+    }
+
+    const userOrganizationId = req.user.organizationId;
+    const targetOrganizationId = req.params.organizationId || req.body.organizationId;
+
+    switch (requiredScope) {
+      case 'own':
+        if (
+          targetOrganizationId
+            && userOrganizationId !== targetOrganizationId
+        ) {
+          return res.status(403).json({
+            success: false,
+            error: 'Access limited to your own organization',
+          });
+        }
+        break;
+
+      case 'client':
+        if (userOrganizationId === 'amexing') {
+          // Amexing users can access any client organization
+          break;
+        }
+        if (
+          targetOrganizationId
+            && userOrganizationId !== targetOrganizationId
+        ) {
+          return res.status(403).json({
+            success: false,
+            error: 'Access limited to your own organization',
+          });
+        }
+        break;
+
+      case 'system':
+        if (userOrganizationId !== 'amexing') {
+          return res.status(403).json({
+            success: false,
+            error: 'System access required',
+          });
+        }
+        break;
+
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid scope configuration',
+        });
+    }
+
+    next();
+  } catch (error) {
+    logger.error('Organization scope check error:', {
+      userId: req.userId,
+      requiredScope,
+      error: error.message,
+    });
+
+    return res.status(500).json({
+      success: false,
+      error: 'Organization scope validation failed',
+    });
+  }
 };
 
 /**
@@ -290,6 +493,9 @@ module.exports = {
   authenticateToken,
   authenticateOptional,
   requireRole,
+  requirePermission,
+  requireRoleLevel,
+  requireOrganizationScope,
   autoRefreshToken,
   extractUser,
   authRateLimit,

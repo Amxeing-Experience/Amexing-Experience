@@ -277,7 +277,7 @@ Supports white-label branding and department-specific flows
             </div>
             
             <%# Enhanced OAuth Component %>
-            <%- include('../partials/oauth-enhanced', { 
+            <%- include('../organisms/auth/corporate-oauth-section', { 
                 title: corporateConfig && corporateConfig.welcomeMessage ? corporateConfig.welcomeMessage : 'Welcome back',
                 error: typeof error !== 'undefined' ? error : null,
                 success: typeof success !== 'undefined' ? success : null,

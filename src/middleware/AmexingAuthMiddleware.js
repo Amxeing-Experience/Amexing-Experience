@@ -242,7 +242,9 @@ class AmexingAuthMiddleware {
       }
 
       // Normalize permissions to array
-      const requiredPermissions = Array.isArray(permissions) ? permissions : [permissions];
+      const requiredPermissions = Array.isArray(permissions)
+        ? permissions
+        : [permissions];
 
       // Build context for permission checking
       const context = this.buildPermissionContext(req, options);
@@ -602,6 +604,7 @@ class AmexingAuthMiddleware {
    * @param {*} jti - JWT ID (currently unused).
    * @param _jti
    * @param {*} userId - User ID (currently unused).
+   * @param _userId
    * @returns {boolean} - Boolean result Session is valid.
    * @example
    * // Authentication middleware usage
@@ -610,7 +613,7 @@ class AmexingAuthMiddleware {
    * // const result = await authService.login(credentials);
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async validateSession(_jti, userId /* unused */) {
+  async validateSession(_jti, _userId) {
     try {
       // This would check the Session table
       // For now, we'll assume valid if JWT is valid
@@ -698,7 +701,11 @@ class AmexingAuthMiddleware {
       if (requireAll) {
         // User must have all permissions
         for (const permission of permissions) {
-          const hasPermission = await PermissionService.hasPermission(userId, permission, context);
+          const hasPermission = await PermissionService.hasPermission(
+            userId,
+            permission,
+            context
+          );
           if (!hasPermission) {
             return false;
           }
@@ -707,7 +714,11 @@ class AmexingAuthMiddleware {
       }
       // User must have at least one permission
       for (const permission of permissions) {
-        const hasPermission = await PermissionService.hasPermission(userId, permission, context);
+        const hasPermission = await PermissionService.hasPermission(
+          userId,
+          permission,
+          context
+        );
         if (hasPermission) {
           return true;
         }
@@ -746,21 +757,25 @@ class AmexingAuthMiddleware {
 
       if (user.departmentId) {
         // Load department information
-        const department = await this.authService.db.collection('Department').findOne({
-          id: user.departmentId,
-          active: true,
-          deleted: false,
-        });
+        const department = await this.authService.db
+          .collection('Department')
+          .findOne({
+            id: user.departmentId,
+            active: true,
+            deleted: false,
+          });
         context.department = department;
       }
 
       if (user.employeeId) {
         // Load employee information
-        const employee = await this.authService.db.collection('ClientEmployee').findOne({
-          id: user.employeeId,
-          active: true,
-          deleted: false,
-        });
+        const employee = await this.authService.db
+          .collection('ClientEmployee')
+          .findOne({
+            id: user.employeeId,
+            active: true,
+            deleted: false,
+          });
         context.employee = employee;
       }
 
@@ -775,6 +790,7 @@ class AmexingAuthMiddleware {
    * Validate OAuth token.
    * @param {string} token - OAuth token.
    * @param token
+   * @param _token
    * @returns {object | null} - Operation result Token data.
    * @example
    * // Authentication middleware usage
@@ -783,7 +799,7 @@ class AmexingAuthMiddleware {
    * // const result = await authService.login(credentials);
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async validateOAuthToken(token /* unused */) {
+  async validateOAuthToken(_token) {
     try {
       // This would validate the OAuth token with the provider
       // and return token data if valid
@@ -808,7 +824,7 @@ class AmexingAuthMiddleware {
    * // const result = await authService.login(credentials);
    * // Returns: { success: true, user: {...}, tokens: {...} }
    */
-  async checkRateLimit(key /* unused */, limit /* unused */) {
+  async checkRateLimit(_key, _limit) {
     try {
       // This would implement rate limiting using Redis or similar
       // For now, always allow

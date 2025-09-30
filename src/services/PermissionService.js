@@ -124,7 +124,7 @@ class PermissionService {
       // Check cache first
       const cacheKey = `user_permissions:${userId}:${JSON.stringify(context)}`;
       const cached = this.permissionCache.get(cacheKey);
-      if (cached && (Date.now() - cached.timestamp) < this.cacheTimeout) {
+      if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
         return cached.permissions;
       }
 
@@ -148,12 +148,18 @@ class PermissionService {
       // 2. Add department permissions if user belongs to department
       if (user.departmentId || context.departmentId) {
         const departmentId = context.departmentId || user.departmentId;
-        const departmentPermissions = await this.getDepartmentPermissions(departmentId, userId);
+        const departmentPermissions = await this.getDepartmentPermissions(
+          departmentId,
+          userId
+        );
         departmentPermissions.forEach((permission) => effectivePermissions.add(permission));
       }
 
       // 3. Add explicit user permissions (highest priority)
-      const userPermissions = await this.getUserSpecificPermissions(userId, context);
+      const userPermissions = await this.getUserSpecificPermissions(
+        userId,
+        context
+      );
 
       // Apply user permissions (can grant or revoke)
       userPermissions.forEach((userPerm) => {
@@ -175,7 +181,9 @@ class PermissionService {
         timestamp: Date.now(),
       });
 
-      logger.debug(`Resolved ${resolvedPermissions.length} permissions for user ${userId}`);
+      logger.debug(
+        `Resolved ${resolvedPermissions.length} permissions for user ${userId}`
+      );
       return resolvedPermissions;
     } catch (error) {
       logger.error('Permission resolution failed:', error);
@@ -209,13 +217,22 @@ class PermissionService {
   async hasPermission(userId, permissionCode, context = {}) {
     try {
       // Special case: superadmin has all permissions
-      const user = await this.db.collection('AmexingUser').findOne({ id: userId });
-      if (user && user.role === 'superadmin') {
-        return true;
+      const user = await this.db
+        .collection('AmexingUser')
+        .findOne({ id: userId });
+      if (user) {
+        // Check if user has superadmin role (supports both string and Pointer)
+        const hasSupeAdminRole = await this.hasRole(user, 'superadmin');
+        if (hasSupeAdminRole) {
+          return true;
+        }
       }
 
       // Get effective permissions
-      const effectivePermissions = await this.getUserEffectivePermissions(userId, context);
+      const effectivePermissions = await this.getUserEffectivePermissions(
+        userId,
+        context
+      );
 
       // Check for exact match
       if (effectivePermissions.includes(permissionCode)) {
@@ -312,10 +329,13 @@ class PermissionService {
    * const deptPerms = await permissionService.getDepartmentPermissions('dept_finance', 'user123');
    */
   async getDepartmentPermissions(departmentId, userId) {
-    const departmentPermissions = await this.db.collection('DepartmentPermission').find({
-      departmentId,
-      granted: true,
-    }).toArray();
+    const departmentPermissions = await this.db
+      .collection('DepartmentPermission')
+      .find({
+        departmentId,
+        granted: true,
+      })
+      .toArray();
 
     // Get user's role in department context
     const employee = await this.db.collection('ClientEmployee').findOne({
@@ -356,10 +376,7 @@ class PermissionService {
     const query = {
       userId,
       status: 'active',
-      $or: [
-        { expiresAt: null },
-        { expiresAt: { $gt: new Date() } },
-      ],
+      $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
     };
 
     // Add context filtering if provided
@@ -371,7 +388,10 @@ class PermissionService {
       ];
     }
 
-    const userPermissions = await this.db.collection('UserPermission').find(query).toArray();
+    const userPermissions = await this.db
+      .collection('UserPermission')
+      .find(query)
+      .toArray();
 
     // Resolve permission codes
     const permissions = [];
@@ -408,18 +428,27 @@ class PermissionService {
     const resolvedPermissions = new Set(permissionCodes);
 
     // Get all permissions with their dependencies
-    const permissions = await this.db.collection('Permission').find({
-      code: { $in: permissionCodes },
-      isActive: true,
-    }).toArray();
+    const permissions = await this.db
+      .collection('Permission')
+      .find({
+        code: { $in: permissionCodes },
+        isActive: true,
+      })
+      .toArray();
 
     for (const permission of permissions) {
       // Add implied permissions
-      if (permission.impliesPermissions && permission.impliesPermissions.length > 0) {
-        const impliedPermissions = await this.db.collection('Permission').find({
-          id: { $in: permission.impliesPermissions },
-          isActive: true,
-        }).toArray();
+      if (
+        permission.impliesPermissions
+        && permission.impliesPermissions.length > 0
+      ) {
+        const impliedPermissions = await this.db
+          .collection('Permission')
+          .find({
+            id: { $in: permission.impliesPermissions },
+            isActive: true,
+          })
+          .toArray();
 
         impliedPermissions.forEach((impliedPerm) => {
           resolvedPermissions.add(impliedPerm.code);
@@ -445,15 +474,15 @@ class PermissionService {
    */
   async checkContextualPermission(userId, permissionCode, context) {
     // Get user permissions with conditions
-    const conditionalPermissions = await this.db.collection('UserPermission').find({
-      userId,
-      status: 'active',
-      conditions: { $exists: true, $ne: {} },
-      $or: [
-        { expiresAt: null },
-        { expiresAt: { $gt: new Date() } },
-      ],
-    }).toArray();
+    const conditionalPermissions = await this.db
+      .collection('UserPermission')
+      .find({
+        userId,
+        status: 'active',
+        conditions: { $exists: true, $ne: {} },
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+      })
+      .toArray();
 
     for (const userPerm of conditionalPermissions) {
       const permission = await this.db.collection('Permission').findOne({
@@ -461,7 +490,10 @@ class PermissionService {
         code: permissionCode,
       });
 
-      if (permission && this.evaluatePermissionConditions(userPerm.conditions, context)) {
+      if (
+        permission
+        && this.evaluatePermissionConditions(userPerm.conditions, context)
+      ) {
         return userPerm.granted;
       }
     }
@@ -488,16 +520,22 @@ class PermissionService {
         const now = new Date();
         const currentHour = now.getHours();
 
-        if (conditions.timeRestrictions.startHour
-            && conditions.timeRestrictions.endHour) {
-          if (currentHour < conditions.timeRestrictions.startHour
-              || currentHour > conditions.timeRestrictions.endHour) {
+        if (
+          conditions.timeRestrictions.startHour
+          && conditions.timeRestrictions.endHour
+        ) {
+          if (
+            currentHour < conditions.timeRestrictions.startHour
+            || currentHour > conditions.timeRestrictions.endHour
+          ) {
             return false;
           }
         }
 
-        if (conditions.timeRestrictions.weekdays
-            && !conditions.timeRestrictions.weekdays.includes(now.getDay())) {
+        if (
+          conditions.timeRestrictions.weekdays
+          && !conditions.timeRestrictions.weekdays.includes(now.getDay())
+        ) {
           return false;
         }
       }
@@ -699,10 +737,13 @@ class PermissionService {
         throw new Error(`Permission template not found: ${templateId}`);
       }
 
-      const permissions = await this.db.collection('Permission').find({
-        id: { $in: template.permissions },
-        isActive: true,
-      }).toArray();
+      const permissions = await this.db
+        .collection('Permission')
+        .find({
+          id: { $in: template.permissions },
+          isActive: true,
+        })
+        .toArray();
 
       // Grant each permission
       for (const permission of permissions) {
@@ -714,11 +755,15 @@ class PermissionService {
           });
         } catch (error) {
           // Continue with other permissions if one fails
-          logger.warn(`Failed to grant permission ${permission.code}: ${error.message}`);
+          logger.warn(
+            `Failed to grant permission ${permission.code}: ${error.message}`
+          );
         }
       }
 
-      logger.info(`Permission template applied: ${template.name} to user ${userId}`);
+      logger.info(
+        `Permission template applied: ${template.name} to user ${userId}`
+      );
     } catch (error) {
       logger.error('Permission template assignment failed:', error);
       throw error;
@@ -745,14 +790,19 @@ class PermissionService {
     if (!employee) return false;
 
     // Check if permission applies to employees
-    if (deptPermission.appliesToEmployees
-        && (employee.role !== 'manager' && employee.role !== 'director')) {
+    if (
+      deptPermission.appliesToEmployees
+      && employee.role !== 'manager'
+      && employee.role !== 'director'
+    ) {
       return true;
     }
 
     // Check if permission applies to managers
-    if (deptPermission.appliesToManagers
-        && (employee.role === 'manager' || employee.role === 'director')) {
+    if (
+      deptPermission.appliesToManagers
+      && (employee.role === 'manager' || employee.role === 'director')
+    ) {
       return true;
     }
 
@@ -821,9 +871,13 @@ class PermissionService {
    * // Returns: Promise resolving to operation result
    */
   async getPermissionHierarchy() {
-    const permissions = await this.db.collection('Permission').find({
-      isActive: true,
-    }).sort({ category: 1, resource: 1, action: 1 }).toArray();
+    const permissions = await this.db
+      .collection('Permission')
+      .find({
+        isActive: true,
+      })
+      .sort({ category: 1, resource: 1, action: 1 })
+      .toArray();
 
     const hierarchy = {};
 
@@ -865,12 +919,17 @@ class PermissionService {
     const effectivePermissions = await this.getUserEffectivePermissions(userId);
     const userSpecificPermissions = await this.getUserSpecificPermissions(userId);
 
-    const user = await this.db.collection('AmexingUser').findOne({ id: userId });
+    const user = await this.db
+      .collection('AmexingUser')
+      .findOne({ id: userId });
     const rolePermissions = await this.getRolePermissions(user.role);
 
     let departmentPermissions = [];
     if (user.departmentId) {
-      departmentPermissions = await this.getDepartmentPermissions(user.departmentId, userId);
+      departmentPermissions = await this.getDepartmentPermissions(
+        user.departmentId,
+        userId
+      );
     }
 
     return {
@@ -891,6 +950,49 @@ class PermissionService {
         },
       },
     };
+  }
+
+  /**
+   * Helper method to check if user has a specific role.
+   * Supports both string roles and Pointer relationships.
+   * @param {object} user - User object from database.
+   * @param {string} roleName - Role name to check.
+   * @returns {Promise<boolean>} - True if user has the role.
+   */
+  async hasRole(user, roleName) {
+    try {
+      // Check string role field (backward compatibility)
+      if (user.role === roleName) {
+        return true;
+      }
+
+      // Check roleId Pointer
+      if (user.roleId) {
+        // If roleId is a string (object ID)
+        if (typeof user.roleId === 'string') {
+          const role = await this.db.collection('Role').findOne({
+            _id: user.roleId,
+            exists: true,
+            active: true,
+          });
+          return role && role.name === roleName;
+        }
+
+        // If roleId is already populated object
+        if (user.roleId.name) {
+          return user.roleId.name === roleName;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      logger.error('Error checking user role', {
+        userId: user.id,
+        roleName,
+        error: error.message,
+      });
+      return false;
+    }
   }
 }
 

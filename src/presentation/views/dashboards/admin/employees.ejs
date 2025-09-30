@@ -19,7 +19,7 @@
                 <!-- Quick Stats -->
                 <div class="row">
                     <div class="col-md-3">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-users',
                             title: 'Total Employees',
                             value: typeof stats !== 'undefined' ? stats.totalEmployees : '1,247',
@@ -29,7 +29,7 @@
                         }) %>
                     </div>
                     <div class="col-md-3">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-user-check',
                             title: 'Active Employees',
                             value: typeof stats !== 'undefined' ? stats.activeEmployees : '1,198',
@@ -39,7 +39,7 @@
                         }) %>
                     </div>
                     <div class="col-md-3">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-calendar-event',
                             title: 'Employee Bookings',
                             value: typeof stats !== 'undefined' ? stats.employeeBookings : '3,456',
@@ -49,7 +49,7 @@
                         }) %>
                     </div>
                     <div class="col-md-3">
-                        <%- include('../../components/cards/stats', {
+                        <%- include('../../atoms/dashboard/stats-card', {
                             icon: 'ti ti-brand-oauth',
                             title: 'OAuth Provisioned',
                             value: typeof stats !== 'undefined' ? stats.oauthEmployees : '892',

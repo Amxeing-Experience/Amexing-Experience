@@ -1,0 +1,965 @@
+<!-- Search and Filter Section -->
+<div class="search-section">
+    <div class="row g-3 align-items-center">
+        <div class="col-md-8">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="ti ti-search"></i>
+                </span>
+                <input type="text" class="form-control search-input" id="componentSearch"
+                       placeholder="Search common components...">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="btn-group w-100" role="group">
+                <button type="button" class="btn btn-outline-primary active" data-filter="all">All</button>
+                <button type="button" class="btn btn-outline-success" data-filter="atom">Atoms</button>
+                <button type="button" class="btn btn-outline-info" data-filter="molecule">Molecules</button>
+                <button type="button" class="btn btn-outline-warning" data-filter="organism">Organisms</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Atoms Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-success mb-4">
+            <i class="ti ti-circle-dot me-2"></i>Atoms (<%= components.atoms.length %>)
+        </h3>
+        <p class="text-muted mb-4">Universal building blocks used throughout the application</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <% components.atoms.forEach(component => { %>
+        <div class="col-lg-6">
+            <div class="component-card fade-in" data-type="atom">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge atom">Atom</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <% if (component.name === 'Icon') { %>
+                        <!-- Live Preview for Icon -->
+                        <div class="text-center py-4">
+                            <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap">
+                                <%- include('../../atoms/common/icon', {
+                                    name: 'home',
+                                    size: 'md',
+                                    color: 'primary'
+                                }) %>
+                                <%- include('../../atoms/common/icon', {
+                                    name: 'user',
+                                    size: 'lg',
+                                    color: 'success'
+                                }) %>
+                                <%- include('../../atoms/common/icon', {
+                                    name: 'settings',
+                                    size: 'xl',
+                                    color: 'warning'
+                                }) %>
+                            </div>
+                            <small class="text-muted mt-2">Examples: Home, User, Settings icons</small>
+                        </div>
+                    <% } else if (component.name === 'Button') { %>
+                        <!-- Live Preview for Button -->
+                        <div class="text-center py-4">
+                            <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap">
+                                <%- include('../../atoms/common/button', {
+                                    text: 'Primary',
+                                    variant: 'primary',
+                                    size: 'md'
+                                }) %>
+                                <%- include('../../atoms/common/button', {
+                                    text: 'Secondary',
+                                    variant: 'outline-secondary',
+                                    size: 'md'
+                                }) %>
+                                <%- include('../../atoms/common/button', {
+                                    text: 'With Icon',
+                                    variant: 'success',
+                                    size: 'md',
+                                    icon: 'check'
+                                }) %>
+                            </div>
+                            <div class="d-flex justify-content-center align-items-center gap-2 mt-3">
+                                <%- include('../../atoms/common/button', {
+                                    text: 'Small',
+                                    variant: 'info',
+                                    size: 'sm'
+                                }) %>
+                                <%- include('../../atoms/common/button', {
+                                    text: 'Large',
+                                    variant: 'warning',
+                                    size: 'lg'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Label') { %>
+                        <!-- Live Preview for Label -->
+                        <div class="text-center py-4">
+                            <div class="d-flex flex-column align-items-center gap-3">
+                                <%- include('../../atoms/common/label', {
+                                    text: 'Default Label',
+                                    htmlFor: 'example1'
+                                }) %>
+                                <%- include('../../atoms/common/label', {
+                                    text: 'Required Field',
+                                    htmlFor: 'example2',
+                                    required: true
+                                }) %>
+                                <%- include('../../atoms/common/label', {
+                                    text: 'Success Label',
+                                    htmlFor: 'example3',
+                                    color: 'success'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Checkbox') { %>
+                        <!-- Live Preview for Checkbox -->
+                        <div class="text-center py-4">
+                            <div class="d-flex flex-column align-items-center gap-3">
+                                <%- include('../../atoms/common/checkbox', {
+                                    name: 'demo1',
+                                    id: 'check1',
+                                    label: 'Default Checkbox',
+                                    value: '1'
+                                }) %>
+                                <%- include('../../atoms/common/checkbox', {
+                                    name: 'demo2',
+                                    id: 'check2',
+                                    label: 'Checked Checkbox',
+                                    value: '1',
+                                    checked: true
+                                }) %>
+                                <%- include('../../atoms/common/checkbox', {
+                                    name: 'demo3',
+                                    id: 'check3',
+                                    label: 'Large Checkbox',
+                                    value: '1',
+                                    size: 'lg'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Radio Button') { %>
+                        <!-- Live Preview for Radio Button -->
+                        <div class="text-center py-4">
+                            <div class="d-flex flex-column align-items-center gap-3">
+                                <%- include('../../atoms/common/radio', {
+                                    name: 'radioDemo',
+                                    id: 'radio1',
+                                    label: 'Option 1',
+                                    value: '1',
+                                    checked: true
+                                }) %>
+                                <%- include('../../atoms/common/radio', {
+                                    name: 'radioDemo',
+                                    id: 'radio2',
+                                    label: 'Option 2',
+                                    value: '2'
+                                }) %>
+                                <%- include('../../atoms/common/radio', {
+                                    name: 'radioDemo',
+                                    id: 'radio3',
+                                    label: 'Option 3',
+                                    value: '3'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Toggle Switch') { %>
+                        <!-- Live Preview for Toggle Switch -->
+                        <div class="text-center py-4">
+                            <div class="d-flex flex-column align-items-center gap-3">
+                                <%- include('../../atoms/common/toggle', {
+                                    name: 'toggle1',
+                                    id: 'toggle1',
+                                    label: 'Default Toggle'
+                                }) %>
+                                <%- include('../../atoms/common/toggle', {
+                                    name: 'toggle2',
+                                    id: 'toggle2',
+                                    label: 'Checked Toggle',
+                                    checked: true,
+                                    color: 'success'
+                                }) %>
+                                <%- include('../../atoms/common/toggle', {
+                                    name: 'toggle3',
+                                    id: 'toggle3',
+                                    label: 'Large Toggle',
+                                    size: 'lg',
+                                    color: 'primary'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Textarea') { %>
+                        <!-- Live Preview for Textarea -->
+                        <div class="text-center py-4">
+                            <div class="d-flex flex-column align-items-center gap-3" style="max-width: 400px; margin: 0 auto;">
+                                <%- include('../../atoms/common/textarea', {
+                                    name: 'demo1',
+                                    id: 'textarea1',
+                                    placeholder: 'Enter your message...',
+                                    rows: 3
+                                }) %>
+                                <%- include('../../atoms/common/textarea', {
+                                    name: 'demo2',
+                                    id: 'textarea2',
+                                    value: 'This textarea has content',
+                                    rows: 2,
+                                    resize: 'none'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Avatar') { %>
+                        <!-- Live Preview for Avatar -->
+                        <div class="text-center py-4">
+                            <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap">
+                                <%- include('../../atoms/common/avatar', {
+                                    fallbackText: 'JD',
+                                    size: 'md',
+                                    shape: 'rounded'
+                                }) %>
+                                <%- include('../../atoms/common/avatar', {
+                                    fallbackText: 'AB',
+                                    size: 'lg',
+                                    shape: 'circle',
+                                    status: 'online'
+                                }) %>
+                                <%- include('../../atoms/common/avatar', {
+                                    fallbackText: 'XY',
+                                    size: 'sm',
+                                    shape: 'circle',
+                                    status: 'offline'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Badge') { %>
+                        <!-- Live Preview for Badge -->
+                        <div class="text-center py-4">
+                            <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap">
+                                <%- include('../../atoms/common/badge', {
+                                    text: 'Primary',
+                                    variant: 'primary'
+                                }) %>
+                                <%- include('../../atoms/common/badge', {
+                                    text: 'Success',
+                                    variant: 'success',
+                                    pill: true
+                                }) %>
+                                <%- include('../../atoms/common/badge', {
+                                    text: 'Warning',
+                                    variant: 'warning',
+                                    outline: true
+                                }) %>
+                                <%- include('../../atoms/common/badge', {
+                                    text: 'With Icon',
+                                    variant: 'info',
+                                    icon: 'star'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Spinner') { %>
+                        <!-- Live Preview for Spinner -->
+                        <div class="text-center py-4">
+                            <div class="d-flex justify-content-center align-items-center gap-4">
+                                <%- include('../../atoms/common/spinner', {
+                                    size: 'sm',
+                                    color: 'primary'
+                                }) %>
+                                <%- include('../../atoms/common/spinner', {
+                                    size: 'md',
+                                    color: 'success'
+                                }) %>
+                                <%- include('../../atoms/common/spinner', {
+                                    size: 'lg',
+                                    color: 'warning'
+                                }) %>
+                            </div>
+                            <small class="text-muted mt-2">Small, Medium, and Large spinners</small>
+                        </div>
+                    <% } else if (component.name === 'Divider') { %>
+                        <!-- Live Preview for Divider -->
+                        <div class="text-center py-4">
+                            <div class="d-flex flex-column align-items-center gap-3" style="max-width: 300px; margin: 0 auto;">
+                                <p class="mb-2">Content above</p>
+                                <%- include('../../atoms/common/divider', {
+                                    orientation: 'horizontal'
+                                }) %>
+                                <p class="mb-2">Content below</p>
+                                <%- include('../../atoms/common/divider', {
+                                    orientation: 'horizontal',
+                                    style: 'dashed'
+                                }) %>
+                                <p class="mb-0">More content</p>
+                            </div>
+                        </div>
+                    <% } else { %>
+                        <!-- Placeholder for undefined components -->
+                        <div class="text-center py-4">
+                            <i class="ti ti-components text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2"><%= component.usage %></p>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Examples</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <% if (component.name === 'Icon') { %>
+                            <pre><code class="language-markup">&lt;!-- Basic icon --&gt;
+&lt;%- include('atoms/common/icon', {
+    name: 'home',
+    size: 'md',
+    color: 'primary'
+}) %&gt;
+
+&lt;!-- Icon with custom class --&gt;
+&lt;%- include('atoms/common/icon', {
+    name: 'settings',
+    size: 'lg',
+    additionalClasses: 'custom-class'
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Button') { %>
+                            <pre><code class="language-markup">&lt;!-- Primary button --&gt;
+&lt;%- include('atoms/common/button', {
+    text: 'Click me',
+    variant: 'primary',
+    size: 'md'
+}) %&gt;
+
+&lt;!-- Button with icon --&gt;
+&lt;%- include('atoms/common/button', {
+    text: 'Save',
+    variant: 'success',
+    icon: 'check',
+    type: 'submit'
+}) %&gt;
+
+&lt;!-- Disabled button --&gt;
+&lt;%- include('atoms/common/button', {
+    text: 'Disabled',
+    variant: 'secondary',
+    disabled: true
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Label') { %>
+                            <pre><code class="language-markup">&lt;!-- Basic label --&gt;
+&lt;%- include('atoms/common/label', {
+    text: 'Username',
+    htmlFor: 'username'
+}) %&gt;
+
+&lt;!-- Required label --&gt;
+&lt;%- include('atoms/common/label', {
+    text: 'Email Address',
+    htmlFor: 'email',
+    required: true,
+    color: 'primary'
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Checkbox') { %>
+                            <pre><code class="language-markup">&lt;!-- Basic checkbox --&gt;
+&lt;%- include('atoms/common/checkbox', {
+    name: 'agree',
+    id: 'agree',
+    label: 'I agree to terms',
+    value: '1'
+}) %&gt;
+
+&lt;!-- Checked checkbox --&gt;
+&lt;%- include('atoms/common/checkbox', {
+    name: 'newsletter',
+    id: 'newsletter',
+    label: 'Subscribe to newsletter',
+    value: '1',
+    checked: true,
+    size: 'lg'
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Radio Button') { %>
+                            <pre><code class="language-markup">&lt;!-- Radio button group --&gt;
+&lt;%- include('atoms/common/radio', {
+    name: 'payment',
+    id: 'credit',
+    label: 'Credit Card',
+    value: 'credit',
+    checked: true
+}) %&gt;
+
+&lt;%- include('atoms/common/radio', {
+    name: 'payment',
+    id: 'paypal',
+    label: 'PayPal',
+    value: 'paypal'
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Toggle Switch') { %>
+                            <pre><code class="language-markup">&lt;!-- Basic toggle --&gt;
+&lt;%- include('atoms/common/toggle', {
+    name: 'notifications',
+    id: 'notifications',
+    label: 'Enable notifications'
+}) %&gt;
+
+&lt;!-- Colored toggle --&gt;
+&lt;%- include('atoms/common/toggle', {
+    name: 'darkmode',
+    id: 'darkmode',
+    label: 'Dark mode',
+    checked: true,
+    color: 'success',
+    size: 'lg'
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Textarea') { %>
+                            <pre><code class="language-markup">&lt;!-- Basic textarea --&gt;
+&lt;%- include('atoms/common/textarea', {
+    name: 'message',
+    id: 'message',
+    placeholder: 'Enter your message...',
+    rows: 4
+}) %&gt;
+
+&lt;!-- Non-resizable textarea --&gt;
+&lt;%- include('atoms/common/textarea', {
+    name: 'description',
+    id: 'description',
+    value: 'Existing content',
+    rows: 3,
+    resize: 'none'
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Avatar') { %>
+                            <pre><code class="language-markup">&lt;!-- Avatar with initials --&gt;
+&lt;%- include('atoms/common/avatar', {
+    fallbackText: 'JD',
+    size: 'md',
+    shape: 'circle'
+}) %&gt;
+
+&lt;!-- Avatar with image and status --&gt;
+&lt;%- include('atoms/common/avatar', {
+    src: '/images/user.jpg',
+    alt: 'John Doe',
+    size: 'lg',
+    shape: 'circle',
+    status: 'online'
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Badge') { %>
+                            <pre><code class="language-markup">&lt;!-- Basic badge --&gt;
+&lt;%- include('atoms/common/badge', {
+    text: 'New',
+    variant: 'primary'
+}) %&gt;
+
+&lt;!-- Badge with icon --&gt;
+&lt;%- include('atoms/common/badge', {
+    text: 'Featured',
+    variant: 'success',
+    icon: 'star',
+    pill: true
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Spinner') { %>
+                            <pre><code class="language-markup">&lt;!-- Small spinner --&gt;
+&lt;%- include('atoms/common/spinner', {
+    size: 'sm',
+    color: 'primary'
+}) %&gt;
+
+&lt;!-- Loading button --&gt;
+&lt;%- include('atoms/common/spinner', {
+    size: 'md',
+    color: 'secondary'
+}) %&gt; Loading...</code></pre>
+                        <% } else if (component.name === 'Divider') { %>
+                            <pre><code class="language-markup">&lt;!-- Horizontal divider --&gt;
+&lt;%- include('atoms/common/divider', {
+    orientation: 'horizontal'
+}) %&gt;
+
+&lt;!-- Dashed divider --&gt;
+&lt;%- include('atoms/common/divider', {
+    orientation: 'horizontal',
+    style: 'dashed'
+}) %&gt;</code></pre>
+                        <% } else { %>
+                            <pre><code class="language-markup">&lt;%- include('atoms/common/<%= component.file.replace('.ejs', '') %>', {
+<% if (component.params) { component.params.forEach((param, index) => { %>    <%= param %>: value<%= index < component.params.length - 1 ? ',' : '' %>
+<% }); } %>}) %&gt;</code></pre>
+                        <% } %>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <% if (component.params && component.params.length > 0) { %>
+                        <div class="row g-2">
+                            <% component.params.forEach(param => { %>
+                                <div class="col-md-6">
+                                    <code class="text-info"><%= param %></code>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <p class="text-muted small">No configurable parameters</p>
+                    <% } %>
+
+                    <% if (component.name === 'Icon') { %>
+                        <div class="mt-3">
+                            <h6>Available Icon Sizes:</h6>
+                            <div class="d-flex gap-2 align-items-center">
+                                <code class="text-success">xs</code>
+                                <code class="text-success">sm</code>
+                                <code class="text-success">md</code>
+                                <code class="text-success">lg</code>
+                                <code class="text-success">xl</code>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <% if (component.name === 'Button') { %>
+                        <div class="mt-3">
+                            <h6>Available Variants:</h6>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <code class="text-success">primary</code>
+                                <code class="text-success">secondary</code>
+                                <code class="text-success">success</code>
+                                <code class="text-success">warning</code>
+                                <code class="text-success">danger</code>
+                                <code class="text-success">info</code>
+                                <code class="text-success">outline-*</code>
+                            </div>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Molecules Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-info mb-4">
+            <i class="ti ti-components me-2"></i>Molecules (<%= components.molecules.length %>)
+        </h3>
+        <p class="text-muted mb-4">Combinations of atoms working together as functional units</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <% components.molecules.forEach(component => { %>
+        <div class="col-lg-6">
+            <div class="component-card fade-in" data-type="molecule">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge molecule">Molecule</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <% if (component.name === 'Form Field') { %>
+                        <!-- Live Preview for Form Field -->
+                        <div class="text-center py-4">
+                            <div style="max-width: 400px; margin: 0 auto;">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'example1',
+                                    label: 'Username',
+                                    placeholder: 'Enter your username',
+                                    required: true
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Search Bar') { %>
+                        <!-- Live Preview for Search Bar -->
+                        <div class="text-center py-4">
+                            <div style="max-width: 500px; margin: 0 auto;">
+                                <%- include('../../molecules/common/searchbar', {
+                                    name: 'search',
+                                    placeholder: 'Search components...',
+                                    clearable: true,
+                                    size: 'md'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else if (component.name === 'Card') { %>
+                        <!-- Live Preview for Card -->
+                        <div class="text-center py-4">
+                            <div style="max-width: 400px; margin: 0 auto;">
+                                <%- include('../../molecules/common/card', {
+                                    title: 'Sample Card',
+                                    subtitle: 'This is a card subtitle',
+                                    bodyContent: 'This card demonstrates the flexible layout options available in our card molecule component.',
+                                    variant: 'default',
+                                    shadow: 'sm',
+                                    hoverable: true
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else { %>
+                        <!-- Placeholder for other molecules -->
+                        <div class="text-center py-4">
+                            <i class="ti ti-components text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2"><%= component.usage %></p>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Examples</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <% if (component.name === 'Form Field') { %>
+                            <pre><code class="language-markup">&lt;!-- Complete form field --&gt;
+&lt;%- include('molecules/common/form-field', {
+    type: 'text',
+    name: 'username',
+    label: 'Username',
+    placeholder: 'Enter username',
+    required: true,
+    helpText: 'Must be at least 3 characters'
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Search Bar') { %>
+                            <pre><code class="language-markup">&lt;!-- Basic search bar --&gt;
+&lt;%- include('molecules/common/searchbar', {
+    name: 'search',
+    placeholder: 'Search...',
+    clearable: true
+}) %&gt;</code></pre>
+                        <% } else if (component.name === 'Card') { %>
+                            <pre><code class="language-markup">&lt;!-- Basic card --&gt;
+&lt;%- include('molecules/common/card', {
+    title: 'Card Title',
+    bodyContent: 'Card content goes here',
+    variant: 'default'
+}) %&gt;</code></pre>
+                        <% } else { %>
+                            <pre><code class="language-markup">&lt;%- include('molecules/common/<%= component.file.replace('.ejs', '') %>', {
+<% if (component.params) { component.params.forEach((param, index) => { %>    <%= param %>: value<%= index < component.params.length - 1 ? ',' : '' %>
+<% }); } %>}) %&gt;</code></pre>
+                        <% } %>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <% if (component.params && component.params.length > 0) { %>
+                        <div class="row g-2">
+                            <% component.params.forEach(param => { %>
+                                <div class="col-md-6">
+                                    <code class="text-info"><%= param %></code>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <p class="text-muted small">No configurable parameters</p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Organisms Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-warning mb-4">
+            <i class="ti ti-layout-dashboard me-2"></i>Organisms (<%= components.organisms.length %>)
+        </h3>
+        <p class="text-muted mb-4">Complex components made of molecules and atoms</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <% components.organisms.forEach(component => { %>
+        <div class="col-lg-6">
+            <div class="component-card fade-in" data-type="organism">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge organism">Organism</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <% if (component.name === 'Modal') { %>
+                        <!-- Live Preview for Modal -->
+                        <div class="text-center py-4">
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#exampleModal">
+                                Open Modal
+                            </button>
+                            <small class="d-block mt-2 text-muted">Click to see modal preview</small>
+                        </div>
+                    <% } else { %>
+                        <!-- Placeholder for other organisms -->
+                        <div class="text-center py-4">
+                            <i class="ti ti-layout-dashboard text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2"><%= component.usage %></p>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Examples</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <% if (component.name === 'Modal') { %>
+                            <pre><code class="language-markup">&lt;!-- Basic modal --&gt;
+&lt;%- include('organisms/common/modal', {
+    id: 'exampleModal',
+    title: 'Modal Title',
+    bodyContent: 'Modal body content',
+    primaryButtonText: 'Save changes'
+}) %&gt;</code></pre>
+                        <% } else { %>
+                            <pre><code class="language-markup">&lt;%- include('organisms/common/<%= component.file.replace('.ejs', '') %>', {
+<% if (component.params) { component.params.forEach((param, index) => { %>    <%= param %>: value<%= index < component.params.length - 1 ? ',' : '' %>
+<% }); } %>}) %&gt;</code></pre>
+                        <% } %>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <% if (component.params && component.params.length > 0) { %>
+                        <div class="row g-2">
+                            <% component.params.forEach(param => { %>
+                                <div class="col-md-6">
+                                    <code class="text-info"><%= param %></code>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <p class="text-muted small">No configurable parameters</p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Future Components Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Expanding the Common Library</h3>
+                <p class="component-description">
+                    Common components that could be added to improve consistency across the application
+                </p>
+            </div>
+            <div class="component-preview">
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-loading text-muted mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Loading Spinner</h6>
+                                <p class="card-text small text-muted">
+                                    Consistent loading indicators with different sizes and styles
+                                </p>
+                                <small class="text-primary">Potential Addition</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-badge text-muted mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Badge</h6>
+                                <p class="card-text small text-muted">
+                                    Status badges and labels for notifications and states
+                                </p>
+                                <small class="text-primary">Potential Addition</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-photo text-muted mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Avatar</h6>
+                                <p class="card-text small text-muted">
+                                    User avatars with fallbacks and various sizes
+                                </p>
+                                <small class="text-primary">Potential Addition</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Usage Guidelines -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Common Component Guidelines</h3>
+                <p class="component-description">
+                    Best practices for using and maintaining common components
+                </p>
+            </div>
+            <div class="component-preview">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <h5 class="text-success mb-3">
+                            <i class="ti ti-check-circle me-2"></i>Do's
+                        </h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-check text-success me-2"></i>
+                                Use common components consistently across contexts
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-check text-success me-2"></i>
+                                Extend common components rather than duplicating code
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-check text-success me-2"></i>
+                                Follow established parameter patterns when adding features
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-check text-success me-2"></i>
+                                Test components in multiple contexts before committing
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="text-danger mb-3">
+                            <i class="ti ti-x-circle me-2"></i>Don'ts
+                        </h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-x text-danger me-2"></i>
+                                Don't create context-specific versions of common components
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-x text-danger me-2"></i>
+                                Don't modify common components for single-use cases
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-x text-danger me-2"></i>
+                                Don't hardcode styles that should be configurable
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-x text-danger me-2"></i>
+                                Don't break backwards compatibility without versioning
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Integration Examples -->
+<div class="row">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Integration Examples</h3>
+                <p class="component-description">
+                    How common components are used within other atomic design levels
+                </p>
+            </div>
+            <div class="component-code">
+                <div class="code-header">
+                    <span class="title">Example: Using Common Components in Molecules</span>
+                    <button class="copy-btn" type="button">
+                        <i class="ti ti-copy"></i> Copy
+                    </button>
+                </div>
+                <div class="code-content">
+                    <pre><code class="language-markup">&lt;!-- nav-item.ejs molecule using common icon and button --&gt;
+&lt;li class="nav-item"&gt;
+    &lt;a href="&lt;%= url %&gt;" class="nav-link &lt;%= active ? 'active' : '' %&gt;"&gt;
+        &lt;!-- Common Icon Component --&gt;
+        &lt;%- include('../../../atoms/common/icon', {
+            name: icon,
+            size: 'sm',
+            color: active ? 'primary' : 'muted',
+            className: 'me-2'
+        }) %&gt;
+
+        &lt;%= title %&gt;
+
+        &lt;% if (badge) { %&gt;
+            &lt;!-- Future: Common Badge Component --&gt;
+            &lt;span class="badge bg-&lt;%= badge.color %&gt; ms-2"&gt;&lt;%= badge.text %&gt;&lt;/span&gt;
+        &lt;% } %&gt;
+    &lt;/a&gt;
+&lt;/li&gt;
+
+&lt;!-- form-actions.ejs molecule using common buttons --&gt;
+&lt;div class="form-actions d-flex gap-2"&gt;
+    &lt;%- include('../../../atoms/common/button', {
+        text: 'Cancel',
+        variant: 'outline-secondary',
+        type: 'button'
+    }) %&gt;
+
+    &lt;%- include('../../../atoms/common/button', {
+        text: 'Save Changes',
+        variant: 'primary',
+        type: 'submit',
+        icon: 'ti-check'
+    }) %&gt;
+&lt;/div&gt;</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

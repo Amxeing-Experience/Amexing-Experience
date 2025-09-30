@@ -1,0 +1,68 @@
+<%
+/**
+ * Checkbox Atom
+ * Reusable checkbox component with Flexy styling
+ *
+ * @param {string} name - Input name attribute
+ * @param {string} id - Input ID attribute
+ * @param {string} value - Input value attribute
+ * @param {boolean} checked - Whether checkbox is checked
+ * @param {boolean} disabled - Whether checkbox is disabled
+ * @param {string} label - Label text for the checkbox
+ * @param {string} size - Checkbox size (sm, default, lg)
+ * @param {string} color - Checkbox color variant (primary, secondary, success, etc.)
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const checkboxName = typeof name !== 'undefined' ? name : '';
+const checkboxId = typeof id !== 'undefined' ? id : `checkbox-${Math.random().toString(36).substr(2, 9)}`;
+const checkboxValue = typeof value !== 'undefined' ? value : '';
+const checkboxChecked = typeof checked !== 'undefined' ? checked : false;
+const checkboxDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const checkboxLabel = typeof label !== 'undefined' ? label : '';
+const checkboxSize = typeof size !== 'undefined' ? size : 'default';
+const checkboxColor = typeof color !== 'undefined' ? color : 'primary';
+const checkboxAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const checkboxAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build wrapper classes
+let wrapperClasses = ['form-check'];
+if (checkboxAdditionalClasses) wrapperClasses.push(checkboxAdditionalClasses);
+
+// Build input classes
+let inputClasses = ['form-check-input'];
+if (checkboxSize === 'sm') {
+    inputClasses.push('form-check-input-sm');
+} else if (checkboxSize === 'lg') {
+    inputClasses.push('form-check-input-lg');
+}
+
+// Build attributes string
+let attributesString = '';
+if (checkboxAttributes && typeof checkboxAttributes === 'object') {
+    attributesString = Object.entries(checkboxAttributes)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+}
+
+const finalWrapperClasses = wrapperClasses.join(' ');
+const finalInputClasses = inputClasses.join(' ');
+%>
+
+<div class="<%= finalWrapperClasses %>">
+    <input type="checkbox"
+           class="<%= finalInputClasses %>"
+           id="<%= checkboxId %>"
+           <% if (checkboxName) { %>name="<%= checkboxName %>"<% } %>
+           <% if (checkboxValue) { %>value="<%= checkboxValue %>"<% } %>
+           <% if (checkboxChecked) { %>checked<% } %>
+           <% if (checkboxDisabled) { %>disabled<% } %>
+           <% if (attributesString) { %><%= attributesString %><% } %>>
+    <% if (checkboxLabel) { %>
+        <label class="form-check-label" for="<%= checkboxId %>">
+            <%= checkboxLabel %>
+        </label>
+    <% } %>
+</div>

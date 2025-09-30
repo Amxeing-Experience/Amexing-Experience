@@ -5,6 +5,8 @@
 
 const { ParseServer } = require('parse-server');
 const Parse = require('parse/node');
+const express = require('express');
+const http = require('http');
 
 // Test configuration
 const testConfig = {
@@ -19,21 +21,42 @@ const testConfig = {
 };
 
 let parseServer;
+let httpServer;
 
 /**
  * Setup test environment before running tests
  */
 const setupTests = async () => {
   try {
+    // Create Express app for Parse Server
+    const app = express();
+
     // Initialize Parse Server for testing
     parseServer = new ParseServer(testConfig);
     await parseServer.start();
+
+    // Mount Parse Server API
+    app.use('/parse', parseServer.app);
+
+    // Start HTTP server
+    httpServer = http.createServer(app);
+
+    await new Promise((resolve, reject) => {
+      httpServer.listen(testConfig.port, (error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
 
     // Initialize Parse SDK
     Parse.initialize(testConfig.appId, null, testConfig.masterKey);
     Parse.serverURL = testConfig.serverURL;
 
+    // Wait a bit for Parse Server to be fully ready
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     console.log('Test environment setup complete');
+    console.log(`Parse Server running at: ${testConfig.serverURL}`);
     return parseServer;
   } catch (error) {
     console.error('Failed to setup test environment:', error);
@@ -46,10 +69,24 @@ const setupTests = async () => {
  */
 const teardownTests = async () => {
   try {
-    if (parseServer) {
-      await parseServer.handleShutdown();
-      console.log('Test environment cleaned up');
+    if (httpServer) {
+      await new Promise((resolve) => {
+        httpServer.close((error) => {
+          if (error) console.warn('HTTP server close error:', error.message);
+          resolve();
+        });
+      });
+      httpServer = null;
     }
+    if (parseServer) {
+      try {
+        await parseServer.handleShutdown();
+      } catch (error) {
+        console.warn('Parse server shutdown error:', error.message);
+      }
+      parseServer = null;
+    }
+    console.log('Test environment cleaned up');
   } catch (error) {
     console.error('Failed to cleanup test environment:', error);
   }

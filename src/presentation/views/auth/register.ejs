@@ -1,5 +1,9 @@
-<%- include('../layout', {
-    title: 'Register',
-    body: include('../partials/register', { error: error }),
-    error: error
+<%- include('../templates/auth-layout', {
+    title: 'Register - Amexing',
+    body: include('../molecules/auth/register-form', {
+        error: typeof error !== 'undefined' ? error : null,
+        csrfToken: typeof csrfToken !== 'undefined' ? csrfToken : '',
+        formData: typeof formData !== 'undefined' ? formData : {},
+        redirectTo: typeof redirectTo !== 'undefined' ? redirectTo : null
+    })
 }) %>

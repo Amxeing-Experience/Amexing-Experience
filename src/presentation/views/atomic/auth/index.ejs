@@ -1,0 +1,421 @@
+<%- include('../../templates/atomic-showcase-layout', {
+    title: 'Authentication Components - Atomic Design',
+    headerTitle: 'Authentication Components',
+    headerSubtitle: 'Components designed for login, registration and auth flows',
+    category: 'auth',
+    breadcrumbs: breadcrumbs
+}) %>
+
+<!-- Search and Filter Section -->
+<div class="search-section">
+    <div class="row g-3 align-items-center">
+        <div class="col-md-8">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="ti ti-search"></i>
+                </span>
+                <input type="text" class="form-control search-input" id="componentSearch"
+                       placeholder="Search authentication components...">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="btn-group w-100" role="group">
+                <button type="button" class="btn btn-outline-primary active" data-filter="all">All</button>
+                <button type="button" class="btn btn-outline-success" data-filter="atom">Atoms</button>
+                <button type="button" class="btn btn-outline-info" data-filter="molecule">Molecules</button>
+                <button type="button" class="btn btn-outline-warning" data-filter="organism">Organisms</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Atoms Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-success mb-4">
+            <i class="ti ti-circle-dot me-2"></i>Atoms (<%= components.atoms.length %>)
+        </h3>
+        <p class="text-muted mb-4">Basic authentication building blocks</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <% components.atoms.forEach(component => { %>
+        <div class="col-lg-6">
+            <div class="component-card fade-in" data-type="atom">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge atom">Atom</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <% if (component.name === 'Success Icon') { %>
+                        <!-- Live Preview for Success Icon -->
+                        <div class="text-center py-4">
+                            <%- include('../../../atoms/auth/success-icon', {
+                                type: 'check',
+                                size: 'lg',
+                                color: 'success',
+                                animated: true
+                            }) %>
+                        </div>
+                    <% } else if (component.name === 'OAuth Button') { %>
+                        <!-- Live Preview for OAuth Button -->
+                        <div class="text-center">
+                            <%- include('../../../atoms/auth/oauth-button', {
+                                provider: 'google',
+                                text: 'Sign in with Google',
+                                href: '#',
+                                size: 'md',
+                                variant: 'outlined'
+                            }) %>
+                        </div>
+                    <% } else if (component.name === 'Auth Input') { %>
+                        <!-- Live Preview for Auth Input -->
+                        <%- include('../../../atoms/auth/auth-input', {
+                            type: 'email',
+                            name: 'email',
+                            id: 'demo-email',
+                            label: 'Email Address',
+                            placeholder: 'Enter your email',
+                            required: true,
+                            icon: 'ti-mail'
+                        }) %>
+                    <% } else { %>
+                        <!-- Placeholder for other atoms -->
+                        <div class="text-center py-4">
+                            <i class="ti-shield-lock text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2"><%= component.usage %></p>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Example</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <pre><code class="language-markup"><%-
+                            component.name === 'Success Icon' ?
+                            '<%- include(\'atoms/auth/success-icon\', {\n' +
+                            '    type: \'check\',\n' +
+                            '    size: \'lg\',\n' +
+                            '    color: \'success\',\n' +
+                            '    animated: true\n' +
+                            '}) %>' :
+                            component.name === 'OAuth Button' ?
+                            '<%- include(\'atoms/auth/oauth-button\', {\n' +
+                            '    provider: \'google\',\n' +
+                            '    text: \'Sign in with Google\',\n' +
+                            '    href: \'/auth/google\',\n' +
+                            '    size: \'md\',\n' +
+                            '    variant: \'outlined\'\n' +
+                            '}) %>' :
+                            component.name === 'Auth Input' ?
+                            '<%- include(\'atoms/auth/auth-input\', {\n' +
+                            '    type: \'email\',\n' +
+                            '    name: \'email\',\n' +
+                            '    label: \'Email Address\',\n' +
+                            '    required: true,\n' +
+                            '    icon: \'ti-mail\'\n' +
+                            '}) %>' :
+                            '<%- include(\'atoms/auth/' + component.file.replace('.ejs', '') + '\', {\n' +
+                            (component.params ? component.params.map(param => '    ' + param + ': value').join(',\n') : '') +
+                            '\n}) %>'
+                        %></code></pre>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <% if (component.params && component.params.length > 0) { %>
+                        <div class="row g-2">
+                            <% component.params.forEach(param => { %>
+                                <div class="col-md-6">
+                                    <code class="text-info"><%= param %></code>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <p class="text-muted small">No configurable parameters</p>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Molecules Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-info mb-4">
+            <i class="ti ti-molecules me-2"></i>Molecules (<%= components.molecules.length %>)
+        </h3>
+        <p class="text-muted mb-4">Authentication form combinations and patterns</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <% components.molecules.forEach(component => { %>
+        <div class="col-12">
+            <div class="component-card fade-in" data-type="molecule">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge molecule">Molecule</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <% if (component.name === 'OAuth Providers') { %>
+                        <!-- Live Preview for OAuth Providers -->
+                        <%- include('../../../molecules/auth/oauth-providers', {
+                            providers: ['google', 'microsoft', 'apple'],
+                            action: 'login',
+                            showDivider: true,
+                            size: 'md'
+                        }) %>
+                    <% } else if (component.name === 'Success Message') { %>
+                        <!-- Live Preview for Success Message -->
+                        <%- include('../../../molecules/auth/success-message', {
+                            type: 'email-sent',
+                            title: 'Check Your Email',
+                            message: 'We\'ve sent password reset instructions to your email address.',
+                            actions: [
+                                { text: 'Back to Login', href: '#', icon: 'ti-arrow-left' }
+                            ]
+                        }) %>
+                    <% } else { %>
+                        <div class="text-center py-4">
+                            <i class="ti-forms text-muted" style="font-size: 3rem;"></i>
+                            <h5 class="mt-3 text-muted"><%= component.name %></h5>
+                            <p class="text-muted"><%= component.usage %></p>
+                            <small class="text-muted">Complex form - see usage example below</small>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Example</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <pre><code class="language-markup"><%-
+                            component.name === 'OAuth Providers' ?
+                            '<%- include(\'molecules/auth/oauth-providers\', {\n' +
+                            '    providers: [\'google\', \'microsoft\', \'apple\'],\n' +
+                            '    action: \'login\',\n' +
+                            '    showDivider: true,\n' +
+                            '    size: \'md\'\n' +
+                            '}) %>' :
+                            component.name === 'Success Message' ?
+                            '<%- include(\'molecules/auth/success-message\', {\n' +
+                            '    type: \'email-sent\',\n' +
+                            '    title: \'Check Your Email\',\n' +
+                            '    message: \'Reset instructions sent\',\n' +
+                            '    actions: [{ text: \'Login\', href: \'/login\' }]\n' +
+                            '}) %>' :
+                            '<%- include(\'molecules/auth/' + component.file.replace('.ejs', '') + '\', {\n' +
+                            (component.params ? component.params.map(param => '    ' + param + ': value').join(',\n') : '') +
+                            '\n}) %>'
+                        %></code></pre>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <div class="row g-2">
+                        <% component.params.forEach(param => { %>
+                            <div class="col-md-4">
+                                <code class="text-info"><%= param %></code>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Organisms Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-warning mb-4">
+            <i class="ti ti-components me-2"></i>Organisms (<%= components.organisms.length %>)
+        </h3>
+        <p class="text-muted mb-4">Complete authentication sections and flows</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <% components.organisms.forEach(component => { %>
+        <div class="col-12">
+            <div class="component-card fade-in" data-type="organism">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge organism">Organism</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <div class="text-center py-5">
+                        <i class="<%= component.name === 'Corporate OAuth Section' ? 'ti-building' : 'ti-layout-navbar' %> text-muted" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-muted">Complex Authentication Component</h5>
+                        <p class="text-muted"><%= component.usage %></p>
+                        <small class="text-muted">
+                            <% if (component.name === 'Corporate OAuth Section') { %>
+                                Visit <code>/auth/oauth-login</code> for full preview
+                            <% } else { %>
+                                View in authentication context for full preview
+                            <% } %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Example</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <pre><code class="language-markup"><%-
+                            component.name === 'Corporate OAuth Section' ?
+                            '<%- include(\'organisms/auth/corporate-oauth-section\', {\n' +
+                            '    corporate: {\n' +
+                            '        name: \'Acme Corp\',\n' +
+                            '        logo: \'/images/acme-logo.png\',\n' +
+                            '        googleDomain: \'acme.com\'\n' +
+                            '    },\n' +
+                            '    departments: [],\n' +
+                            '    requireDepartment: false,\n' +
+                            '    action: \'login\'\n' +
+                            '}) %>' :
+                            component.name === 'Auth Header' ?
+                            '<%- include(\'organisms/auth/auth-header\', {\n' +
+                            '    page: \'login\',\n' +
+                            '    title: \'Welcome Back\',\n' +
+                            '    subtitle: \'Sign in to your account\',\n' +
+                            '    showLogo: true\n' +
+                            '}) %>' :
+                            '<%- include(\'organisms/auth/' + component.file.replace('.ejs', '') + '\', {\n' +
+                            (component.params ? component.params.map(param => '    ' + param + ': value').join(',\n') : '') +
+                            '\n}) %>'
+                        %></code></pre>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <div class="row g-2">
+                        <% component.params.forEach(param => { %>
+                            <div class="col-md-4">
+                                <code class="text-info"><%= param %></code>
+                            </div>
+                        <% }) %>
+                    </div>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Authentication Flow Examples -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Complete Authentication Flows</h3>
+                <p class="component-description">
+                    See how components work together in real authentication scenarios
+                </p>
+            </div>
+            <div class="component-preview">
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-login text-primary mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Standard Login</h6>
+                                <p class="card-text small text-muted mb-3">
+                                    Basic email/password authentication with OAuth options
+                                </p>
+                                <a href="/auth/login" class="btn btn-outline-primary btn-sm">View Live</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-building text-info mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Corporate OAuth</h6>
+                                <p class="card-text small text-muted mb-3">
+                                    Enterprise authentication with department selection
+                                </p>
+                                <a href="/auth/oauth-login" class="btn btn-outline-info btn-sm">View Live</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-key text-success mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Password Reset</h6>
+                                <p class="card-text small text-muted mb-3">
+                                    Complete password recovery with email verification
+                                </p>
+                                <a href="/auth/forgot-password" class="btn btn-outline-success btn-sm">View Live</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

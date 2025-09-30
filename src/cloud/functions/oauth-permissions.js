@@ -15,7 +15,9 @@ const OAuthPermissionService = require('../../application/services/OAuthPermissi
 const PermissionInheritanceService = require('../../application/services/PermissionInheritanceService');
 const PermissionContextService = require('../../application/services/PermissionContextService');
 const PermissionDelegationService = require('../../application/services/PermissionDelegationService');
-const { PermissionAuditService } = require('../../application/services/PermissionAuditService');
+const {
+  PermissionAuditService,
+} = require('../../application/services/PermissionAuditService');
 const logger = require('../../infrastructure/logger');
 
 /**
@@ -32,7 +34,10 @@ const logger = require('../../infrastructure/logger');
 const getUserPermissionInheritance = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const { userId = request.user.id } = request.params;
@@ -43,7 +48,7 @@ const getUserPermissionInheritance = async (request) => {
       if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          'Cannot view other users\' permission inheritance'
+          "Cannot view other users' permission inheritance"
         );
       }
     }
@@ -81,7 +86,10 @@ const getUserPermissionInheritance = async (request) => {
 const getAvailableContexts = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const { userId = request.user.id } = request.params;
@@ -92,7 +100,7 @@ const getAvailableContexts = async (request) => {
       if (!['admin', 'superadmin'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          'Cannot view other users\' contexts'
+          "Cannot view other users' contexts"
         );
       }
     }
@@ -125,7 +133,10 @@ const getAvailableContexts = async (request) => {
 const switchPermissionContext = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const { contextId } = request.params;
@@ -181,7 +192,10 @@ const switchPermissionContext = async (request) => {
 const createPermissionDelegation = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -211,15 +225,17 @@ const createPermissionDelegation = async (request) => {
 
     const managerId = request.user.id;
 
-    const delegationResult = await PermissionDelegationService.createDelegation({
-      managerId,
-      employeeId,
-      permissions: Array.isArray(permissions) ? permissions : [permissions],
-      delegationType,
-      duration,
-      reason,
-      context,
-    });
+    const delegationResult = await PermissionDelegationService.createDelegation(
+      {
+        managerId,
+        employeeId,
+        permissions: Array.isArray(permissions) ? permissions : [permissions],
+        delegationType,
+        duration,
+        reason,
+        context,
+      }
+    );
 
     // Record audit event
     await PermissionAuditService.recordPermissionAudit({
@@ -260,7 +276,10 @@ const createPermissionDelegation = async (request) => {
 const revokePermissionDelegation = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const { delegationId, reason } = request.params;
@@ -274,7 +293,11 @@ const revokePermissionDelegation = async (request) => {
 
     const revokedBy = request.user.id;
 
-    const revocationResult = await PermissionDelegationService.revokeDelegation(delegationId, revokedBy, reason);
+    const revocationResult = await PermissionDelegationService.revokeDelegation(
+      delegationId,
+      revokedBy,
+      reason
+    );
 
     return {
       success: true,
@@ -301,7 +324,10 @@ const revokePermissionDelegation = async (request) => {
 const createEmergencyElevation = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -378,7 +404,10 @@ const createEmergencyElevation = async (request) => {
 const createPermissionOverride = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -390,12 +419,7 @@ const createPermissionOverride = async (request) => {
     }
 
     const {
-      userId,
-      overrideType,
-      permission,
-      reason,
-      context,
-      expiresAt,
+      userId, overrideType, permission, reason, context, expiresAt,
     } = request.params;
 
     if (!userId || !overrideType || !permission || !reason) {
@@ -461,17 +485,19 @@ const createPermissionOverride = async (request) => {
 const checkUserPermission = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
-    const {
-      userId = request.user.id,
-      permission,
-      context,
-    } = request.params;
+    const { userId = request.user.id, permission, context } = request.params;
 
     if (!permission) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'permission parameter is required');
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'permission parameter is required'
+      );
     }
 
     // Check authorization
@@ -480,7 +506,7 @@ const checkUserPermission = async (request) => {
       if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          'Cannot check other users\' permissions'
+          "Cannot check other users' permissions"
         );
       }
     }
@@ -519,7 +545,10 @@ const checkUserPermission = async (request) => {
 const getActiveDelegations = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const { managerId = request.user.id } = request.params;
@@ -530,7 +559,7 @@ const getActiveDelegations = async (request) => {
       if (!['admin', 'superadmin'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          'Cannot view other managers\' delegations'
+          "Cannot view other managers' delegations"
         );
       }
     }
@@ -563,7 +592,10 @@ const getActiveDelegations = async (request) => {
 const getDelegatedPermissions = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const { employeeId = request.user.id } = request.params;
@@ -574,7 +606,7 @@ const getDelegatedPermissions = async (request) => {
       if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
         throw new Parse.Error(
           Parse.Error.OPERATION_FORBIDDEN,
-          'Cannot view other employees\' delegated permissions'
+          "Cannot view other employees' delegated permissions"
         );
       }
     }
@@ -607,7 +639,10 @@ const getDelegatedPermissions = async (request) => {
 const getPermissionAuditReport = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -636,12 +671,16 @@ const getPermissionAuditReport = async (request) => {
       format,
     });
 
-    logger.logSecurityEvent('PERMISSION_AUDIT_REPORT_ACCESSED', request.user.id, {
-      framework: complianceFramework,
-      format,
-      recordCount: report.summary.totalRecords,
-      requestedBy: request.user.get('username'),
-    });
+    logger.logSecurityEvent(
+      'PERMISSION_AUDIT_REPORT_ACCESSED',
+      request.user.id,
+      {
+        framework: complianceFramework,
+        format,
+        recordCount: report.summary.totalRecords,
+        requestedBy: request.user.get('username'),
+      }
+    );
 
     return {
       success: true,
@@ -667,7 +706,10 @@ const getPermissionAuditReport = async (request) => {
 const getPermissionAuditStats = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -678,10 +720,7 @@ const getPermissionAuditStats = async (request) => {
       );
     }
 
-    const {
-      timeFrame = '30d',
-      complianceFramework = 'PCI_DSS',
-    } = request.params;
+    const { timeFrame = '30d', complianceFramework = 'PCI_DSS' } = request.params;
 
     const stats = await PermissionAuditService.getAuditStatistics({
       timeFrame,
@@ -714,7 +753,10 @@ const getPermissionAuditStats = async (request) => {
 const getAvailablePermissions = async (request) => {
   try {
     if (!request.user) {
-      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+      throw new Parse.Error(
+        Parse.Error.INVALID_SESSION_TOKEN,
+        'User not authenticated'
+      );
     }
 
     const userRole = request.user.get('role');
@@ -738,7 +780,9 @@ const getAvailablePermissions = async (request) => {
       success: true,
       permissions,
       provider: _provider || 'all',
-      count: Array.isArray(permissions) ? permissions.length : Object.keys(permissions).length,
+      count: Array.isArray(permissions)
+        ? permissions.length
+        : Object.keys(permissions).length,
     };
   } catch (error) {
     logger.error('Error getting available permissions:', error);

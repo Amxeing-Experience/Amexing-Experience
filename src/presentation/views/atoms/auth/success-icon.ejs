@@ -1,0 +1,253 @@
+<%
+/**
+ * Success Icon Atom
+ * Animated success icon for auth pages
+ *
+ * @param {string} size - Icon size (sm, md, lg, xl, default: 'lg')
+ * @param {string} color - Icon color (success, primary, secondary, default: 'success')
+ * @param {boolean} animated - Whether to show animation (default: true)
+ * @param {string} type - Icon type (check, checkmark-circle, shield-check, default: 'check')
+ */
+
+// Default parameters
+const iconSize = typeof size !== 'undefined' ? size : 'lg';
+const iconColor = typeof color !== 'undefined' ? color : 'success';
+const iconAnimated = typeof animated !== 'undefined' ? animated : true;
+const iconType = typeof type !== 'undefined' ? type : 'check';
+
+// Size configurations
+const sizeConfig = {
+    sm: { containerSize: '48px', iconClass: 'fs-4', animationScale: 'scale(1.1)' },
+    md: { containerSize: '64px', iconClass: 'fs-2', animationScale: 'scale(1.15)' },
+    lg: { containerSize: '80px', iconClass: 'fs-1', animationScale: 'scale(1.2)' },
+    xl: { containerSize: '96px', iconClass: 'display-4', animationScale: 'scale(1.25)' }
+};
+
+const config = sizeConfig[iconSize] || sizeConfig.lg;
+
+// Icon mapping
+const iconMap = {
+    check: 'ti-check',
+    'checkmark-circle': 'ti-circle-check-filled',
+    'shield-check': 'ti-shield-check-filled',
+    star: 'ti-star-filled',
+    heart: 'ti-heart-filled'
+};
+
+const iconClass = iconMap[iconType] || iconMap.check;
+%>
+
+<div class="success-icon-container d-flex justify-content-center">
+    <div class="success-icon-wrapper <%= iconAnimated ? 'animated' : '' %>"
+         style="width: <%= config.containerSize %>; height: <%= config.containerSize %>;">
+        <div class="success-icon-circle bg-<%= iconColor %>-subtle d-flex align-items-center justify-content-center rounded-circle h-100 w-100 position-relative">
+            <!-- Success Icon -->
+            <i class="ti <%= iconClass %> text-<%= iconColor %> <%= config.iconClass %> success-icon"></i>
+
+            <!-- Animated Ring -->
+            <% if (iconAnimated) { %>
+                <div class="success-ring position-absolute rounded-circle border border-<%= iconColor %> opacity-25"></div>
+                <div class="success-ring-2 position-absolute rounded-circle border border-<%= iconColor %> opacity-15"></div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<style>
+    .success-icon-container {
+        margin: 2rem 0;
+    }
+
+    .success-icon-wrapper {
+        position: relative;
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .success-icon-circle {
+        transition: all 0.3s ease;
+        box-shadow: 0 8px 25px rgba(40, 167, 69, 0.15);
+        border: 3px solid rgba(40, 167, 69, 0.1);
+    }
+
+    .success-icon {
+        transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+    }
+
+    /* Animation for success ring */
+    .success-ring,
+    .success-ring-2 {
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+    }
+
+    /* Main animation sequence */
+    .success-icon-wrapper.animated {
+        animation: successPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    .success-icon-wrapper.animated .success-ring {
+        animation: successRing 1.5s ease-out forwards;
+        animation-delay: 0.3s;
+    }
+
+    .success-icon-wrapper.animated .success-ring-2 {
+        animation: successRing 1.5s ease-out forwards;
+        animation-delay: 0.6s;
+    }
+
+    @keyframes successPop {
+        0% {
+            transform: scale(0);
+            opacity: 0;
+        }
+        50% {
+            transform: <%= config.animationScale %>;
+        }
+        100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+
+    @keyframes successRing {
+        0% {
+            transform: scale(1);
+            opacity: 0.3;
+        }
+        100% {
+            transform: scale(1.4);
+            opacity: 0;
+        }
+    }
+
+    /* Hover effect */
+    .success-icon-wrapper:hover {
+        transform: scale(1.05);
+    }
+
+    .success-icon-wrapper:hover .success-icon-circle {
+        box-shadow: 0 12px 35px rgba(40, 167, 69, 0.25);
+        transform: translateY(-2px);
+    }
+
+    .success-icon-wrapper:hover .success-icon {
+        transform: scale(1.1);
+    }
+
+    /* Color variations */
+    .success-icon-circle.bg-primary-subtle {
+        box-shadow: 0 8px 25px rgba(93, 135, 255, 0.15);
+        border-color: rgba(93, 135, 255, 0.1);
+    }
+
+    .success-icon-wrapper:hover .success-icon-circle.bg-primary-subtle {
+        box-shadow: 0 12px 35px rgba(93, 135, 255, 0.25);
+    }
+
+    .success-icon-circle.bg-secondary-subtle {
+        box-shadow: 0 8px 25px rgba(108, 117, 125, 0.15);
+        border-color: rgba(108, 117, 125, 0.1);
+    }
+
+    /* Pulse animation for continuous effect */
+    .success-icon-wrapper.pulse {
+        animation: successPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes successPulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.02);
+        }
+    }
+
+    /* Accessibility - Reduce motion for users who prefer it */
+    @media (prefers-reduced-motion: reduce) {
+        .success-icon-wrapper.animated,
+        .success-ring,
+        .success-ring-2 {
+            animation: none;
+        }
+
+        .success-icon-wrapper {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    /* Loading state */
+    .success-icon-wrapper.loading .success-icon {
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Different icon sizes responsive behavior */
+    @media (max-width: 576px) {
+        .success-icon-wrapper {
+            width: 64px !important;
+            height: 64px !important;
+        }
+
+        .success-icon {
+            font-size: 1.5rem !important;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-trigger animation when element comes into view
+    const successIcons = document.querySelectorAll('.success-icon-wrapper.animated');
+
+    // Intersection Observer for scroll-triggered animations
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const element = entry.target;
+                element.style.animationPlayState = 'running';
+
+                // Add pulse effect after main animation
+                setTimeout(() => {
+                    element.classList.add('pulse');
+                }, 2000);
+            }
+        });
+    }, {
+        threshold: 0.5
+    });
+
+    successIcons.forEach(icon => {
+        observer.observe(icon);
+
+        // Initially pause animation
+        icon.style.animationPlayState = 'paused';
+
+        // Add click interaction
+        icon.addEventListener('click', function() {
+            this.style.animation = 'none';
+            setTimeout(() => {
+                this.style.animation = '';
+            }, 10);
+        });
+    });
+
+    // Sound effect (optional, only if user interaction)
+    successIcons.forEach(icon => {
+        icon.addEventListener('animationend', function(e) {
+            if (e.animationName === 'successPop') {
+                // Could play a subtle success sound here
+            }
+        });
+    });
+});
+</script>

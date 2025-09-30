@@ -1,0 +1,154 @@
+<%
+/**
+ * Modal Organism
+ * Reusable modal dialog component
+ *
+ * @param {string} id - Modal ID attribute
+ * @param {string} title - Modal title
+ * @param {string} size - Modal size (sm, default, lg, xl)
+ * @param {boolean} centered - Whether modal is vertically centered
+ * @param {boolean} scrollable - Whether modal body is scrollable
+ * @param {boolean} fullscreen - Whether modal is fullscreen
+ * @param {string} headerContent - Custom header content (HTML)
+ * @param {string} bodyContent - Modal body content (HTML)
+ * @param {string} footerContent - Custom footer content (HTML)
+ * @param {boolean} closeButton - Whether to show close button in header
+ * @param {boolean} backdrop - Whether clicking backdrop closes modal (static, true, false)
+ * @param {boolean} keyboard - Whether pressing escape closes modal
+ * @param {string} primaryButtonText - Text for primary action button
+ * @param {string} primaryButtonAction - JavaScript function for primary button
+ * @param {string} secondaryButtonText - Text for secondary action button
+ * @param {string} secondaryButtonAction - JavaScript function for secondary button
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const modalId = typeof id !== 'undefined' ? id : `modal-${Math.random().toString(36).substr(2, 9)}`;
+const modalTitle = typeof title !== 'undefined' ? title : 'Modal Title';
+const modalSize = typeof size !== 'undefined' ? size : 'default';
+const modalCentered = typeof centered !== 'undefined' ? centered : false;
+const modalScrollable = typeof scrollable !== 'undefined' ? scrollable : false;
+const modalFullscreen = typeof fullscreen !== 'undefined' ? fullscreen : false;
+const modalHeaderContent = typeof headerContent !== 'undefined' ? headerContent : '';
+const modalBodyContent = typeof bodyContent !== 'undefined' ? bodyContent : '';
+const modalFooterContent = typeof footerContent !== 'undefined' ? footerContent : '';
+const modalCloseButton = typeof closeButton !== 'undefined' ? closeButton : true;
+const modalBackdrop = typeof backdrop !== 'undefined' ? backdrop : true;
+const modalKeyboard = typeof keyboard !== 'undefined' ? keyboard : true;
+const modalPrimaryButtonText = typeof primaryButtonText !== 'undefined' ? primaryButtonText : '';
+const modalPrimaryButtonAction = typeof primaryButtonAction !== 'undefined' ? primaryButtonAction : '';
+const modalSecondaryButtonText = typeof secondaryButtonText !== 'undefined' ? secondaryButtonText : '';
+const modalSecondaryButtonAction = typeof secondaryButtonAction !== 'undefined' ? secondaryButtonAction : '';
+const modalAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const modalAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build modal classes
+let modalClasses = ['modal', 'fade'];
+if (modalAdditionalClasses) modalClasses.push(modalAdditionalClasses);
+
+// Build dialog classes
+let dialogClasses = ['modal-dialog'];
+
+// Size classes
+if (modalSize === 'sm') {
+    dialogClasses.push('modal-sm');
+} else if (modalSize === 'lg') {
+    dialogClasses.push('modal-lg');
+} else if (modalSize === 'xl') {
+    dialogClasses.push('modal-xl');
+}
+
+// Position and behavior classes
+if (modalCentered) {
+    dialogClasses.push('modal-dialog-centered');
+}
+if (modalScrollable) {
+    dialogClasses.push('modal-dialog-scrollable');
+}
+if (modalFullscreen) {
+    dialogClasses.push('modal-fullscreen');
+}
+
+// Build attributes
+let modalAttrs = {
+    'tabindex': '-1',
+    'aria-labelledby': modalId + 'Label',
+    'aria-hidden': 'true'
+};
+
+if (modalBackdrop === 'static') {
+    modalAttrs['data-bs-backdrop'] = 'static';
+} else if (modalBackdrop === false) {
+    modalAttrs['data-bs-backdrop'] = 'false';
+}
+
+if (!modalKeyboard) {
+    modalAttrs['data-bs-keyboard'] = 'false';
+}
+
+// Merge with custom attributes
+Object.assign(modalAttrs, modalAttributes);
+
+// Build attributes string
+let attributesString = Object.entries(modalAttrs)
+    .map(([key, value]) => `${key}="${value}"`)
+    .join(' ');
+
+const hasDefaultFooter = modalPrimaryButtonText || modalSecondaryButtonText;
+const hasCustomFooter = modalFooterContent;
+const hasFooter = hasDefaultFooter || hasCustomFooter;
+%>
+
+<!-- Modal -->
+<div class="<%= modalClasses.join(' ') %>" id="<%= modalId %>" <%= attributesString %>>
+    <div class="<%= dialogClasses.join(' ') %>">
+        <div class="modal-content">
+            <!-- Header -->
+            <div class="modal-header">
+                <% if (modalHeaderContent) { %>
+                    <%# Safe: headerContent contains server-generated trusted HTML %><%- modalHeaderContent %> <!-- nosemgrep: trusted server-generated content -->
+                <% } else { %>
+                    <h5 class="modal-title" id="<%= modalId %>Label"><%= modalTitle %></h5>
+                <% } %>
+
+                <% if (modalCloseButton) { %>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <% } %>
+            </div>
+
+            <!-- Body -->
+            <div class="modal-body">
+                <% if (modalBodyContent) { %>
+                    <%# Safe: bodyContent contains server-generated trusted HTML %><%- modalBodyContent %> <!-- nosemgrep: trusted server-generated content -->
+                <% } else { %>
+                    <p>Modal body content goes here.</p>
+                <% } %>
+            </div>
+
+            <!-- Footer -->
+            <% if (hasFooter) { %>
+                <div class="modal-footer">
+                    <% if (modalFooterContent) { %>
+                        <%# Safe: footerContent contains server-generated trusted HTML %><%- modalFooterContent %> <!-- nosemgrep: trusted server-generated content -->
+                    <% } else { %>
+                        <% if (modalSecondaryButtonText) { %>
+                            <button type="button"
+                                    class="btn btn-secondary"
+                                    <% if (modalSecondaryButtonAction) { %>onclick="<%= modalSecondaryButtonAction %>"<% } else { %>data-bs-dismiss="modal"<% } %>>
+                                <%= modalSecondaryButtonText %>
+                            </button>
+                        <% } %>
+                        <% if (modalPrimaryButtonText) { %>
+                            <button type="button"
+                                    class="btn btn-primary"
+                                    <% if (modalPrimaryButtonAction) { %>onclick="<%= modalPrimaryButtonAction %>"<% } %>>
+                                <%= modalPrimaryButtonText %>
+                            </button>
+                        <% } %>
+                    <% } %>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>

@@ -65,11 +65,23 @@ class Client extends BaseModel {
     });
 
     // OAuth and employee management settings
-    client.set('isCorporate', clientData.isCorporate !== undefined ? clientData.isCorporate : true);
+    client.set(
+      'isCorporate',
+      clientData.isCorporate !== undefined ? clientData.isCorporate : true
+    );
     client.set('oauthDomain', clientData.oauthDomain || null);
-    client.set('autoProvisionEmployees', clientData.autoProvisionEmployees || false);
-    client.set('defaultEmployeeRole', clientData.defaultEmployeeRole || 'employee');
-    client.set('employeeAccessLevel', clientData.employeeAccessLevel || 'basic');
+    client.set(
+      'autoProvisionEmployees',
+      clientData.autoProvisionEmployees || false
+    );
+    client.set(
+      'defaultEmployeeRole',
+      clientData.defaultEmployeeRole || 'employee'
+    );
+    client.set(
+      'employeeAccessLevel',
+      clientData.employeeAccessLevel || 'basic'
+    );
 
     // Lifecycle fields are set by BaseModel constructor
     // active: true, exists: true are defaults
@@ -324,7 +336,10 @@ class Client extends BaseModel {
 
       // Validate OAuth domain
       const oauthDomain = this.get('oauthDomain');
-      if (oauthDomain && !userData.email.toLowerCase().endsWith(`@${oauthDomain.toLowerCase()}`)) {
+      if (
+        oauthDomain
+        && !userData.email.toLowerCase().endsWith(`@${oauthDomain.toLowerCase()}`)
+      ) {
         return null;
       }
 
@@ -333,7 +348,9 @@ class Client extends BaseModel {
       // Check if user already exists
       const existingUserQuery = BaseModel.queryExisting('AmexingUser');
       existingUserQuery.equalTo('email', userData.email.toLowerCase());
-      const existingUser = await existingUserQuery.first({ useMasterKey: true });
+      const existingUser = await existingUserQuery.first({
+        useMasterKey: true,
+      });
 
       if (existingUser) {
         // User exists, update OAuth information if needed
@@ -344,7 +361,9 @@ class Client extends BaseModel {
 
         // Update OAuth accounts
         const oauthAccounts = existingUser.get('oauthAccounts') || [];
-        const hasProvider = oauthAccounts.some((account) => account.__provider === oauthProvider); // eslint-disable-line no-underscore-dangle
+        const hasProvider = oauthAccounts.some(
+          (account) => account.provider === oauthProvider
+        );
 
         if (!hasProvider) {
           oauthAccounts.push({
@@ -376,12 +395,14 @@ class Client extends BaseModel {
         emailVerified: true, // OAuth emails are considered verified
         active: true,
         exists: true,
-        oauthAccounts: [{
-          provider: oauthProvider,
-          providerId: userData.providerId || userData.id,
-          email: userData.email,
-          connectedAt: new Date(),
-        }],
+        oauthAccounts: [
+          {
+            provider: oauthProvider,
+            providerId: userData.providerId || userData.id,
+            email: userData.email,
+            connectedAt: new Date(),
+          },
+        ],
         primaryOAuthProvider: oauthProvider,
         lastAuthMethod: 'oauth',
         createdBy: this.id,
@@ -425,10 +446,21 @@ class Client extends BaseModel {
   async updateSettings(updates, modifiedBy) {
     try {
       const allowedFields = [
-        'name', 'email', 'phone', 'contactPerson', 'companyType',
-        'taxId', 'website', 'notes', 'address', 'isCorporate',
-        'oauthDomain', 'autoProvisionEmployees', 'defaultEmployeeRole',
-        'employeeAccessLevel', 'active',
+        'name',
+        'email',
+        'phone',
+        'contactPerson',
+        'companyType',
+        'taxId',
+        'website',
+        'notes',
+        'address',
+        'isCorporate',
+        'oauthDomain',
+        'autoProvisionEmployees',
+        'defaultEmployeeRole',
+        'employeeAccessLevel',
+        'active',
       ];
 
       // Apply only allowed updates
@@ -538,14 +570,25 @@ class Client extends BaseModel {
     }
 
     // Company type validation
-    const allowedCompanyTypes = ['corporate', 'government', 'nonprofit', 'individual'];
-    if (clientData.companyType && !allowedCompanyTypes.includes(clientData.companyType)) {
+    const allowedCompanyTypes = [
+      'corporate',
+      'government',
+      'nonprofit',
+      'individual',
+    ];
+    if (
+      clientData.companyType
+      && !allowedCompanyTypes.includes(clientData.companyType)
+    ) {
       errors.push('Invalid company type');
     }
 
     // Employee role validation
     const allowedEmployeeRoles = ['employee', 'department_manager'];
-    if (clientData.defaultEmployeeRole && !allowedEmployeeRoles.includes(clientData.defaultEmployeeRole)) {
+    if (
+      clientData.defaultEmployeeRole
+      && !allowedEmployeeRoles.includes(clientData.defaultEmployeeRole)
+    ) {
       errors.push('Invalid default employee role');
     }
 

@@ -1,0 +1,403 @@
+<%- include('../../templates/atomic-showcase-layout', {
+    title: 'Common Components - Atomic Design',
+    headerTitle: 'Common Components',
+    headerSubtitle: 'Reusable components shared across different contexts',
+    category: 'common',
+    breadcrumbs: breadcrumbs
+}) %>
+
+<!-- Search and Filter Section -->
+<div class="search-section">
+    <div class="row g-3 align-items-center">
+        <div class="col-md-8">
+            <div class="input-group">
+                <span class="input-group-text">
+                    <i class="ti ti-search"></i>
+                </span>
+                <input type="text" class="form-control search-input" id="componentSearch"
+                       placeholder="Search common components...">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="btn-group w-100" role="group">
+                <button type="button" class="btn btn-outline-primary active" data-filter="all">All</button>
+                <button type="button" class="btn btn-outline-success" data-filter="atom">Atoms</button>
+                <button type="button" class="btn btn-outline-info" data-filter="molecule">Molecules</button>
+                <button type="button" class="btn btn-outline-warning" data-filter="organism">Organisms</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Atoms Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <h3 class="text-success mb-4">
+            <i class="ti ti-circle-dot me-2"></i>Atoms (<%= components.atoms.length %>)
+        </h3>
+        <p class="text-muted mb-4">Universal building blocks used throughout the application</p>
+    </div>
+</div>
+
+<div class="row g-4 mb-5">
+    <% components.atoms.forEach(component => { %>
+        <div class="col-lg-6">
+            <div class="component-card fade-in" data-type="atom">
+                <div class="component-header">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h4 class="component-title"><%= component.name %></h4>
+                            <p class="component-description"><%= component.description %></p>
+                        </div>
+                        <span class="component-badge atom">Atom</span>
+                    </div>
+                    <div class="component-meta">
+                        <small class="text-muted">
+                            <i class="ti ti-file me-1"></i><%= component.file %>
+                        </small>
+                        <small class="text-muted">
+                            <i class="ti ti-folder me-1"></i><%= component.path %>
+                        </small>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <div class="preview-label">Preview</div>
+                    <% if (component.name === 'Icon') { %>
+                        <!-- Live Preview for Icon -->
+                        <div class="text-center py-4">
+                            <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap">
+                                <%- include('../../../atoms/common/icon', {
+                                    name: 'ti-home',
+                                    size: 'md',
+                                    color: 'primary'
+                                }) %>
+                                <%- include('../../../atoms/common/icon', {
+                                    name: 'ti-user',
+                                    size: 'lg',
+                                    color: 'success'
+                                }) %>
+                                <%- include('../../../atoms/common/icon', {
+                                    name: 'ti-settings',
+                                    size: 'xl',
+                                    color: 'warning'
+                                }) %>
+                            </div>
+                            <small class="text-muted mt-2">Examples: Home, User, Settings icons</small>
+                        </div>
+                    <% } else if (component.name === 'Button') { %>
+                        <!-- Live Preview for Button -->
+                        <div class="text-center py-4">
+                            <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap">
+                                <%- include('../../../atoms/common/button', {
+                                    text: 'Primary',
+                                    variant: 'primary',
+                                    size: 'md'
+                                }) %>
+                                <%- include('../../../atoms/common/button', {
+                                    text: 'Secondary',
+                                    variant: 'outline-secondary',
+                                    size: 'md'
+                                }) %>
+                                <%- include('../../../atoms/common/button', {
+                                    text: 'With Icon',
+                                    variant: 'success',
+                                    size: 'md',
+                                    icon: 'ti-check'
+                                }) %>
+                            </div>
+                            <div class="d-flex justify-content-center align-items-center gap-2 mt-3">
+                                <%- include('../../../atoms/common/button', {
+                                    text: 'Small',
+                                    variant: 'info',
+                                    size: 'sm'
+                                }) %>
+                                <%- include('../../../atoms/common/button', {
+                                    text: 'Large',
+                                    variant: 'warning',
+                                    size: 'lg'
+                                }) %>
+                            </div>
+                        </div>
+                    <% } else { %>
+                        <!-- Placeholder for other atoms -->
+                        <div class="text-center py-4">
+                            <i class="ti-components text-muted" style="font-size: 3rem;"></i>
+                            <p class="text-muted mt-2"><%= component.usage %></p>
+                        </div>
+                    <% } %>
+                </div>
+
+                <div class="component-code">
+                    <div class="code-header">
+                        <span class="title">Usage Examples</span>
+                        <button class="copy-btn" type="button">
+                            <i class="ti ti-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="code-content">
+                        <pre><code class="language-markup"><%-
+                            component.name === 'Icon' ?
+                            '<!-- Basic icon -->\n' +
+                            '<%- include(\'atoms/common/icon\', {\n' +
+                            '    name: \'ti-home\',\n' +
+                            '    size: \'md\',\n' +
+                            '    color: \'primary\'\n' +
+                            '}) %>\n\n' +
+                            '<!-- Icon with custom class -->\n' +
+                            '<%- include(\'atoms/common/icon\', {\n' +
+                            '    name: \'ti-settings\',\n' +
+                            '    size: \'lg\',\n' +
+                            '    className: \'custom-class\',\n' +
+                            '    ariaLabel: \'Settings\'\n' +
+                            '}) %>' :
+                            component.name === 'Button' ?
+                            '<!-- Primary button -->\n' +
+                            '<%- include(\'atoms/common/button\', {\n' +
+                            '    text: \'Click me\',\n' +
+                            '    variant: \'primary\',\n' +
+                            '    size: \'md\'\n' +
+                            '}) %>\n\n' +
+                            '<!-- Button with icon -->\n' +
+                            '<%- include(\'atoms/common/button\', {\n' +
+                            '    text: \'Save\',\n' +
+                            '    variant: \'success\',\n' +
+                            '    icon: \'ti-check\',\n' +
+                            '    type: \'submit\'\n' +
+                            '}) %>\n\n' +
+                            '<!-- Disabled button -->\n' +
+                            '<%- include(\'atoms/common/button\', {\n' +
+                            '    text: \'Disabled\',\n' +
+                            '    variant: \'secondary\',\n' +
+                            '    disabled: true\n' +
+                            '}) %>' :
+                            '<%- include(\'atoms/common/' + component.file.replace('.ejs', '') + '\', {\n' +
+                            (component.params ? component.params.map(param => '    ' + param + ': value').join(',\n') : '') +
+                            '\n}) %>'
+                        %></code></pre>
+                    </div>
+                </div>
+
+                <div class="component-preview">
+                    <h6>Parameters:</h6>
+                    <% if (component.params && component.params.length > 0) { %>
+                        <div class="row g-2">
+                            <% component.params.forEach(param => { %>
+                                <div class="col-md-6">
+                                    <code class="text-info"><%= param %></code>
+                                </div>
+                            <% }) %>
+                        </div>
+                    <% } else { %>
+                        <p class="text-muted small">No configurable parameters</p>
+                    <% } %>
+
+                    <% if (component.name === 'Icon') { %>
+                        <div class="mt-3">
+                            <h6>Available Icon Sizes:</h6>
+                            <div class="d-flex gap-2 align-items-center">
+                                <code class="text-success">xs</code>
+                                <code class="text-success">sm</code>
+                                <code class="text-success">md</code>
+                                <code class="text-success">lg</code>
+                                <code class="text-success">xl</code>
+                            </div>
+                        </div>
+                    <% } %>
+
+                    <% if (component.name === 'Button') { %>
+                        <div class="mt-3">
+                            <h6>Available Variants:</h6>
+                            <div class="d-flex gap-2 flex-wrap">
+                                <code class="text-success">primary</code>
+                                <code class="text-success">secondary</code>
+                                <code class="text-success">success</code>
+                                <code class="text-success">warning</code>
+                                <code class="text-success">danger</code>
+                                <code class="text-success">info</code>
+                                <code class="text-success">outline-*</code>
+                            </div>
+                        </div>
+                    <% } %>
+                </div>
+            </div>
+        </div>
+    <% }) %>
+</div>
+
+<!-- Future Components Section -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Expanding the Common Library</h3>
+                <p class="component-description">
+                    Common components that could be added to improve consistency across the application
+                </p>
+            </div>
+            <div class="component-preview">
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-loading text-muted mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Loading Spinner</h6>
+                                <p class="card-text small text-muted">
+                                    Consistent loading indicators with different sizes and styles
+                                </p>
+                                <small class="text-primary">Potential Addition</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-badge text-muted mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Badge</h6>
+                                <p class="card-text small text-muted">
+                                    Status badges and labels for notifications and states
+                                </p>
+                                <small class="text-primary">Potential Addition</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100 border-0 bg-light">
+                            <div class="card-body text-center">
+                                <i class="ti ti-photo text-muted mb-3" style="font-size: 2rem;"></i>
+                                <h6 class="card-title">Avatar</h6>
+                                <p class="card-text small text-muted">
+                                    User avatars with fallbacks and various sizes
+                                </p>
+                                <small class="text-primary">Potential Addition</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Usage Guidelines -->
+<div class="row mb-5">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Common Component Guidelines</h3>
+                <p class="component-description">
+                    Best practices for using and maintaining common components
+                </p>
+            </div>
+            <div class="component-preview">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <h5 class="text-success mb-3">
+                            <i class="ti ti-check-circle me-2"></i>Do's
+                        </h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-check text-success me-2"></i>
+                                Use common components consistently across contexts
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-check text-success me-2"></i>
+                                Extend common components rather than duplicating code
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-check text-success me-2"></i>
+                                Follow established parameter patterns when adding features
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-check text-success me-2"></i>
+                                Test components in multiple contexts before committing
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h5 class="text-danger mb-3">
+                            <i class="ti ti-x-circle me-2"></i>Don'ts
+                        </h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-x text-danger me-2"></i>
+                                Don't create context-specific versions of common components
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-x text-danger me-2"></i>
+                                Don't modify common components for single-use cases
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-x text-danger me-2"></i>
+                                Don't hardcode styles that should be configurable
+                            </li>
+                            <li class="list-group-item border-0 px-0">
+                                <i class="ti ti-x text-danger me-2"></i>
+                                Don't break backwards compatibility without versioning
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Integration Examples -->
+<div class="row">
+    <div class="col-12">
+        <div class="component-card fade-in">
+            <div class="component-header">
+                <h3 class="component-title">Integration Examples</h3>
+                <p class="component-description">
+                    How common components are used within other atomic design levels
+                </p>
+            </div>
+            <div class="component-code">
+                <div class="code-header">
+                    <span class="title">Example: Using Common Components in Molecules</span>
+                    <button class="copy-btn" type="button">
+                        <i class="ti ti-copy"></i> Copy
+                    </button>
+                </div>
+                <div class="code-content">
+                    <pre><code class="language-markup"><!-- nav-item.ejs molecule using common icon and button -->
+<li class="nav-item">
+    <a href="<%= url %>" class="nav-link <%= active ? 'active' : '' %>">
+        <!-- Common Icon Component -->
+        <%- include('../../../atoms/common/icon', {
+            name: icon,
+            size: 'sm',
+            color: active ? 'primary' : 'muted',
+            className: 'me-2'
+        }) %>
+
+        <%= title %>
+
+        <% if (badge) { %>
+            <!-- Future: Common Badge Component -->
+            <span class="badge bg-<%= badge.color %> ms-2"><%= badge.text %></span>
+        <% } %>
+    </a>
+</li>
+
+<!-- form-actions.ejs molecule using common buttons -->
+<div class="form-actions d-flex gap-2">
+    <%- include('../../../atoms/common/button', {
+        text: 'Cancel',
+        variant: 'outline-secondary',
+        type: 'button'
+    }) %>
+
+    <%- include('../../../atoms/common/button', {
+        text: 'Save Changes',
+        variant: 'primary',
+        type: 'submit',
+        icon: 'ti-check'
+    }) %>
+</div></code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

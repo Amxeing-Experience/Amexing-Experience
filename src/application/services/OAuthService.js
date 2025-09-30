@@ -86,7 +86,8 @@ class OAuthService {
         enabled: process.env.MICROSOFT_OAUTH_ENABLED === 'true',
         mockMode: process.env.MICROSOFT_OAUTH_MOCK_MODE === 'true',
         scopes: ['openid', 'profile', 'email'],
-        authUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+        authUrl:
+          'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
         tokenUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/token',
         userInfoUrl: 'https://graph.microsoft.com/v1.0/me',
       },
@@ -126,7 +127,10 @@ class OAuthService {
       const providerConfig = this.providers[provider]; // eslint-disable-line no-undef
 
       if (!providerConfig) {
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${_provider}`);
+        throw new Parse.Error(
+          Parse.Error.INVALID_REQUEST,
+          `Unsupported provider: ${_provider}`
+        );
       }
 
       // In mock mode, return mock URL
@@ -141,7 +145,10 @@ class OAuthService {
       }
 
       // Store state for verification (in production, use Redis or database)
-      await this.storeOAuthState(stateValue, { provider, timestamp: Date.now() }); // eslint-disable-line no-undef
+      await this.storeOAuthState(stateValue, {
+        provider: _provider,
+        timestamp: Date.now(),
+      });
 
       const params = new URLSearchParams({
         client_id: providerConfig.clientId,
@@ -169,7 +176,10 @@ class OAuthService {
 
       return authUrl;
     } catch (error) {
-      logger.error(`OAuth authorization URL generation error for ${_provider}:`, error);
+      logger.error(
+        `OAuth authorization URL generation error for ${_provider}:`,
+        error
+      );
       throw error;
     }
   }
@@ -197,13 +207,19 @@ class OAuthService {
       const providerConfig = this.providers[provider]; // eslint-disable-line no-undef
 
       if (!providerConfig) {
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${_provider}`);
+        throw new Parse.Error(
+          Parse.Error.INVALID_REQUEST,
+          `Unsupported provider: ${_provider}`
+        );
       }
 
       // Verify state parameter
       const stateData = await this.verifyOAuthState(state);
-      if (!stateData || stateData._provider !== _provider) { // eslint-disable-line no-underscore-dangle
-        throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid state parameter');
+      if (!stateData || stateData.provider !== _provider) {
+        throw new Parse.Error(
+          Parse.Error.INVALID_REQUEST,
+          'Invalid state parameter'
+        );
       }
 
       let userInfo;
@@ -275,7 +291,10 @@ class OAuthService {
       // Check if OAuth account is already linked to another user
       const existingUser = await this.findUserByOAuth(_provider, oauthData.id);
       if (existingUser && existingUser.id !== userId) {
-        throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, 'OAuth account is already linked to another user');
+        throw new Parse.Error(
+          Parse.Error.DUPLICATE_VALUE,
+          'OAuth account is already linked to another user'
+        );
       }
 
       // Add OAuth account to user
@@ -333,7 +352,10 @@ class OAuthService {
 
       const oauthAccount = user.getOAuthAccount(_provider);
       if (!oauthAccount) {
-        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'OAuth account not found');
+        throw new Parse.Error(
+          Parse.Error.OBJECT_NOT_FOUND,
+          'OAuth account not found'
+        );
       }
 
       // Remove OAuth account
@@ -466,7 +488,10 @@ class OAuthService {
     const providerConfig = this.providers[provider]; // eslint-disable-line no-undef
 
     if (!providerConfig) {
-      throw new Parse.Error(Parse.Error.INVALID_REQUEST, `Unsupported provider: ${_provider}`);
+      throw new Parse.Error(
+        Parse.Error.INVALID_REQUEST,
+        `Unsupported provider: ${_provider}`
+      );
     }
 
     // In mock mode, return mock tokens
@@ -482,7 +507,11 @@ class OAuthService {
 
     // Real token exchange implementation
     try {
-      const tokenData = await this.performTokenExchange(_provider, code, providerConfig);
+      const tokenData = await this.performTokenExchange(
+        _provider,
+        code,
+        providerConfig
+      );
 
       logger.logSecurityEvent('OAUTH_TOKEN_EXCHANGE_SUCCESS', null, {
         provider, // eslint-disable-line no-undef
@@ -496,7 +525,10 @@ class OAuthService {
         provider, // eslint-disable-line no-undef
         error: error.message,
       });
-      throw new Parse.Error(Parse.Error.OTHER_CAUSE, `Token exchange failed: ${error.message}`);
+      throw new Parse.Error(
+        Parse.Error.OTHER_CAUSE,
+        `Token exchange failed: ${error.message}`
+      );
     }
   }
 
@@ -539,7 +571,9 @@ class OAuthService {
       configWithTenantUrl = { ...config, tokenUrl };
 
       // Add scope for Microsoft
-      tokenPayload.scope = config.scopes ? config.scopes.join(' ') : 'openid profile email';
+      tokenPayload.scope = config.scopes
+        ? config.scopes.join(' ')
+        : 'openid profile email';
     }
 
     // Apple requires JWT client assertion instead of client_secret
@@ -549,14 +583,17 @@ class OAuthService {
       tokenPayload.client_assertion = await this.createAppleClientAssertion(config);
     }
 
-    const response = await fetch(configWithTenantUrl?.tokenUrl || config.tokenUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        Accept: 'application/json',
-      },
-      body: new URLSearchParams(tokenPayload),
-    });
+    const response = await fetch(
+      configWithTenantUrl?.tokenUrl || config.tokenUrl,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+        body: new URLSearchParams(tokenPayload),
+      }
+    );
 
     if (!response.ok) {
       const errorData = await response.text();
@@ -605,7 +642,10 @@ class OAuthService {
     try {
       // Read the private key file
       // eslint-disable-next-line security/detect-non-literal-fs-filename
-      const privateKey = await fs.readFile(process.env.APPLE_OAUTH_PRIVATE_KEY_PATH, 'utf8');
+      const privateKey = await fs.readFile(
+        process.env.APPLE_OAUTH_PRIVATE_KEY_PATH,
+        'utf8'
+      );
 
       const now = Math.floor(Date.now() / 1000);
       const payload = {
@@ -624,7 +664,9 @@ class OAuthService {
         },
       });
     } catch (error) {
-      throw new Error(`Failed to create Apple client assertion: ${error.message}`);
+      throw new Error(
+        `Failed to create Apple client assertion: ${error.message}`
+      );
     }
   }
 
@@ -653,16 +695,22 @@ class OAuthService {
 
     const config = this.providers[provider]; // eslint-disable-line no-undef
     if (!config) {
-      throw new Parse.Error(Parse.Error.INVALID_QUERY, `Unsupported provider: ${_provider}`);
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        `Unsupported provider: ${_provider}`
+      );
     }
 
     try {
       let userInfo;
 
       if (_provider === 'google') {
-        const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const response = await fetch(
+          'https://www.googleapis.com/oauth2/v2/userinfo',
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
 
         if (!response.ok) {
           throw new Error(`Google API error: ${response.status}`);
@@ -717,18 +765,27 @@ class OAuthService {
   async findOrCreateUser(_provider, userInfo) {
     try {
       // Check if this is a corporate user first
-      const corporateResult = await CorporateOAuthService.mapCorporateUser(userInfo, _provider);
+      const corporateResult = await CorporateOAuthService.mapCorporateUser(
+        userInfo,
+        _provider
+      );
 
       if (corporateResult.isCorporateUser) {
         // Corporate user handling - generate tokens for corporate user
-        const tokens = await AuthenticationService.generateTokens(corporateResult.user);
+        const tokens = await AuthenticationService.generateTokens(
+          corporateResult.user
+        );
 
-        logger.logSecurityEvent('CORPORATE_OAUTH_LOGIN_SUCCESS', corporateResult.user.id, {
-          provider, // eslint-disable-line no-undef
-          clientId: corporateResult.client?.id,
-          clientName: corporateResult.client?.get('name'),
-          email: this.maskEmail(userInfo.email),
-        });
+        logger.logSecurityEvent(
+          'CORPORATE_OAUTH_LOGIN_SUCCESS',
+          corporateResult.user.id,
+          {
+            provider, // eslint-disable-line no-undef
+            clientId: corporateResult.client?.id,
+            clientName: corporateResult.client?.get('name'),
+            email: this.maskEmail(userInfo.email),
+          }
+        );
 
         return {
           success: true,
@@ -736,11 +793,13 @@ class OAuthService {
           tokens,
           isNewUser: !corporateResult.user.existed(),
           isCorporateUser: true,
-          client: corporateResult.client ? {
-            id: corporateResult.client.id,
-            name: corporateResult.client.get('name'),
-            type: corporateResult.client.get('type'),
-          } : null,
+          client: corporateResult.client
+            ? {
+              id: corporateResult.client.id,
+              name: corporateResult.client.get('name'),
+              type: corporateResult.client.get('type'),
+            }
+            : null,
           message: corporateResult.user.existed()
             ? 'Corporate OAuth login successful'
             : 'Corporate OAuth account created and login successful',
@@ -808,9 +867,12 @@ class OAuthService {
       user = AmexingUser.create({
         username: this.generateUsernameFromEmail(userInfo.email),
         email: userInfo.email,
-        firstName: userInfo.given_name || userInfo.name?.split(' ')[0] || 'User',
-        lastName: userInfo.family_name
-          || userInfo.name?.split(' ').slice(1).join(' ') || '',
+        firstName:
+          userInfo.given_name || userInfo.name?.split(' ')[0] || 'User',
+        lastName:
+          userInfo.family_name
+          || userInfo.name?.split(' ').slice(1).join(' ')
+          || '',
         role: this.determineUserRole(userInfo),
         primaryOAuthProvider: provider, // eslint-disable-line no-undef
       });
@@ -958,7 +1020,7 @@ class OAuthService {
 
     this.stateStore.set(state, {
       ...data,
-      expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
     });
   }
 
@@ -1052,36 +1114,46 @@ class OAuthService {
 
       // Fetch Apple's public keys
       return new Promise((resolve, reject) => {
-        https.get('https://appleid.apple.com/auth/keys', (res) => {
-          let data = '';
-          res.on('data', (chunk) => { data += chunk; });
-          res.on('end', () => {
-            try {
-              const _keys = JSON.parse(data); // eslint-disable-line no-underscore-dangle
-              const key = _keys.keys.find((k) => k.kid === keyId);
+        https
+          .get('https://appleid.apple.com/auth/keys', (res) => {
+            let data = '';
+            res.on('data', (chunk) => {
+              data += chunk;
+            });
+            res.on('end', () => {
+              try {
+                const _keys = JSON.parse(data); // eslint-disable-line no-underscore-dangle
+                const key = _keys.keys.find((k) => k.kid === keyId);
 
-              if (!key) {
-                throw new Error(`No public key found for key ID: ${keyId}`);
+                if (!key) {
+                  throw new Error(`No public key found for key ID: ${keyId}`);
+                }
+
+                // Convert JWK to PEM format using crypto
+                const nodeCrypto = require('crypto');
+                const keyObject = nodeCrypto.createPublicKey({
+                  key,
+                  format: 'jwk',
+                });
+                const publicKey = keyObject.export({
+                  type: 'spki',
+                  format: 'pem',
+                });
+                resolve(publicKey);
+              } catch (error) {
+                reject(
+                  new Error(
+                    `Failed to parse Apple public keys: ${error.message}`
+                  )
+                );
               }
-
-              // Convert JWK to PEM format using crypto
-              const nodeCrypto = require('crypto');
-              const keyObject = nodeCrypto.createPublicKey({
-                key,
-                format: 'jwk',
-              });
-              const publicKey = keyObject.export({
-                type: 'spki',
-                format: 'pem',
-              });
-              resolve(publicKey);
-            } catch (error) {
-              reject(new Error(`Failed to parse Apple public keys: ${error.message}`));
-            }
+            });
+          })
+          .on('error', (error) => {
+            reject(
+              new Error(`Failed to fetch Apple public keys: ${error.message}`)
+            );
           });
-        }).on('error', (error) => {
-          reject(new Error(`Failed to fetch Apple public keys: ${error.message}`));
-        });
       });
     } catch (error) {
       throw new Error(`Failed to get Apple public key: ${error.message}`);
@@ -1124,7 +1196,9 @@ class OAuthService {
         sub: payload.sub, // Apple user ID
         email: payload.email,
         email_verified: payload.email_verified,
-        name: payload.name ? `${payload.name.firstName || ''} ${payload.name.lastName || ''}`.trim() : null,
+        name: payload.name
+          ? `${payload.name.firstName || ''} ${payload.name.lastName || ''}`.trim()
+          : null,
         given_name: payload.name?.firstName,
         family_name: payload.name?.lastName,
         iss: payload.iss, // Should be https://appleid.apple.com
@@ -1182,7 +1256,9 @@ class OAuthService {
       });
 
       if (!response.ok) {
-        throw new Error(`Microsoft token validation failed: ${response.status}`);
+        throw new Error(
+          `Microsoft token validation failed: ${response.status}`
+        );
       }
 
       const userData = await response.json();
@@ -1226,21 +1302,29 @@ class OAuthService {
   async getMicrosoftUserProfile(accessToken) {
     try {
       // Get basic profile
-      const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const profileResponse = await fetch(
+        'https://graph.microsoft.com/v1.0/me',
+        {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        }
+      );
 
       if (!profileResponse.ok) {
-        throw new Error(`Failed to get Microsoft profile: ${profileResponse.status}`);
+        throw new Error(
+          `Failed to get Microsoft profile: ${profileResponse.status}`
+        );
       }
 
       const profile = await profileResponse.json();
 
       // Try to get additional directory information if permissions allow
       try {
-        const directoryResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation', {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const directoryResponse = await fetch(
+          'https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName,givenName,surname,jobTitle,department,companyName,officeLocation',
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
 
         if (directoryResponse.ok) {
           const directoryData = await directoryResponse.json();
@@ -1255,7 +1339,10 @@ class OAuthService {
           };
         }
       } catch (directoryError) {
-        logger.info('Directory information not available, using basic profile:', directoryError.message);
+        logger.info(
+          'Directory information not available, using basic profile:',
+          directoryError.message
+        );
       }
 
       return profile;
@@ -1280,7 +1367,9 @@ class OAuthService {
    * const providers = service.getAvailableProviders();
    */
   getAvailableProviders() {
-    return Object.keys(this.providers).filter((_provider) => this.providers[provider].enabled || this.mockMode); // eslint-disable-line no-undef
+    return Object.keys(this.providers).filter(
+      (providerKey) => this.providers[providerKey].enabled || this.mockMode
+    );
   }
 
   /**
@@ -1354,7 +1443,9 @@ class OAuthService {
     const _domain = CorporateOAuthService.extractEmailDomain(email); // eslint-disable-line no-underscore-dangle
     const corporateDomains = CorporateOAuthService.getAvailableCorporateDomains();
 
-    return corporateDomains.find((config) => config._domain === _domain) || null; // eslint-disable-line no-underscore-dangle
+    return (
+      corporateDomains.find((config) => config.domain === _domain) || null
+    );
   }
 
   /**

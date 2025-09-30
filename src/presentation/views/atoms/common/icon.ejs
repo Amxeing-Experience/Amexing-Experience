@@ -1,0 +1,41 @@
+<%
+/**
+ * Icon Atom
+ * Reusable icon component with Tabler Icons
+ *
+ * @param {string} name - Icon name (e.g., 'dashboard', 'users')
+ * @param {string} size - Icon size class (optional, default: '')
+ * @param {string} color - Icon color class (optional, default: '')
+ * @param {string} additionalClasses - Additional CSS classes (optional)
+ */
+
+// Default parameters
+const iconName = typeof name !== 'undefined' ? name : 'circle';
+
+// Map size to Bootstrap font-size classes
+const sizeMap = {
+    'xs': 'fs-6',
+    'sm': 'fs-5',
+    'md': 'fs-4',
+    'lg': 'fs-3',
+    'xl': 'fs-2',
+    'xxl': 'fs-1',
+    // Support direct numeric values for backward compatibility
+    '6': 'fs-6',
+    '5': 'fs-5',
+    '4': 'fs-4',
+    '3': 'fs-3',
+    '2': 'fs-2',
+    '1': 'fs-1'
+};
+const iconSize = typeof size !== 'undefined' && size && sizeMap[size] ? sizeMap[size] : '';
+const iconColor = typeof color !== 'undefined' && color ? `text-${color}` : '';
+const iconAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+
+// Build class string
+const iconClasses = ['ti', `ti-${iconName}`, iconSize, iconColor, iconAdditionalClasses]
+    .filter(cls => cls.length > 0)
+    .join(' ');
+%>
+
+<i class="<%= iconClasses %>"></i>

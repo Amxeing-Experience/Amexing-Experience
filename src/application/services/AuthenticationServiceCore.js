@@ -14,7 +14,7 @@ const Parse = require('parse/node');
 const jwt = require('jsonwebtoken');
 // const crypto = require('crypto'); // Not used in this file
 const AmexingUser = require('../../domain/models/AmexingUser');
-// const logger = require('../../infrastructure/logger'); // Not used in this file
+const logger = require('../../infrastructure/logger');
 
 /**
  * Authentication Service Core - Base functionality for authentication operations.
@@ -80,21 +80,34 @@ class AuthenticationServiceCore {
 
     required.forEach((field) => {
       // eslint-disable-next-line security/detect-object-injection
-      if (!userData[field] || typeof userData[field] !== 'string' || userData[field].trim() === '') {
-        throw new Parse.Error(Parse.Error.VALIDATION_ERROR, `${field} is required`);
+      if (
+        !userData[field]
+        || typeof userData[field] !== 'string'
+        || userData[field].trim() === ''
+      ) {
+        throw new Parse.Error(
+          Parse.Error.VALIDATION_ERROR,
+          `${field} is required`
+        );
       }
     });
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userData.email)) {
-      throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Invalid email format');
+      throw new Parse.Error(
+        Parse.Error.VALIDATION_ERROR,
+        'Invalid email format'
+      );
     }
 
     // Validate username format (alphanumeric and underscores only)
     const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
     if (!usernameRegex.test(userData.username)) {
-      throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Username must be 3-20 characters, alphanumeric and underscores only');
+      throw new Parse.Error(
+        Parse.Error.VALIDATION_ERROR,
+        'Username must be 3-20 characters, alphanumeric and underscores only'
+      );
     }
   }
 
@@ -129,7 +142,10 @@ class AuthenticationServiceCore {
     const existingUsername = await usernameQuery.first({ useMasterKey: true });
 
     if (existingUsername) {
-      throw new Parse.Error(Parse.Error.USERNAME_TAKEN, 'Username already exists');
+      throw new Parse.Error(
+        Parse.Error.USERNAME_TAKEN,
+        'Username already exists'
+      );
     }
   }
 
@@ -219,11 +235,60 @@ class AuthenticationServiceCore {
    * console.log('Expires In:', tokens.expires_in);
    */
   async generateTokens(user) {
+    // Get role name from the new Role relationship (Pointer)
+    let roleName = 'guest';
+    let roleObjectId = null;
+    const rolePointer = user.get('roleId');
+
+    if (rolePointer) {
+      try {
+        // Check if rolePointer is already a fetched object or just a pointer
+        if (rolePointer.get && typeof rolePointer.get === 'function') {
+          // Role object is already fetched
+          roleName = rolePointer.get('name') || 'guest';
+          roleObjectId = rolePointer.id;
+        } else if (typeof rolePointer === 'string') {
+          // rolePointer is a string ID (backward compatibility)
+          const roleQuery = new Parse.Query('Role');
+          roleQuery.equalTo('objectId', rolePointer);
+          const roleObject = await roleQuery.first({ useMasterKey: true });
+          if (roleObject) {
+            roleName = roleObject.get('name') || 'guest';
+            roleObjectId = roleObject.id;
+          }
+        } else {
+          // rolePointer is a pointer object, fetch it
+          const roleQuery = new Parse.Query('Role');
+          roleQuery.equalTo('objectId', rolePointer.id);
+          const roleObject = await roleQuery.first({ useMasterKey: true });
+          if (roleObject) {
+            roleName = roleObject.get('name') || 'guest';
+            roleObjectId = roleObject.id;
+          }
+        }
+      } catch (roleError) {
+        // Fall back to old role field if new relationship fails
+        roleName = user.get('role') || 'guest';
+        logger.warn(
+          'Failed to resolve role from Pointer, falling back to string role',
+          {
+            userId: user.id,
+            error: roleError.message,
+          }
+        );
+      }
+    } else {
+      // Fall back to old role field if no roleId
+      roleName = user.get('role') || 'guest';
+    }
+
     const payload = {
       userId: user.id,
       username: user.get('username'),
       email: user.get('email'),
-      role: user.get('role'),
+      role: roleName,
+      roleId: roleObjectId,
+      organizationId: user.get('organizationId'),
       iat: Math.floor(Date.now() / 1000),
     };
 
