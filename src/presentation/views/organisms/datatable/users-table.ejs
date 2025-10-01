@@ -17,7 +17,7 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
 
 // Permission checks
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
-const canDelete = ['superadmin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 %>
 
@@ -153,10 +153,11 @@ function initializeDataTableWithData(usersData) {
                             'department_manager': { name: 'Jefe Depto.', class: 'success' },
                             'employee': { name: 'Empleado', class: 'secondary' },
                             'driver': { name: 'Conductor', class: 'warning' },
-                            'guest': { name: 'Invitado', class: 'light' }
+                            'guest': { name: 'Invitado', class: 'dark', textClass: 'text-white' }
                         };
                         const role = roleNames[data] || { name: data, class: 'secondary' };
-                        return `<span class="badge bg-${role.class}">${role.name}</span>`;
+                        const textClass = role.textClass || '';
+                        return `<span class="badge bg-${role.class} ${textClass}">${role.name}</span>`;
                     }
                     return data;
                 }
@@ -167,10 +168,14 @@ function initializeDataTableWithData(usersData) {
                 className: 'text-center',
                 render: function(data, type, row) {
                     if (type === 'display') {
-                        const isActive = data === true || data === 'true';
-                        const statusClass = isActive ? 'success' : 'danger';
+                        // Active/Inactive status based on active field
+                        const isActive = row.active === true;
+                        const statusClass = isActive ? 'success' : 'warning';
                         const statusText = isActive ? 'Activo' : 'Inactivo';
-                        return `<span class="badge bg-${statusClass}">${statusText}</span>`;
+                        const icon = isActive ? 'ti-check' : 'ti-x';
+                        return `<span class="badge bg-${statusClass}">
+                                    <i class="ti ${icon} me-1"></i>${statusText}
+                                </span>`;
                     }
                     return data;
                 }
@@ -213,21 +218,47 @@ function initializeDataTableWithData(usersData) {
             orderable: false,
             searchable: false,
             className: 'text-center',
+            width: '120px',
             render: function(data, type, row) {
                 if (type === 'display') {
-                    let actions = '';
-                    if (canEdit) {
-                        actions += `<button type="button" class="btn btn-sm btn-primary me-1"
-                                    onclick="editUser('${row.id}')" title="Editar">
-                                    <i class="ti ti-edit"></i>
+                    const isSuperadmin = row.role === 'superadmin';
+                    const isActive = row.active === true;
+                    const userName = `${row.firstName} ${row.lastName}`;
+
+                    let actions = '<div class="btn-group" role="group">';
+
+                    // Toggle Active/Inactive button - not for superadmin users
+                    if (canDelete && !isSuperadmin) {
+                        const toggleIcon = isActive ? 'ti-user-off' : 'ti-user-check';
+                        const toggleClass = isActive ? 'btn-warning' : 'btn-success';
+                        const toggleTitle = isActive ? 'Desactivar usuario' : 'Activar usuario';
+                        actions += `<button type="button"
+                                    class="btn btn-sm ${toggleClass} btn-toggle-user"
+                                    data-user-id="${row.id}"
+                                    data-user-name="${userName}"
+                                    data-current-status="${isActive}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="${toggleTitle}">
+                                    <i class="ti ${toggleIcon}"></i>
                                 </button>`;
                     }
-                    if (canDelete && row.role !== 'superadmin') {
-                        actions += `<button type="button" class="btn btn-sm btn-danger"
-                                    onclick="deleteUser('${row.id}')" title="Eliminar">
+
+                    // Delete button - not for superadmin users
+                    // Sets both active: false and exists: false
+                    if (canDelete && !isSuperadmin) {
+                        actions += `<button type="button"
+                                    class="btn btn-sm btn-danger btn-delete-user"
+                                    data-user-id="${row.id}"
+                                    data-user-name="${userName}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Eliminar usuario del sistema">
                                     <i class="ti ti-trash"></i>
                                 </button>`;
                     }
+
+                    actions += '</div>';
                     return actions;
                 }
                 return '';
@@ -248,24 +279,351 @@ function initializeDataTableWithData(usersData) {
         // Store reference globally
         window.usersTable = usersTable;
 
+        // Initialize Bootstrap tooltips after table draws
+        usersTable.on('draw', function() {
+            // Initialize tooltips for action buttons
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+        });
+
+        // Initialize tooltips on initial load
+        setTimeout(() => {
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+        }, 100);
+
     } catch (error) {
         console.error('Failed to initialize DataTable:', error);
     }
 }
 
-// User action functions (placeholders)
-function editUser(userId) {
-    // TODO: Implement edit functionality
+// ============================================================================
+// Note: CSRF Token is NOT required for /api/* routes
+// JWT authentication provides sufficient security for API endpoints
+// ============================================================================
+
+// ============================================================================
+// Alert/Notification System
+// ============================================================================
+function showAlert(message, type = 'info', duration = 5000) {
+    // Remove any existing alerts
+    const existingAlert = document.querySelector('.user-management-alert');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+
+    // Create alert element
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show user-management-alert`;
+    alertDiv.setAttribute('role', 'alert');
+    alertDiv.style.cssText = 'position: fixed; top: 80px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+
+    // Icon mapping
+    const icons = {
+        success: 'ti-check-circle',
+        danger: 'ti-alert-circle',
+        warning: 'ti-alert-triangle',
+        info: 'ti-info-circle'
+    };
+
+    alertDiv.innerHTML = `
+        <i class="ti ${icons[type] || icons.info} me-2"></i>
+        <strong>${message}</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+
+    document.body.appendChild(alertDiv);
+
+    // Auto-dismiss after duration
+    if (duration > 0) {
+        setTimeout(() => {
+            alertDiv.classList.remove('show');
+            setTimeout(() => alertDiv.remove(), 150);
+        }, duration);
+    }
 }
 
-function deleteUser(userId) {
-    // TODO: Implement delete functionality
+function showSuccessAlert(message) {
+    showAlert(message, 'success', 5000);
+}
+
+function showErrorAlert(message) {
+    showAlert(message, 'danger', 0); // Don't auto-dismiss errors
+}
+
+function showWarningAlert(message) {
+    showAlert(message, 'warning', 5000);
+}
+
+// ============================================================================
+// User Action Functions
+// ============================================================================
+
+/**
+ * Confirm and delete user (sets active: false, exists: false)
+ */
+function confirmDeleteUser(userId, userName) {
+    // Create modal HTML
+    const modalHtml = `
+        <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title" id="deleteUserModalLabel">
+                            <i class="ti ti-alert-triangle me-2"></i>¿Eliminar Usuario?
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-danger">
+                            <i class="ti ti-alert-octagon me-2"></i>
+                            <strong>⚠️ ADVERTENCIA:</strong> Esta acción eliminará permanentemente al usuario <strong>${userName}</strong>.
+                            El usuario no podrá acceder al sistema y no será visible en el listado.
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="ti ti-x me-1"></i>Cancelar
+                        </button>
+                        <button type="button" class="btn btn-danger" data-action="delete" data-user-id="${userId}">
+                            <i class="ti ti-trash me-1"></i>Eliminar Usuario
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('deleteUserModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
+    modal.show();
+
+    // Add event listener for the delete button
+    document.querySelector('#deleteUserModal [data-action="delete"]').addEventListener('click', function() {
+        executeDeleteUser(userId);
+    });
+}
+
+/**
+ * Execute delete user (sets active: false, exists: false)
+ */
+async function executeDeleteUser(userId) {
+    try {
+        // Show loading state
+        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteUserModal'));
+        const deleteBtn = document.querySelector('#deleteUserModal [data-action="delete"]');
+        deleteBtn.disabled = true;
+        deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Eliminando...';
+
+        // Make API request to DELETE endpoint (sets active: false, exists: false)
+        // No CSRF token needed - JWT authentication is used for API routes
+        const response = await fetch(`/api/users/${userId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        if (!data.success) {
+            throw new Error(data.error || 'Error al eliminar usuario');
+        }
+
+        // Success
+        modal.hide();
+        showSuccessAlert('Usuario eliminado correctamente');
+
+        // Reload DataTable
+        if (window.usersTable) {
+            loadUsersAndInitializeTable();
+        }
+
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        showErrorAlert(`Error al eliminar usuario: ${error.message}`);
+
+        // Restore button
+        const deleteBtn = document.querySelector('#deleteUserModal [data-action="delete"]');
+        if (deleteBtn) {
+            deleteBtn.disabled = false;
+            deleteBtn.innerHTML = '<i class="ti ti-trash me-1"></i>Eliminar Usuario';
+        }
+    }
+}
+
+// ============================================================================
+// Event Delegation for Action Buttons (CSP Compliant)
+// ============================================================================
+function setupEventDelegation() {
+    // Use event delegation on document to handle dynamically created buttons
+    document.addEventListener('click', function(event) {
+        const target = event.target.closest('button');
+        if (!target) return;
+
+        // Toggle status button
+        if (target.classList.contains('btn-toggle-user')) {
+            const userId = target.getAttribute('data-user-id');
+            const userName = target.getAttribute('data-user-name');
+            const currentStatus = target.getAttribute('data-current-status') === 'true';
+            confirmToggleUser(userId, userName, currentStatus);
+            return;
+        }
+
+        // Delete button
+        if (target.classList.contains('btn-delete-user')) {
+            const userId = target.getAttribute('data-user-id');
+            const userName = target.getAttribute('data-user-name');
+            confirmDeleteUser(userId, userName);
+            return;
+        }
+    });
+}
+
+// ============================================================================
+// Toggle User Status Function
+// ============================================================================
+/**
+ * Confirm and toggle user active status
+ */
+function confirmToggleUser(userId, userName, currentStatus) {
+    const newStatus = !currentStatus;
+    const action = newStatus ? 'activar' : 'desactivar';
+    const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+    const actionColor = newStatus ? 'success' : 'warning';
+    const actionIcon = newStatus ? 'ti-user-check' : 'ti-user-off';
+
+    // Create modal HTML
+    const modalHtml = `
+        <div class="modal fade" id="toggleUserModal" tabindex="-1" aria-labelledby="toggleUserModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-${actionColor} text-white">
+                        <h5 class="modal-title" id="toggleUserModalLabel">
+                            <i class="ti ${actionIcon} me-2"></i>¿${actionTitle} Usuario?
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="ti ti-info-circle me-2"></i>
+                            <strong>Información:</strong> Esta acción ${action === 'activar' ? 'activará' : 'desactivará'} temporalmente al usuario <strong>${userName}</strong>.
+                            ${action === 'desactivar' ? 'El usuario no podrá acceder al sistema hasta que sea reactivado.' : 'El usuario podrá acceder nuevamente al sistema.'}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="ti ti-x me-1"></i>Cancelar
+                        </button>
+                        <button type="button" class="btn btn-${actionColor}" data-action="toggle" data-user-id="${userId}" data-new-status="${newStatus}">
+                            <i class="ti ${actionIcon} me-1"></i>${actionTitle} Usuario
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('toggleUserModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('toggleUserModal'));
+    modal.show();
+
+    // Add event listener for the toggle button
+    document.querySelector('#toggleUserModal [data-action="toggle"]').addEventListener('click', function() {
+        executeToggleUser(userId, newStatus);
+    });
+}
+
+/**
+ * Execute toggle user status
+ */
+async function executeToggleUser(userId, newStatus) {
+    try {
+        // Show loading state
+        const modal = bootstrap.Modal.getInstance(document.getElementById('toggleUserModal'));
+        const toggleBtn = document.querySelector('#toggleUserModal [data-action="toggle"]');
+        toggleBtn.disabled = true;
+        toggleBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${newStatus ? 'Activando' : 'Desactivando'}...`;
+
+        // Make API request - No CSRF token needed for API routes
+        const response = await fetch(`/api/users/${userId}/toggle-status`, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ active: newStatus })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+
+        if (!data.success) {
+            throw new Error(data.error || 'Error al cambiar estado del usuario');
+        }
+
+        // Success
+        modal.hide();
+        const statusText = newStatus ? 'activado' : 'desactivado';
+        showSuccessAlert(`Usuario ${statusText} correctamente`);
+
+        // Reload DataTable
+        if (window.usersTable) {
+            loadUsersAndInitializeTable();
+        }
+
+    } catch (error) {
+        console.error('Error toggling user status:', error);
+        showErrorAlert(`Error al cambiar estado del usuario: ${error.message}`);
+
+        // Restore button
+        const toggleBtn = document.querySelector('#toggleUserModal [data-action="toggle"]');
+        if (toggleBtn) {
+            const newStatus = toggleBtn.getAttribute('data-new-status') === 'true';
+            const actionIcon = newStatus ? 'ti-user-check' : 'ti-user-off';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            toggleBtn.disabled = false;
+            toggleBtn.innerHTML = `<i class="ti ${actionIcon} me-1"></i>${actionTitle} Usuario`;
+        }
+    }
 }
 
 // Start loading when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadUsersAndInitializeTable);
+    document.addEventListener('DOMContentLoaded', function() {
+        setupEventDelegation();
+        loadUsersAndInitializeTable();
+    });
 } else {
+    setupEventDelegation();
     loadUsersAndInitializeTable();
 }
 </script>

@@ -84,10 +84,12 @@ class UserManagementService {
         sort = { field: 'lastName', direction: 'asc' },
       } = options;
 
-      // Query only active and existing users
-      const query = new Parse.Query(this.className);
-      query.equalTo('active', true);
-      query.equalTo('exists', true);
+      // Query all existing users (exists: true), regardless of active status
+      // The active field only controls access, not visibility in admin panel
+      const query = BaseModel.queryExisting(this.className);
+
+      // Force query to fetch fresh data from network (not from cache)
+      query.fromNetwork();
 
       // Apply role-based access filtering
       await this.applyRoleBasedFiltering(query, currentUser, targetRole);
@@ -399,8 +401,9 @@ class UserManagementService {
         throw new Error('Cannot deactivate your own account');
       }
 
-      // AI Agent Rule: Use deactivate method, never hard delete
-      await user.deactivate(deactivatedBy.id);
+      // AI Agent Rule: Use softDelete method to set active=false and exists=false
+      // This is a logical deletion, never hard delete
+      await user.softDelete(deactivatedBy.id);
 
       // Log deactivation activity
       await this.logUserCRUDActivity(deactivatedBy, 'deactivate', userId, {
@@ -1067,9 +1070,8 @@ class UserManagementService {
    */
   async getTotalUserCount(currentUser, targetRole, filters) {
     // Apply same filters as main query for consistency
-    const countQuery = new Parse.Query(this.className);
-    countQuery.equalTo('active', true);
-    countQuery.equalTo('exists', true);
+    // Query all existing users (exists: true), regardless of active status
+    const countQuery = BaseModel.queryExisting(this.className);
 
     await this.applyRoleBasedFiltering(countQuery, currentUser, targetRole);
     this.applyAdvancedFilters(countQuery, filters);
@@ -1166,6 +1168,10 @@ class UserManagementService {
       }
     }
 
+    // Get lifecycle fields with safety defaults
+    const active = user.get('active');
+    const exists = user.get('exists');
+
     return {
       id: user.id,
       email: user.get('email'),
@@ -1174,8 +1180,8 @@ class UserManagementService {
       lastName: user.get('lastName'),
       role: roleName || 'guest',
       roleId: roleObjectId,
-      active: user.get('active'),
-      exists: user.get('exists'),
+      active: active !== undefined ? active : true,
+      exists: exists !== undefined ? exists : true,
       emailVerified: user.get('emailVerified'),
       lastLoginAt: user.get('lastLoginAt'),
       loginAttempts: user.get('loginAttempts'),

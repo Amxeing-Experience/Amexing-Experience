@@ -507,6 +507,14 @@ function registerCloudFunctions() {
         }
         user.set('updatedAt', new Date());
 
+        // Set lifecycle defaults for new users (moved from BaseModel constructor)
+        if (user.get('active') === undefined) {
+          user.set('active', true);
+        }
+        if (user.get('exists') === undefined) {
+          user.set('exists', true);
+        }
+
         // Log user registration
         logger.logSecurityEvent('AMEXING_USER_REGISTRATION', {
           username: user.get('username'),

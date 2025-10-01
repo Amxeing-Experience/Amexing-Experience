@@ -22,21 +22,9 @@ const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 
 class BaseModel extends Parse.Object {
-  constructor(className, attributes, options) {
-    super(className, attributes, options);
-
-    // Set default lifecycle values on creation
-    if (!this.has('active')) {
-      this.set('active', true);
-    }
-    if (!this.has('exists')) {
-      this.set('exists', true);
-    }
-    if (!this.has('createdAt')) {
-      this.set('createdAt', new Date());
-    }
-    this.set('updatedAt', new Date());
-  }
+  // NOTE: Default values are NOT set in constructor to avoid interference with Parse object hydration
+  // Defaults are set in Parse Server cloud functions (beforeSave hook) instead
+  // This ensures MongoDB values are preserved when objects are queried
 
   /**
    * Check if record is active and exists (normal business operations).
