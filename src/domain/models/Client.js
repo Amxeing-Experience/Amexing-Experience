@@ -26,9 +26,8 @@ const logger = require('../../infrastructure/logger');
  * Implements BaseModel for consistent lifecycle management across the platform.
  */
 class Client extends BaseModel {
-  constructor() {
-    super('Client');
-  }
+  // Constructor removed - useless constructor that only calls super with no additional logic
+  // Parse.Object.extend pattern handles this automatically
 
   /**
    * Creates a new Client instance with default lifecycle values.

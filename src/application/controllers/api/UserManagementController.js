@@ -124,6 +124,10 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
+
       const userId = req.params.id;
       if (!userId) {
         return this.sendError(res, 'User ID is required', 400);
@@ -187,6 +191,10 @@ class UserManagementController {
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
+
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
 
       // Validate request body
       const validationErrors = this.validateCreateUserRequest(req.body);
@@ -277,6 +285,10 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
+
       const userId = req.params.id;
       if (!userId) {
         return this.sendError(res, 'User ID is required', 400);
@@ -359,12 +371,15 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Add role property to currentUser for service validation
+      currentUser.role = req.userRole;
+
       const userId = req.params.id;
       if (!userId) {
         return this.sendError(res, 'User ID is required', 400);
       }
 
-      const reason = req.body.reason || 'Deactivated via API';
+      const reason = req.body?.reason || 'Deactivated via API';
 
       // Deactivate user through service
       const success = await this.userService.deactivateUser(
@@ -395,7 +410,7 @@ class UserManagementController {
       logger.error('Error in UserManagementController.deactivateUser', {
         error: error.message,
         userId: req.params.id,
-        reason: req.body.reason,
+        reason: req.body?.reason,
         deactivatedBy: req.user?.id,
       });
 
@@ -441,6 +456,10 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
+
       const userId = req.params.id;
       if (!userId) {
         return this.sendError(res, 'User ID is required', 400);
@@ -477,7 +496,7 @@ class UserManagementController {
       logger.error('Error in UserManagementController.reactivateUser', {
         error: error.message,
         userId: req.params.id,
-        reason: req.body.reason,
+        reason: req.body?.reason,
         reactivatedBy: req.user?.id,
       });
 
@@ -515,6 +534,10 @@ class UserManagementController {
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
+
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
 
       const userId = req.params.id;
       if (!userId) {
@@ -598,6 +621,10 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
+
       const userId = req.params.id;
       if (!userId) {
         return this.sendError(res, 'User ID is required', 400);
@@ -635,7 +662,7 @@ class UserManagementController {
       logger.error('Error in UserManagementController.archiveUser', {
         error: error.message,
         userId: req.params.id,
-        reason: req.body.reason,
+        reason: req.body?.reason,
         archivedBy: req.user?.id,
       });
 

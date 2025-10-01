@@ -1,256 +1,125 @@
 <%
 /**
- * Superadmin Users Page
- * Uses new atomic design structure with DataTables
+ * SuperAdmin Users Management Page
+ * Follows main dashboard layout structure with atomic design components
+ *
+ * Layout Structure (matching main dashboard):
+ * - Direct row/column structure (no body-wrapper)
+ * - Container-fluid from Flexy Bootstrap
+ * - Consistent spacing and alignment
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller (pageStyles & footerScripts)
  */
 
-// Set layout and page variables
-const layoutType = 'dashboard';
+// Page configuration
 const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'superadmin';
 const currentPath = '/dashboard/superadmin/users';
-const title = 'Gestión de Usuarios - Amexing';
 %>
 
-<%
-// Set layout configuration for dashboard
-const head = `
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Gestión de usuarios del sistema Amexing">
-`;
-%>
-
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="utf-8">
-    <title><%= title %></title>
-    <%# Safe: head contains server-generated trusted HTML %><%-  head || '' %>
-    <%- include('../../assets/admin/cdn-dependencies') %>
-    <%- include('../../assets/dashboard/css') %>
-
-    <!-- Core Scripts (needed for header dropdowns) -->
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
-
-    <!-- Custom CSS for better space utilization -->
-    <style>
-        /* Override Flexy's restrictive layout for better space usage */
-        .body-wrapper .container-fluid,
-        .body-wrapper .container-sm,
-        .body-wrapper .container-md,
-        .body-wrapper .container-lg,
-        .body-wrapper .container-xl,
-        .body-wrapper .container-xxl {
-            max-width: none !important;  /* Remove width restriction */
-            margin: 0 !important;        /* Remove auto centering */
-            padding: 20px !important;    /* Reduce from 24px */
-        }
-
-        /* Optimize for desktop screens */
-        @media (min-width: 1200px) {
-            .body-wrapper .container-fluid,
-            .body-wrapper .container-sm,
-            .body-wrapper .container-md,
-            .body-wrapper .container-lg,
-            .body-wrapper .container-xl,
-            .body-wrapper .container-xxl {
-                padding: 15px 30px !important; /* Less vertical, reasonable horizontal */
-            }
-        }
-
-        /* Mobile optimization */
-        @media (max-width: 991.98px) {
-            .body-wrapper .container-fluid,
-            .body-wrapper .container-sm,
-            .body-wrapper .container-md,
-            .body-wrapper .container-lg,
-            .body-wrapper .container-xl,
-            .body-wrapper .container-xxl {
-                padding: 15px !important;
-            }
-        }
-
-        /* Small mobile screens */
-        @media (max-width: 767.98px) {
-            .body-wrapper > .container-fluid,
-            .body-wrapper > .container-sm,
-            .body-wrapper > .container-md,
-            .body-wrapper > .container-lg,
-            .body-wrapper > .container-xl,
-            .body-wrapper > .container-xxl {
-                padding: 15px 10px !important;
-            }
-        }
-
-        /* Ensure table uses full available width */
-        .table-responsive {
-            margin: 0 !important;
-        }
-
-        /* Card optimizations */
-        .card {
-            margin-bottom: 1rem;
-        }
-
-        .card-body {
-            padding: 1rem;
-        }
-
-        /* DataTable wrapper optimizations */
-        .dataTables_wrapper {
-            width: 100%;
-        }
-
-        .dataTables_wrapper .row {
-            margin-left: 0;
-            margin-right: 0;
-        }
-    </style>
-</head>
-
-<body>
-    <!-- Main wrapper - Flexy Bootstrap Lite structure -->
-    <div class="page-wrapper" id="main-wrapper" data-layout="vertical" data-navbarbg="skin6"
-         data-sidebartype="full" data-sidebar-position="fixed" data-header-position="fixed">
-
-        <!-- Sidebar Start -->
-        <%- include('../../organisms/dashboard/navigation/sidebar-nav', { user: user, userRole: currentUserRole, currentPath: currentPath }) %>
-        <!-- Sidebar End -->
-
-        <!-- Main Content wrapper -->
-        <div class="body-wrapper">
-            <!-- Header Start -->
-            <%- include('../../organisms/dashboard/header/dashboard-header', { user: user, userRole: currentUserRole, currentPath: currentPath, title: 'Usuarios' }) %>
-            <!-- Header End -->
-
-            <!-- Main Content -->
-            <div class="container-fluid">
-                <!-- Page Header -->
-                <div class="row">
-                    <div class="col-12">
-                        <div class="d-flex justify-content-between align-items-center mb-4">
-                            <div>
-                                <h2 class="mb-1 fw-bold">Gestión de Usuarios</h2>
-                                <nav aria-label="breadcrumb">
-                                    <ol class="breadcrumb mb-0">
-                                        <li class="breadcrumb-item">
-                                            <a href="/dashboard/superadmin" class="text-decoration-none">
-                                                <i class="ti ti-home me-1"></i>Dashboard
-                                            </a>
-                                        </li>
-                                        <li class="breadcrumb-item active" aria-current="page">
-                                            <i class="ti ti-users me-1"></i>Usuarios
-                                        </li>
-                                    </ol>
-                                </nav>
-                            </div>
-                            <div class="text-muted">
-                                <small class="d-block">Total usuarios registrados</small>
-                                <strong id="total-users-count">-</strong>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Users DataTable -->
-                <div class="row">
-                    <div class="col-12">
-                        <%- include('../../organisms/datatable/users-table', {
-                            tableId: 'users-table',
-                            apiEndpoint: '/api/users',
-                            userRole: currentUserRole,
-                            showActions: true
-                        }) %>
-                    </div>
-                </div>
-
-                <!-- User Modals will go here -->
-                <!-- Create User Modal -->
-                <div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="createUserModalLabel">
-                                    <i class="ti ti-user-plus me-2"></i>Crear Nuevo Usuario
-                                </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <!-- Create user form will go here -->
-                                <p class="text-muted">Formulario de creación de usuario pendiente de implementar</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Edit User Modal -->
-                <div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="editUserModalLabel">
-                                    <i class="ti ti-edit me-2"></i>Editar Usuario
-                                </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <!-- Edit user form will go here -->
-                                <p class="text-muted">Formulario de edición de usuario pendiente de implementar</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- View User Modal -->
-                <div class="modal fade" id="viewUserModal" tabindex="-1" aria-labelledby="viewUserModalLabel" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="viewUserModalLabel">
-                                    <i class="ti ti-eye me-2"></i>Detalles de Usuario
-                                </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <!-- User details will go here -->
-                                <p class="text-muted">Vista de detalles de usuario pendiente de implementar</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold">Gestión de Usuarios</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/superadmin" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-users me-1"></i>Usuarios
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="text-muted">
+                <small class="d-block">Total usuarios registrados</small>
+                <strong id="total-users-count">-</strong>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Global Loading Overlay -->
-    <div id="loading-overlay" class="d-none">
-        <div class="text-center">
-            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
-                <span class="visually-hidden">Cargando...</span>
+<!-- Users DataTable -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/datatable/users-table', {
+            tableId: 'users-table',
+            apiEndpoint: '/api/users',
+            userRole: currentUserRole,
+            showActions: true
+        }) %>
+    </div>
+</div>
+
+<!-- User Management Modals -->
+<!-- Create User Modal -->
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createUserModalLabel">
+                    <i class="ti ti-user-plus me-2"></i>Crear Nuevo Usuario
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="mt-2">
-                <small class="text-muted">Cargando datos...</small>
+            <div class="modal-body">
+                <!-- Create user form will go here -->
+                <p class="text-muted">Formulario de creación de usuario pendiente de implementar</p>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Include DataTables CDN Scripts -->
-    <%- include('../../assets/admin/cdn-scripts') %>
-    <!-- Include Dashboard Admin Scripts (for DataTables compatibility) -->
-    <%- include('../../assets/admin/scripts') %>
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editUserModalLabel">
+                    <i class="ti ti-edit me-2"></i>Editar Usuario
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Edit user form will go here -->
+                <p class="text-muted">Formulario de edición de usuario pendiente de implementar</p>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <!-- Page-specific JavaScript -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Update total count when table loads (listen to custom event)
-            document.addEventListener('usersTableLoaded', function(e) {
-                const count = e.detail?.count || 0;
-                const countEl = document.getElementById('total-users-count');
-                if (countEl) {
-                    countEl.textContent = count;
-                }
-            });
+<!-- View User Modal -->
+<div class="modal fade" id="viewUserModal" tabindex="-1" aria-labelledby="viewUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewUserModalLabel">
+                    <i class="ti ti-eye me-2"></i>Detalles de Usuario
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- User details will go here -->
+                <p class="text-muted">Vista de detalles de usuario pendiente de implementar</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page-specific JavaScript -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update total count when table loads (listen to custom event)
+        document.addEventListener('usersTableLoaded', function(e) {
+            const count = e.detail?.count || 0;
+            const countEl = document.getElementById('total-users-count');
+            if (countEl) {
+                countEl.textContent = count;
+            }
         });
-    </script>
-</body>
-</html>
+    });
+</script>

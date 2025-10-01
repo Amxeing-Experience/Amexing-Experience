@@ -22,7 +22,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const UserManagementController = require('../../../application/controllers/api/UserManagementController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
-const securityMiddleware = require('../../../infrastructure/security/securityMiddleware');
+// securityMiddleware removed - CSRF protection not needed for JWT-authenticated API routes
 const logger = require('../../../infrastructure/logger');
 
 const router = express.Router();
@@ -170,7 +170,6 @@ router.get(
 router.post(
   '/',
   writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
   jwtMiddleware.requirePermission('users.create'),
   async (req, res) => {
     await userController.createUser(req, res);
@@ -196,7 +195,6 @@ router.post(
 router.put(
   '/:id',
   writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
   jwtMiddleware.requirePermission('users.update'),
   async (req, res) => {
     await userController.updateUser(req, res);
@@ -222,7 +220,6 @@ router.put(
 router.delete(
   '/:id',
   writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
   jwtMiddleware.requirePermission('users.deactivate'),
   async (req, res) => {
     await userController.deactivateUser(req, res);
@@ -248,7 +245,6 @@ router.delete(
 router.put(
   '/:id/reactivate',
   writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
   jwtMiddleware.requirePermission('users.reactivate'),
   async (req, res) => {
     await userController.reactivateUser(req, res);
@@ -274,7 +270,6 @@ router.put(
 router.patch(
   '/:id/toggle-status',
   writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
   jwtMiddleware.requirePermission('users.update'),
   async (req, res) => {
     await userController.toggleUserStatus(req, res);
@@ -300,7 +295,6 @@ router.patch(
 router.patch(
   '/:id/archive',
   writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
   jwtMiddleware.requireRoleLevel(7),
   async (req, res) => {
     await userController.archiveUser(req, res);
