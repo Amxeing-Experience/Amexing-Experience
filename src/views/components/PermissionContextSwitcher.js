@@ -13,6 +13,34 @@
 const Parse = require('parse/node');
 
 class PermissionContextSwitcher {
+  /**
+   * Creates a new PermissionContextSwitcher instance.
+   * Initializes the component with the specified container and options, sets up default configuration,
+   * and automatically triggers initialization of the context switcher UI.
+   * @function
+   * @param {string} containerId - The ID of the DOM element that will contain the context switcher component.
+   * @param {object} [options] - Optional configuration object for customizing the component behavior and appearance.
+   * @param {string} [options.theme] - The theme to apply to the component ('default', 'dark', 'light', etc.). Defaults to 'default'.
+   * @param {string} [options.position] - Position of the component when fixed ('top-right', 'top-left', 'bottom-right', 'bottom-left'). Defaults to 'top-right'.
+   * @param {boolean} [options.showIcons] - Whether to display icons alongside context information. Defaults to true.
+   * @param {number} [options.autoRefresh] - Auto-refresh interval in milliseconds (0 to disable). Defaults to 30000 (30 seconds).
+   * @example
+   * // Basic usage with default options
+   * const switcher = new PermissionContextSwitcher('context-container');
+   * @example
+   * // Custom configuration
+   * const switcher = new PermissionContextSwitcher('context-container', {
+   *   theme: 'dark',
+   *   position: 'bottom-left',
+   *   showIcons: false,
+   *   autoRefresh: 60000
+   * });
+   * @example
+   * // Disable auto-refresh
+   * const switcher = new PermissionContextSwitcher('context-container', {
+   *   autoRefresh: 0
+   * });
+   */
   constructor(containerId, options = {}) {
     this.container = document.getElementById(containerId);
     this.currentUser = null;

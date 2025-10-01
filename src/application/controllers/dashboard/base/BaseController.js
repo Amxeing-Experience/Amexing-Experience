@@ -88,6 +88,7 @@ class BaseController {
   handleError(res, error, statusCode = 500) {
     logger.error('Controller Error:', error);
 
+    // Prevent sending response if headers already sent
     if (res.headersSent) {
       return;
     }
@@ -137,6 +138,7 @@ class BaseController {
   validateRequired(data, requiredFields) {
     const missing = [];
 
+    // Check each required field
     requiredFields.forEach((field) => {
       // eslint-disable-next-line security/detect-object-injection
       if (!data[field]) {
@@ -144,6 +146,7 @@ class BaseController {
       }
     });
 
+    // Throw error if any fields are missing
     if (missing.length > 0) {
       throw new Error(`Missing required fields: ${missing.join(', ')}`);
     }

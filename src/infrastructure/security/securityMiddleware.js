@@ -69,7 +69,16 @@ class SecurityMiddleware {
     });
   }
 
-  // Helmet configuration for comprehensive security headers with DataTables CSP support
+  /**
+   * Configures and returns Helmet middleware for comprehensive security headers.
+   * Implements Content Security Policy (CSP) with DataTables and CDN support,
+   * HSTS, XSS protection, and other security headers required for PCI DSS compliance.
+   * @function getHelmetConfig
+   * @returns {Function} - Helmet middleware configured with security headers.
+   * @example
+   * // Apply Helmet security headers to Express app
+   * app.use(securityMiddleware.getHelmetConfig());
+   */
   getHelmetConfig() {
     return helmet({
       contentSecurityPolicy: {
@@ -133,7 +142,16 @@ class SecurityMiddleware {
     });
   }
 
-  // Rate limiting configuration
+  /**
+   * Configures and returns standard rate limiting middleware for general API protection.
+   * Limits requests based on IP address with configurable window and threshold.
+   * Logs rate limit violations and returns 429 status with retry information.
+   * @function getRateLimiter
+   * @returns {Function} - Express rate limiting middleware.
+   * @example
+   * // Apply standard rate limiting to all routes
+   * app.use(securityMiddleware.getRateLimiter());
+   */
   getRateLimiter() {
     return rateLimit({
       windowMs:
@@ -155,7 +173,16 @@ class SecurityMiddleware {
     });
   }
 
-  // Strict rate limiter for sensitive endpoints
+  /**
+   * Configures and returns strict rate limiting middleware for sensitive endpoints.
+   * Implements more aggressive rate limiting for authentication, password reset,
+   * and other security-critical operations. More lenient in development mode.
+   * @function getStrictRateLimiter
+   * @returns {Function} - Strict rate limiting middleware with reduced thresholds.
+   * @example
+   * // Apply strict rate limiting to authentication endpoints
+   * app.use('/auth/login', securityMiddleware.getStrictRateLimiter());
+   */
   getStrictRateLimiter() {
     return rateLimit({
       windowMs: 15 * 60 * 1000,
@@ -165,7 +192,16 @@ class SecurityMiddleware {
     });
   }
 
-  // API rate limiter
+  /**
+   * Configures and returns API-specific rate limiting middleware.
+   * Implements short window (1 minute) rate limiting optimized for API endpoints
+   * to prevent abuse while allowing legitimate high-frequency API usage.
+   * @function getApiRateLimiter
+   * @returns {Function} - API-optimized rate limiting middleware.
+   * @example
+   * // Apply API rate limiting to REST endpoints
+   * app.use('/api/v1', securityMiddleware.getApiRateLimiter());
+   */
   getApiRateLimiter() {
     return rateLimit({
       windowMs: 1 * 60 * 1000,
@@ -176,7 +212,16 @@ class SecurityMiddleware {
     });
   }
 
-  // MongoDB injection prevention
+  /**
+   * Configures and returns MongoDB injection prevention middleware.
+   * Sanitizes user input to prevent NoSQL injection attacks by removing
+   * dollar signs and periods from request data. Logs sanitization events.
+   * @function getMongoSanitizer
+   * @returns {Function} - Express-mongo-sanitize middleware for NoSQL injection protection.
+   * @example
+   * // Apply MongoDB sanitization to all routes
+   * app.use(securityMiddleware.getMongoSanitizer());
+   */
   getMongoSanitizer() {
     return mongoSanitize({
       replaceWith: '_',
@@ -188,19 +233,46 @@ class SecurityMiddleware {
     });
   }
 
-  // XSS protection
+  /**
+   * Configures and returns XSS (Cross-Site Scripting) protection middleware.
+   * Sanitizes user input to prevent XSS attacks by cleaning and filtering
+   * potentially malicious HTML and JavaScript code from request data.
+   * @function getXssProtection
+   * @returns {Function} - XSS-clean middleware for XSS attack prevention.
+   * @example
+   * // Apply XSS protection to all routes
+   * app.use(securityMiddleware.getXssProtection());
+   */
   getXssProtection() {
     return xss();
   }
 
-  // HTTP Parameter Pollution prevention
+  /**
+   * Configures and returns HTTP Parameter Pollution (HPP) protection middleware.
+   * Prevents parameter pollution attacks by protecting against duplicate parameters
+   * in query strings. Whitelists specific parameters that legitimately need arrays.
+   * @function getHppProtection
+   * @returns {Function} - HPP middleware for parameter pollution prevention.
+   * @example
+   * // Apply HPP protection to all routes
+   * app.use(securityMiddleware.getHppProtection());
+   */
   getHppProtection() {
     return hpp({
       whitelist: ['sort', 'fields', 'page', 'limit'],
     });
   }
 
-  // CORS configuration
+  /**
+   * Configures and returns CORS (Cross-Origin Resource Sharing) middleware.
+   * Implements origin validation, credential handling, and allowed methods/headers.
+   * Permits Parse Server health checks and validates origins against whitelist.
+   * @function getCorsConfig
+   * @returns {Function} - CORS middleware with origin validation and security controls.
+   * @example
+   * // Apply CORS configuration to Express app
+   * app.use(securityMiddleware.getCorsConfig());
+   */
   getCorsConfig() {
     const corsOptions = {
       origin: (origin, callback) => {
@@ -237,7 +309,16 @@ class SecurityMiddleware {
     return cors(corsOptions);
   }
 
-  // Session configuration
+  /**
+   * Configures and returns session management middleware with secure settings.
+   * Uses MongoDB for production session storage and memory store for development.
+   * Implements secure cookies, session timeouts, and PCI DSS compliant settings.
+   * @function getSessionConfig
+   * @returns {Function} - Express-session middleware with secure configuration.
+   * @example
+   * // Apply session configuration to Express app
+   * app.use(securityMiddleware.getSessionConfig());
+   */
   // eslint-disable-next-line complexity
   getSessionConfig() {
     // Use MemoryStore for development to avoid MongoDB dependency issues
@@ -286,7 +367,16 @@ class SecurityMiddleware {
     });
   }
 
-  // Content Type validation middleware
+  /**
+   * Validates Content-Type headers for POST, PUT, and PATCH requests.
+   * Ensures requests use accepted content types (JSON, form data, multipart).
+   * Prevents content type confusion attacks and enforces API standards.
+   * @function validateContentType
+   * @returns {Function} - Middleware that validates request Content-Type headers.
+   * @example
+   * // Apply content type validation to all routes
+   * app.use(securityMiddleware.validateContentType());
+   */
   validateContentType() {
     return (req, res, next) => {
       if (
@@ -312,7 +402,16 @@ class SecurityMiddleware {
     };
   }
 
-  // Security headers for API responses
+  /**
+   * Adds comprehensive security headers to API responses.
+   * Implements cache control, content type options, frame options, and XSS protection.
+   * Prevents response caching and browser-based security vulnerabilities.
+   * @function apiSecurityHeaders
+   * @returns {Function} - Middleware that sets security headers on API responses.
+   * @example
+   * // Apply API security headers to all API routes
+   * app.use('/api', securityMiddleware.apiSecurityHeaders());
+   */
   apiSecurityHeaders() {
     return (req, res, next) => {
       res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -329,7 +428,17 @@ class SecurityMiddleware {
     };
   }
 
-  // IP whitelist middleware for admin routes
+  /**
+   * Restricts access to routes based on IP address whitelist.
+   * Validates client IP against allowed list and blocks unauthorized access.
+   * Automatically bypassed in development mode for easier testing.
+   * @function ipWhitelist
+   * @param {Array<string>} allowedIps - Array of IP addresses permitted to access the route.
+   * @returns {Function} - Middleware that enforces IP-based access control.
+   * @example
+   * // Restrict admin routes to specific IP addresses
+   * app.use('/admin', securityMiddleware.ipWhitelist(['192.168.1.1', '10.0.0.1']));
+   */
   ipWhitelist(allowedIps = []) {
     return (req, res, next) => {
       if (this.isDevelopment || allowedIps.length === 0) {
@@ -348,7 +457,16 @@ class SecurityMiddleware {
     };
   }
 
-  // Request ID middleware for tracking
+  /**
+   * Generates and attaches unique request IDs for tracking and debugging.
+   * Uses existing X-Request-Id header if present, otherwise generates UUID.
+   * Adds request ID to response headers for end-to-end traceability.
+   * @function requestId
+   * @returns {Function} - Middleware that adds unique request IDs to requests and responses.
+   * @example
+   * // Enable request ID tracking for all routes
+   * app.use(securityMiddleware.requestId());
+   */
   requestId() {
     const { v4: uuid } = require('uuid');
     return (req, res, next) => {
@@ -358,7 +476,16 @@ class SecurityMiddleware {
     };
   }
 
-  // Audit logging middleware
+  /**
+   * Implements comprehensive audit logging for compliance and security monitoring.
+   * Records request details, response times, user information, and error data.
+   * Activated when ENABLE_AUDIT_LOGGING environment variable is true.
+   * @function auditLogger
+   * @returns {Function} - Middleware that logs detailed audit information for requests.
+   * @example
+   * // Enable audit logging for all routes
+   * app.use(securityMiddleware.auditLogger());
+   */
   auditLogger() {
     return (req, res, next) => {
       if (process.env.ENABLE_AUDIT_LOGGING !== 'true') {
@@ -396,7 +523,16 @@ class SecurityMiddleware {
     };
   }
 
-  // CSRF protection middleware
+  /**
+   * Implements CSRF (Cross-Site Request Forgery) protection middleware.
+   * Generates tokens for GET requests and validates tokens on state-changing requests.
+   * Skips validation for safe methods (GET, HEAD, OPTIONS) and API endpoints.
+   * @function getCsrfProtection
+   * @returns {Function} - Async middleware that validates CSRF tokens for protected requests.
+   * @example
+   * // Apply CSRF protection to form routes
+   * app.use(securityMiddleware.getCsrfProtection());
+   */
   // eslint-disable-next-line max-lines-per-function
   getCsrfProtection() {
     // eslint-disable-next-line complexity,max-lines-per-function
@@ -476,7 +612,17 @@ class SecurityMiddleware {
     };
   }
 
-  // Get all security middleware as an array
+  /**
+   * Returns an array of all security middleware in recommended application order.
+   * Provides a convenient way to apply the complete security stack to an Express app.
+   * Includes request tracking, audit logging, headers, CORS, rate limiting, and protection middleware.
+   * @function getAllMiddleware
+   * @returns {Array<Function>} - Array of all configured security middleware functions.
+   * @example
+   * // Apply all security middleware to Express app
+   * const allSecurityMiddleware = securityMiddleware.getAllMiddleware();
+   * allSecurityMiddleware.forEach(middleware => app.use(middleware));
+   */
   getAllMiddleware() {
     return [
       this.requestId(),

@@ -22,7 +22,7 @@ const { execSync } = require('child_process');
 
 class GitHooksSetup {
   constructor() {
-    this.projectRoot = path.resolve(__dirname, '..');
+    this.projectRoot = path.resolve(__dirname, '../../..');
     this.hooksDir = path.join(this.projectRoot, '.git', 'hooks');
     this.sourceHooksDir = path.join(this.projectRoot, 'scripts', 'git-hooks');
     this.isForce = process.argv.includes('--force');
@@ -194,17 +194,17 @@ log_info "Scanning for potential secrets..."
 staged_files=$(git diff --cached --name-only)
 
 if [ -n "$staged_files" ]; then
-    # Exclude documentation and example files from secret scanning
-    sensitive_files=$(echo "$staged_files" | grep -v "\\.md$" | grep -v "^docs/" | grep -v "\\.example$" | grep -v "^README")
+    # Exclude documentation, example files, and security tooling scripts from secret scanning
+    sensitive_files=$(echo "$staged_files" | grep -v "\\.md$" | grep -v "^docs/" | grep -v "\\.example$" | grep -v "^README" | grep -v "^scripts/git-hooks/" | grep -v "^scripts/global/setup/")
     
     if [ -n "$sensitive_files" ]; then
-        # Look for real secrets, excluding code examples and documentation
-        if echo "$sensitive_files" | xargs grep -l "password\\|secret\\|key\\|token\\|credential" 2>/dev/null | \\
-           xargs grep -v "// Example\\|# Example\\|\\.example\\|TODO\\|FIXME\\|body('password')\\|process\\.env\\." 2>/dev/null > /dev/null; then
-            
-            log_error "CRITICAL: Potential real secrets detected!"
-            echo "$sensitive_files" | xargs grep -n "password\\|secret\\|key\\|token\\|credential" 2>/dev/null | \\
-            grep -v "// Example\\|# Example\\|\\.example\\|TODO\\|FIXME\\|body('password')\\|process\\.env\\." || true
+        # Look for real hardcoded secrets (not in JSDoc, comments, or code patterns)
+        potential_secrets=$(echo "$sensitive_files" | xargs grep -nE "password\\s*=\\s*['\"]|secret\\s*=\\s*['\"]|api_key\\s*=\\s*['\"]|token\\s*=\\s*['\"]|credential\\s*=\\s*['\"]\\w+" 2>/dev/null | \\
+           grep -v "// \\|/\\* \\| \\* \\|@param\\|@returns\\|@example\\|process\\.env\\|\\.env\\." || true)
+
+        if [ -n "$potential_secrets" ]; then
+            log_error "CRITICAL: Potential hardcoded secrets detected!"
+            echo "$potential_secrets"
             echo ""
             
             # In CI/CD, always fail if real secrets detected
@@ -244,10 +244,12 @@ if [ -f "CHANGELOG.md" ]; then
     fi
 fi
 
-# 5. Documentation coverage check
+# 5. Documentation coverage check (mandatory)
 log_info "Checking documentation coverage..."
 if ! yarn docs:coverage; then
-    log_warning "Documentation coverage check failed. Consider updating docs."
+    log_error "Documentation coverage below threshold. Update JSDoc comments."
+    log_error "Run 'yarn docs:coverage' to see which files need documentation."
+    exit 1
 fi
 
 # 6. Check for PCI DSS compliance keywords in security commits

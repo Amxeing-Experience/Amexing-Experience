@@ -74,10 +74,12 @@ const customFormat = winston.format.combine(
   }) => {
     let msg = `${timestamp} [${level.toUpperCase()}]: ${message}`;
 
+    // Append metadata if present
     if (Object.keys(metadata).length > 0) {
       msg += ` ${JSON.stringify(metadata)}`;
     }
 
+    // Append stack trace if error
     if (stack) {
       msg += `\n${stack}`;
     }
@@ -133,7 +135,7 @@ const logger = winston.createLogger({
   ],
 });
 
-// Add audit log transport if enabled
+// Enable audit logging if configured
 if (process.env.ENABLE_AUDIT_LOGGING === 'true') {
   logger.add(
     new DailyRotateFile({
@@ -230,10 +232,12 @@ logger.logAccessAttempt = (success, username, ip, reason = null) => {
     timestamp: new Date().toISOString(),
   };
 
+  // Include failure reason if provided
   if (reason) {
     logData.reason = reason;
   }
 
+  // Log success or failure with appropriate level
   if (success) {
     logger.info('Successful login', logData);
   } else {

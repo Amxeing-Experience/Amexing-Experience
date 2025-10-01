@@ -132,6 +132,7 @@ class AuthenticationServiceCore {
     emailQuery.equalTo('email', email.toLowerCase());
     const existingEmail = await emailQuery.first({ useMasterKey: true });
 
+    // Throw error if email already registered
     if (existingEmail) {
       throw new Parse.Error(Parse.Error.USERNAME_TAKEN, 'Email already exists');
     }
@@ -141,6 +142,7 @@ class AuthenticationServiceCore {
     usernameQuery.equalTo('username', username.toLowerCase());
     const existingUsername = await usernameQuery.first({ useMasterKey: true });
 
+    // Throw error if username already taken
     if (existingUsername) {
       throw new Parse.Error(
         Parse.Error.USERNAME_TAKEN,
@@ -240,9 +242,10 @@ class AuthenticationServiceCore {
     let roleObjectId = null;
     const rolePointer = user.get('roleId');
 
+    // Process role pointer if it exists
     if (rolePointer) {
       try {
-        // Check if rolePointer is already a fetched object or just a pointer
+        // Check if role is already fetched or just a pointer
         if (rolePointer.get && typeof rolePointer.get === 'function') {
           // Role object is already fetched
           roleName = rolePointer.get('name') || 'guest';
@@ -252,6 +255,7 @@ class AuthenticationServiceCore {
           const roleQuery = new Parse.Query('Role');
           roleQuery.equalTo('objectId', rolePointer);
           const roleObject = await roleQuery.first({ useMasterKey: true });
+          // Extract role name if found
           if (roleObject) {
             roleName = roleObject.get('name') || 'guest';
             roleObjectId = roleObject.id;
@@ -261,6 +265,7 @@ class AuthenticationServiceCore {
           const roleQuery = new Parse.Query('Role');
           roleQuery.equalTo('objectId', rolePointer.id);
           const roleObject = await roleQuery.first({ useMasterKey: true });
+          // Extract role name if found
           if (roleObject) {
             roleName = roleObject.get('name') || 'guest';
             roleObjectId = roleObject.id;

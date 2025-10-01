@@ -21,6 +21,41 @@
 const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 
+/**
+ * BaseModel class extending Parse.Object with standardized lifecycle management.
+ * Provides consistent data lifecycle operations with active/exists state management,
+ * soft deletion capabilities, and comprehensive audit logging for all domain entities.
+ *
+ * This base class implements a three-state lifecycle model with active/exists flags,
+ * enabling soft deletion, archival, and restoration of records while maintaining
+ * complete audit trails for PCI DSS compliance and business intelligence.
+ *
+ * Features:
+ * - Three-state lifecycle (active, archived, soft-deleted)
+ * - Audit trail logging for all state transitions
+ * - Static query helpers for lifecycle-aware queries
+ * - Automatic timestamp management
+ * - Modified-by tracking for compliance.
+ * @class BaseModel
+ * @augments Parse.Object
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 2025-09-22
+ * @example
+ * // Extend BaseModel for domain entities
+ * class AmexingUser extends BaseModel {
+ *   constructor() {
+ *     super('AmexingUser');
+ *   }
+ * }
+ * Parse.Object.registerSubclass('AmexingUser', AmexingUser);
+ *
+ * // Use lifecycle methods
+ * const user = await BaseModel.queryActive('AmexingUser').first();
+ * await user.deactivate('admin123');
+ * await user.softDelete('admin123');
+ * await user.restore('admin123');
+ */
 class BaseModel extends Parse.Object {
   // NOTE: Default values are NOT set in constructor to avoid interference with Parse object hydration
   // Defaults are set in Parse Server cloud functions (beforeSave hook) instead
@@ -83,6 +118,7 @@ class BaseModel extends Parse.Object {
     this.set('active', true);
     this.set('exists', true);
     this.set('updatedAt', new Date());
+    // Track who modified the record
     if (modifiedBy) {
       this.set('modifiedBy', modifiedBy);
     }
@@ -111,6 +147,7 @@ class BaseModel extends Parse.Object {
     this.set('active', false);
     this.set('exists', true); // Keep in archive
     this.set('updatedAt', new Date());
+    // Track who modified the record
     if (modifiedBy) {
       this.set('modifiedBy', modifiedBy);
     }
@@ -140,6 +177,7 @@ class BaseModel extends Parse.Object {
     this.set('exists', false);
     this.set('deletedAt', new Date());
     this.set('updatedAt', new Date());
+    // Track who deleted the record
     if (modifiedBy) {
       this.set('modifiedBy', modifiedBy);
       this.set('deletedBy', modifiedBy);
@@ -171,6 +209,7 @@ class BaseModel extends Parse.Object {
     this.unset('deletedAt');
     this.unset('deletedBy');
     this.set('updatedAt', new Date());
+    // Track who restored the record
     if (modifiedBy) {
       this.set('modifiedBy', modifiedBy);
     }

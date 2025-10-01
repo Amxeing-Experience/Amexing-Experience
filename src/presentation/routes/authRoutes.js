@@ -48,7 +48,9 @@ router.post('/login', async (req, res) => {
     const { identifier, password, returnTo } = req.body;
 
     // Validate required fields
+    // Check if identifier or password is missing
     if (!identifier || !password) {
+      // Check if client expects HTML response
       if (req.accepts('html')) {
         return res.redirect(
           `/login?error=${encodeURIComponent('Email and password are required')}`
@@ -67,15 +69,18 @@ router.post('/login', async (req, res) => {
       // Try to authenticate with Parse first
       const parseUser = await Parse.User.logIn(identifier, password);
 
+      // Check if Parse authentication was successful
       if (parseUser) {
         // Get role name from the new Role relationship for Parse User too
         let roleName = 'guest';
         const roleId = parseUser.get('roleId');
+        // Check if user has a role ID
         if (roleId) {
           try {
             const roleQuery = new Parse.Query('Role');
             roleQuery.equalTo('objectId', roleId);
             const roleObject = await roleQuery.first({ useMasterKey: true });
+            // Check if role object was found
             if (roleObject) {
               roleName = roleObject.get('name');
             }
@@ -126,7 +131,9 @@ router.post('/login', async (req, res) => {
         query.equalTo('email', identifier.toLowerCase().trim());
         const user = await query.first({ useMasterKey: true });
 
+        // Check if user was not found
         if (!user) {
+          // Check if client expects HTML response
           if (req.accepts('html')) {
             return res.redirect(
               `/login?error=${encodeURIComponent('Invalid email or password')}`
@@ -141,10 +148,12 @@ router.post('/login', async (req, res) => {
         // Verify password using AmexingUser model method
         const passwordMatch = await user.validatePassword(password);
 
+        // Check if password does not match
         if (!passwordMatch) {
           // Record failed login attempt
           await user.recordFailedLogin();
 
+          // Check if client expects HTML response
           if (req.accepts('html')) {
             return res.redirect(
               `/login?error=${encodeURIComponent('Invalid email or password')}`
@@ -158,6 +167,7 @@ router.post('/login', async (req, res) => {
 
         // Check if account is locked
         if (user.isAccountLocked()) {
+          // Check if client expects HTML response
           if (req.accepts('html')) {
             return res.redirect(
               `/login?error=${encodeURIComponent('Account is temporarily locked')}`
@@ -172,11 +182,13 @@ router.post('/login', async (req, res) => {
         // Get role name from the new Role relationship
         let roleName = 'guest';
         const roleId = user.get('roleId');
+        // Check if user has a role ID
         if (roleId) {
           try {
             const roleQuery = new Parse.Query('Role');
             roleQuery.equalTo('objectId', roleId);
             const roleObject = await roleQuery.first({ useMasterKey: true });
+            // Check if role object was found
             if (roleObject) {
               roleName = roleObject.get('name');
             }
@@ -219,6 +231,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Create standardized JWT token for authenticated user
+    // Check if user was successfully authenticated
     if (authenticatedUser) {
       const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
       const accessToken = jwt.sign(
@@ -250,6 +263,7 @@ router.post('/login', async (req, res) => {
       });
 
       // Handle different response types
+      // Check if client expects HTML response
       if (req.accepts('html')) {
         // For web form submissions, redirect to role-specific dashboard
         const redirectUrl = returnTo || `/dashboard/${authenticatedUser.role}`;
@@ -275,6 +289,7 @@ router.post('/login', async (req, res) => {
     }
 
     // If we reach here, authentication failed
+    // Check if client expects HTML response
     if (req.accepts('html')) {
       return res.redirect(
         `/login?error=${encodeURIComponent('Authentication failed')}`
@@ -288,6 +303,7 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     logger.error('Login route error:', error);
 
+    // Check if client expects HTML response
     if (req.accepts('html')) {
       const errorMessage = error.message || 'Login failed';
       return res.redirect(`/login?error=${encodeURIComponent(errorMessage)}`);
@@ -308,6 +324,7 @@ router.post('/register', async (req, res) => {
     } = req.body;
 
     // Validate required fields
+    // Check if any required field is missing
     if (!username || !email || !password || !firstName || !lastName) {
       return res.status(400).json({
         success: false,
@@ -316,6 +333,7 @@ router.post('/register', async (req, res) => {
     }
 
     // Validate password confirmation
+    // Check if passwords do not match
     // eslint-disable-next-line security/detect-possible-timing-attacks
     if (password !== confirmPassword) {
       return res.status(400).json({
@@ -350,6 +368,7 @@ router.post('/register', async (req, res) => {
     });
 
     // Handle different response types for registration
+    // Check if client expects HTML response
     if (req.accepts('html')) {
       // For web form submissions, redirect to role-specific dashboard
       const userRole = result.user?.role || 'user';
@@ -396,6 +415,7 @@ router.post('/refresh', async (req, res) => {
   try {
     const { refreshToken } = req.cookies;
 
+    // Check if refresh token is missing
     if (!refreshToken) {
       return res.status(401).json({
         success: false,
@@ -439,6 +459,7 @@ router.post('/forgot-password', strictAuthRateLimit, async (req, res) => {
   try {
     const { email } = req.body;
 
+    // Check if email is missing
     if (!email) {
       return res.status(400).json({
         success: false,
@@ -463,6 +484,7 @@ router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
   try {
     const { token, password, confirmPassword } = req.body;
 
+    // Check if token or password is missing
     if (!token || !password) {
       return res.status(400).json({
         success: false,
@@ -470,6 +492,7 @@ router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
       });
     }
 
+    // Check if passwords do not match
     // eslint-disable-next-line security/detect-possible-timing-attacks
     if (password !== confirmPassword) {
       return res.status(400).json({
@@ -503,6 +526,7 @@ router.post(
 
       const { currentPassword, newPassword, confirmPassword } = req.body;
 
+      // Check if current or new password is missing
       if (!currentPassword || !newPassword) {
         return res.status(400).json({
           success: false,
@@ -510,6 +534,7 @@ router.post(
         });
       }
 
+      // Check if new passwords do not match
       if (newPassword !== confirmPassword) {
         return res.status(400).json({
           success: false,
@@ -577,6 +602,7 @@ router.get('/oauth/:provider/callback', async (req, res) => {
     const { provider: _provider } = req.params;
     const { code, state, error } = req.query;
 
+    // Check if OAuth callback has error
     if (error) {
       logger.error('OAuth callback error:', error);
       return res.redirect(
@@ -584,6 +610,7 @@ router.get('/oauth/:provider/callback', async (req, res) => {
       );
     }
 
+    // Check if authorization code is missing
     if (!code) {
       return res.redirect(
         `/login?error=${encodeURIComponent('OAuth authentication failed')}`
@@ -613,6 +640,7 @@ router.get('/oauth/:provider/callback', async (req, res) => {
 
     // Redirect to role-specific dashboard or intended destination
     let userRole = 'guest';
+    // Check if user and role are present
     if (result.user && result.user.role) {
       userRole = result.user.role;
     }

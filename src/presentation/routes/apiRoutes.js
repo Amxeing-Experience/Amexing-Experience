@@ -35,7 +35,7 @@ router.post(
   }
 );
 
-// Test endpoint for CSRF validation (development/testing only)
+// Enable test endpoint in development and test environments only
 if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development') {
   router.post('/test-csrf', (req, res) => {
     res.json({

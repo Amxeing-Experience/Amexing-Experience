@@ -83,6 +83,7 @@ class RoleBasedController extends DashboardController {
    */
   requireRole(requiredRole) {
     return (req, res, next) => {
+      // Redirect to login if user not authenticated
       if (!req.user) {
         return this.redirectWithMessage(
           res,
@@ -106,6 +107,7 @@ class RoleBasedController extends DashboardController {
       const userLevel = roleHierarchy[req.user.role] || 0;
       const requiredLevel = roleHierarchy[requiredRole] || 0;
 
+      // Check if user has sufficient permissions
       if (userLevel < requiredLevel) {
         return this.handleError(
           res,

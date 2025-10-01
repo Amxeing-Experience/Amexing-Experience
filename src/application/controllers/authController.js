@@ -224,6 +224,19 @@ class AuthController {
     }
   }
 
+  /**
+   * Renders the login form with an error message and regenerated CSRF token.
+   * Helper method used when login fails to re-render the login page with
+   * security tokens and error messages, ensuring CSRF protection is maintained.
+   * @function returnWithToken
+   * @param {object} req - Express request object with session data.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} - Renders login view with error message.
+   * @example
+   * // Internal usage when login validation fails
+   * return this.returnWithToken(req, res);
+   * // Renders login page with "Invalid username or password" error
+   */
   async returnWithToken(req, res) {
     // Ensure CSRF secret exists, generate if missing
     if (!req.session || !req.session.csrfSecret) {
@@ -295,6 +308,25 @@ class AuthController {
     }
   }
 
+  /**
+   * Validates user registration input data for required fields.
+   * Checks that username, password, and email are provided in the registration
+   * request and returns validation result with error messages if validation fails.
+   * @function validateRegistration
+   * @param {object} data - Registration data object.
+   * @param {string} data.username - Username for the new account.
+   * @param {string} data.password - Password for the new account.
+   * @param {string} data.email - Email address for the new account.
+   * @returns {{isValid: boolean, error?: string}} Validation result object with isValid flag and optional error message.
+   * @example
+   * // Valid registration data
+   * const result = validateRegistration({ username: 'user', password: 'pass123', email: 'user@example.com' });
+   * // Returns: { isValid: true }
+   *
+   * // Invalid registration data (missing email)
+   * const result = validateRegistration({ username: 'user', password: 'pass123' });
+   * // Returns: { isValid: false, error: 'Username, password, and email are required' }
+   */
   validateRegistration({ username, password, email }) {
     if (!username || !password || !email) {
       return {
@@ -305,6 +337,23 @@ class AuthController {
     return { isValid: true };
   }
 
+  /**
+   * Handles registration validation errors by rendering error responses.
+   * Processes validation failures during registration and returns appropriate
+   * error responses for both JSON API and web interface requests with CSRF protection.
+   * @function handleRegistrationValidationError
+   * @param {object} res - Express response object.
+   * @param {string} errorMessage - Validation error message to display.
+   * @returns {Promise<void>} - Sends JSON error or renders registration form with error.
+   * @example
+   * // JSON API request
+   * await handleRegistrationValidationError(res, 'Username, password, and email are required');
+   * // Returns: { success: false, message: 'Username, password, and email are required' }
+   *
+   * // Web interface request
+   * await handleRegistrationValidationError(res, 'All fields are required');
+   * // Renders registration form with error message and new CSRF token
+   */
   async handleRegistrationValidationError(res, errorMessage) {
     if (res.req.accepts('json')) {
       return res.status(400).json({
@@ -336,6 +385,26 @@ class AuthController {
     });
   }
 
+  /**
+   * Creates a new Parse Server user account with the provided credentials.
+   * Initializes a Parse.User object, sets username, password, and email,
+   * and persists the user to the database through Parse Server's signUp method.
+   * @function createUser
+   * @param {object} userData - User registration data.
+   * @param {string} userData.username - Username for the new account.
+   * @param {string} userData.password - Password for the new account.
+   * @param {string} userData.email - Email address for the new account.
+   * @returns {Promise<Parse.User>} - Promise resolving to the created Parse User object.
+   * @throws {Parse.Error} - Throws Parse error if username exists or validation fails.
+   * @example
+   * // Create new user
+   * const newUser = await createUser({
+   *   username: 'johndoe',
+   *   password: 'securePassword123',
+   *   email: 'john@example.com'
+   * });
+   * // Returns Parse.User object with id and session token
+   */
   async createUser({ username, password, email }) {
     const user = new Parse.User();
     user.set('username', username);
@@ -344,6 +413,20 @@ class AuthController {
     return user.signUp();
   }
 
+  /**
+   * Stores authenticated user information in the Express session.
+   * Sets session data including user ID, username, and Parse Server session token
+   * for maintaining authentication state across requests.
+   * @function setUserSession
+   * @param {object} req - Express request object with session.
+   * @param {Parse.User} user - Authenticated Parse User object.
+   * @returns {void}
+   * @example
+   * // Store user session after successful login
+   * const user = await Parse.User.logIn(username, password);
+   * setUserSession(req, user);
+   * // Session now contains: { user: { id: '...', username: '...' }, sessionToken: '...' }
+   */
   setUserSession(req, user) {
     req.session.user = {
       id: user.id,
@@ -352,6 +435,23 @@ class AuthController {
     req.session.sessionToken = user.getSessionToken();
   }
 
+  /**
+   * Handles successful user registration by sending appropriate response.
+   * Processes successful registration completion and returns JSON response for
+   * API requests or redirects to homepage for web interface requests.
+   * @function handleRegistrationSuccess
+   * @param {object} res - Express response object.
+   * @param {Parse.User} user - Newly created and authenticated Parse User object.
+   * @returns {void} - Sends JSON response or redirects to homepage.
+   * @example
+   * // JSON API request
+   * handleRegistrationSuccess(res, user);
+   * // Returns: { success: true, user: { id: '123', username: 'johndoe' } }
+   *
+   * // Web interface request
+   * handleRegistrationSuccess(res, user);
+   * // Redirects to: /
+   */
   handleRegistrationSuccess(res, user) {
     if (res.req.accepts('json')) {
       return res.json({
@@ -365,6 +465,23 @@ class AuthController {
     return res.redirect('/');
   }
 
+  /**
+   * Handles registration errors by logging and rendering error responses.
+   * Processes errors during user registration, logs security events, and returns
+   * appropriate error responses for both JSON API and web interface requests.
+   * @function handleRegistrationError
+   * @param {object} res - Express response object.
+   * @param {Error} error - Error object from registration failure.
+   * @returns {Promise<void>} - Sends JSON error or renders registration form with error.
+   * @example
+   * // JSON API request with username already taken
+   * await handleRegistrationError(res, new Error('Username already exists'));
+   * // Returns: { success: false, message: 'Username already exists' }
+   *
+   * // Web interface request with validation error
+   * await handleRegistrationError(res, new Error('Invalid email format'));
+   * // Renders registration form with error message and new CSRF token
+   */
   async handleRegistrationError(res, error) {
     logger.error('Registration error:', error);
 

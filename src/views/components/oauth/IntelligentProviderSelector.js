@@ -1677,12 +1677,41 @@ class IntelligentProviderSelector {
     return iconElement;
   }
 
+  /**
+   * Get CSS class name based on confidence level for visual indication.
+   * Converts numerical confidence score to appropriate styling class.
+   * @function getConfidenceClass
+   * @param {number} confidence - Confidence score between 0 and 1.
+   * @example
+   * // Usage example
+   * const cssClass = getConfidenceClass(0.85);
+   * // Returns: 'confidence-high'
+   * const cssClass2 = getConfidenceClass(0.65);
+   * // Returns: 'confidence-medium'
+   * @returns {string} - CSS class name: 'confidence-high', 'confidence-medium', or 'confidence-low'.
+   */
   getConfidenceClass(confidence) {
     if (confidence >= 0.8) return 'confidence-high';
     if (confidence >= 0.6) return 'confidence-medium';
     return 'confidence-low';
   }
 
+  /**
+   * Generate human-readable reason for domain-based provider suggestion.
+   * Creates contextual explanation based on domain type and provider mapping.
+   * @function generateDomainReason
+   * @param {string} _domain - Email domain (e.g., 'company.com').
+   * @param {object} domainInfo - Domain information object containing type and provider.
+   * @param {string} domainInfo.type - Type of domain: 'corporate_verified', 'corporate', 'consumer', 'educational'.
+   * @param {string} domainInfo.provider - OAuth provider name (google, microsoft, apple).
+   * @example
+   * // Usage example
+   * const reason = generateDomainReason('company.com', { type: 'corporate_verified', provider: 'microsoft' });
+   * // Returns: 'company.com is configured in your organization'
+   * const reason2 = generateDomainReason('university.edu', { type: 'educational', provider: 'google' });
+   * // Returns: 'Educational domains like university.edu commonly use Google'
+   * @returns {string} - Human-readable explanation for the provider suggestion.
+   */
   generateDomainReason(_domain, domainInfo) {
     switch (domainInfo.type) {
       case 'corporate_verified':
@@ -1714,6 +1743,18 @@ class IntelligentProviderSelector {
     this.initialize();
   }
 
+  /**
+   * Force refresh of provider selector state and re-detect contextual provider.
+   * Clears all current highlights and suggestions, then performs fresh contextual analysis.
+   * Useful when page state changes or user navigates without full page reload.
+   * @function forceRefresh
+   * @example
+   * // Usage example
+   * intelligentProviderSelector.forceRefresh();
+   * // Clears current state and re-analyzes context
+   * // Useful after SPA navigation or dynamic form changes
+   * @returns {void} - No return value.
+   */
   forceRefresh() {
     this.clearProviderHighlights();
     this.hideSuggestion();

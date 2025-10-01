@@ -8,6 +8,22 @@ class ClientController extends RoleBasedController {
     super('client');
   }
 
+  /**
+   * Dashboard index page.
+   * @function index
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await index(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
   async index(req, res) {
     try {
       await this.renderRoleView(req, res, 'index', {
@@ -20,6 +36,22 @@ class ClientController extends RoleBasedController {
     }
   }
 
+  /**
+   * Departments page.
+   * @function departments
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await departments(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
   async departments(req, res) {
     try {
       await this.renderRoleView(req, res, 'departments', {
@@ -35,6 +67,22 @@ class ClientController extends RoleBasedController {
     }
   }
 
+  /**
+   * Employees page.
+   * @function employees
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await employees(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
   async employees(req, res) {
     try {
       await this.renderRoleView(req, res, 'employees', {
@@ -50,6 +98,22 @@ class ClientController extends RoleBasedController {
     }
   }
 
+  /**
+   * Budgets page.
+   * @function budgets
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await budgets(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
   async budgets(req, res) {
     try {
       await this.renderRoleView(req, res, 'budgets', {
@@ -65,6 +129,22 @@ class ClientController extends RoleBasedController {
     }
   }
 
+  /**
+   * Reports page.
+   * @function reports
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await reports(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
   async reports(req, res) {
     try {
       await this.renderRoleView(req, res, 'reports', {
@@ -80,6 +160,20 @@ class ClientController extends RoleBasedController {
     }
   }
 
+  /**
+   * Get client statistics.
+   * @function getClientStats
+   * @example
+   * // GET endpoint example
+   * const result = await ClientController.getClientStats();
+   * // Returns: { success: true, data: {...}, message: 'Success' }
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to client statistics object containing totalEmployees, activeDepartments, monthlyBudget, budgetUsed, activeBookings, and completedTrips.
+   */
   async getClientStats() {
     return {
       totalEmployees: 250,

@@ -270,18 +270,56 @@ function getErrorDetails(err) {
 }
 
 /**
- * Main error handler middleware.
- * @param {Error} err - The error object.
- * @param {object} req - Express request object.
- * @param {object} res - Express response object.
- * @param {*} next - Express next function.
- * @param _next
- * @returns {void} - No return value.
+ * Main error handler middleware for centralized error processing and response formatting.
+ * Provides comprehensive error handling with logging, error classification, and appropriate
+ * HTTP response formatting for both API and web routes with PCI DSS compliant error reporting.
+ *
+ * This middleware orchestrates the complete error handling flow by logging errors.
+ * It classifies them using specialized handlers and formats appropriate responses.
+ * For API or web clients with environment-aware detail exposure for security and debugging purposes.
+ *
+ * Features:
+ * - Centralized error logging with comprehensive context
+ * - Automatic error classification (Parse, MongoDB, Validation, Generic)
+ * - Environment-aware error detail exposure (development vs production)
+ * - Separate response formatting for API (JSON) and web (rendered) routes
+ * - Security-focused error message sanitization in production
+ * - Stack trace exposure in development mode only
+ * - HTTP status code normalization
+ * - PCI DSS compliant error handling without sensitive data exposure.
+ * @function errorHandler
+ * @param {Error} err - The error object containing message, stack, code, and other error properties.
+ * @param {object} req - Express request object with user context and request details.
+ * @param {object} res - Express response object for sending formatted error responses.
+ * @param {Function} _next - Express next function (unused in error handler, required by Express signature).
+ * @returns {void} - No return value Sends error response to client via res.json() or res.render().
+ * @author Amexing Development Team
+ * @version 2.0.0
+ * @since 1.0.0
  * @example
+ * // Middleware usage
+ * app.use('/path', middlewareFunction);
+ * // Processes request before route handler
  * // app.use(middlewareName);
  * // Middleware protects routes with validation/authentication
- * // Express error handling middleware
+ * // Register as Express error handling middleware (must be last middleware)
  * app.use(errorHandler);
+ *
+ * // API route error handling
+ * // GET /api/users/invalid-id
+ * // Response: { error: true, message: 'User not found', status: 404 }
+ *
+ * // Web route error handling
+ * // GET /dashboard/invalid-page
+ * // Response: Rendered error page with status 404
+ *
+ * // Development mode error with stack trace
+ * // NODE_ENV=development GET /api/test-error
+ * // Response: { error: true, message: 'Test error', status: 500, stack: '...', details: {...} }
+ *
+ * // Production mode sanitized error
+ * // NODE_ENV=production GET /api/internal-error
+ * // Response: { error: true, message: 'An error occurred processing your request', status: 500 }
  */
 const errorHandler = (err, req, res, _next) => {
   logError(err, req);

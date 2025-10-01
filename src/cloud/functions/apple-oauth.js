@@ -19,8 +19,10 @@ const logger = require('../../infrastructure/logger');
 
 // Initialize services
 let appleOAuthService = null;
+// Attempt to initialize Apple OAuth service with error handling
 try {
   appleOAuthService = new AppleOAuthService();
+// Handle service initialization failure gracefully
 } catch (error) {
   logger.warn('Apple OAuth service disabled:', error.message);
 }
@@ -40,6 +42,7 @@ const auditService = new PermissionAuditService();
  * // Returns: function result
  */
 const initiateAppleOAuth = async (request) => {
+  // Check if Apple OAuth service is available
   if (!appleOAuthService) {
     throw new Parse.Error(
       Parse.Error.OPERATION_FORBIDDEN,
@@ -50,6 +53,7 @@ const initiateAppleOAuth = async (request) => {
   const { params, ip } = request;
   const { department, corporateConfigId, redirectUri } = params;
 
+  // Initiate OAuth flow with error handling
   try {
     // Generate state for OAuth flow
     const state = require('crypto').randomBytes(32).toString('hex');
@@ -58,6 +62,7 @@ const initiateAppleOAuth = async (request) => {
     const result = await appleOAuthService.initiateOAuth({
       department,
       corporateConfigId,
+      // Use provided redirectUri or default callback URL
       redirectUri:
         redirectUri
         || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/apple/callback`,
@@ -104,6 +109,7 @@ const initiateAppleOAuth = async (request) => {
       nonce: result.nonce,
       expiresIn: result.expiresIn,
     };
+  // Handle errors during OAuth initiation
   } catch (error) {
     logger.error('Initiate Apple OAuth failed:', error);
     throw error;
@@ -124,6 +130,7 @@ const initiateAppleOAuth = async (request) => {
  * // Returns: function result
  */
 const handleAppleOAuthCallback = async (request) => {
+  // Check if Apple OAuth service is available
   if (!appleOAuthService) {
     throw new Parse.Error(
       Parse.Error.OPERATION_FORBIDDEN,
@@ -134,8 +141,9 @@ const handleAppleOAuthCallback = async (request) => {
   const { params, ip } = request;
   const { code, error: oauthError, error_description: errorDescription } = params;
 
+  // Process OAuth callback with error handling
   try {
-    // Handle OAuth errors
+    // Check for OAuth errors from Apple
     if (oauthError) {
       throw new Parse.Error(
         Parse.Error.OTHER_CAUSE,
@@ -151,6 +159,7 @@ const handleAppleOAuthCallback = async (request) => {
     stateQuery.greaterThan('expiresAt', new Date());
 
     const stateRecord = await stateQuery.first({ useMasterKey: true });
+    // Verify state record exists and is valid
     if (!stateRecord) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
@@ -205,6 +214,7 @@ const handleAppleOAuthCallback = async (request) => {
       privacyCompliant: result.privacyCompliant,
       isPrivateEmail: result.profile.isPrivateEmail,
     };
+  // Handle callback processing errors
   } catch (error) {
     // Log failed authentication
     await auditService.recordPermissionAudit({
@@ -240,9 +250,11 @@ const getAppleOAuthConfig = async (request) => {
   const { params } = request;
   const { department } = params;
 
+  // Retrieve and build OAuth configuration
   try {
     const config = {
       clientId: process.env.APPLE_CLIENT_ID,
+      // Use environment redirectUri or default callback URL
       redirectUri:
         process.env.APPLE_REDIRECT_URI
         || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/apple/callback`,
@@ -254,7 +266,7 @@ const getAppleOAuthConfig = async (request) => {
       supportsPrivateEmail: true,
     };
 
-    // Department-specific configuration
+    // Apply department-specific configuration if provided
     if (department) {
       const {
         DepartmentOAuthFlowService,
@@ -262,6 +274,7 @@ const getAppleOAuthConfig = async (request) => {
       const departmentService = new DepartmentOAuthFlowService();
 
       const deptConfig = departmentService.getDepartmentConfig(department);
+      // Check if department allows Apple OAuth
       if (deptConfig && deptConfig.allowedProviders.includes('apple')) {
         config.departmentSpecific = true;
         config.departmentConfig = {
@@ -269,6 +282,7 @@ const getAppleOAuthConfig = async (request) => {
           name: deptConfig.name,
           scopes: departmentService.getDepartmentScopes(department, 'apple'),
         };
+      // Apple OAuth not allowed for this department
       } else {
         config.available = false;
         config.reason = 'Apple Sign In not allowed for this department';
@@ -279,6 +293,7 @@ const getAppleOAuthConfig = async (request) => {
       success: true,
       config,
     };
+  // Handle configuration retrieval errors
   } catch (error) {
     logger.error('Get Apple OAuth config failed:', error);
     throw error;
@@ -296,6 +311,7 @@ const getAppleOAuthConfig = async (request) => {
  * // Returns: function result
  */
 const revokeAppleOAuth = async (request) => {
+  // Check if Apple OAuth service is available
   if (!appleOAuthService) {
     throw new Parse.Error(
       Parse.Error.OPERATION_FORBIDDEN,
@@ -305,6 +321,7 @@ const revokeAppleOAuth = async (request) => {
 
   const { user } = request;
 
+  // Verify user is authenticated
   if (!user) {
     throw new Parse.Error(
       Parse.Error.INVALID_SESSION_TOKEN,
@@ -312,6 +329,7 @@ const revokeAppleOAuth = async (request) => {
     );
   }
 
+  // Revoke OAuth tokens with error handling
   try {
     // Revoke Apple OAuth association
     await appleOAuthService.revokeTokens(user);
@@ -333,6 +351,7 @@ const revokeAppleOAuth = async (request) => {
       success: true,
       message: 'Apple OAuth association removed successfully',
     };
+  // Handle revocation errors
   } catch (error) {
     logger.error('Apple OAuth revocation failed:', error);
     throw error;
@@ -349,6 +368,7 @@ const revokeAppleOAuth = async (request) => {
  * // Returns: function result
  */
 const handleAppleWebhook = async (request) => {
+  // Check if Apple OAuth service is available
   if (!appleOAuthService) {
     throw new Parse.Error(
       Parse.Error.OPERATION_FORBIDDEN,
@@ -358,9 +378,11 @@ const handleAppleWebhook = async (request) => {
 
   const { params, headers } = request;
 
+  // Process webhook with error handling
   try {
     // Validate webhook signature
     const signature = headers['x-apple-signature'];
+    // Ensure webhook signature is present
     if (!signature) {
       throw new Parse.Error(
         Parse.Error.INVALID_QUERY,
@@ -380,6 +402,7 @@ const handleAppleWebhook = async (request) => {
       success: true,
       processed: result.processed || true,
     };
+  // Handle webhook processing errors
   } catch (error) {
     logger.error('Apple webhook processing failed:', error);
     throw error;
@@ -398,6 +421,7 @@ const handleAppleWebhook = async (request) => {
  * // Returns: function result
  */
 const getAppleUserData = async (request) => {
+  // Check if Apple OAuth service is available
   if (!appleOAuthService) {
     throw new Parse.Error(
       Parse.Error.OPERATION_FORBIDDEN,
@@ -407,6 +431,7 @@ const getAppleUserData = async (request) => {
 
   const { user } = request;
 
+  // Verify user is authenticated
   if (!user) {
     throw new Parse.Error(
       Parse.Error.INVALID_SESSION_TOKEN,
@@ -414,8 +439,9 @@ const getAppleUserData = async (request) => {
     );
   }
 
+  // Retrieve user data with error handling
   try {
-    // Check if user has Apple association
+    // Verify user has Apple OAuth association
     if (!user.get('appleId')) {
       throw new Parse.Error(
         Parse.Error.OBJECT_NOT_FOUND,
@@ -431,6 +457,7 @@ const getAppleUserData = async (request) => {
       userData,
       privacyCompliant: true,
     };
+  // Handle user data retrieval errors
   } catch (error) {
     logger.error('Get Apple user data failed:', error);
     throw error;
@@ -450,7 +477,9 @@ const validateAppleDomain = async (request) => {
   const { params } = request;
   const { _domain: domain, corporateConfigId } = params;
 
+  // Validate domain with error handling
   try {
+    // Ensure domain parameter is provided
     if (!domain) {
       throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Domain is required');
     }
@@ -462,7 +491,7 @@ const validateAppleDomain = async (request) => {
       privacyCompliant: true,
     };
 
-    // Corporate domain validation
+    // Validate against corporate configuration if provided
     if (corporateConfigId) {
       const CorporateConfig = Parse.Object.extend('CorporateConfig');
       const corpQuery = new Parse.Query(CorporateConfig);
@@ -470,16 +499,18 @@ const validateAppleDomain = async (request) => {
         useMasterKey: true,
       });
 
+      // Apply corporate domain restrictions
       if (corpConfig) {
         const allowedDomains = corpConfig.get('allowedDomains') || [];
         const appleSettings = corpConfig.get('appleOAuthSettings') || {};
 
+        // Check if domain is in allowed list
         if (allowedDomains.length > 0 && !allowedDomains.includes(domain)) {
           validation.valid = false;
           validation.reason = `Domain ${domain} not allowed for this organization`;
         }
 
-        // Apply Apple-specific corporate settings
+        // Check if restricted to corporate domain only
         if (
           appleSettings.restrictToCorporateDomain
           && !domain.endsWith(corpConfig.get('primaryDomain'))
@@ -494,6 +525,7 @@ const validateAppleDomain = async (request) => {
       success: true,
       validation,
     };
+  // Handle domain validation errors
   } catch (error) {
     logger.error('Apple domain validation failed:', error);
     throw error;
@@ -513,6 +545,7 @@ const getAppleOAuthAnalytics = async (request) => {
   const { params, user } = request;
   const { timeRange = '30d' } = params;
 
+  // Verify user is authenticated
   if (!user) {
     throw new Parse.Error(
       Parse.Error.INVALID_SESSION_TOKEN,
@@ -520,8 +553,9 @@ const getAppleOAuthAnalytics = async (request) => {
     );
   }
 
+  // Retrieve analytics with error handling
   try {
-    // Check if user has analytics access
+    // Verify user has required role for analytics access
     const userRole = user.get('role');
     if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
       throw new Parse.Error(
@@ -530,7 +564,7 @@ const getAppleOAuthAnalytics = async (request) => {
       );
     }
 
-    // Calculate date range
+    // Calculate date range based on timeRange parameter
     const endDate = new Date();
     const startDate = new Date();
     switch (timeRange) {
@@ -578,13 +612,16 @@ const getAppleOAuthAnalytics = async (request) => {
 
       analytics.totalAttempts++;
 
+      // Categorize successful login events
       if (action.includes('success')) {
         analytics.successfulLogins++;
+        // Track private vs regular email usage
         if (metadata.isPrivateEmail) {
           analytics.privateEmailUsers++;
         } else {
           analytics.regularEmailUsers++;
         }
+      // Categorize failed login events
       } else if (action.includes('failed')) {
         analytics.failedLogins++;
       }
@@ -594,6 +631,7 @@ const getAppleOAuthAnalytics = async (request) => {
 
     // Calculate privacy metrics
     const totalEmailUsers = analytics.privateEmailUsers + analytics.regularEmailUsers;
+    // Calculate private email percentage if users exist
     if (totalEmailUsers > 0) {
       analytics.privacyMetrics.privateEmailPercentage = Math.round(
         (analytics.privateEmailUsers / totalEmailUsers) * 100
@@ -609,6 +647,7 @@ const getAppleOAuthAnalytics = async (request) => {
       },
       analytics,
     };
+  // Handle analytics retrieval errors
   } catch (error) {
     logger.error('Get Apple OAuth analytics failed:', error);
     throw error;

@@ -35,12 +35,14 @@ class SecureSecretsManager {
    * @returns {*} - Operation result.
    */
   initialize(encryptionKey) {
+    // Check if encryption key is provided
     if (!encryptionKey) {
       throw new Error('Encryption key is required for secrets manager');
     }
 
     try {
       this.encryptionKey = Buffer.from(encryptionKey, 'base64');
+      // Validate encryption key length
       if (this.encryptionKey.length !== this.keyLength) {
         throw new Error(
           `Encryption key must be ${this.keyLength} bytes when decoded`
@@ -64,6 +66,7 @@ class SecureSecretsManager {
    * const encrypted = manager.encryptSecret('my-secret-value');
    */
   encryptSecret(value) {
+    // Check if secrets manager is initialized
     if (!this.encryptionKey) {
       throw new Error('Secrets manager not initialized');
     }
@@ -97,6 +100,7 @@ class SecureSecretsManager {
    * const decrypted = manager.decryptSecret(encryptedValue);
    */
   decryptSecret(encryptedValue) {
+    // Check if secrets manager is initialized
     if (!this.encryptionKey) {
       throw new Error('Secrets manager not initialized');
     }
@@ -104,6 +108,7 @@ class SecureSecretsManager {
     try {
       const [ivHex, authTagHex, encrypted] = encryptedValue.split(':');
 
+      // Validate encrypted value components
       if (!ivHex || !authTagHex || !encrypted) {
         throw new Error('Invalid encrypted value format');
       }
@@ -148,8 +153,10 @@ class SecureSecretsManager {
 
       encryptedContent.split('\n').forEach((line) => {
         const trimmedLine = line.trim();
+        // Skip empty lines and comments
         if (trimmedLine && !trimmedLine.startsWith('#')) {
           const [_key, encryptedValue] = trimmedLine.split('=', 2);
+          // Process valid key-value pairs
           if (_key && encryptedValue) {
             secrets[_key.trim()] = this.decryptSecret(encryptedValue.trim());
             this.loadedSecrets.add(_key.trim());
@@ -186,6 +193,7 @@ class SecureSecretsManager {
       lines.push('');
 
       Object.entries(secrets).forEach(([_key, value]) => {
+        // Validate key and value are strings
         if (typeof _key === 'string' && typeof value === 'string') {
           const encryptedValue = this.encryptSecret(value);
           lines.push(`${_key}=${encryptedValue}`);
@@ -226,6 +234,7 @@ class SecureSecretsManager {
 
     // eslint-disable-next-line security/detect-object-injection
     const value = secrets[_key]; // eslint-disable-line no-underscore-dangle
+    // Track secret access for audit purposes
     if (value) {
       // Mark as accessed for audit purposes
       this.encryptedSecrets.set(_key, {
@@ -285,9 +294,11 @@ class SecureSecretsManager {
   generateSecret(length = 32, options = {}) {
     const { encoding = 'base64', charset = 'alphanumeric' } = options;
 
+    // Generate alphanumeric secret
     if (charset === 'alphanumeric') {
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
       let result = '';
+      // Build secret character by character
       for (let i = 0; i < length; i += 1) {
         result += chars.charAt(Math.floor(Math.random() * chars.length));
       }
@@ -295,6 +306,7 @@ class SecureSecretsManager {
     }
 
     const bytes = crypto.randomBytes(length);
+    // Return secret in requested encoding
     return encoding === 'hex'
       ? bytes.toString('hex')
       : bytes.toString('base64');
@@ -347,15 +359,18 @@ class SecureSecretsManager {
       // eslint-disable-next-line security/detect-object-injection
       const value = secrets[_key]; // eslint-disable-line no-underscore-dangle
 
+      // Check if required secret is missing
       if (!value) {
         missing.push(_key);
         return;
       }
 
+      // Validate minimum length requirement
       if (requirements.minLength && value.length < requirements.minLength) {
         invalid.push(`${_key}: minimum length ${requirements.minLength}`);
       }
 
+      // Validate pattern requirement
       if (requirements.pattern && !requirements.pattern.test(value)) {
         invalid.push(`${_key}: does not match required pattern`);
       }
@@ -420,6 +435,7 @@ let instance = null;
  * const manager = getSecretsManager();
  */
 function getSecretsManager() {
+  // Create singleton instance if not exists
   if (!instance) {
     instance = new SecureSecretsManager();
   }

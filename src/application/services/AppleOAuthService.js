@@ -199,6 +199,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
         // inheritanceService not available yet
       };
 
+      // Apply department permissions if department specified
       if (department) {
         await this.applyDepartmentPermissions(user, department, userProfile);
       }
@@ -232,17 +233,20 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     userQuery.equalTo('appleId', id);
     let user = await userQuery.first({ useMasterKey: true });
 
+    // Try finding by email if not found by Apple ID
     if (!user && email) {
       userQuery = new Parse.Query(Parse.User);
       userQuery.equalTo('email', email);
       user = await userQuery.first({ useMasterKey: true });
 
+      // Link Apple ID to existing email account
       if (user) {
         user.set('appleId', id);
         await user.save(null, { useMasterKey: true });
       }
     }
 
+    // Create new user or update existing
     if (!user) {
       user = await this.createNewUser(userProfile);
     } else {
@@ -406,6 +410,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     try {
       logger.info('Apple webhook received:', requestBody.type);
 
+      // Handle consent revocation event
       if (requestBody.type === 'consent-revoked') {
         await this.handleConsentRevoked(requestBody.sub);
       }
@@ -429,11 +434,13 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     userQuery.equalTo('appleId', appleId);
 
     const user = await userQuery.first({ useMasterKey: true });
+    // Return early if user not found
     if (!user) return;
 
     const providers = user.get('oauthProviders') || [];
     const remainingProviders = providers.filter((p) => p !== 'apple');
 
+    // Delete account if Apple is only provider
     if (remainingProviders.length === 0) {
       await user.destroy({ useMasterKey: true });
       logger.info(

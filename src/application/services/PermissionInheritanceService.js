@@ -196,6 +196,7 @@ class PermissionInheritanceService {
 
       const employee = await employeeQuery.first({ useMasterKey: true });
 
+      // Check if employee exists and has a department assigned
       if (employee && employee.get('departmentId')) {
         const departmentId = employee.get('departmentId');
 
@@ -210,6 +211,7 @@ class PermissionInheritanceService {
           oauthProfile,
           corporateConfig
         );
+        // Check if OAuth department exists and differs from employee department
         if (oauthDepartment && oauthDepartment !== departmentId) {
           const additionalPerms = await OAuthPermissionService.getDepartmentPermissions(
             userId,
@@ -259,6 +261,7 @@ class PermissionInheritanceService {
    * const deptId = await service.extractDepartmentFromOAuth(oauthProfile, corporateConfig);
    */
   async extractDepartmentFromOAuth(oauthProfile, corporateConfig) {
+    // Check if corporate configuration and department mapping are available
     if (!corporateConfig || !corporateConfig.departmentMapping) {
       return null;
     }
@@ -298,6 +301,7 @@ class PermissionInheritanceService {
 
       const appliedOverrides = [];
 
+      // Iterate through all permission overrides to validate and apply them
       for (const override of overrides) {
         const overrideData = {
           id: override.id,
@@ -310,7 +314,7 @@ class PermissionInheritanceService {
           priority: override.get('priority'),
         };
 
-        // Check if override is still valid
+        // Check if override has expired based on expiration date
         if (overrideData.expiresAt && overrideData.expiresAt < new Date()) {
           // Override expired, deactivate it
           override.set('active', false);
@@ -326,10 +330,12 @@ class PermissionInheritanceService {
           // Skip expired override
           // continue; // Replaced with conditional logic
         } else {
+          // Override is still valid, add to applied overrides
           appliedOverrides.push(overrideData);
         }
       }
 
+      // Log applied overrides if any exist
       if (appliedOverrides.length > 0) {
         logger.logSecurityEvent('PERMISSION_OVERRIDES_APPLIED', userId, {
           overrideCount: appliedOverrides.length,
@@ -382,7 +388,9 @@ class PermissionInheritanceService {
       // Apply overrides with priority
       const sortedOverrides = overrides.sort((a, b) => b.priority - a.priority);
 
+      // Process each override based on its type and priority
       for (const override of sortedOverrides) {
+        // Determine the action based on override type
         switch (override.type) {
           case 'grant':
             finalPermissions.add(override.permission);
@@ -450,14 +458,17 @@ class PermissionInheritanceService {
     const validatedPermissions = new Set(permissions);
 
     // Remove redundant lower-level permissions if higher-level exists
+    // Check each permission against all others for hierarchy conflicts
     for (const permission of permissions) {
       const permissionLevel = hierarchy[permission] || 0;
 
+      // Compare current permission with every other permission
       for (const otherPermission of permissions) {
+        // Skip comparing permission with itself
         if (permission !== otherPermission) {
           const otherLevel = hierarchy[otherPermission] || 0;
 
-          // If we have a higher-level permission, we can remove lower ones that it encompasses
+          // Check if another permission supersedes this one
           if (
             otherLevel > permissionLevel
             && this.permissionIncludes(otherPermission, permission)
@@ -617,6 +628,7 @@ class PermissionInheritanceService {
         overrideData.priority || this.overrideTypes[overrideData.type]
       );
 
+      // Set expiration date if provided
       if (overrideData.expiresAt) {
         override.set('expiresAt', overrideData.expiresAt);
       }
@@ -667,6 +679,7 @@ class PermissionInheritanceService {
 
       const masterRecord = await masterQuery.first({ useMasterKey: true });
 
+      // Return message if no inheritance record exists for user
       if (!masterRecord) {
         return {
           hasInheritance: false,

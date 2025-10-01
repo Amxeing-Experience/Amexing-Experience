@@ -86,17 +86,7 @@ class AppleOAuthServiceCore {
     // eslint-disable-next-line security/detect-object-injection
     const missing = required.filter((_key) => !this.config[_key]); // eslint-disable-line no-underscore-dangle
 
-    /**
-     * Handles missing configuration with environment-aware behavior.
-     * In development: warns and disables service gracefully.
-     * In production: throws error to prevent silent failures.
-     * @param {*} missing.length > 0 - missing.length > 0 parameter.
-     * @returns {*} - Operation result.
-     * @example
-     * // OAuth service usage
-     * const result = await oappleoauthservicecore.if(_provider, authCode);
-     * // Returns: { success: true, user: {...}, tokens: {...} }
-     */
+    // Handle missing configuration with environment-aware behavior
     if (missing.length > 0) {
       if (process.env.NODE_ENV === 'development') {
         logger.warn(
@@ -128,16 +118,7 @@ class AppleOAuthServiceCore {
    * appleOAuthService.loadPrivateKey();
    */
   loadPrivateKey() {
-    /**
-     * Skips key loading if service is disabled due to missing configuration.
-     * Prevents errors in development environments with incomplete setup.
-     * @param {*} this.disabled - This.disabled parameter.
-     * @returns {*} - Operation result.
-     * @example
-     * // OAuth service usage
-     * const result = await oappleoauthservicecore.if(_provider, authCode);
-     * // Returns: { success: true, user: {...}, tokens: {...} }
-     */
+    // Skip key loading if service is disabled
     if (this.disabled) {
       return;
     }
