@@ -52,7 +52,6 @@ require('dotenv').config({
 const express = require('express');
 const path = require('path');
 const { ParseServer } = require('parse-server');
-const ParseDashboard = require('parse-dashboard');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const methodOverride = require('method-override');
@@ -60,7 +59,6 @@ const methodOverride = require('method-override');
 const logger = require('./infrastructure/logger');
 const securityMiddleware = require('./infrastructure/security/securityMiddleware');
 const parseServerConfig = require('../config/parse-server');
-const parseDashboardConfig = require('../config/parse-dashboard');
 const webRoutes = require('./presentation/routes/webRoutes');
 const apiRoutes = require('./presentation/routes/apiRoutes');
 const authRoutes = require('./presentation/routes/authRoutes');
@@ -70,7 +68,6 @@ const errorHandler = require('./application/middleware/errorHandler');
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 1337;
-const DASHBOARD_PORT = process.env.DASHBOARD_PORT || 4040;
 
 // Trust proxy in production
 if (process.env.NODE_ENV === 'production') {
@@ -141,13 +138,12 @@ app.use(
 );
 
 // Initialize Parse Server
+logger.info('Initializing Parse Server 8.2.4...');
 const parseServer = new ParseServer(parseServerConfig);
 
-// Start Parse Server with better error handling
-(async () => {
-  try {
-    logger.info('Starting Parse Server initialization...');
-    await parseServer.start();
+// Start Parse Server (required in 8.2.4+)
+parseServer.start()
+  .then(() => {
     logger.info('Parse Server started successfully');
 
     // Initialize Parse SDK for internal use (health checks, etc.)
@@ -159,18 +155,11 @@ const parseServer = new ParseServer(parseServerConfig);
     );
     Parse.serverURL = parseServerConfig.serverURL;
 
-    logger.info('Parse SDK initialized for internal operations');
-
-    // Wait a moment for cloud functions to register
-    setTimeout(() => {
-      logger.info(
-        'Parse Server initialization completed - cloud functions should be ready'
-      );
-    }, 2000);
-
-    // Cloud functions are automatically loaded by Parse Server via the config
-  } catch (error) {
-    logger.error('Failed to initialize Parse Server:', error.message);
+    logger.info('Parse SDK configured for internal operations');
+    logger.info('Parse Server initialization completed - cloud functions loaded');
+  })
+  .catch((error) => {
+    logger.error('Failed to start Parse Server:', error.message);
     logger.error('Parse Server error details:', {
       name: error.name,
       code: error.code,
@@ -184,56 +173,14 @@ const parseServer = new ParseServer(parseServerConfig);
       logger.warn(
         'Continuing in development mode without Parse Server (database may be unavailable)'
       );
-      // Don't exit in development, allow app to start for other endpoints
     }
-  }
-})();
+  });
 
 // Mount Parse Server
 app.use('/parse', parseServer.app);
 
-// Mount Parse Dashboard (separate app for security)
-// Only start dashboard when running directly (not in tests)
-if (
-  require.main === module
-  && (process.env.NODE_ENV !== 'production'
-    || process.env.ENABLE_DASHBOARD === 'true')
-  && process.env.ENABLE_DASHBOARD !== 'false'
-) {
-  try {
-    const dashboardApp = express();
-
-    // Apply security middleware to dashboard
-    dashboardApp.use(securityMiddleware.getHelmetConfig());
-    dashboardApp.use(securityMiddleware.getStrictRateLimiter());
-
-    // Initialize and mount dashboard with error handling
-    const dashboard = new ParseDashboard(parseDashboardConfig, {
-      allowInsecureHTTP: process.env.NODE_ENV === 'development',
-      dev: process.env.NODE_ENV === 'development',
-      trustProxy: process.env.NODE_ENV === 'production',
-    });
-
-    dashboardApp.use('/', dashboard);
-
-    // Start dashboard server
-    dashboardApp.listen(DASHBOARD_PORT, () => {
-      logger.info(
-        `Parse Dashboard running on http://localhost:${DASHBOARD_PORT}`
-      );
-    });
-  } catch (error) {
-    logger.error('Failed to start Parse Dashboard:', error.message);
-    if (process.env.NODE_ENV === 'development') {
-      logger.warn('Continuing without Parse Dashboard in development mode');
-    }
-  }
-}
-
-// Alternative: Use separate dashboard command to avoid conflict
-logger.info(
-  'Parse Dashboard disabled in main app. Use "yarn dashboard" to run separately if needed.'
-);
+// Parse Dashboard has been removed from the project
+// Use MongoDB Compass or other MongoDB tools for database management
 
 // Session middleware
 app.use(securityMiddleware.getSessionConfig());
