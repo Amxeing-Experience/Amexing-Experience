@@ -24,7 +24,8 @@ const parseServerConfig = {
   verifyUserEmails: false,
   preventLoginWithUnverifiedEmail: false,
   
-  // Parse Server 7.0 specific options
+  // Parse Server 8.x configuration - encodeParseObjectInCloudFunction deprecated but set to true (new default)
+  // This option will be removed in future versions
   encodeParseObjectInCloudFunction: true,
   
   // Session Configuration
