@@ -3,7 +3,7 @@
  * Integrates with AmexingUser model and authentication services.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-09-12
+ * @since 0.1.0
  * @example
  * // Usage example
  * const result = await require({ 'parse/node': 'example' });
@@ -42,6 +42,71 @@ const strictAuthRateLimit = rateLimit({
 // Apply rate limiting
 router.use(authRateLimit);
 
+/**
+ * @swagger
+ * /auth/login:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: User login with credentials
+ *     description: |
+ *       Authenticate user with email/username and password.
+ *       Returns JWT token in response and sets HTTP-only cookie.
+ *
+ *       **Security Features:**
+ *       - Rate limited: 50 requests per 15 minutes
+ *       - Account lockout after 5 failed attempts
+ *       - Secure password validation
+ *       - JWT token lifetime: 8 hours
+ *
+ *       **Response Behavior:**
+ *       - HTML clients: Redirects to role-specific dashboard
+ *       - API clients: Returns JSON with user data
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             $ref: '#/components/schemas/LoginRequest'
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *         headers:
+ *           Set-Cookie:
+ *             description: JWT access token (HTTP-only, Secure, SameSite=strict)
+ *             schema:
+ *               type: string
+ *               example: "accessToken=eyJhbGc...; HttpOnly; Secure; SameSite=strict; Max-Age=28800"
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/LoginResponse'
+ *       302:
+ *         description: Redirect to dashboard (for HTML clients)
+ *         headers:
+ *           Location:
+ *             description: Redirect URL based on user role
+ *             schema:
+ *               type: string
+ *               example: "/dashboard/employee"
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Invalid credentials or account locked
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         $ref: '#/components/responses/RateLimitError'
+ */
 // Login endpoint
 router.post('/login', async (req, res) => {
   try {
@@ -316,6 +381,56 @@ router.post('/login', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/register:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Register new user account
+ *     description: |
+ *       Create a new user account with email verification.
+ *       Returns JWT tokens and automatically logs in the user.
+ *
+ *       **Security Features:**
+ *       - Rate limited: 50 requests per 15 minutes
+ *       - Password strength validation
+ *       - Email uniqueness check
+ *       - Automatic email verification flow
+ *
+ *       **Default Role:** user
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/RegisterRequest'
+ *         application/x-www-form-urlencoded:
+ *           schema:
+ *             $ref: '#/components/schemas/RegisterRequest'
+ *     responses:
+ *       201:
+ *         description: Registration successful
+ *         headers:
+ *           Set-Cookie:
+ *             description: JWT tokens set as HTTP-only cookies
+ *             schema:
+ *               type: string
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/RegisterResponse'
+ *       302:
+ *         description: Redirect to dashboard (for HTML clients)
+ *       400:
+ *         description: Validation error or registration failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         $ref: '#/components/responses/RateLimitError'
+ */
 // Register endpoint
 router.post('/register', async (req, res) => {
   try {
@@ -390,6 +505,33 @@ router.post('/register', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/logout:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Logout user session
+ *     description: |
+ *       Clears authentication cookies and terminates user session.
+ *
+ *       **Security:**
+ *       - Clears both access and refresh tokens
+ *       - Invalidates HTTP-only cookies
+ *     responses:
+ *       200:
+ *         description: Logout successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       500:
+ *         description: Logout failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 // Logout endpoint
 router.post('/logout', async (req, res) => {
   try {
@@ -410,6 +552,45 @@ router.post('/logout', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/refresh:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Refresh JWT access token
+ *     description: |
+ *       Renew access token using refresh token before expiration.
+ *
+ *       **Token Lifetimes:**
+ *       - Access Token: 8 hours
+ *       - Refresh Token: 7 days
+ *
+ *       **Security:**
+ *       - Requires valid refresh token in cookie
+ *       - Issues new access and refresh tokens
+ *       - PCI DSS compliant token rotation
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Token refresh successful
+ *         headers:
+ *           Set-Cookie:
+ *             description: New JWT tokens
+ *             schema:
+ *               type: string
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/TokenRefreshResponse'
+ *       401:
+ *         description: Refresh token required or invalid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 // Token refresh endpoint
 router.post('/refresh', async (req, res) => {
   try {
@@ -454,6 +635,49 @@ router.post('/refresh', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/forgot-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Request password reset
+ *     description: |
+ *       Initiate password reset process by sending reset token via email.
+ *
+ *       **Security Features:**
+ *       - Strict rate limiting: 10 requests per 5 minutes
+ *       - Time-limited reset tokens
+ *       - Email verification required
+ *       - No user enumeration (always returns success)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ForgotPasswordRequest'
+ *     responses:
+ *       200:
+ *         description: Password reset email sent (or user not found)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       400:
+ *         description: Email is required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         $ref: '#/components/responses/RateLimitError'
+ *       500:
+ *         description: Password reset request failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 // Password reset request (apply stricter rate limiting)
 router.post('/forgot-password', strictAuthRateLimit, async (req, res) => {
   try {
@@ -479,6 +703,43 @@ router.post('/forgot-password', strictAuthRateLimit, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/reset-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Complete password reset
+ *     description: |
+ *       Complete password reset process using token from email.
+ *
+ *       **Security Features:**
+ *       - Strict rate limiting: 10 requests per 5 minutes
+ *       - Token validation and expiration check
+ *       - Password strength validation
+ *       - Single-use tokens
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ResetPasswordRequest'
+ *     responses:
+ *       200:
+ *         description: Password reset successful
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       400:
+ *         description: Validation error or password reset failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         $ref: '#/components/responses/RateLimitError'
+ */
 // Password reset completion
 router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
   try {
@@ -516,6 +777,46 @@ router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/change-password:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Change password for authenticated user
+ *     description: |
+ *       Change password for currently authenticated user.
+ *
+ *       **Security Features:**
+ *       - Requires authentication (JWT token)
+ *       - Current password verification
+ *       - Password strength validation
+ *       - Audit logging
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ChangePasswordRequest'
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       400:
+ *         description: Validation error or password change failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ */
 // Change password (for authenticated users)
 router.post(
   '/change-password',
@@ -564,6 +865,33 @@ router.post(
   }
 );
 
+/**
+ * @swagger
+ * /auth/oauth/providers:
+ *   get:
+ *     tags:
+ *       - OAuth
+ *     summary: Get list of available OAuth providers
+ *     description: |
+ *       Retrieve list of configured OAuth 2.0 providers.
+ *
+ *       **Available Providers:**
+ *       - Apple (Sign in with Apple)
+ *       - Corporate (Internal company OAuth)
+ *     responses:
+ *       200:
+ *         description: List of OAuth providers
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/OAuthProvidersResponse'
+ *       500:
+ *         description: Failed to get OAuth providers
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
 // OAuth provider list
 router.get('/oauth/providers', async (req, res) => {
   try {
@@ -578,6 +906,46 @@ router.get('/oauth/providers', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/oauth/{provider}:
+ *   get:
+ *     tags:
+ *       - OAuth
+ *     summary: Initiate OAuth authentication flow
+ *     description: |
+ *       Redirect user to OAuth provider for authentication.
+ *
+ *       **Flow:**
+ *       1. User clicks "Sign in with Provider"
+ *       2. Redirects to provider's auth page
+ *       3. User authorizes application
+ *       4. Provider redirects to callback URL
+ *     parameters:
+ *       - in: path
+ *         name: provider
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [apple, corporate]
+ *         description: OAuth provider ID
+ *       - in: query
+ *         name: state
+ *         schema:
+ *           type: string
+ *           default: default
+ *         description: State parameter for CSRF protection
+ *     responses:
+ *       302:
+ *         description: Redirect to OAuth provider
+ *         headers:
+ *           Location:
+ *             description: OAuth provider authorization URL
+ *             schema:
+ *               type: string
+ *       302_error:
+ *         description: Redirect to login page with error
+ */
 // OAuth initiation
 router.get('/oauth/:provider', async (req, res) => {
   try {
@@ -596,6 +964,62 @@ router.get('/oauth/:provider', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/oauth/{provider}/callback:
+ *   get:
+ *     tags:
+ *       - OAuth
+ *     summary: OAuth provider callback handler
+ *     description: |
+ *       Handle OAuth provider callback after user authorization.
+ *
+ *       **Flow:**
+ *       1. OAuth provider redirects here after user authorizes
+ *       2. Validates authorization code
+ *       3. Exchanges code for tokens
+ *       4. Creates/updates user account
+ *       5. Sets JWT cookies
+ *       6. Redirects to dashboard
+ *     parameters:
+ *       - in: path
+ *         name: provider
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [apple, corporate]
+ *         description: OAuth provider ID
+ *       - in: query
+ *         name: code
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Authorization code from OAuth provider
+ *       - in: query
+ *         name: state
+ *         schema:
+ *           type: string
+ *         description: State parameter for CSRF validation
+ *       - in: query
+ *         name: error
+ *         schema:
+ *           type: string
+ *         description: Error code if authorization failed
+ *     responses:
+ *       302:
+ *         description: Redirect to dashboard on success
+ *         headers:
+ *           Location:
+ *             description: Role-specific dashboard URL
+ *             schema:
+ *               type: string
+ *           Set-Cookie:
+ *             description: JWT tokens
+ *             schema:
+ *               type: string
+ *       302_error:
+ *         description: Redirect to login page with error
+ */
 // OAuth callback
 router.get('/oauth/:provider/callback', async (req, res) => {
   try {
@@ -656,6 +1080,53 @@ router.get('/oauth/:provider/callback', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /auth/oauth/{provider}/link:
+ *   post:
+ *     tags:
+ *       - OAuth
+ *     summary: Link OAuth account to existing user
+ *     description: |
+ *       Link an OAuth provider account to the currently authenticated user.
+ *
+ *       **Use Cases:**
+ *       - Enable Sign in with Apple for existing account
+ *       - Link corporate OAuth to personal account
+ *       - Add alternative login methods
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: provider
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [apple, corporate]
+ *         description: OAuth provider to link
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/OAuthLinkRequest'
+ *     responses:
+ *       200:
+ *         description: OAuth account linked successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthSuccessResponse'
+ *       400:
+ *         description: OAuth account linking failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ */
 // Link OAuth account (for authenticated users)
 router.post(
   '/oauth/:provider/link',
@@ -689,6 +1160,47 @@ router.post(
   }
 );
 
+/**
+ * @swagger
+ * /auth/oauth/{provider}/unlink:
+ *   delete:
+ *     tags:
+ *       - OAuth
+ *     summary: Unlink OAuth account from user
+ *     description: |
+ *       Remove OAuth provider link from the currently authenticated user.
+ *
+ *       **Security:**
+ *       - Ensures user has alternative login method
+ *       - Prevents account lockout
+ *       - Audit logging
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: provider
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [apple, corporate]
+ *         description: OAuth provider to unlink
+ *     responses:
+ *       200:
+ *         description: OAuth account unlinked successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AuthSuccessResponse'
+ *       400:
+ *         description: OAuth account unlinking failed (e.g., last login method)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ */
 // Unlink OAuth account (for authenticated users)
 router.delete(
   '/oauth/:provider/unlink',
