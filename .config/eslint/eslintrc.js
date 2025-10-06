@@ -83,7 +83,7 @@ module.exports = {
     'jsdoc/check-indentation': 'error',
     'jsdoc/check-line-alignment': 'error',
     'jsdoc/check-syntax': 'error',
-    'jsdoc/check-tag-names': 'error',
+    'jsdoc/check-tag-names': ['error', { definedTags: ['swagger'] }],
     'jsdoc/check-types': 'error',
   },
   globals: {
@@ -173,6 +173,16 @@ module.exports = {
         'default-case': 'warn',
         'no-trailing-spaces': 'warn',
         'no-return-await': 'warn'
+      }
+    },
+    {
+      files: [
+        'src/infrastructure/swagger/**/*.js',
+        'src/presentation/routes/**/*.js'
+      ],
+      rules: {
+        'jsdoc/check-indentation': 'off', // Swagger YAML blocks need indentation
+        'max-lines': 'off' // Swagger docs can make files longer
       }
     },
   ],
