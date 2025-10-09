@@ -138,23 +138,32 @@ router.post('/login', async (req, res) => {
       if (parseUser) {
         // Get role name from the new Role relationship for Parse User too
         let roleName = 'guest';
-        const roleId = parseUser.get('roleId');
-        // Check if user has a role ID
-        if (roleId) {
+        const rolePointer = parseUser.get('roleId');
+        // Check if user has a role ID (could be Pointer or string)
+        if (rolePointer) {
           try {
-            const roleQuery = new Parse.Query('Role');
-            roleQuery.equalTo('objectId', roleId);
-            const roleObject = await roleQuery.first({ useMasterKey: true });
-            // Check if role object was found
-            if (roleObject) {
-              roleName = roleObject.get('name');
+            // Handle both Pointer objects and string IDs
+            let roleId;
+            if (typeof rolePointer === 'string') {
+              roleId = rolePointer;
+            } else if (rolePointer.id) {
+              roleId = rolePointer.id;
+            }
+
+            if (roleId) {
+              const roleQuery = new Parse.Query('Role');
+              const roleObject = await roleQuery.get(roleId, { useMasterKey: true });
+              // Check if role object was found
+              if (roleObject) {
+                roleName = roleObject.get('name');
+              }
             }
           } catch (roleError) {
             logger.warn(
               'Failed to fetch role for Parse user, defaulting to guest',
               {
                 userId: parseUser.id,
-                roleId,
+                rolePointer: typeof rolePointer === 'string' ? rolePointer : rolePointer?.id,
                 error: roleError.message,
               }
             );
@@ -172,7 +181,7 @@ router.post('/login', async (req, res) => {
           username: parseUser.get('username'),
           email: parseUser.get('email'),
           role: roleName,
-          roleId,
+          roleId: rolePointer,
           organizationId: parseUser.get('organizationId'),
           name: parseUser.get('displayName') || parseUser.get('username'),
         };
@@ -246,21 +255,30 @@ router.post('/login', async (req, res) => {
 
         // Get role name from the new Role relationship
         let roleName = 'guest';
-        const roleId = user.get('roleId');
-        // Check if user has a role ID
-        if (roleId) {
+        const rolePointer = user.get('roleId');
+        // Check if user has a role ID (could be Pointer or string)
+        if (rolePointer) {
           try {
-            const roleQuery = new Parse.Query('Role');
-            roleQuery.equalTo('objectId', roleId);
-            const roleObject = await roleQuery.first({ useMasterKey: true });
-            // Check if role object was found
-            if (roleObject) {
-              roleName = roleObject.get('name');
+            // Handle both Pointer objects and string IDs
+            let roleId;
+            if (typeof rolePointer === 'string') {
+              roleId = rolePointer;
+            } else if (rolePointer.id) {
+              roleId = rolePointer.id;
+            }
+
+            if (roleId) {
+              const roleQuery = new Parse.Query('Role');
+              const roleObject = await roleQuery.get(roleId, { useMasterKey: true });
+              // Check if role object was found
+              if (roleObject) {
+                roleName = roleObject.get('name');
+              }
             }
           } catch (roleError) {
             logger.warn('Failed to fetch role for user, defaulting to guest', {
               userId: user.id,
-              roleId,
+              rolePointer: typeof rolePointer === 'string' ? rolePointer : rolePointer?.id,
               error: roleError.message,
             });
             // Fall back to old role field if new relationship fails
@@ -277,7 +295,7 @@ router.post('/login', async (req, res) => {
           username: user.get('username'),
           email: user.get('email'),
           role: roleName,
-          roleId,
+          roleId: rolePointer,
           organizationId: user.get('organizationId'),
           name: user.getDisplayName(),
         };

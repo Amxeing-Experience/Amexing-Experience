@@ -91,6 +91,9 @@ class UserManagementService {
       // Force query to fetch fresh data from network (not from cache)
       query.fromNetwork();
 
+      // Include role data from Pointer
+      query.include('roleId');
+
       // Apply role-based access filtering
       await this.applyRoleBasedFiltering(query, currentUser, targetRole);
 

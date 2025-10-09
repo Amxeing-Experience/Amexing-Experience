@@ -56,6 +56,9 @@ module.exports = {
     'class-methods-use-this': 'off', // Allow class methods that don't use this
     'global-require': 'off', // Allow require() in functions
     'func-names': 'off', // Allow anonymous functions
+    'no-underscore-dangle': ['error', {
+      allow: ['_cachedRole'], // Allow internal cache property for role objects
+    }],
     'comma-dangle': ['error', {
       arrays: 'always-multiline',
       objects: 'always-multiline',

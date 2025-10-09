@@ -70,11 +70,17 @@ const authenticateToken = async (req, res, next) => {
     req.userRole = result.role; // Backward compatibility
     req.roleObject = result.roleObject; // New role object
 
+    // Cache the roleObject in the user instance to avoid re-fetching
+    if (req.user && req.roleObject) {
+      req.user._cachedRole = req.roleObject;
+    }
+
     logger.debug('JWT Middleware - User attached:', {
       userId: req.userId,
       role: req.userRole,
       organizationId: result.user?.organizationId,
     });
+
     next();
   } catch (error) {
     logger.error('JWT authentication error:', error);

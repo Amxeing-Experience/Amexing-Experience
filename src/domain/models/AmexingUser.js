@@ -121,9 +121,17 @@ class AmexingUser extends BaseModel {
 
     // Role system (new RBAC) - Handle both Pointer objects and string IDs
     if (userData.roleId) {
-      // If roleId is a Role object (Pointer), set it directly
-      // If it's a string ID, we'll need to convert it to a Pointer in the service layer
-      user.set('roleId', userData.roleId);
+      // If roleId is a string, create a Pointer object
+      if (typeof userData.roleId === 'string') {
+        // Create a pointer-like object that Parse Server will understand
+        const Role = require('./Role');
+        const rolePointer = new Role();
+        rolePointer.id = userData.roleId;
+        user.set('roleId', rolePointer);
+      } else {
+        // Already a Pointer object
+        user.set('roleId', userData.roleId);
+      }
     }
     if (userData.role) {
       // Backward compatibility: set legacy role field when provided
@@ -745,6 +753,11 @@ class AmexingUser extends BaseModel {
    */
   async getRole() {
     try {
+      // Check if we have a cached role from JWT middleware
+      if (this._cachedRole) {
+        return this._cachedRole;
+      }
+
       const rolePointer = this.get('roleId');
       if (!rolePointer) {
         return null;
@@ -767,10 +780,25 @@ class AmexingUser extends BaseModel {
       }
 
       const Role = require('./Role');
-      const query = BaseModel.queryActive('Role');
-      query.equalTo('objectId', roleId);
+      // IMPORTANT: Use new Parse.Query(Role) to get Role class instances
+      // NOT BaseModel.queryActive() which returns generic Parse.Objects
+      const query = new Parse.Query(Role);
+      query.equalTo('active', true);
+      query.equalTo('exists', true);
 
-      return await query.first({ useMasterKey: true });
+      const roleObject = await query.get(roleId, { useMasterKey: true });
+
+      // If the object is not already a Role instance, wrap it
+      if (roleObject && !(roleObject instanceof Role)) {
+        // Create a new Role instance from the generic object
+        const role = Parse.Object.fromJSON({
+          className: 'Role',
+          ...roleObject.toJSON(),
+        });
+        return role;
+      }
+
+      return roleObject;
     } catch (error) {
       logger.error('Error fetching user role', {
         userId: this.id,

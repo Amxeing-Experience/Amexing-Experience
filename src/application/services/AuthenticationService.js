@@ -357,9 +357,31 @@ class AuthenticationService extends AuthenticationServiceCore {
       let roleObject = null;
       if (decoded.roleId) {
         try {
-          const roleQuery = new Parse.Query('Role');
-          roleQuery.equalTo('objectId', decoded.roleId);
-          roleObject = await roleQuery.first({ useMasterKey: true });
+          // Import Role class to get proper instance with methods
+          const Role = require('../../domain/models/Role');
+
+          // Handle both Pointer objects and string IDs
+          let roleId;
+          const { roleId: decodedRoleId } = decoded;
+          if (typeof decodedRoleId === 'string') {
+            roleId = decodedRoleId;
+          } else if (decodedRoleId && decodedRoleId.id) {
+            roleId = decodedRoleId.id;
+          } else if (decodedRoleId && decodedRoleId.objectId) {
+            // Parse Pointer object structure
+            roleId = decodedRoleId.objectId;
+          }
+
+          if (roleId) {
+            // Use Role class to get proper instance with hasPermission() method
+            const roleQuery = new Parse.Query(Role);
+            roleObject = await roleQuery.get(roleId, { useMasterKey: true });
+
+            // Fetch the full object to ensure all fields are loaded
+            if (roleObject) {
+              await roleObject.fetch({ useMasterKey: true });
+            }
+          }
         } catch (roleError) {
           logger.warn('Failed to fetch role object during token validation', {
             userId: decoded.userId,
