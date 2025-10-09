@@ -1,4 +1,4 @@
-/* eslint-disable max-lines */
+/* eslint-disable max-lines, no-console */
 /**
  * Mobile OAuth Experience Optimizer - Sprint 04
  * Optimizes OAuth flows for mobile devices with enhanced UX

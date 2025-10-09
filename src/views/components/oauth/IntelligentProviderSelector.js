@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Intelligent OAuth Provider Selector - Sprint 04
  * Smart provider selection based on email domain, corporate context, and user behavior

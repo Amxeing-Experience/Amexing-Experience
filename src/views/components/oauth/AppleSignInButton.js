@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Apple Sign In Button Component - Native Apple ID authentication with privacy compliance.
  * Provides secure Apple Sign In integration with corporate department flows, mobile

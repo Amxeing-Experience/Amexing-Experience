@@ -21,6 +21,7 @@ const Parse = require('parse/node');
 const AmexingUser = require('../../domain/models/AmexingUser');
 const BaseModel = require('../../domain/models/BaseModel');
 const logger = require('../../infrastructure/logger');
+const RoleAuthorizationService = require('./RoleAuthorizationService');
 
 /**
  * UserManagementService class implementing comprehensive user management
@@ -36,6 +37,7 @@ const logger = require('../../infrastructure/logger');
 class UserManagementService {
   constructor() {
     this.className = 'AmexingUser';
+    this.authService = new RoleAuthorizationService();
     this.allowedRoles = [
       'superadmin',
       'admin',
@@ -166,12 +168,13 @@ class UserManagementService {
    * @param {number} options.limit - Items per page (default: 25).
    * @param {object} options.filters - Additional filters.
    * @param {object} options.sort - Sorting configuration.
+   * @param explicitRole
    * @returns {Promise<object>} - Amexing users data with pagination info.
    * @example
    * const result = await userManagementService.getAmexingUsers(currentUser, { page: 1, limit: 25 });
    * // Returns: { users: [...], pagination: {...}, metadata: {...} }
    */
-  async getAmexingUsers(currentUser, options = {}) {
+  async getAmexingUsers(currentUser, options = {}, explicitRole = null) {
     try {
       const {
         page = 1,
@@ -180,13 +183,19 @@ class UserManagementService {
         sort = { field: 'lastName', direction: 'asc' },
       } = options;
 
-      // Get current user's role for permission checking
-      const currentUserRole = currentUser.role || currentUser.get?.('role') || 'guest';
+      // Validate authorization using centralized service
+      this.authService.validateRoleAccess(
+        currentUser,
+        ['superadmin', 'admin'],
+        {
+          throwError: true,
+          context: 'getAmexingUsers',
+          explicitRole, // Pass explicit role from controller (JWT middleware)
+        }
+      );
 
-      // Only SuperAdmin and Admin can access Amexing users
-      if (!['superadmin', 'admin'].includes(currentUserRole)) {
-        throw new Error('Insufficient permissions to access Amexing users');
-      }
+      // Get current user's role for filtering logic
+      const currentUserRole = this.authService.extractUserRole(currentUser, explicitRole);
 
       // Query all existing users from Amexing organization
       const query = BaseModel.queryExisting(this.className);
@@ -1003,6 +1012,7 @@ class UserManagementService {
    * @param {object} query - Query parameters object.
    * @param {object} currentUser - Current authenticated user object.
    * @param {string} targetRole - Target role for authorization check.
+   * @param explicitRole
    * @example
    * // User management service usage
    * const result = await usermanagementservice.applyRoleBasedFiltering(userId , data);
@@ -1011,9 +1021,9 @@ class UserManagementService {
    * // Returns: Promise resolving to operation result
    * @returns {Promise<void>} - Operation result.
    */
-  async applyRoleBasedFiltering(query, currentUser, targetRole = null) {
-    // Get current user's role for permission checking
-    const currentUserRole = currentUser.role || currentUser.get?.('role') || 'guest';
+  async applyRoleBasedFiltering(query, currentUser, targetRole = null, explicitRole = null) {
+    // Get current user's role using centralized service
+    const currentUserRole = this.authService.extractUserRole(currentUser, explicitRole);
 
     switch (currentUserRole) {
       case 'superadmin':
@@ -1204,8 +1214,8 @@ class UserManagementService {
     // Filter by Amexing organization
     await this.filterByOrganization(countQuery, 'amexing');
 
-    // Apply role-based filtering
-    const currentUserRole = currentUser.role || currentUser.get?.('role') || 'guest';
+    // Apply role-based filtering using centralized service
+    const currentUserRole = this.authService.extractUserRole(currentUser);
     if (currentUserRole === 'admin') {
       await this.excludeRoleName(countQuery, 'superadmin');
     }
@@ -1278,6 +1288,7 @@ class UserManagementService {
     // Get role information from Pointer or fallback to string field
     const rolePointer = user.get('roleId');
     let roleName = user.get('role'); // Default to string role
+    let roleDisplayName = null; // Display name from Role object
     let roleObjectId = null;
 
     // Handle rolePointer safely
@@ -1286,6 +1297,7 @@ class UserManagementService {
         // Check if it's a fetched Parse Object with .get() method
         if (rolePointer.get && typeof rolePointer.get === 'function') {
           roleName = rolePointer.get('name') || roleName;
+          roleDisplayName = rolePointer.get('displayName') || rolePointer.get('name') || roleName;
           roleObjectId = rolePointer.id;
         } else if (typeof rolePointer === 'string') {
           // It's a string ID, keep the string role name
@@ -1316,6 +1328,7 @@ class UserManagementService {
       firstName: user.get('firstName'),
       lastName: user.get('lastName'),
       role: roleName || 'guest',
+      roleDisplayName: roleDisplayName || roleName || 'Invitado', // Fallback to roleName or default
       roleId: roleObjectId,
       active: active !== undefined ? active : true,
       exists: exists !== undefined ? exists : true,
@@ -1790,7 +1803,19 @@ class UserManagementService {
       const roleQuery = new Parse.Query('Role');
       roleQuery.equalTo('organization', organizationType);
       roleQuery.equalTo('exists', true);
+
+      logger.info('Filtering by organization', {
+        organizationType,
+        queryConstraints: roleQuery.toJSON(),
+      });
+
       const roles = await roleQuery.find({ useMasterKey: true });
+
+      logger.info('Roles found for organization', {
+        organizationType,
+        rolesCount: roles.length,
+        roleNames: roles.map((r) => r.get('name')),
+      });
 
       if (roles && roles.length > 0) {
         // Filter users by roleId Pointers
@@ -1805,6 +1830,7 @@ class UserManagementService {
     } catch (error) {
       logger.error('Failed to filter by organization', {
         error: error.message,
+        stack: error.stack,
         organizationType,
       });
       throw error;

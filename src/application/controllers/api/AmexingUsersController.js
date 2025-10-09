@@ -7,8 +7,7 @@
  * - RESTful API design (GET, POST, PUT, DELETE)
  * - SuperAdmin/Admin only access control
  * - Manages: superadmin, admin, employee_amexing roles
- * - Comprehensive security, validation, and audit logging
- *
+ * - Comprehensive security, validation, and audit logging.
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 0.1.0
@@ -42,10 +41,9 @@ class AmexingUsersController {
    * - active: Filter by active status (true/false)
    * - search: Search term for email, firstName, lastName
    * - sortField: Field to sort by (default: lastName)
-   * - sortDirection: Sort direction (asc/desc, default: asc)
-   *
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
+   * - sortDirection: Sort direction (asc/desc, default: asc).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
    * GET /api/amexingusers?page=1&limit=10&active=true
@@ -61,9 +59,11 @@ class AmexingUsersController {
       const options = this.parseQueryParams(req.query);
 
       // Get Amexing users from service (permission validation inside)
+      // Pass both user object and explicit role from JWT middleware
       const result = await this.userService.getAmexingUsers(
         currentUser,
-        options
+        options,
+        req.userRole // Pass explicit role from JWT middleware
       );
 
       // Add metadata for frontend consumption
@@ -84,18 +84,25 @@ class AmexingUsersController {
         error: error.message,
         stack: error.stack,
         userId: req.user?.id,
+        userRole: req.userRole,
         queryParams: req.query,
       });
 
-      this.sendError(res, error.message, 500);
+      // Send detailed error for debugging
+      this.sendError(
+        res,
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to retrieve users',
+        500
+      );
     }
   }
 
   /**
    * GET /api/amexingusers/:id - Get single Amexing user by ID.
-   *
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
    * GET /api/amexingusers/abc123
@@ -147,9 +154,8 @@ class AmexingUsersController {
    * POST /api/amexingusers - Create new Amexing internal user.
    * Only allows creation of: admin, employee_amexing roles.
    * SuperAdmin creation requires special authorization.
-   *
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
    * POST /api/amexingusers
@@ -200,9 +206,8 @@ class AmexingUsersController {
 
   /**
    * PUT /api/amexingusers/:id - Update Amexing user.
-   *
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
    * PUT /api/amexingusers/abc123
@@ -252,9 +257,8 @@ class AmexingUsersController {
 
   /**
    * DELETE /api/amexingusers/:id - Deactivate (soft delete) Amexing user.
-   *
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
    * DELETE /api/amexingusers/abc123
@@ -292,9 +296,8 @@ class AmexingUsersController {
 
   /**
    * PATCH /api/amexingusers/:id/toggle-status - Toggle active/inactive status.
-   *
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
    * PATCH /api/amexingusers/abc123/toggle-status
@@ -348,8 +351,9 @@ class AmexingUsersController {
 
   /**
    * Parse and validate query parameters.
-   * @param {object} query - Query parameters from request
-   * @returns {object} - Parsed options object
+   * @param {object} query - Query parameters from request.
+   * @returns {object} - Parsed options object.
+   * @example
    */
   parseQueryParams(query) {
     const page = parseInt(query.page, 10) || 1;
@@ -384,10 +388,11 @@ class AmexingUsersController {
 
   /**
    * Send success response.
-   * @param {object} res - Express response object
-   * @param {object} data - Data to send
-   * @param {string} message - Success message
-   * @param {number} statusCode - HTTP status code
+   * @param {object} res - Express response object.
+   * @param {object} data - Data to send.
+   * @param {string} message - Success message.
+   * @param {number} statusCode - HTTP status code.
+   * @example
    */
   sendSuccess(res, data, message = 'Success', statusCode = 200) {
     res.status(statusCode).json({
@@ -400,9 +405,10 @@ class AmexingUsersController {
 
   /**
    * Send error response.
-   * @param {object} res - Express response object
-   * @param {string} message - Error message
-   * @param {number} statusCode - HTTP status code
+   * @param {object} res - Express response object.
+   * @param {string} message - Error message.
+   * @param {number} statusCode - HTTP status code.
+   * @example
    */
   sendError(res, message, statusCode = 500) {
     res.status(statusCode).json({

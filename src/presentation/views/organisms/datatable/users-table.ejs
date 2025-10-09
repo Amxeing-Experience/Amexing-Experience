@@ -186,22 +186,28 @@ function initializeDataTableWithData(usersData) {
             { title: 'Email', data: 'email', className: 'text-muted' },
             {
                 title: 'Rol',
-                data: 'role',
+                data: 'roleDisplayName',
                 className: 'text-center',
                 render: function(data, type, row) {
                     if (type === 'display') {
-                        const roleNames = {
-                            'superadmin': { name: 'Super Admin', class: 'danger' },
-                            'admin': { name: 'Admin', class: 'primary' },
-                            'client': { name: 'Cliente', class: 'info' },
-                            'department_manager': { name: 'Jefe Depto.', class: 'success' },
-                            'employee': { name: 'Empleado', class: 'secondary' },
-                            'driver': { name: 'Conductor', class: 'warning' },
-                            'guest': { name: 'Invitado', class: 'dark', textClass: 'text-white' }
+                        // Map role names to Bootstrap badge colors
+                        const roleColors = {
+                            'superadmin': 'danger',
+                            'admin': 'primary',
+                            'client': 'info',
+                            'department_manager': 'success',
+                            'employee': 'secondary',
+                            'employee_amexing': 'primary',
+                            'driver': 'warning',
+                            'guest': 'dark'
                         };
-                        const role = roleNames[data] || { name: data, class: 'secondary' };
-                        const textClass = role.textClass || '';
-                        return `<span class="badge bg-${role.class} ${textClass}">${role.name}</span>`;
+
+                        // Get color based on role name (from row.role field)
+                        const roleColor = roleColors[row.role] || 'secondary';
+                        const textClass = row.role === 'guest' ? 'text-white' : '';
+
+                        // Display the roleDisplayName from database
+                        return `<span class="badge bg-${roleColor} ${textClass}">${data || row.role || 'Invitado'}</span>`;
                     }
                     return data;
                 }

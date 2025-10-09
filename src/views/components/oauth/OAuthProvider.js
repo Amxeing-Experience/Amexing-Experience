@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * OAuth Provider Component - Main OAuth orchestration component for comprehensive authentication.
  * Provides centralized OAuth authentication management supporting multiple providers (Google, Microsoft, Apple)
@@ -6,6 +7,9 @@
  * This component serves as the primary orchestrator for OAuth authentication flows, managing provider
  * initialization, UI rendering, authentication workflows, and security compliance across the Amexing platform.
  * It supports both individual and corporate authentication modes with department-specific configurations.
+ *
+ * NOTE: console statements are allowed in this frontend component for client-side debugging.
+ * These are disabled in production builds via environment configuration.
  *
  * Features:
  * - Multi-provider OAuth support (Google, Microsoft, Apple) with dynamic configuration

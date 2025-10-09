@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Corporate OAuth Interface Component - Sprint 04
  * Handles corporate-specific OAuth flows with branding and customization

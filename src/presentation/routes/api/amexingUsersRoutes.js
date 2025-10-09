@@ -8,8 +8,7 @@
  * - SuperAdmin/Admin only access control
  * - Manages: superadmin, admin, employee_amexing roles
  * - Rate limiting and security headers
- * - Comprehensive error handling
- *
+ * - Comprehensive error handling.
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 0.1.0
@@ -371,10 +370,10 @@ router.patch('/:id/toggle-status', writeOperationsLimiter, async (req, res) => {
 
 /**
  * Error handling middleware for this router.
- * @param {Error} error - Error object
- * @param {object} req - Express request object
- * @param {object} res - Express response object
- * @param {Function} _next - Next middleware function
+ * @param {Error} error - Error object.
+ * @param {object} req - Express request object.
+ * @param {object} res - Express response object.
+ * @param {Function} _next - Next middleware function.
  */
 router.use((error, req, res, _next) => {
   logger.error('Amexing Users API Error:', {
