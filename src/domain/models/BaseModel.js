@@ -105,28 +105,35 @@ class BaseModel extends Parse.Object {
 
   /**
    * Activate record (set active to true, ensure exists is true).
-   * @param {string} modifiedBy - User ID who performed the action.
+   * @param {Parse.User|string} modifiedBy - User object or User ID who performed the action.
    * @returns {Promise<BaseModel>} - Promise resolving to operation result.
    * @example
    * // Model method usage
-   * const result = await basemodel.activate({ modifiedBy: 'example' });
+   * const result = await basemodel.activate({ modifiedBy: userObject });
    * // Returns: model operation result
-   * // const instance = new ModelName(data);
-   * // const result = await instance.save();
    */
   async activate(modifiedBy = null) {
     this.set('active', true);
     this.set('exists', true);
     this.set('updatedAt', new Date());
-    // Track who modified the record
+    // Track who modified the record - support both User objects and string IDs
     if (modifiedBy) {
-      this.set('modifiedBy', modifiedBy);
+      if (typeof modifiedBy === 'string') {
+        // Create a Pointer to AmexingUser
+        const AmexingUser = require('./AmexingUser');
+        const userPointer = new AmexingUser();
+        userPointer.id = modifiedBy;
+        this.set('modifiedBy', userPointer);
+      } else {
+        // Already a User object
+        this.set('modifiedBy', modifiedBy);
+      }
     }
 
     logger.info(`Record activated: ${this.className} ${this.id}`, {
       className: this.className,
       objectId: this.id,
-      modifiedBy,
+      modifiedBy: typeof modifiedBy === 'string' ? modifiedBy : modifiedBy?.id,
     });
 
     return this.save(null, { useMasterKey: true });
@@ -134,28 +141,35 @@ class BaseModel extends Parse.Object {
 
   /**
    * Deactivate record (set active to false, keep exists true for archive).
-   * @param {string} modifiedBy - User ID who performed the action.
+   * @param {Parse.User|string} modifiedBy - User object or User ID who performed the action.
    * @returns {Promise<BaseModel>} - Promise resolving to operation result.
    * @example
    * // Model method usage
-   * const result = await basemodel.deactivate({ modifiedBy: 'example' });
+   * const result = await basemodel.deactivate({ modifiedBy: userObject });
    * // Returns: model operation result
-   * // const instance = new ModelName(data);
-   * // const result = await instance.save();
    */
   async deactivate(modifiedBy = null) {
     this.set('active', false);
     this.set('exists', true); // Keep in archive
     this.set('updatedAt', new Date());
-    // Track who modified the record
+    // Track who modified the record - support both User objects and string IDs
     if (modifiedBy) {
-      this.set('modifiedBy', modifiedBy);
+      if (typeof modifiedBy === 'string') {
+        // Create a Pointer to AmexingUser
+        const AmexingUser = require('./AmexingUser');
+        const userPointer = new AmexingUser();
+        userPointer.id = modifiedBy;
+        this.set('modifiedBy', userPointer);
+      } else {
+        // Already a User object
+        this.set('modifiedBy', modifiedBy);
+      }
     }
 
     logger.info(`Record deactivated: ${this.className} ${this.id}`, {
       className: this.className,
       objectId: this.id,
-      modifiedBy,
+      modifiedBy: typeof modifiedBy === 'string' ? modifiedBy : modifiedBy?.id,
     });
 
     return this.save(null, { useMasterKey: true });
@@ -163,30 +177,40 @@ class BaseModel extends Parse.Object {
 
   /**
    * Soft delete record (set exists to false, hide from normal queries but keep for audit).
-   * @param {string} modifiedBy - User ID who performed the action.
+   * @param {Parse.User|string} modifiedBy - User object or User ID who performed the action.
    * @returns {Promise<BaseModel>} - Promise resolving to operation result.
    * @example
    * // Model method usage
-   * const result = await basemodel.softDelete({ modifiedBy: 'example' });
+   * const result = await basemodel.softDelete({ modifiedBy: userObject });
    * // Returns: model operation result
-   * // const instance = new ModelName(data);
-   * // const result = await instance.save();
    */
   async softDelete(modifiedBy = null) {
     this.set('active', false);
     this.set('exists', false);
     this.set('deletedAt', new Date());
     this.set('updatedAt', new Date());
-    // Track who deleted the record
+    // Track who deleted the record - support both User objects and string IDs
     if (modifiedBy) {
-      this.set('modifiedBy', modifiedBy);
-      this.set('deletedBy', modifiedBy);
+      if (typeof modifiedBy === 'string') {
+        // Create Pointers to AmexingUser
+        const AmexingUser = require('./AmexingUser');
+        const modifiedByPointer = new AmexingUser();
+        modifiedByPointer.id = modifiedBy;
+        const deletedByPointer = new AmexingUser();
+        deletedByPointer.id = modifiedBy;
+        this.set('modifiedBy', modifiedByPointer);
+        this.set('deletedBy', deletedByPointer);
+      } else {
+        // Already a User object
+        this.set('modifiedBy', modifiedBy);
+        this.set('deletedBy', modifiedBy);
+      }
     }
 
     logger.info(`Record soft deleted: ${this.className} ${this.id}`, {
       className: this.className,
       objectId: this.id,
-      modifiedBy,
+      modifiedBy: typeof modifiedBy === 'string' ? modifiedBy : modifiedBy?.id,
     });
 
     return this.save(null, { useMasterKey: true });
@@ -194,14 +218,12 @@ class BaseModel extends Parse.Object {
 
   /**
    * Restore soft deleted record (set exists back to true, but keep inactive).
-   * @param {string} modifiedBy - User ID who performed the action.
+   * @param {Parse.User|string} modifiedBy - User object or User ID who performed the action.
    * @returns {Promise<BaseModel>} - Promise resolving to operation result.
    * @example
    * // Model method usage
-   * const result = await basemodel.restore({ modifiedBy: 'example' });
+   * const result = await basemodel.restore({ modifiedBy: userObject });
    * // Returns: model operation result
-   * // const instance = new ModelName(data);
-   * // const result = await instance.save();
    */
   async restore(modifiedBy = null) {
     this.set('exists', true);
@@ -209,15 +231,24 @@ class BaseModel extends Parse.Object {
     this.unset('deletedAt');
     this.unset('deletedBy');
     this.set('updatedAt', new Date());
-    // Track who restored the record
+    // Track who restored the record - support both User objects and string IDs
     if (modifiedBy) {
-      this.set('modifiedBy', modifiedBy);
+      if (typeof modifiedBy === 'string') {
+        // Create a Pointer to AmexingUser
+        const AmexingUser = require('./AmexingUser');
+        const userPointer = new AmexingUser();
+        userPointer.id = modifiedBy;
+        this.set('modifiedBy', userPointer);
+      } else {
+        // Already a User object
+        this.set('modifiedBy', modifiedBy);
+      }
     }
 
     logger.info(`Record restored: ${this.className} ${this.id}`, {
       className: this.className,
       objectId: this.id,
-      modifiedBy,
+      modifiedBy: typeof modifiedBy === 'string' ? modifiedBy : modifiedBy?.id,
     });
 
     return this.save(null, { useMasterKey: true });

@@ -121,7 +121,9 @@ securityMiddlewares.forEach((middleware) => {
 // Swagger API Documentation (Development and Test only)
 // SECURITY: Disabled in production - configure proper API documentation strategy for production
 if (process.env.NODE_ENV !== 'production') {
-  logger.info('Swagger API Documentation enabled at /api-docs (Development/Test only)');
+  logger.info(
+    'Swagger API Documentation enabled at /api-docs (Development/Test only)'
+  );
 
   app.use(
     '/api-docs',
@@ -258,26 +260,44 @@ if (require.main === module) {
  * // Graceful shutdown is triggered automatically on SIGTERM/SIGINT
  * process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
  */
+let isShuttingDown = false;
 const gracefulShutdown = async (signal) => {
+  // Prevent multiple shutdown attempts
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
   logger.info(`Received ${signal}, starting graceful shutdown...`);
 
-  if (server) {
-    server.close(async () => {
-      logger.info('HTTP server closed');
-
-      // Shutdown Parse Server gracefully
-      await shutdownParseServer(parseServer);
-
-      // Exit process
-      process.exit(0);
-    });
-  }
-
   // Force exit after 10 seconds
-  setTimeout(() => {
+  const forceExitTimer = setTimeout(() => {
     logger.error('Forcefully shutting down...');
     process.exit(1);
   }, 10000);
+
+  try {
+    // Close HTTP server first
+    if (server) {
+      await new Promise((resolve) => {
+        server.close(() => {
+          logger.info('HTTP server closed');
+          resolve();
+        });
+      });
+    }
+
+    // Shutdown Parse Server gracefully
+    await shutdownParseServer(parseServer);
+
+    // Clear force exit timer and exit cleanly
+    clearTimeout(forceExitTimer);
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during graceful shutdown:', error.message);
+    clearTimeout(forceExitTimer);
+    process.exit(1);
+  }
 };
 
 // Handle shutdown signals

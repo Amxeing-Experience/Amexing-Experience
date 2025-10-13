@@ -1443,9 +1443,7 @@ class OAuthService {
     const _domain = CorporateOAuthService.extractEmailDomain(email); // eslint-disable-line no-underscore-dangle
     const corporateDomains = CorporateOAuthService.getAvailableCorporateDomains();
 
-    return (
-      corporateDomains.find((config) => config.domain === _domain) || null
-    );
+    return corporateDomains.find((config) => config.domain === _domain) || null;
   }
 
   /**

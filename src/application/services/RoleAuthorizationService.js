@@ -145,13 +145,19 @@ class RoleAuthorizationService {
    * });
    */
   validateRoleAccess(user, requiredRoles, options = {}) {
-    const { throwError = false, context = 'unknown', explicitRole = null } = options;
+    const {
+      throwError = false,
+      context = 'unknown',
+      explicitRole = null,
+    } = options;
 
     // Extract user role
     const userRole = this.extractUserRole(user, explicitRole);
 
     // Normalize requiredRoles to array
-    const roles = Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles];
+    const roles = Array.isArray(requiredRoles)
+      ? requiredRoles
+      : [requiredRoles];
 
     // Check if user has required role
     const hasAccess = roles.includes(userRole);

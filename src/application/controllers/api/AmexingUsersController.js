@@ -131,11 +131,13 @@ class AmexingUsersController {
       const role = user.roleId || user.role;
       if (
         role
-        && !this.allowedRoles.includes(
-          typeof role === 'string' ? role : role.name
-        )
+        && !this.allowedRoles.includes(typeof role === 'string' ? role : role.name)
       ) {
-        return this.sendError(res, 'User is not an Amexing organization user', 403);
+        return this.sendError(
+          res,
+          'User is not an Amexing organization user',
+          403
+        );
       }
 
       this.sendSuccess(res, { user }, 'User retrieved successfully');
@@ -277,10 +279,7 @@ class AmexingUsersController {
       }
 
       // Deactivate user using service
-      const result = await this.userService.deactivateUser(
-        userId,
-        currentUser
-      );
+      const result = await this.userService.deactivateUser(userId, currentUser);
 
       this.sendSuccess(res, result, 'Amexing user deactivated successfully');
     } catch (error) {
@@ -334,14 +333,11 @@ class AmexingUsersController {
         `User ${active ? 'activated' : 'deactivated'} successfully`
       );
     } catch (error) {
-      logger.error(
-        'Error in AmexingUsersController.toggleAmexingUserStatus',
-        {
-          error: error.message,
-          userId: req.params.id,
-          currentUser: req.user?.id,
-        }
-      );
+      logger.error('Error in AmexingUsersController.toggleAmexingUserStatus', {
+        error: error.message,
+        userId: req.params.id,
+        currentUser: req.user?.id,
+      });
 
       this.sendError(res, error.message, 500);
     }

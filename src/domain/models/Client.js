@@ -85,9 +85,27 @@ class Client extends BaseModel {
     // Lifecycle fields are set by BaseModel constructor
     // active: true, exists: true are defaults
 
-    // Audit fields
-    client.set('createdBy', clientData.createdBy || null);
-    client.set('modifiedBy', clientData.modifiedBy || null);
+    // Audit fields - Handle both User objects and string IDs as Pointers
+    if (clientData.createdBy) {
+      if (typeof clientData.createdBy === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const createdByPointer = new AmexingUser();
+        createdByPointer.id = clientData.createdBy;
+        client.set('createdBy', createdByPointer);
+      } else {
+        client.set('createdBy', clientData.createdBy);
+      }
+    }
+    if (clientData.modifiedBy) {
+      if (typeof clientData.modifiedBy === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const modifiedByPointer = new AmexingUser();
+        modifiedByPointer.id = clientData.modifiedBy;
+        client.set('modifiedBy', modifiedByPointer);
+      } else {
+        client.set('modifiedBy', clientData.modifiedBy);
+      }
+    }
 
     return client;
   }
@@ -375,7 +393,10 @@ class Client extends BaseModel {
           existingUser.set('oauthAccounts', oauthAccounts);
           existingUser.set('primaryOAuthProvider', oauthProvider);
           existingUser.set('lastAuthMethod', 'oauth');
-          existingUser.set('modifiedBy', this.id);
+          // Set modifiedBy as Pointer to this Client
+          const clientPointer = new Client();
+          clientPointer.id = this.id;
+          existingUser.set('modifiedBy', clientPointer);
 
           await existingUser.save(null, { useMasterKey: true });
         }
@@ -383,7 +404,10 @@ class Client extends BaseModel {
         return existingUser;
       }
 
-      // Create new user
+      // Create new user with Pointer to this Client for audit fields
+      const clientPointer = new Client();
+      clientPointer.id = this.id;
+
       const newUser = AmexingUser.create({
         username: userData.email,
         email: userData.email,
@@ -404,8 +428,8 @@ class Client extends BaseModel {
         ],
         primaryOAuthProvider: oauthProvider,
         lastAuthMethod: 'oauth',
-        createdBy: this.id,
-        modifiedBy: this.id,
+        createdBy: clientPointer,
+        modifiedBy: clientPointer,
       });
 
       await newUser.save(null, { useMasterKey: true });
@@ -469,8 +493,17 @@ class Client extends BaseModel {
         }
       });
 
-      // Update modification tracking
-      this.set('modifiedBy', modifiedBy);
+      // Update modification tracking - Handle both User objects and string IDs
+      if (modifiedBy) {
+        if (typeof modifiedBy === 'string') {
+          const AmexingUser = require('./AmexingUser');
+          const modifiedByPointer = new AmexingUser();
+          modifiedByPointer.id = modifiedBy;
+          this.set('modifiedBy', modifiedByPointer);
+        } else {
+          this.set('modifiedBy', modifiedBy);
+        }
+      }
       this.set('updatedAt', new Date());
 
       await this.save(null, { useMasterKey: true });

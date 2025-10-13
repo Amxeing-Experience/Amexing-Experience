@@ -126,8 +126,17 @@ class DelegatedPermission extends BaseModel {
     delegation.set('usageHistory', []); // Initialize empty usage history
     delegation.set('extensionHistory', []); // Initialize empty extension history
 
-    // Audit information
-    delegation.set('createdBy', delegationData.fromUserId);
+    // Audit information - Set createdBy as Pointer to AmexingUser
+    if (delegationData.fromUserId) {
+      if (typeof delegationData.fromUserId === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const createdByPointer = new AmexingUser();
+        createdByPointer.id = delegationData.fromUserId;
+        delegation.set('createdBy', createdByPointer);
+      } else {
+        delegation.set('createdBy', delegationData.fromUserId);
+      }
+    }
     delegation.set('revokedBy', null);
     delegation.set('revokedAt', null);
     delegation.set('revocationReason', null);

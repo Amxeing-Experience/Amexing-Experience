@@ -62,7 +62,11 @@ class RolesController {
           userRole,
           ip: req.ip,
         });
-        return this.sendError(res, 'Access denied. SuperAdmin role required.', 403);
+        return this.sendError(
+          res,
+          'Access denied. SuperAdmin role required.',
+          403
+        );
       }
 
       // Parse and validate query parameters
@@ -211,7 +215,11 @@ class RolesController {
           userRole,
           ip: req.ip,
         });
-        return this.sendError(res, 'Access denied. SuperAdmin role required.', 403);
+        return this.sendError(
+          res,
+          'Access denied. SuperAdmin role required.',
+          403
+        );
       }
 
       if (!roleId) {
@@ -295,7 +303,11 @@ class RolesController {
           roleId,
           ip: req.ip,
         });
-        return this.sendError(res, 'Access denied. SuperAdmin role required.', 403);
+        return this.sendError(
+          res,
+          'Access denied. SuperAdmin role required.',
+          403
+        );
       }
 
       // Validate roleId
@@ -305,7 +317,11 @@ class RolesController {
 
       // Validate that at least one field is provided
       if (!displayName && description === undefined) {
-        return this.sendError(res, 'At least one field (displayName or description) must be provided', 400);
+        return this.sendError(
+          res,
+          'At least one field (displayName or description) must be provided',
+          400
+        );
       }
 
       // Validate displayName if provided
@@ -318,7 +334,11 @@ class RolesController {
 
         // Validate displayName length
         if (trimmedDisplayName.length > 100) {
-          return this.sendError(res, 'Display name cannot exceed 100 characters', 400);
+          return this.sendError(
+            res,
+            'Display name cannot exceed 100 characters',
+            400
+          );
         }
       }
 
@@ -332,7 +352,11 @@ class RolesController {
 
         // Validate description length (allow empty, but limit max length)
         if (trimmedDescription.length > 500) {
-          return this.sendError(res, 'Description cannot exceed 500 characters', 400);
+          return this.sendError(
+            res,
+            'Description cannot exceed 500 characters',
+            400
+          );
         }
       }
 
@@ -353,7 +377,10 @@ class RolesController {
       let hasChanges = false;
 
       // Check displayName changes
-      if (trimmedDisplayName !== null && currentDisplayName !== trimmedDisplayName) {
+      if (
+        trimmedDisplayName !== null
+        && currentDisplayName !== trimmedDisplayName
+      ) {
         changes.displayName = {
           old: currentDisplayName,
           new: trimmedDisplayName,
@@ -363,7 +390,10 @@ class RolesController {
       }
 
       // Check description changes
-      if (trimmedDescription !== null && currentDescription !== trimmedDescription) {
+      if (
+        trimmedDescription !== null
+        && currentDescription !== trimmedDescription
+      ) {
         changes.description = {
           old: currentDescription,
           new: trimmedDescription,
@@ -374,7 +404,11 @@ class RolesController {
 
       // Check if no changes were made
       if (!hasChanges) {
-        return this.sendError(res, 'No changes detected. The provided values are the same as current values.', 400);
+        return this.sendError(
+          res,
+          'No changes detected. The provided values are the same as current values.',
+          400
+        );
       }
 
       // Save changes (security: only displayName and description are modified)

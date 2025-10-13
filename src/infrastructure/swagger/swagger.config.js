@@ -225,7 +225,8 @@ This is automatically set by the server upon successful authentication.
                   },
                   error: {
                     type: 'string',
-                    example: 'Validation failed: Email is required, Password must be at least 8 characters',
+                    example:
+                      'Validation failed: Email is required, Password must be at least 8 characters',
                   },
                   timestamp: {
                     type: 'string',

@@ -51,9 +51,6 @@ if (buttonAttributes && typeof buttonAttributes === 'object') {
 const iconHtml = buttonIcon ? `<i class="ti ti-${buttonIcon}"></i>` : '';
 const iconSpacing = buttonIcon && buttonText ? ' ' : '';
 %>
-
-<% if (buttonHref) { %>
-    <a href="<%= buttonHref %>" class="<%= buttonClasses %>" role="button"<% if (buttonDisabled) { %> aria-disabled="true"<% } %><% if (attributesString) { %> <%- attributesString %> <!-- nosemgrep: sanitized attributes string --><% } %>><% if (buttonIcon && buttonIconPosition === 'left') { %><%- iconHtml %> <!-- nosemgrep: safe icon HTML --><%= iconSpacing %><% } %><% if (buttonText) { %><%= buttonText %><% } %><% if (buttonIcon && buttonIconPosition === 'right') { %><%= iconSpacing %><%- iconHtml %> <!-- nosemgrep: safe icon HTML --><% } %></a>
-<% } else { %>
-    <button type="<%= buttonType %>" class="<%= buttonClasses %>"<% if (buttonDisabled) { %> disabled<% } %><% if (attributesString) { %> <%- attributesString %> <!-- nosemgrep: sanitized attributes string --><% } %>><% if (buttonIcon && buttonIconPosition === 'left') { %><%- iconHtml %> <!-- nosemgrep: safe icon HTML --><%= iconSpacing %><% } %><% if (buttonText) { %><%= buttonText %><% } %><% if (buttonIcon && buttonIconPosition === 'right') { %><%= iconSpacing %><%- iconHtml %> <!-- nosemgrep: safe icon HTML --><% } %></button>
-<% } %>
+<%# nosemgrep: sanitized attributes string %>
+<%# nosemgrep: safe icon HTML %>
+<% if (buttonHref) { %><a href="<%= buttonHref %>" class="<%= buttonClasses %>" role="button"<% if (buttonDisabled) { %> aria-disabled="true"<% } %><% if (attributesString) { %> <%- attributesString %><% } %>><% if (buttonIcon && buttonIconPosition === 'left') { %><%- iconHtml %><%= iconSpacing %><% } %><% if (buttonText) { %><%= buttonText %><% } %><% if (buttonIcon && buttonIconPosition === 'right') { %><%= iconSpacing %><%- iconHtml %><% } %></a><% } else { %><button type="<%= buttonType %>" class="<%= buttonClasses %>"<% if (buttonDisabled) { %> disabled<% } %><% if (attributesString) { %> <%- attributesString %><% } %>><% if (buttonIcon && buttonIconPosition === 'left') { %><%- iconHtml %><%= iconSpacing %><% } %><% if (buttonText) { %><%= buttonText %><% } %><% if (buttonIcon && buttonIconPosition === 'right') { %><%= iconSpacing %><%- iconHtml %><% } %></button><% } %>

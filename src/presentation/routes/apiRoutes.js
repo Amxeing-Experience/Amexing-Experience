@@ -103,12 +103,14 @@ router.use(jwtMiddleware.authenticateToken);
 // User Management API routes
 const userManagementRoutes = require('./api/userManagementRoutes');
 const amexingUsersRoutes = require('./api/amexingUsersRoutes');
+const clientsRoutes = require('./api/clientsRoutes');
 const rolesRoutes = require('./api/rolesRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
 router.use('/users', userManagementRoutes);
 router.use('/amexingusers', amexingUsersRoutes);
+router.use('/clients', clientsRoutes);
 router.use('/roles', rolesRoutes);
 
 /**
@@ -281,6 +283,241 @@ router.get(
   '/data',
   jwtMiddleware.requireRoleLevel(1), // Any authenticated user
   apiController.getData
+);
+
+// Bulk Import API routes for clients
+const BulkImportController = require('../../application/controllers/api/BulkImportController');
+
+const bulkImportController = new BulkImportController();
+
+/**
+ * @swagger
+ * /api/clients/bulk/template:
+ *   get:
+ *     tags:
+ *       - Clients
+ *       - Bulk Import
+ *     summary: Download bulk import Excel template
+ *     description: |
+ *       Download Excel template for bulk client import with instructions.
+ *
+ *       **Access:** SuperAdmin and Admin only
+ *       **Rate Limited:** 100 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Template file downloaded
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ */
+router.get(
+  '/clients/bulk/template',
+  jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
+  bulkImportController.downloadTemplate.bind(bulkImportController)
+);
+
+/**
+ * @swagger
+ * /api/clients/bulk/upload:
+ *   post:
+ *     tags:
+ *       - Clients
+ *       - Bulk Import
+ *     summary: Upload Excel file for bulk import
+ *     description: |
+ *       Upload and validate Excel file for bulk client import.
+ *
+ *       **Access:** SuperAdmin and Admin only
+ *       **Rate Limited:** 100 requests per 15 minutes
+ *       **Max File Size:** 10MB
+ *       **Accepted Files:** .xlsx, .xls
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Excel file to upload
+ *     responses:
+ *       200:
+ *         description: File uploaded and validated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     jobId:
+ *                       type: string
+ *                     fileId:
+ *                       type: string
+ *                     validation:
+ *                       type: object
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ */
+router.post(
+  '/clients/bulk/upload',
+  jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
+  bulkImportController.getUploadMiddleware(),
+  bulkImportController.uploadFile.bind(bulkImportController)
+);
+
+/**
+ * @swagger
+ * /api/clients/bulk/process:
+ *   post:
+ *     tags:
+ *       - Clients
+ *       - Bulk Import
+ *     summary: Process bulk import
+ *     description: |
+ *       Start processing bulk client import from uploaded file.
+ *
+ *       **Access:** SuperAdmin and Admin only
+ *       **Rate Limited:** 100 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               jobId:
+ *                 type: string
+ *                 description: Job ID from upload response
+ *     responses:
+ *       202:
+ *         description: Import processing started
+ *       400:
+ *         description: Invalid request
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Job not found
+ */
+router.post(
+  '/clients/bulk/process',
+  jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
+  bulkImportController.processImport.bind(bulkImportController)
+);
+
+/**
+ * @swagger
+ * /api/clients/bulk/status/{jobId}:
+ *   get:
+ *     tags:
+ *       - Clients
+ *       - Bulk Import
+ *     summary: Get bulk import job status
+ *     description: |
+ *       Get status and progress of bulk import job.
+ *
+ *       **Access:** SuperAdmin and Admin only
+ *       **Rate Limited:** 100 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: jobId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Job ID
+ *     responses:
+ *       200:
+ *         description: Job status retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Job not found
+ */
+router.get(
+  '/clients/bulk/status/:jobId',
+  jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
+  bulkImportController.getImportStatus.bind(bulkImportController)
+);
+
+/**
+ * @swagger
+ * /api/clients/bulk/error-report/{jobId}:
+ *   get:
+ *     tags:
+ *       - Clients
+ *       - Bulk Import
+ *     summary: Download bulk import error report
+ *     description: |
+ *       Download Excel file with failed records and error details.
+ *
+ *       **Access:** SuperAdmin and Admin only
+ *       **Rate Limited:** 100 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: jobId
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Job ID
+ *     responses:
+ *       200:
+ *         description: Error report downloaded
+ *         content:
+ *           application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Error report not found
+ */
+router.get(
+  '/clients/bulk/error-report/:jobId',
+  jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
+  bulkImportController.downloadErrorReport.bind(bulkImportController)
 );
 
 module.exports = router;

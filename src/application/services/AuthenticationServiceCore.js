@@ -253,7 +253,9 @@ class AuthenticationServiceCore {
         } else if (typeof rolePointer === 'string') {
           // rolePointer is a string ID (backward compatibility)
           const roleQuery = new Parse.Query('Role');
-          const roleObject = await roleQuery.get(rolePointer, { useMasterKey: true });
+          const roleObject = await roleQuery.get(rolePointer, {
+            useMasterKey: true,
+          });
           // Extract role name if found
           if (roleObject) {
             roleName = roleObject.get('name') || 'guest';
@@ -262,7 +264,9 @@ class AuthenticationServiceCore {
         } else {
           // rolePointer is a pointer object, fetch it
           const roleQuery = new Parse.Query('Role');
-          const roleObject = await roleQuery.get(rolePointer.id, { useMasterKey: true });
+          const roleObject = await roleQuery.get(rolePointer.id, {
+            useMasterKey: true,
+          });
           // Extract role name if found
           if (roleObject) {
             roleName = roleObject.get('name') || 'guest';

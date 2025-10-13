@@ -58,9 +58,27 @@ class Department extends BaseModel {
     // Lifecycle fields are set by BaseModel constructor
     // active: true, exists: true are defaults
 
-    // Audit fields
-    department.set('createdBy', departmentData.createdBy || null);
-    department.set('modifiedBy', departmentData.modifiedBy || null);
+    // Audit fields - Handle both User objects and string IDs as Pointers
+    if (departmentData.createdBy) {
+      if (typeof departmentData.createdBy === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const createdByPointer = new AmexingUser();
+        createdByPointer.id = departmentData.createdBy;
+        department.set('createdBy', createdByPointer);
+      } else {
+        department.set('createdBy', departmentData.createdBy);
+      }
+    }
+    if (departmentData.modifiedBy) {
+      if (typeof departmentData.modifiedBy === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const modifiedByPointer = new AmexingUser();
+        modifiedByPointer.id = departmentData.modifiedBy;
+        department.set('modifiedBy', modifiedByPointer);
+      } else {
+        department.set('modifiedBy', departmentData.modifiedBy);
+      }
+    }
 
     return department;
   }

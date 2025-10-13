@@ -88,9 +88,7 @@ const getSystemMetrics = () => ({
     heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
     heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
     external: Math.round(process.memoryUsage().external / 1024 / 1024),
-    arrayBuffers: Math.round(
-      process.memoryUsage().arrayBuffers / 1024 / 1024
-    ),
+    arrayBuffers: Math.round(process.memoryUsage().arrayBuffers / 1024 / 1024),
   },
   cpu: {
     usage: process.cpuUsage(),

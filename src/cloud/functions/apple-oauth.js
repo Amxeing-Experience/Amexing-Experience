@@ -22,7 +22,7 @@ let appleOAuthService = null;
 // Attempt to initialize Apple OAuth service with error handling
 try {
   appleOAuthService = new AppleOAuthService();
-// Handle service initialization failure gracefully
+  // Handle service initialization failure gracefully
 } catch (error) {
   logger.warn('Apple OAuth service disabled:', error.message);
 }
@@ -109,7 +109,7 @@ const initiateAppleOAuth = async (request) => {
       nonce: result.nonce,
       expiresIn: result.expiresIn,
     };
-  // Handle errors during OAuth initiation
+    // Handle errors during OAuth initiation
   } catch (error) {
     logger.error('Initiate Apple OAuth failed:', error);
     throw error;
@@ -139,7 +139,11 @@ const handleAppleOAuthCallback = async (request) => {
   }
 
   const { params, ip } = request;
-  const { code, error: oauthError, error_description: errorDescription } = params;
+  const {
+    code,
+    error: oauthError,
+    error_description: errorDescription,
+  } = params;
 
   // Process OAuth callback with error handling
   try {
@@ -214,7 +218,7 @@ const handleAppleOAuthCallback = async (request) => {
       privacyCompliant: result.privacyCompliant,
       isPrivateEmail: result.profile.isPrivateEmail,
     };
-  // Handle callback processing errors
+    // Handle callback processing errors
   } catch (error) {
     // Log failed authentication
     await auditService.recordPermissionAudit({
@@ -282,7 +286,7 @@ const getAppleOAuthConfig = async (request) => {
           name: deptConfig.name,
           scopes: departmentService.getDepartmentScopes(department, 'apple'),
         };
-      // Apple OAuth not allowed for this department
+        // Apple OAuth not allowed for this department
       } else {
         config.available = false;
         config.reason = 'Apple Sign In not allowed for this department';
@@ -293,7 +297,7 @@ const getAppleOAuthConfig = async (request) => {
       success: true,
       config,
     };
-  // Handle configuration retrieval errors
+    // Handle configuration retrieval errors
   } catch (error) {
     logger.error('Get Apple OAuth config failed:', error);
     throw error;
@@ -351,7 +355,7 @@ const revokeAppleOAuth = async (request) => {
       success: true,
       message: 'Apple OAuth association removed successfully',
     };
-  // Handle revocation errors
+    // Handle revocation errors
   } catch (error) {
     logger.error('Apple OAuth revocation failed:', error);
     throw error;
@@ -402,7 +406,7 @@ const handleAppleWebhook = async (request) => {
       success: true,
       processed: result.processed || true,
     };
-  // Handle webhook processing errors
+    // Handle webhook processing errors
   } catch (error) {
     logger.error('Apple webhook processing failed:', error);
     throw error;
@@ -457,7 +461,7 @@ const getAppleUserData = async (request) => {
       userData,
       privacyCompliant: true,
     };
-  // Handle user data retrieval errors
+    // Handle user data retrieval errors
   } catch (error) {
     logger.error('Get Apple user data failed:', error);
     throw error;
@@ -525,7 +529,7 @@ const validateAppleDomain = async (request) => {
       success: true,
       validation,
     };
-  // Handle domain validation errors
+    // Handle domain validation errors
   } catch (error) {
     logger.error('Apple domain validation failed:', error);
     throw error;
@@ -621,7 +625,7 @@ const getAppleOAuthAnalytics = async (request) => {
         } else {
           analytics.regularEmailUsers++;
         }
-      // Categorize failed login events
+        // Categorize failed login events
       } else if (action.includes('failed')) {
         analytics.failedLogins++;
       }
@@ -647,7 +651,7 @@ const getAppleOAuthAnalytics = async (request) => {
       },
       analytics,
     };
-  // Handle analytics retrieval errors
+    // Handle analytics retrieval errors
   } catch (error) {
     logger.error('Get Apple OAuth analytics failed:', error);
     throw error;

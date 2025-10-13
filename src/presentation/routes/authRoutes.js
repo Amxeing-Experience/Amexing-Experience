@@ -190,7 +190,9 @@ router.post('/login', async (req, res) => {
 
             if (roleId) {
               const roleQuery = new Parse.Query('Role');
-              const roleObject = await roleQuery.get(roleId, { useMasterKey: true });
+              const roleObject = await roleQuery.get(roleId, {
+                useMasterKey: true,
+              });
               // Check if role object was found
               if (roleObject) {
                 roleName = roleObject.get('name');
@@ -201,7 +203,10 @@ router.post('/login', async (req, res) => {
               'Failed to fetch role for Parse user, defaulting to guest',
               {
                 userId: parseUser.id,
-                rolePointer: typeof rolePointer === 'string' ? rolePointer : rolePointer?.id,
+                rolePointer:
+                  typeof rolePointer === 'string'
+                    ? rolePointer
+                    : rolePointer?.id,
                 error: roleError.message,
               }
             );
@@ -345,7 +350,9 @@ router.post('/login', async (req, res) => {
 
             if (roleId) {
               const roleQuery = new Parse.Query('Role');
-              const roleObject = await roleQuery.get(roleId, { useMasterKey: true });
+              const roleObject = await roleQuery.get(roleId, {
+                useMasterKey: true,
+              });
               // Check if role object was found
               if (roleObject) {
                 roleName = roleObject.get('name');
@@ -354,7 +361,8 @@ router.post('/login', async (req, res) => {
           } catch (roleError) {
             logger.warn('Failed to fetch role for user, defaulting to guest', {
               userId: user.id,
-              rolePointer: typeof rolePointer === 'string' ? rolePointer : rolePointer?.id,
+              rolePointer:
+                typeof rolePointer === 'string' ? rolePointer : rolePointer?.id,
               error: roleError.message,
             });
             // Fall back to old role field if new relationship fails

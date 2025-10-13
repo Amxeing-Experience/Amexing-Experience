@@ -1,0 +1,489 @@
+<%#
+File Dropzone Atom
+Reusable drag-and-drop file upload component using Dropzone.js
+
+Atomic Design Level: Atom
+Category: Common Components
+
+@param {string} id - Unique identifier for the dropzone (required)
+@param {string} acceptedFiles - Accepted file types (default: '.xlsx,.xls')
+@param {number} maxFiles - Maximum number of files (default: 1)
+@param {number} maxFileSize - Maximum file size in MB (default: 10)
+@param {string} uploadUrl - API endpoint for file upload (required)
+@param {string} helpText - Help text to display (optional)
+@param {string} paramName - Name of the file parameter (default: 'file')
+@param {boolean} autoProcessQueue - Auto-upload on file add (default: false)
+@param {object} headers - Additional headers for upload (optional)
+
+Features:
+- Drag and drop file upload
+- File type validation
+- File size validation
+- Visual feedback (drag over, preview, progress)
+- Error handling
+- Accessibility compliant (ARIA labels, keyboard navigation)
+- PCI DSS compliant (no sensitive data in logs)
+%>
+
+<%
+// Default parameters
+const dropzoneId = typeof id !== 'undefined' ? id : 'dropzone-' + Date.now();
+const dzAcceptedFiles = typeof acceptedFiles !== 'undefined' ? acceptedFiles : '.xlsx,.xls';
+const dzMaxFiles = typeof maxFiles !== 'undefined' ? maxFiles : 1;
+const dzMaxFileSize = typeof maxFileSize !== 'undefined' ? maxFileSize : 10;
+const dzUploadUrl = typeof uploadUrl !== 'undefined' ? uploadUrl : '#';
+const dzHelpText = typeof helpText !== 'undefined' ? helpText : 'Arrastra tu archivo aquí o haz clic para seleccionar';
+const dzParamName = typeof paramName !== 'undefined' ? paramName : 'file';
+const dzAutoProcessQueue = typeof autoProcessQueue !== 'undefined' ? autoProcessQueue : false;
+const dzHeaders = typeof headers !== 'undefined' ? headers : {};
+%>
+
+<div class="dropzone-container">
+    <div id="<%= dropzoneId %>"
+         class="dropzone"
+         role="button"
+         tabindex="0"
+         aria-label="Zona de carga de archivos. <%= dzHelpText %>"
+         data-accepted-files="<%= dzAcceptedFiles %>"
+         data-max-files="<%= dzMaxFiles %>"
+         data-max-filesize="<%= dzMaxFileSize %>"
+         data-upload-url="<%= dzUploadUrl %>"
+         data-param-name="<%= dzParamName %>"
+         data-auto-process="<%= dzAutoProcessQueue %>">
+        <div class="dz-message" data-dz-message>
+            <div class="dropzone-icon">
+                <i class="ti ti-cloud-upload" style="font-size: 3rem; color: #5a6a85;"></i>
+            </div>
+            <h4 class="dropzone-title mt-3 mb-2">
+                <%= dzHelpText %>
+            </h4>
+            <p class="dropzone-subtitle text-muted mb-0">
+                <small>Archivos permitidos: <%= dzAcceptedFiles %> | Tamaño máximo: <%= dzMaxFileSize %>MB</small>
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Dropzone container styles */
+.dropzone-container {
+    width: 100%;
+    margin: 1rem 0;
+}
+
+.dropzone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    text-align: center;
+    background-color: #f8fafc;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dropzone:hover,
+.dropzone:focus {
+    border-color: #f76b1c;
+    background-color: #fff5f0;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(247, 107, 28, 0.1);
+}
+
+.dropzone.dz-drag-hover {
+    border-color: #f76b1c;
+    background-color: #fff5f0;
+    border-style: solid;
+}
+
+.dropzone .dz-message {
+    margin: 0;
+    width: 100%;
+}
+
+.dropzone-icon {
+    margin-bottom: 0.5rem;
+}
+
+.dropzone-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+}
+
+.dropzone-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+/* File preview styles */
+.dropzone .dz-preview {
+    margin: 1rem 0.5rem;
+    min-height: 0;
+}
+
+.dropzone .dz-preview .dz-image {
+    border-radius: 0.5rem;
+    overflow: hidden;
+    width: 120px;
+    height: 120px;
+    position: relative;
+    display: inline-block;
+    z-index: 10;
+    border: 1px solid #e2e8f0;
+}
+
+.dropzone .dz-preview .dz-details {
+    padding: 0.5rem;
+    text-align: left;
+}
+
+.dropzone .dz-preview .dz-details .dz-filename {
+    font-weight: 600;
+    color: #1e293b;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dropzone .dz-preview .dz-details .dz-size {
+    font-size: 0.75rem;
+    color: #64748b;
+}
+
+/* Progress bar */
+.dropzone .dz-preview .dz-progress {
+    height: 8px;
+    border-radius: 4px;
+    background-color: #e2e8f0;
+    overflow: hidden;
+    margin-top: 0.5rem;
+}
+
+.dropzone .dz-preview .dz-progress .dz-upload {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #f76b1c 0%, #fa984f 100%);
+    transition: width 0.3s ease;
+}
+
+/* Success state */
+.dropzone .dz-preview.dz-success .dz-success-mark {
+    opacity: 1;
+    animation: passing-through 3s cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+.dropzone .dz-preview .dz-success-mark,
+.dropzone .dz-preview .dz-error-mark {
+    pointer-events: none;
+    opacity: 0;
+    z-index: 500;
+    position: absolute;
+    display: inline-block;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+.dropzone .dz-preview .dz-success-mark svg,
+.dropzone .dz-preview .dz-error-mark svg {
+    width: 54px;
+    height: 54px;
+}
+
+.dropzone .dz-preview.dz-success .dz-success-mark svg {
+    fill: #10b981;
+}
+
+.dropzone .dz-preview.dz-error .dz-error-mark svg {
+    fill: #ef4444;
+}
+
+/* Error state */
+.dropzone .dz-preview.dz-error .dz-error-mark {
+    opacity: 1;
+    animation: slide-in 3s cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+.dropzone .dz-preview.dz-error .dz-error-message {
+    display: block;
+    color: #ef4444;
+    font-size: 0.875rem;
+    margin-top: 0.5rem;
+}
+
+.dropzone .dz-preview .dz-error-message {
+    display: none;
+}
+
+/* Remove link */
+.dropzone .dz-preview .dz-remove {
+    font-size: 0.875rem;
+    text-align: center;
+    display: block;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: #ef4444;
+    margin-top: 0.5rem;
+    text-decoration: none;
+}
+
+.dropzone .dz-preview .dz-remove:hover {
+    text-decoration: underline;
+}
+
+/* Animations */
+@keyframes passing-through {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+    50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.2);
+    }
+}
+
+@keyframes slide-in {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) translateY(-20px);
+    }
+    100% {
+        opacity: 1;
+        transform: translate(-50%, -50%) translateY(0);
+    }
+}
+
+/* Accessibility - Focus visible */
+.dropzone:focus-visible {
+    outline: 2px solid #f76b1c;
+    outline-offset: 2px;
+}
+
+/* Loading state */
+.dropzone.dz-loading {
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .dropzone {
+        padding: 1.5rem 1rem;
+        min-height: 150px;
+    }
+
+    .dropzone-icon i {
+        font-size: 2rem !important;
+    }
+
+    .dropzone-title {
+        font-size: 1rem;
+    }
+
+    .dropzone-subtitle {
+        font-size: 0.75rem;
+    }
+}
+</style>
+
+<script>
+/**
+ * Initialize Dropzone for file upload
+ * This script is executed when the component is rendered
+ */
+(function() {
+    // Function to initialize dropzone
+    const initDropzone = function() {
+        // Wait for Dropzone library to be loaded
+        if (typeof Dropzone === 'undefined') {
+            console.log('Dropzone not yet loaded, waiting...');
+            setTimeout(initDropzone, 100);
+            return;
+        }
+
+        console.log('Dropzone library loaded, initializing...');
+
+        // Prevent Dropzone from auto-discovering all elements with .dropzone class
+        Dropzone.autoDiscover = false;
+        const dropzoneElement = document.getElementById('<%= dropzoneId %>');
+
+        if (!dropzoneElement) {
+            console.error('Dropzone element not found:', '<%= dropzoneId %>');
+            return;
+        }
+
+        // Get configuration from data attributes
+        const config = {
+            url: dropzoneElement.getAttribute('data-upload-url'),
+            paramName: dropzoneElement.getAttribute('data-param-name') || '<%= dzParamName %>',
+            maxFilesize: parseInt(dropzoneElement.getAttribute('data-max-filesize')) || <%= dzMaxFileSize %>,
+            maxFiles: parseInt(dropzoneElement.getAttribute('data-max-files')) || <%= dzMaxFiles %>,
+            acceptedFiles: dropzoneElement.getAttribute('data-accepted-files') || '<%= dzAcceptedFiles %>',
+            autoProcessQueue: dropzoneElement.getAttribute('data-auto-process') === 'true',
+            addRemoveLinks: true,
+            withCredentials: true, // Send cookies and credentials
+            dictDefaultMessage: '',
+            dictFallbackMessage: 'Tu navegador no soporta la carga de archivos mediante arrastrar y soltar.',
+            dictFileTooBig: 'El archivo es demasiado grande ({{filesize}}MB). Tamaño máximo: {{maxFilesize}}MB.',
+            dictInvalidFileType: 'No puedes subir archivos de este tipo.',
+            dictResponseError: 'El servidor respondió con código {{statusCode}}.',
+            dictCancelUpload: 'Cancelar subida',
+            dictUploadCanceled: 'Subida cancelada.',
+            dictCancelUploadConfirmation: '¿Estás seguro de que quieres cancelar esta subida?',
+            dictRemoveFile: 'Eliminar archivo',
+            dictMaxFilesExceeded: 'No puedes subir más archivos.',
+            headers: Object.assign({
+                'X-Requested-With': 'XMLHttpRequest'
+            }, <%= JSON.stringify(dzHeaders) %>),
+            init: function() {
+                const dzInstance = this;
+
+                // Event: File added
+                this.on('addedfile', function(file) {
+                    console.log('File added:', file.name);
+                    console.log('File details:', {
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        status: file.status,
+                        accepted: file.accepted
+                    });
+
+                    // Dispatch custom event
+                    const event = new CustomEvent('dropzone:fileAdded', {
+                        detail: { file: file, dropzoneId: '<%= dropzoneId %>' }
+                    });
+                    document.dispatchEvent(event);
+                });
+
+                // Event: File accepted
+                this.on('accept', function(file, done) {
+                    console.log('File accepted:', file.name);
+                    done();
+                });
+
+                // Event: File rejected
+                this.on('addedfile', function(file) {
+                    if (file.accepted === false) {
+                        console.error('File rejected:', file.name, 'Status:', file.status);
+                    }
+                });
+
+                // Event: File removed
+                this.on('removedfile', function(file) {
+                    console.log('File removed:', file.name);
+
+                    // Dispatch custom event
+                    const event = new CustomEvent('dropzone:fileRemoved', {
+                        detail: { file: file, dropzoneId: '<%= dropzoneId %>' }
+                    });
+                    document.dispatchEvent(event);
+                });
+
+                // Event: Sending (upload starts)
+                this.on('sending', function(file, xhr, formData) {
+                    console.log('Dropzone: Sending file:', file.name);
+
+                    // Dispatch custom event
+                    const event = new CustomEvent('dropzone:sending', {
+                        detail: {
+                            file: file,
+                            xhr: xhr,
+                            formData: formData,
+                            dropzoneId: '<%= dropzoneId %>'
+                        }
+                    });
+                    document.dispatchEvent(event);
+                });
+
+                // Event: Upload progress
+                this.on('uploadprogress', function(file, progress, bytesSent) {
+                    // Dispatch custom event
+                    const event = new CustomEvent('dropzone:uploadProgress', {
+                        detail: {
+                            file: file,
+                            progress: progress,
+                            bytesSent: bytesSent,
+                            dropzoneId: '<%= dropzoneId %>'
+                        }
+                    });
+                    document.dispatchEvent(event);
+                });
+
+                // Event: Upload success
+                this.on('success', function(file, response) {
+                    console.log('Upload successful:', file.name);
+
+                    // Dispatch custom event
+                    const event = new CustomEvent('dropzone:uploadSuccess', {
+                        detail: {
+                            file: file,
+                            response: response,
+                            dropzoneId: '<%= dropzoneId %>'
+                        }
+                    });
+                    document.dispatchEvent(event);
+                });
+
+                // Event: Upload error
+                this.on('error', function(file, errorMessage, xhr) {
+                    console.error('Upload error:', errorMessage);
+
+                    // Dispatch custom event
+                    const event = new CustomEvent('dropzone:uploadError', {
+                        detail: {
+                            file: file,
+                            errorMessage: errorMessage,
+                            xhr: xhr,
+                            dropzoneId: '<%= dropzoneId %>'
+                        }
+                    });
+                    document.dispatchEvent(event);
+                });
+
+                // Event: Max files exceeded
+                this.on('maxfilesexceeded', function(file) {
+                    this.removeFile(file);
+                    alert('Solo puedes subir <%= dzMaxFiles %> archivo(s) a la vez.');
+                });
+            }
+        };
+
+        // Create Dropzone instance
+        console.log('Creating Dropzone instance with config:', config);
+        const dropzone = new Dropzone(dropzoneElement, config);
+        console.log('Dropzone instance created:', dropzone);
+
+        // Store instance in global scope for external access
+        window['dropzone_<%= dropzoneId %>'] = dropzone;
+        console.log('Dropzone stored in window as: dropzone_<%= dropzoneId %>');
+
+        // Keyboard accessibility
+        dropzoneElement.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                dropzoneElement.click();
+            }
+        });
+
+        console.log('Dropzone initialized successfully!');
+    };
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDropzone);
+    } else {
+        initDropzone();
+    }
+})();
+</script>

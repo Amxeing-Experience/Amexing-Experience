@@ -83,10 +83,23 @@ const initializeParseServer = async () => {
  * });
  */
 const shutdownParseServer = async (parseServer) => {
-  if (parseServer && parseServer.handleShutdown) {
-    logger.info('Shutting down Parse Server...');
-    await parseServer.handleShutdown();
-    logger.info('Parse Server shutdown complete');
+  if (!parseServer) {
+    logger.warn('Parse Server instance not available for shutdown');
+    return;
+  }
+
+  try {
+    if (parseServer.handleShutdown) {
+      logger.info('Shutting down Parse Server...');
+      await parseServer.handleShutdown();
+      logger.info('Parse Server shutdown complete');
+    }
+  } catch (error) {
+    // Log but don't throw - Parse Server may have internal shutdown issues
+    logger.warn(
+      'Parse Server shutdown encountered an error (non-critical):',
+      error.message
+    );
   }
 };
 

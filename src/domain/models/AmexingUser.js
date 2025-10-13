@@ -162,9 +162,29 @@ class AmexingUser extends BaseModel {
     // Contextual data for permissions
     user.set('contextualData', userData.contextualData || {});
 
-    // Audit fields
-    user.set('createdBy', userData.createdBy || null);
-    user.set('modifiedBy', userData.modifiedBy || null);
+    // Audit fields - Handle both User objects and string IDs as Pointers
+    if (userData.createdBy) {
+      if (typeof userData.createdBy === 'string') {
+        // Create a Pointer to AmexingUser
+        const createdByPointer = new AmexingUser();
+        createdByPointer.id = userData.createdBy;
+        user.set('createdBy', createdByPointer);
+      } else {
+        // Already a User object
+        user.set('createdBy', userData.createdBy);
+      }
+    }
+    if (userData.modifiedBy) {
+      if (typeof userData.modifiedBy === 'string') {
+        // Create a Pointer to AmexingUser
+        const modifiedByPointer = new AmexingUser();
+        modifiedByPointer.id = userData.modifiedBy;
+        user.set('modifiedBy', modifiedByPointer);
+      } else {
+        // Already a User object
+        user.set('modifiedBy', userData.modifiedBy);
+      }
+    }
 
     return user;
   }

@@ -90,8 +90,30 @@ class UserManagementService {
       // The active field only controls access, not visibility in admin panel
       const query = BaseModel.queryExisting(this.className);
 
-      // Force query to fetch fresh data from network (not from cache)
-      query.fromNetwork();
+      // Select only necessary fields for better performance
+      query.select(
+        'email',
+        'username',
+        'firstName',
+        'lastName',
+        'roleId',
+        'active',
+        'exists',
+        'emailVerified',
+        'lastLoginAt',
+        'loginAttempts',
+        'mustChangePassword',
+        'primaryOAuthProvider',
+        'lastAuthMethod',
+        'organizationId',
+        'clientId',
+        'departmentId',
+        'contextualData',
+        'createdAt',
+        'updatedAt',
+        'createdBy',
+        'modifiedBy'
+      );
 
       // Include role data from Pointer
       query.include('roleId');
@@ -99,8 +121,11 @@ class UserManagementService {
       // Filter by client organization roles (exclude Amexing internal users)
       await this.filterByOrganization(query, 'client');
 
-      // Apply role-based access filtering
-      await this.applyRoleBasedFiltering(query, currentUser, targetRole);
+      // Apply role-based access filtering (targetRole specific filter)
+      // Note: Admin already filtered by organization, only apply specific targetRole if provided
+      if (targetRole) {
+        await this.filterByRoleName(query, targetRole);
+      }
 
       // Apply additional filters
       this.applyAdvancedFilters(query, filters);
@@ -118,6 +143,20 @@ class UserManagementService {
         query.find({ useMasterKey: true }),
         this.getTotalUserCount(currentUser, targetRole, filters),
       ]);
+
+      logger.info('User query performed', {
+        usersFound: users.length,
+        totalCount,
+        targetRole,
+        userSample: users.slice(0, 2).map((u) => ({
+          id: u.id,
+          username: u.get('username'),
+          firstName: u.get('firstName'),
+          lastName: u.get('lastName'),
+          roleId: u.get('roleId')?.id || 'NO_ROLE_ID',
+          hasRoleId: !!u.get('roleId'),
+        })),
+      });
 
       // Transform users to safe format
       const safeUsers = users.map((user) => this.transformUserToSafeFormat(user));
@@ -195,7 +234,10 @@ class UserManagementService {
       );
 
       // Get current user's role for filtering logic
-      const currentUserRole = this.authService.extractUserRole(currentUser, explicitRole);
+      const currentUserRole = this.authService.extractUserRole(
+        currentUser,
+        explicitRole
+      );
 
       // Query all existing users from Amexing organization
       const query = BaseModel.queryExisting(this.className);
@@ -353,8 +395,8 @@ class UserManagementService {
         exists: true,
         emailVerified: false,
         loginAttempts: 0,
-        createdBy: createdBy.id,
-        modifiedBy: createdBy.id,
+        createdBy, // Pass User object directly for Pointer creation
+        modifiedBy: createdBy, // Pass User object directly for Pointer creation
       };
 
       // Create user using AmexingUser model (follows BaseModel patterns)
@@ -444,8 +486,8 @@ class UserManagementService {
         }
       });
 
-      // Update modification tracking
-      user.set('modifiedBy', modifiedBy.id);
+      // Update modification tracking - Pass User object directly for Pointer creation
+      user.set('modifiedBy', modifiedBy);
       user.set('updatedAt', new Date());
 
       // Handle password update separately if provided
@@ -521,7 +563,7 @@ class UserManagementService {
 
       // AI Agent Rule: Use softDelete method to set active=false and exists=false
       // This is a logical deletion, never hard delete
-      await user.softDelete(deactivatedBy.id);
+      await user.softDelete(deactivatedBy); // Pass User object directly
 
       // Log deactivation activity
       await this.logUserCRUDActivity(deactivatedBy, 'deactivate', userId, {
@@ -577,7 +619,7 @@ class UserManagementService {
       }
 
       // AI Agent Rule: Use activate method for lifecycle management
-      await user.activate(reactivatedBy.id);
+      await user.activate(reactivatedBy); // Pass User object directly
 
       // Log reactivation activity
       await this.logUserCRUDActivity(reactivatedBy, 'reactivate', userId, {
@@ -1021,9 +1063,17 @@ class UserManagementService {
    * // Returns: Promise resolving to operation result
    * @returns {Promise<void>} - Operation result.
    */
-  async applyRoleBasedFiltering(query, currentUser, targetRole = null, explicitRole = null) {
+  async applyRoleBasedFiltering(
+    query,
+    currentUser,
+    targetRole = null,
+    explicitRole = null
+  ) {
     // Get current user's role using centralized service
-    const currentUserRole = this.authService.extractUserRole(currentUser, explicitRole);
+    const currentUserRole = this.authService.extractUserRole(
+      currentUser,
+      explicitRole
+    );
 
     switch (currentUserRole) {
       case 'superadmin':
@@ -1128,6 +1178,40 @@ class UserManagementService {
           case 'createdBefore':
             query.lessThan('createdAt', new Date(value));
             break;
+          case 'search': {
+            // Multi-field search: firstName, lastName, email, companyName
+            // Using case-insensitive regex matching with MongoDB $or operator
+            const searchTerm = value.trim();
+
+            // Create regex for case-insensitive search
+            // eslint-disable-next-line security/detect-non-literal-regexp
+            const searchRegex = new RegExp(searchTerm, 'i');
+
+            // Use Parse Server's internal _orQuery to combine multiple field searches
+            // This approach works better with existing filters than matchesQuery
+            // eslint-disable-next-line no-underscore-dangle
+            query._orQuery([
+              new Parse.Query(this.className).matches('email', searchRegex),
+              new Parse.Query(this.className).matches('firstName', searchRegex),
+              new Parse.Query(this.className).matches('lastName', searchRegex),
+              new Parse.Query(this.className).matches(
+                'contextualData.companyName',
+                searchRegex
+              ),
+            ]);
+
+            logger.info('Multi-field search applied', {
+              searchTerm: value,
+              fields: [
+                'email',
+                'firstName',
+                'lastName',
+                'contextualData.companyName',
+              ],
+            });
+
+            break;
+          }
           default:
             // Ignore unknown filter keys
             break;
@@ -1159,18 +1243,28 @@ class UserManagementService {
       'updatedAt',
       'lastLoginAt',
       'active',
+      'companyName', // Support sorting by company name
     ];
 
     if (allowedSortFields.includes(field)) {
-      if (direction === 'desc') {
+      // Special handling for nested field companyName
+      if (field === 'companyName') {
+        // Sort by contextualData.companyName which is a nested field
+        const sortField = 'contextualData.companyName';
+        if (direction === 'desc') {
+          query.descending(sortField);
+        } else {
+          query.ascending(sortField);
+        }
+      } else if (direction === 'desc') {
         query.descending(field);
       } else {
         query.ascending(field);
       }
     } else {
-      // Default sorting - ascending by lastName, then firstName
-      query.ascending('lastName');
-      query.addAscending('firstName');
+      // Default sorting - ascending by company name for clients view
+      query.ascending('contextualData.companyName');
+      query.addAscending('email');
     }
   }
 
@@ -1192,10 +1286,28 @@ class UserManagementService {
     // Query all existing users (exists: true), regardless of active status
     const countQuery = BaseModel.queryExisting(this.className);
 
-    await this.applyRoleBasedFiltering(countQuery, currentUser, targetRole);
+    // CRITICAL: Must match exact same filters as getUsers() method
+    // Filter by client organization roles (exclude Amexing internal users)
+    await this.filterByOrganization(countQuery, 'client');
+
+    // Apply role-based access filtering (targetRole specific filter)
+    // Note: Admin already filtered by organization, only apply specific targetRole if provided
+    if (targetRole) {
+      await this.filterByRoleName(countQuery, targetRole);
+    }
+
+    // Apply additional filters (search, active status, etc.)
     this.applyAdvancedFilters(countQuery, filters);
 
     const count = await countQuery.count({ useMasterKey: true });
+
+    logger.info('Total user count calculated', {
+      count,
+      targetRole,
+      organizationFilter: 'client',
+      filters,
+    });
+
     return count;
   }
 
@@ -1297,7 +1409,9 @@ class UserManagementService {
         // Check if it's a fetched Parse Object with .get() method
         if (rolePointer.get && typeof rolePointer.get === 'function') {
           roleName = rolePointer.get('name') || roleName;
-          roleDisplayName = rolePointer.get('displayName') || rolePointer.get('name') || roleName;
+          roleDisplayName = rolePointer.get('displayName')
+            || rolePointer.get('name')
+            || roleName;
           roleObjectId = rolePointer.id;
         } else if (typeof rolePointer === 'string') {
           // It's a string ID, keep the string role name
@@ -1321,6 +1435,13 @@ class UserManagementService {
     const active = user.get('active');
     const exists = user.get('exists');
 
+    // Get contextualData for additional user information
+    const contextualData = user.get('contextualData') || {};
+    const companyName = contextualData.companyName || user.get('companyName') || null;
+    const organizationId = user.get('organizationId');
+    const clientId = user.get('clientId');
+    const departmentId = user.get('departmentId');
+
     return {
       id: user.id,
       email: user.get('email'),
@@ -1342,6 +1463,13 @@ class UserManagementService {
       updatedAt: user.get('updatedAt'),
       createdBy: user.get('createdBy'),
       modifiedBy: user.get('modifiedBy'),
+      // Additional fields for client/organizational data
+      companyName,
+      organizationId,
+      organizationName: organizationId, // Alias for compatibility
+      clientId,
+      departmentId,
+      contextualData, // Include full contextual data object
     };
   }
 
@@ -1791,8 +1919,49 @@ class UserManagementService {
   }
 
   /**
+   * Get organization role filters for building queries.
+   * Returns roles and role names for both new RBAC and legacy formats.
+   * @param {string} organizationType - Organization type ('amexing' or 'client').
+   * @returns {Promise<{roles: Array, roleNames: Array}>} Role filters.
+   * @example
+   */
+  async getOrganizationRoleFilters(organizationType) {
+    try {
+      // Query Role table to get roles by organization
+      const roleQuery = new Parse.Query('Role');
+      roleQuery.equalTo('organization', organizationType);
+      roleQuery.equalTo('exists', true);
+
+      logger.info('Getting organization role filters', {
+        organizationType,
+      });
+
+      const roles = await roleQuery.find({ useMasterKey: true });
+      const roleNames = roles.map((r) => r.get('name'));
+
+      logger.info('Organization roles retrieved', {
+        organizationType,
+        rolesCount: roles.length,
+        roleNames,
+      });
+
+      return {
+        roles,
+        roleNames,
+      };
+    } catch (error) {
+      logger.error('Failed to get organization role filters', {
+        error: error.message,
+        stack: error.stack,
+        organizationType,
+      });
+      throw error;
+    }
+  }
+
+  /**
    * Filter query to include only users with specific organization type.
-   * Uses roleId Pointer to filter by role's organization field.
+   * Uses roleId Pointer to filter by role's organization field (new RBAC format).
    * @param {Parse.Query} query - Parse query object.
    * @param {string} organizationType - Organization type ('amexing' or 'client').
    * @example
@@ -1806,7 +1975,6 @@ class UserManagementService {
 
       logger.info('Filtering by organization', {
         organizationType,
-        queryConstraints: roleQuery.toJSON(),
       });
 
       const roles = await roleQuery.find({ useMasterKey: true });
@@ -1815,11 +1983,17 @@ class UserManagementService {
         organizationType,
         rolesCount: roles.length,
         roleNames: roles.map((r) => r.get('name')),
+        roleIds: roles.map((r) => r.id),
       });
 
       if (roles && roles.length > 0) {
         // Filter users by roleId Pointers
         query.containedIn('roleId', roles);
+
+        logger.info('Applied roleId filter to query', {
+          organizationType,
+          rolesCount: roles.length,
+        });
       } else {
         // If no roles found, return no results
         logger.warn('No roles found for organization type', {
