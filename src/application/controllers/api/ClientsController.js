@@ -478,6 +478,7 @@ class ClientsController {
    * @returns {object} - Parsed options object.
    * @example parseQueryParams({ page: '1', limit: '10', active: 'true' });
    */
+  /* eslint-disable max-lines-per-function */
   parseQueryParams(query) {
     const page = parseInt(query.page, 10) || 1;
     let limit = parseInt(query.limit, 10) || this.defaultPageSize;
@@ -572,7 +573,7 @@ class ClientsController {
     password += specialChars[Math.floor(Math.random() * specialChars.length)];
 
     // Fill remaining characters (12 total - 4 already added = 8 more)
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 8; i += 1) {
       password += allChars[Math.floor(Math.random() * allChars.length)];
     }
 
