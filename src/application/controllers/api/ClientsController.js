@@ -192,10 +192,11 @@ class ClientsController {
       }
 
       // Validate required fields
-      const requiredFields = ['firstName', 'lastName', 'email', 'companyName'];
-      const missingFields = requiredFields.filter(
-        (field) => !clientData[field]?.trim()
-      );
+      const missingFields = [];
+      if (!clientData.firstName?.trim()) missingFields.push('firstName');
+      if (!clientData.lastName?.trim()) missingFields.push('lastName');
+      if (!clientData.email?.trim()) missingFields.push('email');
+      if (!clientData.companyName?.trim()) missingFields.push('companyName');
 
       if (missingFields.length > 0) {
         return this.sendError(
