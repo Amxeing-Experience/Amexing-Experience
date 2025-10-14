@@ -24,6 +24,7 @@ const logger = require('../../../infrastructure/logger');
  * RolesController class implementing RESTful API for role viewing.
  * Read-only operations for security and system stability.
  */
+/* eslint-disable max-lines */
 class RolesController {
   constructor() {
     this.maxPageSize = 100;

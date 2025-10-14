@@ -24,6 +24,7 @@ const logger = require('../../../infrastructure/logger');
  * EmployeesController class implementing RESTful API for employee management.
  * Follows REST conventions and provides comprehensive error handling.
  */
+/* eslint-disable max-lines */
 class EmployeesController {
   constructor() {
     this.userService = new UserManagementService();
