@@ -49,13 +49,18 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
             <!-- Left Section -->
             <div class="d-flex align-items-center">
                 <!-- Mobile Sidebar Toggle -->
-                <button class="btn btn-link d-lg-none p-0 me-3"
-                        id="headerCollapse"
+                <button class="btn btn-link d-lg-none p-0 me-3 text-muted sidebar-toggle-mobile"
                         type="button"
-                        aria-label="Toggle sidebar">
-                    <i class="ti ti-menu-2 fs-6"></i>
+                        aria-label="Abrir menú">
+                    <i class="ti ti-menu-2 fs-5"></i>
                 </button>
 
+                <!-- Desktop Sidebar Toggle -->
+                <button class="btn btn-link d-none d-lg-block p-0 me-3 text-muted sidebar-toggle-desktop"
+                        type="button"
+                        aria-label="Colapsar menú">
+                    <i class="ti ti-menu-2 fs-5"></i>
+                </button>
             </div>
 
 
@@ -175,6 +180,125 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Sidebar toggle functionality
+    const sidebar = document.querySelector('.left-sidebar');
+    const mainContent = document.querySelector('.main-content');
+    const mobileToggle = document.querySelector('.sidebar-toggle-mobile');
+    const desktopToggle = document.querySelector('.sidebar-toggle-desktop');
+
+    // Mobile sidebar toggle
+    if (mobileToggle && sidebar) {
+        mobileToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const isCurrentlyOpen = sidebar.classList.contains('show');
+
+            if (isCurrentlyOpen) {
+                // Close sidebar
+                sidebar.classList.remove('show');
+                sidebar.style.setProperty('left', '-270px', 'important');
+                sidebar.style.setProperty('transform', 'none', 'important');
+                this.setAttribute('aria-label', 'Abrir menú');
+            } else {
+                // Open sidebar
+                sidebar.classList.add('show');
+                sidebar.style.setProperty('left', '0', 'important');
+                sidebar.style.setProperty('transform', 'none', 'important');
+                this.setAttribute('aria-label', 'Cerrar menú');
+            }
+        });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 991.98 &&
+                sidebar.classList.contains('show') &&
+                !sidebar.contains(e.target) &&
+                !mobileToggle.contains(e.target)) {
+                sidebar.classList.remove('show');
+                sidebar.style.setProperty('left', '-270px', 'important');
+                sidebar.style.setProperty('transform', 'none', 'important');
+                mobileToggle.setAttribute('aria-label', 'Abrir menú');
+            }
+        });
+    } else {
+        console.error('Mobile toggle or sidebar not found!');
+    }
+
+    // Desktop sidebar toggle with collapse
+    if (desktopToggle && sidebar && mainContent) {
+        // Check localStorage for saved state (default: expanded/false)
+        const savedState = localStorage.getItem('sidebarCollapsed');
+        const isCollapsed = savedState === 'true';
+
+        // Apply initial state
+        if (isCollapsed) {
+            sidebar.classList.add('collapsed');
+            mainContent.classList.add('sidebar-collapsed');
+        } else {
+            // Ensure it's expanded by default
+            sidebar.classList.remove('collapsed');
+            mainContent.classList.remove('sidebar-collapsed');
+        }
+
+        desktopToggle.addEventListener('click', function() {
+            const willBeCollapsed = sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('sidebar-collapsed');
+
+            // Save state to localStorage
+            localStorage.setItem('sidebarCollapsed', willBeCollapsed);
+
+            this.setAttribute('aria-label', willBeCollapsed ? 'Expandir menú' : 'Colapsar menú');
+        });
+    }
+
+    // Handle window resize and initial load
+    function handleSidebarResponsive() {
+        const isDesktop = window.innerWidth > 991.98;
+
+        if (isDesktop && sidebar && mainContent) {
+            sidebar.classList.remove('show');
+            // Remove all inline styles for desktop
+            sidebar.style.removeProperty('left');
+            sidebar.style.removeProperty('transform');
+
+            // Force desktop position
+            sidebar.style.setProperty('left', '0', 'important');
+
+            // Restore collapsed state if it was saved (default: expanded)
+            const savedState = localStorage.getItem('sidebarCollapsed');
+            const isCollapsed = savedState === 'true';
+
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('sidebar-collapsed');
+            } else {
+                // Default to expanded
+                sidebar.classList.remove('collapsed');
+                mainContent.classList.remove('sidebar-collapsed');
+            }
+
+            if (mobileToggle) {
+                mobileToggle.setAttribute('aria-label', 'Abrir menú');
+            }
+
+        } else if (!isDesktop && sidebar && mainContent && !sidebar.classList.contains('show')) {
+            // Ensure hidden in mobile
+            sidebar.style.setProperty('left', '-270px', 'important');
+            sidebar.style.setProperty('transform', 'none', 'important');
+
+            // Remove desktop collapsed states in mobile
+            sidebar.classList.remove('collapsed');
+            mainContent.classList.remove('sidebar-collapsed');
+        }
+    }
+
+    // Run on load
+    handleSidebarResponsive();
+
+    // Run on resize
+    window.addEventListener('resize', handleSidebarResponsive);
+
     /* TODO: Implementar notificaciones en el futuro
     // Load notifications
     loadNotifications();

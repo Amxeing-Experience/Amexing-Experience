@@ -1,39 +1,39 @@
 /**
- * ClientsController - RESTful API for Client Management.
- * Provides Ajax-ready endpoints for managing client organization users (department_manager role).
- * Restricted to SuperAdmin, Admin, and employee_amexing with specific permission.
+ * EmployeesController - RESTful API for Amexing Employee Management.
+ * Provides Ajax-ready endpoints for managing Amexing employee users (employee_amexing role).
+ * Restricted to SuperAdmin and Admin roles.
  *
  * Features:
  * - RESTful API design (GET, POST, PUT, DELETE, PATCH)
- * - SuperAdmin/Admin/employee_amexing (with permission) access control
- * - Manages: department_manager role users only
+ * - SuperAdmin/Admin access control
+ * - Manages: employee_amexing role users only
  * - Comprehensive security, validation, and audit logging.
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 0.1.0
  * @example
  * Usage example:
- * const controller = new ClientsController();
- * await controller.getClients(req, res);
+ * const controller = new EmployeesController();
+ * await controller.getEmployees(req, res);
  */
 
 const UserManagementService = require('../../services/UserManagementService');
 const logger = require('../../../infrastructure/logger');
 
 /**
- * ClientsController class implementing RESTful API for client management.
+ * EmployeesController class implementing RESTful API for employee management.
  * Follows REST conventions and provides comprehensive error handling.
  */
-class ClientsController {
+class EmployeesController {
   constructor() {
     this.userService = new UserManagementService();
     this.maxPageSize = 100;
     this.defaultPageSize = 25;
-    this.clientRole = 'department_manager';
+    this.employeeRole = 'employee_amexing';
   }
 
   /**
-   * GET /api/clients - Get client users (department_manager role) with filtering and pagination.
+   * GET /api/employees - Get employee users (employee_amexing role) with filtering and pagination.
    *
    * Query Parameters:
    * - page: Page number (default: 1)
@@ -46,9 +46,9 @@ class ClientsController {
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * GET /api/clients?page=1&limit=10&active=true
+   * GET /api/employees?page=1&limit=10&active=true
    */
-  async getClients(req, res) {
+  async getEmployees(req, res) {
     try {
       const currentUser = req.user;
       if (!currentUser) {
@@ -58,10 +58,11 @@ class ClientsController {
       // Parse and validate query parameters
       const options = this.parseQueryParams(req.query);
 
-      // Add role filter to specifically get department_manager users
-      options.targetRole = this.clientRole;
+      // Add role filter to get both employee_amexing and driver users
+      options.filters = options.filters || {};
+      options.filters.roleNames = ['employee_amexing', 'driver'];
 
-      // Get client users from service (filters by organization 'client' and role 'department_manager')
+      // Get employee users from service (filters by organization 'amexing' and roles 'employee_amexing' or 'driver')
       // Permission validation is done in middleware
       const result = await this.userService.getUsers(currentUser, options);
 
@@ -69,7 +70,7 @@ class ClientsController {
       const response = {
         ...result,
         requestMetadata: {
-          endpoint: 'getClients',
+          endpoint: 'getEmployees',
           requestedBy: currentUser.id,
           requestedRole: req.userRole,
           timestamp: new Date(),
@@ -77,9 +78,9 @@ class ClientsController {
         },
       };
 
-      this.sendSuccess(res, response, 'Clients retrieved successfully');
+      this.sendSuccess(res, response, 'Employees retrieved successfully');
     } catch (error) {
-      logger.error('Error in ClientsController.getClients', {
+      logger.error('Error in EmployeesController.getEmployees', {
         error: error.message,
         stack: error.stack,
         userId: req.user?.id,
@@ -92,57 +93,61 @@ class ClientsController {
         res,
         process.env.NODE_ENV === 'development'
           ? `Error: ${error.message}`
-          : 'Failed to retrieve clients',
+          : 'Failed to retrieve employees',
         500
       );
     }
   }
 
   /**
-   * GET /api/clients/:id - Get single client by ID.
+   * GET /api/employees/:id - Get single employee by ID.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * GET /api/clients/abc123
+   * GET /api/employees/abc123
    */
-  async getClientById(req, res) {
+  async getEmployeeById(req, res) {
     try {
       const currentUser = req.user;
-      const clientId = req.params.id;
+      const employeeId = req.params.id;
 
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      if (!clientId) {
-        return this.sendError(res, 'Client ID is required', 400);
+      if (!employeeId) {
+        return this.sendError(res, 'Employee ID is required', 400);
       }
 
       // Get user from service
-      const user = await this.userService.getUserById(currentUser, clientId);
+      const user = await this.userService.getUserById(currentUser, employeeId);
 
       if (!user) {
-        return this.sendError(res, 'Client not found', 404);
+        return this.sendError(res, 'Employee not found', 404);
       }
 
-      // Verify user is a client (department_manager role)
+      // Verify user is an employee (employee_amexing role)
       const role = user.roleId || user.role;
       const roleName = typeof role === 'string' ? role : role?.name;
 
-      if (roleName !== this.clientRole) {
+      if (roleName !== this.employeeRole) {
         return this.sendError(
           res,
-          'User is not a client (department_manager)',
+          'User is not an employee (employee_amexing)',
           403
         );
       }
 
-      this.sendSuccess(res, { client: user }, 'Client retrieved successfully');
+      this.sendSuccess(
+        res,
+        { employee: user },
+        'Employee retrieved successfully'
+      );
     } catch (error) {
-      logger.error('Error in ClientsController.getClientById', {
+      logger.error('Error in EmployeesController.getEmployeeById', {
         error: error.message,
-        clientId: req.params.id,
+        employeeId: req.params.id,
         currentUser: req.user?.id,
       });
 
@@ -151,49 +156,46 @@ class ClientsController {
   }
 
   /**
-   * POST /api/clients - Create new client user (department_manager role).
-   * Only SuperAdmin and Admin can create clients.
+   * POST /api/employees - Create new employee user (employee_amexing role).
+   * Only SuperAdmin and Admin can create employees.
    * Automatically generates secure password and forces password change on first login.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * POST /api/clients
+   * POST /api/employees
    * Body: {
    *   firstName: 'John',
    *   lastName: 'Doe',
-   *   email: 'john@company.com',
-   *   companyName: 'ACME Corp',
+   *   email: 'john@amexing.com',
    *   phone: '+52 999 123 4567',
-   *   taxId: 'ABC123456XXX',
-   *   website: 'https://acme.com',
-   *   address: { street: 'Main St 123', city: 'Merida', state: 'Yucatan', zipCode: '97000', country: 'Mexico' },
-   *   notes: 'Premium client'
+   *   department: 'Operations',
+   *   notes: 'Operations coordinator'
    * }
    */
-  async createClient(req, res) {
+  async createEmployee(req, res) {
     try {
       const currentUser = req.user;
-      const clientData = req.body;
+      const employeeData = req.body;
 
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      // Validate user role (only superadmin and admin can create clients)
+      // Validate user role (only superadmin and admin can create employees)
       const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
       if (!['superadmin', 'admin'].includes(currentUserRole)) {
         return this.sendError(
           res,
-          'Access denied. Only SuperAdmin or Admin can create clients.',
+          'Access denied. Only SuperAdmin or Admin can create employees.',
           403
         );
       }
 
       // Validate required fields
-      const requiredFields = ['firstName', 'lastName', 'email', 'companyName'];
+      const requiredFields = ['firstName', 'lastName', 'email', 'role'];
       const missingFields = requiredFields.filter(
-        (field) => !clientData[field]?.trim()
+        (field) => !employeeData[field]?.trim()
       );
 
       if (missingFields.length > 0) {
@@ -204,47 +206,55 @@ class ClientsController {
         );
       }
 
+      // Validate role (only employee_amexing and driver are allowed)
+      const allowedRoles = ['employee_amexing', 'driver'];
+      if (!allowedRoles.includes(employeeData.role)) {
+        return this.sendError(
+          res,
+          `Rol inválido. Los roles permitidos son: ${allowedRoles.join(', ')}`,
+          400
+        );
+      }
+
       // Email format validation
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(clientData.email)) {
+      if (!emailRegex.test(employeeData.email)) {
         return this.sendError(res, 'Formato de email inválido', 400);
       }
 
       // Generate username from email (lowercase)
-      clientData.username = clientData.email.toLowerCase();
+      employeeData.username = employeeData.email.toLowerCase();
 
-      // Force client organization
-      clientData.organizationId = 'client';
+      // Force Amexing organization
+      employeeData.organizationId = 'amexing';
 
-      // Find and assign the department_manager roleId
+      // Find and assign the roleId based on the provided role
       const Parse = require('parse/node');
       const roleQuery = new Parse.Query('Role');
-      roleQuery.equalTo('name', this.clientRole); // 'department_manager'
+      roleQuery.equalTo('name', employeeData.role); // Use role from body
       roleQuery.equalTo('active', true);
       roleQuery.equalTo('exists', true);
       const roleObject = await roleQuery.first({ useMasterKey: true });
 
       if (!roleObject) {
         throw new Error(
-          `Role '${this.clientRole}' not found in database. Please ensure roles are properly configured.`
+          `Role '${employeeData.role}' not found in database. Please ensure roles are properly configured.`
         );
       }
 
       // Set roleId as Pointer to Role object
-      clientData.roleId = roleObject.id;
-      // Also set legacy role field for backward compatibility
-      clientData.role = this.clientRole;
+      employeeData.roleId = roleObject.id;
+      // Keep role field as provided
 
       // Generate secure random password
-      clientData.password = this.generateSecurePassword();
-      clientData.mustChangePassword = true;
+      employeeData.password = this.generateSecurePassword();
+      employeeData.mustChangePassword = true;
 
-      // Store company info in contextualData for easy retrieval and filtering
-      clientData.contextualData = {
-        companyName: clientData.companyName,
-        taxId: clientData.taxId || null,
-        website: clientData.website || null,
-        notes: clientData.notes || '',
+      // Store employee info in contextualData for easy retrieval and filtering
+      employeeData.contextualData = {
+        department: employeeData.department || null,
+        position: employeeData.position || null,
+        notes: employeeData.notes || '',
         createdVia: 'admin_panel',
       };
 
@@ -253,16 +263,16 @@ class ClientsController {
       const userWithRole = currentUser;
       userWithRole.role = currentUserRole;
 
-      // Create client user via UserManagementService
+      // Create employee user via UserManagementService
       const result = await this.userService.createUser(
-        clientData,
+        employeeData,
         userWithRole
       );
 
-      logger.info('Client created successfully', {
-        clientId: result.user?.id,
-        companyName: clientData.companyName,
-        email: clientData.email,
+      logger.info('Employee created successfully', {
+        employeeId: result.user?.id,
+        email: employeeData.email,
+        department: employeeData.department,
         createdBy: currentUser.id,
         createdByRole: currentUserRole,
       });
@@ -271,19 +281,19 @@ class ClientsController {
       this.sendSuccess(
         res,
         {
-          client: result.user,
+          employee: result.user,
           message:
-            'Cliente creado exitosamente. Se ha generado una contraseña temporal.',
+            'Empleado creado exitosamente. Se ha generado una contraseña temporal.',
         },
-        'Cliente creado exitosamente',
+        'Empleado creado exitosamente',
         201
       );
     } catch (error) {
-      logger.error('Error in ClientsController.createClient', {
+      logger.error('Error in EmployeesController.createEmployee', {
         error: error.message,
         stack: error.stack,
         currentUser: req.user?.id,
-        clientData: { ...req.body, password: '[REDACTED]' },
+        employeeData: { ...req.body, password: '[REDACTED]' },
       });
 
       // Handle specific errors
@@ -296,60 +306,60 @@ class ClientsController {
   }
 
   /**
-   * PUT /api/clients/:id - Update client user.
-   * Only SuperAdmin and Admin can update clients.
+   * PUT /api/employees/:id - Update employee user.
+   * Only SuperAdmin and Admin can update employees.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * PUT /api/clients/abc123
-   * Body: { firstName: 'Jane', active: true, companyName: 'ACME Corporation' }
+   * PUT /api/employees/abc123
+   * Body: { firstName: 'Jane', active: true, department: 'Logistics' }
    */
-  async updateClient(req, res) {
+  async updateEmployee(req, res) {
     try {
       const currentUser = req.user;
-      const clientId = req.params.id;
+      const employeeId = req.params.id;
       const updateData = req.body;
 
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      if (!clientId) {
-        return this.sendError(res, 'Client ID is required', 400);
+      if (!employeeId) {
+        return this.sendError(res, 'Employee ID is required', 400);
       }
 
-      // Validate user role (only superadmin and admin can update clients)
+      // Validate user role (only superadmin and admin can update employees)
       const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
       if (!['superadmin', 'admin'].includes(currentUserRole)) {
         return this.sendError(
           res,
-          'Access denied. Only SuperAdmin or Admin can modify clients.',
+          'Access denied. Only SuperAdmin or Admin can modify employees.',
           403
         );
       }
 
-      // Prevent role change - clients must remain department_manager
-      if (updateData.role && updateData.role !== this.clientRole) {
+      // Prevent role change - employees must remain employee_amexing
+      if (updateData.role && updateData.role !== this.employeeRole) {
         return this.sendError(
           res,
-          `Cannot change client role. Must be ${this.clientRole}`,
+          `Cannot change employee role. Must be ${this.employeeRole}`,
           400
         );
       }
 
       // Update user using service
       const result = await this.userService.updateUser(
-        clientId,
+        employeeId,
         updateData,
         currentUser
       );
 
-      this.sendSuccess(res, result, 'Client updated successfully');
+      this.sendSuccess(res, result, 'Employee updated successfully');
     } catch (error) {
-      logger.error('Error in ClientsController.updateClient', {
+      logger.error('Error in EmployeesController.updateEmployee', {
         error: error.message,
-        clientId: req.params.id,
+        employeeId: req.params.id,
         currentUser: req.user?.id,
       });
 
@@ -358,48 +368,48 @@ class ClientsController {
   }
 
   /**
-   * DELETE /api/clients/:id - Deactivate (soft delete) client user.
-   * Only SuperAdmin and Admin can delete clients.
+   * DELETE /api/employees/:id - Deactivate (soft delete) employee user.
+   * Only SuperAdmin and Admin can delete employees.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * DELETE /api/clients/abc123
+   * DELETE /api/employees/abc123
    */
-  async deactivateClient(req, res) {
+  async deactivateEmployee(req, res) {
     try {
       const currentUser = req.user;
-      const clientId = req.params.id;
+      const employeeId = req.params.id;
 
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      if (!clientId) {
-        return this.sendError(res, 'Client ID is required', 400);
+      if (!employeeId) {
+        return this.sendError(res, 'Employee ID is required', 400);
       }
 
-      // Validate user role (only superadmin and admin can delete clients)
+      // Validate user role (only superadmin and admin can delete employees)
       const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
       if (!['superadmin', 'admin'].includes(currentUserRole)) {
         return this.sendError(
           res,
-          'Access denied. Only SuperAdmin or Admin can delete clients.',
+          'Access denied. Only SuperAdmin or Admin can delete employees.',
           403
         );
       }
 
-      // Deactivate client using service
+      // Deactivate employee using service
       const result = await this.userService.deactivateUser(
-        clientId,
+        employeeId,
         currentUser
       );
 
-      this.sendSuccess(res, result, 'Client deactivated successfully');
+      this.sendSuccess(res, result, 'Employee deactivated successfully');
     } catch (error) {
-      logger.error('Error in ClientsController.deactivateClient', {
+      logger.error('Error in EmployeesController.deactivateEmployee', {
         error: error.message,
-        clientId: req.params.id,
+        employeeId: req.params.id,
         currentUser: req.user?.id,
       });
 
@@ -408,39 +418,39 @@ class ClientsController {
   }
 
   /**
-   * PATCH /api/clients/:id/toggle-status - Toggle active/inactive status.
-   * Only SuperAdmin and Admin can toggle client status.
+   * PATCH /api/employees/:id/toggle-status - Toggle active/inactive status.
+   * Only SuperAdmin and Admin can toggle employee status.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * PATCH /api/clients/abc123/toggle-status
+   * PATCH /api/employees/abc123/toggle-status
    * Body: { active: false }
    */
-  async toggleClientStatus(req, res) {
+  async toggleEmployeeStatus(req, res) {
     try {
       const currentUser = req.user;
-      const clientId = req.params.id;
+      const employeeId = req.params.id;
       const { active } = req.body;
 
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      if (!clientId) {
-        return this.sendError(res, 'Client ID is required', 400);
+      if (!employeeId) {
+        return this.sendError(res, 'Employee ID is required', 400);
       }
 
       if (typeof active !== 'boolean') {
         return this.sendError(res, 'Active status must be a boolean', 400);
       }
 
-      // Validate user role (only superadmin and admin can toggle client status)
+      // Validate user role (only superadmin and admin can toggle employee status)
       const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
       if (!['superadmin', 'admin'].includes(currentUserRole)) {
         return this.sendError(
           res,
-          'Access denied. Only SuperAdmin or Admin can modify client status.',
+          'Access denied. Only SuperAdmin or Admin can modify employee status.',
           403
         );
       }
@@ -448,20 +458,20 @@ class ClientsController {
       // Toggle status using service
       const result = await this.userService.toggleUserStatus(
         currentUser,
-        clientId,
+        employeeId,
         active,
-        'Status changed via clients dashboard'
+        'Status changed via employees dashboard'
       );
 
       this.sendSuccess(
         res,
         result,
-        `Client ${active ? 'activated' : 'deactivated'} successfully`
+        `Employee ${active ? 'activated' : 'deactivated'} successfully`
       );
     } catch (error) {
-      logger.error('Error in ClientsController.toggleClientStatus', {
+      logger.error('Error in EmployeesController.toggleEmployeeStatus', {
         error: error.message,
-        clientId: req.params.id,
+        employeeId: req.params.id,
         currentUser: req.user?.id,
       });
 
@@ -546,7 +556,7 @@ class ClientsController {
   }
 
   /**
-   * Generate secure random password for new clients.
+   * Generate secure random password for new employees.
    * Creates a 12-character password with guaranteed mixed case, numbers, and symbols.
    * Ensures compliance with Parse Server password validation requirements.
    * @returns {string} - Secure random password.
@@ -585,4 +595,4 @@ class ClientsController {
   }
 }
 
-module.exports = ClientsController;
+module.exports = EmployeesController;

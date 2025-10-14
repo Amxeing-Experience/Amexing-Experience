@@ -25,13 +25,8 @@ class AdminController extends RoleBasedController {
    */
   async index(req, res) {
     try {
-      const stats = await this.getOperationalStats();
-      const recentBookings = await this.getRecentBookings();
-
       await this.renderRoleView(req, res, 'index', {
-        title: 'Admin Dashboard',
-        stats,
-        recentBookings,
+        title: 'Tablero de Control',
         breadcrumb: null,
       });
     } catch (error) {
@@ -58,10 +53,7 @@ class AdminController extends RoleBasedController {
     try {
       await this.renderRoleView(req, res, 'clients', {
         title: 'Gestión de Clientes',
-        breadcrumb: {
-          title: 'Clients',
-          items: [{ name: 'Clients', active: true }],
-        },
+        breadcrumb: null, // Disable automatic breadcrumb
         pageStyles: [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
@@ -75,6 +67,140 @@ class AdminController extends RoleBasedController {
         `,
       });
     } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Client detail page.
+   * Shows complete client information with vertical navigation menu.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await clientDetail(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async clientDetail(req, res) {
+    try {
+      const clientId = req.params.id;
+      const currentUser = req.user;
+
+      if (!clientId) {
+        return this.handleError(
+          res,
+          new Error('ID de cliente no proporcionado'),
+          400
+        );
+      }
+
+      if (!currentUser) {
+        return this.handleError(res, new Error('Autenticación requerida'), 401);
+      }
+
+      // Use UserManagementService directly instead of HTTP call
+      const UserManagementService = require('../../services/UserManagementService');
+      const userService = new UserManagementService();
+
+      // Get client data from service
+      const client = await userService.getUserById(currentUser, clientId);
+
+      if (!client) {
+        return this.handleError(res, new Error('Cliente no encontrado'), 404);
+      }
+
+      // Log role for debugging (optional - can be removed in production)
+      const role = client.roleId || client.role;
+      const roleName = typeof role === 'string' ? role : role?.name;
+      const logger = require('../../../infrastructure/logger');
+      logger.info('Client detail view accessed', {
+        clientId,
+        roleName,
+        accessedBy: currentUser.id,
+      });
+
+      // Transform Parse object to plain object if needed
+      const clientData = {
+        id: client.id || client.objectId,
+        firstName: client.firstName || client.get?.('firstName'),
+        lastName: client.lastName || client.get?.('lastName'),
+        email: client.email || client.get?.('email'),
+        username: client.username || client.get?.('username'),
+        phone: client.phone || client.get?.('phone'),
+        active:
+          typeof client.active !== 'undefined'
+            ? client.active
+            : client.get?.('active'),
+        companyName:
+          client.companyName
+          || client.get?.('companyName')
+          || client.contextualData?.companyName
+          || client.get?.('contextualData')?.companyName,
+        taxId:
+          client.taxId
+          || client.get?.('taxId')
+          || client.contextualData?.taxId
+          || client.get?.('contextualData')?.taxId,
+        website:
+          client.website
+          || client.get?.('website')
+          || client.contextualData?.website
+          || client.get?.('contextualData')?.website,
+        notes:
+          client.notes
+          || client.get?.('notes')
+          || client.contextualData?.notes
+          || client.get?.('contextualData')?.notes,
+        address: client.address || client.get?.('address') || {},
+        contextualData:
+          client.contextualData || client.get?.('contextualData') || {},
+        createdAt: client.createdAt || client.get?.('createdAt'),
+        updatedAt: client.updatedAt || client.get?.('updatedAt'),
+      };
+
+      // Determine active section (default: information)
+      const section = req.query.section || 'information';
+
+      // Prepare view data
+      const viewData = {
+        title: `Cliente: ${clientData.companyName || 'Sin nombre'}`,
+        client: clientData,
+        section,
+        breadcrumb: null, // Disable automatic breadcrumb generation
+      };
+
+      // Add DataTables assets if employees section is active
+      if (section === 'employees') {
+        viewData.pageStyles = [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ];
+
+        viewData.footerScripts = `
+          <!-- DataTables Core -->
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `;
+      }
+
+      // Use renderRoleView which handles the layout properly
+      await this.renderRoleView(req, res, 'client-detail', viewData);
+    } catch (error) {
+      const logger = require('../../../infrastructure/logger');
+      logger.error('Error in AdminController.clientDetail', {
+        error: error.message,
+        stack: error.stack,
+        clientId: req.params.id,
+        userId: req.user?.id,
+      });
       this.handleError(res, error);
     }
   }
@@ -127,12 +253,19 @@ class AdminController extends RoleBasedController {
   async employees(req, res) {
     try {
       await this.renderRoleView(req, res, 'employees', {
-        title: 'Employee Management',
-        employees: [],
-        breadcrumb: {
-          title: 'Employees',
-          items: [{ name: 'Employees', active: true }],
-        },
+        title: 'Gestión de Empleados',
+        breadcrumb: null, // Disable automatic breadcrumb
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <!-- DataTables Core -->
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
       });
     } catch (error) {
       this.handleError(res, error);
@@ -187,12 +320,60 @@ class AdminController extends RoleBasedController {
   async bookings(req, res) {
     try {
       await this.renderRoleView(req, res, 'bookings', {
-        title: 'Booking Management',
-        bookings: [],
-        breadcrumb: {
-          title: 'Bookings',
-          items: [{ name: 'Bookings', active: true }],
-        },
+        title: 'Gestión de Reservaciones',
+        breadcrumb: null, // Disable automatic breadcrumb
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Events management page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await events(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async events(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'events', {
+        title: 'Gestión de Eventos',
+        breadcrumb: null, // Disable automatic breadcrumb
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Schedule calendar page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await schedule(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async schedule(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'schedule', {
+        title: 'Calendario de Programación',
+        breadcrumb: null, // Disable automatic breadcrumb
       });
     } catch (error) {
       this.handleError(res, error);
@@ -307,12 +488,8 @@ class AdminController extends RoleBasedController {
   async reports(req, res) {
     try {
       await this.renderRoleView(req, res, 'reports', {
-        title: 'Operational Reports',
-        reports: [],
-        breadcrumb: {
-          title: 'Reports',
-          items: [{ name: 'Reports', active: true }],
-        },
+        title: 'Reportes Operacionales',
+        breadcrumb: null, // Disable automatic breadcrumb
       });
     } catch (error) {
       this.handleError(res, error);

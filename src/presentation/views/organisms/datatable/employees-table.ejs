@@ -1,7 +1,8 @@
 <%
 /**
- * Clients DataTable Organism
- * Advanced DataTable component for client management (department_manager role users)
+ * Employees DataTable Organism
+ * Advanced DataTable component for employee management within a client organization
+ * Supports both 'client' (Agent) and 'employee' roles
  *
  * Atomic Design Level: Organism
  * Category: Dashboard Data Tables
@@ -11,8 +12,9 @@
  * - Uses: Bootstrap buttons, badges, modals (molecules)
  * - Integrates: Alert system, loading states (atoms)
  *
- * @param {string} tableId - Unique table identifier (default: 'clients-table')
- * @param {string} apiEndpoint - API endpoint for data loading (default: '/api/clients')
+ * @param {string} tableId - Unique table identifier (default: 'employees-table')
+ * @param {string} clientId - Client ID for nested endpoint
+ * @param {string} apiEndpoint - API endpoint for data loading (default: '/api/clients/:clientId/employees')
  * @param {string} userRole - Current user role for permission-based features (default: 'admin')
  * @param {boolean} showActions - Whether to show action buttons (default: true)
  *
@@ -23,11 +25,13 @@
  * - Accessibility compliant (ARIA labels, keyboard navigation)
  * - Responsive design with mobile-friendly layout
  * - CSP-compliant event handling (no inline handlers)
+ * - Role filter: Agent (client) vs Employee (employee)
  */
 
 // Component Configuration
-const dtTableId = typeof tableId !== 'undefined' ? tableId : 'clients-table';
-const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/clients';
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'employees-table';
+const dtClientId = typeof clientId !== 'undefined' ? clientId : '';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : `/api/clients/${dtClientId}/employees`;
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
@@ -35,30 +39,30 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+
+// Role translations
+const roleLabels = {
+  client: 'Agent',
+  employee: 'Empleado'
+};
 %>
 
 <div class="card border-0 shadow-sm">
-    <div class="card-header text-white" style="background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%); border: none;">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #5a6a85 0%, #7a8a9f 100%); border: none;">
         <div class="row align-items-center">
             <div class="col">
                 <h5 class="card-title mb-0 text-white">
-                    <i class="ti ti-building me-2"></i>
-                    Gestión de Clientes
+                    <i class="ti ti-users me-2"></i>
+                    Empleados de la Agencia
                 </h5>
-                <small class="text-white" style="opacity: 0.9;">Administra empresas clientes y sus configuraciones</small>
+                <small class="text-white" style="opacity: 0.9;">Gestiona agentes y empleados de la empresa</small>
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createClientModal">
-                            <i class="ti ti-plus me-1"></i>
-                            Nuevo Cliente
-                        </button>
-                        <button type="button" class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#bulkImportModal">
-                            <i class="ti ti-file-upload me-1"></i>
-                            Carga Masiva
-                        </button>
-                    </div>
+                    <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#createEmployeeModal">
+                        <i class="ti ti-plus me-1"></i>
+                        Nuevo Empleado
+                    </button>
                 <% } %>
             </div>
         </div>
@@ -70,8 +74,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
                 <thead class="table-light">
                     <tr>
-                        <th>Empresa</th>
+                        <th>Nombre Completo</th>
                         <th>Email</th>
+                        <th>Rol</th>
                         <th>Estado</th>
                         <th>Registro</th>
                         <% if (dtShowActions && (canEdit || canDelete)) { %>
@@ -84,8 +89,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 </tbody>
                 <tfoot class="table-light">
                     <tr>
-                        <th>Empresa</th>
+                        <th>Nombre Completo</th>
                         <th>Email</th>
+                        <th>Rol</th>
                         <th>Estado</th>
                         <th>Registro</th>
                         <% if (dtShowActions && (canEdit || canDelete)) { %>
@@ -101,13 +107,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 <!-- DataTable Configuration and Initialization Script -->
 <script>
 /**
- * Clients DataTable JavaScript Module
+ * Employees DataTable JavaScript Module
  *
  * Structure:
  * 1. Data Loading & Initialization
  * 2. DataTable Configuration
  * 3. Alert/Notification System
- * 4. Client Action Functions (Toggle Status, Delete)
+ * 4. Employee Action Functions (Toggle Status, Delete)
  * 5. Event Delegation Setup
  * 6. Module Initialization
  */
@@ -121,13 +127,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
  * No need to pre-load data, DataTable will fetch it via AJAX
  * @returns {void}
  */
-function loadClientsAndInitializeTable() {
+function loadEmployeesAndInitializeTable() {
     try {
         // Initialize DataTable - it will handle data loading via AJAX
-        initializeClientsDataTable();
+        initializeEmployeesDataTable();
     } catch (error) {
-        console.error('Error initializing clients table:', error);
-        showErrorAlert('Error al inicializar la tabla de clientes: ' + error.message);
+        console.error('Error initializing employees table:', error);
+        showErrorAlert('Error al inicializar la tabla de empleados: ' + error.message);
     }
 }
 
@@ -137,26 +143,35 @@ function loadClientsAndInitializeTable() {
 
 /**
  * Initialize DataTables with server-side processing
- * @param {number} totalCount - Total number of records
  */
-function initializeClientsDataTable(totalCount) {
+function initializeEmployeesDataTable() {
     // Destroy existing table if it exists
-    if (window.clientsTable) {
-        window.clientsTable.destroy();
+    if (window.employeesTable) {
+        window.employeesTable.destroy();
     }
 
     // Initialize DataTable with server-side processing
-    window.clientsTable = $('#<%= dtTableId %>').DataTable({
-        processing: true, // Enable native processing indicator
+    window.employeesTable = $('#<%= dtTableId %>').DataTable({
+        processing: false,
         serverSide: true,
-        searchDelay: 300, // Wait 300ms after user stops typing before searching
+        searchDelay: 500,
         ajax: function(data, callback, settings) {
+            // Show loading overlay
+            const $table = $('#<%= dtTableId %>');
+            const $wrapper = $table.closest('.dataTables_wrapper');
+
+            // Add loading state
+            $wrapper.addClass('datatable-loading');
+            $table.css('opacity', '0.5');
+
+            // Disable pagination buttons during load
+            $wrapper.find('.paginate_button').addClass('disabled').css('pointer-events', 'none');
 
             // Map DataTables parameters to API parameters
             const params = new URLSearchParams({
                 page: Math.floor(data.start / data.length) + 1,
                 limit: data.length,
-                sortField: data.columns[data.order[0].column].data || 'companyName',
+                sortField: data.columns[data.order[0].column].data || 'lastName',
                 sortDirection: data.order[0].dir
             });
 
@@ -181,16 +196,11 @@ function initializeClientsDataTable(totalCount) {
             })
             .then(json => {
                 if (!json.success) {
-                    throw new Error(json.error || 'Failed to load clients');
+                    throw new Error(json.error || 'Failed to load employees');
                 }
 
-                // Update total count display
-                const totalCount = json.data?.pagination?.totalCount || 0;
-                document.dispatchEvent(new CustomEvent('clientsTableLoaded', {
-                    detail: { count: totalCount }
-                }));
-
                 // Return data in the format DataTables expects
+                const totalCount = json.data?.pagination?.totalCount || 0;
                 callback({
                     draw: data.draw,
                     recordsTotal: totalCount,
@@ -200,7 +210,7 @@ function initializeClientsDataTable(totalCount) {
             })
             .catch(error => {
                 console.error('DataTable AJAX error:', error);
-                showErrorAlert('Error al cargar los datos de clientes: ' + error.message);
+                showErrorAlert('Error al cargar los datos de empleados: ' + error.message);
 
                 // Return empty result on error
                 callback({
@@ -209,21 +219,44 @@ function initializeClientsDataTable(totalCount) {
                     recordsFiltered: 0,
                     data: []
                 });
+            })
+            .finally(() => {
+                // Remove loading state
+                $wrapper.removeClass('datatable-loading');
+                $table.css('opacity', '1');
+
+                // Re-enable pagination buttons
+                $wrapper.find('.paginate_button').removeClass('disabled').css('pointer-events', '');
             });
         },
         columns: [
             {
-                data: 'companyName',
+                data: null,
                 render: function(data, type, row) {
-                    // Get company name from various possible fields
-                    const companyName = row.companyName || row.organizationName || row.company || '-';
-                    return `<strong class="text-dark">${companyName}</strong>`;
+                    const firstName = row.firstName || '';
+                    const lastName = row.lastName || '';
+                    const fullName = `${firstName} ${lastName}`.trim() || '-';
+                    return `<strong class="text-dark">${fullName}</strong>`;
                 }
             },
             {
                 data: 'email',
                 render: function(data, type, row) {
                     return `<a href="mailto:${data}" class="text-decoration-none">${data}</a>`;
+                }
+            },
+            {
+                data: null,
+                render: function(data, type, row) {
+                    const roleLabels = {
+                        client: 'Agent',
+                        employee: 'Empleado'
+                    };
+                    const role = row.role || row.roleId?.name || 'employee';
+                    const roleName = typeof role === 'string' ? role : role.name || 'employee';
+                    const roleLabel = roleLabels[roleName] || roleName;
+                    const badgeClass = roleName === 'client' ? 'bg-info' : 'bg-secondary';
+                    return `<span class="badge ${badgeClass}">${roleLabel}</span>`;
                 }
             },
             {
@@ -255,15 +288,6 @@ function initializeClientsDataTable(totalCount) {
                 render: function(data, type, row) {
                     let actions = '<div class="btn-group btn-group-sm" role="group">';
 
-                    /* View detail button - always visible */
-                    actions += `<a href="/dashboard/admin/clients/${row.id}"
-                                class="btn btn-info"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="Ver Detalle">
-                                <i class="ti ti-eye"></i>
-                            </a>`;
-
                     <% if (canEdit) { %>
                     /* Toggle status button */
                     const statusIcon = row.active ? 'ti-user-off' : 'ti-user-check';
@@ -271,8 +295,8 @@ function initializeClientsDataTable(totalCount) {
                     const statusClass = row.active ? 'btn-warning' : 'btn-success';
 
                     actions += `<button type="button"
-                                class="btn ${statusClass} btn-toggle-status"
-                                data-client-id="${row.id}"
+                                class="btn ${statusClass} btn-toggle-employee-status"
+                                data-employee-id="${row.id}"
                                 data-current-status="${row.active}"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="top"
@@ -283,10 +307,11 @@ function initializeClientsDataTable(totalCount) {
 
                     <% if (canDelete) { %>
                     /* Delete button */
+                    const employeeName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'este empleado';
                     actions += `<button type="button"
-                                class="btn btn-danger btn-delete-client"
-                                data-client-id="${row.id}"
-                                data-client-name="${row.firstName} ${row.lastName}"
+                                class="btn btn-danger btn-delete-employee"
+                                data-employee-id="${row.id}"
+                                data-employee-name="${employeeName}"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="top"
                                 title="Eliminar">
@@ -304,8 +329,8 @@ function initializeClientsDataTable(totalCount) {
         lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
         responsive: true,
         dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
-        order: [[0, 'asc']], // Order by company name
-        pagingType: 'full_numbers', // Shows: First Previous [1] [2] [3] ... [40] Next Last
+        order: [[0, 'asc']], // Order by name
+        pagingType: 'full_numbers',
         language: {
             processing: "Procesando...",
             search: "Buscar:",
@@ -314,8 +339,8 @@ function initializeClientsDataTable(totalCount) {
             infoEmpty: "Mostrando 0 a 0 de 0 registros",
             infoFiltered: "(filtrado de _MAX_ registros totales)",
             loadingRecords: "Cargando...",
-            zeroRecords: "No se encontraron registros coincidentes",
-            emptyTable: "No hay datos disponibles en la tabla",
+            zeroRecords: "No se encontraron empleados coincidentes",
+            emptyTable: "No hay empleados registrados",
             paginate: {
                 first: "Primero",
                 previous: "Anterior",
@@ -324,13 +349,12 @@ function initializeClientsDataTable(totalCount) {
             }
         },
         drawCallback: function(settings) {
-            // Customize pagination: mark ellipsis with class for better UX
+            // Customize pagination
             const $pagination = $('.dataTables_paginate');
             $pagination.find('.paginate_button').each(function() {
                 const $btn = $(this);
                 const text = $btn.text().trim();
 
-                // Mark ellipsis buttons to make them visually distinct
                 if (text === '…' || text === '...') {
                     $btn.addClass('ellipsis');
                     $btn.prop('title', 'Más páginas disponibles');
@@ -401,15 +425,15 @@ function showErrorAlert(message) {
 }
 
 // ============================================================================
-// 4. CLIENT ACTION FUNCTIONS
+// 4. EMPLOYEE ACTION FUNCTIONS
 // ============================================================================
 
 /**
- * Toggle client active status
- * @param {string} clientId - Client ID
+ * Toggle employee active status
+ * @param {string} employeeId - Employee ID
  * @param {boolean} currentStatus - Current active status
  */
-function toggleClientStatus(clientId, currentStatus) {
+function toggleEmployeeStatus(employeeId, currentStatus) {
     const newStatus = !currentStatus;
     const action = newStatus ? 'activar' : 'desactivar';
     const actionTitle = newStatus ? 'Activar' : 'Desactivar';
@@ -417,19 +441,19 @@ function toggleClientStatus(clientId, currentStatus) {
 
     // Create confirmation modal
     const modalHtml = `
-        <div class="modal fade" id="confirmToggleModal" tabindex="-1">
+        <div class="modal fade" id="confirmToggleEmployeeModal" tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title">${actionTitle} Cliente</h5>
+                        <h5 class="modal-title">${actionTitle} Empleado</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <p>¿Estás seguro de que deseas ${action} este cliente?</p>
+                        <p>¿Estás seguro de que deseas ${action} este empleado?</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn ${btnClass}" id="confirmToggleBtn">${actionTitle}</button>
+                        <button type="button" class="btn ${btnClass}" id="confirmToggleEmployeeBtn">${actionTitle}</button>
                     </div>
                 </div>
             </div>
@@ -437,29 +461,29 @@ function toggleClientStatus(clientId, currentStatus) {
     `;
 
     // Remove existing modal if any
-    const existingModal = document.getElementById('confirmToggleModal');
+    const existingModal = document.getElementById('confirmToggleEmployeeModal');
     if (existingModal) existingModal.remove();
 
     // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('confirmToggleModal'));
+    const modal = new bootstrap.Modal(document.getElementById('confirmToggleEmployeeModal'));
     modal.show();
 
     // Handle confirmation
-    document.getElementById('confirmToggleBtn').addEventListener('click', async function() {
+    document.getElementById('confirmToggleEmployeeBtn').addEventListener('click', async function() {
         modal.hide();
-        await executeToggleStatus(clientId, newStatus);
+        await executeToggleEmployeeStatus(employeeId, newStatus);
     });
 }
 
 /**
  * Execute toggle status API call
  */
-async function executeToggleStatus(clientId, newStatus) {
+async function executeToggleEmployeeStatus(employeeId, newStatus) {
     try {
-        const response = await fetch(`<%= dtApiEndpoint %>/${clientId}/toggle-status`, {
+        const response = await fetch(`<%= dtApiEndpoint %>/${employeeId}/toggle-status`, {
             method: 'PATCH',
             credentials: 'include',
             headers: {
@@ -472,41 +496,41 @@ async function executeToggleStatus(clientId, newStatus) {
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Error al cambiar el estado del cliente');
+            throw new Error(result.error || 'Error al cambiar el estado del empleado');
         }
 
-        showSuccessAlert(`Cliente ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+        showSuccessAlert(`Empleado ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
         // Reload table data
-        window.clientsTable.ajax.reload(null, false);
+        window.employeesTable.ajax.reload(null, false);
 
     } catch (error) {
-        console.error('Error toggling client status:', error);
-        showErrorAlert(error.message || 'Error al cambiar el estado del cliente. Por favor, intenta nuevamente.');
+        console.error('Error toggling employee status:', error);
+        showErrorAlert(error.message || 'Error al cambiar el estado del empleado. Por favor, intenta nuevamente.');
     }
 }
 
 /**
- * Delete (soft delete) client
- * @param {string} clientId - Client ID
- * @param {string} clientName - Client name for confirmation
+ * Delete (soft delete) employee
+ * @param {string} employeeId - Employee ID
+ * @param {string} employeeName - Employee name for confirmation
  */
-function deleteClient(clientId, clientName) {
+function deleteEmployee(employeeId, employeeName) {
     // Create confirmation modal
     const modalHtml = `
-        <div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+        <div class="modal fade" id="confirmDeleteEmployeeModal" tabindex="-1">
             <div class="modal-dialog">
                 <div class="modal-content">
                     <div class="modal-header bg-danger text-white">
-                        <h5 class="modal-title">Eliminar Cliente</h5>
+                        <h5 class="modal-title">Eliminar Empleado</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <p>¿Estás seguro de que deseas eliminar el cliente <strong>"${clientName}"</strong>?</p>
+                        <p>¿Estás seguro de que deseas eliminar el empleado <strong>"${employeeName}"</strong>?</p>
                         <p class="text-muted mb-0">Esta acción se puede revertir.</p>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Eliminar</button>
+                        <button type="button" class="btn btn-danger" id="confirmDeleteEmployeeBtn">Eliminar</button>
                     </div>
                 </div>
             </div>
@@ -514,29 +538,29 @@ function deleteClient(clientId, clientName) {
     `;
 
     // Remove existing modal if any
-    const existingModal = document.getElementById('confirmDeleteModal');
+    const existingModal = document.getElementById('confirmDeleteEmployeeModal');
     if (existingModal) existingModal.remove();
 
     // Add modal to body
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 
     // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+    const modal = new bootstrap.Modal(document.getElementById('confirmDeleteEmployeeModal'));
     modal.show();
 
     // Handle confirmation
-    document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+    document.getElementById('confirmDeleteEmployeeBtn').addEventListener('click', async function() {
         modal.hide();
-        await executeDeleteClient(clientId, clientName);
+        await executeDeleteEmployee(employeeId, employeeName);
     });
 }
 
 /**
- * Execute delete client API call
+ * Execute delete employee API call
  */
-async function executeDeleteClient(clientId, clientName) {
+async function executeDeleteEmployee(employeeId, employeeName) {
     try {
-        const response = await fetch(`<%= dtApiEndpoint %>/${clientId}`, {
+        const response = await fetch(`<%= dtApiEndpoint %>/${employeeId}`, {
             method: 'DELETE',
             credentials: 'include',
             headers: {
@@ -548,16 +572,16 @@ async function executeDeleteClient(clientId, clientName) {
         const result = await response.json();
 
         if (!response.ok || !result.success) {
-            throw new Error(result.error || 'Error al eliminar el cliente');
+            throw new Error(result.error || 'Error al eliminar el empleado');
         }
 
-        showSuccessAlert(`Cliente "${clientName}" eliminado exitosamente`);
+        showSuccessAlert(`Empleado "${employeeName}" eliminado exitosamente`);
         // Reload table data
-        window.clientsTable.ajax.reload(null, false);
+        window.employeesTable.ajax.reload(null, false);
 
     } catch (error) {
-        console.error('Error deleting client:', error);
-        showErrorAlert(error.message || 'Error al eliminar el cliente. Por favor, intenta nuevamente.');
+        console.error('Error deleting employee:', error);
+        showErrorAlert(error.message || 'Error al eliminar el empleado. Por favor, intenta nuevamente.');
     }
 }
 
@@ -580,18 +604,18 @@ function setupEventDelegation() {
         if (!target) return;
 
         // Toggle status button
-        if (target.classList.contains('btn-toggle-status')) {
-            const clientId = target.getAttribute('data-client-id');
+        if (target.classList.contains('btn-toggle-employee-status')) {
+            const employeeId = target.getAttribute('data-employee-id');
             const currentStatus = target.getAttribute('data-current-status') === 'true';
-            toggleClientStatus(clientId, currentStatus);
+            toggleEmployeeStatus(employeeId, currentStatus);
             return;
         }
 
         // Delete button
-        if (target.classList.contains('btn-delete-client')) {
-            const clientId = target.getAttribute('data-client-id');
-            const clientName = target.getAttribute('data-client-name');
-            deleteClient(clientId, clientName);
+        if (target.classList.contains('btn-delete-employee')) {
+            const employeeId = target.getAttribute('data-employee-id');
+            const employeeName = target.getAttribute('data-employee-name');
+            deleteEmployee(employeeId, employeeName);
             return;
         }
     });
@@ -603,7 +627,7 @@ function setupEventDelegation() {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', function() {
-    loadClientsAndInitializeTable();
+    loadEmployeesAndInitializeTable();
     setupEventDelegation();
 });
 
@@ -650,4 +674,10 @@ document.addEventListener('DOMContentLoaded', function() {
     font-weight: 500;
 }
 
+
+/* Role filter buttons */
+.btn-check:checked + .btn-outline-primary {
+    background-color: #5a6a85;
+    border-color: #5a6a85;
+}
 </style>

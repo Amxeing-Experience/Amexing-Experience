@@ -1,0 +1,36 @@
+/**
+ * Dashboard Custom Styles
+ * Global CSS for Amexing Dashboard
+ *
+ * Purpose: Centralized custom styles for all dashboard views
+ * Applied to: All dashboard pages via dashboard-layout.ejs
+ *
+ * @version 1.0.0
+ * @since 2025-10-14
+ */
+
+/* ==========================================================================
+   Page Content Layout
+   ========================================================================== */
+
+/**
+ * Page Content Container
+ * Provides consistent spacing from header across all dashboard views
+ */
+.page-content {
+    margin-top: 3.5rem !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 991.98px) {
+    .page-content {
+        padding: 1.5rem !important;
+        margin-top: 3.5rem !important;
+    }
+}
+
+/* ==========================================================================
+   Future Common Styles
+   ========================================================================== */
+
+/* Add additional common dashboard styles here as needed */

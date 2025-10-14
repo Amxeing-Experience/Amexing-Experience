@@ -657,9 +657,7 @@ class BulkImportService {
   mapColumnName(headerName) {
     const normalized = this.normalizeColumnName(headerName);
 
-    for (const [internalName, aliases] of Object.entries(
-      this.columnMappings
-    )) {
+    for (const [internalName, aliases] of Object.entries(this.columnMappings)) {
       const normalizedAliases = aliases.map((alias) => this.normalizeColumnName(alias));
       if (normalizedAliases.includes(normalized)) {
         return internalName;

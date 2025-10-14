@@ -266,9 +266,10 @@ describe('Role Model', () => {
     it('should create system roles correctly', () => {
       const roles = Role.getSystemRoles();
 
-      expect(roles).toHaveLength(7); // Updated to correct count
+      expect(roles).toHaveLength(8); // Updated to 8 - added driver role
       expect(roles.find(r => r.name === 'superadmin')).toBeDefined();
       expect(roles.find(r => r.name === 'guest')).toBeDefined();
+      expect(roles.find(r => r.name === 'driver')).toBeDefined(); // New driver role
 
       const superadmin = roles.find(r => r.name === 'superadmin');
       expect(superadmin.level).toBe(7);

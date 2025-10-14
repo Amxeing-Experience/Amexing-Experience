@@ -87,7 +87,6 @@ class DashboardController extends BaseController {
       const stats = await this.getDashboardStats(req.user?.id, req.user?.role);
 
       const dashboardData = {
-        ...additionalData,
         stats,
         user: req.user || {
           id: '',
@@ -101,6 +100,7 @@ class DashboardController extends BaseController {
         userId: req.user?.id,
         accessToken: res.locals.accessToken || req.cookies?.accessToken || '',
         breadcrumb: this.buildBreadcrumb(req.path, req.user?.role),
+        ...additionalData, // Spread additionalData last so it can override defaults
       };
 
       return await this.render(res, view, dashboardData);

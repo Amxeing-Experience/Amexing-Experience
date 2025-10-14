@@ -6,10 +6,10 @@
  * Features:
  * - RESTful API design (GET, POST, PUT, DELETE)
  * - SuperAdmin/Admin only access control
- * - Manages: superadmin, admin, employee_amexing roles
+ * - Manages: superadmin, admin, employee_amexing, driver roles
  * - Comprehensive security, validation, and audit logging.
  * @author Amexing Development Team
- * @version 1.0.0
+ * @version 1.1.0
  * @since 0.1.0
  * @example
  * // Usage example
@@ -29,7 +29,7 @@ class AmexingUsersController {
     this.userService = new UserManagementService();
     this.maxPageSize = 100;
     this.defaultPageSize = 25;
-    this.allowedRoles = ['superadmin', 'admin', 'employee_amexing'];
+    this.allowedRoles = ['superadmin', 'admin', 'employee_amexing', 'driver'];
   }
 
   /**

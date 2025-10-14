@@ -1,3 +1,5 @@
+const ejs = require('ejs');
+const path = require('path');
 const logger = require('../../../../infrastructure/logger');
 
 /**
@@ -31,21 +33,51 @@ class BaseController {
 
       // Check if this is a dashboard view that needs layout
       if (view.startsWith('dashboards/')) {
-        // Render the content view first
-        const contentHtml = await new Promise((resolve, reject) => {
-          res.app.render(view, defaultData, (err, html) => {
-            if (err) reject(err);
-            else resolve(html);
-          });
+        // Get the views directory path
+        const viewsPath = res.app.get('views');
+
+        // Sanitize view path: remove path traversal attempts
+        const sanitizedView = view.replace(/\.\./g, '').replace(/\\/g, '/');
+
+        // Validate view name contains only allowed characters
+        if (!/^dashboards\/[a-z-]+\/[a-z-]+$/.test(sanitizedView)) {
+          throw new Error('Invalid view path format');
+        }
+
+        // Build paths with sanitized input
+        // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+        const contentPath = path.resolve(viewsPath, `${sanitizedView}.ejs`);
+        // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+        const resolvedViewsPath = path.resolve(viewsPath);
+
+        // Verify the resolved path is within views directory
+        if (!contentPath.startsWith(resolvedViewsPath)) {
+          throw new Error('Path traversal detected');
+        }
+
+        // Render the content view first using EJS directly with cache disabled
+        const contentHtml = await ejs.renderFile(contentPath, defaultData, {
+          cache: false,
+          rmWhitespace: false,
         });
 
-        // Then render with layout
-        const layoutData = {
-          ...defaultData,
-          body: contentHtml,
-        };
+        // Layout path is hardcoded and safe
+        // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal.path-join-resolve-traversal
+        const layoutPath = path.resolve(viewsPath, 'layouts/dashboard.ejs');
+        const layoutHtml = await ejs.renderFile(
+          layoutPath,
+          {
+            ...defaultData,
+            body: contentHtml,
+          },
+          {
+            cache: false,
+            rmWhitespace: false,
+          }
+        );
 
-        return res.render('layouts/dashboard', layoutData);
+        // Send the final HTML
+        return res.send(layoutHtml);
       }
       // Regular view without layout
       return res.render(view, defaultData);

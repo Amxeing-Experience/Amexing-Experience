@@ -44,6 +44,7 @@ class UserManagementService {
       'client',
       'department_manager',
       'employee',
+      'employee_amexing',
       'driver',
       'guest',
       'employee_amexing',
@@ -130,7 +131,7 @@ class UserManagementService {
       }
 
       // Apply additional filters
-      this.applyAdvancedFilters(query, filters);
+      await this.applyAdvancedFilters(query, filters);
 
       // Apply sorting
       this.applySorting(query, sort);
@@ -257,7 +258,7 @@ class UserManagementService {
       // SuperAdmin sees all Amexing users (no exclusion)
 
       // Apply additional filters
-      this.applyAdvancedFilters(query, filters);
+      await this.applyAdvancedFilters(query, filters);
 
       // Apply sorting
       this.applySorting(query, sort);
@@ -1143,13 +1144,13 @@ class UserManagementService {
    * // Returns: Promise resolving to operation result
    * @returns {*} - Operation result.
    */
-  applyAdvancedFilters(query, filters) {
+  async applyAdvancedFilters(query, filters) {
     // Apply filters from request parameters
     if (!filters || typeof filters !== 'object') {
       return;
     }
 
-    Object.entries(filters).forEach(([key, value]) => {
+    for (const [key, value] of Object.entries(filters)) {
       if (value !== null && value !== undefined && value !== '') {
         switch (key) {
           case 'active':
@@ -1166,6 +1167,16 @@ class UserManagementService {
                 { role: value, error: error.message }
               );
               query.equalTo('role', value);
+            });
+            break;
+          case 'roleNames':
+            // Support filtering by multiple roles (async operation)
+            await this.filterByRoleNames(query, value).catch((error) => {
+              logger.warn(
+                'Failed to filter by role names, no results will be returned',
+                { roleNames: value, error: error.message }
+              );
+              query.equalTo('objectId', 'non-existent-id');
             });
             break;
           case 'clientId':
@@ -1219,7 +1230,7 @@ class UserManagementService {
             break;
         }
       }
-    });
+    }
   }
 
   /**
@@ -1299,7 +1310,7 @@ class UserManagementService {
     }
 
     // Apply additional filters (search, active status, etc.)
-    this.applyAdvancedFilters(countQuery, filters);
+    await this.applyAdvancedFilters(countQuery, filters);
 
     const count = await countQuery.count({ useMasterKey: true });
 

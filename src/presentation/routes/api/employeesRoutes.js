@@ -1,39 +1,39 @@
 /**
- * Amexing Users API Routes - RESTful endpoints for Amexing internal user management
- * Provides Ajax-ready API endpoints for managing Amexing organization users only.
+ * Employees API Routes - RESTful endpoints for Amexing employee management
+ * Provides Ajax-ready API endpoints for managing Amexing employee users only.
  * Restricted to SuperAdmin and Admin roles.
  *
  * Features:
  * - RESTful API design
  * - SuperAdmin/Admin only access control
- * - Manages: superadmin, admin, employee_amexing, driver roles
+ * - Manages: employee_amexing role
  * - Rate limiting and security headers
  * - Comprehensive error handling.
  * @author Amexing Development Team
- * @version 1.1.0
+ * @version 1.0.0
  * @since 0.1.0
  * @example
  * // Usage example
- * router.use('/amexingusers', amexingUsersRoutes);
+ * router.use('/employees', employeesRoutes);
  */
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const AmexingUsersController = require('../../../application/controllers/api/AmexingUsersController');
+const EmployeesController = require('../../../application/controllers/api/EmployeesController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 const logger = require('../../../infrastructure/logger');
 
 const router = express.Router();
-const amexingUsersController = new AmexingUsersController();
+const employeesController = new EmployeesController();
 
-// Rate limiting for Amexing user management operations
-const amexingUserApiLimiter = rateLimit({
+// Rate limiting for employee management operations
+const employeeApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // Limit each IP to 100 requests per windowMs
   message: {
     success: false,
     error:
-      'Too many Amexing user management requests from this IP, please try again later.',
+      'Too many employee management requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -55,7 +55,7 @@ const writeOperationsLimiter = rateLimit({
 });
 
 // Apply rate limiting and authentication to all routes
-router.use(amexingUserApiLimiter);
+router.use(employeeApiLimiter);
 router.use(jwtMiddleware.authenticateToken);
 
 // Apply role level restriction: Only SuperAdmin (7) and Admin (6) can access
@@ -63,22 +63,22 @@ router.use(jwtMiddleware.requireRoleLevel(6));
 
 /**
  * @swagger
- * /api/amexingusers:
+ * /api/employees:
  *   get:
  *     tags:
- *       - Amexing User Management
- *     summary: Get list of Amexing internal users
+ *       - Employee Management
+ *     summary: Get list of Amexing employees
  *     description: |
- *       Retrieve paginated list of Amexing organization users (superadmin, admin, employee_amexing, driver).
+ *       Retrieve paginated list of Amexing employee users (employee_amexing role).
  *
  *       **Access Control:**
  *       - Requires role level 6+ (Admin or SuperAdmin)
- *       - SuperAdmin: See all Amexing users
- *       - Admin: See admin and employee_amexing (excludes superadmin)
+ *       - Returns only employee_amexing role users
  *
  *       **Features:**
  *       - Pagination (default: 25 items, max: 100)
  *       - Filter by active status
+ *       - Search by name, email
  *       - Sort by any field
  *       - Rate limited: 100 requests per 15 minutes
  *
@@ -97,15 +97,15 @@ router.use(jwtMiddleware.requireRoleLevel(6));
  *           type: boolean
  *         description: Filter by active status
  *       - in: query
- *         name: emailVerified
+ *         name: search
  *         schema:
- *           type: boolean
- *         description: Filter by email verification status
+ *           type: string
+ *         description: Search term for name, email
  *       - $ref: '#/components/parameters/SortFieldParameter'
  *       - $ref: '#/components/parameters/SortDirectionParameter'
  *     responses:
  *       200:
- *         description: Amexing users retrieved successfully
+ *         description: Employees retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -120,22 +120,22 @@ router.use(jwtMiddleware.requireRoleLevel(6));
  *         $ref: '#/components/responses/ServerError'
  */
 router.get('/', async (req, res) => {
-  await amexingUsersController.getAmexingUsers(req, res);
+  await employeesController.getEmployees(req, res);
 });
 
 /**
  * @swagger
- * /api/amexingusers/{id}:
+ * /api/employees/{id}:
  *   get:
  *     tags:
- *       - Amexing User Management
- *     summary: Get Amexing user by ID
+ *       - Employee Management
+ *     summary: Get employee by ID
  *     description: |
- *       Retrieve detailed Amexing user information by user ID.
+ *       Retrieve detailed employee information by user ID.
  *
  *       **Access Control:**
  *       - Requires role level 6+ (Admin or SuperAdmin)
- *       - User must belong to Amexing organization
+ *       - User must have employee_amexing role
  *
  *       **PCI DSS:**
  *       - No sensitive payment data returned
@@ -153,7 +153,7 @@ router.get('/', async (req, res) => {
  *         example: "abc123def456"
  *     responses:
  *       200:
- *         description: User retrieved successfully
+ *         description: Employee retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -165,11 +165,11 @@ router.get('/', async (req, res) => {
  *                 data:
  *                   type: object
  *                   properties:
- *                     user:
+ *                     employee:
  *                       $ref: '#/components/schemas/User'
  *                 message:
  *                   type: string
- *                   example: "User retrieved successfully"
+ *                   example: "Employee retrieved successfully"
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       403:
@@ -178,24 +178,24 @@ router.get('/', async (req, res) => {
  *         $ref: '#/components/responses/NotFoundError'
  */
 router.get('/:id', async (req, res) => {
-  await amexingUsersController.getAmexingUserById(req, res);
+  await employeesController.getEmployeeById(req, res);
 });
 
 /**
  * @swagger
- * /api/amexingusers:
+ * /api/employees:
  *   post:
  *     tags:
- *       - Amexing User Management
- *     summary: Create new Amexing internal user
+ *       - Employee Management
+ *     summary: Create new Amexing employee
  *     description: |
- *       Create a new Amexing organization user account.
+ *       Create a new Amexing employee user account with employee_amexing role.
  *
- *       **Allowed Roles:**
- *       - admin (any Admin/SuperAdmin can create)
- *       - employee_amexing (any Admin/SuperAdmin can create)
- *       - driver (any Admin/SuperAdmin can create)
- *       - superadmin (only SuperAdmin can create)
+ *       **Features:**
+ *       - Auto-generates secure password
+ *       - Forces password change on first login
+ *       - Assigns employee_amexing role automatically
+ *       - Sets organizationId to 'amexing'
  *
  *       **Access:** Requires role level 6+ (Admin or SuperAdmin)
  *       **Rate Limited:** 30 requests per 15 minutes
@@ -211,48 +211,73 @@ router.get('/:id', async (req, res) => {
  *               - firstName
  *               - lastName
  *               - email
- *               - role
  *             properties:
  *               firstName:
  *                 type: string
- *                 example: "John"
+ *                 example: "Juan"
  *               lastName:
  *                 type: string
- *                 example: "Doe"
+ *                 example: "Pérez"
  *               email:
  *                 type: string
  *                 format: email
- *                 example: "john.doe@amexing.com"
- *               role:
+ *                 example: "juan.perez@amexing.com"
+ *               phone:
  *                 type: string
- *                 enum: [admin, employee_amexing, driver, superadmin]
- *                 example: "admin"
- *               password:
+ *                 example: "+52 999 123 4567"
+ *               department:
  *                 type: string
- *                 description: Optional - auto-generated if not provided
+ *                 example: "Operations"
+ *               position:
+ *                 type: string
+ *                 example: "Operations Coordinator"
+ *               notes:
+ *                 type: string
+ *                 example: "Responsible for daily operations"
  *     responses:
  *       201:
- *         description: User created successfully
+ *         description: Employee created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     employee:
+ *                       $ref: '#/components/schemas/User'
+ *                     message:
+ *                       type: string
+ *                       example: "Empleado creado exitosamente. Se ha generado una contraseña temporal."
+ *                 message:
+ *                   type: string
+ *                   example: "Empleado creado exitosamente"
  *       400:
  *         $ref: '#/components/responses/ValidationError'
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       403:
  *         $ref: '#/components/responses/ForbiddenError'
+ *       409:
+ *         description: Conflict - Email already exists
  */
 router.post('/', writeOperationsLimiter, async (req, res) => {
-  await amexingUsersController.createAmexingUser(req, res);
+  await employeesController.createEmployee(req, res);
 });
 
 /**
  * @swagger
- * /api/amexingusers/{id}:
+ * /api/employees/{id}:
  *   put:
  *     tags:
- *       - Amexing User Management
- *     summary: Update Amexing user
+ *       - Employee Management
+ *     summary: Update employee
  *     description: |
- *       Update Amexing user information.
+ *       Update employee user information.
  *
  *       **Access:** Requires role level 6+ (Admin or SuperAdmin)
  *       **Rate Limited:** 30 requests per 15 minutes
@@ -277,11 +302,19 @@ router.post('/', writeOperationsLimiter, async (req, res) => {
  *               email:
  *                 type: string
  *                 format: email
+ *               phone:
+ *                 type: string
+ *               department:
+ *                 type: string
+ *               position:
+ *                 type: string
  *               active:
  *                 type: boolean
+ *               notes:
+ *                 type: string
  *     responses:
  *       200:
- *         description: User updated successfully
+ *         description: Employee updated successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       403:
@@ -290,18 +323,18 @@ router.post('/', writeOperationsLimiter, async (req, res) => {
  *         $ref: '#/components/responses/NotFoundError'
  */
 router.put('/:id', writeOperationsLimiter, async (req, res) => {
-  await amexingUsersController.updateAmexingUser(req, res);
+  await employeesController.updateEmployee(req, res);
 });
 
 /**
  * @swagger
- * /api/amexingusers/{id}:
+ * /api/employees/{id}:
  *   delete:
  *     tags:
- *       - Amexing User Management
- *     summary: Deactivate Amexing user (soft delete)
+ *       - Employee Management
+ *     summary: Deactivate employee (soft delete)
  *     description: |
- *       Sets user exists=false (soft delete).
+ *       Sets employee exists=false (soft delete).
  *
  *       **Access:** Requires role level 6+ (Admin or SuperAdmin)
  *       **Rate Limited:** 30 requests per 15 minutes
@@ -315,7 +348,7 @@ router.put('/:id', writeOperationsLimiter, async (req, res) => {
  *           type: string
  *     responses:
  *       200:
- *         description: User deactivated successfully
+ *         description: Employee deactivated successfully
  *       401:
  *         $ref: '#/components/responses/UnauthorizedError'
  *       403:
@@ -324,16 +357,16 @@ router.put('/:id', writeOperationsLimiter, async (req, res) => {
  *         $ref: '#/components/responses/NotFoundError'
  */
 router.delete('/:id', writeOperationsLimiter, async (req, res) => {
-  await amexingUsersController.deactivateAmexingUser(req, res);
+  await employeesController.deactivateEmployee(req, res);
 });
 
 /**
  * @swagger
- * /api/amexingusers/{id}/toggle-status:
+ * /api/employees/{id}/toggle-status:
  *   patch:
  *     tags:
- *       - Amexing User Management
- *     summary: Toggle Amexing user active status
+ *       - Employee Management
+ *     summary: Toggle employee active status
  *     description: |
  *       Switch between active/inactive status.
  *
@@ -366,7 +399,7 @@ router.delete('/:id', writeOperationsLimiter, async (req, res) => {
  *         $ref: '#/components/responses/ForbiddenError'
  */
 router.patch('/:id/toggle-status', writeOperationsLimiter, async (req, res) => {
-  await amexingUsersController.toggleAmexingUserStatus(req, res);
+  await employeesController.toggleEmployeeStatus(req, res);
 });
 
 /**
@@ -377,7 +410,7 @@ router.patch('/:id/toggle-status', writeOperationsLimiter, async (req, res) => {
  * @param {Function} _next - Next middleware function.
  */
 router.use((error, req, res, _next) => {
-  logger.error('Amexing Users API Error:', {
+  logger.error('Employees API Error:', {
     error: error.message,
     stack: error.stack,
     url: req.url,
