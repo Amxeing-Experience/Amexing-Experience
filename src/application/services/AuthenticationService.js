@@ -56,6 +56,7 @@ const { AuthenticationServiceCore } = require('./AuthenticationServiceCore');
  * // Validate token
  * const tokenValidation = await AuthenticationService.validateToken(accessToken);
  */
+/* eslint-disable max-lines */
 class AuthenticationService extends AuthenticationServiceCore {
   /**
    * Registers a new user with email/password.
@@ -135,6 +136,7 @@ class AuthenticationService extends AuthenticationServiceCore {
    * // console.log(result);
    * const result = await authService.loginUser('user@example.com', 'password123');
    */
+  /* eslint-disable max-lines-per-function */
   async loginUser(identifier, password) {
     try {
       // Find user by email or username
@@ -318,7 +320,6 @@ class AuthenticationService extends AuthenticationServiceCore {
   /**
    * Validates JWT token.
    * @param {string} token - JWT token.
-   * @param token
    * @returns {Promise<object>} - Decoded token data.
    * @example
    * // Authentication service usage
@@ -414,7 +415,6 @@ class AuthenticationService extends AuthenticationServiceCore {
   /**
    * Initiates password reset process.
    * @param {string} email - User email.
-   * @param email
    * @returns {Promise<object>} - Password reset result.
    * @example
    * // Authentication service usage

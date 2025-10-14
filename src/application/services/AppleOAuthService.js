@@ -400,8 +400,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Validates Apple webhook.
    * @param {object} requestBody - Webhook request body.
-   * @param {*} signature - Webhook signature (unused for now).
-   * @param _signature
+   * @param {string} _signature - Webhook signature (unused for now).
    * @returns {Promise<object>} - Validation result.
    * @example Validate Apple webhook
    * const result = await service.validateAppleWebhook(requestBody, signature);
