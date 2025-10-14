@@ -80,8 +80,8 @@ class BulkImportController {
   /**
    * GET /api/clients/bulk/template
    * Download Excel template for bulk import.
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
    * @example GET /api/clients/bulk/template
    * @returns {Promise<void>}
    */
@@ -438,12 +438,12 @@ class BulkImportController {
   }
 
   /**
-   * POST /api/clients/bulk/upload
+   * POST /api/clients/bulk/upload.
    * Upload and validate Excel file.
-   * @param {object} req - Express request object
-   * @param {object} res - Express response object
-   * @example POST /api/clients/bulk/upload
-   * @returns {object} - JSON response
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example POST /api/clients/bulk/upload.
+   * @returns {object} - JSON response.
    */
   async uploadFile(req, res) {
     try {
@@ -564,11 +564,12 @@ class BulkImportController {
   }
 
   /**
-   * POST /api/clients/bulk/process
+   * POST /api/clients/bulk/process.
    * Process bulk import.
-   * @param req
-   * @param res
-   * @example
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example POST /api/clients/bulk/process.
+   * @returns {object} - JSON response.
    */
   async processImport(req, res) {
     try {

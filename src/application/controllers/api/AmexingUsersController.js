@@ -349,8 +349,7 @@ class AmexingUsersController {
    * Parse and validate query parameters.
    * @param {object} query - Query parameters from request.
    * @returns {object} - Parsed options object.
-   * @example
-   * GET /api/amexingusers?page=1&limit=10&active=true
+   * @example GET /api/amexingusers?page=1&limit=10&active=true.
    */
   parseQueryParams(query) {
     const page = parseInt(query.page, 10) || 1;
