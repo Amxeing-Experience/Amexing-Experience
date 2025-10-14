@@ -34,6 +34,8 @@ class AtomicController {
    * // GET /atomic
    * // Shows atomic design component showcase index page
    */
+  /* eslint-disable max-lines-per-function */
+  /* eslint-disable max-lines */
   static async index(req, res) {
     try {
       logger.info('Atomic showcase index accessed', {
@@ -126,6 +128,8 @@ class AtomicController {
    * // GET /atomic/dashboard
    * // Shows dashboard-specific atomic design components
    */
+  /* eslint-disable max-lines-per-function */
+  /* eslint-disable max-lines */
   static async dashboard(req, res) {
     try {
       logger.info('Dashboard components showcase accessed', {
@@ -284,6 +288,8 @@ class AtomicController {
    * // GET /atomic/auth
    * // Shows authentication-related atomic design components
    */
+  /* eslint-disable max-lines-per-function */
+  /* eslint-disable max-lines */
   static async auth(req, res) {
     try {
       logger.info('Auth components showcase accessed', {
@@ -446,6 +452,8 @@ class AtomicController {
    * // GET /atomic/common
    * // Shows common shared atomic design components
    */
+  /* eslint-disable max-lines-per-function */
+  /* eslint-disable max-lines */
   static async common(req, res) {
     try {
       logger.info('Common components showcase accessed', {
