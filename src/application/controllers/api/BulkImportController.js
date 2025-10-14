@@ -10,7 +10,7 @@
  * - PCI DSS compliant (audit logging, secure file handling).
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-10-12
+ * @since 1.0.0
  */
 
 const multer = require('multer');
