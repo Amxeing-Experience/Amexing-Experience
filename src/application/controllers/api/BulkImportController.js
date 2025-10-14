@@ -640,10 +640,11 @@ class BulkImportController {
 
   /**
    * Async processing of import.
-   * @param jobId
-   * @param job
-   * @param currentUser
-   * @example
+   * @param {string} jobId - Job ID.
+   * @param {object} job - Job object.
+   * @param {object} currentUser - Current user object.
+   * @returns {object} - Job object.
+   * @example processImportAsync(jobId, job, currentUser).
    */
   async processImportAsync(jobId, job, currentUser) {
     try {
@@ -714,9 +715,10 @@ class BulkImportController {
   /**
    * GET /api/clients/bulk/status/:jobId
    * Get import job status.
-   * @param req
-   * @param res
-   * @example
+   * @param {object} req - Request object.
+   * @param {object} res - Response object.
+   * @example getImportStatus(req, res).
+   * @returns {object} - Status object.
    */
   async getImportStatus(req, res) {
     try {
@@ -767,9 +769,10 @@ class BulkImportController {
   /**
    * GET /api/clients/bulk/error-report/:jobId
    * Download error report.
-   * @param req
-   * @param res
-   * @example
+   * @param {object} req - Request object.
+   * @param {object} res - Response object.
+   * @returns {object} - Status object.
+   * @example downloadErrorReport(req, res).
    */
   async downloadErrorReport(req, res) {
     try {
@@ -837,11 +840,12 @@ class BulkImportController {
 
   /**
    * Send success response.
-   * @param res
-   * @param data
-   * @param message
-   * @param statusCode
-   * @example
+   * @param {object} res - Express response object.
+   * @param {object} data - Data to send.
+   * @param {string} message - Success message.
+   * @param {number} statusCode - HTTP status code.
+   * @example sendSuccess(res, data, 'Success', 200);.
+   * @returns {object} - Status object.
    */
   sendSuccess(res, data, message, statusCode = 200) {
     res.status(statusCode).json({
@@ -854,11 +858,12 @@ class BulkImportController {
 
   /**
    * Send error response.
-   * @param res
-   * @param message
-   * @param statusCode
-   * @param errors
-   * @example
+   * @param {object} res - Express response object.
+   * @param {string} message - Error message.
+   * @param {number} statusCode - HTTP status code.
+   * @param {object|null} errors - Additional error details.
+   * @example sendError(res, 'Error message', 500);
+   * @returns {object} - Status object.
    */
   sendError(res, message, statusCode = 500, errors = null) {
     const response = {
@@ -876,7 +881,8 @@ class BulkImportController {
 
   /**
    * Get multer upload middleware.
-   * @example
+   * @returns {object} - Multer upload middleware.
+   * @example getUploadMiddleware().
    */
   getUploadMiddleware() {
     return this.upload.single('file');
