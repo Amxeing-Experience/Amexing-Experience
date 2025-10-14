@@ -177,9 +177,7 @@ class RoleBasedController extends DashboardController {
 
   /**
    * Get role-specific dashboard widgets.
-   * @param {string} userId - User unique identifier.
-   * @param {*} userId - _userId parameter.
-   * @param _userId
+   * @param {string} _userId - User unique identifier (unused parameter).
    * @example
    * // GET endpoint example
    * const result = await RoleBasedController.getNotifications(req, res);
@@ -196,9 +194,7 @@ class RoleBasedController extends DashboardController {
   /**
    * Apply role-specific data filters.
    * @param {object} query - Query parameters object.
-   * @param {*} user - User parameter.
-   * @param {*} user - _user parameter.
-   * @param _user
+   * @param {*} _user - _user parameter.
    * @example
    * // Usage example
    * const result = await applyRoleFilters({ query: 'example', _user: 'example' });
@@ -214,9 +210,7 @@ class RoleBasedController extends DashboardController {
 
   /**
    * Get role-specific notifications.
-   * @param {string} userId - User unique identifier.
-   * @param {*} userId - _userId parameter.
-   * @param _userId
+   * @param {string} _userId - User unique identifier (unused parameter).
    * @example
    * // GET endpoint example
    * const result = await RoleBasedController.getNotifications(req, res);
@@ -233,9 +227,7 @@ class RoleBasedController extends DashboardController {
   /**
    * Validate role-specific actions.
    * @param {string} action - Action identifier.
-   * @param {*} user - User parameter.
-   * @param {*} user - _user parameter.
-   * @param _user
+   * @param {string} _user - User unique identifier (unused parameter).
    * @example
    * // Validation utility usage
    * const isValid = validateFunction(input);

@@ -39,6 +39,7 @@ const securityMiddlewares = require('../../infrastructure/security/securityMiddl
  * router.get('/oauth/:provider', authController.initiateOAuth.bind(authController));
  * router.post('/oauth/:provider/callback', authController.handleOAuthCallback.bind(authController));
  */
+/* eslint-disable max-lines */
 class AuthController {
   /**
    * Displays the login form with CSRF protection and OAuth provider options.

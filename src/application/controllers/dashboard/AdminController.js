@@ -3,6 +3,7 @@ const RoleBasedController = require('./base/RoleBasedController');
 /**
  * AdminController - Implements admin-specific dashboard functionality.
  */
+/* eslint-disable max-lines */
 class AdminController extends RoleBasedController {
   constructor() {
     super('admin');
@@ -87,6 +88,7 @@ class AdminController extends RoleBasedController {
    * // console.log(result);
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
+  /* eslint-disable max-lines-per-function */
   async clientDetail(req, res) {
     try {
       const clientId = req.params.id;
