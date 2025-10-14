@@ -1,0 +1,293 @@
+<%
+/**
+ * Admin Vehicles Management Page
+ * Manages Amexing vehicle fleet and vehicle types
+ *
+ * Layout Structure:
+ * - Vertical navigation menu (collapsible)
+ * - Two sections: Vehículos (vehicles list) and Tipos (vehicle types management)
+ * - Section-based content rendering
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const activeSection = typeof section !== 'undefined' ? section : 'vehicles';
+
+// Menu items configuration
+const menuItems = [
+    { label: 'Vehículos', icon: 'car', section: 'vehicles', href: '/dashboard/admin/vehicles' },
+    { label: 'Tipos de Vehículo', icon: 'list', section: 'types', href: '/dashboard/admin/vehicles?section=types' }
+];
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold">Gestión de Vehículos</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a>
+                        </li>
+                        <li class="breadcrumb-item active">
+                            <i class="ti ti-car me-1"></i>Vehículos
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/dashboard/admin" class="btn btn-sm btn-outline-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>Volver
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content with Vertical Menu -->
+<div class="row mt-4">
+    <!-- Vertical Menu Column -->
+    <div class="col-lg-3 mb-3 mb-lg-0" id="menuColumn">
+        <nav class="vertical-menu card border-0 shadow-sm">
+            <div class="card-body p-3">
+                <div class="menu-header mb-3">
+                    <h6 class="text-uppercase text-muted fw-bold menu-title" style="font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 0;">MENÚ</h6>
+                    <button class="btn btn-sm btn-link text-muted p-0 menu-toggle-btn" id="menuToggle" type="button" aria-label="Colapsar menú">
+                        <i class="ti ti-menu-2 fs-5"></i>
+                    </button>
+                </div>
+                <% menuItems.forEach(function(item) { %>
+                    <a href="<%= item.href %>" class="menu-item <%= item.section === activeSection ? 'active' : '' %>" data-bs-toggle="tooltip" data-bs-placement="right" title="<%= item.label %>">
+                        <i class="ti ti-<%= item.icon %> menu-icon"></i><span class="menu-label"><%= item.label %></span>
+                    </a>
+                <% }); %>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Content Column -->
+    <div class="col-lg-9" id="contentColumn">
+        <% if (activeSection === 'vehicles') { %>
+            <!-- Vehicles Management Section -->
+            <%- include('../../organisms/datatable/vehicles-table', {
+                tableId: 'vehicles-table',
+                apiEndpoint: '/api/vehicles',
+                userRole: currentUserRole,
+                showActions: true
+            }) %>
+
+        <% } else if (activeSection === 'types') { %>
+            <!-- Vehicle Types Management Section -->
+
+            <%- include('../../organisms/datatable/vehicle-types-table', {
+                tableId: 'vehicle-types-table',
+                apiEndpoint: '/api/vehicle-types',
+                userRole: currentUserRole,
+                showActions: true
+            }) %>
+
+        <% } %>
+    </div>
+</div>
+
+<!-- Vertical Menu Styles -->
+<style>
+/* Vertical Menu Styles */
+.vertical-menu {
+    position: sticky;
+    top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.vertical-menu.collapsed {
+    max-width: 80px;
+}
+
+.menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.vertical-menu.collapsed .menu-header {
+    justify-content: center;
+}
+
+.vertical-menu.collapsed .menu-title,
+.vertical-menu.collapsed .menu-label {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    transition: opacity 0.2s ease, width 0.3s ease;
+}
+
+.vertical-menu:not(.collapsed) .menu-title,
+.vertical-menu:not(.collapsed) .menu-label {
+    opacity: 1;
+    width: auto;
+    transition: opacity 0.3s ease 0.1s, width 0.3s ease;
+}
+
+.menu-toggle-btn {
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.menu-toggle-btn:hover {
+    transform: scale(1.1);
+    color: #0891b2 !important;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: #5a6a85;
+    text-decoration: none;
+    border-radius: 0.375rem;
+    margin-bottom: 0.25rem;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.vertical-menu.collapsed .menu-item {
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.menu-item:hover {
+    background-color: #f8f9fa;
+    color: #0891b2;
+}
+
+.menu-item.active {
+    background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%);
+    color: white;
+    font-weight: 600;
+}
+
+.menu-icon {
+    font-size: 1.25rem;
+    min-width: 1.25rem;
+    transition: margin 0.3s ease;
+}
+
+.vertical-menu:not(.collapsed) .menu-icon {
+    margin-right: 0.5rem;
+}
+
+.vertical-menu.collapsed .menu-icon {
+    margin-right: 0;
+}
+
+.menu-label {
+    transition: opacity 0.2s ease, width 0.3s ease;
+}
+
+/* Column transitions */
+#menuColumn, #contentColumn {
+    transition: all 0.3s ease;
+}
+
+#menuColumn.collapsed {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+#contentColumn.expanded {
+    flex: 1;
+}
+
+/* Breadcrumb styles */
+.breadcrumb-item a {
+    color: #5a6a85;
+    text-decoration: none;
+}
+
+.breadcrumb-item a:hover {
+    color: #0891b2;
+}
+
+/* Responsive styles */
+@media (max-width: 991.98px) {
+    .vertical-menu {
+        position: static;
+    }
+    #menuToggle {
+        display: none;
+    }
+}
+</style>
+
+<!-- Menu Toggle Script -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const menuToggle = document.getElementById('menuToggle');
+    const verticalMenu = document.querySelector('.vertical-menu');
+    const menuColumn = document.getElementById('menuColumn');
+    const contentColumn = document.getElementById('contentColumn');
+
+    if (menuToggle && verticalMenu) {
+        // Check localStorage for saved state
+        const isCollapsed = localStorage.getItem('vehiclesMenuCollapsed') === 'true';
+        if (isCollapsed) {
+            verticalMenu.classList.add('collapsed');
+            menuColumn.classList.add('collapsed');
+            contentColumn.classList.add('expanded');
+        }
+
+        // Initialize tooltips for menu items
+        const menuItems = document.querySelectorAll('.menu-item[data-bs-toggle="tooltip"]');
+        menuItems.forEach(item => {
+            new bootstrap.Tooltip(item, {
+                trigger: 'hover',
+                boundary: 'window'
+            });
+        });
+
+        // Toggle menu on button click
+        menuToggle.addEventListener('click', function() {
+            const isCurrentlyCollapsed = verticalMenu.classList.toggle('collapsed');
+            menuColumn.classList.toggle('collapsed');
+            contentColumn.classList.toggle('expanded');
+
+            // Save state to localStorage
+            localStorage.setItem('vehiclesMenuCollapsed', isCurrentlyCollapsed);
+
+            // Update aria-label
+            this.setAttribute('aria-label', isCurrentlyCollapsed ? 'Expandir menú' : 'Colapsar menú');
+
+            // Enable/disable tooltips based on state
+            menuItems.forEach(item => {
+                const tooltip = bootstrap.Tooltip.getInstance(item);
+                if (tooltip) {
+                    if (isCurrentlyCollapsed) {
+                        tooltip.enable();
+                    } else {
+                        tooltip.disable();
+                    }
+                }
+            });
+        });
+
+        // Disable tooltips initially if menu is not collapsed
+        if (!isCollapsed) {
+            menuItems.forEach(item => {
+                const tooltip = bootstrap.Tooltip.getInstance(item);
+                if (tooltip) {
+                    tooltip.disable();
+                }
+            });
+        }
+    }
+});
+</script>
+
+<!-- Load Dropzone.js from CDN -->
+<script src="https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone-min.js"></script>
+<link href="https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone.css" rel="stylesheet" type="text/css" />

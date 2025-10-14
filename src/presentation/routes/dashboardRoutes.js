@@ -93,6 +93,7 @@ router.get('/admin/drivers', dashboardAuth.requireRole('admin'), (req, res) => a
 router.get('/admin/events', dashboardAuth.requireRole('admin'), (req, res) => adminController.events(req, res));
 router.get('/admin/schedule', dashboardAuth.requireRole('admin'), (req, res) => adminController.schedule(req, res));
 router.get('/admin/bookings', dashboardAuth.requireRole('admin'), (req, res) => adminController.bookings(req, res));
+router.get('/admin/vehicles', dashboardAuth.requireRole('admin'), (req, res) => adminController.vehicles(req, res));
 router.get('/admin/fleet', dashboardAuth.requireRole('admin'), (req, res) => adminController.fleet(req, res));
 router.get('/admin/routes', dashboardAuth.requireRole('admin'), (req, res) => adminController.routes(req, res));
 router.get('/admin/billing', dashboardAuth.requireRole('admin'), (req, res) => adminController.billing(req, res));

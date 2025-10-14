@@ -115,7 +115,6 @@ class BaseModel extends Parse.Object {
   async activate(modifiedBy = null) {
     this.set('active', true);
     this.set('exists', true);
-    this.set('updatedAt', new Date());
     // Track who modified the record - support both User objects and string IDs
     if (modifiedBy) {
       if (typeof modifiedBy === 'string') {
@@ -151,7 +150,6 @@ class BaseModel extends Parse.Object {
   async deactivate(modifiedBy = null) {
     this.set('active', false);
     this.set('exists', true); // Keep in archive
-    this.set('updatedAt', new Date());
     // Track who modified the record - support both User objects and string IDs
     if (modifiedBy) {
       if (typeof modifiedBy === 'string') {

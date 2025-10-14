@@ -1,0 +1,835 @@
+<%#
+Vehicle Images Modal - Organism
+Modal for managing vehicle images (upload, delete, set primary, reorder)
+
+Atomic Design Level: Organism
+Category: Modal Components
+
+Features:
+- Dropzone for async image upload
+- Responsive grid gallery (3 columns)
+- Owl Carousel for image preview
+- Set primary image
+- Delete images (soft delete)
+- Drag & drop reordering with Sortable.js
+- Bootstrap alerts for feedback
+%>
+
+<!-- Vehicle Images Modal -->
+<div class="modal fade" id="vehicleImagesModal" tabindex="-1" aria-labelledby="vehicleImagesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="vehicleImagesModalLabel">
+                    <i class="ti ti-photo me-2"></i>
+                    Gestionar Imágenes - <span id="vehicle-info-text">Vehículo</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body" id="vehicle-images-modal-content">
+                <!-- Alert Container -->
+                <div id="vehicle-images-alerts"></div>
+
+                <!-- Upload Section -->
+                <div class="upload-section mb-4">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                        <i class="ti ti-upload me-1"></i>
+                        Subir Nuevas Imágenes
+                    </h6>
+                    <p class="text-muted mb-3">
+                        <i class="ti ti-info-circle me-1"></i>
+                        Arrastra tus imágenes aquí o haz clic para seleccionarlas. La primera imagen será la principal automáticamente.
+                    </p>
+
+                    <!-- Manual Dropzone Container -->
+                    <div class="dropzone-container">
+                        <div id="vehicle-images-dropzone"
+                             class="dropzone"
+                             role="button"
+                             tabindex="0"
+                             aria-label="Zona de carga de imágenes">
+                            <div class="dz-message" data-dz-message>
+                                <div class="dropzone-icon">
+                                    <i class="ti ti-cloud-upload" style="font-size: 3rem; color: #5a6a85;"></i>
+                                </div>
+                                <h4 class="dropzone-title mt-3 mb-2">
+                                    Arrastra tus imágenes aquí o haz clic para seleccionar
+                                </h4>
+                                <p class="dropzone-subtitle text-muted mb-0">
+                                    <small>Archivos permitidos: .jpg, .jpeg, .png, .webp | Tamaño máximo: 5MB</small>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Gallery Section -->
+                <div class="gallery-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+                        <h6 class="fw-bold text-primary mb-0">
+                            <i class="ti ti-photo-scan me-1"></i>
+                            Imágenes Actuales
+                        </h6>
+                        <span class="badge bg-info" id="images-count-badge">0 imágenes</span>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div id="images-empty-state" class="text-center py-5">
+                        <i class="ti ti-photo-off" style="font-size: 4rem; color: #cbd5e1;"></i>
+                        <p class="text-muted mt-3 mb-0">No hay imágenes para este vehículo</p>
+                        <small class="text-muted">Sube tu primera imagen usando la sección superior</small>
+                    </div>
+
+                    <!-- Images Grid -->
+                    <div class="row g-3" id="images-grid" style="display: none;">
+                        <!-- Dynamic image cards will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Owl Carousel (Hidden by default, shown on image click) -->
+                <div class="modal-backdrop-custom" id="carousel-backdrop" style="display: none;"></div>
+                <div class="carousel-container" id="carousel-container" style="display: none;">
+                    <button type="button" class="btn btn-light carousel-close-btn" id="carousel-close-btn">
+                        <i class="ti ti-x"></i>
+                    </button>
+                    <div class="owl-carousel owl-theme" id="images-carousel">
+                        <!-- Dynamic carousel items will be inserted here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Styles -->
+<style>
+/* Dropzone Styles */
+.dropzone-container {
+    width: 100%;
+    margin: 1rem 0;
+}
+
+.dropzone {
+    border: 2px dashed #cbd5e1;
+    border-radius: 0.5rem;
+    padding: 2rem;
+    text-align: center;
+    background-color: #f8fafc;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dropzone:hover,
+.dropzone:focus {
+    border-color: #f76b1c;
+    background-color: #fff5f0;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(247, 107, 28, 0.1);
+}
+
+.dropzone.dz-drag-hover {
+    border-color: #f76b1c;
+    background-color: #fff5f0;
+    border-style: solid;
+}
+
+.dropzone .dz-message {
+    margin: 0;
+    width: 100%;
+}
+
+.dropzone-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+}
+
+.dropzone-subtitle {
+    font-size: 0.875rem;
+    color: #64748b;
+}
+
+/* Gallery Grid Styles */
+.gallery-section {
+    position: relative;
+}
+
+#images-grid .image-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+#images-grid .image-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#images-grid .card-img-top {
+    height: 220px;
+    object-fit: cover;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+#images-grid .card-img-top:hover {
+    opacity: 0.9;
+}
+
+#images-grid .primary-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+}
+
+#images-grid .image-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+}
+
+/* Carousel Overlay Styles */
+.modal-backdrop-custom {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 2000;
+}
+
+.carousel-container {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 1200px;
+    z-index: 2001;
+}
+
+.carousel-close-btn {
+    position: absolute;
+    top: -50px;
+    right: 0;
+    z-index: 2002;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.owl-carousel .owl-item img {
+    width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+}
+
+/* Sortable Drag Styles */
+.sortable-ghost {
+    opacity: 0.4;
+}
+
+.sortable-drag {
+    cursor: move;
+}
+
+/* Empty State */
+#images-empty-state {
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    #images-grid .card-img-top {
+        height: 180px;
+    }
+
+    .carousel-container {
+        width: 95%;
+    }
+}
+</style>
+
+<!-- Load External Libraries (Owl Carousel & Sortable.js) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.carousel.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.theme.default.min.css">
+
+<!-- JavaScript Logic -->
+<script>
+(function() {
+    'use strict';
+
+    let currentVehicleId = null;
+    let currentVehicleInfo = null;
+    let vehicleImagesDropzone = null;
+    let imagesCarousel = null;
+    let sortableInstance = null;
+
+    /**
+     * Load Dropzone library dynamically
+     */
+    function loadDropzone() {
+        return new Promise((resolve, reject) => {
+            // Check if already loaded
+            if (typeof Dropzone !== 'undefined') {
+                console.log('Dropzone already loaded');
+                resolve();
+                return;
+            }
+
+            console.log('Loading Dropzone library dynamically...');
+
+            // Load CSS first
+            const link = document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = 'https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone.css';
+            document.head.appendChild(link);
+
+            // Load JS
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone-min.js';
+            script.onload = () => {
+                console.log('Dropzone library loaded successfully');
+                resolve();
+            };
+            script.onerror = () => {
+                console.error('Failed to load Dropzone library');
+                reject(new Error('Failed to load Dropzone'));
+            };
+            document.head.appendChild(script);
+        });
+    }
+
+    /**
+     * Load external libraries
+     */
+    function loadExternalLibraries() {
+        return new Promise((resolve) => {
+            // Load Dropzone first (dynamically if not available)
+            loadDropzone().then(() => {
+                // Check if jQuery is loaded
+                if (typeof jQuery === 'undefined') {
+                    console.error('jQuery not loaded');
+                    setTimeout(() => loadExternalLibraries().then(resolve), 100);
+                    return;
+                }
+
+                // Load Owl Carousel
+                if (typeof jQuery.fn.owlCarousel === 'undefined') {
+                    const owlScript = document.createElement('script');
+                    owlScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/owl.carousel.min.js';
+                    owlScript.onload = () => {
+                        loadSortable().then(resolve);
+                    };
+                    document.head.appendChild(owlScript);
+                } else {
+                    loadSortable().then(resolve);
+                }
+            }).catch((error) => {
+                console.error('Error loading Dropzone:', error);
+                resolve(); // Continue anyway
+            });
+        });
+    }
+
+    /**
+     * Load Sortable.js
+     */
+    function loadSortable() {
+        return new Promise((resolve) => {
+            if (typeof Sortable === 'undefined') {
+                const sortableScript = document.createElement('script');
+                sortableScript.src = 'https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js';
+                sortableScript.onload = resolve;
+                document.head.appendChild(sortableScript);
+            } else {
+                resolve();
+            }
+        });
+    }
+
+    /**
+     * Initialize Dropzone instance
+     */
+    function initDropzone() {
+        if (typeof Dropzone === 'undefined') {
+            console.error('Dropzone library not loaded');
+            return null;
+        }
+
+        Dropzone.autoDiscover = false;
+        const dropzoneElement = document.getElementById('vehicle-images-dropzone');
+
+        if (!dropzoneElement) {
+            console.error('Dropzone element not found');
+            return null;
+        }
+
+        const dropzone = new Dropzone(dropzoneElement, {
+            url: '/api/vehicles/PLACEHOLDER/images',
+            paramName: 'image',
+            maxFilesize: 5,
+            maxFiles: 10,
+            acceptedFiles: '.jpg,.jpeg,.png,.webp',
+            autoProcessQueue: true,
+            addRemoveLinks: true,
+            withCredentials: true,
+            dictDefaultMessage: '',
+            dictFileTooBig: 'El archivo es demasiado grande ({{filesize}}MB). Tamaño máximo: {{maxFilesize}}MB.',
+            dictInvalidFileType: 'No puedes subir archivos de este tipo.',
+            dictMaxFilesExceeded: 'No puedes subir más archivos.',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        // Store instance
+        window['dropzone_vehicle-images-dropzone'] = dropzone;
+
+        // Success event
+        dropzone.on('success', function(file, response) {
+            if (response.success) {
+                showSuccessAlert(response.message || 'Imagen subida exitosamente');
+                loadVehicleImages();
+            }
+        });
+
+        // Error event
+        dropzone.on('error', function(file, errorMessage) {
+            showErrorAlert(errorMessage.error || errorMessage || 'Error al subir la imagen');
+        });
+
+        return dropzone;
+    }
+
+    /**
+     * Initialize vehicle images modal
+     */
+    function initVehicleImagesModal() {
+        // Initialize Dropzone
+        vehicleImagesDropzone = initDropzone();
+
+        // Close carousel on backdrop or close button click
+        document.getElementById('carousel-backdrop')?.addEventListener('click', closeCarousel);
+        document.getElementById('carousel-close-btn')?.addEventListener('click', closeCarousel);
+
+        // Modal shown event
+        $('#vehicleImagesModal').on('shown.bs.modal', function() {
+            if (currentVehicleId) {
+                loadVehicleImages();
+            }
+        });
+
+        // Modal hidden event
+        $('#vehicleImagesModal').on('hidden.bs.modal', function() {
+            resetModal();
+        });
+    }
+
+    /**
+     * Open vehicle images modal
+     */
+    window.openVehicleImagesModal = function(vehicleId, brand, model) {
+        currentVehicleId = vehicleId;
+        currentVehicleInfo = { brand, model };
+
+        // Update modal title
+        document.getElementById('vehicle-info-text').textContent = `${brand} ${model}`;
+
+        // Update dropzone URL
+        updateDropzoneUrl();
+
+        // Show modal
+        $('#vehicleImagesModal').modal('show');
+    };
+
+    /**
+     * Update dropzone URL with current vehicle ID
+     */
+    function updateDropzoneUrl() {
+        if (vehicleImagesDropzone && currentVehicleId) {
+            vehicleImagesDropzone.options.url = `/api/vehicles/${currentVehicleId}/images`;
+            console.log('Dropzone URL updated:', vehicleImagesDropzone.options.url);
+        }
+    }
+
+    /**
+     * Load vehicle images from API
+     */
+    async function loadVehicleImages() {
+        try {
+            const response = await fetch(`/api/vehicles/${currentVehicleId}/images`, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                renderImages(result.data || []);
+                updateImagesCount(result.count || 0);
+            } else {
+                showErrorAlert(result.error || 'Error al cargar las imágenes');
+            }
+        } catch (error) {
+            console.error('Error loading vehicle images:', error);
+            showErrorAlert('Error al cargar las imágenes');
+        }
+    }
+
+    /**
+     * Render images in grid
+     */
+    function renderImages(images) {
+        const grid = document.getElementById('images-grid');
+        const emptyState = document.getElementById('images-empty-state');
+
+        if (images.length === 0) {
+            grid.style.display = 'none';
+            emptyState.style.display = 'block';
+            return;
+        }
+
+        emptyState.style.display = 'none';
+        grid.style.display = 'flex';
+        grid.innerHTML = '';
+
+        images.forEach((image, index) => {
+            const col = document.createElement('div');
+            col.className = 'col-md-4 image-card';
+            col.dataset.imageId = image.id;
+
+            col.innerHTML = `
+                <div class="card h-100 shadow-sm position-relative">
+                    ${image.isPrimary ? '<span class="badge bg-success primary-badge">Principal</span>' : ''}
+                    <img src="${image.url}"
+                         class="card-img-top image-preview"
+                         alt="${image.fileName}"
+                         data-index="${index}"
+                         loading="lazy">
+                    <div class="card-body p-2">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted text-truncate" style="max-width: 60%;" title="${image.fileName}">
+                                ${image.fileName}
+                            </small>
+                            <div class="btn-group btn-group-sm">
+                                ${!image.isPrimary ? `
+                                    <button class="btn btn-sm btn-outline-primary set-primary-btn"
+                                            data-image-id="${image.id}"
+                                            title="Establecer como principal">
+                                        <i class="ti ti-star"></i>
+                                    </button>
+                                ` : ''}
+                                <button class="btn btn-sm btn-outline-danger delete-image-btn"
+                                        data-image-id="${image.id}"
+                                        title="Eliminar">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            grid.appendChild(col);
+        });
+
+        // Initialize Sortable for drag & drop reordering
+        initSortable();
+
+        // Initialize Owl Carousel
+        initOwlCarousel(images);
+
+        // Add event listeners using delegation
+        setupImageEventListeners();
+    }
+
+    /**
+     * Setup event listeners for images (delegated)
+     */
+    function setupImageEventListeners() {
+        const grid = document.getElementById('images-grid');
+
+        // Remove existing listeners to avoid duplicates
+        const newGrid = grid.cloneNode(true);
+        grid.parentNode.replaceChild(newGrid, grid);
+
+        // Image click to open carousel
+        newGrid.addEventListener('click', function(e) {
+            if (e.target.classList.contains('image-preview')) {
+                const index = parseInt(e.target.dataset.index);
+                openCarousel(index);
+            }
+
+            // Set primary button
+            if (e.target.closest('.set-primary-btn')) {
+                const imageId = e.target.closest('.set-primary-btn').dataset.imageId;
+                setPrimaryImage(imageId);
+            }
+
+            // Delete button
+            if (e.target.closest('.delete-image-btn')) {
+                const imageId = e.target.closest('.delete-image-btn').dataset.imageId;
+                deleteImage(imageId);
+            }
+        });
+    }
+
+    /**
+     * Initialize Sortable.js for drag & drop reordering
+     */
+    function initSortable() {
+        if (sortableInstance) {
+            sortableInstance.destroy();
+        }
+
+        const grid = document.getElementById('images-grid');
+        sortableInstance = Sortable.create(grid, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            dragClass: 'sortable-drag',
+            onEnd: function(evt) {
+                // Get new order of image IDs
+                const imageIds = Array.from(grid.querySelectorAll('.image-card')).map(card => card.dataset.imageId);
+                reorderImages(imageIds);
+            }
+        });
+    }
+
+    /**
+     * Initialize Owl Carousel
+     */
+    function initOwlCarousel(images) {
+        // Destroy existing carousel
+        if (imagesCarousel) {
+            imagesCarousel.trigger('destroy.owl.carousel');
+        }
+
+        const carousel = $('#images-carousel');
+        carousel.html('');
+
+        images.forEach(image => {
+            carousel.append(`
+                <div class="item">
+                    <img src="${image.url}" alt="${image.fileName}">
+                </div>
+            `);
+        });
+
+        imagesCarousel = carousel.owlCarousel({
+            items: 1,
+            loop: true,
+            center: true,
+            nav: true,
+            dots: true,
+            navText: [
+                '<i class="ti ti-chevron-left" style="font-size: 2rem;"></i>',
+                '<i class="ti ti-chevron-right" style="font-size: 2rem;"></i>'
+            ]
+        });
+    }
+
+    /**
+     * Open carousel at specific index
+     */
+    window.openCarousel = function(index) {
+        document.getElementById('carousel-backdrop').style.display = 'block';
+        document.getElementById('carousel-container').style.display = 'block';
+
+        if (imagesCarousel) {
+            imagesCarousel.trigger('to.owl.carousel', [index, 300]);
+        }
+    };
+
+    /**
+     * Close carousel
+     */
+    function closeCarousel() {
+        document.getElementById('carousel-backdrop').style.display = 'none';
+        document.getElementById('carousel-container').style.display = 'none';
+    }
+
+    /**
+     * Set primary image
+     */
+    window.setPrimaryImage = async function(imageId) {
+        try {
+            const response = await fetch(`/api/vehicles/${currentVehicleId}/images/${imageId}/primary`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showSuccessAlert('Imagen principal actualizada');
+                loadVehicleImages();
+            } else {
+                showErrorAlert(result.error || 'Error al actualizar imagen principal');
+            }
+        } catch (error) {
+            console.error('Error setting primary image:', error);
+            showErrorAlert('Error al actualizar imagen principal');
+        }
+    };
+
+    /**
+     * Delete image
+     */
+    window.deleteImage = async function(imageId) {
+        if (!confirm('¿Estás seguro de que deseas eliminar esta imagen?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/vehicles/${currentVehicleId}/images/${imageId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showSuccessAlert('Imagen eliminada exitosamente');
+                loadVehicleImages();
+            } else {
+                showErrorAlert(result.error || 'Error al eliminar la imagen');
+            }
+        } catch (error) {
+            console.error('Error deleting image:', error);
+            showErrorAlert('Error al eliminar la imagen');
+        }
+    };
+
+    /**
+     * Reorder images
+     */
+    async function reorderImages(imageIds) {
+        try {
+            const response = await fetch(`/api/vehicles/${currentVehicleId}/images/reorder`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ imageIds })
+            });
+
+            const result = await response.json();
+
+            if (!result.success) {
+                showErrorAlert(result.error || 'Error al reordenar imágenes');
+                loadVehicleImages(); // Reload to restore original order
+            }
+        } catch (error) {
+            console.error('Error reordering images:', error);
+            showErrorAlert('Error al reordenar imágenes');
+            loadVehicleImages(); // Reload to restore original order
+        }
+    }
+
+    /**
+     * Update images count badge
+     */
+    function updateImagesCount(count) {
+        const badge = document.getElementById('images-count-badge');
+        badge.textContent = `${count} ${count === 1 ? 'imagen' : 'imágenes'}`;
+    }
+
+    /**
+     * Show success alert
+     */
+    function showSuccessAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="ti ti-check-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+
+        const container = document.getElementById('vehicle-images-alerts');
+        container.querySelectorAll('.alert').forEach(el => el.remove());
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+
+        setTimeout(() => {
+            container.querySelectorAll('.alert').forEach(el => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 150);
+            });
+        }, 5000);
+    }
+
+    /**
+     * Show error alert
+     */
+    function showErrorAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+
+        const container = document.getElementById('vehicle-images-alerts');
+        container.querySelectorAll('.alert').forEach(el => el.remove());
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+    }
+
+    /**
+     * Reset modal state
+     */
+    function resetModal() {
+        currentVehicleId = null;
+        currentVehicleInfo = null;
+        document.getElementById('images-grid').innerHTML = '';
+        document.getElementById('images-empty-state').style.display = 'block';
+        document.getElementById('images-grid').style.display = 'none';
+        document.getElementById('vehicle-images-alerts').innerHTML = '';
+        closeCarousel();
+
+        // Clear dropzone
+        if (vehicleImagesDropzone) {
+            vehicleImagesDropzone.removeAllFiles();
+        }
+    }
+
+    // Initialize on DOM ready
+    function init() {
+        loadExternalLibraries().then(() => {
+            initVehicleImagesModal();
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
+</script>

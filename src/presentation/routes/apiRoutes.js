@@ -106,6 +106,10 @@ const amexingUsersRoutes = require('./api/amexingUsersRoutes');
 const clientsRoutes = require('./api/clientsRoutes');
 const employeesRoutes = require('./api/employeesRoutes');
 const rolesRoutes = require('./api/rolesRoutes');
+// Vehicle Management API routes
+const vehicleTypesRoutes = require('./api/vehicleTypesRoutes');
+const vehiclesRoutes = require('./api/vehiclesRoutes');
+const vehicleImagesRoutes = require('./api/vehicleImagesRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
@@ -114,6 +118,9 @@ router.use('/amexingusers', amexingUsersRoutes);
 router.use('/clients', clientsRoutes);
 router.use('/employees', employeesRoutes);
 router.use('/roles', rolesRoutes);
+router.use('/vehicle-types', vehicleTypesRoutes);
+router.use('/vehicles', vehiclesRoutes);
+router.use('/vehicles', vehicleImagesRoutes); // Vehicle images endpoints
 
 /**
  * @swagger

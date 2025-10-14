@@ -1,0 +1,52 @@
+[
+  {
+    "name": "Sedan",
+    "code": "sedan",
+    "description": "Vehículo de pasajeros estándar, ideal para trayectos ejecutivos y aeropuerto",
+    "icon": "car",
+    "defaultCapacity": 4,
+    "sortOrder": 1,
+    "active": true,
+    "exists": true
+  },
+  {
+    "name": "SUV",
+    "code": "suv",
+    "description": "Vehículo utilitario deportivo con mayor espacio y comodidad",
+    "icon": "car-suv",
+    "defaultCapacity": 6,
+    "sortOrder": 2,
+    "active": true,
+    "exists": true
+  },
+  {
+    "name": "Van",
+    "code": "van",
+    "description": "Van de pasajeros para grupos medianos y familias",
+    "icon": "bus",
+    "defaultCapacity": 8,
+    "sortOrder": 3,
+    "active": true,
+    "exists": true
+  },
+  {
+    "name": "Bus",
+    "code": "bus",
+    "description": "Autobús de pasajeros para grupos grandes y eventos corporativos",
+    "icon": "bus",
+    "defaultCapacity": 20,
+    "sortOrder": 4,
+    "active": true,
+    "exists": true
+  },
+  {
+    "name": "Limousine",
+    "code": "limousine",
+    "description": "Limusina de lujo para ocasiones especiales y eventos VIP",
+    "icon": "car-garage",
+    "defaultCapacity": 8,
+    "sortOrder": 5,
+    "active": true,
+    "exists": true
+  }
+]
