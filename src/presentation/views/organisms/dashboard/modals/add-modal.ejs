@@ -120,8 +120,12 @@
                   <%= input.required ? 'required' : '' %>
                   <%= input.multiple %>>
                     <% input.options.forEach((option) => { %>
-                      <% /* eslint-disable-next-line security/detect-object-injection */ %>
-                      <option value="<%= option.value %>" data-custom-properties='<%- JSON.stringify({ name: option.dataName }) %>'><%= option.label %></option>
+                      <option 
+                          value="<%= option.value %>" 
+                          data-custom-properties='<%= JSON.stringify({ name: option.dataName }).replace(/'/g, "&#39;") %>'
+                        >
+                        <%= option.label %>
+                      </option>
                     <% }) %>
                 </select>
 
@@ -308,8 +312,11 @@
     // Documentación: https://getbootstrap.com/docs/5.3/components/modal/
     // ============================================================================
     //Obtains the IDs of the inputs for field validation
-    <% /* eslint-disable-next-line security/detect-object-injection */ %>
-    const idsInputsModalAdd = <%- JSON.stringify(inputs.map(input => input.required ? input.id : '')) %>;
+    const idsInputsModalAdd = [
+      <% inputs.forEach((input, i) => { %>
+        '<%= input.required ? input.id : '' %>'<%= i < inputs.length - 1 ? ',' : '' %>
+      <% }) %>
+    ];
     const btnAddUserModalAdd = document.querySelector('[data-action="<%= dataAction %>"]');
 
     /**
@@ -475,8 +482,11 @@
     */
     async function AddUserModalAdd() {
       const updateBtn = document.querySelector('#<%= modalId %> [data-action="<%= dataAction %>"]');
-      <% /* eslint-disable-next-line security/detect-object-injection */ %>
-      const idsInputs = <%- JSON.stringify(inputs.map(input => input.required ? input.id : '')) %>;
+      const idsInputs = [
+        <% inputs.forEach((input, i) => { %>
+          '<%= input.required ? input.id : '' %>'<%= i < inputs.length - 1 ? ',' : '' %>
+        <% }) %>
+      ];
 
       // Disable button and show loading state
       updateBtn.disabled = true;
@@ -527,6 +537,8 @@
           if (rechargeData && window.usersTable) {
             loadUsersAndInitializeTable();
           }
+          updateBtn.disabled = false;
+          updateBtn.innerHTML = originalBtnContent;
 
       } catch (error) {
         console.log(error)
