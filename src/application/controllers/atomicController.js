@@ -56,10 +56,10 @@ class AtomicController {
           total: 12,
         },
         common: {
-          atoms: 9, // icon, button, label, checkbox, radio, toggle, textarea, avatar, badge, spinner, divider
-          molecules: 3, // form-field, searchbar, card
-          organisms: 1, // modal
-          total: 13,
+          atoms: 10, // icon, button, label, checkbox, radio, toggle, textarea, avatar, badge, spinner, divider, vertical-menu-item
+          molecules: 4, // form-field, searchbar, card, vertical-navigation-menu
+          organisms: 2, // modal, client-detail-layout
+          total: 16,
         },
       };
 

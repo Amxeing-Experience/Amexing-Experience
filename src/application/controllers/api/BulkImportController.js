@@ -119,11 +119,31 @@ class BulkImportController {
         { header: 'phone', key: 'phone', width: 20 },
         { header: 'taxId', key: 'taxId', width: 15 },
         { header: 'website', key: 'website', width: 30 },
-        { header: `${addressPrefix}Street`, key: `${addressPrefix}Street`, width: 30 },
-        { header: `${addressPrefix}City`, key: `${addressPrefix}City`, width: 20 },
-        { header: `${addressPrefix}State`, key: `${addressPrefix}State`, width: 20 },
-        { header: `${addressPrefix}ZipCode`, key: `${addressPrefix}ZipCode`, width: 15 },
-        { header: `${addressPrefix}Country`, key: `${addressPrefix}Country`, width: 20 },
+        {
+          header: `${addressPrefix}Street`,
+          key: `${addressPrefix}Street`,
+          width: 30,
+        },
+        {
+          header: `${addressPrefix}City`,
+          key: `${addressPrefix}City`,
+          width: 20,
+        },
+        {
+          header: `${addressPrefix}State`,
+          key: `${addressPrefix}State`,
+          width: 20,
+        },
+        {
+          header: `${addressPrefix}ZipCode`,
+          key: `${addressPrefix}ZipCode`,
+          width: 15,
+        },
+        {
+          header: `${addressPrefix}Country`,
+          key: `${addressPrefix}Country`,
+          width: 20,
+        },
         { header: 'notes', key: 'notes', width: 40 },
       ];
       clientsSheet.columns = columnDefs;
@@ -177,19 +197,21 @@ class BulkImportController {
       };
 
       // Add data validation for email column
-      clientsSheet.getColumn('email').eachCell({ includeEmpty: true }, (cell, rowNumber) => {
-        if (rowNumber > 1) {
-          // eslint-disable-next-line no-param-reassign -- ExcelJS requires direct property assignment to cell objects
-          cell.dataValidation = {
-            type: 'textLength',
-            operator: 'lessThanOrEqual',
-            showErrorMessage: true,
-            formulae: [255],
-            errorTitle: 'Email demasiado largo',
-            error: 'El email no debe exceder 255 caracteres',
-          };
-        }
-      });
+      clientsSheet
+        .getColumn('email')
+        .eachCell({ includeEmpty: true }, (cell, rowNumber) => {
+          if (rowNumber > 1) {
+            // eslint-disable-next-line no-param-reassign -- ExcelJS requires direct property assignment to cell objects
+            cell.dataValidation = {
+              type: 'textLength',
+              operator: 'lessThanOrEqual',
+              showErrorMessage: true,
+              formulae: [255],
+              errorTitle: 'Email demasiado largo',
+              error: 'El email no debe exceder 255 caracteres',
+            };
+          }
+        });
 
       // Add comments to header cells
       const comments = {
@@ -455,9 +477,7 @@ class BulkImportController {
       });
 
       // Validate file structure
-      const validation = await this.bulkImportService.validateExcelFile(
-        filePath
-      );
+      const validation = await this.bulkImportService.validateExcelFile(filePath);
 
       if (!validation.valid) {
         // Delete invalid file
@@ -474,9 +494,7 @@ class BulkImportController {
       }
 
       // Parse file
-      const parseResult = await this.bulkImportService.parseExcelFile(
-        filePath
-      );
+      const parseResult = await this.bulkImportService.parseExcelFile(filePath);
 
       // Validate records
       const validationResult = await this.bulkImportService.validateRecords(
@@ -567,11 +585,7 @@ class BulkImportController {
       const job = this.importJobs.get(jobId);
 
       if (!job) {
-        return this.sendError(
-          res,
-          'Job no encontrado o expirado',
-          404
-        );
+        return this.sendError(res, 'Job no encontrado o expirado', 404);
       }
 
       // Verify user owns this job
@@ -613,7 +627,11 @@ class BulkImportController {
         userId: req.user?.id,
       });
 
-      this.sendError(res, error.message || 'Error al procesar importación', 500);
+      this.sendError(
+        res,
+        error.message || 'Error al procesar importación',
+        500
+      );
     }
   }
 

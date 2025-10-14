@@ -1,0 +1,217 @@
+<%
+/**
+ * Vertical Navigation Menu Molecule
+ * Complete vertical navigation menu component
+ *
+ * Atomic Design Level: Molecule
+ * Category: Navigation
+ *
+ * Component Dependencies:
+ * - Uses: atoms/navigation/vertical-menu-item
+ *
+ * @param {Array} items - Array of menu item objects (required)
+ *   Each item object should have:
+ *   - {string} label - Menu item label
+ *   - {string} icon - Tabler icon name
+ *   - {string} href - Navigation URL
+ *   - {string|number} badge - Optional badge content
+ *   - {string} badgeVariant - Optional badge variant
+ * @param {string} activeSection - Currently active section identifier (default: '')
+ * @param {string} title - Optional menu title/header
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {boolean} collapsible - Whether menu is collapsible on mobile (default: true)
+ *
+ * Features:
+ * - Renders multiple menu items from array
+ * - Automatic active state detection
+ * - Optional menu title/header
+ * - Responsive with mobile collapse support
+ * - Sticky positioning option
+ * - Accessible navigation with ARIA roles
+ *
+ * Usage Example:
+ * <%- include('../../molecules/navigation/vertical-navigation-menu', {
+ *   title: 'Client Panel',
+ *   items: [
+ *     { label: 'Information', icon: 'info-circle', href: '/clients/123' },
+ *     { label: 'Employees', icon: 'users', href: '/clients/123/employees', badge: '5' },
+ *     { label: 'Quotes', icon: 'file-invoice', href: '/clients/123/quotes' }
+ *   ],
+ *   activeSection: 'information'
+ * }) %>
+ */
+
+// Default parameters
+const menuItems = typeof items !== 'undefined' ? items : [];
+const menuActiveSection = typeof activeSection !== 'undefined' ? activeSection : '';
+const menuTitle = typeof title !== 'undefined' ? title : '';
+const menuAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const menuCollapsible = typeof collapsible !== 'undefined' ? collapsible : true;
+
+// Build class string
+const menuClasses = ['vertical-navigation-menu', menuAdditionalClasses]
+    .filter(cls => cls.length > 0)
+    .join(' ');
+%>
+<nav class="<%= menuClasses %>" role="navigation" aria-label="Vertical navigation menu">
+    <% if (menuTitle) { %>
+        <div class="menu-header">
+            <h6 class="menu-title"><%= menuTitle %></h6>
+        </div>
+    <% } %>
+
+    <div class="menu-items" role="menu">
+        <% if (menuItems.length > 0) { %>
+            <% menuItems.forEach(function(item, index) { %>
+                <%
+                // Determine if this item is active
+                const isActive = item.section ? (item.section === menuActiveSection) : false;
+                %>
+                <%- include('../../atoms/navigation/vertical-menu-item', {
+                    label: item.label,
+                    icon: item.icon,
+                    href: item.href,
+                    active: isActive,
+                    badge: item.badge || null,
+                    badgeVariant: item.badgeVariant || 'primary',
+                    id: item.id || null
+                }) %>
+            <% }); %>
+        <% } else { %>
+            <div class="menu-empty-state text-center text-muted py-4">
+                <i class="ti ti-menu-2 fs-1"></i>
+                <p class="mb-0 mt-2">No menu items</p>
+            </div>
+        <% } %>
+    </div>
+
+    <% if (menuCollapsible) { %>
+        <!-- Mobile toggle button (hidden on desktop) -->
+        <button type="button"
+                class="btn btn-link menu-toggle d-lg-none"
+                data-bs-toggle="collapse"
+                data-bs-target="#verticalMenuCollapse"
+                aria-expanded="false"
+                aria-controls="verticalMenuCollapse"
+                aria-label="Toggle navigation menu">
+            <i class="ti ti-menu-2"></i>
+        </button>
+    <% } %>
+</nav>
+
+<!-- Vertical Navigation Menu Styles -->
+<style>
+.vertical-navigation-menu {
+    background-color: #ffffff;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    padding: 1.25rem;
+    min-width: 250px;
+    height: fit-content;
+    position: sticky;
+    top: 1rem;
+}
+
+.menu-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #f0f0f0;
+}
+
+.menu-title {
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #5a6a85;
+    margin: 0;
+}
+
+.menu-items {
+    display: flex;
+    flex-direction: column;
+}
+
+.menu-empty-state {
+    padding: 2rem 1rem;
+}
+
+.menu-empty-state i {
+    color: #d1d5db;
+}
+
+.menu-toggle {
+    width: 100%;
+    margin-top: 0.5rem;
+    color: #5a6a85;
+    text-decoration: none;
+}
+
+.menu-toggle:hover {
+    color: #f76b1c;
+}
+
+/* Responsive Styles */
+@media (max-width: 991.98px) {
+    .vertical-navigation-menu {
+        min-width: 100%;
+        position: static;
+        margin-bottom: 1rem;
+    }
+
+    .menu-items {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-in-out;
+    }
+
+    .menu-items.show {
+        max-height: 500px;
+    }
+
+    /* Mobile collapsed state */
+    .vertical-navigation-menu[data-collapsed="true"] .menu-items {
+        display: none;
+    }
+}
+
+/* Tablet adjustments */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .vertical-navigation-menu {
+        min-width: 200px;
+    }
+}
+
+/* Large desktop */
+@media (min-width: 1400px) {
+    .vertical-navigation-menu {
+        min-width: 280px;
+    }
+}
+
+/* Print styles */
+@media print {
+    .vertical-navigation-menu {
+        display: none;
+    }
+}
+</style>
+
+<!-- JavaScript for mobile collapse functionality -->
+<script>
+(function() {
+    // Mobile menu collapse handler
+    document.addEventListener('DOMContentLoaded', function() {
+        const menuToggle = document.querySelector('.menu-toggle');
+        const menuItems = document.querySelector('.menu-items');
+
+        if (menuToggle && menuItems) {
+            menuToggle.addEventListener('click', function() {
+                menuItems.classList.toggle('show');
+                const isExpanded = menuItems.classList.contains('show');
+                menuToggle.setAttribute('aria-expanded', isExpanded);
+            });
+        }
+    });
+})();
+</script>

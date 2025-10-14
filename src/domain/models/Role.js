@@ -545,7 +545,7 @@ class Role extends BaseModel {
       {
         name: 'employee_amexing',
         displayName: 'Amexing Employee',
-        description: 'Internal Amexing staff (drivers, operators)',
+        description: 'Internal Amexing administrative and operations staff',
         level: 3,
         scope: 'operations',
         organization: 'amexing',
@@ -565,6 +565,32 @@ class Role extends BaseModel {
           scheduleScope: 'assigned', // Only assigned bookings/vehicles
         },
         color: '#EA580C',
+        icon: 'briefcase',
+      },
+      {
+        name: 'driver',
+        displayName: 'Driver',
+        description: 'Transportation service driver with mobile app access',
+        level: 2,
+        scope: 'operations',
+        organization: 'amexing',
+        basePermissions: [
+          'trips.read',
+          'trips.accept',
+          'trips.complete',
+          'trips.cancel',
+          'vehicles.read',
+          'routes.read',
+          'location.update',
+          'earnings.read',
+        ],
+        delegatable: false,
+        isSystemRole: true,
+        conditions: {
+          assignedOnly: true, // Only assigned trips and vehicles
+          mobileAccess: true, // Primarily mobile app access
+        },
+        color: '#F59E0B',
         icon: 'truck',
       },
       {

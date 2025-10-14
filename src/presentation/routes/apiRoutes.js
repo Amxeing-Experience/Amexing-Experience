@@ -104,6 +104,7 @@ router.use(jwtMiddleware.authenticateToken);
 const userManagementRoutes = require('./api/userManagementRoutes');
 const amexingUsersRoutes = require('./api/amexingUsersRoutes');
 const clientsRoutes = require('./api/clientsRoutes');
+const employeesRoutes = require('./api/employeesRoutes');
 const rolesRoutes = require('./api/rolesRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
@@ -111,6 +112,7 @@ const NotificationsController = require('../../application/controllers/api/Notif
 router.use('/users', userManagementRoutes);
 router.use('/amexingusers', amexingUsersRoutes);
 router.use('/clients', clientsRoutes);
+router.use('/employees', employeesRoutes);
 router.use('/roles', rolesRoutes);
 
 /**

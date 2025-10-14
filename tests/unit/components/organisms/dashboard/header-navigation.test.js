@@ -85,8 +85,9 @@ describe('Header Navigation Organism', () => {
       const html = await renderComponent(componentPath, {
         userRole: 'admin'
       });
-      expect(html).toContain('Operations');
-      expect(html).toContain('Resources');
+      // Updated to Spanish after i18n translation
+      expect(html).toContain('Operaciones Principales');
+      expect(html).toContain('Equipo y Recursos');
     });
 
     test('should include mega menu dropdowns', async () => {

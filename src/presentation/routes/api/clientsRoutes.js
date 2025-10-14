@@ -20,11 +20,13 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const ClientsController = require('../../../application/controllers/api/ClientsController');
+const ClientEmployeesController = require('../../../application/controllers/api/ClientEmployeesController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 const logger = require('../../../infrastructure/logger');
 
 const router = express.Router();
 const clientsController = new ClientsController();
+const clientEmployeesController = new ClientEmployeesController();
 
 // Rate limiting for client management operations
 const clientApiLimiter = rateLimit({
@@ -452,6 +454,324 @@ router.delete('/:id', writeOperationsLimiter, async (req, res) => {
 router.patch('/:id/toggle-status', writeOperationsLimiter, async (req, res) => {
   await clientsController.toggleClientStatus(req, res);
 });
+
+// ===== NESTED ROUTES: CLIENT EMPLOYEES =====
+
+/**
+ * @swagger
+ * /api/clients/{clientId}/employees:
+ *   get:
+ *     tags:
+ *       - Client Employee Management
+ *     summary: Get employees for specific client
+ *     description: |
+ *       Retrieve paginated list of employees (client/employee roles) for a specific client.
+ *
+ *       **Access Control:**
+ *       - SuperAdmin: Full access
+ *       - Admin: Full access
+ *
+ *       **Features:**
+ *       - Pagination (default: 25 items, max: 100)
+ *       - Filter by active status and role
+ *       - Validates employee belongs to client
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Client User ObjectId
+ *       - $ref: '#/components/parameters/PageParameter'
+ *       - $ref: '#/components/parameters/LimitParameter'
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: [client, employee]
+ *         description: Filter by role (client=Agent, employee=Employee)
+ *       - in: query
+ *         name: active
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status
+ *     responses:
+ *       200:
+ *         description: Employees retrieved successfully
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Client not found
+ */
+router.get('/:clientId/employees', async (req, res) => {
+  await clientEmployeesController.getEmployees(req, res);
+});
+
+/**
+ * @swagger
+ * /api/clients/{clientId}/employees/{id}:
+ *   get:
+ *     tags:
+ *       - Client Employee Management
+ *     summary: Get employee by ID
+ *     description: Retrieve employee details and validate it belongs to specified client
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Employee retrieved successfully
+ *       403:
+ *         description: Employee does not belong to client
+ *       404:
+ *         description: Employee not found
+ */
+router.get('/:clientId/employees/:id', async (req, res) => {
+  await clientEmployeesController.getEmployeeById(req, res);
+});
+
+/**
+ * @swagger
+ * /api/clients/{clientId}/employees:
+ *   post:
+ *     tags:
+ *       - Client Employee Management
+ *     summary: Create new employee for client
+ *     description: |
+ *       Create employee with client (Agent) or employee role.
+ *
+ *       **Roles:**
+ *       - client: Agent representative with management capabilities
+ *       - employee: Standard employee
+ *
+ *       **Access:** Requires SuperAdmin or Admin
+ *       **Rate Limited:** 30 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - firstName
+ *               - lastName
+ *               - email
+ *               - role
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *                 example: "John"
+ *               lastName:
+ *                 type: string
+ *                 example: "Doe"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "john@agency.com"
+ *               role:
+ *                 type: string
+ *                 enum: [client, employee]
+ *                 description: "client=Agent, employee=Employee"
+ *                 example: "client"
+ *               phone:
+ *                 type: string
+ *                 example: "+52 999 123 4567"
+ *               notes:
+ *                 type: string
+ *                 example: "Agency representative"
+ *     responses:
+ *       201:
+ *         description: Employee created successfully
+ *       400:
+ *         description: Validation error
+ *       403:
+ *         description: Access denied
+ *       404:
+ *         description: Client not found
+ */
+router.post(
+  '/:clientId/employees',
+  writeOperationsLimiter,
+  async (req, res) => {
+    await clientEmployeesController.createEmployee(req, res);
+  }
+);
+
+/**
+ * @swagger
+ * /api/clients/{clientId}/employees/{id}:
+ *   put:
+ *     tags:
+ *       - Client Employee Management
+ *     summary: Update employee
+ *     description: |
+ *       Update employee information.
+ *       Validates employee belongs to client.
+ *
+ *       **Access:** Requires SuperAdmin or Admin
+ *       **Rate Limited:** 30 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               role:
+ *                 type: string
+ *                 enum: [client, employee]
+ *               active:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Employee updated successfully
+ *       403:
+ *         description: Employee does not belong to client
+ *       404:
+ *         description: Employee not found
+ */
+router.put(
+  '/:clientId/employees/:id',
+  writeOperationsLimiter,
+  async (req, res) => {
+    await clientEmployeesController.updateEmployee(req, res);
+  }
+);
+
+/**
+ * @swagger
+ * /api/clients/{clientId}/employees/{id}:
+ *   delete:
+ *     tags:
+ *       - Client Employee Management
+ *     summary: Deactivate employee (soft delete)
+ *     description: |
+ *       Sets employee exists=false (soft delete).
+ *       Validates employee belongs to client.
+ *
+ *       **Access:** Requires SuperAdmin or Admin
+ *       **Rate Limited:** 30 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Employee deactivated successfully
+ *       403:
+ *         description: Employee does not belong to client
+ *       404:
+ *         description: Employee not found
+ */
+router.delete(
+  '/:clientId/employees/:id',
+  writeOperationsLimiter,
+  async (req, res) => {
+    await clientEmployeesController.deactivateEmployee(req, res);
+  }
+);
+
+/**
+ * @swagger
+ * /api/clients/{clientId}/employees/{id}/toggle-status:
+ *   patch:
+ *     tags:
+ *       - Client Employee Management
+ *     summary: Toggle employee active status
+ *     description: |
+ *       Switch between active/inactive status.
+ *       Validates employee belongs to client.
+ *
+ *       **Access:** Requires SuperAdmin or Admin
+ *       **Rate Limited:** 30 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: clientId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - active
+ *             properties:
+ *               active:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Status toggled successfully
+ *       403:
+ *         description: Employee does not belong to client
+ *       404:
+ *         description: Employee not found
+ */
+router.patch(
+  '/:clientId/employees/:id/toggle-status',
+  writeOperationsLimiter,
+  async (req, res) => {
+    await clientEmployeesController.toggleEmployeeStatus(req, res);
+  }
+);
 
 /**
  * Error handling middleware for this router.

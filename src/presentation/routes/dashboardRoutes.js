@@ -79,12 +79,19 @@ router.get(
 router.get('/admin', dashboardAuth.requireRole('admin'), (req, res) => adminController.index(req, res));
 router.get('/admin/clients', dashboardAuth.requireRole('admin'), (req, res) => adminController.clients(req, res));
 router.get(
+  '/admin/clients/:id',
+  dashboardAuth.requireRole('admin'),
+  (req, res) => adminController.clientDetail(req, res)
+);
+router.get(
   '/admin/departments',
   dashboardAuth.requireRole('admin'),
   (req, res) => adminController.departments(req, res)
 );
 router.get('/admin/employees', dashboardAuth.requireRole('admin'), (req, res) => adminController.employees(req, res));
 router.get('/admin/drivers', dashboardAuth.requireRole('admin'), (req, res) => adminController.drivers(req, res));
+router.get('/admin/events', dashboardAuth.requireRole('admin'), (req, res) => adminController.events(req, res));
+router.get('/admin/schedule', dashboardAuth.requireRole('admin'), (req, res) => adminController.schedule(req, res));
 router.get('/admin/bookings', dashboardAuth.requireRole('admin'), (req, res) => adminController.bookings(req, res));
 router.get('/admin/fleet', dashboardAuth.requireRole('admin'), (req, res) => adminController.fleet(req, res));
 router.get('/admin/routes', dashboardAuth.requireRole('admin'), (req, res) => adminController.routes(req, res));

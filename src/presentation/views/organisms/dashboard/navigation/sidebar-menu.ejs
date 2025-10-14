@@ -23,20 +23,19 @@ const navigationItems = {
         ]}
     ],
     admin: [
-        { section: 'Operations', icon: 'ti-dashboard', items: [
-            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/admin', id: 'dashboard' },
-            { name: 'Events Management', icon: 'calendar-event', path: '/dashboard/admin/events', id: 'events' },
-            { name: 'Bookings', icon: 'car', path: '/dashboard/admin/bookings', id: 'bookings' }
+        { section: 'Operaciones Principales', icon: 'ti-dashboard', items: [
+            { name: 'Tablero', icon: 'dashboard', path: '/dashboard/admin', id: 'dashboard' },
+            { name: 'Gestión de Clientes', icon: 'users', path: '/dashboard/admin/clients', id: 'clients' },
+            { name: 'Reservaciones', icon: 'clipboard-list', path: '/dashboard/admin/bookings', id: 'bookings' }
         ]},
-        { section: 'Users Management', icon: 'ti-users', items: [
-            { name: 'Client Management', icon: 'users', path: '/dashboard/admin/clients', id: 'clients' },
-            { name: 'Employee Management', icon: 'ti-briefcase', path: '/dashboard/admin/employees', id: 'employees' }
+        { section: 'Gestión de Eventos', icon: 'ti-calendar', items: [
+            { name: 'Gestión de Eventos', icon: 'calendar-event', path: '/dashboard/admin/events', id: 'events' },
+            { name: 'Calendario', icon: 'calendar', path: '/dashboard/admin/schedule', id: 'schedule' }
         ]},
-        { section: 'Resources', icon: 'ti-car', items: [
-            { name: 'Vehicle Management', icon: 'car-garage', path: '/dashboard/admin/vehicles', id: 'vehicles' },
-            { name: 'Driver Management', icon: 'user-check', path: '/dashboard/admin/drivers', id: 'drivers' },
-            { name: 'Schedule Calendar', icon: 'calendar', path: '/dashboard/admin/schedule', id: 'schedule' },
-            { name: 'Reports', icon: 'report', path: '/dashboard/admin/reports', id: 'reports' }
+        { section: 'Equipo y Recursos', icon: 'ti-users', items: [
+            { name: 'Gestión de Empleados', icon: 'user-check', path: '/dashboard/admin/employees', id: 'employees' },
+            { name: 'Gestión de Vehículos', icon: 'car', path: '/dashboard/admin/vehicles', id: 'vehicles' },
+            { name: 'Reportes', icon: 'report', path: '/dashboard/admin/reports', id: 'reports' }
         ]}
     ],
     client: [
