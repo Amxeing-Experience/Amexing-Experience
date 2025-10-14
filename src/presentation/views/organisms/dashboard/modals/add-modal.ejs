@@ -66,30 +66,30 @@
   }
 </style>
 
-<div class="modal fade" id="<%- modalId %>" tabindex="-1" aria-labelledby="<%- modalId %>Label" aria-hidden="true">
+<div class="modal fade" id="<%= modalId %>" tabindex="-1" aria-labelledby="<%= modalId %>Label" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg">
     <div class="modal-content border-0 shadow-lg">
 
       <!-- Header -->
-      <div class="modal-header bg-<%- headerColor %> text-white" style="<%- headerStyle %>">
-        <h5 class="modal-title d-flex align-items-center gap-2 text-white" id="<%- modalId %>Label">
-          <i class="ti ti-<%- icon %>"></i>
-          <span><%- title %></span>
+      <div class="modal-header bg-<%= headerColor %> text-white" style="<%= headerStyle %>">
+        <h5 class="modal-title d-flex align-items-center gap-2 text-white" id="<%= modalId %>Label">
+          <i class="ti ti-<%= icon %>"></i>
+          <span><%= title %></span>
         </h5>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
 
       <!-- Body -->
       <div class="modal-body">
-        <p class="text-muted mb-4"><%- description %></p>
+        <p class="text-muted mb-4"><%= description %></p>
 
         <% if (inputs.length > 0) { %>
 
           <% inputs.forEach((input) => { %>
 
-            <div class="mb-3" <%-input.hidden ? 'hidden' : ''%>>
+            <div class="mb-3" <%=input.hidden ? 'hidden' : ''%>>
 
-              <label for="<%- input.id %>" class="form-label fw-bold">
+              <label for="<%= input.id %>" class="form-label fw-bold">
                 <%- input.label %>
                 <% if (input.required) { %>
                   <span class="text-danger">*</span>
@@ -100,27 +100,27 @@
 
                 <textarea 
                   class="form-control"
-                  id="<%- input.id %>"
-                  name="<%- input.name %>"
-                  rows="<%- input.rows || 4 %>"
-                  maxlength="<%- input.maxLength || 500 %>"
-                  placeholder="<%- input.placeholder || '' %>"
-                  aria-label="<%- input.label %>"
-                  <%- input.required ? 'required' : '' %>>
-                    <%- input.value || '' %>
+                  id="<%= input.id %>"
+                  name="<%= input.name %>"
+                  rows="<%= input.rows || 4 %>"
+                  maxlength="<%= input.maxLength || 500 %>"
+                  placeholder="<%= input.placeholder || '' %>"
+                  aria-label="<%= input.label %>"
+                  <%= input.required ? 'required' : '' %>>
+                    <%= input.value || '' %>
                 </textarea>
 
               <% } else if (input.type === "select") { %>
 
                 <select 
                   class="form-control form-select select-modals-add"
-                  id="<%- input.id %>"
-                  name="<%- input.name %>"
-                  aria-label="<%- input.label %>"
-                  <%- input.required ? 'required' : '' %>
-                  <%- input.multiple %>>
+                  id="<%= input.id %>"
+                  name="<%= input.name %>"
+                  aria-label="<%= input.label %>"
+                  <%= input.required ? 'required' : '' %>
+                  <%= input.multiple %>>
                     <% input.options.forEach((option) => { %>
-                      <option value="<%- option.value %>" data-custom-properties='<%- JSON.stringify({ name: option.dataName }) %>'><%- option.label %></option>
+                      <option value="<%- option.value %>" data-custom-properties='<%= JSON.stringify({ name: option.dataName }) %>'><%= option.label %></option>
                     <% }) %>
                 </select>
 
@@ -133,17 +133,17 @@
                     <input 
                       type="password"
                       class="form-control"
-                      id="<%- input.id %>"
-                      name="<%- input.name %>"
-                      value="<%- input.value || '' %>"
-                      maxlength="<%- input.maxLength || 100 %>"
-                      placeholder="<%- input.placeholder || '' %>"
-                      aria-label="<%- input.label %>"
-                      <%- input.required ? 'required' : '' %>>
+                      id="<%= input.id %>"
+                      name="<%= input.name %>"
+                      value="<%= input.value || '' %>"
+                      maxlength="<%= input.maxLength || 100 %>"
+                      placeholder="<%= input.placeholder || '' %>"
+                      aria-label="<%= input.label %>"
+                      <%= input.required ? 'required' : '' %>>
                     <button 
                       class="btn btn-outline-secondary toggle-password" 
                       type="button"
-                      data-target="<%- input.id %>">
+                      data-target="<%= input.id %>">
                       <i class="ti ti-eye"></i>
                     </button>
                   </div>
@@ -151,14 +151,14 @@
                 <% } else { %>
 
                   <input 
-                    type="<%- input.type || 'text' %>"
+                    type="<%= input.type || 'text' %>"
                     class="form-control"
-                    id="<%- input.id %>"
-                    name="<%- input.name %>"
-                    value="<%- input.value || '' %>"
-                    maxlength="<%- input.maxLength || 100 %>"
-                    placeholder="<%- input.placeholder || '' %>"
-                    aria-label="<%- input.label %>"
+                    id="<%= input.id %>"
+                    name="<%= input.name %>"
+                    value="<%= input.value || '' %>"
+                    maxlength="<%= input.maxLength || 100 %>"
+                    placeholder="<%= input.placeholder || '' %>"
+                    aria-label="<%= input.label %>"
                     <%- input.required ? 'required' : '' %>>
 
                 <% } %>
@@ -169,13 +169,13 @@
 
                 <div class="form-text">
                   <i class="ti ti-info-circle me-1"></i>
-                  <%- input.helper %>
+                  <%= input.helper %>
                 </div>
 
               <% } %>
 
               <div 
-                id="<%- input.id %>ValidationError" 
+                id="<%= input.id %>ValidationError" 
                 class="invalid-feedback" 
                 style="display: none;">
               </div>
@@ -191,10 +191,10 @@
       <!-- Footer -->
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-          <i class="ti ti-x me-1"></i> <%- secondaryLabel %>
+          <i class="ti ti-x me-1"></i> <%= secondaryLabel %>
         </button>
-        <button type="button" class="btn btn-primary" data-action="<%- dataAction %>">
-          <i class="ti ti-check me-1"></i> <%- primaryLabel %>
+        <button type="button" class="btn btn-primary" data-action="<%= dataAction %>">
+          <i class="ti ti-check me-1"></i> <%= primaryLabel %>
         </button>
       </div>
     </div>
@@ -307,8 +307,8 @@
     // Documentación: https://getbootstrap.com/docs/5.3/components/modal/
     // ============================================================================
     //Obtains the IDs of the inputs for field validation
-    const idsInputsModalAdd = <%- JSON.stringify(inputs.map(input => input.required ? input.id : '')) %>;
-    const btnAddUserModalAdd = document.querySelector('[data-action="<%- dataAction %>"]');
+    const idsInputsModalAdd = <%= JSON.stringify(inputs.map(input => input.required ? input.id : '')) %>;
+    const btnAddUserModalAdd = document.querySelector('[data-action="<%= dataAction %>"]');
 
     /**
      * Show error message modal
@@ -438,7 +438,7 @@
     * @param {Event} e - The event
     * @returns {void}
     */
-    const modalAddUserModalAdd = document.getElementById('<%- modalId %>');
+    const modalAddUserModalAdd = document.getElementById('<%= modalId %>');
     modalAddUserModalAdd.addEventListener('hidden.bs.modal', () => {
       idsInputsModalAdd.forEach(id => {
         const el = document.getElementById(id);
@@ -472,8 +472,8 @@
     * @returns {Promise<void>}
     */
     async function AddUserModalAdd() {
-      const updateBtn = document.querySelector('#<%- modalId %> [data-action="<%- dataAction %>"]');
-      const idsInputs = <%- JSON.stringify(inputs.map(input => input.required ? input.id : '')) %>;
+      const updateBtn = document.querySelector('#<%= modalId %> [data-action="<%= dataAction %>"]');
+      const idsInputs = <%= JSON.stringify(inputs.map(input => input.required ? input.id : '')) %>;
 
       // Disable button and show loading state
       updateBtn.disabled = true;
@@ -495,7 +495,7 @@
             }
           })
 
-          const response = await fetch(`<%-actionURL%>`, {
+          const response = await fetch(`<%=actionURL%>`, {
               method: 'POST',
               credentials: 'include',
               headers: {
@@ -512,7 +512,7 @@
           }
 
           // Success
-          const modalEl = document.getElementById('<%- modalId %>');
+          const modalEl = document.getElementById('<%= modalId %>');
           const modalInstance = bootstrap.Modal.getInstance(modalEl);
           if (modalInstance) {
             modalInstance.hide();
