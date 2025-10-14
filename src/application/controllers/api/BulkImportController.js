@@ -85,6 +85,7 @@ class BulkImportController {
    * @example GET /api/clients/bulk/template
    * @returns {Promise<void>}
    */
+  /* eslint-disable max-lines-per-function */
   async downloadTemplate(req, res) {
     try {
       const currentUser = req.user;
@@ -406,7 +407,7 @@ class BulkImportController {
         }
 
         row.height = 20;
-        rowNum++;
+        rowNum += 1;
       });
 
       // Set response headers for file download
@@ -445,6 +446,7 @@ class BulkImportController {
    * @example POST /api/clients/bulk/upload.
    * @returns {object} - JSON response.
    */
+  /* eslint-disable max-lines-per-function */
   async uploadFile(req, res) {
     try {
       const currentUser = req.user;
