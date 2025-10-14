@@ -71,7 +71,7 @@ module.exports = {
     'max-depth': 'warn', // Downgraded to warning
     'max-lines': 'warn', // Downgraded to warning
     'max-lines-per-function': 'warn', // Downgraded to warning
-    'max-params': 'warn', // Downgraded to warning
+    'max-params': ['warn', 4], // Downgraded to warning
     'no-restricted-syntax': 'warn', // Downgraded to warning
     'no-await-in-loop': 'warn', // Downgraded to warning
     'no-plusplus': 'warn', // Downgraded to warning
