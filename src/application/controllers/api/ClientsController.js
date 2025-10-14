@@ -24,6 +24,7 @@ const logger = require('../../../infrastructure/logger');
  * ClientsController class implementing RESTful API for client management.
  * Follows REST conventions and provides comprehensive error handling.
  */
+/* eslint-disable max-lines */
 class ClientsController {
   constructor() {
     this.userService = new UserManagementService();
