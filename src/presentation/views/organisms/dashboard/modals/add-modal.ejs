@@ -31,10 +31,12 @@
    *   headerStyle: '',
    *   addScripts: true
    *   actionURL: '/api/users/',
-   *   rechargeData: 'if (window.usersTable) { loadUsersAndInitializeTable(); }'
+   *   rechargeData: true
    * };
    * const html = ejs.render(template, data);
    */
+  const safeData = (typeof data !== "undefined" && data) ? data : {};
+
   const {
     modalId,
     title,
@@ -48,8 +50,8 @@
     headerStyle = "",
     actionURL = "",
     rechargeData = "",
-  } = data;
-  const addScripts = data.addScripts || false;
+    addScripts = false,
+  } = safeData;
 %>
 
 <style>
@@ -402,6 +404,9 @@
           // Display the Bootstrap error message
           const feedback = el.parentElement.querySelector('.invalid-feedback');
           if (feedback) feedback.style.display = 'block';
+
+          let feedbackParent = el.parentElement.parentElement.querySelector('.invalid-feedback');
+          if (feedbackParent) feedbackParent.style.display = 'block';
         }
         else {
           el.classList.remove('is-invalid');
@@ -414,8 +419,12 @@
             if (feedback) feedback.style.display = 'none';
           }
 
-          const feedback = el.parentElement.querySelector('.invalid-feedback');
+          let feedback = el.parentElement.querySelector('.invalid-feedback');
           if (feedback) feedback.style.display = 'none';
+
+          let feedbackParent = el.parentElement.parentElement.querySelector('.invalid-feedback');
+          if (feedbackParent) feedbackParent.style.display = 'none';
+
         }
       });
 
@@ -461,9 +470,11 @@
 
         // Hide feedback
         const feedback = el.parentElement.querySelector('.invalid-feedback');
-        const feedback2 = el.parentElement.parentElement.parentElement.querySelector('.invalid-feedback');
+        const feedback2 = el.parentElement.parentElement.querySelector('.invalid-feedback');
+        const feedback3 = el.parentElement.parentElement.parentElement.querySelector('.invalid-feedback');
         if (feedback) feedback.style.display = 'none';
         if (feedback2) feedback2.style.display = 'none';
+        if (feedback3) feedback3.style.display = 'none';
 
         // You can also clear values if you want:
         if (!el.parentElement.hidden) {
