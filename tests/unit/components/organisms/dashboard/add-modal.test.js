@@ -3,7 +3,7 @@
 * Comprehensive tests for the new add modal
 */
 
-const { renderComponent, parseHTML, extractClasses, extractAttributes } = require('../../../../helpers/ejsTestUtils');
+const { renderComponent, parseHTML } = require('../../../../helpers/ejsTestUtils');
 
 describe('Add Modal Organism', () => {
   const componentPath = '/organisms/dashboard/modals/add-modal';
