@@ -1,7 +1,7 @@
 /**
- * Vehicle Types API Routes - RESTful endpoints for vehicle type catalog management.
+ * Rate API Routes - RESTful endpoints for pricing rates management.
  *
- * Provides Ajax-ready API endpoints for managing vehicle type definitions.
+ * Provides Ajax-ready API endpoints for managing pricing rates catalog.
  * Read operations available to authenticated users, write operations restricted to Admin/SuperAdmin.
  *
  * Features:
@@ -15,18 +15,18 @@
  * @since 2025-10-14
  * @example
  * // Usage
- * router.use('/vehicle-types', vehicleTypesRoutes);
+ * router.use('/rates', ratesRoutes);
  */
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const VehicleTypeController = require('../../../application/controllers/api/VehicleTypeController');
+const RateController = require('../../../application/controllers/api/RateController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
 
-// Rate limiting for vehicle type operations
-const vehicleTypeApiLimiter = rateLimit({
+// Rate limiting for Rate operations
+const rateApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200, // Higher limit for read-heavy operations
   message: {
@@ -53,47 +53,47 @@ const writeOperationsLimiter = rateLimit({
 });
 
 // Apply rate limiting to all routes
-router.use(vehicleTypeApiLimiter);
+router.use(rateApiLimiter);
 
 // =================
 // PUBLIC/READ ROUTES (require authentication only)
 // =================
 
 /**
- * GET /api/vehicle-types - Get vehicle types with DataTables server-side processing.
+ * GET /api/rates - Get Rates with DataTables server-side processing.
  *
  * Access: Authenticated users (admin, superadmin)
- * Returns: Paginated list of vehicle types.
+ * Returns: Paginated list of Rates.
  */
 router.get(
   '/',
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.getVehicleTypes(req, res)
+  (req, res) => RateController.getRates(req, res)
 );
 
 /**
- * GET /api/vehicle-types/active - Get active vehicle types for dropdowns.
+ * GET /api/rates/active - Get active Rates for dropdowns.
  *
  * Access: Authenticated users
- * Returns: Simple array of {value, label, capacity, icon} for select options.
+ * Returns: Simple array of {value, label, percentage, formattedPercentage} for select options.
  *
  * This endpoint is optimized for dropdown/select elements and returns
- * only active vehicle types in a simplified format.
+ * only active Rates in a simplified format.
  */
-router.get('/active', jwtMiddleware.authenticateToken, (req, res) => VehicleTypeController.getActiveVehicleTypes(req, res));
+router.get('/active', jwtMiddleware.authenticateToken, (req, res) => RateController.getActiveRates(req, res));
 
 /**
- * GET /api/vehicle-types/:id - Get single vehicle type by ID.
+ * GET /api/rates/:id - Get single Rate by ID.
  *
  * Access: Authenticated users (admin, superadmin)
- * Returns: Vehicle type details.
+ * Returns: Rate details.
  */
 router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.getVehicleTypeById(req, res)
+  (req, res) => RateController.getRateById(req, res)
 );
 
 // =================
@@ -101,64 +101,62 @@ router.get(
 // =================
 
 /**
- * POST /api/vehicle-types - Create new vehicle type.
+ * POST /api/rates - Create new Rate.
  *
  * Access: Admin (level 6+)
- * Body: { name, code, description?, icon?, defaultCapacity?, sortOrder? }
- * Returns: Created vehicle type.
+ * Body: { name, percentage }
+ * Returns: Created Rate.
  */
 router.post(
   '/',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.createVehicleType(req, res)
+  (req, res) => RateController.createRate(req, res)
 );
 
 /**
- * PATCH /api/vehicle-types/:id/toggle-status - Toggle active/inactive status.
+ * PATCH /api/rates/:id/toggle-status - Toggle active/inactive status.
  *
  * Access: Admin (level 6+)
  * Body: { active: boolean }
- * Returns: Updated vehicle type with new status.
+ * Returns: Updated Rate with new status.
  */
 router.patch(
   '/:id/toggle-status',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.toggleVehicleTypeStatus(req, res)
+  (req, res) => RateController.toggleRateStatus(req, res)
 );
 
 /**
- * PUT /api/vehicle-types/:id - Update vehicle type.
+ * PUT /api/rates/:id - Update Rate.
  *
  * Access: Admin (level 6+)
- * Body: { name?, code?, description?, icon?, defaultCapacity?, sortOrder?, active? }
- * Returns: Updated vehicle type.
+ * Body: { name?, percentage?, active? }
+ * Returns: Updated Rate.
  */
 router.put(
   '/:id',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.updateVehicleType(req, res)
+  (req, res) => RateController.updateRate(req, res)
 );
 
 /**
- * DELETE /api/vehicle-types/:id - Soft delete vehicle type.
+ * DELETE /api/rates/:id - Soft delete Rate.
  *
- * Access: Admin (level 6+) - Changed from SuperAdmin only
+ * Access: Admin (level 6+)
  * Returns: Success message.
- *
- * Note: Checks if any vehicles are using this type before deletion.
  */
 router.delete(
   '/:id',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above (changed from 7)
-  (req, res) => VehicleTypeController.deleteVehicleType(req, res)
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => RateController.deleteRate(req, res)
 );
 
 module.exports = router;

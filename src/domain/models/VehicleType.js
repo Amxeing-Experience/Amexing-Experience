@@ -178,7 +178,9 @@ class VehicleType extends BaseModel {
     }
 
     if (this.getCode() && !/^[a-z0-9_-]+$/.test(this.getCode())) {
-      errors.push('Code must contain only lowercase letters, numbers, hyphens and underscores');
+      errors.push(
+        'Code must contain only lowercase letters, numbers, hyphens and underscores'
+      );
     }
 
     const capacity = this.getDefaultCapacity();
@@ -342,19 +344,44 @@ class VehicleType extends BaseModel {
   static async seedDefaults() {
     const defaultTypes = [
       {
-        name: 'Sedan', code: 'sedan', description: 'Vehículo de pasajeros estándar', icon: 'car', defaultCapacity: 4, sortOrder: 1,
+        name: 'Sedan',
+        code: 'sedan',
+        description: 'Vehículo de pasajeros estándar',
+        icon: 'car',
+        defaultCapacity: 4,
+        sortOrder: 1,
       },
       {
-        name: 'SUV', code: 'suv', description: 'Vehículo utilitario deportivo', icon: 'car-suv', defaultCapacity: 6, sortOrder: 2,
+        name: 'SUV',
+        code: 'suv',
+        description: 'Vehículo utilitario deportivo',
+        icon: 'car-suv',
+        defaultCapacity: 6,
+        sortOrder: 2,
       },
       {
-        name: 'Van', code: 'van', description: 'Van de pasajeros', icon: 'bus', defaultCapacity: 8, sortOrder: 3,
+        name: 'Van',
+        code: 'van',
+        description: 'Van de pasajeros',
+        icon: 'bus',
+        defaultCapacity: 8,
+        sortOrder: 3,
       },
       {
-        name: 'Bus', code: 'bus', description: 'Autobús de pasajeros', icon: 'bus', defaultCapacity: 20, sortOrder: 4,
+        name: 'Bus',
+        code: 'bus',
+        description: 'Autobús de pasajeros',
+        icon: 'bus',
+        defaultCapacity: 20,
+        sortOrder: 4,
       },
       {
-        name: 'Limousine', code: 'limousine', description: 'Limusina de lujo', icon: 'car-garage', defaultCapacity: 8, sortOrder: 5,
+        name: 'Limousine',
+        code: 'limousine',
+        description: 'Limusina de lujo',
+        icon: 'car-garage',
+        defaultCapacity: 8,
+        sortOrder: 5,
       },
     ];
 

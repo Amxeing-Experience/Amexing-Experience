@@ -96,7 +96,10 @@ class RolesController {
       }
 
       // To add a role to a new user
-      if (userRole === 'superadmin' && options.filters.viewUsers !== undefined) {
+      if (
+        userRole === 'superadmin'
+        && options.filters.viewUsers !== undefined
+      ) {
         query.containedIn('name', ['admin', 'superadmin', 'employee_amexing']);
       }
 

@@ -302,12 +302,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     render: function(data) {
                         let actions = '<div class="btn-group btn-group-sm" role="group">';
                         if (canEdit) {
+                            // Edit button
                             actions += `<button type="button"
                                             class="btn btn-primary edit-vehicle-btn"
                                             data-id="${data.objectId || data.id}"
                                             data-bs-toggle="tooltip"
                                             data-bs-placement="top"
-                                            title="Editar">
+                                            title="Editar Vehículo">
                                             <i class="ti ti-edit"></i>
                                         </button>`;
 
@@ -323,9 +324,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                             <i class="ti ti-photo"></i>
                                         </button>`;
 
-                            // Toggle status button
-                            const statusIcon = data.active ? 'ti-x' : 'ti-check';
-                            const statusTitle = data.active ? 'Desactivar' : 'Activar';
+                            // Toggle status button - usar iconos más descriptivos
+                            const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                            const statusTitle = data.active ? 'Archivar Vehículo' : 'Activar Vehículo';
                             const statusClass = data.active ? 'btn-warning' : 'btn-success';
 
                             actions += `<button type="button"
@@ -340,13 +341,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                         </button>`;
                         }
                         if (canDelete) {
+                            // Delete button
                             actions += `<button type="button"
                                             class="btn btn-danger delete-vehicle-btn"
                                             data-id="${data.objectId || data.id}"
                                             data-name="${data.brand} ${data.model}"
                                             data-bs-toggle="tooltip"
                                             data-bs-placement="top"
-                                            title="Eliminar">
+                                            title="Eliminar Vehículo">
                                             <i class="ti ti-trash"></i>
                                         </button>`;
                         }
@@ -362,7 +364,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             order: [[6, 'desc']],
             pageLength: 10,
             searchDelay: 300,
-            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>'
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                // Reinitialize tooltips after table redraw
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
         });
 
         $('#createVehicleBtn').on('click', function() { openVehicleModal(); });

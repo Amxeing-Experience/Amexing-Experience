@@ -267,7 +267,12 @@ class Vehicle extends BaseModel {
    * @example
    */
   setMaintenanceStatus(status) {
-    const validStatuses = ['operational', 'maintenance', 'repair', 'out_of_service'];
+    const validStatuses = [
+      'operational',
+      'maintenance',
+      'repair',
+      'out_of_service',
+    ];
     if (!validStatuses.includes(status)) {
       throw new Error(`Invalid maintenance status: ${status}`);
     }

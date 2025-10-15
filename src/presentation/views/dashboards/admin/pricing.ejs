@@ -1,0 +1,51 @@
+<%
+/**
+ * Admin Pricing Management Page
+ * Manages pricing rates catalog
+ *
+ * Layout Structure:
+ * - Direct row/column structure (no body-wrapper)
+ * - Container-fluid from Flexy Bootstrap
+ * - Consistent spacing and alignment
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller (pageStyles & footerScripts)
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold">Gestión de Tarifas</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/admin" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-currency-dollar me-1"></i>Tarifas
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rates DataTable -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/datatable/rates-table', {
+            tableId: 'rates-table',
+            apiEndpoint: '/api/rates',
+            userRole: currentUserRole,
+            showActions: true
+        }) %>
+    </div>
+</div>

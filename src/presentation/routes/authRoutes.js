@@ -22,6 +22,72 @@ const logger = require('../../infrastructure/logger');
 
 const router = express.Router();
 
+/**
+ * Retry logic for Parse Cloud Function calls with exponential backoff.
+ * Helps prevent errors when cloud functions are not yet initialized during server startup.
+ * @function callCloudFunctionWithRetry
+ * @param {string} functionName - Name of the Parse Cloud Function to call.
+ * @param {object} params - Parameters to pass to the cloud function.
+ * @param {object} options - Additional Parse Cloud options (e.g., sessionToken).
+ * @param {number} maxRetries - Maximum number of retry attempts (default: 3).
+ * @param {number} baseDelay - Base delay in milliseconds for exponential backoff (default: 100).
+ * @returns {Promise<any>} - Result from the cloud function.
+ * @throws {Error} - Throws error if all retries fail.
+ * @private
+ * @example
+ */
+async function callCloudFunctionWithRetry(
+  functionName,
+  params = {},
+  options = {},
+  maxRetries = 3,
+  baseDelay = 100
+) {
+  let lastError;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      // Attempt to call the cloud function
+      const result = await Parse.Cloud.run(functionName, params, options);
+      return result;
+    } catch (error) {
+      lastError = error;
+
+      // Check if error is "Invalid function" (code 141) - function not yet loaded
+      const isInvalidFunction = error.code === 141
+        || error.message?.includes('Invalid function');
+
+      // Only retry for "Invalid function" errors on first few attempts
+      if (isInvalidFunction && attempt < maxRetries - 1) {
+        const delay = baseDelay * 2 ** attempt; // Exponential backoff
+
+        logger.warn(`Cloud function ${functionName} not ready, retrying in ${delay}ms`, {
+          attempt: attempt + 1,
+          maxRetries,
+          error: error.message,
+        });
+
+        // Wait before retrying
+        await new Promise((resolve) => {
+          setTimeout(resolve, delay);
+        });
+        // continue is not needed here, the for loop will continue naturally
+      } else {
+        // For other errors or last attempt, throw immediately
+        throw error;
+      }
+    }
+  }
+
+  // All retries exhausted
+  logger.error(`Cloud function ${functionName} failed after ${maxRetries} attempts`, {
+    error: lastError.message,
+    code: lastError.code,
+  });
+
+  throw lastError;
+}
+
 // Rate limiting for auth endpoints
 const authRateLimit = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 900000, // 15 minutes
@@ -997,13 +1063,23 @@ router.post(
 // OAuth provider list
 router.get('/oauth/providers', async (req, res) => {
   try {
-    const result = await Parse.Cloud.run('getOAuthProviders');
+    // Use retry logic for cloud function call
+    const result = await callCloudFunctionWithRetry('getOAuthProviders');
     res.json(result);
   } catch (error) {
     logger.error('OAuth providers route error:', error);
+
+    // Check if this is an "Invalid function" error
+    const isInvalidFunction = error.code === 141
+      || error.message?.includes('Invalid function');
+
     res.status(500).json({
       success: false,
-      error: 'Failed to get OAuth providers',
+      error: isInvalidFunction
+        ? 'OAuth providers service is initializing. Please try again in a moment.'
+        : 'Failed to get OAuth providers',
+      code: error.code,
+      retryable: isInvalidFunction,
     });
   }
 });

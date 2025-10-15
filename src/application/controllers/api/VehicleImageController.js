@@ -122,7 +122,10 @@ class VehicleImageController {
       const vehicleImage = new VehicleImageClass();
 
       vehicleImage.set('vehicleId', vehicle);
-      vehicleImage.set('url', `/uploads/vehicles/${vehicleId}/${file.filename}`);
+      vehicleImage.set(
+        'url',
+        `/uploads/vehicles/${vehicleId}/${file.filename}`
+      );
       vehicleImage.set('fileName', file.originalname);
       vehicleImage.set('fileSize', file.size);
       vehicleImage.set('mimeType', file.mimetype);

@@ -243,7 +243,9 @@ class VehicleImage extends BaseModel {
       const LocalVehicleImage = Parse.Object.extend('VehicleImage');
       const query = new Parse.Query(LocalVehicleImage);
 
-      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, { useMasterKey: true });
+      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, {
+        useMasterKey: true,
+      });
       query.equalTo('vehicleId', vehicle);
       query.equalTo('exists', true);
       query.ascending('displayOrder');
@@ -301,7 +303,9 @@ class VehicleImage extends BaseModel {
       const LocalVehicleImage = Parse.Object.extend('VehicleImage');
       const query = new Parse.Query(LocalVehicleImage);
 
-      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, { useMasterKey: true });
+      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, {
+        useMasterKey: true,
+      });
       query.equalTo('vehicleId', vehicle);
       query.equalTo('exists', true);
 
@@ -327,7 +331,9 @@ class VehicleImage extends BaseModel {
       const LocalVehicleImage = Parse.Object.extend('VehicleImage');
       const query = new Parse.Query(LocalVehicleImage);
 
-      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, { useMasterKey: true });
+      const vehicle = await new Parse.Query('Vehicle').get(vehicleId, {
+        useMasterKey: true,
+      });
       query.equalTo('vehicleId', vehicle);
       query.equalTo('exists', true);
       query.equalTo('isPrimary', true);

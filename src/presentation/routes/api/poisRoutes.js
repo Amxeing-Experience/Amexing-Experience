@@ -1,7 +1,7 @@
 /**
- * Vehicle Types API Routes - RESTful endpoints for vehicle type catalog management.
+ * POI API Routes - RESTful endpoints for Point of Interest management.
  *
- * Provides Ajax-ready API endpoints for managing vehicle type definitions.
+ * Provides Ajax-ready API endpoints for managing POI definitions.
  * Read operations available to authenticated users, write operations restricted to Admin/SuperAdmin.
  *
  * Features:
@@ -15,18 +15,18 @@
  * @since 2025-10-14
  * @example
  * // Usage
- * router.use('/vehicle-types', vehicleTypesRoutes);
+ * router.use('/pois', poisRoutes);
  */
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const VehicleTypeController = require('../../../application/controllers/api/VehicleTypeController');
+const POIController = require('../../../application/controllers/api/POIController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
 
-// Rate limiting for vehicle type operations
-const vehicleTypeApiLimiter = rateLimit({
+// Rate limiting for POI operations
+const poiApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200, // Higher limit for read-heavy operations
   message: {
@@ -53,47 +53,47 @@ const writeOperationsLimiter = rateLimit({
 });
 
 // Apply rate limiting to all routes
-router.use(vehicleTypeApiLimiter);
+router.use(poiApiLimiter);
 
 // =================
 // PUBLIC/READ ROUTES (require authentication only)
 // =================
 
 /**
- * GET /api/vehicle-types - Get vehicle types with DataTables server-side processing.
+ * GET /api/pois - Get POIs with DataTables server-side processing.
  *
  * Access: Authenticated users (admin, superadmin)
- * Returns: Paginated list of vehicle types.
+ * Returns: Paginated list of POIs.
  */
 router.get(
   '/',
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.getVehicleTypes(req, res)
+  (req, res) => POIController.getPOIs(req, res)
 );
 
 /**
- * GET /api/vehicle-types/active - Get active vehicle types for dropdowns.
+ * GET /api/pois/active - Get active POIs for dropdowns.
  *
  * Access: Authenticated users
- * Returns: Simple array of {value, label, capacity, icon} for select options.
+ * Returns: Simple array of {value, label} for select options.
  *
  * This endpoint is optimized for dropdown/select elements and returns
- * only active vehicle types in a simplified format.
+ * only active POIs in a simplified format.
  */
-router.get('/active', jwtMiddleware.authenticateToken, (req, res) => VehicleTypeController.getActiveVehicleTypes(req, res));
+router.get('/active', jwtMiddleware.authenticateToken, (req, res) => POIController.getActivePOIs(req, res));
 
 /**
- * GET /api/vehicle-types/:id - Get single vehicle type by ID.
+ * GET /api/pois/:id - Get single POI by ID.
  *
  * Access: Authenticated users (admin, superadmin)
- * Returns: Vehicle type details.
+ * Returns: POI details.
  */
 router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.getVehicleTypeById(req, res)
+  (req, res) => POIController.getPOIById(req, res)
 );
 
 // =================
@@ -101,64 +101,62 @@ router.get(
 // =================
 
 /**
- * POST /api/vehicle-types - Create new vehicle type.
+ * POST /api/pois - Create new POI.
  *
  * Access: Admin (level 6+)
- * Body: { name, code, description?, icon?, defaultCapacity?, sortOrder? }
- * Returns: Created vehicle type.
+ * Body: { name }
+ * Returns: Created POI.
  */
 router.post(
   '/',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.createVehicleType(req, res)
+  (req, res) => POIController.createPOI(req, res)
 );
 
 /**
- * PATCH /api/vehicle-types/:id/toggle-status - Toggle active/inactive status.
+ * PATCH /api/pois/:id/toggle-status - Toggle active/inactive status.
  *
  * Access: Admin (level 6+)
  * Body: { active: boolean }
- * Returns: Updated vehicle type with new status.
+ * Returns: Updated POI with new status.
  */
 router.patch(
   '/:id/toggle-status',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.toggleVehicleTypeStatus(req, res)
+  (req, res) => POIController.togglePOIStatus(req, res)
 );
 
 /**
- * PUT /api/vehicle-types/:id - Update vehicle type.
+ * PUT /api/pois/:id - Update POI.
  *
  * Access: Admin (level 6+)
- * Body: { name?, code?, description?, icon?, defaultCapacity?, sortOrder?, active? }
- * Returns: Updated vehicle type.
+ * Body: { name?, active? }
+ * Returns: Updated POI.
  */
 router.put(
   '/:id',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => VehicleTypeController.updateVehicleType(req, res)
+  (req, res) => POIController.updatePOI(req, res)
 );
 
 /**
- * DELETE /api/vehicle-types/:id - Soft delete vehicle type.
+ * DELETE /api/pois/:id - Soft delete POI.
  *
- * Access: Admin (level 6+) - Changed from SuperAdmin only
+ * Access: Admin (level 6+)
  * Returns: Success message.
- *
- * Note: Checks if any vehicles are using this type before deletion.
  */
 router.delete(
   '/:id',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above (changed from 7)
-  (req, res) => VehicleTypeController.deleteVehicleType(req, res)
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => POIController.deletePOI(req, res)
 );
 
 module.exports = router;

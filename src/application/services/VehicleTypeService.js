@@ -120,10 +120,13 @@ class VehicleTypeService {
       try {
         vehicleType = await query.get(typeId, { useMasterKey: true });
       } catch (error) {
-        logger.warn('Vehicle type not found in exists:true query, trying all records', {
-          typeId,
-          error: error.message,
-        });
+        logger.warn(
+          'Vehicle type not found in exists:true query, trying all records',
+          {
+            typeId,
+            error: error.message,
+          }
+        );
 
         // Try without exists filter as fallback
         const fallbackQuery = new Parse.Query(LocalVehicleType);

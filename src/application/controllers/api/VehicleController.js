@@ -63,14 +63,22 @@ class VehicleController {
       const sortDirection = req.query.order?.[0]?.dir || 'asc';
 
       // Column mapping for sorting
-      const columns = ['brand', 'licensePlate', 'capacity', 'maintenanceStatus', 'updatedAt'];
+      const columns = [
+        'brand',
+        'licensePlate',
+        'capacity',
+        'maintenanceStatus',
+        'updatedAt',
+      ];
       const sortField = columns[sortColumnIndex] || 'updatedAt';
 
       // Get total records count (without search filter) - do this first
       // Show all records (active and inactive) but exclude deleted ones
       const totalRecordsQuery = new Parse.Query('Vehicle');
       totalRecordsQuery.equalTo('exists', true);
-      const recordsTotal = await totalRecordsQuery.count({ useMasterKey: true });
+      const recordsTotal = await totalRecordsQuery.count({
+        useMasterKey: true,
+      });
 
       // Build base query for all existing records (not just active)
       const baseQuery = new Parse.Query('Vehicle');
@@ -115,37 +123,39 @@ class VehicleController {
       const vehicles = await filteredQuery.find({ useMasterKey: true });
 
       // Format data for DataTables
-      const data = await Promise.all(vehicles.map(async (vehicle) => {
-        const vehicleType = vehicle.get('vehicleTypeId');
-        let vehicleTypeData = null;
+      const data = await Promise.all(
+        vehicles.map(async (vehicle) => {
+          const vehicleType = vehicle.get('vehicleTypeId');
+          let vehicleTypeData = null;
 
-        if (vehicleType) {
-          await vehicleType.fetch({ useMasterKey: true });
-          vehicleTypeData = {
-            id: vehicleType.id,
-            name: vehicleType.get('name'),
-            code: vehicleType.get('code'),
-            icon: vehicleType.get('icon'),
+          if (vehicleType) {
+            await vehicleType.fetch({ useMasterKey: true });
+            vehicleTypeData = {
+              id: vehicleType.id,
+              name: vehicleType.get('name'),
+              code: vehicleType.get('code'),
+              icon: vehicleType.get('icon'),
+            };
+          }
+
+          return {
+            id: vehicle.id,
+            objectId: vehicle.id,
+            brand: vehicle.get('brand'),
+            model: vehicle.get('model'),
+            year: vehicle.get('year'),
+            licensePlate: vehicle.get('licensePlate'),
+            vehicleTypeId: vehicleTypeData,
+            capacity: vehicle.get('capacity'),
+            color: vehicle.get('color'),
+            maintenanceStatus: vehicle.get('maintenanceStatus'),
+            insuranceExpiry: vehicle.get('insuranceExpiry')?.toISOString(),
+            active: vehicle.get('active'),
+            createdAt: vehicle.createdAt,
+            updatedAt: vehicle.updatedAt,
           };
-        }
-
-        return {
-          id: vehicle.id,
-          objectId: vehicle.id,
-          brand: vehicle.get('brand'),
-          model: vehicle.get('model'),
-          year: vehicle.get('year'),
-          licensePlate: vehicle.get('licensePlate'),
-          vehicleTypeId: vehicleTypeData,
-          capacity: vehicle.get('capacity'),
-          color: vehicle.get('color'),
-          maintenanceStatus: vehicle.get('maintenanceStatus'),
-          insuranceExpiry: vehicle.get('insuranceExpiry')?.toISOString(),
-          active: vehicle.get('active'),
-          createdAt: vehicle.createdAt,
-          updatedAt: vehicle.updatedAt,
-        };
-      }));
+        })
+      );
 
       // DataTables response format
       const response = {
@@ -212,7 +222,10 @@ class VehicleController {
         capacity: vehicle.get('capacity'),
         color: vehicle.get('color'),
         maintenanceStatus: vehicle.get('maintenanceStatus'),
-        insuranceExpiry: vehicle.get('insuranceExpiry')?.toISOString().split('T')[0], // Format for input[type=date]
+        insuranceExpiry: vehicle
+          .get('insuranceExpiry')
+          ?.toISOString()
+          .split('T')[0], // Format for input[type=date]
         active: vehicle.get('active'),
         createdAt: vehicle.createdAt,
         updatedAt: vehicle.updatedAt,
@@ -256,11 +269,28 @@ class VehicleController {
       }
 
       const {
-        brand, model, year, licensePlate, vehicleTypeId, capacity, color, maintenanceStatus, insuranceExpiry,
+        brand,
+        model,
+        year,
+        licensePlate,
+        vehicleTypeId,
+        capacity,
+        color,
+        maintenanceStatus,
+        insuranceExpiry,
       } = req.body;
 
       // Validate required fields
-      if (!brand || !model || !year || !licensePlate || !vehicleTypeId || !capacity || !color || !maintenanceStatus) {
+      if (
+        !brand
+        || !model
+        || !year
+        || !licensePlate
+        || !vehicleTypeId
+        || !capacity
+        || !color
+        || !maintenanceStatus
+      ) {
         return this.sendError(res, 'Missing required fields', 400);
       }
 
@@ -271,11 +301,12 @@ class VehicleController {
       }
 
       // Validate VehicleType exists
-      const vehicleType = await VehicleType.findByCode(vehicleTypeId) || await (async () => {
-        const query = new Parse.Query('VehicleType');
-        query.equalTo('exists', true);
-        return query.get(vehicleTypeId, { useMasterKey: true });
-      })();
+      const vehicleType = (await VehicleType.findByCode(vehicleTypeId))
+        || (await (async () => {
+          const query = new Parse.Query('VehicleType');
+          query.equalTo('exists', true);
+          return query.get(vehicleTypeId, { useMasterKey: true });
+        })());
 
       if (!vehicleType) {
         return this.sendError(res, 'Vehicle type not found', 404);
@@ -338,7 +369,11 @@ class VehicleController {
         body: req.body,
       });
 
-      return this.sendError(res, error.message || 'Failed to create vehicle', 500);
+      return this.sendError(
+        res,
+        error.message || 'Failed to create vehicle',
+        500
+      );
     }
   }
 
@@ -372,7 +407,16 @@ class VehicleController {
       }
 
       const {
-        brand, model, year, licensePlate, vehicleTypeId, capacity, color, maintenanceStatus, insuranceExpiry, active,
+        brand,
+        model,
+        year,
+        licensePlate,
+        vehicleTypeId,
+        capacity,
+        color,
+        maintenanceStatus,
+        insuranceExpiry,
+        active,
       } = req.body;
 
       // Update fields if provided
@@ -390,7 +434,10 @@ class VehicleController {
 
       // Update license plate if changed
       if (licensePlate && licensePlate !== vehicle.get('licensePlate')) {
-        const isUnique = await Vehicle.isLicensePlateUnique(licensePlate, vehicleId);
+        const isUnique = await Vehicle.isLicensePlateUnique(
+          licensePlate,
+          vehicleId
+        );
         if (!isUnique) {
           return this.sendError(res, 'License plate already exists', 409);
         }

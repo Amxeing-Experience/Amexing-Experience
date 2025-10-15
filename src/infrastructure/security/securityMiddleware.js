@@ -570,19 +570,61 @@ class SecurityMiddleware {
         }
 
         // For state-changing requests, verify CSRF token
-        const secret = req.session?.csrfSecret;
-        if (!secret) {
-          winston.error('CSRF secret missing for state-changing request', {
+        let secret = req.session?.csrfSecret;
+
+        // AUTO-RECOVERY: If secret is missing but session exists, generate new one
+        // This prevents user-facing errors during edge cases (session expiration, etc.)
+        if (!secret && req.session) {
+          winston.warn('CSRF secret missing for state-changing request - auto-recovering', {
             method: req.method,
             path: req.path,
-            sessionID: req.session?.id,
+            sessionID: req.session.id,
+            ip: req.ip,
+            userAgent: req.get('User-Agent')?.substring(0, 50),
+            timestamp: new Date().toISOString(),
+          });
+
+          // Generate new CSRF secret
+          secret = await uidSafe(32);
+          req.session.csrfSecret = secret;
+
+          // Log recovery for security audit
+          winston.info('CSRF secret auto-recovered', {
+            sessionID: req.session.id,
+            path: req.path,
+            method: req.method,
+          });
+
+          // Set recovery header for client awareness
+          res.setHeader('X-CSRF-Recovered', 'true');
+
+          // For HTML requests, redirect to refresh with new CSRF token
+          if (req.accepts('html')) {
+            winston.debug('Redirecting HTML request for CSRF recovery', {
+              path: req.path,
+              sessionID: req.session.id,
+            });
+
+            // Preserve the original URL for redirect back
+            const returnUrl = req.originalUrl || req.path;
+            return res.redirect(returnUrl);
+          }
+        }
+
+        // If still no secret (no session), fail with clear error
+        if (!secret) {
+          winston.error('CSRF validation failed - no session available', {
+            method: req.method,
+            path: req.path,
             hasSession: !!req.session,
             ip: req.ip,
           });
+
           return res.status(403).json({
             error: 'CSRF Error',
-            message:
-              'No CSRF secret found in session. Please refresh the page and try again.',
+            message: 'Session expired. Please refresh the page and try again.',
+            code: 'SESSION_EXPIRED',
+            recoveryAction: 'refresh_page',
           });
         }
 
@@ -593,6 +635,7 @@ class SecurityMiddleware {
           return res.status(403).json({
             error: 'CSRF Error',
             message: 'CSRF token missing',
+            code: 'TOKEN_MISSING',
           });
         }
 
@@ -602,11 +645,14 @@ class SecurityMiddleware {
             userAgent: req.get('User-Agent'),
             method: req.method,
             url: req.originalUrl,
+            sessionID: req.session?.id,
           });
 
           return res.status(403).json({
             error: 'CSRF Error',
-            message: 'Invalid CSRF token',
+            message: 'Invalid CSRF token. Please refresh the page and try again.',
+            code: 'TOKEN_INVALID',
+            recoveryAction: 'refresh_page',
           });
         }
 
@@ -616,6 +662,7 @@ class SecurityMiddleware {
         return res.status(500).json({
           error: 'Security Error',
           message: 'CSRF validation failed',
+          code: 'VALIDATION_ERROR',
         });
       }
     };

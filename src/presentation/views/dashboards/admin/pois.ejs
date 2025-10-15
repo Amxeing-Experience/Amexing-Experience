@@ -1,0 +1,51 @@
+<%
+/**
+ * Admin Destinations Management Page
+ * Manages Destinations catalog (POIs - Points of Interest)
+ *
+ * Layout Structure:
+ * - Direct row/column structure (no body-wrapper)
+ * - Container-fluid from Flexy Bootstrap
+ * - Consistent spacing and alignment
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller (pageStyles & footerScripts)
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold">Gestión de Destinos</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/admin" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-map-pin me-1"></i>Destinos
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Destinations DataTable -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/datatable/pois-table', {
+            tableId: 'pois-table',
+            apiEndpoint: '/api/pois',
+            userRole: currentUserRole,
+            showActions: true
+        }) %>
+    </div>
+</div>

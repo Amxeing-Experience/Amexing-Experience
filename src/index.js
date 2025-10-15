@@ -58,6 +58,7 @@ const atomicRoutes = require('./presentation/routes/atomicRoutes');
 
 // Middleware
 const errorHandler = require('./application/middleware/errorHandler');
+const sessionRecovery = require('./application/middleware/sessionRecoveryMiddleware');
 
 // Initialize Express app
 const app = express();
@@ -110,6 +111,11 @@ app.use('/parse', (req, res, next) => {
 
 // Session middleware
 app.use(securityMiddleware.getSessionConfig());
+
+// Session recovery middleware - Auto-recover missing CSRF secrets and detect session issues
+// IMPORTANT: Must be applied AFTER session middleware but BEFORE security middleware
+app.use(sessionRecovery.autoRecoverSession());
+app.use(sessionRecovery.sessionHealthCheck());
 
 // Apply security middleware (Helmet, CSRF, and other security configurations)
 // Note: CSRF protection is included in securityMiddleware.getAllMiddleware()
@@ -166,6 +172,9 @@ if (process.env.NODE_ENV !== 'production') {
     });
   });
 }
+
+// Session health check endpoint (before other routes)
+app.get('/api/session/health', sessionRecovery.sessionHealthEndpoint);
 
 // API Routes
 app.use('/api', apiRoutes);
