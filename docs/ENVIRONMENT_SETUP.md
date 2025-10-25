@@ -348,8 +348,6 @@ project-root/
 PARSE_APP_ID=application-identifier
 PARSE_MASTER_KEY=server-master-key
 PARSE_SERVER_URL=server-endpoint
-PARSE_DASHBOARD_USER=dashboard-username
-PARSE_DASHBOARD_PASS=dashboard-password
 ```
 
 #### 2. Security Variables
@@ -566,11 +564,10 @@ Pre-configured debug setups available via `F5` or Debug panel:
 #### Testing & Development
 - **Debug Current Test File** - Debug active test file
 - **Debug All Tests** - Debug complete test suite
-- **Debug Parse Dashboard** - Debug dashboard separately
 - **Debug Cloud Functions** - Debug Parse cloud code
 
 #### Full Application
-- **Launch Full Application** - Debug server + dashboard together
+- **Launch Full Application** - Debug server
 
 ### Development Tasks
 
@@ -579,7 +576,6 @@ Quick access to common tasks via `Ctrl+Shift+P` → "Tasks: Run Task":
 #### Build & Run
 - **Start Development Server** - `yarn dev`
 - **Start Production Server** - `yarn start`
-- **Start Parse Dashboard** - `yarn dashboard`
 
 #### Testing
 - **Run Tests** - `yarn test`

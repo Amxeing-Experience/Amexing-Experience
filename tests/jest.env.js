@@ -14,9 +14,9 @@ require('dotenv').config({
 // Override specific test configurations
 process.env.PARSE_APP_ID = 'test-app-id';
 process.env.PARSE_MASTER_KEY = 'test-master-key';
-process.env.PARSE_SERVER_URL = 'http://localhost:1338/parse';
+process.env.PARSE_SERVER_URL = 'http://localhost:1339/parse';
 process.env.DATABASE_URI = process.env.TEST_DATABASE_URI || 'mongodb://localhost:27017/AmexingTEST';
-process.env.PORT = '1339'; // Use different port for main app in tests
+process.env.PORT = '1340'; // Use different port for main app in tests
 process.env.DASHBOARD_PORT = '4041'; // Use different port for dashboard in tests
 process.env.LOG_LEVEL = 'error';
 

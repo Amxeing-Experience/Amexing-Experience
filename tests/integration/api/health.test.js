@@ -1,11 +1,18 @@
 /**
  * Health Endpoint API Tests
+ * @updated 2025-01-24 - Migrated to MongoDB Memory Server
  */
 
 const request = require('supertest');
-const app = require('../../../src/index');
+
+// Import the Express app directly for testing
+let app;
 
 describe('Health Endpoint', () => {
+  beforeAll(async () => {
+    app = require('../../../src/index');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }, 30000);
   describe('GET /health', () => {
     it('should return health status', async () => {
       const response = await request(app)

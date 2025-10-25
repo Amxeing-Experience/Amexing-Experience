@@ -310,15 +310,24 @@ fi
 log_info "Running security audit..."
 yarn audit --level critical > /dev/null 2>&1 || log_warning "Non-critical vulnerabilities detected. Review and schedule updates."
 
-# 3. Run critical unit tests (skip flaky integration tests that don't affect security)
-log_info "Running unit test suite..."
-if ! yarn test:unit; then
-    log_error "Unit tests failed. Fix critical tests before pushing."
+# 3. Run complete test suite (unit + integration)
+log_info "Running complete test suite (unit + integration with MongoDB Memory Server)..."
+log_info "This may take 20-30 seconds..."
+if ! yarn test --runInBand; then
+    log_error "Tests failed. Fix all failing tests before pushing."
+    log_error ""
+    log_error "Test suite includes:"
+    log_error "  - Unit tests (fast, no database)"
+    log_error "  - Integration tests (MongoDB Memory Server on port 1339)"
+    log_error ""
+    log_error "To run tests individually:"
+    log_error "  yarn test:unit         # Run only unit tests"
+    log_error "  yarn test:integration  # Run only integration tests"
     exit 1
 fi
-log_success "Critical tests passed. Integration tests skipped for push performance."
+log_success "All tests passed (unit + integration)."
 
-# 4. Check for documentation updates on significant changes
+# 5. Check for documentation updates on significant changes
 changed_files=$(git diff HEAD~1 --name-only)
 if echo "$changed_files" | grep -E "src/.*\\.(js|ts)$" | wc -l | grep -v "^0$" >/dev/null; then
     log_info "Source code changes detected. Checking documentation..."

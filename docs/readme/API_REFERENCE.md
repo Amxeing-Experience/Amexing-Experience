@@ -23,7 +23,6 @@ The complete API reference is available in multiple formats:
 
 #### Parse Server APIs
 - **Base URL**: `/parse`
-- **Documentation**: Available at Parse Dashboard (port 4040)
 
 ### 📋 API Standards
 

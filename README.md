@@ -84,7 +84,6 @@ yarn dev
 
 ### 🚨 Casos Críticos Recientes
 - **Parse Server 8.2.4**: Requiere Node.js 20+ y `yarn install`
-- **Parse Dashboard 7.4.0**: Compatible con las nuevas versiones  
 - **Node.js 24**: Usar `--experimental-vm-modules` (ya configurado)
 - **Yarn resolutions**: Configuraciones de seguridad automáticas
 
@@ -98,7 +97,6 @@ yarn scripts:help security     # Show security scripts
 
 # Development
 yarn dev                       # Start development server
-yarn dashboard                 # Open Parse Dashboard (port 4040)
 
 # Post-pull utilities
 yarn after-pull               # Complete post-pull setup
@@ -122,7 +120,6 @@ Once running, access these endpoints:
 | Service | URL | Description |
 |---------|-----|-------------|
 | **Web App** | http://localhost:1337 | Main application interface |
-| **Parse Dashboard** | http://localhost:4040 | Database management |
 | **API Docs** | http://localhost:1337/docs | Interactive API documentation |
 | **Health Check** | http://localhost:1337/health | System status and metrics |
 
