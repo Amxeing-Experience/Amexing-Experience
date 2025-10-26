@@ -104,7 +104,7 @@ class SecurityMiddleware {
           ],
           scriptSrc: [
             "'self'",
-            this.isDevelopment ? "'unsafe-inline'" : '',
+            "'unsafe-inline'", // Required for EJS templates with inline scripts
             this.isDevelopment ? "'unsafe-eval'" : '',
             'https://code.jquery.com',
             'https://cdn.datatables.net',
@@ -116,7 +116,9 @@ class SecurityMiddleware {
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
           connectSrc: [
             "'self'",
-            'http://localhost:1337',
+            'http://localhost:1337', // Development
+            'http://localhost:1338', // Production local
+            'https://amexing.meeplab.com', // Production
             'https://cdn.datatables.net',
             'https://cdn.jsdelivr.net',
             'https://cdnjs.cloudflare.com',
@@ -131,6 +133,7 @@ class SecurityMiddleware {
             'allow-same-origin',
             'allow-downloads',
             'allow-modals',
+            'allow-popups', // Required for modals
           ],
           reportUri: '/api/csp-report',
           upgradeInsecureRequests: this.isProduction ? [] : null,
