@@ -242,9 +242,7 @@ class AmexingAuthMiddleware {
       }
 
       // Normalize permissions to array
-      const requiredPermissions = Array.isArray(permissions)
-        ? permissions
-        : [permissions];
+      const requiredPermissions = Array.isArray(permissions) ? permissions : [permissions];
 
       // Build context for permission checking
       const context = this.buildPermissionContext(req, options);
@@ -700,11 +698,7 @@ class AmexingAuthMiddleware {
       if (requireAll) {
         // User must have all permissions
         for (const permission of permissions) {
-          const hasPermission = await PermissionService.hasPermission(
-            userId,
-            permission,
-            context
-          );
+          const hasPermission = await PermissionService.hasPermission(userId, permission, context);
           if (!hasPermission) {
             return false;
           }
@@ -713,11 +707,7 @@ class AmexingAuthMiddleware {
       }
       // User must have at least one permission
       for (const permission of permissions) {
-        const hasPermission = await PermissionService.hasPermission(
-          userId,
-          permission,
-          context
-        );
+        const hasPermission = await PermissionService.hasPermission(userId, permission, context);
         if (hasPermission) {
           return true;
         }
@@ -756,25 +746,21 @@ class AmexingAuthMiddleware {
 
       if (user.departmentId) {
         // Load department information
-        const department = await this.authService.db
-          .collection('Department')
-          .findOne({
-            id: user.departmentId,
-            active: true,
-            deleted: false,
-          });
+        const department = await this.authService.db.collection('Department').findOne({
+          id: user.departmentId,
+          active: true,
+          deleted: false,
+        });
         context.department = department;
       }
 
       if (user.employeeId) {
         // Load employee information
-        const employee = await this.authService.db
-          .collection('ClientEmployee')
-          .findOne({
-            id: user.employeeId,
-            active: true,
-            deleted: false,
-          });
+        const employee = await this.authService.db.collection('ClientEmployee').findOne({
+          id: user.employeeId,
+          active: true,
+          deleted: false,
+        });
         context.employee = employee;
       }
 

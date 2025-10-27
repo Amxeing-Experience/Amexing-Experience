@@ -210,65 +210,57 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const API = '<%= dtApiEndpoint %>';
         let table;
 
-        function getToken() {
-            const c = document.cookie.split(';').find(x => x.trim().startsWith('jwt_token='));
-            return c ? c.split('=')[1] : '';
-        }
-
         table = $('#<%= dtTableId %>').DataTable({
         processing: true,
         serverSide: true,
         deferRender: true,
         ajax: function(data, callback, settings) {
-            const params = new URLSearchParams({
+            const params = {
                 page: Math.floor(data.start / data.length) + 1,
                 limit: data.length
-            });
+            };
 
             if (data.search.value) {
-                params.append('search', data.search.value);
+                params.search = data.search.value;
             }
 
-            fetch(`${API}?${params.toString()}`, {
-                method: 'GET',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + getToken(),
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(json => {
-                if (!json.success) {
-                    throw new Error(json.error || 'Failed to load employees');
-                }
+            $.ajax({
+                url: API,
+                type: 'GET',
+                data: params,
+                success: function(json) {
+                    if (!json.success) {
+                        showErrorAlert('Error al cargar los datos de empleados: ' + (json.error || 'Error desconocido'));
+                        callback({
+                            draw: data.draw,
+                            recordsTotal: 0,
+                            recordsFiltered: 0,
+                            data: []
+                        });
+                        return;
+                    }
 
-                const totalCount = json.data?.pagination?.totalCount || json.data?.pagination?.total || 0;
-                $('#total-employees-count').text(totalCount);
+                    const totalCount = json.data?.pagination?.totalCount || json.data?.pagination?.total || 0;
+                    $('#total-employees-count').text(totalCount);
 
-                callback({
-                    draw: data.draw,
-                    recordsTotal: totalCount,
-                    recordsFiltered: totalCount,
-                    data: json.data?.users || []
-                });
-            })
-            .catch(error => {
-                console.error('DataTable AJAX error:', error);
-                showErrorAlert('Error al cargar los datos de empleados: ' + error.message);
+                    const users = json.data?.users || [];
 
-                callback({
-                    draw: data.draw,
-                    recordsTotal: 0,
-                    recordsFiltered: 0,
-                    data: []
-                });
+                    callback({
+                        draw: data.draw,
+                        recordsTotal: totalCount,
+                        recordsFiltered: totalCount,
+                        data: users
+                    });
+                },
+                error: function(xhr, status, error) {
+                    showErrorAlert('Error al cargar los datos de empleados: ' + error);
+                    callback({
+                        draw: data.draw,
+                        recordsTotal: 0,
+                        recordsFiltered: 0,
+                        data: []
+                    });
+                }
             });
         },
         columns: [
@@ -371,7 +363,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         ],
         pageLength: 25,
         lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
-        responsive: true,
+        // responsive: true,  // Removed: Bootstrap .table-responsive handles horizontal scroll
         order: [[0, 'asc']],
         pagingType: 'full_numbers',
         language: {
@@ -418,28 +410,35 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $('#notesCharCount').text(`${length}/500`);
     });
 
-    $('#<%= dtTableId %>').on('click', '.edit-btn', async function() {
+    $('#<%= dtTableId %>').on('click', '.edit-btn', function() {
         const id = $(this).data('id');
-        const res = await fetch(`${API}/${id}`, { headers: { 'Authorization': 'Bearer ' + getToken() }});
-        const data = await res.json();
-        if (data.success) {
-            const e = data.data.employee;
-            $('#employeeId').val(e.id || e.objectId);
-            $('#firstName').val(e.firstName);
-            $('#lastName').val(e.lastName);
-            $('#email').val(e.email);
-            $('#phone').val(e.phone || '');
-            $('#role').val(e.role || e.roleId?.name || 'employee_amexing');
-            $('#department').val(e.contextualData?.department || '');
-            $('#position').val(e.contextualData?.position || '');
-            $('#notes').val(e.contextualData?.notes || '');
-            $('#notesCharCount').text(`${(e.contextualData?.notes || '').length}/500`);
-            $('#modalTitle').text('Editar Empleado');
-            $('#saveButtonText').text('Actualizar Empleado');
-            $('#passwordInfo').hide();
-            $('#role').trigger('change');
-            $('#employeeModal').modal('show');
-        }
+        $.ajax({
+            url: `${API}/${id}`,
+            type: 'GET',
+            success: function(data) {
+                if (data.success) {
+                    const e = data.data.employee;
+                    $('#employeeId').val(e.id || e.objectId);
+                    $('#firstName').val(e.firstName);
+                    $('#lastName').val(e.lastName);
+                    $('#email').val(e.email);
+                    $('#phone').val(e.phone || '');
+                    $('#role').val(e.role || e.roleId?.name || 'employee_amexing');
+                    $('#department').val(e.contextualData?.department || '');
+                    $('#position').val(e.contextualData?.position || '');
+                    $('#notes').val(e.contextualData?.notes || '');
+                    $('#notesCharCount').text(`${(e.contextualData?.notes || '').length}/500`);
+                    $('#modalTitle').text('Editar Empleado');
+                    $('#saveButtonText').text('Actualizar Empleado');
+                    $('#passwordInfo').hide();
+                    $('#role').trigger('change');
+                    $('#employeeModal').modal('show');
+                }
+            },
+            error: function(xhr) {
+                alert(xhr.responseJSON?.error || 'Error al cargar el empleado');
+            }
+        });
     });
 
     $('#createEmployeeBtn').click(() => {
@@ -453,7 +452,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $('#employeeModal').modal('show');
     });
 
-    $('#saveEmployeeBtn').click(async function() {
+    $('#saveEmployeeBtn').click(function() {
         const id = $('#employeeId').val();
         const data = {
             firstName: $('#firstName').val(),
@@ -472,20 +471,24 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             return;
         }
 
-        const res = await fetch(id ? `${API}/${id}` : API, {
-            method: id ? 'PUT' : 'POST',
-            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
-            body: JSON.stringify(data)
+        $.ajax({
+            url: id ? `${API}/${id}` : API,
+            type: id ? 'PUT' : 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(result) {
+                if (result.success) {
+                    showSuccessAlert(`Empleado ${id?'actualizado':'creado'} exitosamente`);
+                    $('#employeeModal').modal('hide');
+                    table.ajax.reload(null, false);
+                } else {
+                    showErrorAlert(result.error || 'Error al guardar el empleado');
+                }
+            },
+            error: function(xhr) {
+                showErrorAlert(xhr.responseJSON?.error || 'Error al guardar el empleado');
+            }
         });
-
-        const result = await res.json();
-        if (result.success) {
-            showSuccessAlert(`Empleado ${id?'actualizado':'creado'} exitosamente`);
-            $('#employeeModal').modal('hide');
-            table.ajax.reload(null, false);
-        } else {
-            showErrorAlert(result.error || 'Error al guardar el empleado');
-        }
     });
     
     $('#<%= dtTableId %>').on('click', '.toggle-btn', function() {
@@ -526,32 +529,37 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </div>
         `;
 
-        const existingModal = document.getElementById('confirmToggleEmployeeModal');
-        if (existingModal) existingModal.remove();
+        // Remove existing modal if any
+        $('#confirmToggleEmployeeModal').remove();
+        $('body').append(modalHtml);
 
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-
+        // Show modal
         const modal = new bootstrap.Modal(document.getElementById('confirmToggleEmployeeModal'));
         modal.show();
 
-        document.getElementById('confirmToggleEmployeeBtn').addEventListener('click', async function() {
-            modal.hide();
-            try {
-                const r = await fetch(`${API}/${employeeId}/toggle-status`, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() },
-                    body: JSON.stringify({ active: newStatus })
-                });
-                const result = await r.json();
-                if (r.ok && result.success) {
-                    showSuccessAlert(`Empleado ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
-                    table.ajax.reload(null, false);
-                } else {
-                    showErrorAlert(result.error || 'Error al cambiar el estado del empleado');
+        // Handle confirmation
+        $('#confirmToggleEmployeeBtn').on('click', function() {
+            $.ajax({
+                url: `${API}/${employeeId}/toggle-status`,
+                type: 'PATCH',
+                contentType: 'application/json',
+                data: JSON.stringify({ active: newStatus }),
+                success: function(result) {
+                    if (result.success) {
+                        modal.hide();
+                        table.ajax.reload(null, false);
+                        showSuccessAlert(`Empleado ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+                    } else {
+                        modal.hide();
+                        showErrorAlert(result.error || 'Error al cambiar el estado del empleado');
+                    }
+                },
+                error: function(xhr) {
+                    modal.hide();
+                    const errorMsg = xhr.responseJSON?.error || 'Error al cambiar el estado del empleado';
+                    showErrorAlert(errorMsg);
                 }
-            } catch (error) {
-                showErrorAlert('Error al cambiar el estado del empleado. Por favor, intenta nuevamente.');
-            }
+            });
         });
     }
 
@@ -577,31 +585,37 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </div>
         `;
 
-        const existingModal = document.getElementById('confirmDeleteEmployeeModal');
-        if (existingModal) existingModal.remove();
+        // Remove existing modal if any (jQuery pattern like POI)
+        $('#confirmDeleteEmployeeModal').remove();
 
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
+        // Add modal to body (jQuery pattern like POI)
+        $('body').append(modalHtml);
 
+        // Show modal
         const modal = new bootstrap.Modal(document.getElementById('confirmDeleteEmployeeModal'));
         modal.show();
 
-        document.getElementById('confirmDeleteEmployeeBtn').addEventListener('click', async function() {
-            modal.hide();
-            try {
-                const r = await fetch(`${API}/${employeeId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + getToken() }
-                });
-                const result = await r.json();
-                if (r.ok && result.success) {
-                    showSuccessAlert(`Empleado "${employeeName}" eliminado exitosamente`);
-                    table.ajax.reload(null, false);
-                } else {
-                    showErrorAlert(result.error || 'Error al eliminar el empleado');
+        // Handle confirmation (jQuery pattern like POI)
+        $('#confirmDeleteEmployeeBtn').on('click', function() {
+            $.ajax({
+                url: `${API}/${employeeId}`,
+                type: 'DELETE',
+                success: function(result) {
+                    if (result.success) {
+                        modal.hide();
+                        table.ajax.reload(null, false);
+                        showSuccessAlert(`Empleado "${employeeName}" eliminado exitosamente`);
+                    } else {
+                        modal.hide();
+                        showErrorAlert(result.error || 'Error al eliminar el empleado');
+                    }
+                },
+                error: function(xhr) {
+                    modal.hide();
+                    const error = xhr.responseJSON?.error || 'Error al eliminar el empleado';
+                    showErrorAlert(error);
                 }
-            } catch (error) {
-                showErrorAlert('Error al eliminar el empleado. Por favor, intenta nuevamente.');
-            }
+            });
         });
     }
 

@@ -36,17 +36,11 @@ const initializeParseServer = async () => {
     logger.info('Parse Server started successfully');
 
     // Initialize Parse SDK for internal use (health checks, etc.)
-    Parse.initialize(
-      parseServerConfig.appId,
-      null,
-      parseServerConfig.masterKey
-    );
+    Parse.initialize(parseServerConfig.appId, null, parseServerConfig.masterKey);
     Parse.serverURL = parseServerConfig.serverURL;
 
     logger.info('Parse SDK configured for internal operations');
-    logger.info(
-      'Parse Server initialization completed - cloud functions loaded'
-    );
+    logger.info('Parse Server initialization completed - cloud functions loaded');
 
     return parseServer;
   } catch (error) {
@@ -61,9 +55,7 @@ const initializeParseServer = async () => {
       logger.error('Exiting in production due to Parse Server failure');
       throw error; // Re-throw to allow process.exit(1) in caller
     } else {
-      logger.warn(
-        'Continuing in development mode without Parse Server (database may be unavailable)'
-      );
+      logger.warn('Continuing in development mode without Parse Server (database may be unavailable)');
       return parseServer; // Return instance even if failed (development only)
     }
   }
@@ -96,10 +88,7 @@ const shutdownParseServer = async (parseServer) => {
     }
   } catch (error) {
     // Log but don't throw - Parse Server may have internal shutdown issues
-    logger.warn(
-      'Parse Server shutdown encountered an error (non-critical):',
-      error.message
-    );
+    logger.warn('Parse Server shutdown encountered an error (non-critical):', error.message);
   }
 };
 

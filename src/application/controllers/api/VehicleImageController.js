@@ -23,12 +23,7 @@ class VehicleImageController {
   constructor() {
     this.uploadDir = path.join(process.cwd(), 'public', 'uploads', 'vehicles');
     this.maxFileSize = 250 * 1024 * 1024; // 250MB
-    this.allowedMimeTypes = [
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/webp',
-    ];
+    this.allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
     // Configure multer for image uploads
     this.upload = multer({

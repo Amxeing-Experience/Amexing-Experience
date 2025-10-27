@@ -45,8 +45,7 @@ const writeOperationsLimiter = rateLimit({
   max: 30, // Limit write operations
   message: {
     success: false,
-    error:
-      'Too many modification requests from this IP, please try again later.',
+    error: 'Too many modification requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,

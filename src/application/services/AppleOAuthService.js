@@ -220,14 +220,16 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     const { email, id } = userProfile;
 
     // First, try to find by Apple ID
-    let userQuery = new Parse.Query(Parse.User);
+    let userQuery = new Parse.Query('AmexingUser');
     userQuery.equalTo('appleId', id);
+    userQuery.equalTo('exists', true);
     let user = await userQuery.first({ useMasterKey: true });
 
     // Try finding by email if not found by Apple ID
     if (!user && email) {
-      userQuery = new Parse.Query(Parse.User);
+      userQuery = new Parse.Query('AmexingUser');
       userQuery.equalTo('email', email);
+      userQuery.equalTo('exists', true);
       user = await userQuery.first({ useMasterKey: true });
 
       // Link Apple ID to existing email account
@@ -413,8 +415,9 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async handleConsentRevoked(appleId) {
-    const userQuery = new Parse.Query(Parse.User);
+    const userQuery = new Parse.Query('AmexingUser');
     userQuery.equalTo('appleId', appleId);
+    userQuery.equalTo('exists', true);
 
     const user = await userQuery.first({ useMasterKey: true });
     // Return early if user not found

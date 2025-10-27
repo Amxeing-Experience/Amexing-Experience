@@ -37,13 +37,7 @@ const router = express.Router();
  * @example
  * // Usage example documented above
  */
-async function callCloudFunctionWithRetry(
-  functionName,
-  params = {},
-  options = {},
-  maxRetries = 3,
-  baseDelay = 100
-) {
+async function callCloudFunctionWithRetry(functionName, params = {}, options = {}, maxRetries = 3, baseDelay = 100) {
   let lastError;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
@@ -61,14 +55,11 @@ async function callCloudFunctionWithRetry(
       if (isInvalidFunction && attempt < maxRetries - 1) {
         const delay = baseDelay * 2 ** attempt; // Exponential backoff
 
-        logger.warn(
-          `Cloud function ${functionName} not ready, retrying in ${delay}ms`,
-          {
-            attempt: attempt + 1,
-            maxRetries,
-            error: error.message,
-          }
-        );
+        logger.warn(`Cloud function ${functionName} not ready, retrying in ${delay}ms`, {
+          attempt: attempt + 1,
+          maxRetries,
+          error: error.message,
+        });
 
         // Wait before retrying
         await new Promise((resolve) => {
@@ -83,13 +74,10 @@ async function callCloudFunctionWithRetry(
   }
 
   // All retries exhausted
-  logger.error(
-    `Cloud function ${functionName} failed after ${maxRetries} attempts`,
-    {
-      error: lastError.message,
-      code: lastError.code,
-    }
-  );
+  logger.error(`Cloud function ${functionName} failed after ${maxRetries} attempts`, {
+    error: lastError.message,
+    code: lastError.code,
+  });
 
   throw lastError;
 }
@@ -189,9 +177,7 @@ router.post('/login', async (req, res) => {
     if (!identifier || !password) {
       // Check if client expects HTML response
       if (req.accepts('html')) {
-        return res.redirect(
-          `/login?error=${encodeURIComponent('Email and password are required')}`
-        );
+        return res.redirect(`/login?error=${encodeURIComponent('Email and password are required')}`);
       }
       return res.status(400).json({
         success: false,
@@ -219,9 +205,7 @@ router.post('/login', async (req, res) => {
           });
           // Check if client expects HTML response
           if (req.accepts('html')) {
-            return res.redirect(
-              `/login?error=${encodeURIComponent('Your account has been deactivated')}`
-            );
+            return res.redirect(`/login?error=${encodeURIComponent('Your account has been deactivated')}`);
           }
           return res.status(401).json({
             success: false,
@@ -236,9 +220,7 @@ router.post('/login', async (req, res) => {
           });
           // Check if client expects HTML response
           if (req.accepts('html')) {
-            return res.redirect(
-              `/login?error=${encodeURIComponent('Account not found')}`
-            );
+            return res.redirect(`/login?error=${encodeURIComponent('Account not found')}`);
           }
           return res.status(401).json({
             success: false,
@@ -271,17 +253,11 @@ router.post('/login', async (req, res) => {
               }
             }
           } catch (roleError) {
-            logger.warn(
-              'Failed to fetch role for Parse user, defaulting to guest',
-              {
-                userId: parseUser.id,
-                rolePointer:
-                  typeof rolePointer === 'string'
-                    ? rolePointer
-                    : rolePointer?.id,
-                error: roleError.message,
-              }
-            );
+            logger.warn('Failed to fetch role for Parse user, defaulting to guest', {
+              userId: parseUser.id,
+              rolePointer: typeof rolePointer === 'string' ? rolePointer : rolePointer?.id,
+              error: roleError.message,
+            });
             // Fall back to old role field if new relationship fails
             roleName = parseUser.get('role') || 'guest';
           }
@@ -307,10 +283,7 @@ router.post('/login', async (req, res) => {
         });
       }
     } catch (parseError) {
-      logger.warn(
-        'Parse authentication failed, falling back to Parse Object auth:',
-        parseError.message
-      );
+      logger.warn('Parse authentication failed, falling back to Parse Object auth:', parseError.message);
       // Fallback to Parse Object authentication using AmexingUser model
       const AmexingUser = require('../../domain/models/AmexingUser');
 
@@ -324,9 +297,7 @@ router.post('/login', async (req, res) => {
         if (!user) {
           // Check if client expects HTML response
           if (req.accepts('html')) {
-            return res.redirect(
-              `/login?error=${encodeURIComponent('Invalid email or password')}`
-            );
+            return res.redirect(`/login?error=${encodeURIComponent('Invalid email or password')}`);
           }
           return res.status(401).json({
             success: false,
@@ -344,9 +315,7 @@ router.post('/login', async (req, res) => {
 
           // Check if client expects HTML response
           if (req.accepts('html')) {
-            return res.redirect(
-              `/login?error=${encodeURIComponent('Invalid email or password')}`
-            );
+            return res.redirect(`/login?error=${encodeURIComponent('Invalid email or password')}`);
           }
           return res.status(401).json({
             success: false,
@@ -358,9 +327,7 @@ router.post('/login', async (req, res) => {
         if (user.isAccountLocked()) {
           // Check if client expects HTML response
           if (req.accepts('html')) {
-            return res.redirect(
-              `/login?error=${encodeURIComponent('Account is temporarily locked')}`
-            );
+            return res.redirect(`/login?error=${encodeURIComponent('Account is temporarily locked')}`);
           }
           return res.status(401).json({
             success: false,
@@ -379,9 +346,7 @@ router.post('/login', async (req, res) => {
           });
           // Check if client expects HTML response
           if (req.accepts('html')) {
-            return res.redirect(
-              `/login?error=${encodeURIComponent('Your account has been deactivated')}`
-            );
+            return res.redirect(`/login?error=${encodeURIComponent('Your account has been deactivated')}`);
           }
           return res.status(401).json({
             success: false,
@@ -396,9 +361,7 @@ router.post('/login', async (req, res) => {
           });
           // Check if client expects HTML response
           if (req.accepts('html')) {
-            return res.redirect(
-              `/login?error=${encodeURIComponent('Account not found')}`
-            );
+            return res.redirect(`/login?error=${encodeURIComponent('Account not found')}`);
           }
           return res.status(401).json({
             success: false,
@@ -433,8 +396,7 @@ router.post('/login', async (req, res) => {
           } catch (roleError) {
             logger.warn('Failed to fetch role for user, defaulting to guest', {
               userId: user.id,
-              rolePointer:
-                typeof rolePointer === 'string' ? rolePointer : rolePointer?.id,
+              rolePointer: typeof rolePointer === 'string' ? rolePointer : rolePointer?.id,
               error: roleError.message,
             });
             // Fall back to old role field if new relationship fails
@@ -530,9 +492,7 @@ router.post('/login', async (req, res) => {
     // If we reach here, authentication failed
     // Check if client expects HTML response
     if (req.accepts('html')) {
-      return res.redirect(
-        `/login?error=${encodeURIComponent('Authentication failed')}`
-      );
+      return res.redirect(`/login?error=${encodeURIComponent('Authentication failed')}`);
     }
 
     res.status(401).json({
@@ -992,52 +952,48 @@ router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 // Change password (for authenticated users)
-router.post(
-  '/change-password',
-  jwtMiddleware.authenticateToken,
-  async (req, res) => {
-    try {
-      const { user } = req;
+router.post('/change-password', jwtMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { user } = req;
 
-      const { currentPassword, newPassword, confirmPassword } = req.body;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
 
-      // Check if current or new password is missing
-      if (!currentPassword || !newPassword) {
-        return res.status(400).json({
-          success: false,
-          error: 'Current password and new password are required',
-        });
-      }
-
-      // Check if new passwords do not match
-      if (newPassword !== confirmPassword) {
-        return res.status(400).json({
-          success: false,
-          error: 'New passwords do not match',
-        });
-      }
-
-      const result = await Parse.Cloud.run(
-        'changePassword',
-        {
-          currentPassword,
-          newPassword,
-        },
-        {
-          user: { id: user.id },
-        }
-      );
-
-      res.json(result);
-    } catch (error) {
-      logger.error('Change password route error:', error);
-      res.status(400).json({
+    // Check if current or new password is missing
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
         success: false,
-        error: error.message || 'Password change failed',
+        error: 'Current password and new password are required',
       });
     }
+
+    // Check if new passwords do not match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        error: 'New passwords do not match',
+      });
+    }
+
+    const result = await Parse.Cloud.run(
+      'changePassword',
+      {
+        currentPassword,
+        newPassword,
+      },
+      {
+        user: { id: user.id },
+      }
+    );
+
+    res.json(result);
+  } catch (error) {
+    logger.error('Change password route error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message || 'Password change failed',
+    });
   }
-);
+});
 
 /**
  * @swagger
@@ -1212,16 +1168,12 @@ router.get('/oauth/:provider/callback', async (req, res) => {
     // Check if OAuth callback has error
     if (error) {
       logger.error('OAuth callback error:', error);
-      return res.redirect(
-        `/login?error=${encodeURIComponent('OAuth authentication was cancelled')}`
-      );
+      return res.redirect(`/login?error=${encodeURIComponent('OAuth authentication was cancelled')}`);
     }
 
     // Check if authorization code is missing
     if (!code) {
-      return res.redirect(
-        `/login?error=${encodeURIComponent('OAuth authentication failed')}`
-      );
+      return res.redirect(`/login?error=${encodeURIComponent('OAuth authentication failed')}`);
     }
 
     const result = await Parse.Cloud.run('handleOAuthCallback', {
@@ -1257,9 +1209,7 @@ router.get('/oauth/:provider/callback', async (req, res) => {
     res.redirect(redirectUrl);
   } catch (error) {
     logger.error('OAuth callback route error:', error);
-    res.redirect(
-      `/login?error=${encodeURIComponent(error.message || 'OAuth authentication failed')}`
-    );
+    res.redirect(`/login?error=${encodeURIComponent(error.message || 'OAuth authentication failed')}`);
   }
 });
 
@@ -1311,37 +1261,33 @@ router.get('/oauth/:provider/callback', async (req, res) => {
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 // Link OAuth account (for authenticated users)
-router.post(
-  '/oauth/:provider/link',
-  jwtMiddleware.authenticateToken,
-  async (req, res) => {
-    try {
-      const { user } = req;
+router.post('/oauth/:provider/link', jwtMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { user } = req;
 
-      const { provider: _provider } = req.params;
-      const { oauthData } = req.body;
+    const { provider: _provider } = req.params;
+    const { oauthData } = req.body;
 
-      const result = await Parse.Cloud.run(
-        'linkOAuthAccount',
-        {
-          provider: _provider,
-          oauthData,
-        },
-        {
-          user: { id: user.id },
-        }
-      );
+    const result = await Parse.Cloud.run(
+      'linkOAuthAccount',
+      {
+        provider: _provider,
+        oauthData,
+      },
+      {
+        user: { id: user.id },
+      }
+    );
 
-      res.json(result);
-    } catch (error) {
-      logger.error('OAuth link route error:', error);
-      res.status(400).json({
-        success: false,
-        error: error.message || 'OAuth account linking failed',
-      });
-    }
+    res.json(result);
+  } catch (error) {
+    logger.error('OAuth link route error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message || 'OAuth account linking failed',
+    });
   }
-);
+});
 
 /**
  * @swagger
@@ -1385,34 +1331,30 @@ router.post(
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 // Unlink OAuth account (for authenticated users)
-router.delete(
-  '/oauth/:provider/unlink',
-  jwtMiddleware.authenticateToken,
-  async (req, res) => {
-    try {
-      const { user } = req;
+router.delete('/oauth/:provider/unlink', jwtMiddleware.authenticateToken, async (req, res) => {
+  try {
+    const { user } = req;
 
-      const { provider: _provider } = req.params;
+    const { provider: _provider } = req.params;
 
-      const result = await Parse.Cloud.run(
-        'unlinkOAuthAccount',
-        {
-          provider: _provider,
-        },
-        {
-          user: { id: user.id },
-        }
-      );
+    const result = await Parse.Cloud.run(
+      'unlinkOAuthAccount',
+      {
+        provider: _provider,
+      },
+      {
+        user: { id: user.id },
+      }
+    );
 
-      res.json(result);
-    } catch (error) {
-      logger.error('OAuth unlink route error:', error);
-      res.status(400).json({
-        success: false,
-        error: error.message || 'OAuth account unlinking failed',
-      });
-    }
+    res.json(result);
+  } catch (error) {
+    logger.error('OAuth unlink route error:', error);
+    res.status(400).json({
+      success: false,
+      error: error.message || 'OAuth account unlinking failed',
+    });
   }
-);
+});
 
 module.exports = router;

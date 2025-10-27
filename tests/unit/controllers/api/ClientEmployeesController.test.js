@@ -468,6 +468,46 @@ describe('ClientEmployeesController', () => {
         })
       );
     });
+
+    it('should handle permission denied from service', async () => {
+      mockUserService.toggleUserStatus = jest.fn().mockResolvedValue({
+        success: false,
+        message: 'Insufficient permissions to change user status',
+      });
+
+      await clientEmployeesController.toggleEmployeeStatus(mockReq, mockRes);
+
+      expect(mockRes.status).toHaveBeenCalledWith(403);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: false,
+          error: 'Insufficient permissions to change user status',
+        })
+      );
+    });
+
+    it('should enrich currentUser with role when missing', async () => {
+      // Simulate middleware behavior where role is separate
+      mockReq.user = { id: 'test-admin-123' }; // No role property
+      mockReq.userRole = 'admin'; // Role in separate property
+
+      mockUserService.toggleUserStatus = jest.fn().mockResolvedValue({
+        success: true,
+        user: { id: 'employee-123', active: false },
+      });
+
+      await clientEmployeesController.toggleEmployeeStatus(mockReq, mockRes);
+
+      // Verify role was added to user object before calling service
+      expect(mockUserService.toggleUserStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'test-admin-123', role: 'admin' }),
+        'employee-123',
+        false,
+        expect.any(String)
+      );
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+    });
   });
 
   describe('deactivateEmployee', () => {

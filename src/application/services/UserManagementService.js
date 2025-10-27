@@ -553,9 +553,20 @@ class UserManagementService {
         throw new Error('Cannot deactivate your own account');
       }
 
-      // AI Agent Rule: Use softDelete method to set active=false and exists=false
+      // AI Agent Rule: Soft delete - set active=false and exists=false
       // This is a logical deletion, never hard delete
-      await user.softDelete(deactivatedBy); // Pass User object directly
+      // Manual implementation since registerSubclass is commented out
+      user.set('active', false);
+      user.set('exists', false);
+      user.set('deletedAt', new Date());
+      user.set('updatedAt', new Date());
+      user.set('modifiedBy', deactivatedBy);
+      user.set('deletedBy', deactivatedBy);
+
+      await user.save(null, {
+        useMasterKey: true,
+        context: extractUserContext(deactivatedBy),
+      });
 
       // Log deactivation activity
       await this.logUserCRUDActivity(deactivatedBy, 'deactivate', userId, {
@@ -597,8 +608,8 @@ class UserManagementService {
    */
   async reactivateUser(userId, reactivatedBy, reason = 'Admin action') {
     try {
-      // Query archived users (deactivated but still exist)
-      const query = BaseModel.queryArchived(this.className);
+      // Query soft deleted users (exists: false)
+      const query = BaseModel.querySoftDeleted(this.className);
       const user = await query.get(userId, {
         useMasterKey: true,
         context: extractUserContext(reactivatedBy),
@@ -608,13 +619,27 @@ class UserManagementService {
         throw new Error('User not found or permanently deleted');
       }
 
+      // Ensure user has role property for permission check (may not be loaded from DB)
+      if (!user.role && typeof user.get === 'function') {
+        user.role = user.get('role');
+      }
+
       // Validate permissions
       if (!this.canReactivateUser(reactivatedBy, user)) {
         throw new Error('Insufficient permissions to reactivate this user');
       }
 
-      // AI Agent Rule: Use activate method for lifecycle management
-      await user.activate(reactivatedBy); // Pass User object directly
+      // AI Agent Rule: Activate user - set active=true and exists=true
+      // Manual implementation since registerSubclass is commented out
+      user.set('active', true);
+      user.set('exists', true);
+      user.set('updatedAt', new Date());
+      user.set('modifiedBy', reactivatedBy);
+
+      await user.save(null, {
+        useMasterKey: true,
+        context: extractUserContext(reactivatedBy),
+      });
 
       // Log reactivation activity
       await this.logUserCRUDActivity(reactivatedBy, 'reactivate', userId, {
@@ -712,14 +737,6 @@ class UserManagementService {
         email: user.get('email'),
         previousStatus,
         newStatus: targetStatus,
-      });
-
-      logger.info('User status toggled successfully', {
-        userId,
-        previousStatus,
-        newStatus: targetStatus,
-        changedBy: currentUser.id,
-        reason,
       });
 
       return {
@@ -1609,8 +1626,13 @@ class UserManagementService {
    * @returns {boolean} - Boolean result Operation result.
    */
   canModifyUser(currentUser, targetUser) {
-    const currentLevel = this.roleHierarchy[currentUser.role] || 0;
-    const targetLevel = this.roleHierarchy[targetUser.get('role')] || 0;
+    // Get role from currentUser - might be property or get() method
+    const currentRole = currentUser?.role || (typeof currentUser?.get === 'function' ? currentUser.get('role') : null);
+    // Get role from targetUser - try property first, then get() method
+    const targetRole = targetUser?.role || (typeof targetUser?.get === 'function' ? targetUser.get('role') : null);
+
+    const currentLevel = this.roleHierarchy[currentRole] || 0;
+    const targetLevel = this.roleHierarchy[targetRole] || 0;
 
     // Cannot modify users with higher role level
     if (currentLevel < targetLevel) {
@@ -1618,7 +1640,7 @@ class UserManagementService {
     }
 
     // Cannot modify other superadmins unless you are superadmin
-    if (targetUser.get('role') === 'superadmin' && currentUser.role !== 'superadmin') {
+    if (targetRole === 'superadmin' && currentRole !== 'superadmin') {
       return false;
     }
 

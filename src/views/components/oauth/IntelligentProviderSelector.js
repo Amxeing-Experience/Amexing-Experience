@@ -8,15 +8,10 @@
 class IntelligentProviderSelector {
   constructor(options = {}) {
     this.config = {
-      container:
-        options.container || document.getElementById('provider-selector'),
+      container: options.container || document.getElementById('provider-selector'),
       corporateConfig: options.corporateConfig || null,
       department: options.department || null,
-      availableProviders: options.availableProviders || [
-        'google',
-        'microsoft',
-        'apple',
-      ],
+      availableProviders: options.availableProviders || ['google', 'microsoft', 'apple'],
       enableLearning: options.enableLearning !== false,
       showSuggestionReason: options.showSuggestionReason !== false,
       animationDuration: options.animationDuration || 300,
@@ -180,16 +175,14 @@ class IntelligentProviderSelector {
 
       // Merge with corporate-specific mappings
       if (this.config.corporateConfig?.domainMappings) {
-        Object.entries(this.config.corporateConfig.domainMappings).forEach(
-          ([domain, provider]) => {
-            commonDomains[domain] = {
-              provider,
-              confidence: 0.99,
-              type: 'corporate_verified',
-              corporateId: this.config.corporateConfig.id,
-            };
-          }
-        );
+        Object.entries(this.config.corporateConfig.domainMappings).forEach(([domain, provider]) => {
+          commonDomains[domain] = {
+            provider,
+            confidence: 0.99,
+            type: 'corporate_verified',
+            corporateId: this.config.corporateConfig.id,
+          };
+        });
       }
 
       // Store in domain database
@@ -246,10 +239,7 @@ class IntelligentProviderSelector {
     if (!this.config.enableLearning) return;
 
     try {
-      localStorage.setItem(
-        'oauth_provider_learning',
-        JSON.stringify(this.learningData)
-      );
+      localStorage.setItem('oauth_provider_learning', JSON.stringify(this.learningData));
     } catch (error) {
       // eslint-disable-next-line no-console
       console.warn('Could not save learning data:', error);
@@ -268,9 +258,7 @@ class IntelligentProviderSelector {
    */
   setupProviderDetection() {
     // Email input detection
-    const emailInputs = document.querySelectorAll(
-      'input[type="email"], input[name="email"], input[name="identifier"]'
-    );
+    const emailInputs = document.querySelectorAll('input[type="email"], input[name="email"], input[name="identifier"]');
 
     emailInputs.forEach((input) => {
       // Debounce email detection
@@ -734,10 +722,7 @@ class IntelligentProviderSelector {
 
     this.config.availableProviders.forEach((provider) => {
       if (providerInfo[provider]) {
-        const button = this.createProviderButton(
-          provider,
-          providerInfo[provider]
-        );
+        const button = this.createProviderButton(provider, providerInfo[provider]);
         this.elements.providerGrid.appendChild(button);
       }
     });
@@ -942,9 +927,9 @@ class IntelligentProviderSelector {
     }
 
     // Check successful providers
-    const successfulProvider = Object.entries(
-      learning.successfulProviders
-    ).sort(([, a], [, b]) => b.count - a.count)[0];
+    const successfulProvider = Object.entries(learning.successfulProviders).sort(
+      ([, a], [, b]) => b.count - a.count
+    )[0];
 
     if (successfulProvider && successfulProvider[1].count >= 3) {
       return {
@@ -1050,11 +1035,7 @@ class IntelligentProviderSelector {
    */
   analyzeCommonPatterns(domain) {
     // Educational institutions typically use Google
-    if (
-      domain.includes('edu')
-      || domain.includes('school')
-      || domain.includes('university')
-    ) {
+    if (domain.includes('edu') || domain.includes('school') || domain.includes('university')) {
       return {
         provider: 'google',
         confidence: 0.7,
@@ -1074,11 +1055,7 @@ class IntelligentProviderSelector {
     }
 
     // Tech companies often use Google
-    if (
-      domain.includes('tech')
-      || domain.includes('software')
-      || domain.includes('dev')
-    ) {
+    if (domain.includes('tech') || domain.includes('software') || domain.includes('dev')) {
       return {
         provider: 'google',
         confidence: 0.6,
@@ -1112,9 +1089,7 @@ class IntelligentProviderSelector {
     // Clear and rebuild suggestion text using DOM methods
     this.elements.suggestionText.textContent = '';
 
-    const mainText = document.createTextNode(
-      `We recommend signing in with ${providerName}`
-    );
+    const mainText = document.createTextNode(`We recommend signing in with ${providerName}`);
     this.elements.suggestionText.appendChild(mainText);
 
     if (this.config.showSuggestionReason && suggestion.reason) {
@@ -1275,9 +1250,7 @@ class IntelligentProviderSelector {
     this.clearProviderHighlights();
 
     // Add suggestion highlight
-    const providerButton = this.elements.providerGrid.querySelector(
-      `[data-provider="${provider}"]`
-    );
+    const providerButton = this.elements.providerGrid.querySelector(`[data-provider="${provider}"]`);
     if (providerButton) {
       providerButton.classList.add('suggested');
 
@@ -1327,9 +1300,7 @@ class IntelligentProviderSelector {
   updateAlternativesDisplay(excludeProvider = null) {
     if (!this.elements.alternatives) return;
 
-    const alternatives = this.config.availableProviders.filter(
-      (p) => p !== excludeProvider
-    );
+    const alternatives = this.config.availableProviders.filter((p) => p !== excludeProvider);
 
     if (excludeProvider && alternatives.length > 0) {
       // Show alternatives
@@ -1338,9 +1309,7 @@ class IntelligentProviderSelector {
       // Clear existing alternatives
       // Clear existing alternatives safely
       while (this.elements.alternativesGrid.firstChild) {
-        this.elements.alternativesGrid.removeChild(
-          this.elements.alternativesGrid.firstChild
-        );
+        this.elements.alternativesGrid.removeChild(this.elements.alternativesGrid.firstChild);
       }
 
       // Add alternative buttons
@@ -1377,9 +1346,7 @@ class IntelligentProviderSelector {
     if (suggestion.email) {
       this.learningData.userChoices[suggestion.email] = {
         provider: suggestion.provider,
-        successCount:
-          (this.learningData.userChoices[suggestion.email]?.successCount || 0)
-          + 1,
+        successCount: (this.learningData.userChoices[suggestion.email]?.successCount || 0) + 1,
         lastUsed: new Date().toISOString(),
       };
     }
@@ -1462,10 +1429,7 @@ class IntelligentProviderSelector {
     const urlParams = new URLSearchParams(window.location.search);
     const preferredProvider = urlParams.get('provider') || urlParams.get('oauth');
 
-    if (
-      preferredProvider
-      && this.config.availableProviders.includes(preferredProvider)
-    ) {
+    if (preferredProvider && this.config.availableProviders.includes(preferredProvider)) {
       this.showSuggestion({
         provider: preferredProvider,
         confidence: 0.9,
@@ -1781,17 +1745,11 @@ window.IntelligentProviderSelector = IntelligentProviderSelector;
 
 // Auto-initialize if container exists
 document.addEventListener('DOMContentLoaded', () => {
-  const container = document.querySelector(
-    '[data-intelligent-provider-selector]'
-  );
+  const container = document.querySelector('[data-intelligent-provider-selector]');
   if (container) {
-    const config = container.dataset.config
-      ? JSON.parse(container.dataset.config)
-      : {};
+    const config = container.dataset.config ? JSON.parse(container.dataset.config) : {};
     config.container = container;
 
-    window.intelligentProviderSelector = new IntelligentProviderSelector(
-      config
-    );
+    window.intelligentProviderSelector = new IntelligentProviderSelector(config);
   }
 });

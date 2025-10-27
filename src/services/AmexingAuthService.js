@@ -235,9 +235,7 @@ class AmexingAuthService {
 
       // Check password
       if (!user.passwordHash) {
-        throw new Error(
-          'Password authentication not available for this account'
-        );
+        throw new Error('Password authentication not available for this account');
       }
 
       const isValidPassword = await bcrypt.compare(password, user.passwordHash);
@@ -325,9 +323,7 @@ class AmexingAuthService {
         tokens: sessionTokens.accessToken,
       });
 
-      logger.info(
-        `OAuth user authenticated: ${oauthProfile.email} via ${_provider}`
-      );
+      logger.info(`OAuth user authenticated: ${oauthProfile.email} via ${_provider}`);
 
       return {
         user: this.sanitizeUser(user),
@@ -373,9 +369,7 @@ class AmexingAuthService {
           email: profile.email,
           profile,
           accessToken: await this.encryptToken(tokens.accessToken),
-          refreshToken: tokens.refreshToken
-            ? await this.encryptToken(tokens.refreshToken)
-            : null,
+          refreshToken: tokens.refreshToken ? await this.encryptToken(tokens.refreshToken) : null,
           tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
           scopes: tokens.scope?.split(' ') || [],
           linkedAt: new Date(),
@@ -389,10 +383,7 @@ class AmexingAuthService {
       // Profile
       firstName: profile.firstName || profile.given_name || '',
       lastName: profile.lastName || profile.family_name || '',
-      displayName:
-        profile.fullName
-        || profile.name
-        || `${profile.firstName} ${profile.lastName}`,
+      displayName: profile.fullName || profile.name || `${profile.firstName} ${profile.lastName}`,
       profilePicture: profile.picture,
       locale: profile.locale || 'en',
       timezone: 'America/Mexico_City',
@@ -460,9 +451,7 @@ class AmexingAuthService {
       email: profile.email,
       profile,
       accessToken: await this.encryptToken(tokens.accessToken),
-      refreshToken: tokens.refreshToken
-        ? await this.encryptToken(tokens.refreshToken)
-        : null,
+      refreshToken: tokens.refreshToken ? await this.encryptToken(tokens.refreshToken) : null,
       tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
       scopes: tokens.scope?.split(' ') || [],
       linkedAt: new Date(),
@@ -480,10 +469,7 @@ class AmexingAuthService {
       existingAccounts.push(oauthAccount);
 
       parseUser.set('oauthAccounts', existingAccounts);
-      parseUser.set(
-        'primaryOAuthProvider',
-        user.primaryOAuthProvider || _provider
-      );
+      parseUser.set('primaryOAuthProvider', user.primaryOAuthProvider || _provider);
       parseUser.set('lastOAuthSync', new Date());
       parseUser.set('updatedAt', new Date());
 
@@ -522,9 +508,7 @@ class AmexingAuthService {
       ...user.oauthAccounts[oauthAccountIndex],
       profile,
       accessToken: await this.encryptToken(tokens.accessToken),
-      refreshToken: tokens.refreshToken
-        ? await this.encryptToken(tokens.refreshToken)
-        : null,
+      refreshToken: tokens.refreshToken ? await this.encryptToken(tokens.refreshToken) : null,
       tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
       scopes: tokens.scope?.split(' ') || [],
       lastUsed: new Date(),
@@ -540,14 +524,8 @@ class AmexingAuthService {
       oauthAccounts[oauthAccountIndex] = updatedOAuthAccount;
 
       parseUser.set('oauthAccounts', oauthAccounts);
-      parseUser.set(
-        'firstName',
-        profile.firstName || profile.given_name || user.firstName
-      );
-      parseUser.set(
-        'lastName',
-        profile.lastName || profile.family_name || user.lastName
-      );
+      parseUser.set('firstName', profile.firstName || profile.given_name || user.firstName);
+      parseUser.set('lastName', profile.lastName || profile.family_name || user.lastName);
       parseUser.set('profilePicture', profile.picture || user.profilePicture);
       parseUser.set('lastOAuthSync', new Date());
       parseUser.set('lastLoginAt', new Date());
@@ -586,9 +564,7 @@ class AmexingAuthService {
       if (client && client.autoProvisionEmployees) {
         // Auto-provision employee
         await this.provisionCorporateEmployee(user, client, profile);
-        logger.info(
-          `Corporate employee provisioned: ${user.email} for client ${client.name}`
-        );
+        logger.info(`Corporate employee provisioned: ${user.email} for client ${client.name}`);
       }
     } catch (error) {
       logger.error('Corporate integration failed:', error);
@@ -952,22 +928,16 @@ class AmexingAuthService {
 
     // Length validation
     if (password.length < minLength) {
-      throw new Error(
-        `La contraseña debe tener al menos ${minLength} caracteres`
-      );
+      throw new Error(`La contraseña debe tener al menos ${minLength} caracteres`);
     }
 
     // Character type validations
     if (requireUppercase && !/[A-Z]/.test(password)) {
-      throw new Error(
-        'La contraseña debe contener al menos una letra mayúscula'
-      );
+      throw new Error('La contraseña debe contener al menos una letra mayúscula');
     }
 
     if (requireLowercase && !/[a-z]/.test(password)) {
-      throw new Error(
-        'La contraseña debe contener al menos una letra minúscula'
-      );
+      throw new Error('La contraseña debe contener al menos una letra minúscula');
     }
 
     if (requireNumbers && !/\d/.test(password)) {
@@ -975,9 +945,7 @@ class AmexingAuthService {
     }
 
     if (requireSpecial && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      throw new Error(
-        'La contraseña debe contener al menos un carácter especial'
-      );
+      throw new Error('La contraseña debe contener al menos un carácter especial');
     }
 
     // Common password validation
@@ -1003,16 +971,12 @@ class AmexingAuthService {
 
     // Sequential characters validation
     if (/123456|abcdef|qwerty/i.test(password)) {
-      throw new Error(
-        'La contraseña no puede contener secuencias comunes de caracteres'
-      );
+      throw new Error('La contraseña no puede contener secuencias comunes de caracteres');
     }
 
     // Repeated characters validation
     if (/(.)\1{3,}/.test(password)) {
-      throw new Error(
-        'La contraseña no puede contener más de 3 caracteres consecutivos iguales'
-      );
+      throw new Error('La contraseña no puede contener más de 3 caracteres consecutivos iguales');
     }
 
     return true;
@@ -1145,9 +1109,7 @@ class AmexingAuthService {
         parseUser.set('locked', true);
         parseUser.set('lockedUntil', new Date(Date.now() + lockDuration));
 
-        logger.warn(
-          `Account locked due to failed login attempts: ${parseUser.get('email')}`
-        );
+        logger.warn(`Account locked due to failed login attempts: ${parseUser.get('email')}`);
       }
 
       await parseUser.save(null, { useMasterKey: true });
@@ -1265,10 +1227,7 @@ class AmexingAuthService {
     tokenRecord.set('token', await this.encryptToken(refreshToken));
     tokenRecord.set('active', true);
     tokenRecord.set('createdAt', new Date());
-    tokenRecord.set(
-      'expiresAt',
-      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-    ); // 30 days
+    tokenRecord.set('expiresAt', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)); // 30 days
 
     await tokenRecord.save(null, { useMasterKey: true });
   }

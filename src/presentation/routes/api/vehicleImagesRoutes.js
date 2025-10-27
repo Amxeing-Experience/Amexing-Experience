@@ -8,10 +8,7 @@
 
 const express = require('express');
 const VehicleImageController = require('../../../application/controllers/api/VehicleImageController');
-const {
-  authenticateToken,
-  requireRole,
-} = require('../../../application/middleware/jwtMiddleware');
+const { authenticateToken, requireRole } = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
 const controller = new VehicleImageController();
@@ -44,11 +41,7 @@ router.post(
  * GET /api/vehicles/:id/images.
  * @access public
  */
-router.get(
-  '/:id/images',
-  authenticateToken,
-  controller.listImages.bind(controller)
-);
+router.get('/:id/images', authenticateToken, controller.listImages.bind(controller));
 
 /**
  * Delete (soft delete) a vehicle image.

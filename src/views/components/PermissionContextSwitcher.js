@@ -252,9 +252,7 @@ class PermissionContextSwitcher {
       return '<span class="no-context">Sin contexto activo</span>';
     }
 
-    const iconHtml = this.options.showIcons
-      ? `<i class="icon-${this.currentContext.icon}"></i>`
-      : '';
+    const iconHtml = this.options.showIcons ? `<i class="icon-${this.currentContext.icon}"></i>` : '';
     const colorStyle = `style="border-left: 4px solid ${this.currentContext.color}"`;
 
     return `
@@ -287,9 +285,7 @@ class PermissionContextSwitcher {
     return this.availableContexts
       .map((context) => {
         const isActive = this.currentContext && this.currentContext.id === context.id;
-        const iconHtml = this.options.showIcons
-          ? `<i class="icon-${context.icon}"></i>`
-          : '';
+        const iconHtml = this.options.showIcons ? `<i class="icon-${context.icon}"></i>` : '';
         const activeClass = isActive ? 'active' : '';
         const colorStyle = `style="border-left: 3px solid ${context.color}"`;
 
@@ -368,14 +364,12 @@ class PermissionContextSwitcher {
    */
   setupEventListeners() {
     // Context selection
-    this.container
-      .querySelectorAll('.context-item:not(.current)')
-      .forEach((item) => {
-        item.addEventListener('click', (e) => {
-          const { contextId } = e.currentTarget.dataset;
-          this.selectContext(contextId);
-        });
+    this.container.querySelectorAll('.context-item:not(.current)').forEach((item) => {
+      item.addEventListener('click', (e) => {
+        const { contextId } = e.currentTarget.dataset;
+        this.selectContext(contextId);
       });
+    });
 
     // Switch button
     const switchBtn = this.container.querySelector('.switch-btn');
@@ -386,9 +380,7 @@ class PermissionContextSwitcher {
     }
 
     // View permissions button
-    const viewPermissionsBtn = this.container.querySelector(
-      '.view-permissions-btn'
-    );
+    const viewPermissionsBtn = this.container.querySelector('.view-permissions-btn');
     if (viewPermissionsBtn) {
       viewPermissionsBtn.addEventListener('click', () => {
         this.showPermissionsModal();
@@ -428,9 +420,7 @@ class PermissionContextSwitcher {
       item.classList.remove('selected');
     });
 
-    const selectedItem = this.container.querySelector(
-      `[data-context-id="${contextId}"]`
-    );
+    const selectedItem = this.container.querySelector(`[data-context-id="${contextId}"]`);
     if (selectedItem) {
       selectedItem.classList.add('selected');
     }
@@ -1003,9 +993,7 @@ class PermissionContextSwitcher {
     }
 
     // Remove styles
-    const styles = document.getElementById(
-      'permission-context-switcher-styles'
-    );
+    const styles = document.getElementById('permission-context-switcher-styles');
     if (styles) {
       styles.remove();
     }

@@ -101,6 +101,10 @@ module.exports = async () => {
 
     console.log('   ✅ MongoDB Memory Server started');
     console.log(`   ℹ️  URI: ${uri}`);
+    console.log('\n⚠️  CRITICAL: Using IN-MEMORY database ONLY');
+    console.log('   ⚠️  NO connections to local MongoDB (localhost:27017)');
+    console.log(`   ✅ Memory Server Port: 27018`);
+    console.log(`   ✅ Database Name: AmexingTEST`);
 
     // Initialize Parse Server with Memory DB
     console.log('\n🔧 Initializing Parse Server...');

@@ -1252,7 +1252,9 @@ class AmexingUser extends BaseModel {
   }
 }
 
-// Register the subclass
-Parse.Object.registerSubclass('AmexingUser', AmexingUser);
+// COMMENTED OUT: registerSubclass causes issues with set() + save() for boolean fields
+// The BaseModel inheritance interferes with Parse.Object field updates
+// Using Parse.Object.extend('AmexingUser') directly works correctly
+// Parse.Object.registerSubclass('AmexingUser', AmexingUser);
 
 module.exports = AmexingUser;

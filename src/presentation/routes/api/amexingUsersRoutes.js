@@ -32,8 +32,7 @@ const amexingUserApiLimiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   message: {
     success: false,
-    error:
-      'Too many Amexing user management requests from this IP, please try again later.',
+    error: 'Too many Amexing user management requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -46,8 +45,7 @@ const writeOperationsLimiter = rateLimit({
   max: 30, // Limit write operations
   message: {
     success: false,
-    error:
-      'Too many user modification requests from this IP, please try again later.',
+    error: 'Too many user modification requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,

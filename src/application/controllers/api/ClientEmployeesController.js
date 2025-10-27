@@ -544,6 +544,11 @@ class ClientEmployeesController {
         'Status changed via client employees dashboard'
       );
 
+      // Check if the operation was successful before responding
+      if (!result.success) {
+        return this.sendError(res, result.message || 'Failed to toggle employee status', 403);
+      }
+
       this.sendSuccess(res, result, `Employee ${active ? 'activated' : 'deactivated'} successfully`);
     } catch (error) {
       logger.error('Error in ClientEmployeesController.toggleEmployeeStatus', {

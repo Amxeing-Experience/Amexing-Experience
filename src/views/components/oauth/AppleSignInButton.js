@@ -219,9 +219,7 @@ class AppleSignInButton {
       AppleID.auth.init({
         clientId: this.options.clientId,
         scope: this.options.scope,
-        redirectURI:
-          this.options.redirectUri
-          || `${window.location.origin}/auth/oauth/apple/callback`,
+        redirectURI: this.options.redirectUri || `${window.location.origin}/auth/oauth/apple/callback`,
         state: this.state,
         nonce: this.nonce,
         usePopup: this.options.usePopup,
@@ -309,18 +307,12 @@ class AppleSignInButton {
     buttonDiv.className = 'apple-signin-button native';
 
     // Apple's official button styling attributes
-    buttonDiv.setAttribute(
-      'data-color',
-      this.isAppleDevice ? 'black' : 'white'
-    );
+    buttonDiv.setAttribute('data-color', this.isAppleDevice ? 'black' : 'white');
     buttonDiv.setAttribute('data-border', 'true');
     buttonDiv.setAttribute('data-type', 'sign-in');
     buttonDiv.setAttribute('data-border-radius', '12');
     buttonDiv.setAttribute('data-size', 'medium');
-    buttonDiv.setAttribute(
-      'data-logo-color',
-      this.isAppleDevice ? 'white' : 'black'
-    );
+    buttonDiv.setAttribute('data-logo-color', this.isAppleDevice ? 'white' : 'black');
 
     container.appendChild(buttonDiv);
 
@@ -336,14 +328,8 @@ class AppleSignInButton {
       });
 
       // Add event listeners
-      document.addEventListener(
-        'AppleIDSignInOnSuccess',
-        this.handleSuccess.bind(this)
-      );
-      document.addEventListener(
-        'AppleIDSignInOnFailure',
-        this.handleError.bind(this)
-      );
+      document.addEventListener('AppleIDSignInOnSuccess', this.handleSuccess.bind(this));
+      document.addEventListener('AppleIDSignInOnFailure', this.handleError.bind(this));
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to render Apple button:', error);
@@ -545,8 +531,7 @@ class AppleSignInButton {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Parse-Application-Id':
-            window.Parse?.applicationId || process.env.PARSE_APP_ID,
+          'X-Parse-Application-Id': window.Parse?.applicationId || process.env.PARSE_APP_ID,
         },
         body: JSON.stringify({
           department: this.options.department,
@@ -697,9 +682,7 @@ class AppleSignInButton {
   generateRandomString(length) {
     const array = new Uint8Array(length);
     crypto.getRandomValues(array);
-    return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join(
-      ''
-    );
+    return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
   }
 
   /**
@@ -815,14 +798,8 @@ class AppleSignInButton {
    */
   destroy() {
     // Clean up event listeners
-    document.removeEventListener(
-      'AppleIDSignInOnSuccess',
-      this.handleSuccess.bind(this)
-    );
-    document.removeEventListener(
-      'AppleIDSignInOnFailure',
-      this.handleError.bind(this)
-    );
+    document.removeEventListener('AppleIDSignInOnSuccess', this.handleSuccess.bind(this));
+    document.removeEventListener('AppleIDSignInOnFailure', this.handleError.bind(this));
 
     // Remove button container
     const container = document.getElementById('apple-signin-container');

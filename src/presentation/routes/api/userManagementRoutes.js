@@ -34,8 +34,7 @@ const userApiLimiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   message: {
     success: false,
-    error:
-      'Too many user management requests from this IP, please try again later.',
+    error: 'Too many user management requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -48,8 +47,7 @@ const writeOperationsLimiter = rateLimit({
   max: 30, // Limit write operations
   message: {
     success: false,
-    error:
-      'Too many user modification requests from this IP, please try again later.',
+    error: 'Too many user modification requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -137,13 +135,9 @@ router.use(jwtMiddleware.authenticateToken);
  *       500:
  *         $ref: '#/components/responses/ServerError'
  */
-router.get(
-  '/',
-  jwtMiddleware.requirePermission('users.list'),
-  async (req, res) => {
-    await userController.getUsers(req, res);
-  }
-);
+router.get('/', jwtMiddleware.requirePermission('users.list'), async (req, res) => {
+  await userController.getUsers(req, res);
+});
 
 /**
  * @swagger
@@ -206,13 +200,9 @@ router.get(
  *       429:
  *         $ref: '#/components/responses/RateLimitError'
  */
-router.get(
-  '/search',
-  jwtMiddleware.requirePermission('users.search'),
-  async (req, res) => {
-    await userController.searchUsers(req, res);
-  }
-);
+router.get('/search', jwtMiddleware.requirePermission('users.search'), async (req, res) => {
+  await userController.searchUsers(req, res);
+});
 
 /**
  * @swagger
@@ -261,13 +251,9 @@ router.get(
  *       429:
  *         $ref: '#/components/responses/RateLimitError'
  */
-router.get(
-  '/statistics',
-  jwtMiddleware.requireRoleLevel(6),
-  async (req, res) => {
-    await userController.getUserStatistics(req, res);
-  }
-);
+router.get('/statistics', jwtMiddleware.requireRoleLevel(6), async (req, res) => {
+  await userController.getUserStatistics(req, res);
+});
 
 /**
  * @swagger
@@ -325,13 +311,9 @@ router.get(
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.get(
-  '/:id',
-  jwtMiddleware.requirePermission('users.read'),
-  async (req, res) => {
-    await userController.getUserById(req, res);
-  }
-);
+router.get('/:id', jwtMiddleware.requirePermission('users.read'), async (req, res) => {
+  await userController.getUserById(req, res);
+});
 
 /**
  * @swagger
@@ -364,14 +346,9 @@ router.get(
  *       403:
  *         $ref: '#/components/responses/ForbiddenError'
  */
-router.post(
-  '/',
-  writeOperationsLimiter,
-  jwtMiddleware.requirePermission('users.create'),
-  async (req, res) => {
-    await userController.createUser(req, res);
-  }
-);
+router.post('/', writeOperationsLimiter, jwtMiddleware.requirePermission('users.create'), async (req, res) => {
+  await userController.createUser(req, res);
+});
 
 /**
  * @swagger
@@ -404,14 +381,9 @@ router.post(
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.put(
-  '/:id',
-  writeOperationsLimiter,
-  jwtMiddleware.requirePermission('users.update'),
-  async (req, res) => {
-    await userController.updateUser(req, res);
-  }
-);
+router.put('/:id', writeOperationsLimiter, jwtMiddleware.requirePermission('users.update'), async (req, res) => {
+  await userController.updateUser(req, res);
+});
 
 /**
  * @swagger
@@ -439,14 +411,9 @@ router.put(
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.delete(
-  '/:id',
-  writeOperationsLimiter,
-  jwtMiddleware.requirePermission('users.deactivate'),
-  async (req, res) => {
-    await userController.deactivateUser(req, res);
-  }
-);
+router.delete('/:id', writeOperationsLimiter, jwtMiddleware.requirePermission('users.deactivate'), async (req, res) => {
+  await userController.deactivateUser(req, res);
+});
 
 /**
  * @swagger
@@ -552,14 +519,9 @@ router.patch(
  *       404:
  *         $ref: '#/components/responses/NotFoundError'
  */
-router.patch(
-  '/:id/archive',
-  writeOperationsLimiter,
-  jwtMiddleware.requireRoleLevel(7),
-  async (req, res) => {
-    await userController.archiveUser(req, res);
-  }
-);
+router.patch('/:id/archive', writeOperationsLimiter, jwtMiddleware.requireRoleLevel(7), async (req, res) => {
+  await userController.archiveUser(req, res);
+});
 
 /**
  * Error handling middleware for this router.

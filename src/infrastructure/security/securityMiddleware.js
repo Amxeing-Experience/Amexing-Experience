@@ -176,14 +176,12 @@ class SecurityMiddleware {
    */
   getRateLimiter() {
     return rateLimit({
-      windowMs:
-        parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+      windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
       max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
       message: 'Too many requests from this IP, please try again later.',
       standardHeaders: true,
       legacyHeaders: false,
-      skipSuccessfulRequests:
-        process.env.RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS === 'true',
+      skipSuccessfulRequests: process.env.RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS === 'true',
       handler: (req, res) => {
         winston.warn(`Rate limit exceeded for IP: ${req.ip}`);
         res.status(429).json({
@@ -248,9 +246,7 @@ class SecurityMiddleware {
     return mongoSanitize({
       replaceWith: '_',
       onSanitize: ({ req, _key }) => {
-        winston.warn(
-          `Attempted NoSQL injection from IP ${req.ip} on field ${_key}`
-        );
+        winston.warn(`Attempted NoSQL injection from IP ${req.ip} on field ${_key}`);
       },
     });
   }
@@ -298,9 +294,7 @@ class SecurityMiddleware {
   getCorsConfig() {
     const corsOptions = {
       origin: (origin, callback) => {
-        const allowedOrigins = (
-          process.env.CORS_ORIGIN || 'http://localhost:3000'
-        ).split(',');
+        const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:3000').split(',');
 
         // Allow requests without origin (server-to-server, Parse Server health checks)
         if (!origin) {
@@ -316,12 +310,7 @@ class SecurityMiddleware {
       },
       credentials: process.env.CORS_CREDENTIALS === 'true',
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-      allowedHeaders: [
-        'Content-Type',
-        'Authorization',
-        'X-Parse-Application-Id',
-        'X-Parse-Session-Token',
-      ],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Parse-Application-Id', 'X-Parse-Session-Token'],
       exposedHeaders: ['X-Total-Count', 'X-Page', 'X-Per-Page'],
       maxAge: 86400,
       preflightContinue: false,
@@ -345,8 +334,7 @@ class SecurityMiddleware {
   getSessionConfig() {
     // Use MemoryStore for development to avoid MongoDB dependency issues
     const sessionConfig = {
-      secret:
-        process.env.SESSION_SECRET || 'default-secret-change-in-production',
+      secret: process.env.SESSION_SECRET || 'default-secret-change-in-production',
       name: 'amexing.sid',
       resave: false,
       saveUninitialized: true, // Changed to true for CSRF initialization
@@ -356,14 +344,12 @@ class SecurityMiddleware {
     if (this.isProduction || this.isProductionLocal) {
       try {
         const store = MongoStore.create({
-          mongoUrl:
-            process.env.DATABASE_URI || 'mongodb://localhost:27017/amexingdb',
+          mongoUrl: process.env.DATABASE_URI || 'mongodb://localhost:27017/amexingdb',
           collectionName: 'sessions',
           ttl: parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 || 3600,
           autoRemove: 'native',
           crypto: {
-            secret:
-              process.env.SESSION_SECRET || 'default-secret-change-in-production',
+            secret: process.env.SESSION_SECRET || 'default-secret-change-in-production',
           },
           // Connection options for better reliability
           mongoOptions: {
@@ -434,13 +420,9 @@ class SecurityMiddleware {
     // production: Requires HTTPS, strict sameSite, domain restriction
     // production-local: HTTP compatible for localhost testing with production database
     // development: Relaxed settings for development
-    const cookieSecure = this.isProduction
-      ? true
-      : process.env.COOKIE_SECURE === 'true' || false;
+    const cookieSecure = this.isProduction ? true : process.env.COOKIE_SECURE === 'true' || false;
 
-    const cookieSameSite = this.isProduction
-      ? 'strict'
-      : process.env.COOKIE_SAMESITE || 'lax';
+    const cookieSameSite = this.isProduction ? 'strict' : process.env.COOKIE_SAMESITE || 'lax';
 
     const cookieDomain = this.isProduction ? process.env.COOKIE_DOMAIN : undefined;
 
@@ -458,14 +440,8 @@ class SecurityMiddleware {
       cookie: {
         secure: cookieSecure, // HTTPS required in true production only
         httpOnly: true,
-        maxAge:
-          parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000
-          || 900000,
-        expires: new Date(
-          Date.now()
-            + (parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000
-              || 900000)
-        ), // Explicit expires
+        maxAge: parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000 || 900000,
+        expires: new Date(Date.now() + (parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 * 1000 || 900000)), // Explicit expires
         path: '/', // Explicit path configuration
         sameSite: cookieSameSite,
         domain: cookieDomain,
@@ -487,11 +463,7 @@ class SecurityMiddleware {
    */
   validateContentType() {
     return (req, res, next) => {
-      if (
-        req.method === 'POST'
-        || req.method === 'PUT'
-        || req.method === 'PATCH'
-      ) {
+      if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
         const contentType = req.headers['content-type'];
         if (
           !contentType
@@ -501,8 +473,7 @@ class SecurityMiddleware {
         ) {
           return res.status(400).json({
             error: 'Invalid Content-Type',
-            message:
-              'Content-Type must be application/json, multipart/form-data, or application/x-www-form-urlencoded',
+            message: 'Content-Type must be application/json, multipart/form-data, or application/x-www-form-urlencoded',
           });
         }
       }
@@ -525,10 +496,7 @@ class SecurityMiddleware {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('X-Frame-Options', 'DENY');
       res.setHeader('X-XSS-Protection', '1; mode=block');
-      res.setHeader(
-        'Cache-Control',
-        'no-store, no-cache, must-revalidate, proxy-revalidate'
-      );
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
       res.setHeader('Surrogate-Control', 'no-store');
@@ -647,12 +615,7 @@ class SecurityMiddleware {
     return async (req, res, next) => {
       try {
         // Skip CSRF for GET, HEAD, OPTIONS requests and API endpoints
-        if (
-          req.method === 'GET'
-          || req.method === 'HEAD'
-          || req.method === 'OPTIONS'
-          || req.path.startsWith('/api/')
-        ) {
+        if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS' || req.path.startsWith('/api/')) {
           // Generate CSRF token for forms if session exists
           if (req.session && (req.method === 'GET' || req.method === 'HEAD')) {
             if (!req.session.csrfSecret) {
@@ -728,9 +691,7 @@ class SecurityMiddleware {
           });
         }
 
-        const token = req.headers['x-csrf-token']
-          || req.body?.csrfToken
-          || req.query.csrfToken;
+        const token = req.headers['x-csrf-token'] || req.body?.csrfToken || req.query.csrfToken;
         if (!token) {
           sessionMetrics.recordCsrfValidationFailure('TOKEN_MISSING', {
             method: req.method,

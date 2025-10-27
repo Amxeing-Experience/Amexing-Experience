@@ -31,6 +31,7 @@ class EmployeesController {
     this.maxPageSize = 100;
     this.defaultPageSize = 25;
     this.employeeRole = 'employee_amexing';
+    this.allowedEmployeeRoles = ['employee_amexing', 'driver'];
   }
 
   /**
@@ -119,25 +120,125 @@ class EmployeesController {
         return this.sendError(res, 'Employee ID is required', 400);
       }
 
-      // Get user from service
-      const user = await this.userService.getUserById(currentUser, employeeId);
+      // Get user directly from Parse (same pattern as POIController)
+      const Parse = require('parse/node');
+      const query = new Parse.Query('AmexingUser');
+      query.equalTo('exists', true);
+      query.include('roleId');
+
+      let user;
+      try {
+        logger.info('Attempting to fetch employee', { employeeId });
+        user = await query.get(employeeId, { useMasterKey: true });
+        logger.info('Employee fetched successfully', { employeeId, userId: user.id });
+      } catch (parseError) {
+        logger.error('Parse error getting employee', {
+          employeeId,
+          error: parseError.message,
+          code: parseError.code,
+          stack: parseError.stack,
+        });
+        return this.sendError(res, `Employee not found: ${parseError.message}`, 404);
+      }
 
       if (!user) {
         return this.sendError(res, 'Employee not found', 404);
       }
 
-      // Verify user is an employee (employee_amexing role)
-      const role = user.roleId || user.role;
-      const roleName = typeof role === 'string' ? role : role?.name;
+      // Get role information with better null handling
+      let rolePointer = null;
+      let roleString = null;
+      let roleName = null;
 
-      if (roleName !== this.employeeRole) {
-        return this.sendError(res, 'User is not an employee (employee_amexing)', 403);
+      try {
+        rolePointer = user.get('roleId');
+        roleString = user.get('role');
+
+        // Try to get role name from multiple sources
+        if (roleString) {
+          roleName = roleString;
+        } else if (rolePointer && typeof rolePointer.get === 'function') {
+          try {
+            roleName = rolePointer.get('name');
+          } catch (roleError) {
+            logger.warn('Error getting role name from pointer', {
+              employeeId,
+              rolePointerId: rolePointer.id,
+              error: roleError.message,
+            });
+          }
+        }
+      } catch (roleAccessError) {
+        logger.error('Error accessing role information', {
+          employeeId,
+          error: roleAccessError.message,
+        });
       }
 
-      this.sendSuccess(res, { employee: user }, 'Employee retrieved successfully');
+      // Log detailed role information for debugging
+      logger.info('Getting employee by ID - Role details', {
+        employeeId,
+        roleString,
+        rolePointer: rolePointer ? { id: rolePointer.id, className: rolePointer.className } : null,
+        roleName,
+        currentUserId: currentUser.id,
+      });
+
+      // Format employee data
+      let employeeData;
+      try {
+        employeeData = {
+          id: user.id,
+          objectId: user.id,
+          firstName: user.get('firstName') || '',
+          lastName: user.get('lastName') || '',
+          email: user.get('email') || '',
+          phone: user.get('phone') || '',
+          role: roleName,
+          roleId: rolePointer
+            ? {
+              id: rolePointer.id,
+              name: roleName,
+            }
+            : null,
+          contextualData: {
+            department: user.get('department') || '',
+            position: user.get('position') || '',
+            notes: user.get('notes') || '',
+          },
+          active: user.get('active') !== false,
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        };
+      } catch (dataError) {
+        logger.error('Error formatting employee data', {
+          employeeId,
+          error: dataError.message,
+          stack: dataError.stack,
+        });
+        return this.sendError(res, 'Error formatting employee data', 500);
+      }
+
+      // Verify user is an employee (employee_amexing or driver role)
+      // Note: SuperAdmin and Admin can edit any employee, permission validation is done in middleware
+      if (!roleName || !this.allowedEmployeeRoles.includes(roleName)) {
+        logger.warn('User role not allowed', {
+          employeeId,
+          roleName,
+          allowedRoles: this.allowedEmployeeRoles,
+        });
+        return this.sendError(
+          res,
+          `User is not an employee (allowed roles: ${this.allowedEmployeeRoles.join(', ')}, found: ${roleName || 'none'})`,
+          403
+        );
+      }
+
+      this.sendSuccess(res, { employee: employeeData }, 'Employee retrieved successfully');
     } catch (error) {
       logger.error('Error in EmployeesController.getEmployeeById', {
         error: error.message,
+        stack: error.stack,
         employeeId: req.params.id,
         currentUser: req.user?.id,
       });
@@ -248,7 +349,7 @@ class EmployeesController {
       const result = await this.userService.createUser(employeeData, userWithRole);
 
       logger.info('Employee created successfully', {
-        employeeId: result.user?.id,
+        employeeId: result.id,
         email: employeeData.email,
         department: employeeData.department,
         createdBy: currentUser.id,
@@ -256,10 +357,11 @@ class EmployeesController {
       });
 
       // Return success (password NOT included in response)
+      // Note: result IS the employee (transformed by transformUserToSafeFormat)
       this.sendSuccess(
         res,
         {
-          employee: result.user,
+          employee: result,
           message: 'Empleado creado exitosamente. Se ha generado una contraseña temporal.',
         },
         'Empleado creado exitosamente',
@@ -312,6 +414,11 @@ class EmployeesController {
         return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can modify employees.', 403);
       }
 
+      // Enrich currentUser with role property for service layer compatibility
+      if (!currentUser.role && currentUserRole) {
+        currentUser.role = currentUserRole;
+      }
+
       // Prevent role change - employees must remain employee_amexing
       if (updateData.role && updateData.role !== this.employeeRole) {
         return this.sendError(res, `Cannot change employee role. Must be ${this.employeeRole}`, 400);
@@ -360,6 +467,11 @@ class EmployeesController {
         return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can delete employees.', 403);
       }
 
+      // Enrich currentUser with role property for service layer compatibility
+      if (!currentUser.role && currentUserRole) {
+        currentUser.role = currentUserRole;
+      }
+
       // Deactivate employee using service
       const result = await this.userService.deactivateUser(employeeId, currentUser);
 
@@ -405,8 +517,15 @@ class EmployeesController {
 
       // Validate user role (only superadmin and admin can toggle employee status)
       const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
+
       if (!['superadmin', 'admin'].includes(currentUserRole)) {
         return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can modify employee status.', 403);
+      }
+
+      // Enrich currentUser with role property for service layer compatibility
+      // The service expects currentUser.role, but Parse objects use .get('role')
+      if (!currentUser.role && currentUserRole) {
+        currentUser.role = currentUserRole;
       }
 
       // Toggle status using service
@@ -417,12 +536,16 @@ class EmployeesController {
         'Status changed via employees dashboard'
       );
 
+      // Check if the operation was successful before responding
+      if (!result.success) {
+        return this.sendError(res, result.message || 'Failed to toggle employee status', 403);
+      }
+
       this.sendSuccess(res, result, `Employee ${active ? 'activated' : 'deactivated'} successfully`);
     } catch (error) {
       logger.error('Error in EmployeesController.toggleEmployeeStatus', {
         error: error.message,
         employeeId: req.params.id,
-        currentUser: req.user?.id,
       });
 
       this.sendError(res, error.message, 500);

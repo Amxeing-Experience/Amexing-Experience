@@ -129,17 +129,12 @@ function registerCloudFunctions() {
       try {
         // Allow superadmin/admin to get any user, others can only get their own
         if (user && (user.get('role') === 'superadmin' || user.get('role') === 'admin' || user.id === userId)) {
-          // Try AmexingUser first, then fallback to Parse.User
+          // Query AmexingUser (all users are stored in AmexingUser table)
           const AmexingUserQuery = new Parse.Query('AmexingUser');
           AmexingUserQuery.equalTo('objectId', userId);
+          AmexingUserQuery.equalTo('exists', true);
 
-          let foundUser = await AmexingUserQuery.first({ useMasterKey: true });
-
-          if (!foundUser) {
-            const ParseUserQuery = new Parse.Query(Parse.User);
-            ParseUserQuery.equalTo('objectId', userId);
-            foundUser = await ParseUserQuery.first({ useMasterKey: true });
-          }
+          const foundUser = await AmexingUserQuery.first({ useMasterKey: true });
 
           if (!foundUser) {
             throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');

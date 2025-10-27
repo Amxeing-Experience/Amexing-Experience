@@ -148,18 +148,12 @@ class PermissionService {
       // 2. Add department permissions if user belongs to department
       if (user.departmentId || context.departmentId) {
         const departmentId = context.departmentId || user.departmentId;
-        const departmentPermissions = await this.getDepartmentPermissions(
-          departmentId,
-          userId
-        );
+        const departmentPermissions = await this.getDepartmentPermissions(departmentId, userId);
         departmentPermissions.forEach((permission) => effectivePermissions.add(permission));
       }
 
       // 3. Add explicit user permissions (highest priority)
-      const userPermissions = await this.getUserSpecificPermissions(
-        userId,
-        context
-      );
+      const userPermissions = await this.getUserSpecificPermissions(userId, context);
 
       // Apply user permissions (can grant or revoke)
       userPermissions.forEach((userPerm) => {
@@ -171,9 +165,7 @@ class PermissionService {
       });
 
       // 4. Resolve permission dependencies
-      const resolvedPermissions = await this.resolvePermissionDependencies(
-        Array.from(effectivePermissions)
-      );
+      const resolvedPermissions = await this.resolvePermissionDependencies(Array.from(effectivePermissions));
 
       // Cache result
       this.permissionCache.set(cacheKey, {
@@ -181,9 +173,7 @@ class PermissionService {
         timestamp: Date.now(),
       });
 
-      logger.debug(
-        `Resolved ${resolvedPermissions.length} permissions for user ${userId}`
-      );
+      logger.debug(`Resolved ${resolvedPermissions.length} permissions for user ${userId}`);
       return resolvedPermissions;
     } catch (error) {
       logger.error('Permission resolution failed:', error);
@@ -217,9 +207,7 @@ class PermissionService {
   async hasPermission(userId, permissionCode, context = {}) {
     try {
       // Special case: superadmin has all permissions
-      const user = await this.db
-        .collection('AmexingUser')
-        .findOne({ id: userId });
+      const user = await this.db.collection('AmexingUser').findOne({ id: userId });
       if (user) {
         // Check if user has superadmin role (supports both string and Pointer)
         const hasSupeAdminRole = await this.hasRole(user, 'superadmin');
@@ -229,10 +217,7 @@ class PermissionService {
       }
 
       // Get effective permissions
-      const effectivePermissions = await this.getUserEffectivePermissions(
-        userId,
-        context
-      );
+      const effectivePermissions = await this.getUserEffectivePermissions(userId, context);
 
       // Check for exact match
       if (effectivePermissions.includes(permissionCode)) {
@@ -249,11 +234,7 @@ class PermissionService {
       }
 
       // Check contextual permissions
-      const hasContextualPermission = await this.checkContextualPermission(
-        userId,
-        permissionCode,
-        context
-      );
+      const hasContextualPermission = await this.checkContextualPermission(userId, permissionCode, context);
 
       return hasContextualPermission;
     } catch (error) {
@@ -388,10 +369,7 @@ class PermissionService {
       ];
     }
 
-    const userPermissions = await this.db
-      .collection('UserPermission')
-      .find(query)
-      .toArray();
+    const userPermissions = await this.db.collection('UserPermission').find(query).toArray();
 
     // Resolve permission codes
     const permissions = [];
@@ -438,10 +416,7 @@ class PermissionService {
 
     for (const permission of permissions) {
       // Add implied permissions
-      if (
-        permission.impliesPermissions
-        && permission.impliesPermissions.length > 0
-      ) {
+      if (permission.impliesPermissions && permission.impliesPermissions.length > 0) {
         const impliedPermissions = await this.db
           .collection('Permission')
           .find({
@@ -490,10 +465,7 @@ class PermissionService {
         code: permissionCode,
       });
 
-      if (
-        permission
-        && this.evaluatePermissionConditions(userPerm.conditions, context)
-      ) {
+      if (permission && this.evaluatePermissionConditions(userPerm.conditions, context)) {
         return userPerm.granted;
       }
     }
@@ -520,10 +492,7 @@ class PermissionService {
         const now = new Date();
         const currentHour = now.getHours();
 
-        if (
-          conditions.timeRestrictions.startHour
-          && conditions.timeRestrictions.endHour
-        ) {
+        if (conditions.timeRestrictions.startHour && conditions.timeRestrictions.endHour) {
           if (
             currentHour < conditions.timeRestrictions.startHour
             || currentHour > conditions.timeRestrictions.endHour
@@ -532,10 +501,7 @@ class PermissionService {
           }
         }
 
-        if (
-          conditions.timeRestrictions.weekdays
-          && !conditions.timeRestrictions.weekdays.includes(now.getDay())
-        ) {
+        if (conditions.timeRestrictions.weekdays && !conditions.timeRestrictions.weekdays.includes(now.getDay())) {
           return false;
         }
       }
@@ -755,15 +721,11 @@ class PermissionService {
           });
         } catch (error) {
           // Continue with other permissions if one fails
-          logger.warn(
-            `Failed to grant permission ${permission.code}: ${error.message}`
-          );
+          logger.warn(`Failed to grant permission ${permission.code}: ${error.message}`);
         }
       }
 
-      logger.info(
-        `Permission template applied: ${template.name} to user ${userId}`
-      );
+      logger.info(`Permission template applied: ${template.name} to user ${userId}`);
     } catch (error) {
       logger.error('Permission template assignment failed:', error);
       throw error;
@@ -790,19 +752,12 @@ class PermissionService {
     if (!employee) return false;
 
     // Check if permission applies to employees
-    if (
-      deptPermission.appliesToEmployees
-      && employee.role !== 'manager'
-      && employee.role !== 'director'
-    ) {
+    if (deptPermission.appliesToEmployees && employee.role !== 'manager' && employee.role !== 'director') {
       return true;
     }
 
     // Check if permission applies to managers
-    if (
-      deptPermission.appliesToManagers
-      && (employee.role === 'manager' || employee.role === 'director')
-    ) {
+    if (deptPermission.appliesToManagers && (employee.role === 'manager' || employee.role === 'director')) {
       return true;
     }
 
@@ -919,17 +874,12 @@ class PermissionService {
     const effectivePermissions = await this.getUserEffectivePermissions(userId);
     const userSpecificPermissions = await this.getUserSpecificPermissions(userId);
 
-    const user = await this.db
-      .collection('AmexingUser')
-      .findOne({ id: userId });
+    const user = await this.db.collection('AmexingUser').findOne({ id: userId });
     const rolePermissions = await this.getRolePermissions(user.role);
 
     let departmentPermissions = [];
     if (user.departmentId) {
-      departmentPermissions = await this.getDepartmentPermissions(
-        user.departmentId,
-        userId
-      );
+      departmentPermissions = await this.getDepartmentPermissions(user.departmentId, userId);
     }
 
     return {

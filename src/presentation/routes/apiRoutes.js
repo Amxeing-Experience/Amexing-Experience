@@ -410,11 +410,7 @@ router.patch(
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 // User endpoints - profile access
-router.get(
-  '/user/profile',
-  jwtMiddleware.requirePermission('profile.read'),
-  apiController.getUserProfile
-);
+router.get('/user/profile', jwtMiddleware.requirePermission('profile.read'), apiController.getUserProfile);
 router.put(
   '/user/profile',
   validationMiddleware.validateUpdateProfile,

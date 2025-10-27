@@ -116,6 +116,39 @@ class AuthTestHelper {
   }
 
   /**
+   * Validate user password (compatible with both AmexingUser instances and Parse.Object)
+   *
+   * This method handles both cases:
+   * 1. AmexingUser instances with validatePassword() method (when registerSubclass is enabled)
+   * 2. Generic Parse.Object instances without validatePassword() (when registerSubclass is disabled)
+   *
+   * @param {Parse.Object} user - User object (AmexingUser or Parse.Object)
+   * @param {string} password - Plain text password to validate
+   * @returns {Promise<boolean>} True if password is valid
+   */
+  static async validateUserPassword(user, password) {
+    try {
+      // If user has validatePassword method (AmexingUser instance), use it
+      if (user.validatePassword && typeof user.validatePassword === 'function') {
+        return await user.validatePassword(password);
+      }
+
+      // Fallback: user is generic Parse.Object without validatePassword method
+      // Use bcrypt directly to compare with passwordHash
+      const bcrypt = require('bcrypt');
+      const passwordHash = user.get('passwordHash');
+
+      if (!passwordHash) {
+        return false;
+      }
+
+      return await bcrypt.compare(password, passwordHash);
+    } catch (error) {
+      throw new Error(`Password validation failed: ${error.message}`);
+    }
+  }
+
+  /**
    * Login via Parse SDK (faster, for unit tests)
    * Queries AmexingUser directly and generates JWT token
    *
@@ -135,8 +168,8 @@ class AuthTestHelper {
         throw new Error('User not found');
       }
 
-      // Verify password using AmexingUser model method
-      const passwordMatch = await user.validatePassword(credentials.password);
+      // Verify password using wrapper (handles both AmexingUser and Parse.Object)
+      const passwordMatch = await this.validateUserPassword(user, credentials.password);
       if (!passwordMatch) {
         throw new Error('Invalid password');
       }

@@ -8,10 +8,7 @@
 
 const express = require('express');
 const ExperienceImageController = require('../../../application/controllers/api/ExperienceImageController');
-const {
-  authenticateToken,
-  requireRole,
-} = require('../../../application/middleware/jwtMiddleware');
+const { authenticateToken, requireRole } = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
 const controller = new ExperienceImageController();
@@ -44,11 +41,7 @@ router.post(
  * GET /api/experiences/:id/images.
  * @access public
  */
-router.get(
-  '/:id/images',
-  authenticateToken,
-  controller.listImages.bind(controller)
-);
+router.get('/:id/images', authenticateToken, controller.listImages.bind(controller));
 
 /**
  * Delete (soft delete) an experience image.

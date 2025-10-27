@@ -34,8 +34,7 @@ const clientApiLimiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   message: {
     success: false,
-    error:
-      'Too many client management requests from this IP, please try again later.',
+    error: 'Too many client management requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -48,8 +47,7 @@ const writeOperationsLimiter = rateLimit({
   max: 30, // Limit write operations
   message: {
     success: false,
-    error:
-      'Too many client modification requests from this IP, please try again later.',
+    error: 'Too many client modification requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -612,13 +610,9 @@ router.get('/:clientId/employees/:id', async (req, res) => {
  *       404:
  *         description: Client not found
  */
-router.post(
-  '/:clientId/employees',
-  writeOperationsLimiter,
-  async (req, res) => {
-    await clientEmployeesController.createEmployee(req, res);
-  }
-);
+router.post('/:clientId/employees', writeOperationsLimiter, async (req, res) => {
+  await clientEmployeesController.createEmployee(req, res);
+});
 
 /**
  * @swagger
@@ -672,13 +666,9 @@ router.post(
  *       404:
  *         description: Employee not found
  */
-router.put(
-  '/:clientId/employees/:id',
-  writeOperationsLimiter,
-  async (req, res) => {
-    await clientEmployeesController.updateEmployee(req, res);
-  }
-);
+router.put('/:clientId/employees/:id', writeOperationsLimiter, async (req, res) => {
+  await clientEmployeesController.updateEmployee(req, res);
+});
 
 /**
  * @swagger
@@ -714,13 +704,9 @@ router.put(
  *       404:
  *         description: Employee not found
  */
-router.delete(
-  '/:clientId/employees/:id',
-  writeOperationsLimiter,
-  async (req, res) => {
-    await clientEmployeesController.deactivateEmployee(req, res);
-  }
-);
+router.delete('/:clientId/employees/:id', writeOperationsLimiter, async (req, res) => {
+  await clientEmployeesController.deactivateEmployee(req, res);
+});
 
 /**
  * @swagger
@@ -766,13 +752,9 @@ router.delete(
  *       404:
  *         description: Employee not found
  */
-router.patch(
-  '/:clientId/employees/:id/toggle-status',
-  writeOperationsLimiter,
-  async (req, res) => {
-    await clientEmployeesController.toggleEmployeeStatus(req, res);
-  }
-);
+router.patch('/:clientId/employees/:id/toggle-status', writeOperationsLimiter, async (req, res) => {
+  await clientEmployeesController.toggleEmployeeStatus(req, res);
+});
 
 /**
  * Error handling middleware for this router.

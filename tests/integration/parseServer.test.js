@@ -40,8 +40,8 @@ describe('Parse Server Integration', () => {
       expect(user).toBeDefined();
       expect(user.get('email')).toBe(credentials.email);
 
-      // Validate password
-      const passwordMatch = await user.validatePassword(credentials.password);
+      // Validate password using AuthTestHelper wrapper (handles Parse.Object and AmexingUser)
+      const passwordMatch = await AuthTestHelper.validateUserPassword(user, credentials.password);
       expect(passwordMatch).toBe(true);
     });
 
@@ -55,8 +55,8 @@ describe('Parse Server Integration', () => {
 
       expect(user).toBeDefined();
 
-      // Validate with wrong password
-      const passwordMatch = await user.validatePassword('wrongpassword123!');
+      // Validate with wrong password using AuthTestHelper wrapper
+      const passwordMatch = await AuthTestHelper.validateUserPassword(user, 'wrongpassword123!');
       expect(passwordMatch).toBe(false);
     });
 

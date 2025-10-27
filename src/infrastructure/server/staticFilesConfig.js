@@ -38,14 +38,7 @@ const staticRoutes = [
   },
   {
     route: '/flexy-bootstrap-lite-1.0.0',
-    directory: path.join(
-      __dirname,
-      '..',
-      '..',
-      '..',
-      'public',
-      'flexy-bootstrap-lite-1.0.0'
-    ),
+    directory: path.join(__dirname, '..', '..', '..', 'public', 'flexy-bootstrap-lite-1.0.0'),
   },
 ];
 

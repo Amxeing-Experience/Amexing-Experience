@@ -77,9 +77,8 @@ class MobileOAuthOptimizer {
    */
   detectMobileDevice() {
     return (
-      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent
-      ) || window.innerWidth <= 768
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+      || window.innerWidth <= 768
     );
   }
 
@@ -94,11 +93,7 @@ class MobileOAuthOptimizer {
    * // Returns: true or false
    */
   detectTabletDevice() {
-    return (
-      /iPad|Android/i.test(navigator.userAgent)
-      && window.innerWidth >= 768
-      && window.innerWidth <= 1024
-    );
+    return /iPad|Android/i.test(navigator.userAgent) && window.innerWidth >= 768 && window.innerWidth <= 1024;
   }
 
   /**
@@ -165,9 +160,7 @@ class MobileOAuthOptimizer {
     // Check if adaptive loading is enabled
     if (!this.options.adaptiveLoading) return;
 
-    const oauthContainer = document.querySelector(
-      '#oauth-container, .oauth-container'
-    );
+    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
     if (!oauthContainer) return;
 
     const skeleton = this.createMobileLoadingSkeleton();
@@ -282,9 +275,7 @@ class MobileOAuthOptimizer {
    * this.optimizeButtonTouchTargets();
    */
   optimizeButtonTouchTargets() {
-    const buttons = document.querySelectorAll(
-      '.oauth-btn, .btn, button[type="submit"]'
-    );
+    const buttons = document.querySelectorAll('.oauth-btn, .btn, button[type="submit"]');
     buttons.forEach((button) => {
       const computedStyle = window.getComputedStyle(button);
       const minSize = 44;
@@ -298,11 +289,7 @@ class MobileOAuthOptimizer {
       }
 
       // Ensure adequate padding
-      if (
-        parseInt(computedStyle.paddingTop)
-          + parseInt(computedStyle.paddingBottom)
-        < 12
-      ) {
+      if (parseInt(computedStyle.paddingTop) + parseInt(computedStyle.paddingBottom) < 12) {
         button.style.padding = `12px ${computedStyle.paddingLeft || '16px'}`;
       }
     });
@@ -496,9 +483,7 @@ class MobileOAuthOptimizer {
    * this.adjustForOrientation('landscape');
    */
   adjustForOrientation(orientation) {
-    const oauthContainer = document.querySelector(
-      '#oauth-container, .oauth-container'
-    );
+    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
     if (!oauthContainer) return;
 
     oauthContainer.classList.remove('portrait', 'landscape');
@@ -526,9 +511,7 @@ class MobileOAuthOptimizer {
     style.id = 'oauth-landscape-optimizations';
 
     // Remove existing landscape styles if present
-    const existingStyle = document.getElementById(
-      'oauth-landscape-optimizations'
-    );
+    const existingStyle = document.getElementById('oauth-landscape-optimizations');
     if (existingStyle) existingStyle.remove();
 
     style.textContent = `
@@ -572,9 +555,7 @@ class MobileOAuthOptimizer {
    * this.optimizeForPortrait();
    */
   optimizeForPortrait() {
-    const landscapeStyle = document.getElementById(
-      'oauth-landscape-optimizations'
-    );
+    const landscapeStyle = document.getElementById('oauth-landscape-optimizations');
     if (landscapeStyle) {
       landscapeStyle.remove();
     }
@@ -590,9 +571,7 @@ class MobileOAuthOptimizer {
    * this.setupKeyboardHandling();
    */
   setupKeyboardHandling() {
-    const initialViewportHeight = window.visualViewport
-      ? window.visualViewport.height
-      : window.innerHeight;
+    const initialViewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
     let keyboardVisible = false;
 
     /**
@@ -607,9 +586,7 @@ class MobileOAuthOptimizer {
      * handleViewportChange();
      */
     const handleViewportChange = () => {
-      const currentHeight = window.visualViewport
-        ? window.visualViewport.height
-        : window.innerHeight;
+      const currentHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
       const heightDifference = initialViewportHeight - currentHeight;
 
       const wasKeyboardVisible = _keyboardVisible; // eslint-disable-line no-undef
@@ -647,9 +624,7 @@ class MobileOAuthOptimizer {
    * this.adjustForKeyboard(true);
    */
   adjustForKeyboard(visible) {
-    const oauthContainer = document.querySelector(
-      '#oauth-container, .oauth-container'
-    );
+    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
     if (!oauthContainer) return;
 
     // Add or remove keyboard visibility classes
@@ -676,9 +651,7 @@ class MobileOAuthOptimizer {
     if (!inputElement || !this.isMobile) return;
 
     const rect = inputElement.getBoundingClientRect();
-    const viewportHeight = window.visualViewport
-      ? window.visualViewport.height
-      : window.innerHeight;
+    const viewportHeight = window.visualViewport ? window.visualViewport.height : window.innerHeight;
 
     // Scroll if input is below 60% of viewport height
     if (rect.bottom > viewportHeight * 0.6) {
@@ -737,9 +710,7 @@ class MobileOAuthOptimizer {
    * this.addBiometricOption();
    */
   addBiometricOption() {
-    const oauthContainer = document.querySelector(
-      '#oauth-container, .oauth-container'
-    );
+    const oauthContainer = document.querySelector('#oauth-container, .oauth-container');
     const providersContainer = oauthContainer?.querySelector('.oauth-providers');
 
     if (!providersContainer) return;
@@ -918,10 +889,7 @@ class MobileOAuthOptimizer {
    * this.preloadCriticalResources();
    */
   preloadCriticalResources() {
-    const criticalResources = [
-      '/assets/css/oauth-mobile.css',
-      '/assets/js/oauth-provider.js',
-    ];
+    const criticalResources = ['/assets/css/oauth-mobile.css', '/assets/js/oauth-provider.js'];
 
     criticalResources.forEach((resource) => {
       const link = document.createElement('link');
@@ -942,9 +910,7 @@ class MobileOAuthOptimizer {
    * this.optimizeImages();
    */
   optimizeImages() {
-    const images = document.querySelectorAll(
-      '.oauth-provider-logo , .oauth-btn img'
-    );
+    const images = document.querySelectorAll('.oauth-provider-logo , .oauth-btn img');
 
     images.forEach((img) => {
       if (!img.loading) {
@@ -967,9 +933,7 @@ class MobileOAuthOptimizer {
    * this.deferNonCriticalScripts();
    */
   deferNonCriticalScripts() {
-    const nonCriticalScripts = document.querySelectorAll(
-      'script[data-defer-mobile]'
-    );
+    const nonCriticalScripts = document.querySelectorAll('script[data-defer-mobile]');
 
     // Apply defer only on mobile or tablet devices
     if (this.isMobile || this.isTablet) {
@@ -1024,9 +988,7 @@ class MobileOAuthOptimizer {
    * optimizer.destroy();
    */
   destroy() {
-    const styles = document.querySelectorAll(
-      'style[id*="oauth-"], style[id*="mobile-oauth"]'
-    );
+    const styles = document.querySelectorAll('style[id*="oauth-"], style[id*="mobile-oauth"]');
     styles.forEach((style) => style.remove());
 
     // eslint-disable-next-line no-console

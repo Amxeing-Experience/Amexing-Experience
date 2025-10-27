@@ -145,13 +145,7 @@ class OAuthSecurityValidator {
       },
 
       dataProtection: {
-        sensitiveFields: [
-          'accessToken',
-          'refreshToken',
-          'clientSecret',
-          'privateKey',
-          'password',
-        ],
+        sensitiveFields: ['accessToken', 'refreshToken', 'clientSecret', 'privateKey', 'password'],
         encryption: {
           atRest: true,
           inTransit: true,
@@ -181,32 +175,15 @@ class OAuthSecurityValidator {
     return {
       requirement7: {
         name: 'Restrict access to cardholder data by business need to know',
-        checks: [
-          'roleBasedAccessControl',
-          'leastPrivilege',
-          'accessReview',
-          'segregationOfDuties',
-        ],
+        checks: ['roleBasedAccessControl', 'leastPrivilege', 'accessReview', 'segregationOfDuties'],
       },
       requirement8: {
         name: 'Identify and authenticate access to system components',
-        checks: [
-          'uniqueUserIds',
-          'strongAuthentication',
-          'multiFactorAuth',
-          'passwordPolicies',
-          'accountLockout',
-        ],
+        checks: ['uniqueUserIds', 'strongAuthentication', 'multiFactorAuth', 'passwordPolicies', 'accountLockout'],
       },
       requirement10: {
         name: 'Track and monitor all access to network resources',
-        checks: [
-          'auditLogging',
-          'logRetention',
-          'logIntegrity',
-          'timeSync',
-          'logReview',
-        ],
+        checks: ['auditLogging', 'logRetention', 'logIntegrity', 'timeSync', 'logReview'],
       },
     };
   }
@@ -647,10 +624,7 @@ class OAuthSecurityValidator {
       }
 
       // HTTPS requirement (except localhost for development)
-      if (
-        providedUrl.protocol !== 'https:'
-        && providedUrl.hostname !== 'localhost'
-      ) {
+      if (providedUrl.protocol !== 'https:' && providedUrl.hostname !== 'localhost') {
         results.valid = false;
         results.checks.httpsRequired = false;
         results.issues.push('HTTPS required for redirect URI');
@@ -660,10 +634,7 @@ class OAuthSecurityValidator {
 
       // Block private IPs (except localhost)
       const privateIPRegex = /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/;
-      if (
-        privateIPRegex.test(providedUrl.hostname)
-        && providedUrl.hostname !== 'localhost'
-      ) {
+      if (privateIPRegex.test(providedUrl.hostname) && providedUrl.hostname !== 'localhost') {
         results.valid = false;
         results.checks.privateIP = false;
         results.issues.push('Private IP addresses not allowed');
@@ -707,10 +678,7 @@ class OAuthSecurityValidator {
 
     // Least privilege validation
     const privilegedRoles = accessControlData.roles?.filter((r) => r.privileged) || [];
-    if (
-      privilegedRoles.length > 0
-      && !accessControlData.privilegeJustification
-    ) {
+    if (privilegedRoles.length > 0 && !accessControlData.privilegeJustification) {
       results.compliant = false;
       results.checks.leastPrivilege = false;
       results.issues.push('Privileged access requires justification');
@@ -721,8 +689,7 @@ class OAuthSecurityValidator {
     // Access review validation
     if (
       !accessControlData.lastReviewDate
-      || Date.now() - new Date(accessControlData.lastReviewDate)
-        > 90 * 24 * 60 * 60 * 1000
+      || Date.now() - new Date(accessControlData.lastReviewDate) > 90 * 24 * 60 * 60 * 1000
     ) {
       results.compliant = false;
       results.checks.accessReview = false;
@@ -773,10 +740,7 @@ class OAuthSecurityValidator {
     }
 
     // Multi-factor authentication validation
-    if (
-      authenticationData.requiresMFA === false
-      && authenticationData.privilegedAccess
-    ) {
+    if (authenticationData.requiresMFA === false && authenticationData.privilegedAccess) {
       results.compliant = false;
       results.checks.mfa = false;
       results.issues.push('MFA required for privileged access');
@@ -925,9 +889,7 @@ class OAuthSecurityValidator {
 
     // Overall status
     report.overallStatus = report.summary.failed === 0 ? 'PASS' : 'FAIL';
-    report.complianceScore = Math.round(
-      (report.summary.passed / report.summary.totalChecks) * 100
-    );
+    report.complianceScore = Math.round((report.summary.passed / report.summary.totalChecks) * 100);
 
     // Log report generation
     this.auditLogger.info('Security validation report generated', {
@@ -1062,9 +1024,7 @@ class OAuthSecurityValidator {
         },
       };
 
-      if (
-        Object.values(monitoringResults.checks).some((check) => check.alert)
-      ) {
+      if (Object.values(monitoringResults.checks).some((check) => check.alert)) {
         this.auditLogger.warn('Security monitoring alert', monitoringResults);
         // Trigger security incident response
         await this.triggerSecurityAlert(monitoringResults);
