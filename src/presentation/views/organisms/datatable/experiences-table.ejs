@@ -444,10 +444,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $('#saveExperienceBtn').on('click', function() { saveExperience(); });
 
         function loadAvailableItems(currentId = null) {
+            // Build query parameters
+            const queryParams = { length: 1000 }; // Get all for selection
+
+            // Add exclusion parameter if editing existing experience (eliminates flickering)
+            if (currentId) {
+                queryParams.excludeId = currentId;
+            }
+
             return $.ajax({
                 url: '/api/experiences',
                 type: 'GET',
-                data: { length: 1000 }, // Get all for selection
+                data: queryParams,
                 success: function(response) {
                     if (response.data) {
                         // Reset data map
@@ -462,8 +470,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             tomSelectInstance.clearOptions();
 
                             // Add new options with cost information
+                            // Note: Backend already excludes currentId, no need for client-side filter
                             response.data.forEach(function(item) {
-                                if (item.id !== currentId && item.active) {
+                                if (item.active) {
                                     // Store complete data for cost calculation
                                     experiencesDataMap[item.id] = {
                                         id: item.id,

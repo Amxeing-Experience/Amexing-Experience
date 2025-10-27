@@ -58,6 +58,7 @@ class ExperienceController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'asc';
       const typeFilter = req.query.type; // "Experience" or "Provider"
+      const { excludeId } = req.query; // ID to exclude from results (for edit modal)
 
       // Column mapping for sorting
       const columns = ['name', 'description', 'cost', 'updatedAt'];
@@ -79,6 +80,10 @@ class ExperienceController {
       if (typeFilter && ['Experience', 'Provider'].includes(typeFilter)) {
         baseQuery.equalTo('type', typeFilter);
       }
+      // Exclude specific experience if provided (for edit modal to prevent self-selection)
+      if (excludeId) {
+        baseQuery.notEqualTo('objectId', excludeId);
+      }
 
       // Build filtered query with search
       let filteredQuery = baseQuery;
@@ -86,11 +91,13 @@ class ExperienceController {
         const nameQuery = new Parse.Query('Experience');
         nameQuery.equalTo('exists', true);
         if (typeFilter) nameQuery.equalTo('type', typeFilter);
+        if (excludeId) nameQuery.notEqualTo('objectId', excludeId);
         nameQuery.matches('name', searchValue, 'i');
 
         const descQuery = new Parse.Query('Experience');
         descQuery.equalTo('exists', true);
         if (typeFilter) descQuery.equalTo('type', typeFilter);
+        if (excludeId) descQuery.notEqualTo('objectId', excludeId);
         descQuery.matches('description', searchValue, 'i');
 
         filteredQuery = Parse.Query.or(nameQuery, descQuery);
