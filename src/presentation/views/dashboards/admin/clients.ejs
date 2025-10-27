@@ -245,10 +245,13 @@ const currentPath = '/dashboard/admin/clients';
                             label: 'Notas Adicionales',
                             required: false,
                             placeholder: 'Información relevante sobre el cliente...',
-                            helpText: 'Máximo 500 caracteres',
                             inputAttributes: { maxlength: '500', rows: '3' }
                         }) %>
-                        <small id="notesCharCount" class="text-muted float-end">0/500</small>
+                        <!-- Contenedor flex para helpText y contador en la misma línea -->
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <small class="text-muted">Máximo 500 caracteres</small>
+                            <small id="notesCharCount" class="text-muted">0/500</small>
+                        </div>
                     </div>
 
                     <!-- Alert informativo -->
