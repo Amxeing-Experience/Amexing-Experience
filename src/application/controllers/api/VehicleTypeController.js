@@ -66,8 +66,8 @@ class VehicleTypeController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'asc';
 
-      // Column mapping for sorting (matches frontend columns order)
-      const columns = ['name', 'code', 'defaultCapacity', 'active'];
+      // Column mapping for sorting (matches frontend columns order - code column removed)
+      const columns = ['name', 'defaultCapacity', 'active'];
       const sortField = columns[sortColumnIndex] || 'name';
 
       // Get total records count (without search filter) - do this first
@@ -89,15 +89,11 @@ class VehicleTypeController {
         searchQuery.equalTo('exists', true);
         searchQuery.matches('name', searchValue, 'i');
 
-        const codeQuery = new Parse.Query('VehicleType');
-        codeQuery.equalTo('exists', true);
-        codeQuery.matches('code', searchValue, 'i');
-
         const descQuery = new Parse.Query('VehicleType');
         descQuery.equalTo('exists', true);
         descQuery.matches('description', searchValue, 'i');
 
-        filteredQuery = Parse.Query.or(searchQuery, codeQuery, descQuery);
+        filteredQuery = Parse.Query.or(searchQuery, descQuery);
       }
 
       // Get count of filtered results
@@ -257,7 +253,7 @@ class VehicleTypeController {
    *
    * Body Parameters:
    * - name: string (required) - Display name
-   * - code: string (required) - Unique code
+   * - code: string (optional) - Unique code (auto-generated from name if not provided)
    * - description: string (optional) - Type description
    * - icon: string (optional) - Tabler icon name
    * - defaultCapacity: number (optional) - Default passenger capacity
@@ -276,48 +272,45 @@ class VehicleTypeController {
       }
 
       const {
-        name, code, description, icon, defaultCapacity, sortOrder,
+        name, description, icon, defaultCapacity, sortOrder,
       } = req.body;
 
       // Validate required fields
-      if (!name || !code) {
-        return this.sendError(res, 'El nombre y código son requeridos', 400);
+      if (!name) {
+        return this.sendError(res, 'El nombre es requerido', 400);
       }
 
-      // Check code uniqueness manually
-      const checkQuery = new Parse.Query('VehicleType');
-      checkQuery.equalTo('code', code.toLowerCase());
-      checkQuery.equalTo('exists', true);
-      const existingCount = await checkQuery.count({ useMasterKey: true });
+      // Check name uniqueness (primary validation)
+      const nameCheckQuery = new Parse.Query('VehicleType');
+      nameCheckQuery.equalTo('name', name);
+      nameCheckQuery.equalTo('exists', true);
+      const existingNameCount = await nameCheckQuery.count({ useMasterKey: true });
 
-      if (existingCount > 0) {
-        return this.sendError(res, 'El código del tipo de vehículo ya existe', 409);
+      if (existingNameCount > 0) {
+        return this.sendError(
+          res,
+          'El nombre del tipo de vehículo ya existe. Por favor proporcione un nombre diferente.',
+          409
+        );
       }
+
+      // Auto-generate code from name
+      const autoCode = name.toLowerCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-z0-9_-]/g, '');
 
       // Create new vehicle type using Parse.Object.extend
       const VehicleTypeClass = Parse.Object.extend('VehicleType');
       const vehicleType = new VehicleTypeClass();
 
       vehicleType.set('name', name);
-      vehicleType.set('code', code.toLowerCase());
+      vehicleType.set('code', autoCode);
       vehicleType.set('description', description || '');
       vehicleType.set('icon', icon || 'car');
       vehicleType.set('defaultCapacity', parseInt(defaultCapacity, 10) || 4);
       vehicleType.set('sortOrder', parseInt(sortOrder, 10) || 0);
       vehicleType.set('active', true);
       vehicleType.set('exists', true);
-
-      // Basic validation
-      if (!name || !code) {
-        return this.sendError(res, 'El nombre y código son requeridos', 400);
-      }
-      if (!/^[a-z0-9_-]+$/.test(code.toLowerCase())) {
-        return this.sendError(
-          res,
-          'El código debe contener solo letras minúsculas, números, guiones y guiones bajos',
-          400
-        );
-      }
 
       // Save with master key and user context for audit trail
       await vehicleType.save(null, {
@@ -393,36 +386,39 @@ class VehicleTypeController {
       }
 
       const {
-        name, code, description, icon, defaultCapacity, sortOrder, active,
+        name, description, icon, defaultCapacity, sortOrder, active,
       } = req.body;
 
-      // Update fields if provided using set()
-      if (name) vehicleType.set('name', name);
+      // Check name uniqueness if name is being changed
+      if (name && name !== vehicleType.get('name')) {
+        const nameCheckQuery = new Parse.Query('VehicleType');
+        nameCheckQuery.equalTo('name', name);
+        nameCheckQuery.equalTo('exists', true);
+        nameCheckQuery.notEqualTo('objectId', typeId);
+        const existingNameCount = await nameCheckQuery.count({ useMasterKey: true });
 
-      if (code && code !== vehicleType.get('code')) {
-        // Check code uniqueness if changing
-        const checkQuery = new Parse.Query('VehicleType');
-        checkQuery.equalTo('code', code.toLowerCase());
-        checkQuery.equalTo('exists', true);
-        checkQuery.notEqualTo('objectId', typeId);
-        const existingCount = await checkQuery.count({ useMasterKey: true });
-
-        if (existingCount > 0) {
-          return this.sendError(res, 'El código del tipo de vehículo ya existe', 409);
+        if (existingNameCount > 0) {
+          return this.sendError(
+            res,
+            'El nombre del tipo de vehículo ya existe. Por favor proporcione un nombre diferente.',
+            409
+          );
         }
-        vehicleType.set('code', code.toLowerCase());
+
+        // Update name and regenerate code
+        vehicleType.set('name', name);
+        const autoCode = name.toLowerCase()
+          .replace(/\s+/g, '_')
+          .replace(/[^a-z0-9_-]/g, '');
+        vehicleType.set('code', autoCode);
       }
 
+      // Update other fields if provided
       if (description !== undefined) vehicleType.set('description', description);
       if (icon) vehicleType.set('icon', icon);
       if (defaultCapacity) vehicleType.set('defaultCapacity', parseInt(defaultCapacity, 10));
       if (sortOrder !== undefined) vehicleType.set('sortOrder', parseInt(sortOrder, 10));
       if (active !== undefined) vehicleType.set('active', active);
-
-      // Basic validation
-      if (code && !/^[a-z0-9_-]+$/.test(code.toLowerCase())) {
-        return this.sendError(res, 'Code must contain only lowercase letters, numbers, hyphens and underscores', 400);
-      }
 
       // Save changes with user context for audit trail
       await vehicleType.save(null, {

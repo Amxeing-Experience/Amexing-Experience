@@ -68,7 +68,7 @@ class RateController {
       const sortDirection = req.query.order?.[0]?.dir || 'asc';
 
       // Column mapping for sorting (matches frontend columns order)
-      const columns = ['name', 'percentage', 'active'];
+      const columns = ['name', 'active'];
       const sortField = columns[sortColumnIndex] || 'name';
 
       // Get total records count (without search filter)
@@ -108,20 +108,15 @@ class RateController {
       const rates = await filteredQuery.find({ useMasterKey: true });
 
       // Format data for DataTables
-      const data = rates.map((rate) => {
-        const percentage = rate.get('percentage');
-        return {
-          id: rate.id,
-          objectId: rate.id,
-          name: rate.get('name'),
-          percentage,
-          formattedPercentage: percentage !== undefined && percentage !== null ? `${percentage}%` : '-',
-          color: rate.get('color') || '#6366F1',
-          active: rate.get('active'),
-          createdAt: rate.createdAt,
-          updatedAt: rate.updatedAt,
-        };
-      });
+      const data = rates.map((rate) => ({
+        id: rate.id,
+        objectId: rate.id,
+        name: rate.get('name'),
+        color: rate.get('color') || '#6366F1',
+        active: rate.get('active'),
+        createdAt: rate.createdAt,
+        updatedAt: rate.updatedAt,
+      }));
 
       // DataTables response format
       const response = {
@@ -168,16 +163,11 @@ class RateController {
       const rates = await query.find({ useMasterKey: true });
 
       // Format for select options
-      const options = rates.map((rate) => {
-        const percentage = rate.get('percentage');
-        return {
-          value: rate.id,
-          label: rate.get('name'),
-          percentage,
-          formattedPercentage: percentage !== undefined && percentage !== null ? `${percentage}%` : '-',
-          color: rate.get('color') || '#6366F1',
-        };
-      });
+      const options = rates.map((rate) => ({
+        value: rate.id,
+        label: rate.get('name'),
+        color: rate.get('color') || '#6366F1',
+      }));
 
       return this.sendSuccess(res, options, 'Active Rates retrieved successfully');
     } catch (error) {
@@ -219,12 +209,9 @@ class RateController {
         return this.sendError(res, 'Tarifa no encontrada', 404);
       }
 
-      const percentage = rate.get('percentage');
       const data = {
         id: rate.id,
         name: rate.get('name'),
-        percentage,
-        formattedPercentage: percentage !== undefined && percentage !== null ? `${percentage}%` : '-',
         color: rate.get('color') || '#6366F1',
         active: rate.get('active'),
         createdAt: rate.createdAt,
@@ -248,7 +235,6 @@ class RateController {
    *
    * Body Parameters:
    * - name: string (required) - Display name
-   * - percentage: number (required) - Percentage value (0-100)
    * - color: string (optional) - Hex color code for visual tagging (#RRGGBB).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
@@ -263,7 +249,7 @@ class RateController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      const { name, percentage, color } = req.body;
+      const { name, color } = req.body;
 
       // Validate required fields
       if (!name || name.trim().length === 0) {
@@ -272,18 +258,6 @@ class RateController {
 
       if (name.length > 200) {
         return this.sendError(res, 'El nombre debe tener 200 caracteres o menos', 400);
-      }
-
-      if (percentage === undefined || percentage === null) {
-        return this.sendError(res, 'El porcentaje es requerido', 400);
-      }
-
-      if (typeof percentage !== 'number') {
-        return this.sendError(res, 'El porcentaje debe ser un número', 400);
-      }
-
-      if (percentage < 0 || percentage > 100) {
-        return this.sendError(res, 'El porcentaje debe estar entre 0 y 100', 400);
       }
 
       // Validate color format if provided
@@ -309,7 +283,6 @@ class RateController {
       const rate = new RateClass();
 
       rate.set('name', name.trim());
-      rate.set('percentage', percentage);
       rate.set('color', color || '#6366F1'); // Default indigo color
       rate.set('active', true);
       rate.set('exists', true);
@@ -330,15 +303,12 @@ class RateController {
       logger.info('Rate created', {
         rateId: rate.id,
         name: rate.get('name'),
-        percentage: rate.get('percentage'),
         createdBy: currentUser.id,
       });
 
       const data = {
         id: rate.id,
         name: rate.get('name'),
-        percentage: rate.get('percentage'),
-        formattedPercentage: `${percentage}%`,
         color: rate.get('color'),
         active: rate.get('active'),
       };
@@ -387,7 +357,7 @@ class RateController {
       }
 
       const {
-        name, percentage, active, color,
+        name, active, color,
       } = req.body;
 
       // Update name if provided
@@ -410,19 +380,6 @@ class RateController {
 
           rate.set('name', name.trim());
         }
-      }
-
-      // Update percentage if provided
-      if (percentage !== undefined && percentage !== null) {
-        if (typeof percentage !== 'number') {
-          return this.sendError(res, 'El porcentaje debe ser un número', 400);
-        }
-
-        if (percentage < 0 || percentage > 100) {
-          return this.sendError(res, 'El porcentaje debe estar entre 0 y 100', 400);
-        }
-
-        rate.set('percentage', percentage);
       }
 
       // Update color if provided
@@ -455,17 +412,13 @@ class RateController {
       logger.info('Rate updated', {
         rateId: rate.id,
         name: rate.get('name'),
-        percentage: rate.get('percentage'),
         active: rate.get('active'),
         updatedBy: currentUser.id,
       });
 
-      const finalPercentage = rate.get('percentage');
       const data = {
         id: rate.id,
         name: rate.get('name'),
-        percentage: finalPercentage,
-        formattedPercentage: finalPercentage !== undefined && finalPercentage !== null ? `${finalPercentage}%` : '-',
         color: rate.get('color'),
         active: rate.get('active'),
         updatedAt: rate.updatedAt,

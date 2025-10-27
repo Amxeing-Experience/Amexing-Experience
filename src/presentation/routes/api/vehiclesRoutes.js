@@ -121,7 +121,7 @@ router.put(
 /**
  * DELETE /api/vehicles/:id - Soft delete vehicle.
  *
- * Access: SuperAdmin (level 7) only
+ * Access: Admin (level 6+) and SuperAdmin
  * Returns: Success message.
  *
  * Note: Checks if vehicle has active bookings before deletion (future validation).
@@ -130,7 +130,7 @@ router.delete(
   '/:id',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(7), // SuperAdmin only
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => VehicleController.deleteVehicle(req, res)
 );
 

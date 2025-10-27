@@ -29,7 +29,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <h5 class="card-title mb-0 text-white">
                     <i class="ti ti-currency-dollar me-2"></i>Tarifas
                 </h5>
-                <small class="text-white" style="opacity: 0.9;">Gestión de tarifas y porcentajes</small>
+                <small class="text-white" style="opacity: 0.9;">Gestión de tarifas del sistema</small>
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
@@ -47,7 +47,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <thead class="table-light">
                     <tr>
                         <th>Nombre</th>
-                        <th>Porcentaje</th>
                         <th>Estado</th>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
@@ -99,15 +98,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             showPreview: true,
                             previewText: 'Vista previa'
                         }) %>
-
-                        <div class="mb-3">
-                            <label for="percentage" class="form-label">Porcentaje <span class="text-danger">*</span></label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="percentage" name="percentage" required min="0" max="100" step="0.01" placeholder="10">
-                                <span class="input-group-text">%</span>
-                            </div>
-                            <div class="form-text">Porcentaje entre 0 y 100</div>
-                        </div>
                     </div>
 
                     <!-- Alert informativo -->
@@ -115,7 +105,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                         <div>
                             <strong>Tarifa:</strong>
-                            <p class="mb-0 mt-1">Las tarifas se utilizarán para aplicar porcentajes de descuento o recargo en los servicios.</p>
+                            <p class="mb-0 mt-1">Las tarifas se utilizarán para clasificar y diferenciar los servicios en el sistema.</p>
                         </div>
                     </div>
                 </form>
@@ -239,16 +229,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         const color = row.color || '#6366F1';
                         const textColor = getContrastTextColor(color);
                         return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${data || '-'}</span>`;
-                    }
-                },
-                {
-                    data: 'formattedPercentage',
-                    render: function(data, type, row) {
-                        const percentage = row.percentage;
-                        if (percentage !== undefined && percentage !== null) {
-                            return `<span class="badge bg-info">${percentage}%</span>`;
-                        }
-                        return '<span class="text-muted">-</span>';
                     }
                 },
                 {
@@ -386,7 +366,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         // Populate the form with the data
                         $('#rateId').val(rate.id);
                         $('#name').val(rate.name);
-                        $('#percentage').val(rate.percentage);
 
                         // Update color picker and hex input
                         const colorValue = rate.color || '#6366F1';
@@ -420,20 +399,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
             const rateData = {
                 name: $('#name').val().trim(),
-                percentage: parseFloat($('#percentage').val()),
                 color: $('#color').val() || '#6366F1'
             };
-
-            // Validate percentage
-            if (isNaN(rateData.percentage)) {
-                showErrorAlert('El porcentaje debe ser un número válido');
-                return;
-            }
-
-            if (rateData.percentage < 0 || rateData.percentage > 100) {
-                showErrorAlert('El porcentaje debe estar entre 0 y 100');
-                return;
-            }
 
             const url = isEdit ? `${apiEndpoint}/${rateId}` : apiEndpoint;
             const method = isEdit ? 'PUT' : 'POST';
@@ -459,8 +426,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             errorMessage = 'Ya existe una tarifa con ese nombre.';
                         } else if (error.includes('required')) {
                             errorMessage = 'Todos los campos requeridos deben ser completados.';
-                        } else if (error.includes('percentage') || error.includes('porcentaje')) {
-                            errorMessage = error;
                         } else {
                             errorMessage = error;
                         }

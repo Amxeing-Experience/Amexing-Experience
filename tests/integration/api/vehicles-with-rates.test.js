@@ -47,7 +47,6 @@ describe("Vehicles with Rates Integration", () => {
     const RateClass = Parse.Object.extend("Rate");
     testRate = new RateClass();
     testRate.set("name", "Test Rate for Vehicles");
-    testRate.set("percentage", 15);
     testRate.set("color", "#FF5733");
     testRate.set("active", true);
     testRate.set("exists", true);
@@ -56,7 +55,6 @@ describe("Vehicles with Rates Integration", () => {
     // Create test inactive rate
     inactiveRate = new RateClass();
     inactiveRate.set("name", "Inactive Test Rate");
-    inactiveRate.set("percentage", 5);
     inactiveRate.set("color", "#999999");
     inactiveRate.set("active", false);
     inactiveRate.set("exists", true);
@@ -245,7 +243,6 @@ describe("Vehicles with Rates Integration", () => {
       expect(testVehicle.rateId).toBeDefined();
       expect(testVehicle.rateId.id).toBe(testRate.id);
       expect(testVehicle.rateId.name).toBe("Test Rate for Vehicles");
-      expect(testVehicle.rateId.percentage).toBe(15);
       expect(testVehicle.rateId.color).toBe("#FF5733");
     });
 

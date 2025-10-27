@@ -47,7 +47,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <thead class="table-light">
                     <tr>
                         <th>Nombre</th>
-                        <th>Código</th>
                         <th>Capacidad</th>
                         <th>Estado</th>
                         <% if (dtShowActions) { %>
@@ -84,16 +83,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         </h6>
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-12 mb-3">
                                 <label for="name" class="form-label">Nombre <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="name" name="name" required maxlength="100" placeholder="Ej: Sedan">
                                 <div class="form-text">Nombre mostrado al usuario</div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="code" class="form-label">Código <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="code" name="code" required maxlength="50" placeholder="Ej: sedan" pattern="[a-z0-9_-]+">
-                                <div class="form-text">Código único (solo minúsculas, números, guiones)</div>
-                            </div>
+                            <!-- Hidden code field - auto-generated from name -->
+                            <input type="hidden" id="code" name="code">
                         </div>
 
                         <div class="mb-3">
@@ -128,7 +124,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                         <div>
                             <strong>Tipo de vehículo:</strong>
-                            <p class="mb-0 mt-1">Los tipos se usarán para clasificar los vehículos en el sistema. El código debe ser único y usar solo letras minúsculas, números y guiones.</p>
+                            <p class="mb-0 mt-1">Los tipos se usarán para clasificar los vehículos en el sistema. El nombre debe ser único.</p>
                         </div>
                     </div>
                 </form>
@@ -192,16 +188,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 {
                     data: null,
                     render: function(data) {
+                        const badgeColor = data.active ? 'bg-light text-dark border' : 'bg-secondary';
                         return `<div>
-                                    <div class="fw-semibold">${data.name || '-'}</div>
-                                    <small class="text-muted">${data.description || 'Sin descripción'}</small>
+                                    <span class="badge ${badgeColor} mb-1">${data.name || '-'}</span>
+                                    <br><small class="text-muted">${data.description || 'Sin descripción'}</small>
                                 </div>`;
-                    }
-                },
-                {
-                    data: 'code',
-                    render: function(data) {
-                        return `<code class="badge bg-light text-dark">${data || '-'}</code>`;
                     }
                 },
                 {
@@ -332,12 +323,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#modalTitle').text(isEdit ? 'Editar Tipo de Vehículo' : 'Crear Nuevo Tipo de Vehículo');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Tipo');
 
-            // Disable code field when editing (code cannot be changed)
-            if (isEdit) {
-                $('#code').prop('readonly', true).addClass('bg-light');
-            } else {
-                $('#code').prop('readonly', false).removeClass('bg-light');
-                // Set default values when creating
+            // Set default values when creating
+            if (!isEdit) {
                 $('#icon').val('car');
                 $('#defaultCapacity').val('4');
                 $('#sortOrder').val('0');
@@ -357,10 +344,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     if (response.success && response.data) {
                         const type = response.data;
 
-                        // Now populate the form with the data
+                        // Now populate the form with the data (code field hidden, not loaded)
                         $('#vehicleTypeId').val(type.id);
                         $('#name').val(type.name);
-                        $('#code').val(type.code);
                         $('#description').val(type.description || '');
                         $('#icon').val(type.icon || 'car');
                         $('#defaultCapacity').val(type.defaultCapacity || 4);
@@ -389,7 +375,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
             const typeData = {
                 name: $('#name').val(),
-                code: $('#code').val().toLowerCase(),
                 description: $('#description').val(),
                 icon: $('#icon').val() || 'car',
                 defaultCapacity: parseInt($('#defaultCapacity').val()) || 4,
