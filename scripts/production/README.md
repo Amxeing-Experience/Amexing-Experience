@@ -12,6 +12,54 @@ Estos scripts están diseñados para **PRODUCCIÓN** y requieren:
 
 ## 📋 Scripts Disponibles
 
+### `nginx-amexing.conf`
+
+Archivo de configuración de Nginx para producción con soporte para archivos grandes (hasta 250MB).
+
+**Características:**
+- ✅ Soporte para archivos de hasta 250MB
+- ✅ Configuración SSL/TLS moderna
+- ✅ Headers de seguridad
+- ✅ Timeouts optimizados para cargas grandes
+- ✅ Compresión y cache configurados
+- ✅ Logs configurados
+
+**Instalación:**
+
+```bash
+# 1. Copiar el archivo a sites-available
+sudo cp scripts/production/nginx-amexing.conf /etc/nginx/sites-available/amexing
+
+# 2. Editar y actualizar los valores
+sudo nano /etc/nginx/sites-available/amexing
+# - Reemplazar 'yourdomain.com' con tu dominio
+# - Actualizar rutas de certificados SSL
+# - Verificar el puerto de la aplicación (por defecto 1338)
+
+# 3. Crear enlace simbólico
+sudo ln -s /etc/nginx/sites-available/amexing /etc/nginx/sites-enabled/
+
+# 4. Probar la configuración
+sudo nginx -t
+
+# 5. Recargar nginx
+sudo systemctl reload nginx
+```
+
+**Verificación:**
+
+```bash
+# Verificar que nginx está corriendo
+sudo systemctl status nginx
+
+# Verificar los logs
+sudo tail -f /var/log/nginx/amexing-error.log
+sudo tail -f /var/log/nginx/amexing-access.log
+
+# Probar la carga de archivos
+curl -F "file=@test-file.jpg" https://tudominio.com/api/upload
+```
+
 ### `init-production-database.js`
 
 Inicializa una base de datos de producción **VACÍA** con los datos esenciales:

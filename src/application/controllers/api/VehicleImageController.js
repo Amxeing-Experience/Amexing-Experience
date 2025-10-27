@@ -22,7 +22,7 @@ const VehicleImage = require('../../../domain/models/VehicleImage');
 class VehicleImageController {
   constructor() {
     this.uploadDir = path.join(process.cwd(), 'public', 'uploads', 'vehicles');
-    this.maxFileSize = 5 * 1024 * 1024; // 5MB
+    this.maxFileSize = 250 * 1024 * 1024; // 250MB
     this.allowedMimeTypes = [
       'image/jpeg',
       'image/jpg',

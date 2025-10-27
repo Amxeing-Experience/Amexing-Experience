@@ -8,7 +8,7 @@ Category: Common Components
 @param {string} id - Unique identifier for the dropzone (required)
 @param {string} acceptedFiles - Accepted file types (default: '.xlsx,.xls')
 @param {number} maxFiles - Maximum number of files (default: 1)
-@param {number} maxFileSize - Maximum file size in MB (default: 10)
+@param {number} maxFileSize - Maximum file size in MB (default: 250)
 @param {string} uploadUrl - API endpoint for file upload (required)
 @param {string} helpText - Help text to display (optional)
 @param {string} paramName - Name of the file parameter (default: 'file')
@@ -30,7 +30,7 @@ Features:
 const dropzoneId = typeof id !== 'undefined' ? id : 'dropzone-' + Date.now();
 const dzAcceptedFiles = typeof acceptedFiles !== 'undefined' ? acceptedFiles : '.xlsx,.xls';
 const dzMaxFiles = typeof maxFiles !== 'undefined' ? maxFiles : 1;
-const dzMaxFileSize = typeof maxFileSize !== 'undefined' ? maxFileSize : 10;
+const dzMaxFileSize = typeof maxFileSize !== 'undefined' ? maxFileSize : 250;
 const dzUploadUrl = typeof uploadUrl !== 'undefined' ? uploadUrl : '#';
 const dzHelpText = typeof helpText !== 'undefined' ? helpText : 'Arrastra tu archivo aquí o haz clic para seleccionar';
 const dzParamName = typeof paramName !== 'undefined' ? paramName : 'file';

@@ -22,7 +22,7 @@ const ExperienceImage = require('../../../domain/models/ExperienceImage');
 class ExperienceImageController {
   constructor() {
     this.uploadDir = path.join(process.cwd(), 'public', 'uploads', 'experiences');
-    this.maxFileSize = 5 * 1024 * 1024; // 5MB
+    this.maxFileSize = 250 * 1024 * 1024; // 250MB
     this.allowedMimeTypes = [
       'image/jpeg',
       'image/jpg',

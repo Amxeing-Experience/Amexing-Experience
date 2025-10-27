@@ -28,7 +28,7 @@ class BulkImportController {
   constructor() {
     this.bulkImportService = new BulkImportService();
     this.uploadDir = path.join(process.cwd(), 'uploads', 'temp');
-    this.maxFileSize = 10 * 1024 * 1024; // 10MB
+    this.maxFileSize = 250 * 1024 * 1024; // 250MB
     this.allowedMimeTypes = [
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel',
