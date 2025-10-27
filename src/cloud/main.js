@@ -619,7 +619,44 @@ function registerCloudFunctions() {
     Parse.Cloud.beforeSave(Parse.User, async (request) => {
       const { object: user, master } = request;
 
-      // Skip validation for master key requests
+      // EMAIL UNIQUENESS VALIDATION (runs even with masterKey for data integrity)
+      const email = user.get('email');
+      if (email) {
+        // Trim and lowercase email for consistent validation
+        const normalizedEmail = email.trim().toLowerCase();
+        user.set('email', normalizedEmail);
+
+        // Check if email is being changed
+        const isCreating = !user.existed();
+        const isEmailChanged = isCreating || (request.original && request.original.get('email') !== normalizedEmail);
+
+        if (isEmailChanged) {
+          // Query for existing users with this email
+          const query = new Parse.Query(Parse.User);
+          query.equalTo('email', normalizedEmail);
+          if (!isCreating && user.id) {
+            query.notEqualTo('objectId', user.id);
+          }
+          query.limit(1);
+
+          const existingUser = await query.first({ useMasterKey: true });
+          if (existingUser) {
+            logger.warn('Duplicate email attempt detected', {
+              attemptedEmail: normalizedEmail,
+              existingUserId: existingUser.id,
+              attemptedBy: request.user?.id || 'unauthenticated',
+              isCreating,
+            });
+
+            throw new Parse.Error(
+              Parse.Error.DUPLICATE_VALUE,
+              'Email address is already registered. Please use a different email or contact support.'
+            );
+          }
+        }
+      }
+
+      // Skip remaining validation for master key requests (non-critical validations)
       if (master) {
         return;
       }
@@ -637,7 +674,6 @@ function registerCloudFunctions() {
         throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Username is required');
       }
 
-      const email = user.get('email');
       if (email) {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
@@ -810,6 +846,7 @@ function registerCloudFunctions() {
     logger.info('Registering audit trail hooks...');
     registerAuditHooks();
     logger.info('✅ Audit trail hooks registered successfully');
+    logger.info('✅ Email uniqueness validation enabled for Parse.User (cloud/main.js beforeSave hook)');
   } catch (error) {
     logger.error('Error registering cloud functions:', error);
   }

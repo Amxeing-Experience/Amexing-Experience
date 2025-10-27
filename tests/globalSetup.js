@@ -23,8 +23,10 @@ async function initializeParseServer(uri) {
     const http = require('http');
 
     // Parse Server configuration
+    const path = require('path');
     const parseConfig = {
       databaseURI: uri,
+      cloud: path.join(__dirname, '../src/cloud/main.js'), // Load cloud functions including hooks
       appId: 'test-app-id',
       masterKey: 'test-master-key',
       serverURL: 'http://localhost:1339/parse',
