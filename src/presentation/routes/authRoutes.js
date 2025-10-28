@@ -305,13 +305,32 @@ router.post('/login', async (req, res) => {
           });
         }
 
-        // Verify password using AmexingUser model method
-        const passwordMatch = await user.validatePassword(password);
+        // Verify password using bcrypt directly (registerSubclass is disabled)
+        const bcrypt = require('bcrypt');
+        const passwordHash = user.get('password');
+
+        if (!passwordHash) {
+          logger.error('No password hash found for user', { userId: user.id });
+          // Check if client expects HTML response
+          if (req.accepts('html')) {
+            return res.redirect(`/login?error=${encodeURIComponent('Invalid email or password')}`);
+          }
+          return res.status(401).json({
+            success: false,
+            error: 'Invalid email or password',
+          });
+        }
+
+        const passwordMatch = await bcrypt.compare(password, passwordHash);
 
         // Check if password does not match
         if (!passwordMatch) {
-          // Record failed login attempt
-          await user.recordFailedLogin();
+          // Record failed login attempt - use method if available, otherwise skip
+          if (typeof user.recordFailedLogin === 'function') {
+            await user.recordFailedLogin();
+          } else {
+            logger.warn('recordFailedLogin method not available, skipping', { userId: user.id });
+          }
 
           // Check if client expects HTML response
           if (req.accepts('html')) {
@@ -323,8 +342,12 @@ router.post('/login', async (req, res) => {
           });
         }
 
-        // Check if account is locked
-        if (user.isAccountLocked()) {
+        // Check if account is locked - use method if available, otherwise check field directly
+        const isLocked = typeof user.isAccountLocked === 'function'
+          ? user.isAccountLocked()
+          : user.get('accountLocked') === true;
+
+        if (isLocked) {
           // Check if client expects HTML response
           if (req.accepts('html')) {
             return res.redirect(`/login?error=${encodeURIComponent('Account is temporarily locked')}`);
@@ -415,11 +438,17 @@ router.post('/login', async (req, res) => {
           role: roleName,
           roleId: rolePointer,
           organizationId: user.get('organizationId'),
-          name: user.getDisplayName(),
+          name: typeof user.getDisplayName === 'function'
+            ? user.getDisplayName()
+            : (user.get('displayName') || `${user.get('firstName')} ${user.get('lastName')}` || user.get('username')),
         };
 
-        // Record successful login
-        await user.recordSuccessfulLogin('password');
+        // Record successful login - use method if available, otherwise skip
+        if (typeof user.recordSuccessfulLogin === 'function') {
+          await user.recordSuccessfulLogin('password');
+        } else {
+          logger.info('recordSuccessfulLogin method not available, skipping', { userId: user.id });
+        }
 
         logger.info('Parse Object authentication successful', {
           userId: authenticatedUser.id,

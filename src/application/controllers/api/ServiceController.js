@@ -67,22 +67,38 @@ class ServiceController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'asc';
 
+      // Optional serviceType filter (e.g., 'Aeropuerto', 'Punto a Punto', 'Local')
+      const serviceTypeFilter = req.query.serviceType || null;
+
       // Column mapping for sorting (matches frontend columns order)
       const columns = [
         'rate.name', // 0. Tarifa
-        'destinationPOI.serviceType.name', // 1. Tipo de Destino
-        'originPOI.name', // 2. Origen
-        'destinationPOI.name', // 3. Destino
-        'vehicleType.name', // 4. Tipo de Vehículo
-        'price', // 5. Costo
-        'note', // 6. Notas
-        'active', // 7. Estado
+        'originPOI.name', // 1. Origen
+        'destinationPOI.name', // 2. Destino
+        'vehicleType.name', // 3. Tipo de Vehículo
+        'price', // 4. Costo
+        'note', // 5. Notas
+        'active', // 6. Estado
       ];
       const sortField = columns[sortColumnIndex] || 'rate.name';
 
-      // Get total records count (without search filter)
+      // Get total records count (without search filter, but with serviceType filter if provided)
       const totalRecordsQuery = new Parse.Query('Service');
       totalRecordsQuery.equalTo('exists', true);
+
+      // Apply serviceType filter if provided
+      if (serviceTypeFilter) {
+        const serviceTypeQuery = new Parse.Query('ServiceType');
+        serviceTypeQuery.equalTo('name', serviceTypeFilter);
+        const serviceTypeObj = await serviceTypeQuery.first({ useMasterKey: true });
+
+        if (serviceTypeObj) {
+          const poiQuery = new Parse.Query('POI');
+          poiQuery.equalTo('serviceType', serviceTypeObj);
+          totalRecordsQuery.matchesQuery('destinationPOI', poiQuery);
+        }
+      }
+
       const recordsTotal = await totalRecordsQuery.count({
         useMasterKey: true,
       });
@@ -96,12 +112,36 @@ class ServiceController {
       baseQuery.include('vehicleType');
       baseQuery.include('rate');
 
+      // Apply serviceType filter to base query
+      if (serviceTypeFilter) {
+        const serviceTypeQuery = new Parse.Query('ServiceType');
+        serviceTypeQuery.equalTo('name', serviceTypeFilter);
+        const serviceTypeObj = await serviceTypeQuery.first({ useMasterKey: true });
+
+        if (serviceTypeObj) {
+          const poiQuery = new Parse.Query('POI');
+          poiQuery.equalTo('serviceType', serviceTypeObj);
+          baseQuery.matchesQuery('destinationPOI', poiQuery);
+        }
+      }
+
       // Build filtered query with search
       let filteredQuery = baseQuery;
       if (searchValue) {
-        // Search in origin POI names
+        // Pre-fetch serviceType object once if filter is provided
+        let serviceTypeObj = null;
+        if (serviceTypeFilter) {
+          const serviceTypeQuery = new Parse.Query('ServiceType');
+          serviceTypeQuery.equalTo('name', serviceTypeFilter);
+          serviceTypeObj = await serviceTypeQuery.first({ useMasterKey: true });
+        }
+
+        // Search in origin POI names (filter POIs by serviceType if applicable)
         const originPOIQuery = new Parse.Query('POI');
         originPOIQuery.matches('name', searchValue, 'i');
+        if (serviceTypeObj) {
+          originPOIQuery.equalTo('serviceType', serviceTypeObj);
+        }
 
         const originQuery = new Parse.Query('Service');
         originQuery.equalTo('exists', true);
@@ -112,9 +152,19 @@ class ServiceController {
         originQuery.include('vehicleType');
         originQuery.include('rate');
 
-        // Search in destination POI names
+        // Also ensure destinationPOI matches serviceType
+        if (serviceTypeObj) {
+          const destPoiTypeQuery = new Parse.Query('POI');
+          destPoiTypeQuery.equalTo('serviceType', serviceTypeObj);
+          originQuery.matchesQuery('destinationPOI', destPoiTypeQuery);
+        }
+
+        // Search in destination POI names (filter POIs by serviceType if applicable)
         const destPOIQuery = new Parse.Query('POI');
         destPOIQuery.matches('name', searchValue, 'i');
+        if (serviceTypeObj) {
+          destPOIQuery.equalTo('serviceType', serviceTypeObj);
+        }
 
         const destQuery = new Parse.Query('Service');
         destQuery.equalTo('exists', true);
@@ -124,6 +174,8 @@ class ServiceController {
         destQuery.include('destinationPOI.serviceType');
         destQuery.include('vehicleType');
         destQuery.include('rate');
+
+        // Destination POI query already has serviceType filter applied above
 
         // Search in vehicle type names
         const vehicleTypeQuery = new Parse.Query('VehicleType');
@@ -138,6 +190,13 @@ class ServiceController {
         vehicleQuery.include('vehicleType');
         vehicleQuery.include('rate');
 
+        // Apply serviceType filter to vehicle query
+        if (serviceTypeObj) {
+          const poiQuery = new Parse.Query('POI');
+          poiQuery.equalTo('serviceType', serviceTypeObj);
+          vehicleQuery.matchesQuery('destinationPOI', poiQuery);
+        }
+
         // Search in rate names
         const rateTypeQuery = new Parse.Query('Rate');
         rateTypeQuery.matches('name', searchValue, 'i');
@@ -150,6 +209,13 @@ class ServiceController {
         rateQuery.include('destinationPOI.serviceType');
         rateQuery.include('vehicleType');
         rateQuery.include('rate');
+
+        // Apply serviceType filter to rate query
+        if (serviceTypeObj) {
+          const poiQuery = new Parse.Query('POI');
+          poiQuery.equalTo('serviceType', serviceTypeObj);
+          rateQuery.matchesQuery('destinationPOI', poiQuery);
+        }
 
         filteredQuery = Parse.Query.or(originQuery, destQuery, vehicleQuery, rateQuery);
       }
@@ -285,10 +351,6 @@ class ServiceController {
           case 'rate.name':
             valueA = a.get('rate')?.get('name') || '';
             valueB = b.get('rate')?.get('name') || '';
-            break;
-          case 'destinationPOI.serviceType.name':
-            valueA = a.get('destinationPOI')?.get('serviceType')?.get('name') || '';
-            valueB = b.get('destinationPOI')?.get('serviceType')?.get('name') || '';
             break;
           case 'originPOI.name':
             valueA = a.get('originPOI')?.get('name') || '';

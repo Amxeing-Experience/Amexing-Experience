@@ -347,6 +347,33 @@ class ServiceTypeController {
 
       const { name, active } = req.body;
 
+      // Check if trying to modify a system-protected type
+      const currentName = serviceType.get('name');
+      const PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local'];
+
+      if (PROTECTED_TYPES.includes(currentName)) {
+        logger.warn('Attempted to modify protected service type', {
+          typeId,
+          currentName,
+          userId: currentUser.id,
+        });
+
+        return this.sendError(
+          res,
+          'No se puede modificar este tipo de traslado. Es un tipo de sistema protegido.',
+          403
+        );
+      }
+
+      // Also prevent renaming TO a protected type name
+      if (name && name !== currentName && PROTECTED_TYPES.includes(name)) {
+        return this.sendError(
+          res,
+          'No se puede usar ese nombre. Es un nombre reservado del sistema.',
+          400
+        );
+      }
+
       // Update fields if provided
       if (name) {
         // Check name uniqueness if changing

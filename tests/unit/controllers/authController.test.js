@@ -8,6 +8,10 @@ jest.mock('parse/node', () => ({
     logIn: jest.fn(),
     logOut: jest.fn(),
   },
+  Query: jest.fn(),
+  Cloud: {
+    run: jest.fn(),
+  },
   initialize: jest.fn(),
   serverURL: '',
 }));
@@ -19,7 +23,13 @@ jest.mock('../../../src/infrastructure/logger', () => ({
   debug: jest.fn(),
 }));
 
+// Mock bcrypt
+jest.mock('bcrypt', () => ({
+  compare: jest.fn(),
+}));
+
 const Parse = require('parse/node');
+const bcrypt = require('bcrypt');
 const authController = require('../../../src/application/controllers/authController');
 const { createMockRequest, createMockResponse, createMockNext } = require('../../helpers/testUtils');
 
@@ -53,19 +63,44 @@ describe('Authentication Controller', () => {
       mockReq.body = { username: 'testuser', password: 'testpass' };
       mockReq.session = {};
       mockReq.accepts = jest.fn(() => false); // Return false for 'json' to force HTML response
-      
+
       const mockUser = {
         id: 'test-user-id',
-        get: jest.fn((field) => field === 'username' ? 'testuser' : null),
-        getSessionToken: jest.fn().mockReturnValue('test-session-token')
+        get: jest.fn((field) => {
+          if (field === 'username') return 'testuser';
+          if (field === 'email') return 'testuser@test.com';
+          if (field === 'password') return '$2b$10$hashedpassword';
+          if (field === 'active') return true;
+          if (field === 'exists') return true;
+          return null;
+        }),
       };
-      
-      Parse.User.logIn.mockResolvedValue(mockUser);
+
+      // Mock Parse.Query for AmexingUser
+      const mockQuery = {
+        equalTo: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(mockUser),
+      };
+      const mockOrQuery = {
+        equalTo: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(mockUser),
+      };
+      Parse.Query.mockImplementation(() => mockQuery);
+      Parse.Query.or = jest.fn().mockReturnValue(mockOrQuery);
+
+      // Mock bcrypt password verification
+      bcrypt.compare.mockResolvedValue(true);
+
+      // Mock Parse.Cloud.run for session creation
+      Parse.Cloud.run.mockResolvedValue('test-session-token');
 
       await authController.login(mockReq, mockRes);
 
-      expect(Parse.User.logIn).toHaveBeenCalledWith('testuser', 'testpass');
-      expect(mockReq.session.user).toEqual({ id: 'test-user-id', username: 'testuser' });
+      expect(mockReq.session.user).toEqual({
+        id: 'test-user-id',
+        username: 'testuser',
+        email: 'testuser@test.com'
+      });
       expect(mockReq.session.sessionToken).toBe('test-session-token');
       expect(mockRes.redirect).toHaveBeenCalledWith('/');
     });
@@ -74,12 +109,17 @@ describe('Authentication Controller', () => {
       mockReq.method = 'POST';
       mockReq.body = { username: 'testuser', password: 'wrongpass' };
       mockReq.accepts = jest.fn(() => false); // Return false for 'json' to force HTML response
-      
-      Parse.User.logIn.mockRejectedValue(new Error('Invalid credentials'));
+
+      // Mock Parse.Query returning no user
+      const mockQuery = {
+        equalTo: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(null), // User not found
+      };
+      Parse.Query.mockImplementation(() => mockQuery);
+      Parse.Query.or = jest.fn().mockReturnValue(mockQuery);
 
       await authController.login(mockReq, mockRes);
 
-      expect(Parse.User.logIn).toHaveBeenCalledWith('testuser', 'wrongpass');
       expect(mockRes.render).toHaveBeenCalledWith('auth/login', {
         title: 'Login - AmexingWeb',
         error: 'Invalid username or password',
@@ -92,15 +132,38 @@ describe('Authentication Controller', () => {
       mockReq.method = 'POST';
       mockReq.body = { username: 'testuser', password: 'testpass' };
       mockReq.path = '/api/auth/login';
+      mockReq.session = {};
       mockReq.accepts = jest.fn(() => 'json'); // Mock JSON accept
-      
+
       const mockUser = {
         id: 'test-user-id',
-        get: jest.fn((field) => field === 'username' ? 'testuser' : null),
-        getSessionToken: jest.fn().mockReturnValue('test-session-token')
+        get: jest.fn((field) => {
+          if (field === 'username') return 'testuser';
+          if (field === 'email') return 'testuser@test.com';
+          if (field === 'password') return '$2b$10$hashedpassword';
+          if (field === 'active') return true;
+          if (field === 'exists') return true;
+          return null;
+        }),
       };
-      
-      Parse.User.logIn.mockResolvedValue(mockUser);
+
+      // Mock Parse.Query for AmexingUser
+      const mockQuery = {
+        equalTo: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(mockUser),
+      };
+      const mockOrQuery = {
+        equalTo: jest.fn().mockReturnThis(),
+        first: jest.fn().mockResolvedValue(mockUser),
+      };
+      Parse.Query.mockImplementation(() => mockQuery);
+      Parse.Query.or = jest.fn().mockReturnValue(mockOrQuery);
+
+      // Mock bcrypt password verification
+      bcrypt.compare.mockResolvedValue(true);
+
+      // Mock Parse.Cloud.run for session creation
+      Parse.Cloud.run.mockResolvedValue('test-session-token');
 
       await authController.login(mockReq, mockRes);
 
@@ -108,7 +171,8 @@ describe('Authentication Controller', () => {
         success: true,
         user: {
           id: 'test-user-id',
-          username: 'testuser'
+          username: 'testuser',
+          email: 'testuser@test.com'
         }
       });
     });

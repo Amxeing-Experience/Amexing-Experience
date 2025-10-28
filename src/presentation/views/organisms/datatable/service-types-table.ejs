@@ -33,8 +33,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
-                    <button type="button" class="btn btn-light btn-sm" id="createServiceTypeBtn">
+                    <button type="button" class="btn btn-light btn-sm" id="createServiceTypeBtn" disabled>
                         <i class="ti ti-plus me-1"></i>Nuevo Tipo
+                        <i class="ti ti-lock ms-1"
+                           data-bs-toggle="tooltip"
+                           data-bs-placement="top"
+                           title="Temporalmente deshabilitado por seguridad del sistema"></i>
                     </button>
                 <% } %>
             </div>
@@ -141,6 +145,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
 
+        // Define system-protected service types (cannot be edited/deleted)
+        const PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local'];
+
+        // Helper function to check if type is protected
+        function isProtectedType(typeName) {
+            return PROTECTED_TYPES.includes(typeName);
+        }
+
         // DataTable Configuration
         const dataTable = $(`#${tableId}`).DataTable({
             processing: true,
@@ -177,6 +189,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     searchable: false,
                     className: 'text-center',
                     render: function(data) {
+                        // Check if this is a system-protected type
+                        const isProtected = isProtectedType(data.name);
+
+                        // If protected, show lock indicator instead of action buttons
+                        if (isProtected) {
+                            return `<div class="text-center">
+                                        <span class="badge bg-info"
+                                              data-bs-toggle="tooltip"
+                                              data-bs-placement="top"
+                                              title="Tipo de sistema protegido - No se puede editar ni eliminar">
+                                            <i class="ti ti-lock"></i> Sistema
+                                        </span>
+                                    </div>`;
+                        }
+
+                        // Regular action buttons for non-protected types
                         let actions = '<div class="btn-group btn-group-sm" role="group">';
 
                         if (canEdit) {

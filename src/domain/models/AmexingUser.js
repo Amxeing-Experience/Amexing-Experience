@@ -203,6 +203,10 @@ class AmexingUser extends BaseModel {
     const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
+    // Save hash in both fields for compatibility
+    // 'password' is used by authentication system
+    // 'passwordHash' kept for backwards compatibility
+    this.set('password', hashedPassword);
     this.set('passwordHash', hashedPassword);
     this.set('passwordChangedAt', new Date());
     this.set('mustChangePassword', false);
@@ -238,7 +242,9 @@ class AmexingUser extends BaseModel {
    * }
    */
   async validatePassword(password) {
-    const hashedPassword = this.get('passwordHash');
+    // Try 'password' field first (used by authentication system)
+    // Fall back to 'passwordHash' for backwards compatibility
+    const hashedPassword = this.get('password') || this.get('passwordHash');
     if (!hashedPassword) {
       return false;
     }

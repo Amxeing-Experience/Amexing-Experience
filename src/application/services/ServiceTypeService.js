@@ -43,6 +43,20 @@ class ServiceTypeService {
       admin: 6,
       employee_amexing: 3,
     };
+
+    // System-protected service types (cannot be modified or deleted)
+    this.PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local'];
+  }
+
+  /**
+   * Check if a service type is system-protected.
+   * @param {string} typeName - Name of the service type.
+   * @returns {boolean} True if protected.
+   * @private
+   * @example
+   */
+  isProtectedType(typeName) {
+    return this.PROTECTED_TYPES.includes(typeName);
   }
 
   /**
@@ -136,6 +150,21 @@ class ServiceTypeService {
         return {
           success: false,
           message: 'Service type not found',
+        };
+      }
+
+      // Check if type is system-protected
+      const typeName = serviceType.get('name');
+      if (this.isProtectedType(typeName)) {
+        logger.warn('Attempted to modify protected service type', {
+          typeId,
+          typeName,
+          userId: currentUser.id,
+        });
+
+        return {
+          success: false,
+          message: 'No se puede modificar este tipo de traslado. Es un tipo de sistema protegido.',
         };
       }
 
@@ -268,6 +297,21 @@ class ServiceTypeService {
         return {
           success: false,
           message: 'Service type not found',
+        };
+      }
+
+      // Check if type is system-protected
+      const typeName = serviceType.get('name');
+      if (this.isProtectedType(typeName)) {
+        logger.warn('Attempted to delete protected service type', {
+          typeId,
+          typeName,
+          userId: currentUser.id,
+        });
+
+        return {
+          success: false,
+          message: 'No se puede eliminar este tipo de traslado. Es un tipo de sistema protegido y es fundamental para el funcionamiento del sistema.',
         };
       }
 

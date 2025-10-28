@@ -142,9 +142,83 @@ class AuthController {
   }
 
   /**
-   * Processes user login with Parse Server authentication and session management.
-   * Handles POST requests for user authentication, validates credentials, creates
-   * sessions, and manages login attempts with security logging and error handling.
+   * Authenticates user against AmexingUser table with password validation.
+   * Queries AmexingUser by username or email and validates password.
+   * @function authenticateAmexingUser
+   * @param {string} usernameOrEmail - Username or email to authenticate.
+   * @param {string} password - Password to validate.
+   * @returns {Promise<Parse.Object|null>} - AmexingUser object or null if authentication fails.
+   * @private
+   * @example
+   * const user = await authenticateAmexingUser('user@example.com', 'password123');
+   * if (user) {
+   *   // Authentication successful
+   * }
+   */
+  async authenticateAmexingUser(usernameOrEmail, password) {
+    try {
+      const bcrypt = require('bcrypt');
+
+      // Query AmexingUser by username or email
+      const usernameQuery = new Parse.Query('AmexingUser');
+      usernameQuery.equalTo('username', usernameOrEmail);
+
+      const emailQuery = new Parse.Query('AmexingUser');
+      emailQuery.equalTo('email', usernameOrEmail);
+
+      const combinedQuery = Parse.Query.or(usernameQuery, emailQuery);
+      combinedQuery.equalTo('active', true);
+      combinedQuery.equalTo('exists', true);
+
+      const user = await combinedQuery.first({ useMasterKey: true });
+
+      if (!user) {
+        logger.warn('Authentication failed: User not found', {
+          usernameOrEmail,
+        });
+        return null;
+      }
+
+      // Get stored password hash
+      const passwordHash = user.get('password');
+      if (!passwordHash) {
+        logger.error('Authentication failed: No password hash found', {
+          userId: user.id,
+        });
+        return null;
+      }
+
+      // Validate password using bcrypt
+      const isValid = await bcrypt.compare(password, passwordHash);
+
+      if (!isValid) {
+        logger.warn('Authentication failed: Invalid password', {
+          userId: user.id,
+          username: user.get('username'),
+        });
+        return null;
+      }
+
+      logger.info('User authenticated successfully', {
+        userId: user.id,
+        username: user.get('username'),
+      });
+
+      return user;
+    } catch (error) {
+      logger.error('Error during AmexingUser authentication:', {
+        error: error.message,
+        usernameOrEmail,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Processes user login with AmexingUser authentication and session management.
+   * Handles POST requests for user authentication, validates credentials against
+   * AmexingUser table, creates sessions, and manages login attempts with security
+   * logging and error handling.
    * @function login
    * @param {object} req - Express request object with username and password in body.
    * @param {object} res - Express response object.
@@ -181,17 +255,40 @@ class AuthController {
         return this.returnWithToken(req, res);
       }
 
-      // Authenticate with Parse Server
-      const user = await Parse.User.logIn(username, password);
+      // Authenticate with AmexingUser table
+      const user = await this.authenticateAmexingUser(username, password);
+
+      if (!user) {
+        logger.warn('Login failed: Invalid credentials', {
+          username,
+        });
+
+        if (req.accepts('json')) {
+          return res.status(401).json({
+            success: false,
+            message: 'Credenciales inválidas',
+          });
+        }
+
+        return this.returnWithToken(req, res);
+      }
+
+      // Create session token for the user
+      const sessionToken = await Parse.Cloud.run('createSessionForUser', {
+        userId: user.id,
+      });
 
       // Store session information
       req.session.user = {
         id: user.id,
         username: user.get('username'),
+        email: user.get('email'),
       };
-      req.session.sessionToken = user.getSessionToken();
+      req.session.sessionToken = sessionToken;
 
-      logger.info(`User ${username} logged in successfully`);
+      logger.info(`User ${username} logged in successfully`, {
+        userId: user.id,
+      });
 
       if (req.accepts('json')) {
         return res.json({
@@ -199,18 +296,22 @@ class AuthController {
           user: {
             id: user.id,
             username: user.get('username'),
+            email: user.get('email'),
           },
         });
       }
 
       return res.redirect('/');
     } catch (error) {
-      logger.error('Login error:', error);
+      logger.error('Login error:', {
+        error: error.message,
+        stack: error.stack,
+      });
 
       if (req.accepts('json')) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid login',
+          message: 'Error en el inicio de sesión',
         });
       }
 

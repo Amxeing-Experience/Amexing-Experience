@@ -113,6 +113,80 @@ function registerCloudFunctions() {
 
     // Authentication Cloud Functions
     /**
+     * Creates a session token for an AmexingUser by user ID.
+     * Used for authentication after password validation to establish a Parse session.
+     * @function createSessionForUser
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<string>} - Promise resolving to the session token string.
+     * @throws {Parse.Error} - Throws error if user not found or session creation fails.
+     * @example
+     * // Call from authController
+     * const sessionToken = await Parse.Cloud.run('createSessionForUser', { userId: 'abc123' });
+     */
+    Parse.Cloud.define('createSessionForUser', async (request) => {
+      const { params } = request;
+      const { userId } = params;
+
+      try {
+        if (!userId) {
+          throw new Parse.Error(Parse.Error.INVALID_QUERY, 'User ID is required');
+        }
+
+        // Query AmexingUser to get the user
+        const userQuery = new Parse.Query('AmexingUser');
+        userQuery.equalTo('objectId', userId);
+        userQuery.equalTo('active', true);
+        userQuery.equalTo('exists', true);
+
+        const user = await userQuery.first({ useMasterKey: true });
+
+        if (!user) {
+          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found or inactive');
+        }
+
+        // Create a new session for this user
+        const sessionData = {
+          user: {
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: userId,
+          },
+          createdWith: {
+            action: 'login',
+            authProvider: 'password',
+          },
+          restricted: false,
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+        };
+
+        const Session = Parse.Object.extend('_Session');
+        const session = new Session();
+        session.set('user', sessionData.user);
+        session.set('createdWith', sessionData.createdWith);
+        session.set('restricted', sessionData.restricted);
+        session.set('expiresAt', sessionData.expiresAt);
+
+        await session.save(null, { useMasterKey: true });
+
+        logger.info('Session created for AmexingUser', {
+          userId,
+          sessionToken: session.get('sessionToken'),
+        });
+
+        return session.get('sessionToken');
+      } catch (error) {
+        logger.error('Error creating session for user', {
+          userId,
+          error: error.message,
+        });
+        throw new Parse.Error(
+          Parse.Error.INTERNAL_SERVER_ERROR,
+          `Failed to create session: ${error.message}`
+        );
+      }
+    });
+
+    /**
      * Retrieves user information by user ID with role-based access control.
      * SuperAdmin and Admin roles can access any user, while other users can only access their own data.
      * @function getUserById

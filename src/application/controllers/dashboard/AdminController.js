@@ -466,9 +466,32 @@ class AdminController extends RoleBasedController {
    */
   async services(req, res) {
     try {
+      // Menu items configuration for services submenu
+      const menuItems = [
+        {
+          label: 'Aeropuerto',
+          icon: 'plane',
+          section: 'airport',
+          href: '/dashboard/admin/services?section=airport',
+        },
+        {
+          label: 'Punto a Punto',
+          icon: 'route',
+          section: 'p2p',
+          href: '/dashboard/admin/services?section=p2p',
+        },
+        {
+          label: 'Local',
+          icon: 'map-pin',
+          section: 'local',
+          href: '/dashboard/admin/services?section=local',
+        },
+      ];
+
       await this.renderRoleView(req, res, 'services', {
-        title: 'Gestión de Servicios',
-        section: req.query.section || 'services',
+        title: 'Gestión de Traslados',
+        section: req.query.section || 'airport',
+        menuItems,
         breadcrumb: null, // Disable automatic breadcrumb
         pageStyles: [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',

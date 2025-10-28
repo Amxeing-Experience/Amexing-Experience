@@ -156,6 +156,8 @@ class POIController {
    * GET /api/pois/active - Get active POIs for dropdowns.
    *
    * Returns simplified array of active POIs suitable for select/dropdown elements.
+   * Query Parameters:
+   * - serviceType: string (optional) - Filter by service type name (Aeropuerto, Punto a Punto, Local).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
@@ -164,12 +166,27 @@ class POIController {
    */
   async getActivePOIs(req, res) {
     try {
+      const serviceTypeFilter = req.query.serviceType || null;
+
       const query = new Parse.Query('POI');
       query.equalTo('active', true);
       query.equalTo('exists', true);
       query.ascending('name');
       query.limit(1000);
       query.include('serviceType');
+
+      // Filter by serviceType if provided
+      if (serviceTypeFilter) {
+        const serviceTypeQuery = new Parse.Query('ServiceType');
+        serviceTypeQuery.equalTo('name', serviceTypeFilter);
+        serviceTypeQuery.equalTo('active', true);
+        serviceTypeQuery.equalTo('exists', true);
+        const serviceTypeObj = await serviceTypeQuery.first({ useMasterKey: true });
+
+        if (serviceTypeObj) {
+          query.equalTo('serviceType', serviceTypeObj);
+        }
+      }
 
       const pois = await query.find({ useMasterKey: true });
 
