@@ -121,19 +121,112 @@ async function loadReferenceData() {
 }
 
 /**
- * Import services with batch processing
+ * Determine if a service should be skipped (duplicate in bidirectional pair)
+ */
+function shouldSkipDuplicate(row, rows, poisMap) {
+  const { tarifa, tipoTraslado, origen, destino, tipoVehiculo, precio } = row;
+
+  // Local services don't have duplicates (no origin)
+  if (tipoTraslado === 'Local' || !origen) {
+    return false;
+  }
+
+  // Find potential reverse pair
+  for (const otherRow of rows) {
+    if (row.lineNumber === otherRow.lineNumber) continue;
+
+    // Check if it's a reverse pair
+    if (
+      tarifa === otherRow.tarifa &&
+      tipoTraslado === otherRow.tipoTraslado &&
+      origen === otherRow.destino &&
+      destino === otherRow.origen &&
+      tipoVehiculo === otherRow.tipoVehiculo
+    ) {
+      // Check if prices match (tolerance $1)
+      const priceDiff = Math.abs(parseFloat(precio) - parseFloat(otherRow.precio));
+      if (priceDiff >= 1) {
+        // Prices don't match - import both (not round trip)
+        return false;
+      }
+
+      // Found reverse pair with matching price - determine which to skip
+      if (tipoTraslado === 'Aeropuerto' || tipoTraslado === 'aeropuerto') {
+        // For Airport: Keep Airport → City, skip City → Airport
+        const originIsAirport = origen.includes('Aeropuerto') || origen.match(/\([A-Z]{3}\)/);
+        const destinationIsAirport = destino.includes('Aeropuerto') || destino.match(/\([A-Z]{3}\)/);
+
+        if (!originIsAirport && destinationIsAirport) {
+          // This is City → Airport, skip it
+          return true;
+        }
+      } else {
+        // For Punto a Punto: Keep alphabetically first origin
+        if (origen > destino) {
+          // This one should be skipped (other one has alphabetically earlier origin)
+          return true;
+        }
+      }
+
+      return false;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Check if a service is part of a bidirectional pair (round trip)
+ */
+function isRoundTripService(row, rows) {
+  const { tarifa, tipoTraslado, origen, destino, tipoVehiculo, precio } = row;
+
+  // Local services are not round trip (no origin)
+  if (tipoTraslado === 'Local' || !origen) {
+    return false;
+  }
+
+  // Find reverse pair
+  for (const otherRow of rows) {
+    if (row.lineNumber === otherRow.lineNumber) continue;
+
+    if (
+      tarifa === otherRow.tarifa &&
+      tipoTraslado === otherRow.tipoTraslado &&
+      origen === otherRow.destino &&
+      destino === otherRow.origen &&
+      tipoVehiculo === otherRow.tipoVehiculo
+    ) {
+      // Check if prices match
+      const priceDiff = Math.abs(parseFloat(precio) - parseFloat(otherRow.precio));
+      return priceDiff < 1; // Round trip if prices match
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Import services with batch processing and deduplication
  */
 async function importServices(rows, { ratesMap, poisMap, vehicleTypesMap }) {
-  console.log('   🚀 Importing services...');
+  console.log('   🚀 Importing services with deduplication...');
 
   let created = 0;
   let skipped = 0;
+  let duplicatesSkipped = 0;
   let failed = 0;
   let servicesToSave = [];
 
   for (const row of rows) {
     try {
       const { tarifa, tipoTraslado, origen, destino, tipoVehiculo, precio, notas } = row;
+
+      // Check if this is a duplicate that should be skipped
+      if (shouldSkipDuplicate(row, rows, poisMap)) {
+        duplicatesSkipped++;
+        continue;
+      }
 
       // Get references using composite key (name|serviceType)
       const rate = ratesMap[tarifa];
@@ -175,6 +268,9 @@ async function importServices(rows, { ratesMap, poisMap, vehicleTypesMap }) {
         continue;
       }
 
+      // Determine if this is a round trip service
+      const isRoundTrip = isRoundTripService(row, rows);
+
       // Create service
       const Service = Parse.Object.extend('Service');
       const service = new Service();
@@ -186,6 +282,7 @@ async function importServices(rows, { ratesMap, poisMap, vehicleTypesMap }) {
       service.set('vehicleType', vehicleType);
       service.set('rate', rate);
       service.set('price', parseFloat(precio));
+      service.set('isRoundTrip', isRoundTrip);
       if (notas) {
         service.set('note', notas);
       }
@@ -222,7 +319,10 @@ async function importServices(rows, { ratesMap, poisMap, vehicleTypesMap }) {
     console.log(`      💾 Final batch saved: ${servicesToSave.length} services`);
   }
 
-  return { created, skipped, failed };
+  console.log(`\n   📊 Deduplication Summary:`);
+  console.log(`      ↔️  Bidirectional duplicates skipped: ${duplicatesSkipped}`);
+
+  return { created, skipped, failed, duplicatesSkipped };
 }
 
 /**

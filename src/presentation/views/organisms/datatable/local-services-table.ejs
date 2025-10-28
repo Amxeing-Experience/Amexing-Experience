@@ -182,6 +182,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Traslado</span>
                 </button>
             </div>
+
+            <%- include('../../atoms/common/modal-loader', { text: 'Cargando datos del traslado...' }) %>
         </div>
     </div>
 </div>
@@ -564,6 +566,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Open modal first in edit mode (this will reset the form)
             await openServiceModal(true);
 
+            // Show loader to prevent user interaction during data loading
+            showModalLoader('serviceModal');
+
             // Extract base URL without query parameters
             const baseUrl = apiEndpoint.split('?')[0];
 
@@ -590,15 +595,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             $('#rate').val(service.rate?.id);
                             $('#note').val(service.note || '');
                             $('#price').val(service.price);
+
+                            // Hide loader after all data is loaded and populated
+                            hideModalLoader('serviceModal');
                         } catch (error) {
                             console.error('Error setting Tom Select values:', error);
+                            hideModalLoader('serviceModal');
                         }
                     } else {
+                        hideModalLoader('serviceModal');
                         showErrorAlert('Formato de respuesta inválido');
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('AJAX Error:', { xhr, status, error });
+                    hideModalLoader('serviceModal');
                     const errorMessage = xhr.responseJSON?.error || 'Error al cargar el traslado';
                     showModalError(errorMessage);
                 }

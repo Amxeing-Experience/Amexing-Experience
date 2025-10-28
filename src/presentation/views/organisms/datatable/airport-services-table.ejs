@@ -47,8 +47,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <thead class="table-light">
                     <tr>
                         <th>Tarifa</th>
-                        <th>Origen</th>
-                        <th>Destino</th>
+                        <th>Ruta</th>
                         <th>Tipo de Vehículo</th>
                         <th>Costo</th>
                         <th>Notas</th>
@@ -162,6 +161,16 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             </div>
                             <div class="form-text">Precio del traslado en pesos mexicanos</div>
                         </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="isRoundTrip" name="isRoundTrip">
+                                <label class="form-check-label" for="isRoundTrip">
+                                    Viaje Redondo
+                                </label>
+                            </div>
+                            <div class="form-text">El precio aplica en ambas direcciones (Aeropuerto ↔ Ciudad)</div>
+                        </div>
                     </div>
 
                     <!-- Sección: Notas Adicionales -->
@@ -197,6 +206,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Traslado</span>
                 </button>
             </div>
+
+            <%- include('../../atoms/common/modal-loader', { text: 'Cargando datos del traslado...' }) %>
         </div>
     </div>
 </div>
@@ -304,28 +315,43 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${data || '-'}</span>`;
                     }
                 },
-                // 2. Origen
+                // 2. Ruta (Origen → Destino con indicador de viaje redondo)
                 {
-                    data: 'originPOI.name',
-                    render: function(data) {
-                        return `<div class="fw-semibold">${data || '-'}</div>`;
+                    data: null,
+                    render: function(data, type, row) {
+                        const origin = row.originPOI?.name || '-';
+                        const destination = row.destinationPOI?.name || '-';
+                        const isRoundTrip = row.isRoundTrip || false;
+
+                        // Para búsqueda y ordenamiento, retornar texto plano
+                        if (type === 'filter' || type === 'sort') {
+                            return `${origin} ${destination}`;
+                        }
+
+                        // Para display, retornar HTML visual
+                        const arrowIcon = isRoundTrip
+                            ? '<i class="ti ti-arrows-down-up text-info" style="font-size: 1.25rem;" data-bs-toggle="tooltip" title="Viaje Redondo"></i>'
+                            : '<i class="ti ti-arrow-down text-success" style="font-size: 1.25rem;"></i>';
+
+                        return `
+                            <div class="d-flex flex-column align-items-start gap-1" style="min-width: 180px;">
+                                <span class="fw-medium" style="font-size: 0.875rem;">${origin}</span>
+                                <div class="text-center w-100">
+                                    ${arrowIcon}
+                                </div>
+                                <span class="fw-medium" style="font-size: 0.875rem;">${destination}</span>
+                            </div>
+                        `;
                     }
                 },
-                // 3. Destino
-                {
-                    data: 'destinationPOI.name',
-                    render: function(data) {
-                        return `<div class="fw-semibold">${data || '-'}</div>`;
-                    }
-                },
-                // 4. Tipo de Vehículo
+                // 3. Tipo de Vehículo
                 {
                     data: 'vehicleType.name',
                     render: function(data) {
                         return `<span class="badge bg-dark">${data || '-'}</span>`;
                     }
                 },
-                // 5. Costo
+                // 4. Costo
                 {
                     data: 'price',
                     render: function(data) {
@@ -336,7 +362,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         return `<div class="fw-bold text-success">${formatted}</div>`;
                     }
                 },
-                // 6. Notas
+                // 5. Notas
                 {
                     data: 'note',
                     render: function(data) {
@@ -346,7 +372,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         return `<div class="small" title="${data}">${truncated}</div>`;
                     }
                 },
-                // 7. Estado
+                // 6. Estado
                 {
                     data: 'active',
                     render: function(data) {
@@ -417,9 +443,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             },
             order: [
                 [0, 'asc'],  // 1. Tarifa
-                [1, 'asc'],  // 2. Origen
-                [2, 'asc'],  // 3. Destino
-                [4, 'asc']   // 4. Costo
+                [1, 'asc'],  // 2. Ruta
+                [3, 'asc']   // 3. Costo
             ],
             pageLength: 10,
             searchDelay: 300,
@@ -598,6 +623,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Open modal first in edit mode (this will reset the form)
             await openServiceModal(true);
 
+            // Show loader to prevent user interaction during data loading
+            showModalLoader('serviceModal');
+
             // Extract base URL without query parameters
             const baseUrl = apiEndpoint.split('?')[0];
 
@@ -628,15 +656,22 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             $('#rate').val(service.rate?.id);
                             $('#note').val(service.note || '');
                             $('#price').val(service.price);
+                            $('#isRoundTrip').prop('checked', service.isRoundTrip || false);
+
+                            // Hide loader after all data is loaded and populated
+                            hideModalLoader('serviceModal');
                         } catch (error) {
                             console.error('Error setting Tom Select values:', error);
+                            hideModalLoader('serviceModal');
                         }
                     } else {
+                        hideModalLoader('serviceModal');
                         showErrorAlert('Formato de respuesta inválido');
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('AJAX Error:', { xhr, status, error });
+                    hideModalLoader('serviceModal');
                     const errorMessage = xhr.responseJSON?.error || 'Error al cargar el traslado';
                     showModalError(errorMessage);
                 }
@@ -674,7 +709,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     vehicleType: $('#vehicleType').val(),
                     rate: $('#rate').val(),
                     note: $('#note').val().trim(),
-                    price: parseFloat($('#price').val())
+                    price: parseFloat($('#price').val()),
+                    isRoundTrip: $('#isRoundTrip').is(':checked')
                 };
 
                 // Extract base URL without query parameters

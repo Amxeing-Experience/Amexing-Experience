@@ -431,6 +431,7 @@ class ServiceController {
           },
           note: service.get('note') || '',
           price: service.get('price') || 0,
+          isRoundTrip: service.get('isRoundTrip') || false,
           active: service.get('active'),
           createdAt: service.createdAt,
           updatedAt: service.updatedAt,
@@ -505,6 +506,7 @@ class ServiceController {
             color: rate?.get('color'),
           },
           price: service.get('price'),
+          isRoundTrip: service.get('isRoundTrip') || false,
         };
       });
 
@@ -586,6 +588,7 @@ class ServiceController {
         },
         note: service.get('note') || '',
         price: service.get('price'),
+        isRoundTrip: service.get('isRoundTrip') || false,
         active: service.get('active'),
         createdAt: service.createdAt,
         updatedAt: service.updatedAt,
@@ -607,11 +610,13 @@ class ServiceController {
    * POST /api/services - Create new service.
    *
    * Body Parameters:
-   * - originPOI: string (required) - Origin POI ID
+   * - originPOI: string (optional) - Origin POI ID (optional for Local services)
    * - destinationPOI: string (required) - Destination POI ID
    * - vehicleType: string (required) - VehicleType ID
+   * - rate: string (required) - Rate ID
    * - note: string (optional) - Service note
-   * - price: number (required) - Service price.
+   * - price: number (required) - Service price
+   * - isRoundTrip: boolean (optional) - Whether service applies to both directions (default: false).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
@@ -626,7 +631,7 @@ class ServiceController {
       }
 
       const {
-        originPOI, destinationPOI, vehicleType, rate, note, price,
+        originPOI, destinationPOI, vehicleType, rate, note, price, isRoundTrip,
       } = req.body;
 
       // Validate required fields (origin is optional for local transfers)
@@ -743,6 +748,7 @@ class ServiceController {
       service.set('rate', rateObj);
       service.set('note', note || '');
       service.set('price', parseFloat(price));
+      service.set('isRoundTrip', !!isRoundTrip);
       service.set('active', true);
       service.set('exists', true);
 
@@ -792,6 +798,7 @@ class ServiceController {
         },
         note: service.get('note'),
         price: service.get('price'),
+        isRoundTrip: service.get('isRoundTrip') || false,
         active: service.get('active'),
       };
 
@@ -810,6 +817,16 @@ class ServiceController {
 
   /**
    * PUT /api/services/:id - Update service.
+   *
+   * Body Parameters:
+   * - originPOI: string (optional) - Origin POI ID
+   * - destinationPOI: string (optional) - Destination POI ID
+   * - vehicleType: string (optional) - VehicleType ID
+   * - rate: string (optional) - Rate ID
+   * - note: string (optional) - Service note
+   * - price: number (optional) - Service price
+   * - isRoundTrip: boolean (optional) - Whether service applies to both directions
+   * - active: boolean (optional) - Active status.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
@@ -843,7 +860,7 @@ class ServiceController {
       }
 
       const {
-        originPOI, destinationPOI, vehicleType, rate, note, price, active,
+        originPOI, destinationPOI, vehicleType, rate, note, price, isRoundTrip, active,
       } = req.body;
 
       // Update originPOI if provided
@@ -918,6 +935,11 @@ class ServiceController {
         service.set('price', priceNum);
       }
 
+      // Update isRoundTrip if provided
+      if (typeof isRoundTrip === 'boolean') {
+        service.set('isRoundTrip', isRoundTrip);
+      }
+
       // Update active status if provided
       if (typeof active === 'boolean') {
         service.set('active', active);
@@ -971,6 +993,7 @@ class ServiceController {
         },
         note: service.get('note'),
         price: service.get('price'),
+        isRoundTrip: service.get('isRoundTrip') || false,
         active: service.get('active'),
         updatedAt: service.updatedAt,
       };

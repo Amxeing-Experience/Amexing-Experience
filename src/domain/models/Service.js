@@ -185,6 +185,35 @@ class Service extends BaseModel {
     }).format(this.getPrice());
   }
 
+  /**
+   * Get round trip status.
+   * Indicates if the service price applies to both directions (bidirectional).
+   * @returns {boolean} True if service supports round trips, false otherwise.
+   * @example
+   * // Check if service is round trip
+   * const service = await Service.getServiceById('serviceId');
+   * if (service.getRoundTrip()) {
+   *   console.log('This service applies to both directions');
+   * }
+   */
+  getRoundTrip() {
+    return this.get('isRoundTrip') || false;
+  }
+
+  /**
+   * Set round trip status.
+   * Mark service as bidirectional (same price applies to both origin→destination and destination→origin).
+   * @param {boolean} isRoundTrip - True if service supports round trips.
+   * @example
+   * // Mark service as round trip
+   * const service = Service.create({...});
+   * service.setRoundTrip(true);
+   * await service.save();
+   */
+  setRoundTrip(isRoundTrip) {
+    this.set('isRoundTrip', !!isRoundTrip);
+  }
+
   // =================
   // BUSINESS LOGIC
   // =================
