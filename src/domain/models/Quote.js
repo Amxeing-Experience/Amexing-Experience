@@ -429,6 +429,80 @@ class Quote extends BaseModel {
       throw error;
     }
   }
+
+  /**
+   * Find quote by folio for public view (includes rate and client).
+   * @param {string} folio - Quote folio number.
+   * @returns {Promise<Quote|null>} Quote object with included relations or null if not found.
+   * @example
+   * const quote = await Quote.findByFolioPublic('QTE-2025-0001');
+   */
+  static async findByFolioPublic(folio) {
+    const query = new Parse.Query('Quote');
+    query.equalTo('folio', folio);
+    query.equalTo('exists', true);
+    query.equalTo('active', true);
+
+    // Include related objects for public view
+    query.include('rate');
+    query.include('client');
+
+    try {
+      const result = await query.first({ useMasterKey: true });
+      if (result) {
+        logger.info('Found quote by folio (public)', { folio, quoteId: result.id });
+      } else {
+        logger.warn('Quote not found by folio (public)', { folio });
+      }
+      return result;
+    } catch (error) {
+      logger.error('Error finding quote by folio (public)', {
+        error: error.message,
+        folio,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Get share token.
+   * @returns {string} Share token for public access.
+   * @example
+   * const token = quote.getShareToken();
+   */
+  getShareToken() {
+    return this.get('shareToken');
+  }
+
+  /**
+   * Set share token.
+   * @param {string} token - UUID v4 token for public sharing.
+   * @example
+   * quote.setShareToken('a1b2c3d4-e5f6-7890-abcd-ef1234567890');
+   */
+  setShareToken(token) {
+    this.set('shareToken', token);
+  }
+
+  /**
+   * Get share token active status.
+   * @returns {boolean} Whether share token is active.
+   * @example
+   * const isActive = quote.getShareTokenActive();
+   */
+  getShareTokenActive() {
+    return this.get('shareTokenActive');
+  }
+
+  /**
+   * Set share token active status.
+   * @param {boolean} active - Whether share token is active.
+   * @example
+   * quote.setShareTokenActive(true);
+   */
+  setShareTokenActive(active) {
+    this.set('shareTokenActive', active);
+  }
 }
 
 // Register the subclass with Parse

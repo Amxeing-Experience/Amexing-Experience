@@ -1226,6 +1226,97 @@ class QuoteController {
   }
 
   /**
+   * Generate share link for public quote viewing.
+   * POST /api/quotes/:id/share-link.
+   *
+   * Generates a shareable public URL using the quote's folio.
+   * No token generation needed - folio acts as the access key.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * POST /api/quotes/A2tZ1JtzD4/share-link
+   * Response: { success: true, data: { shareUrl: "http://localhost:1337/quotes/QTE-2025-0004" } }
+   */
+  async generateShareLink(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Usuario no autenticado', 401);
+      }
+
+      // 2. Get quote ID from params
+      const { id } = req.params;
+      if (!id) {
+        return this.sendError(res, 'ID de cotización requerido', 400);
+      }
+
+      // 3. Fetch quote
+      const query = new Parse.Query('Quote');
+      query.equalTo('exists', true);
+      const quote = await query.get(id, { useMasterKey: true });
+
+      if (!quote) {
+        return this.sendError(res, 'Cotización no encontrada', 404);
+      }
+
+      // 4. Verify quote is active
+      const isActive = quote.get('active');
+      if (!isActive) {
+        return this.sendError(
+          res,
+          'No se puede compartir una cotización inactiva',
+          400
+        );
+      }
+
+      // 5. Get folio (required for public access)
+      const folio = quote.get('folio');
+      if (!folio) {
+        return this.sendError(
+          res,
+          'La cotización no tiene folio asignado',
+          500
+        );
+      }
+
+      // 6. Generate share URL using folio
+      const { protocol } = req; // http or https
+      const host = req.get('host'); // localhost:1337 or domain
+      const shareUrl = `${protocol}://${host}/quotes/${folio}`;
+
+      // 7. Log share link generation for audit trail
+      logger.info('Share link generated for quote', {
+        quoteId: quote.id,
+        folio,
+        shareUrl,
+        generatedBy: currentUser.id,
+        timestamp: new Date().toISOString(),
+      });
+
+      // 8. Return share URL
+      return res.json({
+        success: true,
+        data: {
+          shareUrl,
+          folio,
+          quoteId: quote.id,
+        },
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.generateShareLink', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al generar enlace de compartir', 500);
+    }
+  }
+
+  /**
    * Send error response.
    * @param {object} res - Express response object.
    * @param {string} error - Error message.

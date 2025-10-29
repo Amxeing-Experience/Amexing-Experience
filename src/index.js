@@ -47,6 +47,7 @@ const authRoutes = require('./presentation/routes/authRoutes');
 const docsRoutes = require('./presentation/routes/docsRoutes');
 const dashboardRoutes = require('./presentation/routes/dashboardRoutes');
 const atomicRoutes = require('./presentation/routes/atomicRoutes');
+const publicRoutes = require('./presentation/routes/publicRoutes');
 
 // Middleware
 const errorHandler = require('./application/middleware/errorHandler');
@@ -176,6 +177,9 @@ app.use(parseContextMiddleware);
 // Audit context middleware - Propagates authenticated user context to Parse hooks
 // IMPORTANT: Must be applied AFTER authentication middleware but BEFORE routes
 app.use(auditContextMiddleware);
+
+// Public Routes (no authentication - must be before other routes)
+app.use('/', publicRoutes);
 
 // API Routes
 app.use('/api', apiRoutes);

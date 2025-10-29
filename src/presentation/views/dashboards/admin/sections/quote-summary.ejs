@@ -411,16 +411,23 @@
 </style>
 
 <div class="card border-0 shadow-sm">
+    <% if (!locals.isPublicView) { %>
     <div class="card-header bg-white border-bottom d-print-none">
         <div class="d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">
                 <i class="ti ti-file-description me-2"></i>Resumen de la Cotización
             </h5>
-            <button id="exportPdfBtn" class="btn btn-primary" style="display: none;">
-                <i class="ti ti-download me-2"></i>Exportar a PDF
-            </button>
+            <div class="d-flex gap-2">
+                <button id="shareLinkBtn" class="btn btn-success" style="display: none;">
+                    <i class="ti ti-share me-2"></i>Compartir
+                </button>
+                <button id="exportPdfBtn" class="btn btn-primary" style="display: none;">
+                    <i class="ti ti-download me-2"></i>Exportar a PDF
+                </button>
+            </div>
         </div>
     </div>
+    <% } %>
 
     <div class="card-body">
         <!-- Loading State -->
@@ -660,10 +667,12 @@
             // Render services table
             renderServicesTable(quote.serviceItems);
 
-            // Show summary content and export button
+            // Show summary content
             document.getElementById('summaryLoading').style.display = 'none';
             document.getElementById('summaryContent').style.display = 'block';
 
+            // Show and attach buttons (only if not in public view)
+            <% if (!locals.isPublicView) { %>
             const exportBtn = document.getElementById('exportPdfBtn');
             exportBtn.style.display = 'inline-block';
 
@@ -671,6 +680,16 @@
             const newExportBtn = exportBtn.cloneNode(true);
             exportBtn.parentNode.replaceChild(newExportBtn, exportBtn);
             newExportBtn.addEventListener('click', exportToPdf);
+
+            // Show and attach share button
+            const shareBtn = document.getElementById('shareLinkBtn');
+            shareBtn.style.display = 'inline-block';
+
+            // Attach share event listener
+            const newShareBtn = shareBtn.cloneNode(true);
+            shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
+            newShareBtn.addEventListener('click', () => generateShareLink(quote.id));
+            <% } %>
 
         } catch (error) {
             console.error('Error loading quote summary:', error);
@@ -879,6 +898,58 @@
 
         const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
         const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
+        // Apply PDF export mode to original element
+        element.classList.add('pdf-export-mode');
+
+        // Create wrapper using percentage-based width for dynamic PDF sizing
+        // 100% width adapts to page size automatically
+        const wrapper = document.createElement('div');
+        wrapper.id = 'pdf-generation-wrapper';
+        wrapper.style.cssText = `
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 10px;
+            background: #ffffff;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        `;
+
+        // Move original content into wrapper temporarily
+        const parent = element.parentNode;
+        const nextSibling = element.nextSibling;
+
+        wrapper.appendChild(element);
+        document.body.appendChild(wrapper);
+
+        // PDF generation options using percentage-based sizing
+        // Letter page: 215.9mm x 279.4mm - dynamic width calculation
+        const opt = {
+            margin:       [8, 8, 8, 8], // Balanced margins (8mm) for centered content
+            filename:     filename,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  {
+                scale: 2,              // High quality rendering (2x resolution)
+                // No fixed width - let it calculate dynamically from wrapper
+                windowWidth: 800,      // Reference width for consistent rendering
+                useCORS: true,         // Allow external images (logo)
+                letterRendering: true, // Better text rendering
+                scrollY: 0,            // No vertical scroll offset
+                scrollX: 0,            // No horizontal scroll offset
+                backgroundColor: '#ffffff',
+                logging: false         // Disable console logs
+            },
+            jsPDF:        {
+                unit: 'mm',
+                format: 'letter',      // US Letter (215.9mm x 279.4mm)
+                orientation: 'portrait',
+                compress: true
+            },
+            pagebreak: {
+                mode: ['css', 'legacy'],
+                avoid: ['.summary-day-header', '.summary-totals', '.summary-banner', 'tr']
+            }
+        };
 
         // UI feedback
         const btn = document.getElementById('exportPdfBtn');
@@ -1136,5 +1207,152 @@
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             });
+    }
+
+    // Generate share link function
+    async function generateShareLink(quoteId) {
+        try {
+            // Show loading state
+            const btn = document.getElementById('shareLinkBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando...';
+            btn.disabled = true;
+
+            // Get CSRF token from meta tag or cookie
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            // Call API to generate share link (credentials: 'include' sends cookies automatically)
+            const response = await fetch(`/api/quotes/${quoteId}/share-link`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                credentials: 'include' // Important: sends cookies (JWT token) automatically
+            });
+
+            const result = await response.json();
+
+            // Restore button state
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Error al generar el enlace');
+            }
+
+            // Show modal with share link
+            showShareModal(result.data);
+
+        } catch (error) {
+            console.error('Error generating share link:', error);
+            alert(`Error al generar enlace: ${error.message}`);
+
+            // Restore button state
+            const btn = document.getElementById('shareLinkBtn');
+            btn.innerHTML = '<i class="ti ti-share me-2"></i>Compartir';
+            btn.disabled = false;
+        }
+    }
+
+    // Show share modal with copy functionality
+    function showShareModal(data) {
+        // Create modal HTML
+        const modalHtml = `
+            <div class="modal fade" id="shareLinkModal" tabindex="-1" aria-labelledby="shareLinkModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title" id="shareLinkModalLabel">
+                                <i class="ti ti-share me-2"></i>Enlace de Compartir
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted mb-3">
+                                <i class="ti ti-info-circle me-2"></i>
+                                Comparta este enlace con su cliente para que pueda ver la cotización sin necesidad de iniciar sesión.
+                            </p>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Folio</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" value="${data.folio}" readonly>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">URL Pública</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="shareUrlInput" value="${data.shareUrl}" readonly>
+                                    <button class="btn btn-outline-primary" type="button" id="copyShareUrlBtn">
+                                        <i class="ti ti-copy me-1"></i>Copiar
+                                    </button>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="ti ti-lock-open me-1"></i>
+                                    Este enlace es público y no requiere autenticación
+                                </small>
+                            </div>
+
+                            <div class="alert alert-info mb-0">
+                                <i class="ti ti-bulb me-2"></i>
+                                <strong>Consejo:</strong> Puede copiar este enlace y enviarlo por correo electrónico o WhatsApp a su cliente.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                            <a href="${data.shareUrl}" target="_blank" class="btn btn-primary">
+                                <i class="ti ti-external-link me-2"></i>Abrir en Nueva Pestaña
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        const existingModal = document.getElementById('shareLinkModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Insert modal into DOM
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Get modal element and show it
+        const modalElement = document.getElementById('shareLinkModal');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+
+        // Attach copy button event listener
+        document.getElementById('copyShareUrlBtn').addEventListener('click', () => {
+            const input = document.getElementById('shareUrlInput');
+            input.select();
+            input.setSelectionRange(0, 99999); // For mobile devices
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(input.value).then(() => {
+                const btn = document.getElementById('copyShareUrlBtn');
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="ti ti-check me-1"></i>¡Copiado!';
+                btn.classList.remove('btn-outline-primary');
+                btn.classList.add('btn-success');
+
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-primary');
+                }, 2000);
+            }).catch(err => {
+                console.error('Error copying to clipboard:', err);
+                alert('Error al copiar el enlace. Por favor cópielo manualmente.');
+            });
+        });
+
+        // Clean up modal when hidden
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            modalElement.remove();
+        });
     }
 </script>

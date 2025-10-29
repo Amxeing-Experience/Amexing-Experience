@@ -677,6 +677,7 @@ class ClientsController {
         organizationId: 'client',
         password: this.generateSecurePassword(),
         active: true,
+        exists: true, // MANDATORY: Required for all database records (CLAUDE.md standard)
         contextualData: {
           companyName: companyName?.trim() || '',
           quickCreated: true,

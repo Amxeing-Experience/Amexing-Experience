@@ -52,6 +52,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <th class="text-center">No. Personas</th>
                         <th>Creado Por</th>
                         <th class="text-center">Estatus</th>
+                        <th class="text-center">Fecha Creación</th>
+                        <th class="text-center">Última Modificación</th>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
                         <% } %>
@@ -292,6 +294,48 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         return select;
                     }
                 },
+                {
+                    data: 'createdAt',
+                    className: 'text-center',
+                    render: function(data) {
+                        if (!data) return '<em class="text-muted">N/A</em>';
+                        const date = new Date(data);
+                        const dateStr = date.toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                        const timeStr = date.toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        return `<div style="white-space: nowrap;">
+                                    <div class="fw-semibold">${dateStr}</div>
+                                    <small class="text-muted">${timeStr}</small>
+                                </div>`;
+                    }
+                },
+                {
+                    data: 'updatedAt',
+                    className: 'text-center',
+                    render: function(data) {
+                        if (!data) return '<em class="text-muted">N/A</em>';
+                        const date = new Date(data);
+                        const dateStr = date.toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                        const timeStr = date.toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        return `<div style="white-space: nowrap;">
+                                    <div class="fw-semibold">${dateStr}</div>
+                                    <small class="text-muted">${timeStr}</small>
+                                </div>`;
+                    }
+                },
                 ...(showActions ? [{
                     data: null,
                     orderable: false,
@@ -344,7 +388,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando Cotizaciones...'
             },
-            order: [[5, 'desc']], // Sort by status column by default
+            order: [[7, 'desc']], // Sort by updatedAt column by default (most recent first)
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +

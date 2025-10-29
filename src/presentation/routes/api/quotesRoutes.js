@@ -264,6 +264,33 @@ router.post(
 );
 
 /**
+ * POST /api/quotes/:id/share-link - Generate shareable public link.
+ * Private access (Admin and SuperAdmin only).
+ *
+ * Generates a public URL for sharing the quote with clients.
+ * Uses the quote's folio as the access key (e.g., /quotes/QTE-2025-0004).
+ * No authentication required for the public view.
+ * @returns {object} Response with share URL.
+ * @example
+ * // Response structure:
+ * {
+ *   success: true,
+ *   data: {
+ *     shareUrl: 'http://localhost:1337/quotes/QTE-2025-0004',
+ *     folio: 'QTE-2025-0004',
+ *     quoteId: 'abc123'
+ *   }
+ * }
+ */
+router.post(
+  '/:id/share-link',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.generateShareLink(req, res)
+);
+
+/**
  * DELETE /api/quotes/:id - Soft delete quote.
  * Private access (Admin and SuperAdmin only).
  *
