@@ -34,7 +34,7 @@ class ExperienceImageController {
     // Initialize FileStorageService for S3 operations
     this.fileStorageService = new FileStorageService({
       baseFolder: 'experiences',
-      isPublic: false,
+      isPublic: false, // Use presigned URLs with IAM role credentials
       deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
       presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
     });
@@ -181,7 +181,7 @@ class ExperienceImageController {
       await ExperienceImage.recalculateDisplayOrder(experienceId);
 
       // Generate presigned URL for immediate access
-      const presignedUrl = this.fileStorageService.getPresignedUrl(uploadResult.s3Key);
+      const presignedUrl = await this.fileStorageService.getPresignedUrl(uploadResult.s3Key);
 
       logger.info('Experience image uploaded to S3', {
         experienceId,
@@ -291,30 +291,32 @@ class ExperienceImageController {
 
       const images = await ExperienceImage.findByExperience(experienceId);
 
-      const data = images.map((img) => {
-        const s3Key = img.get('s3Key');
-        const imageFile = img.get('imageFile'); // Legacy Parse.File support
+      const data = await Promise.all(
+        images.map(async (img) => {
+          const s3Key = img.get('s3Key');
+          const imageFile = img.get('imageFile'); // Legacy Parse.File support
 
-        // Generate presigned URL from s3Key, or fallback to legacy imageFile or url
-        let url = null;
-        if (s3Key) {
-          url = this.fileStorageService.getPresignedUrl(s3Key);
-        } else if (imageFile) {
-          url = imageFile.url(); // Legacy Parse.File
-        } else {
-          url = img.get('url'); // Very old legacy local path
-        }
+          // Generate presigned URL from s3Key, or fallback to legacy imageFile or url
+          let url = null;
+          if (s3Key) {
+            url = await this.fileStorageService.getPresignedUrl(s3Key);
+          } else if (imageFile) {
+            url = imageFile.url(); // Legacy Parse.File
+          } else {
+            url = img.get('url'); // Very old legacy local path
+          }
 
-        return {
-          id: img.id,
-          url,
-          fileName: img.get('fileName'),
-          fileSize: img.get('fileSize'),
-          isPrimary: img.get('isPrimary'),
-          displayOrder: img.get('displayOrder'),
-          uploadedAt: img.get('uploadedAt'),
-        };
-      });
+          return {
+            id: img.id,
+            url,
+            fileName: img.get('fileName'),
+            fileSize: img.get('fileSize'),
+            isPrimary: img.get('isPrimary'),
+            displayOrder: img.get('displayOrder'),
+            uploadedAt: img.get('uploadedAt'),
+          };
+        })
+      );
 
       // PCI DSS 10.2.1 - Security logging for data access (READ operation)
       if (req.user) {
@@ -437,7 +439,7 @@ class ExperienceImageController {
           // Update experience's mainImage reference with presigned URL
           const nextS3Key = nextPrimaryImage.get('s3Key');
           if (nextS3Key) {
-            const mainImageUrl = this.fileStorageService.getPresignedUrl(nextS3Key);
+            const mainImageUrl = await this.fileStorageService.getPresignedUrl(nextS3Key);
             experience.set('mainImage', mainImageUrl);
           } else {
             // Fallback to legacy url field
@@ -605,7 +607,7 @@ class ExperienceImageController {
         // Generate presigned URL from s3Key or use legacy url
         const s3Key = newPrimaryImage.get('s3Key');
         if (s3Key) {
-          const mainImageUrl = this.fileStorageService.getPresignedUrl(s3Key);
+          const mainImageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
           experience.set('mainImage', mainImageUrl);
         } else {
           // Fallback to legacy url field

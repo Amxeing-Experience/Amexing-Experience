@@ -140,9 +140,9 @@ class SecurityMiddleware {
           upgradeInsecureRequests: this.isProduction ? [] : null,
         },
       },
-      crossOriginEmbedderPolicy: !this.isDevelopment,
+      crossOriginEmbedderPolicy: false, // Disabled to allow S3 images
       crossOriginOpenerPolicy: { policy: 'same-origin' },
-      crossOriginResourcePolicy: { policy: 'same-origin' },
+      crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin resources (S3 images)
       dnsPrefetchControl: { allow: false },
       expectCt: {
         enforce: true,

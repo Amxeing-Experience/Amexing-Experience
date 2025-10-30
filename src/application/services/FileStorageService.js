@@ -121,13 +121,29 @@ class FileStorageService {
       const s3Prefix = process.env.S3_PREFIX || '';
       const s3Key = `${s3Prefix}${uniqueFileName}`;
 
-      // Initialize AWS S3 client
+      // Initialize AWS S3 client using credential chain (IAM role, env vars, etc.)
       const AWS = require('aws-sdk');
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        region: process.env.AWS_REGION || 'us-east-2',
+      const region = process.env.AWS_REGION || 'us-east-2';
+
+      // Configure AWS to use EC2 instance metadata with IMDSv2
+      AWS.config.update({
+        region,
+        maxRetries: 3,
+        httpOptions: {
+          timeout: 5000,
+          connectTimeout: 5000,
+        },
       });
+
+      // Use EC2 Metadata credentials explicitly if no env credentials
+      if (!process.env.AWS_ACCESS_KEY_ID) {
+        AWS.config.credentials = new AWS.EC2MetadataCredentials({
+          httpOptions: { timeout: 5000 },
+          maxRetries: 3,
+        });
+      }
+
+      const s3 = new AWS.S3();
 
       const bucket = process.env.S3_BUCKET;
 
@@ -239,30 +255,98 @@ class FileStorageService {
   }
 
   /**
-   * Generate presigned URL for secure file access.
+   * Generate URL for file access.
    *
-   * Creates temporary URL with expiration for accessing private S3 objects.
-   * Default expiration is 24 hours (86400 seconds).
+   * For public files: Returns direct S3 URL without expiration.
+   * For private files: Returns presigned URL with expiration.
+   *
+   * Uses AWS SDK credential chain (IAM role, environment variables, etc.)
+   * instead of explicit credentials for better security.
    * @param {string} s3Key - S3 object key (full path including prefix).
-   * @param {number} expiresIn - URL expiration in seconds (default: 86400 = 24 hours).
-   * @returns {string} Presigned S3 URL.
+   * @param {number} expiresIn - URL expiration in seconds (only for presigned URLs).
+   * @returns {Promise<string>} S3 URL (direct or presigned based on isPublic setting).
    * @example
-   * const url = service.getPresignedUrl('dev/vehicles/abc123/image.jpg');
-   * // https://amexing-bucket.s3.us-east-2.amazonaws.com/dev/vehicles/abc123/image.jpg?X-Amz-Signature=...
+   * // Public file (direct URL)
+   * const url = await service.getPresignedUrl('prod/vehicles/abc123/image.jpg');
+   * // https://amexing-bucket.s3.us-east-2.amazonaws.com/prod/vehicles/abc123/image.jpg
+   *
+   * // Private file (presigned URL)
+   * const privateUrl = await service.getPresignedUrl('prod/documents/sensitive.pdf', 3600);
+   * // https://amexing-bucket.s3.us-east-2.amazonaws.com/prod/documents/sensitive.pdf?X-Amz-Signature=...
    */
-  getPresignedUrl(s3Key, expiresIn = null) {
+  async getPresignedUrl(s3Key, expiresIn = null) {
     try {
+      const bucket = process.env.S3_BUCKET;
+      const region = process.env.AWS_REGION || 'us-east-2';
+
+      // Validate inputs
+      if (!bucket) {
+        throw new Error('S3_BUCKET environment variable is not configured');
+      }
+      if (!s3Key) {
+        throw new Error('s3Key parameter is required');
+      }
+
+      // For public files, generate direct S3 URL (no signature needed)
+      if (this.isPublic) {
+        const directUrl = `https://${bucket}.s3.${region}.amazonaws.com/${s3Key}`;
+
+        logger.debug('Generated direct S3 URL for public file', {
+          s3Key,
+          bucket,
+          region,
+          urlLength: directUrl.length,
+        });
+
+        return directUrl;
+      }
+
+      // For private files, generate presigned URL with signature
       const AWS = require('aws-sdk');
+
+      // Configure AWS to use EC2 instance metadata with IMDSv2
+      AWS.config.update({
+        region,
+        maxRetries: 3,
+        httpOptions: {
+          timeout: 5000, // 5 second timeout
+          connectTimeout: 5000,
+        },
+      });
+
+      // Use EC2 Metadata credentials explicitly if no env credentials
+      if (!process.env.AWS_ACCESS_KEY_ID) {
+        const credentials = new AWS.EC2MetadataCredentials({
+          httpOptions: { timeout: 5000 },
+          maxRetries: 3,
+        });
+
+        // IMPORTANT: Wait for credentials to load before generating URL
+        await new Promise((resolve, reject) => {
+          credentials.get((err) => {
+            if (err) {
+              logger.error('Failed to load EC2 metadata credentials', {
+                error: err.message,
+                code: err.code,
+              });
+              reject(err);
+            } else {
+              logger.debug('EC2 metadata credentials loaded successfully', {
+                accessKeyId: `${credentials.accessKeyId?.substring(0, 8)}...`,
+              });
+              resolve();
+            }
+          });
+        });
+
+        AWS.config.credentials = credentials;
+      }
+
       const s3 = new AWS.S3({
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        region: process.env.AWS_REGION || 'us-east-2',
         signatureVersion: 'v4',
       });
 
-      const bucket = process.env.S3_BUCKET;
       const expiration = expiresIn || this.presignedUrlExpires;
-
       const params = {
         Bucket: bucket,
         Key: s3Key,
@@ -270,6 +354,24 @@ class FileStorageService {
       };
 
       const url = s3.getSignedUrl('getObject', params);
+
+      // Validate the generated presigned URL
+      if (!url.includes(bucket) || !url.includes(s3Key)) {
+        logger.error('Generated presigned URL is incomplete - possibly missing AWS credentials', {
+          url,
+          bucket,
+          s3Key,
+          hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
+          hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
+        });
+
+        // Fallback to direct URL if presigned URL generation fails
+        const fallbackUrl = `https://${bucket}.s3.${region}.amazonaws.com/${s3Key}`;
+        logger.warn('Using direct S3 URL as fallback (may fail if bucket is private)', {
+          fallbackUrl,
+        });
+        return fallbackUrl;
+      }
 
       logger.debug('Generated presigned URL', {
         s3Key,
@@ -279,9 +381,11 @@ class FileStorageService {
 
       return url;
     } catch (error) {
-      logger.error('Error generating presigned URL', {
+      logger.error('Error generating S3 URL', {
         error: error.message,
+        stack: error.stack,
         s3Key,
+        isPublic: this.isPublic,
       });
       throw error;
     }
@@ -292,10 +396,10 @@ class FileStorageService {
    * Kept for backward compatibility with Parse.File references.
    * @deprecated
    * @param {Parse.File|string} parseFileOrKey - Parse.File object or S3 key.
-   * @returns {string|null} Presigned S3 URL or null if file is null/undefined.
+   * @returns {Promise<string|null>} Presigned S3 URL or null if file is null/undefined.
    * @example
    */
-  generateUrl(parseFileOrKey) {
+  async generateUrl(parseFileOrKey) {
     if (!parseFileOrKey) return null;
 
     // If it's a Parse.File, extract the name (S3 key)
@@ -381,11 +485,27 @@ class FileStorageService {
       // Use AWS SDK directly for copy/delete operations
       // Parse.File doesn't support move/copy natively
       const AWS = require('aws-sdk');
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        region: process.env.AWS_REGION || 'us-east-1',
+      const region = process.env.AWS_REGION || 'us-east-2';
+
+      // Configure AWS to use EC2 instance metadata with IMDSv2
+      AWS.config.update({
+        region,
+        maxRetries: 3,
+        httpOptions: {
+          timeout: 5000,
+          connectTimeout: 5000,
+        },
       });
+
+      // Use EC2 Metadata credentials explicitly if no env credentials
+      if (!process.env.AWS_ACCESS_KEY_ID) {
+        AWS.config.credentials = new AWS.EC2MetadataCredentials({
+          httpOptions: { timeout: 5000 },
+          maxRetries: 3,
+        });
+      }
+
+      const s3 = new AWS.S3();
 
       const bucket = process.env.S3_BUCKET;
       const sourceKey = parseFile.name();
@@ -455,11 +575,27 @@ class FileStorageService {
   async _hardDelete(parseFile, options) {
     try {
       const AWS = require('aws-sdk');
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        region: process.env.AWS_REGION || 'us-east-1',
+      const region = process.env.AWS_REGION || 'us-east-2';
+
+      // Configure AWS to use EC2 instance metadata with IMDSv2
+      AWS.config.update({
+        region,
+        maxRetries: 3,
+        httpOptions: {
+          timeout: 5000,
+          connectTimeout: 5000,
+        },
       });
+
+      // Use EC2 Metadata credentials explicitly if no env credentials
+      if (!process.env.AWS_ACCESS_KEY_ID) {
+        AWS.config.credentials = new AWS.EC2MetadataCredentials({
+          httpOptions: { timeout: 5000 },
+          maxRetries: 3,
+        });
+      }
+
+      const s3 = new AWS.S3();
 
       await s3
         .deleteObject({
@@ -500,11 +636,27 @@ class FileStorageService {
   async listFiles(prefix) {
     try {
       const AWS = require('aws-sdk');
-      const s3 = new AWS.S3({
-        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-        region: process.env.AWS_REGION || 'us-east-1',
+      const region = process.env.AWS_REGION || 'us-east-2';
+
+      // Configure AWS to use EC2 instance metadata with IMDSv2
+      AWS.config.update({
+        region,
+        maxRetries: 3,
+        httpOptions: {
+          timeout: 5000,
+          connectTimeout: 5000,
+        },
       });
+
+      // Use EC2 Metadata credentials explicitly if no env credentials
+      if (!process.env.AWS_ACCESS_KEY_ID) {
+        AWS.config.credentials = new AWS.EC2MetadataCredentials({
+          httpOptions: { timeout: 5000 },
+          maxRetries: 3,
+        });
+      }
+
+      const s3 = new AWS.S3();
 
       const fullPrefix = `${this.baseFolder}/${prefix || ''}`;
       const result = await s3
