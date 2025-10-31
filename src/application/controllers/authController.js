@@ -652,25 +652,31 @@ class AuthController {
         const crypto = require('crypto');
         req.session.csrfSecret = crypto.randomBytes(32).toString('hex');
 
-        // Save regenerated session before redirect
+        // CRITICAL FIX: Save regenerated session and wait for persistence before redirect
         req.session.save((saveErr) => {
           if (saveErr) {
             logger.error('Error saving regenerated session:', saveErr);
+            // Don't return here - still clear cookie and redirect
           }
 
           // Clear cookie (will be recreated with new session)
           res.clearCookie('amexing.sid');
 
-          // Handle response type
-          if (req.accepts('json')) {
-            return res.json({
-              success: true,
-              message: 'Logged out successfully',
-            });
-          }
+          // CRITICAL FIX: Add small delay to ensure MongoDB write completes
+          // This prevents race conditions where the user immediately logs back in
+          // before the new session with CSRF secret is fully persisted
+          setTimeout(() => {
+            // Handle response type
+            if (req.accepts('json')) {
+              return res.json({
+                success: true,
+                message: 'Logged out successfully',
+              });
+            }
 
-          // Redirect to home
-          res.redirect('/');
+            // Redirect to home
+            res.redirect('/');
+          }, 100); // 100ms delay for MongoDB persistence
         });
       });
     } catch (error) {

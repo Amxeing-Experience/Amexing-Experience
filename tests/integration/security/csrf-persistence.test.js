@@ -292,4 +292,162 @@ describe('CSRF Persistence Integration', () => {
       expect(response.body.message).toContain('refresh');
     });
   });
+
+  describe('CSRF Race Condition Prevention', () => {
+    it('should handle rapid logout-login without TOKEN_INVALID errors', async () => {
+      // First login
+      const loginPage1 = await agent.get('/login').expect(200);
+      const csrf1 = AuthTestHelper.extractCsrfToken(loginPage1.text);
+
+      const credentials = AuthTestHelper.getCredentials('admin');
+      await agent
+        .post('/auth/login')
+        .send({
+          identifier: credentials.email,
+          password: credentials.password,
+          csrfToken: csrf1,
+        })
+        .expect(302);
+
+      // Immediate logout (don't wait)
+      await agent.get('/logout').expect(302);
+
+      // CRITICAL TEST: Immediately get login page and submit
+      // This tests the race condition fix where CSRF secret might not be
+      // persisted to MongoDB yet
+      const loginPage2 = await agent.get('/login').expect(200);
+      const csrf2 = AuthTestHelper.extractCsrfToken(loginPage2.text);
+
+      // Should NOT get TOKEN_INVALID error
+      const response = await agent
+        .post('/auth/login')
+        .send({
+          identifier: credentials.email,
+          password: credentials.password,
+          csrfToken: csrf2,
+        })
+        .expect(302);
+
+      expect(response.headers.location).toMatch(/^\/dashboard/);
+    });
+
+    it('should handle multiple rapid GET requests without losing CSRF secret', async () => {
+      // Rapid-fire multiple GET requests
+      const promises = [];
+      for (let i = 0; i < 10; i++) {
+        promises.push(agent.get('/login'));
+      }
+
+      const responses = await Promise.all(promises);
+
+      // All should succeed
+      responses.forEach(response => {
+        expect(response.status).toBe(200);
+        const csrf = AuthTestHelper.extractCsrfToken(response.text);
+        expect(csrf).toBeTruthy();
+        expect(csrf.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('should allow login immediately after session regeneration', async () => {
+      // Login
+      const loginPage1 = await agent.get('/login').expect(200);
+      const csrf1 = AuthTestHelper.extractCsrfToken(loginPage1.text);
+
+      const credentials = AuthTestHelper.getCredentials('superadmin');
+      await agent
+        .post('/auth/login')
+        .send({
+          identifier: credentials.email,
+          password: credentials.password,
+          csrfToken: csrf1,
+        })
+        .expect(302);
+
+      // Logout
+      await agent.get('/logout').expect(302);
+
+      // IMMEDIATELY (no delay) get new login page
+      const loginPage2 = await agent.get('/login');
+      expect(loginPage2.status).toBe(200);
+
+      const csrf2 = AuthTestHelper.extractCsrfToken(loginPage2.text);
+      expect(csrf2).toBeTruthy();
+
+      // IMMEDIATELY try to login (stress test the persistence)
+      const response = await agent
+        .post('/auth/login')
+        .send({
+          identifier: credentials.email,
+          password: credentials.password,
+          csrfToken: csrf2,
+        });
+
+      // Should succeed without TOKEN_INVALID
+      expect(response.status).toBe(302);
+      expect(response.headers.location).toMatch(/^\/dashboard/);
+    });
+  });
+
+  describe('CSRF MongoDB Persistence', () => {
+    it('should persist CSRF secret to session store within 200ms', async () => {
+      const response = await agent.get('/login').expect(200);
+      const csrfToken = AuthTestHelper.extractCsrfToken(response.text);
+
+      expect(csrfToken).toBeTruthy();
+
+      // Wait for persistence (should happen within 200ms with our fixes)
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Get the page again - should still have valid CSRF
+      const response2 = await agent.get('/login').expect(200);
+      const csrfToken2 = AuthTestHelper.extractCsrfToken(response2.text);
+
+      expect(csrfToken2).toBeTruthy();
+
+      // Should be able to use the second token successfully
+      const credentials = AuthTestHelper.getCredentials('admin');
+      const loginResponse = await agent
+        .post('/auth/login')
+        .send({
+          identifier: credentials.email,
+          password: credentials.password,
+          csrfToken: csrfToken2,
+        })
+        .expect(302);
+
+      expect(loginResponse.headers.location).toMatch(/^\/dashboard/);
+    });
+
+    it('should not lose CSRF secret across multiple page loads', async () => {
+      // Load login page 5 times
+      const tokens = [];
+      for (let i = 0; i < 5; i++) {
+        const response = await agent.get('/login').expect(200);
+        const token = AuthTestHelper.extractCsrfToken(response.text);
+        tokens.push(token);
+        // Small delay between requests
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      // All tokens should be valid (non-empty)
+      tokens.forEach(token => {
+        expect(token).toBeTruthy();
+        expect(token.length).toBeGreaterThan(0);
+      });
+
+      // Use the last token to login (should work)
+      const credentials = AuthTestHelper.getCredentials('admin');
+      const response = await agent
+        .post('/auth/login')
+        .send({
+          identifier: credentials.email,
+          password: credentials.password,
+          csrfToken: tokens[tokens.length - 1],
+        })
+        .expect(302);
+
+      expect(response.headers.location).toMatch(/^\/dashboard/);
+    });
+  });
 });

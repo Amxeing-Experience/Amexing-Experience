@@ -359,9 +359,17 @@ class SecurityMiddleware {
             serverSelectionTimeoutMS: 10000,
             retryWrites: true,
             retryReads: true,
+            // CRITICAL FIX: Add write concern for guaranteed persistence
+            writeConcern: {
+              w: 'majority', // Wait for majority of nodes to acknowledge
+              j: true, // Wait for journal write (durable)
+              wtimeout: 5000, // Timeout after 5 seconds
+            },
           },
           // Touch sessions on access to extend TTL
-          touchAfter: 300, // Touch session every 5 minutes (in seconds)
+          // CRITICAL FIX: Reduced from 300 to 30 seconds to ensure frequent persistence
+          // This prevents in-memory/MongoDB desynchronization of CSRF secrets
+          touchAfter: 30, // Touch session every 30 seconds (in seconds)
         });
 
         // Session store error handling
@@ -402,7 +410,8 @@ class SecurityMiddleware {
 
         winston.info('MongoDB session store configured successfully', {
           ttl: parseInt(process.env.SESSION_TIMEOUT_MINUTES, 10) * 60 || 3600,
-          touchAfter: 300,
+          touchAfter: 30,
+          writeConcern: 'majority with journal',
         });
       } catch (error) {
         winston.error('Failed to create MongoDB session store:', {
@@ -641,9 +650,35 @@ class SecurityMiddleware {
             // Generate CSRF secret if missing (auto-recovery)
             if (!req.session.csrfSecret) {
               req.session.csrfSecret = await uidSafe(32);
-              winston.debug('Generated CSRF secret for new session', {
-                sessionID: req.session.id,
-                path: req.path,
+
+              // CRITICAL FIX: Explicitly save session to MongoDB before proceeding
+              // This prevents race conditions where the token is generated but the secret
+              // hasn't been persisted to the database yet
+              await new Promise((resolve, reject) => {
+                req.session.save((err) => {
+                  if (err) {
+                    winston.error('Failed to save session after CSRF generation', {
+                      error: err.message,
+                      sessionID: req.session.id,
+                      path: req.path,
+                    });
+                    sessionMetrics.recordCsrfSecretPersistenceFailure(req.session.id, err, {
+                      path: req.path,
+                      phase: 'generation',
+                    });
+                    reject(err);
+                  } else {
+                    winston.debug('Generated and saved CSRF secret for new session', {
+                      sessionID: req.session.id,
+                      path: req.path,
+                    });
+                    sessionMetrics.recordCsrfSecretPersisted(req.session.id, {
+                      path: req.path,
+                      phase: 'generation',
+                    });
+                    resolve();
+                  }
+                });
               });
             }
             const token = this.csrfProtection.create(req.session.csrfSecret);
@@ -654,59 +689,36 @@ class SecurityMiddleware {
         }
 
         // For state-changing requests, verify CSRF token
-        let secret = req.session?.csrfSecret;
+        const secret = req.session?.csrfSecret;
 
-        // AUTO-RECOVERY: If secret is missing but session exists, generate new one
-        // This prevents user-facing errors during edge cases (session expiration, etc.)
-        if (!secret && req.session) {
-          winston.warn('CSRF secret missing for state-changing request - auto-recovering', {
+        // CRITICAL FIX: Removed dangerous auto-recovery logic that generates new secret on POST
+        // The old logic would generate a NEW secret when validating a token that was created
+        // with the OLD secret, causing guaranteed validation failures.
+        //
+        // Instead, we now fail fast with a clear error message that tells the user
+        // their session has expired and they need to refresh the page to get a new token.
+        if (!secret) {
+          winston.error('CSRF validation failed - no CSRF secret in session', {
             method: req.method,
             path: req.path,
-            sessionID: req.session.id,
+            hasSession: !!req.session,
+            sessionID: req.session?.id,
             ip: req.ip,
             userAgent: req.get('User-Agent')?.substring(0, 50),
             timestamp: new Date().toISOString(),
           });
 
-          // Generate new CSRF secret
-          secret = await uidSafe(32);
-          req.session.csrfSecret = secret;
-
-          // Log recovery for security audit
-          winston.info('CSRF secret auto-recovered', {
-            sessionID: req.session.id,
-            path: req.path,
+          // Record metrics for monitoring
+          sessionMetrics.recordCsrfValidationFailure('SECRET_MISSING', {
             method: req.method,
-          });
-
-          // Set recovery header for client awareness
-          res.setHeader('X-CSRF-Recovered', 'true');
-
-          // For HTML requests, redirect to refresh with new CSRF token
-          if (req.accepts('html')) {
-            winston.debug('Redirecting HTML request for CSRF recovery', {
-              path: req.path,
-              sessionID: req.session.id,
-            });
-
-            // Preserve the original URL for redirect back
-            const returnUrl = req.originalUrl || req.path;
-            return res.redirect(returnUrl);
-          }
-        }
-
-        // If still no secret (no session), fail with clear error
-        if (!secret) {
-          winston.error('CSRF validation failed - no session available', {
-            method: req.method,
-            path: req.path,
-            hasSession: !!req.session,
+            url: req.originalUrl,
             ip: req.ip,
+            hasSession: !!req.session,
           });
 
           return res.status(403).json({
             error: 'CSRF Error',
-            message: 'Session expired. Please refresh the page and try again.',
+            message: 'Your session has expired. Please refresh the page and try again.',
             code: 'SESSION_EXPIRED',
             recoveryAction: 'refresh_page',
           });

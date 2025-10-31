@@ -154,6 +154,51 @@ class SessionMetrics {
   }
 
   /**
+   * Record successful CSRF secret persistence to session store.
+   * @param sessionId
+   * @param context
+   * @example
+   */
+  recordCsrfSecretPersisted(sessionId, context = {}) {
+    if (!this.metrics.csrfSecretsPersisted) {
+      this.metrics.csrfSecretsPersisted = 0;
+    }
+    this.metrics.csrfSecretsPersisted++;
+
+    logger.debug('CSRF secret persisted successfully', {
+      sessionId: `${sessionId?.substring(0, 8)}***`,
+      totalPersisted: this.metrics.csrfSecretsPersisted,
+      context,
+    });
+  }
+
+  /**
+   * Record failed CSRF secret persistence to session store.
+   * @param sessionId
+   * @param error
+   * @param context
+   * @example
+   */
+  recordCsrfSecretPersistenceFailure(sessionId, error, context = {}) {
+    if (!this.metrics.csrfSecretPersistenceFailures) {
+      this.metrics.csrfSecretPersistenceFailures = 0;
+    }
+    this.metrics.csrfSecretPersistenceFailures++;
+
+    this.addRecentError('CSRF_SECRET_PERSISTENCE_FAILURE', error.message || error, {
+      sessionId: `${sessionId?.substring(0, 8)}***`,
+      ...context,
+    });
+
+    logger.error('CSRF secret persistence failure', {
+      sessionId: `${sessionId?.substring(0, 8)}***`,
+      error: error.message || error,
+      totalFailures: this.metrics.csrfSecretPersistenceFailures,
+      context,
+    });
+  }
+
+  /**
    * Record CSRF validation success.
    * @example
    */
