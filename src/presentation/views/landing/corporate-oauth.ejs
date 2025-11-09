@@ -1,0 +1,591 @@
+<%# 
+Corporate OAuth Landing Page - Sprint 04
+Dedicated landing page for corporate OAuth authentication
+Supports white-label branding and department-specific flows
+%>
+
+<!DOCTYPE html>
+<html lang="en" data-corporate-oauth="true">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    
+    <%# Dynamic title based on corporate configuration %>
+    <title><%= corporateConfig && corporateConfig.metadata && corporateConfig.metadata.title ? corporateConfig.metadata.title : (corporateConfig && corporateConfig.name ? 'Sign in to ' + corporateConfig.name : 'Corporate Sign In - AmexingWeb') %></title>
+    
+    <%# Dynamic meta description %>
+    <% if (corporateConfig && corporateConfig.metadata && corporateConfig.metadata.description) { %>
+        <meta name="description" content="<%= corporateConfig.metadata.description %>">
+    <% } else { %>
+        <meta name="description" content="Secure corporate sign-in powered by AmexingWeb OAuth integration">
+    <% } %>
+    
+    <%# Open Graph meta tags for social sharing %>
+    <% if (corporateConfig && corporateConfig.metadata) { %>
+        <% if (corporateConfig.metadata.ogTitle) { %>
+            <meta property="og:title" content="<%= corporateConfig.metadata.ogTitle %>">
+        <% } %>
+        <% if (corporateConfig.metadata.ogDescription) { %>
+            <meta property="og:description" content="<%= corporateConfig.metadata.ogDescription %>">
+        <% } %>
+        <% if (corporateConfig.metadata.ogImage) { %>
+            <meta property="og:image" content="<%= corporateConfig.metadata.ogImage %>">
+        <% } %>
+    <% } %>
+    
+    <%# Favicon - corporate or default %>
+    <% if (corporateConfig && corporateConfig.branding && corporateConfig.branding.favicon) { %>
+        <link rel="icon" href="<%= corporateConfig.branding.favicon %>">
+    <% } else { %>
+        <link rel="icon" href="/favicon.ico">
+    <% } %>
+    
+    <%# Base styles %>
+    <style>
+        :root {
+            --primary-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.primaryColor ? corporateConfig.theme.primaryColor : '#667eea' %>;
+            --secondary-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.secondaryColor ? corporateConfig.theme.secondaryColor : '#764ba2' %>;
+            --background-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.backgroundColor ? corporateConfig.theme.backgroundColor : '#ffffff' %>;
+            --text-color: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.textColor ? corporateConfig.theme.textColor : '#1f2937' %>;
+            --font-primary: <%= corporateConfig && corporateConfig.fonts && corporateConfig.fonts.primaryFont ? corporateConfig.fonts.primaryFont : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif' %>;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: var(--font-primary);
+            line-height: 1.6;
+            color: var(--text-color);
+            background: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.gradientBackground ? corporateConfig.theme.gradientBackground : 'linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%)' %>;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            <% if (corporateConfig && corporateConfig.branding && corporateConfig.branding.backgroundImage) { %>
+                background-image: url('<%= corporateConfig.branding.backgroundImage %>');
+                background-size: cover;
+                background-position: center;
+                background-attachment: fixed;
+            <% } %>
+        }
+        
+        .corporate-container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--background-color);
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .corporate-header {
+            text-align: center;
+            padding: 2rem 2rem 1rem 2rem;
+            background: <%= corporateConfig && corporateConfig.theme && corporateConfig.theme.headerBackground ? corporateConfig.theme.headerBackground : 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)' %>;
+            position: relative;
+        }
+        
+        .corporate-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+        }
+        
+        .corporate-logo {
+            max-height: 80px;
+            max-width: 250px;
+            margin-bottom: 1rem;
+            object-fit: contain;
+        }
+        
+        .corporate-name {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+        
+        .corporate-tagline {
+            color: #666;
+            font-size: 0.875rem;
+            margin-bottom: 0;
+        }
+        
+        .oauth-content {
+            padding: 2rem;
+        }
+        
+        .security-notice {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid #10b981;
+            border-radius: 0 8px 8px 0;
+            margin-bottom: 2rem;
+            font-size: 0.875rem;
+            color: #059669;
+        }
+        
+        .security-icon {
+            width: 20px;
+            height: 20px;
+            margin-right: 0.75rem;
+            flex-shrink: 0;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 1rem 2rem 2rem 2rem;
+            font-size: 0.75rem;
+            color: #666;
+            border-top: 1px solid #eee;
+        }
+        
+        .powered-by {
+            opacity: 0.7;
+            margin-top: 0.5rem;
+        }
+        
+        .powered-by a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            body {
+                padding: 0.5rem;
+            }
+            
+            .corporate-container {
+                border-radius: 12px;
+            }
+            
+            .corporate-header {
+                padding: 1.5rem 1.5rem 1rem 1.5rem;
+            }
+            
+            .oauth-content {
+                padding: 1.5rem;
+            }
+            
+            .corporate-logo {
+                max-height: 60px;
+            }
+            
+            .corporate-name {
+                font-size: 1.25rem;
+            }
+        }
+        
+        /* High contrast mode */
+        @media (prefers-contrast: high) {
+            .corporate-container {
+                border: 2px solid var(--primary-color);
+            }
+            
+            .security-notice {
+                border-width: 3px;
+            }
+        }
+        
+        /* Reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+            }
+            
+            .corporate-container {
+                box-shadow: none;
+                border: 1px solid #ccc;
+            }
+        }
+    </style>
+    
+    <%# Corporate-specific custom CSS %>
+    <% if (corporateConfig && corporateConfig.customCSS) { %>
+        <style data-corporate-css="<%= corporateConfig.id %>">
+            <%= corporateConfig.customCSS %>
+        </style>
+    <% } %>
+    
+    <%# Google Fonts if specified %>
+    <% if (corporateConfig && corporateConfig.fonts && corporateConfig.fonts.googleFonts) { %>
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?<%= corporateConfig.fonts.googleFonts.map(font => 'family=' + encodeURIComponent(font)).join('&') %>&display=swap" rel="stylesheet">
+    <% } %>
+    
+    <%# OAuth Component Styles %>
+    <link rel="stylesheet" href="/css/oauth-styles.css">
+</head>
+<body>
+    <div class="corporate-container" 
+         data-corporate-config='<%= JSON.stringify(corporateConfig || {}).replace(/'/g, "&#39;") %>'
+         data-corporate-oauth="true">
+        
+        <%# Corporate Header %>
+        <div class="corporate-header">
+            <% if (corporateConfig && corporateConfig.branding && corporateConfig.branding.logo) { %>
+                <img src="<%= corporateConfig.branding.logo %>" 
+                     alt="<%= corporateConfig.name %> Logo" 
+                     class="corporate-logo"
+                     onerror="this.style.display='none'; document.querySelector('.corporate-name').style.display='block'">
+            <% } %>
+            
+            <h1 class="corporate-name" style="<%= corporateConfig && corporateConfig.branding && corporateConfig.branding.logo ? 'display: none;' : '' %>">
+                <%= corporateConfig && corporateConfig.name ? corporateConfig.name : 'Corporate Portal' %>
+            </h1>
+            
+            <% if (corporateConfig && corporateConfig.tagline) { %>
+                <p class="corporate-tagline"><%= corporateConfig.tagline %></p>
+            <% } %>
+        </div>
+        
+        <%# Security Notice %>
+        <div class="oauth-content">
+            <div class="security-notice">
+                <svg class="security-icon" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 1L5 4v6c0 5.55 3.84 9.74 9 9.74s9-4.19 9-9.74V4l-5-3-4 2.25L10 1z" clip-rule="evenodd"/>
+                    <path d="M9 12l2 2 4-4"/>
+                </svg>
+                <div>
+                    <strong>Secure Enterprise Sign-In</strong><br>
+                    Your corporate credentials are protected with enterprise-grade security.
+                </div>
+            </div>
+            
+            <%# Enhanced OAuth Component %>
+            <%- include('../organisms/auth/corporate-oauth-section', { 
+                title: corporateConfig && corporateConfig.welcomeMessage ? corporateConfig.welcomeMessage : 'Welcome back',
+                error: typeof error !== 'undefined' ? error : null,
+                success: typeof success !== 'undefined' ? success : null,
+                corporateConfig: corporateConfig,
+                departmentRequired: corporateConfig && corporateConfig.requireDepartmentSelection ? true : false,
+                departments: corporateConfig && corporateConfig.departments ? corporateConfig.departments : null,
+                oauthProviders: typeof oauthProviders !== 'undefined' ? oauthProviders : [
+                    { name: 'google', displayName: 'Google Workspace' },
+                    { name: 'microsoft', displayName: 'Microsoft 365' },
+                    { name: 'apple', displayName: 'Apple' }
+                ],
+                allowedProviders: corporateConfig && corporateConfig.allowedProviders ? corporateConfig.allowedProviders : ['google', 'microsoft', 'apple'],
+                intelligentSelection: true,
+                mobile: typeof mobile !== 'undefined' ? mobile : false,
+                theme: corporateConfig && corporateConfig.theme ? corporateConfig.theme.name : 'corporate',
+                csrfToken: typeof csrfToken !== 'undefined' ? csrfToken : '',
+                showForgotPassword: corporateConfig && corporateConfig.showForgotPassword !== false,
+                showRegister: corporateConfig && corporateConfig.allowRegistration === true
+            }) %>
+        </div>
+        
+        <%# Corporate Footer %>
+        <div class="footer">
+            <% if (corporateConfig && corporateConfig.supportInfo) { %>
+                <p>Need help? Contact <a href="<%= corporateConfig.supportInfo.url || ('mailto:' + corporateConfig.supportInfo.email) %>"><%= corporateConfig.supportInfo.name || 'IT Support' %></a></p>
+            <% } else { %>
+                <p>For technical support, contact your system administrator</p>
+            <% } %>
+            
+            <div class="powered-by">
+                Powered by <a href="https://amexing.com" target="_blank">AmexingWeb</a> 
+                | Enterprise OAuth Authentication
+            </div>
+        </div>
+    </div>
+
+    <%# Corporate OAuth JavaScript %>
+    <script src="/js/oauth-provider.js"></script>
+    <script src="/js/corporate-oauth-interface.js"></script>
+    
+    <%# Corporate-specific JavaScript initialization %>
+    <script>
+    (function() {
+        'use strict';
+        
+        // Corporate OAuth configuration
+        const corporateConfig = <%= JSON.stringify(corporateConfig || {}) %>;
+        
+        // Initialize corporate OAuth interface
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up corporate OAuth interface
+            if (window.CorporateOAuthInterface) {
+                window.corporateOAuthInterface = new window.CorporateOAuthInterface({
+                    corporateConfig: corporateConfig,
+                    corporateConfigId: corporateConfig.id,
+                    landingPageMode: true,
+                    autoDetectCorporate: false, // Already detected
+                    fallbackToRegular: false
+                });
+            }
+            
+            // Handle corporate-specific events
+            handleCorporateEvents();
+            
+            // Set up analytics if configured
+            if (corporateConfig.analytics) {
+                initializeCorporateAnalytics();
+            }
+            
+            // Set up custom features
+            if (corporateConfig.features) {
+                initializeCorporateFeatures();
+            }
+        });
+        
+        function handleCorporateEvents() {
+            // Track page load
+            if (corporateConfig.id && window.fetch) {
+                fetch('/api/analytics/page-view', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        corporateId: corporateConfig.id,
+                        page: 'oauth_landing',
+                        timestamp: new Date().toISOString(),
+                        userAgent: navigator.userAgent,
+                        referrer: document.referrer
+                    })
+                }).catch(function(error) {
+                    console.warn('Failed to track page view:', error);
+                });
+            }
+            
+            // Handle form submissions with corporate context
+            document.addEventListener('submit', function(e) {
+                if (e.target.matches('#traditional-login-form')) {
+                    // Add corporate context to form submission
+                    const corporateInput = document.createElement('input');
+                    corporateInput.type = 'hidden';
+                    corporateInput.name = 'corporateId';
+                    corporateInput.value = corporateConfig.id || '';
+                    e.target.appendChild(corporateInput);
+                }
+            });
+            
+            // Handle OAuth success with corporate tracking
+            document.addEventListener('oauthSuccess', function(e) {
+                const { provider, user, department } = e.detail;
+                
+                // Corporate success tracking
+                if (corporateConfig.id && window.fetch) {
+                    fetch('/api/analytics/oauth-success', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            corporateId: corporateConfig.id,
+                            provider: provider,
+                            department: department,
+                            timestamp: new Date().toISOString()
+                        })
+                    }).catch(function(error) {
+                        console.warn('Failed to track OAuth success:', error);
+                    });
+                }
+            });
+        }
+        
+        function initializeCorporateAnalytics() {
+            const analytics = corporateConfig.analytics;
+            
+            // Google Analytics
+            if (analytics.googleAnalytics) {
+                const script = document.createElement('script');
+                script.src = 'https://www.googletagmanager.com/gtag/js?id=' + analytics.googleAnalytics;
+                script.async = true;
+                document.head.appendChild(script);
+                
+                window.dataLayer = window.dataLayer || [];
+                function gtag() { dataLayer.push(arguments); }
+                gtag('js', new Date());
+                gtag('config', analytics.googleAnalytics);
+                
+                // Track corporate OAuth events
+                document.addEventListener('oauthSuccess', function(e) {
+                    gtag('event', 'oauth_success', {
+                        event_category: 'authentication',
+                        event_label: e.detail.provider,
+                        custom_map: {
+                            corporate_id: corporateConfig.id
+                        }
+                    });
+                });
+            }
+            
+            // Microsoft Clarity
+            if (analytics.microsoftClarity) {
+                (function(c,l,a,r,i,t,y){
+                    c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+                    t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+                    y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+                })(window, document, "clarity", "script", analytics.microsoftClarity);
+            }
+            
+            // Custom analytics
+            if (analytics.customEndpoint) {
+                // Set up custom analytics tracking
+                window.addEventListener('beforeunload', function() {
+                    navigator.sendBeacon(analytics.customEndpoint, JSON.stringify({
+                        corporateId: corporateConfig.id,
+                        sessionDuration: Date.now() - window.performance.timing.navigationStart,
+                        page: 'oauth_landing'
+                    }));
+                });
+            }
+        }
+        
+        function initializeCorporateFeatures() {
+            const features = corporateConfig.features;
+            
+            // Auto-logout after inactivity
+            if (features.autoLogoutMinutes) {
+                let inactivityTimer;
+                
+                function resetInactivityTimer() {
+                    clearTimeout(inactivityTimer);
+                    inactivityTimer = setTimeout(function() {
+                        alert('Session expired due to inactivity. Please sign in again.');
+                        window.location.href = window.location.href; // Refresh page
+                    }, features.autoLogoutMinutes * 60 * 1000);
+                }
+                
+                // Track user activity
+                ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'].forEach(function(event) {
+                    document.addEventListener(event, resetInactivityTimer, { passive: true });
+                });
+                
+                resetInactivityTimer();
+            }
+            
+            // Session persistence warning
+            if (features.sessionPersistenceWarning) {
+                const warning = document.createElement('div');
+                warning.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    left: 20px;
+                    right: 20px;
+                    max-width: 400px;
+                    margin: 0 auto;
+                    padding: 0.75rem 1rem;
+                    background: #fef3c7;
+                    border: 1px solid #f59e0b;
+                    border-radius: 8px;
+                    font-size: 0.875rem;
+                    color: #92400e;
+                    z-index: 1000;
+                `;
+                warning.innerHTML = `
+                    <strong>Privacy Notice:</strong> Your session will expire when you close this browser.
+                    <button onclick="this.parentElement.remove()" style="float: right; background: none; border: none; color: #92400e; cursor: pointer;">&times;</button>
+                `;
+                document.body.appendChild(warning);
+                
+                // Auto-hide after 10 seconds
+                setTimeout(function() {
+                    if (warning.parentElement) {
+                        warning.remove();
+                    }
+                }, 10000);
+            }
+            
+            // Custom CSS injection for advanced features
+            if (features.advancedStyling) {
+                const style = document.createElement('style');
+                style.textContent = features.advancedStyling;
+                document.head.appendChild(style);
+            }
+        }
+        
+        // Error handling
+        window.addEventListener('error', function(e) {
+            if (corporateConfig.id && window.fetch) {
+                fetch('/api/analytics/js-error', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify({
+                        corporateId: corporateConfig.id,
+                        error: e.error ? e.error.toString() : e.message,
+                        filename: e.filename,
+                        lineno: e.lineno,
+                        colno: e.colno,
+                        timestamp: new Date().toISOString()
+                    })
+                }).catch(function(error) {
+                    console.warn('Failed to track JS error:', error);
+                });
+            }
+        });
+        
+        // Performance monitoring
+        window.addEventListener('load', function() {
+            if (corporateConfig.id && window.fetch && window.performance) {
+                setTimeout(function() {
+                    const perfData = window.performance.timing;
+                    const loadTime = perfData.loadEventEnd - perfData.navigationStart;
+                    
+                    fetch('/api/analytics/performance', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            corporateId: corporateConfig.id,
+                            loadTime: loadTime,
+                            domContentLoaded: perfData.domContentLoadedEventEnd - perfData.navigationStart,
+                            firstPaint: window.performance.getEntriesByType ? 
+                                       (window.performance.getEntriesByType('paint')[0] ? 
+                                        window.performance.getEntriesByType('paint')[0].startTime : null) : null,
+                            timestamp: new Date().toISOString()
+                        })
+                    }).catch(function(error) {
+                        console.warn('Failed to track performance:', error);
+                    });
+                }, 1000);
+            }
+        });
+        
+    })();
+    </script>
+    
+    <%# Corporate-specific additional scripts - SECURITY: Dynamic script loading disabled for PCI DSS compliance %>
+    <% if (corporateConfig && corporateConfig.customScripts) { %>
+        <%# Security Notice: Dynamic script loading has been disabled for security compliance %>
+        <!--
+        Corporate custom scripts are disabled for security reasons.
+        All scripts must be statically included during build time.
+        Contact your security team to whitelist required scripts.
+        -->
+    <% } %>
+</body>
+</html>

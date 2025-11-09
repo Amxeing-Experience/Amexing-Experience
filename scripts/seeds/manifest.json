@@ -1,0 +1,126 @@
+{
+  "version": "1.0.0",
+  "description": "Seed manifest for AmexingWeb database initialization",
+  "author": "Amexing Development Team",
+  "seeds": [
+    {
+      "name": "000-seed-rbac-roles",
+      "file": "000-seed-rbac-roles.js",
+      "description": "Create system roles for RBAC (SuperAdmin, Admin, Client, Department Manager, Employee, Guest)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": [],
+      "idempotent": true,
+      "order": 0
+    },
+    {
+      "name": "000-seed-rbac-permissions",
+      "file": "000-seed-rbac-permissions.js",
+      "description": "Create system permissions for RBAC (users.*, clients.*, bookings.*, etc.)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["000-seed-rbac-roles"],
+      "idempotent": true,
+      "order": 0.5
+    },
+    {
+      "name": "000-seed-superadmin-user",
+      "file": "000-seed-superadmin-user.js",
+      "description": "Create initial SuperAdmin user from environment variables (DEV_SUPERADMIN_EMAIL, DEV_SUPERADMIN_PASSWORD)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["000-seed-rbac-roles"],
+      "idempotent": true,
+      "order": 0.6
+    },
+    {
+      "name": "001-seed-service-types",
+      "file": "001-seed-service-types.js",
+      "description": "Seed initial service types (Aeropuerto, Punto a Punto, Local)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": [],
+      "idempotent": true,
+      "order": 1
+    },
+    {
+      "name": "002-seed-pois-local",
+      "file": "002-seed-pois-local.js",
+      "description": "Seed 45 local destinations from docs/tarifario/datos_local.txt",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["001-seed-service-types"],
+      "idempotent": true,
+      "order": 2
+    },
+    {
+      "name": "003-seed-pois-aeropuerto",
+      "file": "003-seed-pois-aeropuerto.js",
+      "description": "Seed 10 airport destinations from docs/tarifario/datos_aeropuerto.txt",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["001-seed-service-types"],
+      "idempotent": true,
+      "order": 3
+    },
+    {
+      "name": "004-seed-pois-ciudades",
+      "file": "004-seed-pois-ciudades.js",
+      "description": "Seed 18 city destinations from docs/tarifario/datos_ciudades.txt",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["001-seed-service-types"],
+      "idempotent": true,
+      "order": 4
+    },
+    {
+      "name": "005-seed-rates",
+      "file": "005-seed-rates.js",
+      "description": "Ensure existing 4 rates have color field (Económico, First Class, Green Class, Premium)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": [],
+      "idempotent": true,
+      "order": 5
+    },
+    {
+      "name": "006-seed-vehicle-types",
+      "file": "006-seed-vehicle-types.js",
+      "description": "Seed 6 vehicle types from vehicleTypes.json (SEDAN, VAN, SUBURBAN, SPRINTER, MODEL 3, MODEL Y)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": [],
+      "idempotent": true,
+      "order": 6
+    },
+    {
+      "name": "007-seed-services-from-csv",
+      "file": "007-seed-services-from-csv.js",
+      "description": "Import 837 services from Estructura_Tarifario.csv with POI+serviceType matching and batch processing",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["001-seed-service-types", "002-seed-pois-local", "003-seed-pois-aeropuerto", "004-seed-pois-ciudades", "005-seed-rates", "006-seed-vehicle-types"],
+      "idempotent": true,
+      "order": 7
+    }
+  ],
+  "notes": [
+    "Seeds are executed in order specified by 'order' field",
+    "Dependencies must be listed in 'dependencies' array",
+    "Idempotent seeds can be run multiple times safely",
+    "Use 'enabled: false' to skip a seed without removing it",
+    "Environment-specific seeds only run in specified environments",
+    "RBAC seeds (000-*) MUST run first to create roles, permissions, and SuperAdmin user",
+    "Set DEV_SUPERADMIN_EMAIL and DEV_SUPERADMIN_PASSWORD in .env before running seeds"
+  ]
+}

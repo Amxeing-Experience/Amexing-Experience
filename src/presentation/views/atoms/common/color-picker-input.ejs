@@ -1,0 +1,212 @@
+<%#
+  Color Picker Input Atom
+
+  Atomic Design Level: Atom
+  Category: Common Form Controls
+
+  Professional color picker with hex input and real-time preview.
+  Combines HTML5 native color picker with manual hex input for advanced users.
+  Includes live preview with automatic contrast calculation for text readability.
+
+  Parameters:
+  - id (string): Unique identifier for the input field (required)
+  - name (string): Name attribute for form submission (required)
+  - label (string): Label text for the input (optional, defaults to 'Color')
+  - value (string): Initial color value in hex format (optional, defaults to '#6366F1')
+  - required (boolean): Whether the field is required (optional, defaults to false)
+  - helpText (string): Help text displayed below input (optional)
+  - showPreview (boolean): Show color preview badge (optional, defaults to true)
+  - previewText (string): Text shown in preview badge (optional, defaults to 'Vista previa')
+
+  Usage Example:
+  include('../../atoms/common/color-picker-input', {
+    id: 'rateColor',
+    name: 'color',
+    label: 'Color de Etiqueta',
+    value: '#6366F1',
+    required: false,
+    helpText: 'Selecciona un color para identificar visualmente esta tarifa',
+    showPreview: true,
+    previewText: 'Vista previa'
+  })
+
+  Author: Amexing Development Team
+  Version: 1.0.0
+  Since: 2025-10-15
+%>
+<%
+// Parameter defaults and validation
+const inputId = typeof id !== 'undefined' ? id : 'colorPicker';
+const inputName = typeof name !== 'undefined' ? name : 'color';
+const inputLabel = typeof label !== 'undefined' ? label : 'Color';
+const inputValue = typeof value !== 'undefined' ? value : '#6366F1';
+const inputRequired = typeof required !== 'undefined' ? required : false;
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const inputShowPreview = typeof showPreview !== 'undefined' ? showPreview : true;
+const inputPreviewText = typeof previewText !== 'undefined' ? previewText : 'Vista previa';
+
+// Generate unique IDs for related elements
+const hexInputId = `${inputId}Hex`;
+const previewId = `${inputId}Preview`;
+%>
+
+<div class="mb-3">
+    <label for="<%= inputId %>" class="form-label">
+        <%= inputLabel %>
+        <% if (inputRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+
+    <div class="row g-2">
+        <!-- Native HTML5 Color Picker -->
+        <div class="col-auto">
+            <input
+                type="color"
+                class="form-control form-control-color"
+                id="<%= inputId %>"
+                name="<%= inputName %>"
+                value="<%= inputValue %>"
+                <%= inputRequired ? 'required' : '' %>
+                title="Seleccionar color"
+                style="width: 3rem; height: 38px; cursor: pointer;">
+        </div>
+
+        <!-- Hex Input for Manual Entry -->
+        <div class="col">
+            <input
+                type="text"
+                class="form-control"
+                id="<%= hexInputId %>"
+                placeholder="#000000"
+                value="<%= inputValue %>"
+                maxlength="7"
+                pattern="^#[0-9A-Fa-f]{6}$"
+                title="Formato: #RRGGBB"
+                style="font-family: 'Courier New', monospace;">
+        </div>
+
+        <!-- Live Preview Badge -->
+        <% if (inputShowPreview) { %>
+        <div class="col-auto d-flex align-items-center">
+            <span
+                id="<%= previewId %>"
+                class="badge px-3 py-2"
+                style="background-color: <%= inputValue %>; color: #FFFFFF; font-size: 0.875rem; min-width: 120px; text-align: center;">
+                <%= inputPreviewText %>
+            </span>
+        </div>
+        <% } %>
+    </div>
+
+    <% if (inputHelpText) { %>
+    <div class="form-text"><%= inputHelpText %></div>
+    <% } %>
+</div>
+
+<script>
+(function() {
+    const colorPicker = document.getElementById('<%= inputId %>');
+    const hexInput = document.getElementById('<%= hexInputId %>');
+    <% if (inputShowPreview) { %>
+    const preview = document.getElementById('<%= previewId %>');
+    <% } %>
+
+    /**
+     * Calculate relative luminance of a color for contrast determination.
+     * Uses WCAG 2.0 formula for luminance calculation.
+     * @param {string} hex - Hex color code (#RRGGBB)
+     * @returns {number} Luminance value between 0 (darkest) and 1 (brightest)
+     */
+    function calculateLuminance(hex) {
+        // Remove # if present
+        const cleanHex = hex.replace('#', '');
+
+        // Parse RGB values
+        const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
+        const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
+        const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
+
+        // Apply gamma correction
+        const rLinear = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+        const gLinear = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+        const bLinear = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+
+        // Calculate luminance using WCAG formula
+        return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+    }
+
+    /**
+     * Determine optimal text color (dark or light) based on background luminance.
+     * @param {string} backgroundColor - Hex color code of background
+     * @returns {string} '#1F2937' for dark text or '#FFFFFF' for light text
+     */
+    function getContrastTextColor(backgroundColor) {
+        const luminance = calculateLuminance(backgroundColor);
+        // Threshold at 0.5 for optimal contrast
+        return luminance > 0.5 ? '#1F2937' : '#FFFFFF';
+    }
+
+    /**
+     * Update all related elements when color changes.
+     * @param {string} newColor - New hex color value
+     */
+    function updateColor(newColor) {
+        // Validate hex format
+        const hexRegex = /^#[0-9A-Fa-f]{6}$/;
+        if (!hexRegex.test(newColor)) {
+            return; // Invalid format, skip update
+        }
+
+        // Normalize to uppercase
+        const normalizedColor = newColor.toUpperCase();
+
+        // Update both inputs
+        colorPicker.value = normalizedColor;
+        hexInput.value = normalizedColor;
+
+        <% if (inputShowPreview) { %>
+        // Update preview with automatic contrast
+        preview.style.backgroundColor = normalizedColor;
+        preview.style.color = getContrastTextColor(normalizedColor);
+        <% } %>
+    }
+
+    // Color picker change event
+    colorPicker.addEventListener('input', function(e) {
+        updateColor(e.target.value);
+    });
+
+    // Hex input change event with validation
+    hexInput.addEventListener('input', function(e) {
+        let value = e.target.value;
+
+        // Auto-add # if missing
+        if (value && !value.startsWith('#')) {
+            value = '#' + value;
+            hexInput.value = value;
+        }
+
+        // Only update if valid format
+        if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+            updateColor(value);
+            hexInput.classList.remove('is-invalid');
+        } else if (value.length === 7) {
+            hexInput.classList.add('is-invalid');
+        }
+    });
+
+    // Validate on blur
+    hexInput.addEventListener('blur', function(e) {
+        const value = e.target.value;
+        if (!/^#[0-9A-Fa-f]{6}$/.test(value)) {
+            // Reset to last valid value
+            hexInput.value = colorPicker.value;
+            hexInput.classList.remove('is-invalid');
+        }
+    });
+
+    // Initialize with current value
+    updateColor('<%= inputValue %>');
+})();
+</script>

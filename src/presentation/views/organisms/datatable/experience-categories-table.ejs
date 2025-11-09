@@ -1,0 +1,549 @@
+<%
+/**
+ * Experience Categories DataTable Organism
+ * DataTable component for experience category catalog management
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'experience-categories-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/experience-categories';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-category me-2"></i>Categorías de Experiencias
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Catálogo de categorías para clasificar experiencias</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createCategoryBtn">
+                        <i class="ti ti-plus me-1"></i>Nueva Categoría
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="categories-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Categoría</th>
+                        <th>Código</th>
+                        <th>Experiencias</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="categoryModalLabel">
+                    <i class="ti ti-category-plus me-2"></i><span id="modalTitle">Crear Nueva Categoría</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="categoryModalAlerts"></div>
+
+                <form id="categoryForm">
+                    <input type="hidden" id="categoryId">
+
+                    <!-- Sección: Información Básica -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Información Básica
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="name" class="form-label">Nombre <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required maxlength="100" placeholder="Ej: Aventura">
+                                <div class="form-text">Nombre mostrado al usuario</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="code" class="form-label">Código <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="code" name="code" required maxlength="50" placeholder="Ej: aventura" pattern="[a-z0-9_-]+">
+                                <div class="form-text">Código único (solo minúsculas, números, guiones)</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Descripción</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" maxlength="500" placeholder="Descripción de la categoría"></textarea>
+                            <div class="form-text">Descripción opcional de la categoría</div>
+                        </div>
+                    </div>
+
+                    <!-- Sección: Configuración Visual -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-palette me-1"></i>
+                            Configuración Visual (Opcional)
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="icon" class="form-label">Icono</label>
+                                <input type="text" class="form-control" id="icon" name="icon" maxlength="50" placeholder="Ej: star" value="star">
+                                <div class="form-text">Icono Tabler (sin prefijo ti-)</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="color" class="form-label">Color</label>
+                                <input type="text" class="form-control" id="color" name="color" maxlength="20" placeholder="Ej: #f59e0b">
+                                <div class="form-text">Color en formato hexadecimal</div>
+                            </div>
+                        </div>
+
+                        <input type="hidden" id="sortOrder" name="sortOrder" value="0">
+                    </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Categoría de experiencia:</strong>
+                            <p class="mb-0 mt-1">Las categorías se usarán para clasificar las experiencias en el sistema. El código debe ser único y usar solo letras minúsculas, números y guiones.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveCategoryBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Categoría</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function initWhenReady() {
+        if (typeof jQuery === 'undefined') {
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+        if (!jQuery.fn.dataTable) {
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+        initCategoriesTable();
+    }
+
+    function initCategoriesTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint,
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading categories:', error);
+                    showErrorAlert('Error al cargar las categorías. Por favor, intente nuevamente.');
+                }
+            },
+            columns: [
+                {
+                    data: null,
+                    render: function(data) {
+                        const icon = data.icon || 'star';
+                        const color = data.color || '#f59e0b';
+                        return `<div class="d-flex align-items-center">
+                                    <div class="p-2 rounded me-2" style="background-color: ${color}20;">
+                                        <i class="ti ti-${icon}" style="color: ${color}; font-size: 1.5rem;"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-semibold">${data.name}</div>
+                                        ${data.description ? `<small class="text-muted">${data.description}</small>` : ''}
+                                    </div>
+                                </div>`;
+                    }
+                },
+                {
+                    data: 'code',
+                    render: function(data) {
+                        return `<code class="badge bg-dark">${data}</code>`;
+                    }
+                },
+                {
+                    data: 'experienceCount',
+                    className: 'text-center',
+                    render: function(data) {
+                        const count = data || 0;
+                        return `<span class="badge bg-primary">${count}</span>`;
+                    }
+                },
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data
+                            ? '<span class="badge bg-success">Activa</span>'
+                            : '<span class="badge bg-secondary">Inactiva</span>';
+                    }
+                },
+                ...(showActions ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+                        if (canEdit) {
+                            actions += `<button type="button"
+                                            class="btn btn-primary edit-category-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Categoría">
+                                            <i class="ti ti-edit"></i>
+                                        </button>`;
+
+                            const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                            const statusTitle = data.active ? 'Desactivar Categoría' : 'Activar Categoría';
+                            const statusClass = data.active ? 'btn-warning' : 'btn-success';
+
+                            actions += `<button type="button"
+                                            class="btn ${statusClass} toggle-category-status-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-current-status="${data.active}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="${statusTitle}">
+                                            <i class="ti ${statusIcon}"></i>
+                                        </button>`;
+                        }
+                        if (canDelete) {
+                            actions += `<button type="button"
+                                            class="btn btn-danger delete-category-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Eliminar Categoría">
+                                            <i class="ti ti-trash"></i>
+                                        </button>`;
+                        }
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando categorías...'
+            },
+            order: [[0, 'asc']],
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
+        });
+
+        $('#createCategoryBtn').on('click', function() { openCategoryModal(); });
+        $(`#${tableId}`).on('click', '.edit-category-btn', function() { loadCategoryData($(this).data('id')); });
+        $(`#${tableId}`).on('click', '.toggle-category-status-btn', function() {
+            toggleCategoryStatus($(this).data('id'), $(this).data('current-status'), $(this).data('name'));
+        });
+        $(`#${tableId}`).on('click', '.delete-category-btn', function() { deleteCategory($(this).data('id'), $(this).data('name')); });
+        $('#saveCategoryBtn').on('click', function() { saveCategory(); });
+
+        function openCategoryModal(isEdit = false) {
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('categoryModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+
+            $('#categoryModal').modal('show');
+            $('#categoryForm')[0].reset();
+            $('#categoryId').val('');
+            $('#modalTitle').text(isEdit ? 'Editar Categoría' : 'Crear Nueva Categoría');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Categoría');
+        }
+
+        function loadCategoryData(categoryId) {
+            openCategoryModal(true);
+
+            $.ajax({
+                url: `${apiEndpoint}/${categoryId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const category = response.data;
+                        $('#categoryId').val(category.id);
+                        $('#name').val(category.name);
+                        $('#code').val(category.code);
+                        $('#description').val(category.description || '');
+                        $('#icon').val(category.icon || 'star');
+                        $('#color').val(category.color || '');
+                        $('#sortOrder').val(category.sortOrder || 0);
+                    } else {
+                        showErrorAlert('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr) {
+                    showModalError(xhr.responseJSON?.error || 'Error al cargar la categoría');
+                }
+            });
+        }
+
+        function saveCategory() {
+            const form = $('#categoryForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+            const categoryId = $('#categoryId').val();
+            const isEdit = !!categoryId;
+            const categoryData = {
+                name: $('#name').val(),
+                code: $('#code').val().toLowerCase(),
+                description: $('#description').val() || null,
+                icon: $('#icon').val() || 'star',
+                color: $('#color').val() || null,
+                sortOrder: parseInt($('#sortOrder').val()) || 0
+            };
+            const url = isEdit ? `${apiEndpoint}/${categoryId}` : apiEndpoint;
+            const method = isEdit ? 'PUT' : 'POST';
+            $('#saveCategoryBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
+            $.ajax({
+                url, type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(categoryData),
+                success: function(response) {
+                    if (response.success) {
+                        $('#categoryModal').modal('hide');
+                        dataTable.ajax.reload();
+                        showSuccessAlert(isEdit ? 'Categoría actualizada exitosamente' : 'Categoría creada exitosamente');
+                    }
+                },
+                error: function(xhr) {
+                    const errorMessage = xhr.responseJSON?.error || 'Error al guardar la categoría';
+                    showModalError(errorMessage);
+                },
+                complete: function() {
+                    $('#saveCategoryBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>' + (isEdit ? 'Guardar Cambios' : 'Crear Categoría'));
+                }
+            });
+        }
+
+        function toggleCategoryStatus(categoryId, currentStatus, categoryName) {
+            const newStatus = !currentStatus;
+            const action = newStatus ? 'activar' : 'desactivar';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+            const modalHtml = `
+                <div class="modal fade" id="confirmToggleCategoryModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${actionTitle} Categoría</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas ${action} la categoría <strong>"${categoryName}"</strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn ${btnClass}" id="confirmToggleCategoryBtn">${actionTitle}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#confirmToggleCategoryModal').remove();
+            $('body').append(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('confirmToggleCategoryModal'));
+            modal.show();
+
+            $('#confirmToggleCategoryBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${categoryId}`,
+                    type: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showSuccessAlert(`Categoría ${newStatus ? 'activada' : 'desactivada'} exitosamente`);
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado de la categoría';
+                        showErrorAlert(error);
+                    }
+                });
+            });
+        }
+
+        function deleteCategory(categoryId, categoryName) {
+            const modalHtml = `
+                <div class="modal fade" id="confirmDeleteCategoryModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white">Eliminar Categoría</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas eliminar la categoría <strong>"${categoryName}"</strong>?</p>
+                                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeleteCategoryBtn">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#confirmDeleteCategoryModal').remove();
+            $('body').append(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteCategoryModal'));
+            modal.show();
+
+            $('#confirmDeleteCategoryBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${categoryId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showSuccessAlert('Categoría eliminada exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al eliminar la categoría';
+                        showErrorAlert(error);
+                    }
+                });
+            });
+        }
+
+        function showModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('categoryModalAlerts');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('categories-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('categories-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>

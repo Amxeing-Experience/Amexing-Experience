@@ -1,0 +1,89 @@
+<%
+/**
+ * Spinner/Loader Atom
+ * Reusable loading spinner component
+ *
+ * @param {string} type - Spinner type (border, grow)
+ * @param {string} size - Spinner size (sm, default, lg)
+ * @param {string} color - Spinner color (primary, secondary, success, etc.)
+ * @param {string} text - Loading text to display
+ * @param {boolean} centered - Whether to center the spinner
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const spinnerType = typeof type !== 'undefined' ? type : 'border';
+const spinnerSize = typeof size !== 'undefined' ? size : 'default';
+const spinnerColor = typeof color !== 'undefined' ? color : 'primary';
+const spinnerText = typeof text !== 'undefined' ? text : '';
+const spinnerCentered = typeof centered !== 'undefined' ? centered : false;
+const spinnerAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const spinnerAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build wrapper classes
+let wrapperClasses = [];
+if (spinnerCentered) {
+    wrapperClasses.push('d-flex', 'justify-content-center', 'align-items-center');
+}
+if (spinnerText) {
+    wrapperClasses.push('d-flex', 'align-items-center', 'gap-2');
+}
+
+// Build spinner classes
+let spinnerClasses = [];
+if (spinnerType === 'grow') {
+    spinnerClasses.push('spinner-grow');
+} else {
+    spinnerClasses.push('spinner-border');
+}
+
+// Color class
+spinnerClasses.push(`text-${spinnerColor}`);
+
+// Size classes
+if (spinnerSize === 'sm') {
+    spinnerClasses.push(`${spinnerType === 'grow' ? 'spinner-grow' : 'spinner-border'}-sm`);
+} else if (spinnerSize === 'lg') {
+    // For larger spinners, we'll use custom CSS
+    spinnerClasses.push('spinner-lg');
+}
+
+// Additional classes
+if (spinnerAdditionalClasses) {
+    spinnerClasses.push(spinnerAdditionalClasses);
+}
+
+// Build attributes string
+let attributesString = '';
+if (spinnerAttributes && typeof spinnerAttributes === 'object') {
+    attributesString = Object.entries(spinnerAttributes)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+}
+
+const finalWrapperClasses = wrapperClasses.join(' ');
+const finalSpinnerClasses = spinnerClasses.join(' ');
+%>
+
+<% if (spinnerSize === 'lg') { %>
+<style>
+.spinner-lg {
+    width: 3rem;
+    height: 3rem;
+}
+</style>
+<% } %>
+
+<% if (wrapperClasses.length > 0) { %>
+<div class="<%= finalWrapperClasses %>">
+<% } %>
+    <div class="<%= finalSpinnerClasses %>" role="status" <% if (attributesString) { %><%= attributesString %><% } %>>
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <% if (spinnerText) { %>
+        <span class="text-muted"><%= spinnerText %></span>
+    <% } %>
+<% if (wrapperClasses.length > 0) { %>
+</div>
+<% } %>

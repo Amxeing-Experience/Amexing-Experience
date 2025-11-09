@@ -1,6 +1,9 @@
-name: Weekly Security Scan
+name: PCI DSS Security Scan
 
 on:
+  pull_request:
+    # Run comprehensive security scan on all PRs for PCI DSS compliance
+    types: [opened, synchronize, reopened]
   push:
     branches: [main, master]
   schedule:
@@ -36,8 +39,17 @@ jobs:
           echo "Running Semgrep security analysis..."
           yarn security:semgrep || echo "⚠️ Semgrep completed with findings"
           
+          echo "Running dependency audit with high threshold..."
+          yarn audit --level high || echo "⚠️ High vulnerabilities found - immediate review required"
+          
           echo "Running dependency audit with moderate threshold..."
           yarn audit --level moderate || echo "⚠️ Moderate vulnerabilities found - review recommended"
+          
+          echo "Checking Parse Server and Dashboard versions..."
+          PARSE_SERVER_VERSION=$(node -p "require('./package.json').dependencies['parse-server']")
+          PARSE_DASHBOARD_VERSION=$(node -p "require('./package.json').dependencies['parse-dashboard']")
+          echo "Parse Server version: $PARSE_SERVER_VERSION"
+          echo "Parse Dashboard version: $PARSE_DASHBOARD_VERSION"
           
           echo "Checking documentation coverage..."
           yarn docs:coverage || echo "⚠️ Documentation coverage below threshold"
@@ -64,7 +76,92 @@ jobs:
             echo "✅ All required security middleware configured"
           else
             echo "⚠️ $MISSING_COUNT security middleware components missing"
+            exit 1
           fi
+          
+          # Verify minimum Parse versions (security requirement)
+          echo "🔍 Verifying Parse component versions..."
+          PARSE_SERVER_MIN="8.0.0"
+          PARSE_DASHBOARD_MIN="7.0.0"
+          
+          CURRENT_SERVER=$(node -p "require('./package.json').dependencies['parse-server']" | sed 's/[^0-9.]//g')
+          CURRENT_DASHBOARD=$(node -p "require('./package.json').dependencies['parse-dashboard']" | sed 's/[^0-9.]//g')
+          
+          echo "Current Parse Server: $CURRENT_SERVER (minimum: $PARSE_SERVER_MIN)"
+          echo "Current Parse Dashboard: $CURRENT_DASHBOARD (minimum: $PARSE_DASHBOARD_MIN)"
+          
+          if [ "$(printf '%s\n' "$PARSE_SERVER_MIN" "$CURRENT_SERVER" | sort -V | head -n1)" = "$PARSE_SERVER_MIN" ] && 
+             [ "$(printf '%s\n' "$PARSE_DASHBOARD_MIN" "$CURRENT_DASHBOARD" | sort -V | head -n1)" = "$PARSE_DASHBOARD_MIN" ]; then
+            echo "✅ Parse components meet minimum security versions"
+          else
+            echo "⚠️ Parse components below minimum security versions - update required"
+          fi
+
+      # PCI DSS Requirement 3.4 - Smart Secret Detection
+      - name: Smart Secret Detection
+        run: |
+          echo "🕵️ Scanning for hardcoded secrets (PCI DSS Req 3.4)..."
+
+          FINDINGS=0
+
+          # Check for real secrets (excluding test files and placeholder patterns)
+          echo "Scanning for potential real secrets in production code..."
+
+          # Create temporary file to store potential secrets
+          TEMP_SECRETS=$(mktemp)
+
+          # Look for secrets in source code only (exclude tests, docs, configs)
+          grep -rE '(password|secret|key|token|credential)\s*[:=]\s*["\'"'"'][^"'"'"']{12,}["\'"'"']' \
+            --exclude-dir=node_modules \
+            --exclude-dir=.git \
+            --exclude-dir=tests \
+            --exclude-dir=docs \
+            --exclude="*.md" \
+            --exclude="*.json" \
+            --exclude="*.test.js" \
+            --exclude="*.spec.js" \
+            src/ > "$TEMP_SECRETS" 2>/dev/null || true
+
+          # Filter out obvious placeholders and documentation examples
+          if [ -s "$TEMP_SECRETS" ]; then
+            # Exclude known placeholder patterns and HTML5 autocomplete values
+            FILTERED_SECRETS=$(grep -vE "(your-secure-password|sample-jwt-token|user-password|new-password|current-password|test-password|placeholder|example|demo-|fake-|autocomplete)" "$TEMP_SECRETS" || true)
+
+            if [ -n "$FILTERED_SECRETS" ]; then
+              echo "❌ Potential real secrets found in source code!"
+              echo "$FILTERED_SECRETS"
+              FINDINGS=$((FINDINGS + 1))
+            else
+              echo "✅ Only placeholder/example values found (acceptable)"
+            fi
+          else
+            echo "✅ No potential secrets found"
+          fi
+
+          # Clean up temp file
+          rm -f "$TEMP_SECRETS"
+
+          # Check for actual environment files that shouldn't be committed
+          if find . -name ".env" -not -path "./node_modules/*" -not -name ".env.example" | grep -q .; then
+            echo "❌ Real .env file found (should not be committed)!"
+            find . -name ".env" -not -path "./node_modules/*" -not -name ".env.example"
+            FINDINGS=$((FINDINGS + 1))
+          fi
+
+          # Check for private keys or certificates (exclude node_modules)
+          if find . -name "*.key" -o -name "*.pem" -o -name "*.p12" | grep -v "node_modules" | grep -q .; then
+            echo "❌ Private keys or certificates found!"
+            find . -name "*.key" -o -name "*.pem" -o -name "*.p12" | grep -v "node_modules"
+            FINDINGS=$((FINDINGS + 1))
+          fi
+
+          if [ "$FINDINGS" -gt 0 ]; then
+            echo "🚨 Security scan failed: $FINDINGS security issue(s) found"
+            echo "Please remove any real secrets or sensitive files before merging"
+            exit 1
+          fi
+
+          echo "✅ No real secrets detected (placeholders excluded)"
 
       # Summary
       - name: Security Scan Summary
@@ -77,3 +174,4 @@ jobs:
           echo ""
           echo "✅ PCI DSS Requirement 11.2 - Weekly security testing completed"
           echo "✅ PCI DSS Requirement 6.2.4 - Security configuration validated"
+          echo "✅ PCI DSS Requirement 3.4 - Secret detection completed"

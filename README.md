@@ -34,7 +34,7 @@ A PCI DSS 4.0 compliant e-commerce platform built with Parse Server, Node.js, an
 ```bash
 # Clone and setup
 git clone <your-repo-url> && cd amexing-web
-cp .env.example .env && yarn install
+cp environments/.env.example environments/.env.development && yarn install
 
 # Start development
 yarn dev
@@ -64,6 +64,29 @@ open http://localhost:1337
 - [✨ Code Quality](docs/project/CODE_QUALITY.md) - Quality standards and tools
 - [🎯 Release Process](docs/readme/RELEASE.md) - Release management workflow
 
+## 🔄 Después de hacer Git Pull
+
+**¿Acabas de hacer `git pull` y algo no funciona?** Sigue estos pasos:
+
+```bash
+# 1. Verificar si necesitas actualizar dependencias
+yarn deps:update-check
+
+# 2. Si hay cambios en package.json/yarn.lock, actualizar:
+yarn install
+
+# 3. Si hay actualizaciones importantes (Parse, Node.js, etc.):
+yarn after-pull
+
+# 4. Verificar que todo funciona:
+yarn dev
+```
+
+### 🚨 Casos Críticos Recientes
+- **Parse Server 8.2.4**: Requiere Node.js 20+ y `yarn install`
+- **Node.js 24**: Usar `--experimental-vm-modules` (ya configurado)
+- **Yarn resolutions**: Configuraciones de seguridad automáticas
+
 ## 🎯 Essential Commands
 
 ```bash
@@ -74,7 +97,11 @@ yarn scripts:help security     # Show security scripts
 
 # Development
 yarn dev                       # Start development server
-yarn dashboard                 # Open Parse Dashboard (port 4040)
+
+# Post-pull utilities
+yarn after-pull               # Complete post-pull setup
+yarn deps:update-check        # Check if dependencies need updating
+yarn deps:full-update         # Full dependency refresh
 
 # Testing & Quality
 yarn test                      # Run all tests
@@ -93,7 +120,6 @@ Once running, access these endpoints:
 | Service | URL | Description |
 |---------|-----|-------------|
 | **Web App** | http://localhost:1337 | Main application interface |
-| **Parse Dashboard** | http://localhost:4040 | Database management |
 | **API Docs** | http://localhost:1337/docs | Interactive API documentation |
 | **Health Check** | http://localhost:1337/health | System status and metrics |
 

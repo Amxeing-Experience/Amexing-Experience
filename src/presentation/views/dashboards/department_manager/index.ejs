@@ -1,0 +1,117 @@
+<!-- Department Manager Dashboard -->
+<div class="row">
+    <!-- Welcome Section -->
+    <div class="col-lg-12">
+        <div class="card bg-light-success position-relative overflow-hidden">
+            <div class="card-body px-4 py-3">
+                <div class="row align-items-center">
+                    <div class="col-9">
+                        <h4 class="fw-semibold mb-8">Welcome <%= userName || 'Department Manager' %>!</h4>
+                        <p class="mb-0">Manage your team and department resources efficiently</p>
+                    </div>
+                    <div class="col-3">
+                        <div class="text-center mb-n5">
+                            <img src="/dashboard/images/breadcrumb/ChatBc.png" alt="" class="img-fluid mb-n4" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row">
+    <div class="col-md-6 col-lg-3">
+        <%- include('../../atoms/dashboard/stats-card', {
+            icon: 'ti ti-users',
+            title: 'Team Members',
+            value: typeof stats !== 'undefined' ? stats.teamMembers : '25',
+            color: 'success',
+            trend: 'Active',
+            trendColor: 'muted'
+        }) %>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <%- include('../../atoms/dashboard/stats-card', {
+            icon: 'ti ti-wallet',
+            title: 'Department Budget',
+            value: '$' + (typeof stats !== 'undefined' ? (stats.departmentBudget/1000).toFixed(0) : '15') + 'K',
+            color: 'primary',
+            trend: '$' + (typeof stats !== 'undefined' ? (stats.budgetUsed/1000).toFixed(1) : '8.5') + 'K used',
+            trendColor: 'warning'
+        }) %>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <%- include('../../atoms/dashboard/stats-card', {
+            icon: 'ti ti-checklist',
+            title: 'Pending Approvals',
+            value: typeof stats !== 'undefined' ? stats.pendingApprovals : '3',
+            color: 'warning',
+            trend: 'Needs review',
+            trendColor: 'warning'
+        }) %>
+    </div>
+    <div class="col-md-6 col-lg-3">
+        <%- include('../../atoms/dashboard/stats-card', {
+            icon: 'ti ti-calendar-event',
+            title: 'Active Bookings',
+            value: typeof stats !== 'undefined' ? stats.activeBookings : '12',
+            color: 'info',
+            trend: 'This week',
+            trendColor: 'muted'
+        }) %>
+    </div>
+</div>
+
+<!-- Team Management -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <h5 class="card-title mb-0">Team Overview</h5>
+                    <a href="/dashboard/department_manager/team" class="btn btn-sm btn-success">
+                        <i class="ti ti-users me-1"></i>Manage Team
+                    </a>
+                </div>
+                <div class="d-grid gap-2">
+                    <a href="/dashboard/department_manager/budgets" class="btn btn-primary">
+                        <i class="ti ti-wallet me-2"></i>Manage Budget
+                    </a>
+                    <a href="/dashboard/department_manager/approvals" class="btn btn-outline-warning">
+                        <i class="ti ti-checklist me-2"></i>Review Approvals
+                    </a>
+                    <a href="/dashboard/department_manager/reports" class="btn btn-outline-info">
+                        <i class="ti ti-report me-2"></i>Department Reports
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Department Performance</h5>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Budget Utilization</span>
+                        <span class="fw-semibold">57%</span>
+                    </div>
+                    <div class="progress mb-3" style="height: 5px;">
+                        <div class="progress-bar bg-primary" style="width: 57%;"></div>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-muted">Team Satisfaction</span>
+                    <span class="fw-semibold text-success">4.2/5</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Productivity</span>
+                    <span class="fw-semibold text-success">92%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

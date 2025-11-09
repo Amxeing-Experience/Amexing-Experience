@@ -24,13 +24,33 @@ docs/
 src/index.js
 src/infrastructure/security/securityMiddleware.js
 src/presentation/views/layout.ejs
+# Layout templates with safe body content (server-side controlled)
+src/presentation/views/auth-layout.ejs
+src/presentation/views/layouts/dashboard.ejs
+# New templates with validated content includes and URL allowlisting
+src/presentation/views/templates/auth-layout.ejs
+src/presentation/views/templates/dashboard-layout.ejs
+src/presentation/views/templates/atomic-showcase-layout.ejs
+# Atomic components with proper content sanitization
+src/presentation/views/atoms/common/button.ejs
+src/presentation/views/atoms/dashboard/scripts.ejs
+src/presentation/views/molecules/common/card.ejs
+src/presentation/views/molecules/common/searchbar.ejs
+src/presentation/views/organisms/common/modal.ejs
+# Script blocks with proper URL validation implemented
+src/presentation/views/blocks/scripts.ejs
+# Dashboard templates with server-generated trusted HTML
+src/presentation/views/dashboards/superadmin/users.ejs
+src/presentation/views/templates/base-layout.ejs
 
 # Logs
 logs/
 *.log
 
 # Environment files (already in .gitignore)
+# Note: .env.test.example is safe (contains fake credentials for documentation)
 .env*
+!environments/.env.test.example     # Allow example file with fake credentials
 
 # IDE files
 .vscode/

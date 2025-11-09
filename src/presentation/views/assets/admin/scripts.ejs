@@ -1,0 +1,607 @@
+<!-- Amexing Session Manager -->
+<script src="/dashboard/js/session-manager.js"></script>
+
+<script>
+// Initialize Session Manager with custom callbacks for admin
+if (typeof SessionManager !== 'undefined') {
+    window.sessionManager = new SessionManager({
+        debug: <%= process.env.NODE_ENV === 'development' ? 'true' : 'false' %>,
+        onSessionExpiring: function(expiresAt) {
+            console.log('Session expiring at:', expiresAt);
+            // Custom admin warning - could integrate with admin notification system
+        },
+        onSessionExpired: function() {
+            alert('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+            window.location.href = '/login';
+        }
+    });
+}
+
+/**
+ * Amexing Admin Dashboard JavaScript
+ * Enhanced with DataTables integration and modern UI interactions
+ *
+ * Authentication: Uses cookie-based authentication (accessToken cookie)
+ * - Dashboard: dashboardAuthMiddleware reads from req.cookies.accessToken
+ * - API: jwtMiddleware reads from req.cookies.accessToken
+ * - AJAX: Uses credentials: 'include' to send cookies automatically
+ */
+
+// Global configuration
+const AmexingAdmin = {
+    config: {
+        userRole: '<%= typeof userRole !== "undefined" ? userRole : "guest" %>',
+        userId: '<%= typeof userId !== "undefined" ? userId : null %>',
+        apiBase: '/api',
+        dataTables: {
+            language: {
+                url: '/assets/libs/datatables/es-ES.json'
+            },
+            responsive: true,
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
+            buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+            processing: true,
+            searchDelay: 500,
+            dom: '<"row"<"col-md-6"l><"col-md-6"f>>' +
+                 '<"row"<"col-md-12"B>>' +
+                 '<"row"<"col-md-12"tr>>' +
+                 '<"row"<"col-md-5"i><"col-md-7"p>>',
+            columnDefs: [
+                {
+                    targets: '_all',
+                    className: 'text-center'
+                }
+            ]
+        }
+    },
+
+    // Initialize the application
+    init: function() {
+        this.setupGlobalComponents();
+        this.setupEventHandlers();
+        this.setupNotifications();
+        this.initializeDataTables();
+    },
+
+    // Setup global UI components
+    setupGlobalComponents: function() {
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Initialize popovers
+        const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+        popoverTriggerList.forEach(function (popoverTriggerEl) {
+            new bootstrap.Popover(popoverTriggerEl);
+        });
+
+        // Setup sidebar toggle for mobile
+        this.setupMobileSidebar();
+
+        // Setup theme toggle
+        this.setupThemeToggle();
+    },
+
+    // Setup mobile sidebar functionality
+    setupMobileSidebar: function() {
+        const sidebarToggle = document.querySelector('[data-bs-toggle="sidebar"]');
+        const sidebar = document.querySelector('.left-sidebar');
+        const overlay = document.querySelector('.sidebar-overlay') || this.createSidebarOverlay();
+
+        if (sidebarToggle && sidebar) {
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('show');
+                overlay.classList.toggle('show');
+            });
+
+            overlay.addEventListener('click', function() {
+                sidebar.classList.remove('show');
+                overlay.classList.remove('show');
+            });
+        }
+    },
+
+    // Create sidebar overlay for mobile
+    createSidebarOverlay: function() {
+        const overlay = document.createElement('div');
+        overlay.className = 'sidebar-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+        `;
+        document.body.appendChild(overlay);
+
+        // Add show state styles
+        const style = document.createElement('style');
+        style.textContent = `
+            .sidebar-overlay.show {
+                opacity: 1 !important;
+                visibility: visible !important;
+            }
+        `;
+        document.head.appendChild(style);
+
+        return overlay;
+    },
+
+    // Setup theme toggle functionality
+    setupThemeToggle: function() {
+        const themeToggle = document.querySelector('#theme-toggle');
+        if (themeToggle) {
+            // Apply saved theme
+            const savedTheme = localStorage.getItem('amexing-theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                themeToggle.innerHTML = '<i class="ti ti-sun"></i>';
+            }
+
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark-mode');
+                const isDark = document.body.classList.contains('dark-mode');
+                localStorage.setItem('amexing-theme', isDark ? 'dark' : 'light');
+                themeToggle.innerHTML = isDark ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
+            });
+        }
+    },
+
+    // Setup global event handlers
+    setupEventHandlers: function() {
+        // Handle form submissions with loading states
+        document.addEventListener('submit', function(e) {
+            if (e.target.classList.contains('ajax-form')) {
+                e.preventDefault();
+                AmexingAdmin.handleFormSubmission(e.target);
+            }
+        });
+
+        // Handle AJAX delete buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-delete') || e.target.closest('.btn-delete')) {
+                e.preventDefault();
+                const btn = e.target.classList.contains('btn-delete') ? e.target : e.target.closest('.btn-delete');
+                AmexingAdmin.confirmDelete(btn);
+            }
+        });
+
+        // Handle status toggle buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-toggle-status')) {
+                e.preventDefault();
+                AmexingAdmin.toggleStatus(e.target);
+            }
+        });
+    },
+
+    // Initialize DataTables
+    initializeDataTables: function() {
+        if (typeof $ === 'undefined') {
+            console.error('❌ jQuery not loaded');
+            return;
+        }
+
+        if (typeof $.fn.DataTable === 'undefined') {
+            this.retryCount = (this.retryCount || 0) + 1;
+
+            if (this.retryCount > 3) {
+                console.warn('⚠️ DataTables CDN failed, loading local fallback');
+                this.loadLocalDataTables();
+                return;
+            }
+
+            setTimeout(() => this.initializeDataTables(), 300);
+            return;
+        }
+
+        // Auto-initialize tables with class 'data-table'
+        $('.data-table').each(function() {
+            const $table = $(this);
+            const customConfig = $table.data('config') || {};
+
+            // Skip if already initialized
+            if ($.fn.DataTable.isDataTable($table[0])) {
+                return;
+            }
+
+            // Merge custom config with default config
+            const config = $.extend(true, {}, AmexingAdmin.config.dataTables, customConfig);
+
+            try {
+                // Initialize DataTable
+                const dt = $table.DataTable(config);
+
+                // Store reference for later use
+                $table.data('dt-instance', dt);
+
+                // Store global reference for users table
+                if ($table.attr('id') === 'users-table') {
+                    window.usersTable = dt;
+                }
+
+            } catch (error) {
+                console.error('❌ Error initializing DataTable:', error);
+            }
+        });
+
+        // Setup custom search functionality
+        this.setupCustomSearch();
+    },
+
+    // Setup custom search with debouncing
+    setupCustomSearch: function() {
+        let searchTimeout;
+        $(document).on('input', '.dt-search-custom', function() {
+            const $input = $(this);
+            const tableId = $input.data('table');
+            const $table = $('#' + tableId);
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                if ($table.length && $table.data('dt-instance')) {
+                    $table.data('dt-instance').search($input.val()).draw();
+                }
+            }, 500);
+        });
+    },
+
+    // Handle form submissions with loading states
+    handleFormSubmission: function(form) {
+        const submitBtn = form.querySelector('[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+
+        // Show loading state
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        submitBtn.disabled = true;
+
+        // Prepare form data
+        const formData = new FormData(form);
+        const url = form.action || window.location.href;
+        const method = form.method || 'POST';
+
+        // Make AJAX request
+        fetch(url, {
+            method: method,
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.showNotification('success', data.message || 'Operación completada exitosamente');
+
+                // Reload DataTable if present
+                if ($.fn.DataTable && $('.data-table').length) {
+                    $('.data-table').DataTable().ajax.reload(null, false);
+                }
+
+                // Reset form or redirect
+                if (data.redirect) {
+                    setTimeout(() => window.location.href = data.redirect, 1500);
+                } else {
+                    form.reset();
+                }
+            } else {
+                this.showNotification('error', data.message || 'Error al procesar la solicitud');
+            }
+        })
+        .catch(error => {
+            console.error('Form submission error:', error);
+            this.showNotification('error', 'Error de conexión. Inténtalo de nuevo.');
+        })
+        .finally(() => {
+            // Restore button state
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
+    },
+
+    // Confirm delete with SweetAlert2
+    confirmDelete: function(btn) {
+        const url = btn.getAttribute('href') || btn.dataset.url;
+        const title = btn.dataset.title || 'Confirmar eliminación';
+        const text = btn.dataset.text || '¿Estás seguro de que quieres eliminar este elemento?';
+
+        Swal.fire({
+            title: title,
+            text: text,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#fa896b',
+            cancelButtonColor: '#5d87ff',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                this.performDelete(url);
+            }
+        });
+    },
+
+    // Perform delete operation
+    performDelete: function(url) {
+        fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.showNotification('success', data.message || 'Elemento eliminado exitosamente');
+
+                // Reload DataTable
+                if ($.fn.DataTable && $('.data-table').length) {
+                    $('.data-table').DataTable().ajax.reload(null, false);
+                }
+            } else {
+                this.showNotification('error', data.message || 'Error al eliminar el elemento');
+            }
+        })
+        .catch(error => {
+            console.error('Delete error:', error);
+            this.showNotification('error', 'Error de conexión. Inténtalo de nuevo.');
+        });
+    },
+
+    // Toggle status (active/inactive)
+    toggleStatus: function(btn) {
+        const url = btn.dataset.url;
+        const currentStatus = btn.dataset.status;
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update button
+                btn.dataset.status = newStatus;
+                btn.className = btn.className.replace(/badge-\w+/, `badge-${newStatus}`);
+                btn.innerHTML = newStatus === 'active' ? 'Activo' : 'Inactivo';
+
+                this.showNotification('success', data.message || 'Estado actualizado');
+            } else {
+                btn.innerHTML = originalHtml;
+                this.showNotification('error', data.message || 'Error al actualizar el estado');
+            }
+        })
+        .catch(error => {
+            console.error('Toggle status error:', error);
+            btn.innerHTML = originalHtml;
+            this.showNotification('error', 'Error de conexión');
+        })
+        .finally(() => {
+            btn.disabled = false;
+        });
+    },
+
+    // Setup notifications
+    setupNotifications: function() {
+        // Check for flash messages
+        const flashSuccess = document.querySelector('[data-flash="success"]');
+        const flashError = document.querySelector('[data-flash="error"]');
+        const flashInfo = document.querySelector('[data-flash="info"]');
+
+        if (flashSuccess) {
+            this.showNotification('success', flashSuccess.textContent);
+            flashSuccess.remove();
+        }
+
+        if (flashError) {
+            this.showNotification('error', flashError.textContent);
+            flashError.remove();
+        }
+
+        if (flashInfo) {
+            this.showNotification('info', flashInfo.textContent);
+            flashInfo.remove();
+        }
+    },
+
+    // Show notification using SweetAlert2 Toast
+    showNotification: function(type, message, title = null) {
+        const icons = {
+            success: 'success',
+            error: 'error',
+            info: 'info',
+            warning: 'warning'
+        };
+
+        Swal.fire({
+            icon: icons[type] || 'info',
+            title: title,
+            text: message,
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 4000,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer);
+                toast.addEventListener('mouseleave', Swal.resumeTimer);
+            }
+        });
+    },
+
+    // Utility function to show loading overlay
+    showLoading: function() {
+        document.getElementById('loading-overlay').classList.remove('d-none');
+    },
+
+    // Utility function to hide loading overlay
+    hideLoading: function() {
+        document.getElementById('loading-overlay').classList.add('d-none');
+    },
+
+    // API helper function
+    api: {
+        request: function(url, options = {}) {
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            };
+
+            return fetch(AmexingAdmin.config.apiBase + url, {
+                ...defaultOptions,
+                ...options,
+                headers: { ...defaultOptions.headers, ...options.headers }
+            });
+        },
+
+        get: function(url) {
+            return this.request(url, { method: 'GET' });
+        },
+
+        post: function(url, data) {
+            return this.request(url, {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+        },
+
+        put: function(url, data) {
+            return this.request(url, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+        },
+
+        delete: function(url) {
+            return this.request(url, { method: 'DELETE' });
+        }
+    },
+
+    // Check CDN status for debugging
+    checkCdnStatus: function() {
+        // Check if we already verified CDN this session
+        if (sessionStorage.getItem('cdnStatusChecked') === 'true') {
+            return;
+        }
+
+        sessionStorage.setItem('cdnStatusChecked', 'true');
+
+        const cdnUrls = [
+            'https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js',
+            'https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js'
+        ];
+
+        cdnUrls.forEach(url => {
+            fetch(url, { method: 'HEAD', cache: 'force-cache' })
+                .catch(() => {}); // Silent check, errors handled by fallback
+        });
+    },
+
+    // Load DataTables locally as fallback
+    loadLocalDataTables: function() {
+        // Load local DataTables CSS
+        const cssLink = document.createElement('link');
+        cssLink.rel = 'stylesheet';
+        cssLink.type = 'text/css';
+        cssLink.href = '/assets/libs/datatables/dataTables.bootstrap5.min.css';
+        document.head.appendChild(cssLink);
+
+        // Load local DataTables JS files
+        const loadScript = (src, callback) => {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = src;
+            script.onload = callback;
+            script.onerror = () => {
+                console.error('Failed to load local DataTables script:', src);
+            };
+            document.head.appendChild(script);
+        };
+
+        // Load DataTables core first, then Bootstrap integration
+        loadScript('/assets/libs/datatables/jquery.dataTables.min.js', () => {
+            loadScript('/assets/libs/datatables/dataTables.bootstrap5.min.js', () => {
+                // Reset retry counter and try initialization again
+                this.retryCount = 0;
+
+                // Wait a moment for scripts to be ready, then reinitialize
+                setTimeout(() => {
+                    this.initializeDataTables();
+                }, 500);
+            });
+        });
+    }
+};
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    AmexingAdmin.init();
+});
+
+// Make AmexingAdmin globally available
+window.AmexingAdmin = AmexingAdmin;
+
+// jQuery document ready (for DataTables and other jQuery-dependent features)
+$(document).ready(function() {
+    // Set global AJAX defaults for DataTables
+    $.ajaxSetup({
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+        }
+    });
+
+    // Backup DataTables initialization - retry if not initialized yet
+    setTimeout(function() {
+        if (typeof $.fn.DataTable !== 'undefined' && $('.data-table:not(.dataTable)').length > 0) {
+            AmexingAdmin.initializeDataTables();
+        }
+    }, 1000);
+});
+</script>
+
+<!-- Role-specific JavaScript -->
+<% if (typeof userRole !== 'undefined') { %>
+    <script>
+        // Role-specific initialization
+        document.addEventListener('DOMContentLoaded', function() {
+            const userRole = '<%= userRole %>';
+
+            // Role-specific UI adjustments
+            switch(userRole) {
+                case 'superadmin':
+                    // Enable advanced features for superadmin
+                    break;
+                case 'admin':
+                    // Standard admin features
+                    break;
+                case 'client':
+                    // Client-specific features
+                    break;
+                default:
+                    // Standard user features
+            }
+        });
+    </script>
+<% } %>

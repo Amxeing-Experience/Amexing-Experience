@@ -1,0 +1,617 @@
+<%
+/**
+ * Audit Log DataTable Organism
+ * DataTable component for audit trail visualization and compliance reporting
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons (always false for audit logs)
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'audit-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/audit/logs';
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+// Only admin and superadmin can view audit logs
+const canView = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<% if (!canView) { %>
+  <div class="alert alert-danger">
+    <i class="ti ti-alert-circle me-2"></i>
+    No tienes permisos para ver los registros de auditoría.
+  </div>
+<% } else { %>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-history me-2"></i>Auditoría de Operaciones
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Registro completo de acciones de usuarios</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card-body border-bottom bg-light">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="filterDateRange" class="form-label fw-semibold">
+                    <i class="ti ti-calendar me-1"></i>Rango de Fechas
+                </label>
+                <input type="text" class="form-control" id="filterDateRange" placeholder="Seleccionar rango...">
+            </div>
+
+            <div class="col-md-3">
+                <label for="filterUser" class="form-label fw-semibold">
+                    <i class="ti ti-user me-1"></i>Usuario
+                </label>
+                <select class="form-select" id="filterUser">
+                    <option value="">Todos los usuarios</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label for="filterAction" class="form-label fw-semibold">
+                    <i class="ti ti-activity me-1"></i>Acción
+                </label>
+                <select class="form-select" id="filterAction">
+                    <option value="">Todas</option>
+                    <option value="CREATE">CREATE</option>
+                    <option value="UPDATE">UPDATE</option>
+                    <option value="DELETE">DELETE</option>
+                    <option value="LOGIN">LOGIN</option>
+                    <option value="LOGOUT">LOGOUT</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label for="filterEntity" class="form-label fw-semibold">
+                    <i class="ti ti-database me-1"></i>Entidad
+                </label>
+                <select class="form-select" id="filterEntity">
+                    <option value="">Todas</option>
+                    <option value="Client">Client</option>
+                    <option value="Employee">Employee</option>
+                    <option value="AmexingUser">AmexingUser</option>
+                    <option value="Vehicle">Vehicle</option>
+                    <option value="Service">Service</option>
+                    <option value="Experience">Experience</option>
+                    <option value="POI">POI</option>
+                </select>
+            </div>
+
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <button type="button" class="btn btn-secondary w-100" id="clearFiltersBtn">
+                    <i class="ti ti-x me-1"></i>Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="audit-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover table-sm" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha/Hora</th>
+                        <th>Usuario</th>
+                        <th>Acción</th>
+                        <th>Entidad</th>
+                        <th>Cambios</th>
+                        <th>IP</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Changes Details Modal -->
+<div class="modal fade" id="changesModal" tabindex="-1" aria-labelledby="changesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title text-white" id="changesModalLabel">
+                    <i class="ti ti-eye me-2"></i>Detalles de Cambios
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0">Información de la Operación</h6>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="copyChangesBtn">
+                            <i class="ti ti-copy me-1"></i>Copiar JSON
+                        </button>
+                    </div>
+                    <div class="bg-light p-3 rounded">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <small class="text-muted">Usuario:</small><br>
+                                <strong id="modalUsername">-</strong>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Fecha/Hora:</small><br>
+                                <strong id="modalTimestamp">-</strong>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Acción:</small><br>
+                                <span id="modalAction" class="badge">-</span>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted">Entidad:</small><br>
+                                <strong id="modalEntity">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6>Cambios Realizados</h6>
+                <pre id="changesContent" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow-y: auto;"><code></code></pre>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Wait for DOM and all dependencies to be ready
+    function initWhenReady() {
+        // Check if jQuery and DataTables are loaded
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        if (!jQuery.fn.dataTable) {
+            console.warn('DataTables not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        initAuditTable();
+    }
+
+    function initAuditTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+
+        // Get JWT token from cookies
+        function getAccessToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Setup global AJAX configuration to include JWT token
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
+        });
+
+        // Initialize date range picker - start empty
+        $('#filterDateRange').val('');
+
+        // Load users for filter
+        loadUsersFilter();
+
+        // DataTable Configuration
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: false, // Changed to false - we'll handle filtering client-side
+            ajax: {
+                url: apiEndpoint,
+                type: 'GET',
+                data: function(d) {
+                    // Add custom filters
+                    const dateRange = $('#filterDateRange').val();
+                    if (dateRange && dateRange.trim() !== '') {
+                        const parts = dateRange.split(' - ');
+                        if (parts.length === 2) {
+                            const start = parts[0].trim();
+                            const end = parts[1].trim();
+
+                            // Try to parse dates safely
+                            try {
+                                const startDate = new Date(start);
+                                const endDate = new Date(end);
+
+                                // Validate dates are valid
+                                if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime())) {
+                                    d.startDate = startDate.toISOString();
+                                    d.endDate = endDate.toISOString();
+                                }
+                            } catch (error) {
+                                console.warn('Invalid date range:', dateRange);
+                            }
+                        }
+                    }
+
+                    const userId = $('#filterUser').val();
+                    if (userId) d.userId = userId;
+
+                    const action = $('#filterAction').val();
+                    if (action) d.action = action;
+
+                    const entityType = $('#filterEntity').val();
+                    if (entityType) d.entityType = entityType;
+
+                    // Add pagination params
+                    d.page = Math.floor(d.start / d.length) + 1;
+                    d.limit = d.length;
+
+                    return d;
+                },
+                dataSrc: function(json) {
+                    if (json.success && json.data) {
+                        return json.data.data || json.data || [];
+                    }
+                    return [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading audit logs:', error, xhr);
+                    showErrorAlert('Error al cargar los registros de auditoría');
+                }
+            },
+            columns: [
+                {
+                    data: 'timestamp',
+                    render: function(data) {
+                        if (!data) return '-';
+                        const date = new Date(data);
+                        return `
+                            <div class="fw-semibold">${date.toLocaleDateString('es-MX')}</div>
+                            <small class="text-muted">${date.toLocaleTimeString('es-MX')}</small>
+                        `;
+                    }
+                },
+                {
+                    data: 'username',
+                    render: function(data, type, row) {
+                        return `
+                            <div class="fw-semibold">${data || 'Unknown'}</div>
+                            <small class="text-muted">${row.userId || '-'}</small>
+                        `;
+                    }
+                },
+                {
+                    data: 'action',
+                    render: function(data) {
+                        const badgeClasses = {
+                            'CREATE': 'bg-success',
+                            'UPDATE': 'bg-primary',
+                            'DELETE': 'bg-danger',
+                            'LOGIN': 'bg-info',
+                            'LOGOUT': 'bg-secondary',
+                            'ACCESS': 'bg-warning'
+                        };
+                        const badgeClass = badgeClasses[data] || 'bg-secondary';
+                        return `<span class="badge ${badgeClass}">${data || '-'}</span>`;
+                    }
+                },
+                {
+                    data: 'entityName',
+                    render: function(data, type, row) {
+                        // Show entityName if available, otherwise fallback to entityId with entityType
+                        if (data) {
+                            return `<div class="fw-semibold">${data}</div>`;
+                        }
+                        // Fallback: show entityType + entityId
+                        const entityType = row.entityType || 'Unknown';
+                        if (row.entityId) {
+                            const shortId = row.entityId.substring(0, 8) + '...';
+                            return `
+                                <div class="fw-semibold">${entityType}</div>
+                                <code class="text-primary"
+                                      data-bs-toggle="tooltip"
+                                      data-bs-placement="top"
+                                      title="${row.entityId}"
+                                      style="cursor: pointer;">
+                                    ${shortId}
+                                </code>
+                            `;
+                        }
+                        return `<div class="fw-semibold">${entityType}</div>`;
+                    }
+                },
+                {
+                    data: 'changes',
+                    orderable: false,
+                    searchable: false,
+                    render: function(data, type, row) {
+                        if (!data || Object.keys(data).length === 0) {
+                            return '<span class="text-muted">Sin cambios</span>';
+                        }
+
+                        const changesCount = Object.keys(data).length;
+                        return `
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-info view-changes-btn"
+                                    data-changes='${JSON.stringify(data)}'
+                                    data-username="${row.username || 'Unknown'}"
+                                    data-timestamp="${row.timestamp || '-'}"
+                                    data-action="${row.action || '-'}"
+                                    data-entity="${row.entityType || '-'}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Ver detalles de cambios">
+                                <i class="ti ti-eye me-1"></i>${changesCount} campo${changesCount > 1 ? 's' : ''}
+                            </button>
+                        `;
+                    }
+                },
+                {
+                    data: 'metadata.ip',
+                    render: function(data, type, row) {
+                        const ip = data || row.metadata?.ip || '-';
+                        return `<code class="text-muted">${ip}</code>`;
+                    }
+                }
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando registros de auditoría...'
+            },
+            order: [[0, 'desc']], // Sort by timestamp descending
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                // Reinitialize tooltips after table redraw
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
+        });
+
+        // Event Handlers
+
+        // View changes details
+        $(`#${tableId}`).on('click', '.view-changes-btn', function() {
+            const changesData = $(this).data('changes');
+            const username = $(this).data('username');
+            const timestamp = $(this).data('timestamp');
+            const action = $(this).data('action');
+            const entity = $(this).data('entity');
+
+            showChangesModal(changesData, username, timestamp, action, entity);
+        });
+
+        // Filter changes
+        $('#filterDateRange, #filterUser, #filterAction, #filterEntity').on('change', function() {
+            dataTable.ajax.reload();
+        });
+
+        // Clear filters
+        $('#clearFiltersBtn').on('click', function() {
+            $('#filterDateRange').val('');
+            $('#filterUser').val('');
+            $('#filterAction').val('');
+            $('#filterEntity').val('');
+            dataTable.ajax.reload();
+        });
+
+        // Copy changes JSON to clipboard
+        $('#copyChangesBtn').on('click', function() {
+            const changesText = $('#changesContent code').text();
+
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(changesText).then(function() {
+                    showSuccessAlert('JSON copiado al portapapeles');
+                }).catch(function(err) {
+                    console.error('Error copying to clipboard:', err);
+                    showErrorAlert('Error al copiar al portapapeles');
+                });
+            } else {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = changesText;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showSuccessAlert('JSON copiado al portapapeles');
+                } catch (err) {
+                    showErrorAlert('Error al copiar al portapapeles');
+                }
+                document.body.removeChild(textArea);
+            }
+        });
+
+        // Functions
+
+        function loadUsersFilter() {
+            $.ajax({
+                url: '/api/amexingusers',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        // Handle different response structures
+                        let users = response.data.users || response.data.data || response.data;
+
+                        // Ensure users is an array
+                        if (!Array.isArray(users)) {
+                            console.warn('Users data is not an array:', users);
+                            return;
+                        }
+
+                        if (users.length === 0) {
+                            console.warn('No users found');
+                            return;
+                        }
+
+                        const options = users.map(user =>
+                            `<option value="${user.objectId || user.id}">${user.username || user.email}</option>`
+                        ).join('');
+                        $('#filterUser').append(options);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error loading users:', xhr);
+                }
+            });
+        }
+
+        function showChangesModal(changes, username, timestamp, action, entity) {
+            // Populate modal header info
+            $('#modalUsername').text(username);
+            $('#modalTimestamp').text(new Date(timestamp).toLocaleString('es-MX'));
+
+            const badgeClasses = {
+                'CREATE': 'bg-success',
+                'UPDATE': 'bg-primary',
+                'DELETE': 'bg-danger',
+                'LOGIN': 'bg-info',
+                'LOGOUT': 'bg-secondary'
+            };
+            const badgeClass = badgeClasses[action] || 'bg-secondary';
+            $('#modalAction').attr('class', `badge ${badgeClass}`).text(action);
+            $('#modalEntity').text(entity);
+
+            // Format and display changes JSON
+            const formattedChanges = JSON.stringify(changes, null, 2);
+            $('#changesContent code').text(formattedChanges);
+
+            // Show modal
+            $('#changesModal').modal('show');
+        }
+
+        /**
+         * Show success alert message
+         * @param {string} message - Success message to display
+         */
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('audit-content');
+            if (!container) return;
+
+            // Remove existing alerts safely
+            try {
+                const existingAlerts = container.querySelectorAll('.alert');
+                existingAlerts.forEach(el => {
+                    try {
+                        if (el.parentNode) el.parentNode.removeChild(el);
+                    } catch (e) {
+                        console.warn('Could not remove alert:', e);
+                    }
+                });
+            } catch (e) {
+                console.warn('Error removing existing alerts:', e);
+            }
+
+            container.insertAdjacentHTML('afterbegin', alertHtml);
+
+            // Auto-dismiss after 5 seconds - simplified version
+            setTimeout(() => {
+                try {
+                    const containerCheck = document.getElementById('audit-content');
+                    if (!containerCheck) return;
+
+                    const alerts = containerCheck.querySelectorAll('.alert.alert-success');
+                    alerts.forEach(el => {
+                        try {
+                            if (el && el.parentNode && el.parentNode.contains(el)) {
+                                el.classList.remove('show');
+                                // Use a single setTimeout with more delay
+                                setTimeout(() => {
+                                    try {
+                                        if (el && el.parentNode && el.parentNode.contains(el)) {
+                                            el.parentNode.removeChild(el);
+                                        }
+                                    } catch (err) {
+                                        // Silently ignore - element already removed
+                                    }
+                                }, 200);
+                            }
+                        } catch (err) {
+                            // Silently ignore - element already removed
+                        }
+                    });
+                } catch (err) {
+                    // Silently ignore errors
+                }
+            }, 5000);
+        }
+
+        /**
+         * Show error alert message
+         * @param {string} message - Error message to display
+         */
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('audit-content');
+            if (!container) return;
+
+            // Remove existing alerts safely
+            try {
+                const existingAlerts = container.querySelectorAll('.alert');
+                existingAlerts.forEach(el => {
+                    try {
+                        if (el.parentNode) el.parentNode.removeChild(el);
+                    } catch (e) {
+                        console.warn('Could not remove alert:', e);
+                    }
+                });
+            } catch (e) {
+                console.warn('Error removing existing alerts:', e);
+            }
+
+            container.insertAdjacentHTML('afterbegin', alertHtml);
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>
+
+<% } %>

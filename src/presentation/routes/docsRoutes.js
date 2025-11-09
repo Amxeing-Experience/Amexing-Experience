@@ -1,6 +1,10 @@
 /**
  * Documentation Routes
  * API documentation endpoints using Swagger UI.
+ * @example
+ * // Usage example
+ * const result = await require({ 'express': 'example' });
+ * // Returns: operation result
  */
 
 const express = require('express');
@@ -12,12 +16,7 @@ const path = require('path');
 const router = express.Router();
 
 // Load OpenAPI specification
-const swaggerDocument = yaml.load(
-  fs.readFileSync(
-    path.join(__dirname, '../../../docs/api/openapi.yaml'),
-    'utf8'
-  )
-);
+const swaggerDocument = yaml.load(fs.readFileSync(path.join(__dirname, '../../../docs/api/openapi.yaml'), 'utf8'));
 
 // Swagger UI options
 const swaggerOptions = {

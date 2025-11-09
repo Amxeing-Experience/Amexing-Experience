@@ -86,7 +86,9 @@ const createMockRequest = (data = {}) => ({
   query: {},
   headers: {},
   user: null,
-  session: {},
+  session: {
+    csrfSecret: 'test-csrf-secret-12345678901234567890123456789012', // 32 chars for CSRF
+  },
   accepts: jest.fn(() => 'html'), // Default to HTML
   method: 'GET',
   path: '/',

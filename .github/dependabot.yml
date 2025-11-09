@@ -7,8 +7,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: "daily"
       time: "09:00"
       timezone: "America/Mexico_City"
     
@@ -19,10 +18,12 @@ updates:
     assignees:
       - "security-team"
     
-    # Automatic security updates
+    # Automatic security updates with priority
     allow:
       - dependency-type: "all"
         update-type: "security"
+      - dependency-type: "production"
+        update-type: "version-update:semver-patch"
     
     # Labels for tracking
     labels:
@@ -39,6 +40,10 @@ updates:
     # Version strategy
     versioning-strategy: "increase"
     
+    # Security vulnerability alerts
+    vulnerability-alerts:
+      enabled: true
+    
     # Target branch
     target-branch: "main"
 
@@ -46,9 +51,8 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "tuesday"
-      time: "09:00"
+      interval: "daily"
+      time: "10:00"
       timezone: "America/Mexico_City"
     
     open-pull-requests-limit: 3

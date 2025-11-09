@@ -1,0 +1,747 @@
+<%
+/**
+ * Client Detail Page - Simplified without includes
+ */
+
+const activeSection = typeof section !== 'undefined' ? section : 'information';
+
+if (typeof client === 'undefined' || !client) {
+    throw new Error('Client data is required');
+}
+
+function getNestedProperty(obj, path, defaultValue = '') {
+    return path.split('.').reduce((acc, part) => acc && acc[part], obj) || defaultValue;
+}
+
+const clientData = {
+    id: client.id || client.objectId,
+    firstName: client.firstName || '',
+    lastName: client.lastName || '',
+    email: client.email || '',
+    phone: client.phone || '',
+    active: typeof client.active !== 'undefined' ? client.active : true,
+    companyName: client.companyName || getNestedProperty(client, 'contextualData.companyName', 'Sin nombre'),
+    taxId: client.taxId || getNestedProperty(client, 'contextualData.taxId', ''),
+    website: client.website || getNestedProperty(client, 'contextualData.website', ''),
+    notes: client.notes || getNestedProperty(client, 'contextualData.notes', ''),
+    addressStreet: getNestedProperty(client, 'address.street', ''),
+    addressCity: getNestedProperty(client, 'address.city', ''),
+    addressState: getNestedProperty(client, 'address.state', ''),
+    addressZipCode: getNestedProperty(client, 'address.zipCode', ''),
+    addressCountry: getNestedProperty(client, 'address.country', ''),
+    createdAt: client.createdAt || null,
+    updatedAt: client.updatedAt || null
+};
+
+const clientId = clientData.id;
+const clientName = `${clientData.firstName} ${clientData.lastName}`.trim();
+const companyName = clientData.companyName;
+const isActive = clientData.active;
+
+const menuItems = [
+    { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/admin/clients/${clientId}` },
+    { label: 'Empleados', icon: 'users', section: 'employees', href: `/dashboard/admin/clients/${clientId}?section=employees` },
+    { label: 'Cotizaciones', icon: 'file-invoice', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` }
+];
+%>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold"><%= companyName %></h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="/dashboard/admin/clients"><i class="ti ti-building me-1"></i>Clientes</a></li>
+                        <li class="breadcrumb-item active"><%= companyName %></li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <% if (isActive) { %>
+                    <span class="badge bg-success fs-6"><i class="ti ti-check-circle me-1"></i>Activo</span>
+                <% } else { %>
+                    <span class="badge bg-danger fs-6"><i class="ti ti-x-circle me-1"></i>Inactivo</span>
+                <% } %>
+                <a href="/dashboard/admin/clients" class="btn btn-sm btn-outline-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>Volver
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content with spacing from header -->
+<div class="row mt-4">
+    <div class="col-lg-3 mb-3 mb-lg-0" id="menuColumn">
+        <nav class="vertical-menu card border-0 shadow-sm">
+            <div class="card-body p-3">
+                <div class="menu-header mb-3">
+                    <h6 class="text-uppercase text-muted fw-bold menu-title" style="font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 0;">MENÚ</h6>
+                    <button class="btn btn-sm btn-link text-muted p-0 menu-toggle-btn" id="menuToggle" type="button" aria-label="Colapsar menú">
+                        <i class="ti ti-menu-2 fs-5"></i>
+                    </button>
+                </div>
+                <% menuItems.forEach(function(item) { %>
+                    <a href="<%= item.href %>" class="menu-item <%= item.section === activeSection ? 'active' : '' %>" data-bs-toggle="tooltip" data-bs-placement="right" title="<%= item.label %>">
+                        <i class="ti ti-<%= item.icon %> menu-icon"></i><span class="menu-label"><%= item.label %></span>
+                    </a>
+                <% }); %>
+            </div>
+        </nav>
+    </div>
+
+    <div class="col-lg-9" id="contentColumn">
+        <% if (activeSection === 'information') { %>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white"><h5 class="mb-0"><i class="ti ti-info-circle me-2 text-primary"></i>Información del Cliente</h5></div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-user me-1"></i>Datos del Representante</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Nombre</label><p class="fw-semibold mb-0"><%= clientData.firstName || 'N/A' %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Apellido</label><p class="fw-semibold mb-0"><%= clientData.lastName || 'N/A' %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Email</label><p class="mb-0"><a href="mailto:<%= clientData.email %>"><i class="ti ti-mail me-1"></i><%= clientData.email %></a></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Teléfono</label><p class="mb-0"><% if (clientData.phone) { %><a href="tel:<%= clientData.phone %>"><i class="ti ti-phone me-1"></i><%= clientData.phone %></a><% } else { %>N/A<% } %></p></div>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-building me-1"></i>Información de la Empresa</h6>
+                        <div class="row">
+                            <div class="col-md-12 mb-3"><label class="form-label text-muted small">Nombre</label><p class="fw-semibold mb-0"><%= clientData.companyName %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">RFC</label><p class="mb-0"><%= clientData.taxId || 'N/A' %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Sitio Web</label><p class="mb-0"><% if (clientData.website) { %><a href="<%= clientData.website %>" target="_blank"><i class="ti ti-external-link me-1"></i><%= clientData.website %></a><% } else { %>N/A<% } %></p></div>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-map-pin me-1"></i>Dirección Fiscal</h6>
+                        <div class="row">
+                            <div class="col-md-12 mb-3"><label class="form-label text-muted small">Calle</label><p class="mb-0"><%= clientData.addressStreet || 'N/A' %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Ciudad</label><p class="mb-0"><%= clientData.addressCity || 'N/A' %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Estado</label><p class="mb-0"><%= clientData.addressState || 'N/A' %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">CP</label><p class="mb-0"><%= clientData.addressZipCode || 'N/A' %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">País</label><p class="mb-0"><%= clientData.addressCountry || 'N/A' %></p></div>
+                        </div>
+                    </div>
+                    <% if (clientData.notes) { %>
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-notes me-1"></i>Notas</h6>
+                        <p class="text-muted mb-0"><%= clientData.notes %></p>
+                    </div>
+                    <% } %>
+                    <div class="mb-0">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-clock me-1"></i>Registro</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Fecha de Registro</label><p class="mb-0"><% if (clientData.createdAt) { %><%= new Date(clientData.createdAt).toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' }) %><% } else { %>N/A<% } %></p></div>
+                            <div class="col-md-6 mb-3"><label class="form-label text-muted small">Actualización</label><p class="mb-0"><% if (clientData.updatedAt) { %><%= new Date(clientData.updatedAt).toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' }) %><% } else { %>N/A<% } %></p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <% } else if (activeSection === 'employees') { %>
+            <!-- Employees Management Section -->
+            <%- include('../../organisms/datatable/employees-table', {
+                tableId: 'client-employees-table',
+                clientId: clientId,
+                apiEndpoint: `/api/clients/${clientId}/employees`,
+                userRole: typeof userRole !== 'undefined' ? userRole : 'admin',
+                showActions: true
+            }) %>
+        <% } else if (activeSection === 'quotes') { %>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white"><h5 class="mb-0"><i class="ti ti-file-invoice me-2 text-primary"></i>Cotizaciones</h5></div>
+                <div class="card-body text-center py-5">
+                    <i class="ti ti-file-invoice" style="font-size: 4rem; color: #d1d5db;"></i>
+                    <h5 class="mt-3 text-muted">Próximamente</h5>
+                    <p class="text-muted">Gestión de cotizaciones disponible próximamente.</p>
+                </div>
+            </div>
+        <% } %>
+    </div>
+</div>
+
+<style>
+/* Vertical Menu Styles */
+.vertical-menu {
+    position: sticky;
+    top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.vertical-menu.collapsed {
+    max-width: 80px;
+}
+
+.menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.vertical-menu.collapsed .menu-header {
+    justify-content: center;
+}
+
+.vertical-menu.collapsed .menu-title,
+.vertical-menu.collapsed .menu-label {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    transition: opacity 0.2s ease, width 0.3s ease;
+}
+
+.vertical-menu:not(.collapsed) .menu-title,
+.vertical-menu:not(.collapsed) .menu-label {
+    opacity: 1;
+    width: auto;
+    transition: opacity 0.3s ease 0.1s, width 0.3s ease;
+}
+
+.menu-toggle-btn {
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.menu-toggle-btn:hover {
+    transform: scale(1.1);
+    color: #f76b1c !important;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: #5a6a85;
+    text-decoration: none;
+    border-radius: 0.375rem;
+    margin-bottom: 0.25rem;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.vertical-menu.collapsed .menu-item {
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.menu-item:hover {
+    background-color: #f8f9fa;
+    color: #f76b1c;
+}
+
+.menu-item.active {
+    background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%);
+    color: white;
+    font-weight: 600;
+}
+
+.menu-icon {
+    font-size: 1.25rem;
+    min-width: 1.25rem;
+    transition: margin 0.3s ease;
+}
+
+.vertical-menu:not(.collapsed) .menu-icon {
+    margin-right: 0.5rem;
+}
+
+.vertical-menu.collapsed .menu-icon {
+    margin-right: 0;
+}
+
+.menu-label {
+    transition: opacity 0.2s ease, width 0.3s ease;
+}
+
+/* Column transitions */
+#menuColumn, #contentColumn {
+    transition: all 0.3s ease;
+}
+
+#menuColumn.collapsed {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+#contentColumn.expanded {
+    flex: 1;
+}
+
+/* Card and form styles */
+.card-body label.form-label { font-size: 0.8125rem; font-weight: 600; text-transform: uppercase; }
+.card-body p { font-size: 0.9375rem; color: #374151; }
+.card-body a { color: #5a6a85; text-decoration: none; }
+.card-body a:hover { color: #f76b1c; }
+.breadcrumb-item a { color: #5a6a85; text-decoration: none; }
+.breadcrumb-item a:hover { color: #f76b1c; }
+.badge.fs-6 { font-size: 0.875rem !important; padding: 0.375rem 0.75rem; }
+
+/* Responsive styles */
+@media (max-width: 991.98px) {
+    .vertical-menu { position: static; }
+    #menuToggle { display: none; }
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const menuToggle = document.getElementById('menuToggle');
+    const verticalMenu = document.querySelector('.vertical-menu');
+    const menuColumn = document.getElementById('menuColumn');
+    const contentColumn = document.getElementById('contentColumn');
+
+    if (menuToggle && verticalMenu) {
+        // Check localStorage for saved state
+        const isCollapsed = localStorage.getItem('clientDetailMenuCollapsed') === 'true';
+        if (isCollapsed) {
+            verticalMenu.classList.add('collapsed');
+            menuColumn.classList.add('collapsed');
+            contentColumn.classList.add('expanded');
+        }
+
+        // Initialize tooltips for menu items
+        const menuItems = document.querySelectorAll('.menu-item[data-bs-toggle="tooltip"]');
+        menuItems.forEach(item => {
+            new bootstrap.Tooltip(item, {
+                trigger: 'hover',
+                boundary: 'window'
+            });
+        });
+
+        // Toggle menu on button click
+        menuToggle.addEventListener('click', function() {
+            const isCurrentlyCollapsed = verticalMenu.classList.toggle('collapsed');
+            menuColumn.classList.toggle('collapsed');
+            contentColumn.classList.toggle('expanded');
+
+            // Save state to localStorage
+            localStorage.setItem('clientDetailMenuCollapsed', isCurrentlyCollapsed);
+
+            // Update aria-label
+            this.setAttribute('aria-label', isCurrentlyCollapsed ? 'Expandir menú' : 'Colapsar menú');
+
+            // Enable/disable tooltips based on state
+            menuItems.forEach(item => {
+                const tooltip = bootstrap.Tooltip.getInstance(item);
+                if (tooltip) {
+                    if (isCurrentlyCollapsed) {
+                        tooltip.enable();
+                    } else {
+                        tooltip.disable();
+                    }
+                }
+            });
+        });
+
+        // Disable tooltips initially if menu is not collapsed
+        if (!isCollapsed) {
+            menuItems.forEach(item => {
+                const tooltip = bootstrap.Tooltip.getInstance(item);
+                if (tooltip) {
+                    tooltip.disable();
+                }
+            });
+        }
+    }
+});
+</script>
+
+<!-- Create Employee Modal -->
+<div class="modal fade" id="createEmployeeModal" tabindex="-1" aria-labelledby="createEmployeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="createEmployeeModalLabel">
+                    <i class="ti ti-user-plus me-2"></i>Crear Nuevo Empleado
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <form id="createEmployeeForm">
+                    <!-- Sección: Información Personal -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-user me-1"></i>
+                            Información Personal
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'firstName',
+                                    id: 'employeeFirstName',
+                                    label: 'Nombre',
+                                    required: true,
+                                    placeholder: 'Ej: Juan',
+                                    helpText: 'Nombre del empleado',
+                                    inputAttributes: { maxlength: '100' }
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'lastName',
+                                    id: 'employeeLastName',
+                                    label: 'Apellido',
+                                    required: true,
+                                    placeholder: 'Ej: Pérez García',
+                                    inputAttributes: { maxlength: '100' }
+                                }) %>
+                            </div>
+                        </div>
+
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'email',
+                            name: 'email',
+                            id: 'employeeEmail',
+                            label: 'Email Corporativo',
+                            required: true,
+                            placeholder: 'empleado@empresa.com',
+                            helpText: 'Email del empleado para acceso al sistema',
+                            inputAttributes: { maxlength: '255' }
+                        }) %>
+                    </div>
+
+                    <!-- Sección: Asignación de Rol -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-shield-check me-1"></i>
+                            Asignación de Rol
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="employeeRole" class="form-label">Rol <span class="text-danger">*</span></label>
+                            <select class="form-select" id="employeeRole" name="role" required>
+                                <option value="">Seleccionar rol...</option>
+                                <option value="client">Agent (Representante de agencia con capacidades de gestión)</option>
+                                <option value="employee">Employee (Empleado estándar)</option>
+                            </select>
+                            <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
+                        </div>
+
+                        <!-- Role descriptions -->
+                        <div class="alert alert-info role-description d-none" id="roleDescriptionClient">
+                            <strong><i class="ti ti-briefcase me-1"></i>Agent:</strong>
+                            Representante de la agencia con capacidades de gestión. Puede gestionar empleados y cotizaciones.
+                        </div>
+                        <div class="alert alert-secondary role-description d-none" id="roleDescriptionEmployee">
+                            <strong><i class="ti ti-user me-1"></i>Employee:</strong>
+                            Empleado estándar con acceso a funcionalidades básicas.
+                        </div>
+                    </div>
+
+                    <!-- Sección: Datos Adicionales -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-clipboard me-1"></i>
+                            Datos Adicionales (Opcional)
+                        </h6>
+
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'tel',
+                            name: 'phone',
+                            id: 'employeePhone',
+                            label: 'Teléfono de Contacto',
+                            required: false,
+                            placeholder: '+52 (999) 123-4567',
+                            inputAttributes: { maxlength: '20' }
+                        }) %>
+
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'textarea',
+                            name: 'notes',
+                            id: 'employeeNotes',
+                            label: 'Notas Adicionales',
+                            required: false,
+                            placeholder: 'Información relevante sobre el empleado...',
+                            helpText: 'Máximo 500 caracteres',
+                            inputAttributes: { maxlength: '500', rows: '3' }
+                        }) %>
+                        <small id="notesCharCountEmployee" class="text-muted float-end">0/500</small>
+                    </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Acceso al sistema:</strong>
+                            <p class="mb-0 mt-1">Se generará una contraseña temporal automáticamente. El empleado recibirá instrucciones para configurar una nueva contraseña en su primer acceso.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <%- include('../../atoms/common/button', {
+                    type: 'button',
+                    variant: 'secondary',
+                    text: 'Cancelar',
+                    icon: 'x',
+                    attributes: { 'data-bs-dismiss': 'modal' }
+                }) %>
+
+                <%- include('../../atoms/common/button', {
+                    type: 'button',
+                    variant: 'primary',
+                    text: 'Crear Empleado',
+                    icon: 'check',
+                    attributes: {
+                        'id': 'submitCreateEmployee',
+                        'disabled': 'true'
+                    }
+                }) %>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Employee Management JavaScript -->
+<script>
+    // ========================================================================
+    // CREATE EMPLOYEE MODAL FUNCTIONS
+    // ========================================================================
+
+    /**
+     * Initialize create employee modal with validation
+     */
+    function initializeCreateEmployeeModal() {
+        const modal = document.getElementById('createEmployeeModal');
+        const form = document.getElementById('createEmployeeForm');
+        const submitBtn = document.getElementById('submitCreateEmployee');
+
+        if (!modal || !form || !submitBtn) return;
+
+        // Character counter for notes
+        const notesTextarea = document.getElementById('employeeNotes');
+        const charCounter = document.getElementById('notesCharCountEmployee');
+
+        if (notesTextarea && charCounter) {
+            notesTextarea.addEventListener('input', function() {
+                const length = this.value.length;
+                charCounter.textContent = `${length}/500`;
+
+                if (length > 450) {
+                    charCounter.classList.add('text-warning');
+                    charCounter.classList.remove('text-muted');
+                } else if (length === 500) {
+                    charCounter.classList.add('text-danger');
+                    charCounter.classList.remove('text-warning', 'text-muted');
+                } else {
+                    charCounter.classList.remove('text-warning', 'text-danger');
+                    charCounter.classList.add('text-muted');
+                }
+            });
+        }
+
+        // Role description display
+        const roleSelect = document.getElementById('employeeRole');
+        if (roleSelect) {
+            roleSelect.addEventListener('change', function() {
+                // Hide all descriptions
+                document.querySelectorAll('.role-description').forEach(el => el.classList.add('d-none'));
+
+                // Show selected role description
+                if (this.value === 'client') {
+                    document.getElementById('roleDescriptionClient')?.classList.remove('d-none');
+                } else if (this.value === 'employee') {
+                    document.getElementById('roleDescriptionEmployee')?.classList.remove('d-none');
+                }
+            });
+        }
+
+        // Real-time validation
+        const requiredFields = form.querySelectorAll('[required]');
+
+        function validateForm() {
+            let isValid = true;
+
+            requiredFields.forEach(field => {
+                const value = field.value.trim();
+
+                // Required field validation
+                if (!value) {
+                    isValid = false;
+                    return;
+                }
+
+                // Email validation
+                if (field.type === 'email' && value) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(value)) {
+                        isValid = false;
+                    }
+                }
+            });
+
+            submitBtn.disabled = !isValid;
+            return isValid;
+        }
+
+        // Validate on input for all form fields
+        form.addEventListener('input', validateForm);
+        form.addEventListener('change', validateForm);
+
+        // Handle form submission
+        submitBtn.addEventListener('click', async function() {
+            if (!validateForm()) return;
+
+            // Collect form data
+            const formData = {
+                firstName: document.getElementById('employeeFirstName').value.trim(),
+                lastName: document.getElementById('employeeLastName').value.trim(),
+                email: document.getElementById('employeeEmail').value.trim(),
+                role: document.getElementById('employeeRole').value.trim(),
+                phone: document.getElementById('employeePhone').value.trim() || undefined,
+                notes: document.getElementById('employeeNotes').value.trim() || ''
+            };
+
+            // Remove undefined values
+            Object.keys(formData).forEach(key => {
+                if (formData[key] === undefined) {
+                    delete formData[key];
+                }
+            });
+
+            await executeCreateEmployee(formData);
+        });
+
+        // Reset form on modal hide
+        modal.addEventListener('hidden.bs.modal', function() {
+            form.reset();
+            submitBtn.disabled = true;
+
+            if (charCounter) {
+                charCounter.textContent = '0/500';
+                charCounter.classList.remove('text-warning', 'text-danger');
+                charCounter.classList.add('text-muted');
+            }
+
+            // Hide role descriptions
+            document.querySelectorAll('.role-description').forEach(el => el.classList.add('d-none'));
+
+            // Clear validation states
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            form.querySelectorAll('.invalid-feedback').forEach(el => el.style.display = 'none');
+        });
+    }
+
+    /**
+     * Execute create employee API call
+     * @param {object} formData - Employee data from form
+     */
+    async function executeCreateEmployee(formData) {
+        const submitBtn = document.getElementById('submitCreateEmployee');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('createEmployeeModal'));
+
+        // Disable button and show loading
+        submitBtn.disabled = true;
+        const originalContent = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creando...';
+
+        try {
+            const clientId = '<%= clientId %>';
+            const response = await fetch(`/api/clients/${clientId}/employees`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Error al crear el empleado');
+            }
+
+            // Success - restore button before hiding modal
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+
+            modal.hide();
+            showSuccessAlert(`Empleado "${formData.firstName} ${formData.lastName}" creado exitosamente`);
+
+            // Reload table
+            if (window.employeesTable) {
+                window.employeesTable.ajax.reload(null, false);
+            }
+
+        } catch (error) {
+            console.error('Error creating employee:', error);
+            showErrorAlert(error.message || 'Error al crear el empleado. Por favor, intenta nuevamente.');
+
+            // Restore button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+        }
+    }
+
+    // ========================================================================
+    // ALERT/NOTIFICATION FUNCTIONS FOR EMPLOYEE MODAL
+    // ========================================================================
+
+    /**
+     * Show success alert message
+     * @param {string} message - Success message to display
+     */
+    function showSuccessAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="ti ti-check-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+
+        // Remove existing alerts
+        document.querySelectorAll('.alert').forEach(el => el.remove());
+
+        // Insert new alert at the top of the content column
+        const contentColumn = document.getElementById('contentColumn');
+        if (contentColumn) {
+            contentColumn.insertAdjacentHTML('afterbegin', alertHtml);
+        }
+
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            document.querySelectorAll('.alert').forEach(el => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 150);
+            });
+        }, 5000);
+    }
+
+    /**
+     * Show error alert message
+     * @param {string} message - Error message to display
+     */
+    function showErrorAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+
+        // Remove existing alerts
+        document.querySelectorAll('.alert').forEach(el => el.remove());
+
+        // Insert new alert at the top of the content column
+        const contentColumn = document.getElementById('contentColumn');
+        if (contentColumn) {
+            contentColumn.insertAdjacentHTML('afterbegin', alertHtml);
+        }
+    }
+
+    // Initialize create employee modal on DOM ready
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeCreateEmployeeModal();
+    });
+</script>

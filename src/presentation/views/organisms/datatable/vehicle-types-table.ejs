@@ -1,0 +1,650 @@
+<%
+/**
+ * Vehicle Types DataTable Organism
+ * DataTable component for vehicle type catalog management
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'vehicle-types-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/vehicle-types';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole); // Admin and superadmin can delete
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-list me-2"></i>Tipos de Vehículo
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Catálogo de tipos de vehículos del sistema</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createVehicleTypeBtn">
+                        <i class="ti ti-plus me-1"></i>Nuevo Tipo
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="vehicle-types-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Capacidad</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Vehicle Type Modal -->
+<div class="modal fade" id="vehicleTypeModal" tabindex="-1" aria-labelledby="vehicleTypeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="vehicleTypeModalLabel">
+                    <i class="ti ti-list-plus me-2"></i><span id="modalTitle">Crear Nuevo Tipo de Vehículo</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="vehicleTypeModalAlerts"></div>
+
+                <form id="vehicleTypeForm">
+                    <input type="hidden" id="vehicleTypeId">
+
+                    <!-- Sección: Información Básica -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Información Básica
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="name" class="form-label">Nombre <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="name" name="name" required maxlength="100" placeholder="Ej: Sedan">
+                                <div class="form-text">Nombre mostrado al usuario</div>
+                            </div>
+                            <!-- Hidden code field - auto-generated from name -->
+                            <input type="hidden" id="code" name="code">
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Descripción</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" maxlength="500" placeholder="Descripción del tipo de vehículo"></textarea>
+                            <div class="form-text">Descripción opcional del tipo</div>
+                        </div>
+                    </div>
+
+                    <!-- Sección: Configuración -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-settings me-1"></i>
+                            Configuración
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="defaultCapacity" class="form-label">Capacidad Predeterminada</label>
+                                <input type="number" class="form-control" id="defaultCapacity" name="defaultCapacity" min="1" max="100" placeholder="Ej: 4" value="4">
+                                <div class="form-text">Número de pasajeros típico</div>
+                            </div>
+                        </div>
+
+                        <!-- Hidden fields with default values -->
+                        <input type="hidden" id="icon" name="icon" value="car">
+                        <input type="hidden" id="sortOrder" name="sortOrder" value="0">
+                    </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Tipo de vehículo:</strong>
+                            <p class="mb-0 mt-1">Los tipos se usarán para clasificar los vehículos en el sistema. El nombre debe ser único.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveVehicleTypeBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Tipo</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Wait for DOM and all dependencies to be ready
+    function initWhenReady() {
+        // Check if jQuery and DataTables are loaded
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        if (!jQuery.fn.dataTable) {
+            console.warn('DataTables not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        initVehicleTypesTable();
+    }
+
+    function initVehicleTypesTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        // DataTable Configuration
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint,
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading vehicle types:', error);
+                    showErrorAlert('Error al cargar los tipos de vehículo');
+                }
+            },
+            columns: [
+                {
+                    data: null,
+                    render: function(data) {
+                        const badgeColor = data.active ? 'bg-light text-dark border' : 'bg-secondary';
+                        return `<div>
+                                    <span class="badge ${badgeColor} mb-1">${data.name || '-'}</span>
+                                    <br><small class="text-muted">${data.description || 'Sin descripción'}</small>
+                                </div>`;
+                    }
+                },
+                {
+                    data: 'defaultCapacity',
+                    defaultContent: '-',
+                    className: 'text-center',
+                    render: function(data) {
+                        return `<span class="badge bg-info">${data}</span>`;
+                    }
+                },
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data
+                            ? '<span class="badge bg-success">Activo</span>'
+                            : '<span class="badge bg-secondary">Inactivo</span>';
+                    }
+                },
+                ...(showActions ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+                        if (canEdit) {
+                            // Edit button
+                            actions += `<button type="button"
+                                            class="btn btn-primary edit-type-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Tipo de Vehículo">
+                                            <i class="ti ti-edit"></i>
+                                        </button>`;
+
+                            // Toggle status button - usar iconos más descriptivos
+                            const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                            const statusTitle = data.active ? 'Desactivar Tipo' : 'Activar Tipo';
+                            const statusClass = data.active ? 'btn-warning' : 'btn-success';
+
+                            actions += `<button type="button"
+                                            class="btn ${statusClass} toggle-status-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-current-status="${data.active}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="${statusTitle}">
+                                            <i class="ti ${statusIcon}"></i>
+                                        </button>`;
+                        }
+
+                        if (canDelete) {
+                            // Delete button
+                            actions += `<button type="button"
+                                            class="btn btn-danger delete-type-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Eliminar Tipo de Vehículo">
+                                            <i class="ti ti-trash"></i>
+                                        </button>`;
+                        }
+
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tipos...'
+            },
+            order: [[0, 'asc']], // Sort by name by default
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                // Reinitialize tooltips after table redraw
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
+        });
+
+        // Event Handlers
+        $('#createVehicleTypeBtn').on('click', function() {
+            openVehicleTypeModal();
+        });
+
+        // Edit type
+        $(`#${tableId}`).on('click', '.edit-type-btn', function() {
+            const typeId = $(this).data('id');
+            loadVehicleTypeData(typeId);
+        });
+
+        // Toggle status
+        $(`#${tableId}`).on('click', '.toggle-status-btn', function() {
+            const typeId = $(this).data('id');
+            const currentStatus = $(this).data('current-status');
+            const typeName = $(this).data('name');
+            toggleVehicleTypeStatus(typeId, currentStatus, typeName);
+        });
+
+        // Delete type
+        $(`#${tableId}`).on('click', '.delete-type-btn', function() {
+            const typeId = $(this).data('id');
+            const typeName = $(this).data('name');
+            deleteVehicleType(typeId, typeName);
+        });
+
+        // Save type
+        $('#saveVehicleTypeBtn').on('click', function() {
+            saveVehicleType();
+        });
+
+        // Functions
+        function openVehicleTypeModal(isEdit = false) {
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('vehicleTypeModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+
+            $('#vehicleTypeModal').modal('show');
+            $('#vehicleTypeForm')[0].reset();
+            $('#vehicleTypeId').val('');
+            $('#modalTitle').text(isEdit ? 'Editar Tipo de Vehículo' : 'Crear Nuevo Tipo de Vehículo');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Tipo');
+
+            // Set default values when creating
+            if (!isEdit) {
+                $('#icon').val('car');
+                $('#defaultCapacity').val('4');
+                $('#sortOrder').val('0');
+            }
+        }
+
+        function loadVehicleTypeData(typeId) {
+
+            // Open modal first in edit mode (this will reset the form)
+            openVehicleTypeModal(true);
+
+            $.ajax({
+                url: `${apiEndpoint}/${typeId}`,
+                type: 'GET',
+                success: function(response) {
+
+                    if (response.success && response.data) {
+                        const type = response.data;
+
+                        // Now populate the form with the data (code field hidden, not loaded)
+                        $('#vehicleTypeId').val(type.id);
+                        $('#name').val(type.name);
+                        $('#description').val(type.description || '');
+                        $('#icon').val(type.icon || 'car');
+                        $('#defaultCapacity').val(type.defaultCapacity || 4);
+                        $('#sortOrder').val(type.sortOrder || 0);
+                    } else {
+                        showErrorAlert('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', { xhr, status, error });
+                    const errorMessage = xhr.responseJSON?.error || 'Error al cargar el tipo de vehículo';
+                    showModalError(errorMessage);
+                }
+            });
+        }
+
+        function saveVehicleType() {
+            const form = $('#vehicleTypeForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+
+            const typeId = $('#vehicleTypeId').val();
+            const isEdit = !!typeId;
+
+            const typeData = {
+                name: $('#name').val(),
+                description: $('#description').val(),
+                icon: $('#icon').val() || 'car',
+                defaultCapacity: parseInt($('#defaultCapacity').val()) || 4,
+                sortOrder: parseInt($('#sortOrder').val()) || 0
+            };
+
+            const url = isEdit ? `${apiEndpoint}/${typeId}` : apiEndpoint;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            $.ajax({
+                url,
+                type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(typeData),
+                success: function(response) {
+                    if (response.success) {
+                        $('#vehicleTypeModal').modal('hide');
+                        dataTable.ajax.reload();
+                        showSuccessAlert(isEdit ? 'Tipo de vehículo actualizado exitosamente' : 'Tipo de vehículo creado exitosamente');
+                    }
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Error al guardar el tipo de vehículo';
+
+                    if (xhr.responseJSON?.error) {
+                        // Translate common errors to Spanish
+                        const error = xhr.responseJSON.error;
+                        if (error.includes('already exists') || error.includes('nombre')) {
+                            errorMessage = 'El nombre del tipo de vehículo ya existe. Por favor, usa uno diferente.';
+                        } else if (error.includes('required')) {
+                            errorMessage = 'Todos los campos requeridos deben ser completados.';
+                        } else {
+                            errorMessage = error;
+                        }
+                    }
+
+                    showModalError(errorMessage);
+                }
+            });
+        }
+
+        function toggleVehicleTypeStatus(typeId, currentStatus, typeName) {
+            const newStatus = !currentStatus;
+            const action = newStatus ? 'activar' : 'desactivar';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmToggleTypeModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${actionTitle} Tipo de Vehículo</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas ${action} el tipo <strong>"${typeName}"</strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn ${btnClass}" id="confirmToggleTypeBtn">${actionTitle}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmToggleTypeModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmToggleTypeModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmToggleTypeBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${typeId}/toggle-status`,
+                    type: 'PATCH',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            // Force a full reload to see changes
+                            dataTable.ajax.reload(function() {
+                            }, false);
+                            showAlert('success', `Tipo ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+                        } else {
+                            modal.hide();
+                            showAlert('danger', response.error || 'Error desconocido');
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error('Toggle error:', xhr);
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado del tipo';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        function deleteVehicleType(typeId, typeName) {
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmDeleteTypeModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white">Eliminar Tipo de Vehículo</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas eliminar el tipo <strong>"${typeName}"</strong>?</p>
+                                <p class="text-muted mb-0">Esta acción solo se permite si no hay vehículos usando este tipo.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeleteTypeBtn">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmDeleteTypeModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteTypeModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmDeleteTypeBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${typeId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showAlert('success', 'Tipo eliminado exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al eliminar el tipo';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        /**
+         * Show error alert inside modal
+         * @param {string} message - Error message to display
+         */
+        function showModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('vehicleTypeModalAlerts');
+            if (container) {
+                // Remove existing alerts from modal
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+
+                // Insert new alert at the beginning of modal alerts container
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                // Auto-dismiss after 8 seconds
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+
+        /**
+         * Show success alert message
+         * @param {string} message - Success message to display
+         */
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            // Remove existing alerts from this specific section
+            const container = document.getElementById('vehicle-types-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+
+                // Insert new alert at the beginning of the content
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        /**
+         * Show error alert message
+         * @param {string} message - Error message to display
+         */
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            // Remove existing alerts from this specific section
+            const container = document.getElementById('vehicle-types-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+
+                // Insert new alert at the beginning of the content
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        }
+
+        // Legacy function for backward compatibility
+        function showAlert(type, message) {
+            if (type === 'success') {
+                showSuccessAlert(message);
+            } else {
+                showErrorAlert(message);
+            }
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>

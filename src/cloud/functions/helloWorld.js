@@ -4,11 +4,13 @@ const logger = require('../../infrastructure/logger');
  * Hello World Cloud Function.
  * Returns a simple JSON response for testing.
  * @param {object} request - Parse Cloud Function request object.
- * @param {object} request.params - Request parameters.
- * @param {Parse.User} request.user - Authenticated user (optional).
- * @param {object} request.headers - Request headers.
- * @returns {Promise<object>} Response object with greeting and metadata.
+ * @returns {Promise<object>} - Response object with greeting and metadata.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Call from client
  * Parse.Cloud.run('hello', { name: 'Developer' })
  */

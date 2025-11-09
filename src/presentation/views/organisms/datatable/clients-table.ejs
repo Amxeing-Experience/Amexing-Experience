@@ -1,0 +1,653 @@
+<%
+/**
+ * Clients DataTable Organism
+ * Advanced DataTable component for client management (department_manager role users)
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * Component Dependencies:
+ * - Requires: jQuery, Bootstrap 5, DataTables library
+ * - Uses: Bootstrap buttons, badges, modals (molecules)
+ * - Integrates: Alert system, loading states (atoms)
+ *
+ * @param {string} tableId - Unique table identifier (default: 'clients-table')
+ * @param {string} apiEndpoint - API endpoint for data loading (default: '/api/clients')
+ * @param {string} userRole - Current user role for permission-based features (default: 'admin')
+ * @param {boolean} showActions - Whether to show action buttons (default: true)
+ *
+ * Features:
+ * - Real-time data loading from API
+ * - Role-based action buttons (toggle status, delete)
+ * - Server-side rendering with client-side DataTable enhancement
+ * - Accessibility compliant (ARIA labels, keyboard navigation)
+ * - Responsive design with mobile-friendly layout
+ * - CSP-compliant event handling (no inline handlers)
+ */
+
+// Component Configuration
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'clients-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/clients';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+// Role-Based Permission Checks
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #f76b1c 0%, #fa984f 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-building me-2"></i>
+                    Gestión de Clientes
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Administra empresas clientes y sus configuraciones</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#createClientModal">
+                            <i class="ti ti-plus me-1"></i>
+                            Nuevo Cliente
+                        </button>
+                        <button type="button" class="btn btn-outline-light" data-bs-toggle="modal" data-bs-target="#bulkImportModal">
+                            <i class="ti ti-file-upload me-1"></i>
+                            Carga Masiva
+                        </button>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <!-- DataTable Container -->
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Empresa</th>
+                        <th>Email</th>
+                        <th>Estado</th>
+                        <th>Registro</th>
+                        <% if (dtShowActions && (canEdit || canDelete)) { %>
+                            <th>Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be loaded via JavaScript -->
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <th>Empresa</th>
+                        <th>Email</th>
+                        <th>Estado</th>
+                        <th>Registro</th>
+                        <% if (dtShowActions && (canEdit || canDelete)) { %>
+                            <th>Acciones</th>
+                        <% } %>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- DataTable Configuration and Initialization Script -->
+<script>
+/**
+ * Clients DataTable JavaScript Module
+ *
+ * Structure:
+ * 1. Data Loading & Initialization
+ * 2. DataTable Configuration
+ * 3. Alert/Notification System
+ * 4. Client Action Functions (Toggle Status, Delete)
+ * 5. Event Delegation Setup
+ * 6. Module Initialization
+ */
+
+// ============================================================================
+// 1. DATA LOADING & INITIALIZATION
+// ============================================================================
+
+/**
+ * Initialize table with server-side processing
+ * No need to pre-load data, DataTable will fetch it via AJAX
+ * @returns {void}
+ */
+function loadClientsAndInitializeTable() {
+    try {
+        // Initialize DataTable - it will handle data loading via AJAX
+        initializeClientsDataTable();
+    } catch (error) {
+        console.error('Error initializing clients table:', error);
+        showErrorAlert('Error al inicializar la tabla de clientes: ' + error.message);
+    }
+}
+
+// ============================================================================
+// 2. DATATABLE CONFIGURATION
+// ============================================================================
+
+/**
+ * Initialize DataTables with server-side processing
+ * @param {number} totalCount - Total number of records
+ */
+function initializeClientsDataTable(totalCount) {
+    // Destroy existing table if it exists
+    if (window.clientsTable) {
+        window.clientsTable.destroy();
+    }
+
+    // Initialize DataTable with server-side processing
+    window.clientsTable = $('#<%= dtTableId %>').DataTable({
+        processing: true, // Enable native processing indicator
+        serverSide: true,
+        searchDelay: 300, // Wait 300ms after user stops typing before searching
+        ajax: function(data, callback, settings) {
+
+            // Map DataTables parameters to API parameters
+            const params = new URLSearchParams({
+                page: Math.floor(data.start / data.length) + 1,
+                limit: data.length,
+                sortField: data.columns[data.order[0].column].data || 'companyName',
+                sortDirection: data.order[0].dir
+            });
+
+            // Add search parameter if provided
+            if (data.search.value) {
+                params.append('search', data.search.value);
+            }
+
+            fetch(`<%= dtApiEndpoint %>?${params.toString()}`, {
+                method: 'GET',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(json => {
+                if (!json.success) {
+                    throw new Error(json.error || 'Failed to load clients');
+                }
+
+                // Update total count display
+                const totalCount = json.data?.pagination?.totalCount || 0;
+                document.dispatchEvent(new CustomEvent('clientsTableLoaded', {
+                    detail: { count: totalCount }
+                }));
+
+                // Return data in the format DataTables expects
+                callback({
+                    draw: data.draw,
+                    recordsTotal: totalCount,
+                    recordsFiltered: totalCount,
+                    data: json.data?.users || []
+                });
+            })
+            .catch(error => {
+                console.error('DataTable AJAX error:', error);
+                showErrorAlert('Error al cargar los datos de clientes: ' + error.message);
+
+                // Return empty result on error
+                callback({
+                    draw: data.draw,
+                    recordsTotal: 0,
+                    recordsFiltered: 0,
+                    data: []
+                });
+            });
+        },
+        columns: [
+            {
+                data: 'companyName',
+                render: function(data, type, row) {
+                    // Get company name from various possible fields
+                    const companyName = row.companyName || row.organizationName || row.company || '-';
+                    return `<strong class="text-dark">${companyName}</strong>`;
+                }
+            },
+            {
+                data: 'email',
+                render: function(data, type, row) {
+                    return `<a href="mailto:${data}" class="text-decoration-none">${data}</a>`;
+                }
+            },
+            {
+                data: 'active',
+                render: function(data, type, row) {
+                    if (data) {
+                        return '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activo</span>';
+                    } else {
+                        return '<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Inactivo</span>';
+                    }
+                }
+            },
+            {
+                data: 'createdAt',
+                render: function(data, type, row) {
+                    if (!data) return '-';
+                    const date = new Date(data);
+                    return date.toLocaleDateString('es-ES', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                }
+            },
+            <% if (dtShowActions && (canEdit || canDelete)) { %>
+            {
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+                    /* View detail button - always visible */
+                    actions += `<a href="/dashboard/admin/clients/${row.id}"
+                                class="btn btn-info"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="Ver Detalle">
+                                <i class="ti ti-eye"></i>
+                            </a>`;
+
+                    <% if (canEdit) { %>
+                    /* Toggle status button */
+                    const statusIcon = row.active ? 'ti-user-off' : 'ti-user-check';
+                    const statusTitle = row.active ? 'Desactivar' : 'Activar';
+                    const statusClass = row.active ? 'btn-warning' : 'btn-success';
+
+                    actions += `<button type="button"
+                                class="btn ${statusClass} btn-toggle-status"
+                                data-client-id="${row.id}"
+                                data-current-status="${row.active}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="${statusTitle}">
+                                <i class="ti ${statusIcon}"></i>
+                            </button>`;
+                    <% } %>
+
+                    <% if (canDelete) { %>
+                    /* Delete button */
+                    actions += `<button type="button"
+                                class="btn btn-danger btn-delete-client"
+                                data-client-id="${row.id}"
+                                data-client-name="${row.firstName} ${row.lastName}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="Eliminar">
+                                <i class="ti ti-trash"></i>
+                            </button>`;
+                    <% } %>
+
+                    actions += '</div>';
+                    return actions;
+                }
+            }
+            <% } %>
+        ],
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        responsive: true,
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+        order: [[0, 'asc']], // Order by company name
+        pagingType: 'full_numbers', // Shows: First Previous [1] [2] [3] ... [40] Next Last
+        language: {
+            processing: "Procesando...",
+            search: "Buscar:",
+            lengthMenu: "Mostrar _MENU_ registros",
+            info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            infoEmpty: "Mostrando 0 a 0 de 0 registros",
+            infoFiltered: "(filtrado de _MAX_ registros totales)",
+            loadingRecords: "Cargando...",
+            zeroRecords: "No se encontraron registros coincidentes",
+            emptyTable: "No hay datos disponibles en la tabla",
+            paginate: {
+                first: "Primero",
+                previous: "Anterior",
+                next: "Siguiente",
+                last: "Último"
+            }
+        },
+        drawCallback: function(settings) {
+            // Customize pagination: mark ellipsis with class for better UX
+            const $pagination = $('.dataTables_paginate');
+            $pagination.find('.paginate_button').each(function() {
+                const $btn = $(this);
+                const text = $btn.text().trim();
+
+                // Mark ellipsis buttons to make them visually distinct
+                if (text === '…' || text === '...') {
+                    $btn.addClass('ellipsis');
+                    $btn.prop('title', 'Más páginas disponibles');
+                }
+            });
+
+            // Reinitialize tooltips after table redraw
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        }
+    });
+}
+
+// ============================================================================
+// 3. ALERT/NOTIFICATION SYSTEM
+// ============================================================================
+
+/**
+ * Show success alert message
+ * @param {string} message - Success message to display
+ */
+function showSuccessAlert(message) {
+    const alertHtml = `
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="ti ti-check-circle me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+
+    // Remove existing alerts
+    document.querySelectorAll('.alert').forEach(el => el.remove());
+
+    // Insert new alert
+    const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
+    cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        document.querySelectorAll('.alert').forEach(el => {
+            el.classList.remove('show');
+            setTimeout(() => el.remove(), 150);
+        });
+    }, 5000);
+}
+
+/**
+ * Show error alert message
+ * @param {string} message - Error message to display
+ */
+function showErrorAlert(message) {
+    const alertHtml = `
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="ti ti-alert-circle me-2"></i>
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+
+    // Remove existing alerts
+    document.querySelectorAll('.alert').forEach(el => el.remove());
+
+    // Insert new alert
+    const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
+    cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+}
+
+// ============================================================================
+// 4. CLIENT ACTION FUNCTIONS
+// ============================================================================
+
+/**
+ * Toggle client active status
+ * @param {string} clientId - Client ID
+ * @param {boolean} currentStatus - Current active status
+ */
+function toggleClientStatus(clientId, currentStatus) {
+    const newStatus = !currentStatus;
+    const action = newStatus ? 'activar' : 'desactivar';
+    const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+    const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+    // Create confirmation modal
+    const modalHtml = `
+        <div class="modal fade" id="confirmToggleModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">${actionTitle} Cliente</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>¿Estás seguro de que deseas ${action} este cliente?</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn ${btnClass}" id="confirmToggleBtn">${actionTitle}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('confirmToggleModal');
+    if (existingModal) existingModal.remove();
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('confirmToggleModal'));
+    modal.show();
+
+    // Handle confirmation
+    document.getElementById('confirmToggleBtn').addEventListener('click', async function() {
+        modal.hide();
+        await executeToggleStatus(clientId, newStatus);
+    });
+}
+
+/**
+ * Execute toggle status API call
+ */
+async function executeToggleStatus(clientId, newStatus) {
+    try {
+        const response = await fetch(`<%= dtApiEndpoint %>/${clientId}/toggle-status`, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ active: newStatus })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Error al cambiar el estado del cliente');
+        }
+
+        showSuccessAlert(`Cliente ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+        // Reload table data
+        window.clientsTable.ajax.reload(null, false);
+
+    } catch (error) {
+        console.error('Error toggling client status:', error);
+        showErrorAlert(error.message || 'Error al cambiar el estado del cliente. Por favor, intenta nuevamente.');
+    }
+}
+
+/**
+ * Delete (soft delete) client
+ * @param {string} clientId - Client ID
+ * @param {string} clientName - Client name for confirmation
+ */
+function deleteClient(clientId, clientName) {
+    // Create confirmation modal
+    const modalHtml = `
+        <div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header bg-danger text-white">
+                        <h5 class="modal-title">Eliminar Cliente</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>¿Estás seguro de que deseas eliminar el cliente <strong>"${clientName}"</strong>?</p>
+                        <p class="text-muted mb-0">Esta acción se puede revertir.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('confirmDeleteModal');
+    if (existingModal) existingModal.remove();
+
+    // Add modal to body
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+    modal.show();
+
+    // Handle confirmation
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+        modal.hide();
+        await executeDeleteClient(clientId, clientName);
+    });
+}
+
+/**
+ * Execute delete client API call
+ */
+async function executeDeleteClient(clientId, clientName) {
+    try {
+        const response = await fetch(`<%= dtApiEndpoint %>/${clientId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Error al eliminar el cliente');
+        }
+
+        showSuccessAlert(`Cliente "${clientName}" eliminado exitosamente`);
+        // Reload table data
+        window.clientsTable.ajax.reload(null, false);
+
+    } catch (error) {
+        console.error('Error deleting client:', error);
+        showErrorAlert(error.message || 'Error al eliminar el cliente. Por favor, intenta nuevamente.');
+    }
+}
+
+// ============================================================================
+// 5. EVENT DELEGATION SETUP
+// ============================================================================
+
+/**
+ * Setup event delegation for dynamically created buttons
+ */
+function setupEventDelegation() {
+    // Event delegation on table body
+    const tableBody = document.querySelector('#<%= dtTableId %> tbody');
+
+    if (!tableBody) return;
+
+    tableBody.addEventListener('click', function(e) {
+        const target = e.target.closest('button');
+
+        if (!target) return;
+
+        // Toggle status button
+        if (target.classList.contains('btn-toggle-status')) {
+            const clientId = target.getAttribute('data-client-id');
+            const currentStatus = target.getAttribute('data-current-status') === 'true';
+            toggleClientStatus(clientId, currentStatus);
+            return;
+        }
+
+        // Delete button
+        if (target.classList.contains('btn-delete-client')) {
+            const clientId = target.getAttribute('data-client-id');
+            const clientName = target.getAttribute('data-client-name');
+            deleteClient(clientId, clientName);
+            return;
+        }
+    });
+}
+
+// ============================================================================
+// 6. MODULE INITIALIZATION
+// ============================================================================
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    loadClientsAndInitializeTable();
+    setupEventDelegation();
+});
+
+</script>
+
+<!-- Custom Styles -->
+<style>
+.data-table {
+    font-size: 0.875rem;
+}
+
+.data-table thead th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    background-color: #f8f9fa !important;
+    border-bottom: 2px solid #dee2e6;
+    padding: 0.75rem;
+}
+
+.data-table tfoot th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    background-color: #f8f9fa !important;
+    border-top: 2px solid #dee2e6;
+    padding: 0.75rem;
+    color: #5a6a85;
+}
+
+.data-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.badge {
+    padding: 0.375rem 0.75rem;
+    font-weight: 500;
+}
+
+</style>

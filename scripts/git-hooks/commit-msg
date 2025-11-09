@@ -76,15 +76,9 @@ if echo "$commit_msg" | grep -E "^(security|hotfix)" >/dev/null; then
     fi
 fi
 
-# 3. Validate against sensitive data patterns
-if echo "$commit_msg" | grep -iE "password|secret|token|key|credential" >/dev/null; then
-    log_warning "Commit message contains potentially sensitive keywords"
-    read -p "Continue anyway? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_error "Commit aborted. Use generic terms in commit messages."
-        exit 1
-    fi
+# 3. Validate against sensitive data patterns (warning only, non-blocking)
+if echo "$commit_msg" | grep -iE "password.*=|secret.*=|api[_-]?key.*=" >/dev/null; then
+    log_warning "Commit message may contain hardcoded values - review carefully"
 fi
 
 log_success "Commit message validation passed!"

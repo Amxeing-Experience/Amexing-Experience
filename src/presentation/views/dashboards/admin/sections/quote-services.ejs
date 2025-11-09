@@ -1,0 +1,2088 @@
+<%
+/**
+ * Quote Services Section
+ * Itinerary management with days, subconcepts, and totals calculation
+ * Structure: Each day has a title and multiple subconcepts with time scheduling
+ */
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+        <h5 class="card-title mb-0">
+            <i class="ti ti-list me-2"></i>Servicios del Itinerario
+        </h5>
+        <button type="button" class="btn btn-primary btn-sm" id="addDayBtn">
+            <i class="ti ti-plus me-1"></i>Agregar Día
+        </button>
+    </div>
+
+    <div class="card-body">
+        <!-- Alerts Container -->
+        <div id="servicesAlerts"></div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="alert alert-info d-none align-items-start" role="alert">
+            <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+            <div>
+                <strong>Sin días agregados</strong>
+                <p class="mb-0 mt-1">Presiona "+ Agregar Día" para comenzar a construir el itinerario de servicios.</p>
+            </div>
+        </div>
+
+        <!-- Services Table -->
+        <div id="servicesTableContainer" class="d-none">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle" id="servicesTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width: 100px;" class="text-center">
+                                <i class="ti ti-settings me-1"></i>Acciones
+                            </th>
+                            <th style="min-width: 100px;" class="text-center">
+                                <i class="ti ti-calendar me-1"></i>Día
+                            </th>
+                            <th style="min-width: 300px;">
+                                <i class="ti ti-file-text me-1"></i>Concepto
+                            </th>
+                            <th style="min-width: 150px;">
+                                <i class="ti ti-car me-1"></i>Tipo Vehículo
+                            </th>
+                            <th style="min-width: 100px;" class="text-center">
+                                <i class="ti ti-clock-hour-4 me-1"></i>Horas
+                            </th>
+                            <th style="min-width: 120px;" class="text-end">
+                                <i class="ti ti-currency-dollar me-1"></i>Precio Unit.
+                            </th>
+                            <th style="min-width: 140px;" class="text-end">
+                                <i class="ti ti-receipt me-1"></i>Total Día
+                            </th>
+                            <th style="min-width: 300px;">
+                                <i class="ti ti-notes me-1"></i>Notas
+                            </th>
+                            <th style="min-width: 100px;" class="text-center">
+                                <i class="ti ti-settings me-1"></i>Acciones
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody id="servicesTableBody">
+                        <!-- Rows will be dynamically generated -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Totals Section -->
+            <div class="totals-section mt-4">
+                <div class="row align-items-center">
+                    <!-- Add Day Button (Left Side) -->
+                    <div class="col-lg-6 col-md-6 mb-3 mb-lg-0">
+                        <button type="button" class="btn btn-primary" id="addDayBtnBottom">
+                            <i class="ti ti-plus me-1"></i>Agregar Día
+                        </button>
+                        <p class="text-muted small mb-0 mt-2">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Agrega días al itinerario para organizar los servicios
+                        </p>
+                    </div>
+
+                    <!-- Totals Card (Right Side) -->
+                    <div class="col-lg-6 col-md-6">
+                        <div class="card border">
+                            <div class="card-body">
+                                <table class="table table-sm mb-0">
+                                    <tr>
+                                        <td class="text-end border-0"><strong>Subtotal:</strong></td>
+                                        <td class="text-end border-0 fs-6" id="subtotalDisplay">$0.00 MXN</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="text-end border-0"><strong>IVA (16%):</strong></td>
+                                        <td class="text-end border-0 fs-6" id="ivaDisplay">$0.00 MXN</td>
+                                    </tr>
+                                    <tr class="border-top">
+                                        <td class="text-end border-0 pt-2"><strong>TOTAL:</strong></td>
+                                        <td class="text-end border-0 fs-5 fw-bold text-primary pt-2" id="totalDisplay">$0.00 MXN</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save Indicator -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div id="saveIndicator">
+                <span class="badge bg-secondary">
+                    <i class="ti ti-check me-1"></i>Sin cambios
+                </span>
+            </div>
+
+            <div class="text-muted small">
+                <i class="ti ti-info-circle me-1"></i>
+                Los cambios se guardan automáticamente cada 2 segundos
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Day Modal -->
+<div class="modal fade" id="deleteDayModal" tabindex="-1" aria-labelledby="deleteDayModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteDayModalLabel">
+                    <i class="ti ti-alert-triangle me-2"></i>Confirmar Eliminación de Día
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro que desea eliminar <strong id="deleteDayText">Día X</strong>?</p>
+                <p class="text-muted small mb-0 mt-2">Esta acción eliminará el día completo con todos sus subconceptos. Los días posteriores se re-numerarán automáticamente.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteDayBtn">
+                    <i class="ti ti-trash me-1"></i>Eliminar Día
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Subconcept Modal -->
+<div class="modal fade" id="deleteSubconceptModal" tabindex="-1" aria-labelledby="deleteSubconceptModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title" id="deleteSubconceptModalLabel">
+                    <i class="ti ti-alert-triangle me-2"></i>Confirmar Eliminación de Subconcepto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro que desea eliminar este subconcepto?</p>
+                <div class="alert alert-warning border mb-0">
+                    <strong id="deleteSubconceptText" class="text-dark"></strong>
+                </div>
+                <p class="text-muted small mb-0 mt-2">El total del día se recalculará automáticamente.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-warning" id="confirmDeleteSubconceptBtn">
+                    <i class="ti ti-trash me-1"></i>Eliminar Subconcepto
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Service Items Table Styles */
+#servicesTable input.form-control {
+    font-size: 0.875rem;
+}
+
+#servicesTable .badge {
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+}
+
+/* Day total container with rowspan */
+.day-total-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    min-height: 100px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+    border-radius: 0.5rem;
+}
+
+.day-total-display {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #f76b1c;
+    transition: all 0.3s ease;
+}
+
+.day-total-display.text-success {
+    color: #28a745 !important;
+    transform: scale(1.1);
+}
+
+/* Time input styling */
+.time-input {
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 1px;
+}
+
+.time-input.is-invalid {
+    border-color: #dc3545;
+    animation: shake 0.3s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+/* Day header row */
+tr[data-row-type="day-header"] {
+    background-color: #f8f9fa;
+    border-top: 3px solid #f76b1c;
+}
+
+tr[data-row-type="day-header"] td {
+    vertical-align: top;
+    padding-top: 1rem;
+}
+
+/* Subconcept rows */
+tr[data-row-type="subconcept"] {
+    border-left: 3px solid rgba(247, 107, 28, 0.3);
+}
+
+/* Add subconcept button */
+.add-subconcept-btn {
+    border-style: dashed;
+    border-width: 2px;
+    transition: all 0.2s;
+    font-size: 0.813rem;
+}
+
+.add-subconcept-btn:hover {
+    border-style: solid;
+    background-color: #f76b1c;
+    color: white;
+    border-color: #f76b1c;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(247, 107, 28, 0.2);
+}
+
+/* Day separator */
+.day-separator {
+    height: 1rem;
+    background: linear-gradient(to bottom, #dee2e6 0%, transparent 100%);
+}
+
+/* Save indicator animations */
+#saveIndicator .badge {
+    transition: all 0.3s ease;
+}
+
+/* Input focus states */
+#servicesTable input:focus {
+    border-color: #f76b1c;
+    box-shadow: 0 0 0 0.2rem rgba(247, 107, 28, 0.15);
+}
+
+/* Empty state */
+#emptyState {
+    margin: 2rem 0;
+}
+
+/* Totals card */
+.totals-section .card {
+    background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    #servicesTable th,
+    #servicesTable td {
+        font-size: 0.813rem;
+    }
+
+    #servicesTable input.form-control {
+        font-size: 0.813rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .day-total-container {
+        min-height: 60px;
+        padding: 0.5rem;
+    }
+
+    .day-total-display {
+        font-size: 1rem;
+    }
+}
+</style>
+
+<script>
+(function() {
+    'use strict';
+
+    // ==================
+    // GLOBAL STATE
+    // ==================
+
+    let serviceItemsData = {
+        days: [],
+        subtotal: 0,
+        iva: 0,
+        total: 0
+    };
+
+    let isDirty = false;
+    let saveTimeout = null;
+    let deleteContext = { type: null, dayIndex: null, subconceptIndex: null };
+    let quoteNumberOfPeople = 1; // Store quote's total number of people
+
+    const quoteId = '<%= typeof quoteId !== "undefined" ? quoteId : "" %>';
+    const isNewQuote = quoteId === '' || quoteId === 'new';
+
+    // Currency formatter
+    const currencyFormatter = new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+
+    // ==================
+    // UTILITY FUNCTIONS
+    // ==================
+
+    /**
+     * Format number as currency for display (with $ and commas)
+     */
+    function formatCurrency(value) {
+        if (value === null || value === undefined || value === '') return '';
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue)) return '';
+        return currencyFormatter.format(numValue);
+    }
+
+    /**
+     * Parse formatted currency string back to number
+     */
+    function parseCurrency(formattedValue) {
+        if (!formattedValue) return null;
+        // Remove currency symbol, spaces, and commas
+        const cleaned = formattedValue.replace(/[$,\s]/g, '');
+        const numValue = parseFloat(cleaned);
+        return isNaN(numValue) ? null : numValue;
+    }
+
+    function getAccessToken() {
+        console.log('All cookies:', document.cookie);
+        const cookies = document.cookie.split(';');
+        console.log('Parsed cookies:', cookies);
+
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            console.log(`Cookie: ${name} = ${value ? 'exists' : 'empty'}`);
+            if (name === 'accessToken') {
+                console.log('Found accessToken!');
+                return value;
+            }
+        }
+        console.warn('accessToken not found in cookies!');
+
+        // Try to get from localStorage as fallback
+        const localToken = localStorage.getItem('accessToken');
+        if (localToken) {
+            console.log('Found token in localStorage');
+            return localToken;
+        }
+
+        // Try to get from sessionStorage as fallback
+        const sessionToken = sessionStorage.getItem('accessToken');
+        if (sessionToken) {
+            console.log('Found token in sessionStorage');
+            return sessionToken;
+        }
+
+        return null;
+    }
+
+    function showAlert(containerId, message, type = 'danger') {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        container.appendChild(alertDiv);
+
+        setTimeout(() => {
+            if (alertDiv && alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
+    function clearAlerts(containerId) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.querySelectorAll('.alert').forEach(el => el.remove());
+        }
+    }
+
+    // ==================
+    // STATE MANAGEMENT
+    // ==================
+
+    function markDirty() {
+        isDirty = true;
+        showSaveIndicator('pending', 'Cambios pendientes');
+    }
+
+    function markClean() {
+        isDirty = false;
+    }
+
+    function showSaveIndicator(state, text) {
+        const indicator = document.getElementById('saveIndicator');
+        if (!indicator) return;
+
+        const badge = indicator.querySelector('.badge');
+        if (!badge) return;
+
+        badge.className = 'badge';
+
+        switch(state) {
+            case 'idle':
+                badge.className = 'badge bg-secondary';
+                badge.innerHTML = '<i class="ti ti-check me-1"></i>' + text;
+                break;
+            case 'pending':
+                badge.className = 'badge bg-warning text-dark';
+                badge.innerHTML = '<i class="ti ti-clock me-1"></i>' + text;
+                break;
+            case 'saving':
+                badge.className = 'badge bg-info';
+                badge.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>' + text;
+                break;
+            case 'saved':
+                badge.className = 'badge bg-success';
+                badge.innerHTML = '<i class="ti ti-check me-1"></i>' + text;
+                break;
+            case 'error':
+                badge.className = 'badge bg-danger';
+                badge.innerHTML = '<i class="ti ti-alert-triangle me-1"></i>' + text;
+                break;
+        }
+    }
+
+    // ==================
+    // DATA MIGRATION
+    // ==================
+
+    function migrateOldFormatToNew(oldDays) {
+        return oldDays.map(oldDay => {
+            // If already has new structure, return as is
+            if (oldDay.subconcepts !== undefined) {
+                return oldDay;
+            }
+
+            // Migrate old format
+            return {
+                dayNumber: oldDay.dayNumber,
+                dayTitle: oldDay.concept || `Día ${oldDay.dayNumber}`,
+                subconcepts: oldDay.concept ? [
+                    {
+                        time: "",
+                        concept: oldDay.concept || "",
+                        vehicleType: oldDay.vehicleType || "",
+                        hours: oldDay.hours,
+                        unitPrice: oldDay.unitPrice,
+                        total: oldDay.total || 0,
+                        notes: oldDay.notes || ""
+                    }
+                ] : [],
+                dayTotal: oldDay.total || 0
+            };
+        });
+    }
+
+    // ==================
+    // DATA LOADING
+    // ==================
+
+    async function loadServiceItems() {
+        console.log('=== loadServiceItems called ===');
+        console.log('quoteId:', quoteId);
+        console.log('isNewQuote:', isNewQuote);
+
+        if (isNewQuote) {
+            console.log('New quote - showing empty state');
+            renderTable();
+            updateTotalsDisplay();
+            return;
+        }
+
+        try {
+            const token = getAccessToken();
+            console.log('Access token exists:', !!token);
+
+            const url = `/api/quotes/${quoteId}`;
+            console.log('Fetching from:', url);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            console.log('Response status:', response.status);
+            const result = await response.json();
+            console.log('Response data:', result);
+
+            if (result.success && result.data) {
+                const quote = result.data;
+                console.log('Quote serviceItems:', quote.serviceItems);
+
+                // Store quote's number of people for validation
+                quoteNumberOfPeople = quote.numberOfPeople || 1;
+                console.log('Quote numberOfPeople:', quoteNumberOfPeople);
+
+                if (quote.serviceItems) {
+                    let days = quote.serviceItems.days || [];
+                    console.log('Days loaded:', days.length);
+
+                    // Detect old format and migrate
+                    if (days.length > 0 && days[0].concept !== undefined && days[0].subconcepts === undefined) {
+                        console.log('Migrating old format to new subconcepts structure...');
+                        days = migrateOldFormatToNew(days);
+                    }
+
+                    // Migrate subconcepts to add type field
+                    days = days.map(day => ({
+                        ...day,
+                        subconcepts: day.subconcepts.map(migrateSubconceptToTyped)
+                    }));
+                    console.log('Subconcepts migrated to typed format');
+
+                    serviceItemsData = {
+                        days: days,
+                        subtotal: quote.serviceItems.subtotal || 0,
+                        iva: quote.serviceItems.iva || 0,
+                        total: quote.serviceItems.total || 0
+                    };
+
+                    console.log('serviceItemsData set:', serviceItemsData);
+                    console.log('Calling renderTable()...');
+                    renderTable();
+
+                    // Recalculate totals from loaded data (in case of data inconsistencies)
+                    recalculateAllDayTotals();
+                    recalculateGeneralTotals();
+                } else {
+                    console.log('No serviceItems in quote data - showing empty state');
+                    // Initialize with empty data and show empty state
+                    serviceItemsData = {
+                        days: [],
+                        subtotal: 0,
+                        iva: 0,
+                        total: 0
+                    };
+                    renderTable();
+                    updateTotalsDisplay();
+                }
+            } else {
+                console.log('Response not successful or no data');
+            }
+        } catch (error) {
+            console.error('Error loading service items:', error);
+            showAlert('servicesAlerts', 'Error al cargar los servicios', 'danger');
+        }
+    }
+
+    // ==================
+    // RENDERING
+    // ==================
+
+    function renderTable() {
+        console.log('=== renderTable called ===');
+        const tbody = document.getElementById('servicesTableBody');
+        const emptyState = document.getElementById('emptyState');
+        const tableContainer = document.getElementById('servicesTableContainer');
+
+        console.log('tbody:', tbody);
+        console.log('emptyState:', emptyState);
+        console.log('tableContainer:', tableContainer);
+
+        if (!tbody || !emptyState || !tableContainer) {
+            console.error('Missing required DOM elements!');
+            return;
+        }
+
+        tbody.innerHTML = '';
+
+        console.log('serviceItemsData.days.length:', serviceItemsData.days.length);
+
+        if (serviceItemsData.days.length === 0) {
+            console.log('No days - showing empty state');
+            emptyState.classList.remove('d-none');
+            emptyState.classList.add('d-flex');
+            tableContainer.classList.add('d-none');
+            tableContainer.classList.remove('d-block');
+        } else {
+            console.log('Rendering', serviceItemsData.days.length, 'days');
+            emptyState.classList.remove('d-flex');
+            emptyState.classList.add('d-none');
+            tableContainer.classList.remove('d-none');
+            tableContainer.classList.add('d-block');
+
+            serviceItemsData.days.forEach((day, dayIndex) => {
+                console.log(`Rendering day ${dayIndex}:`, day);
+                renderDay(dayIndex, true);
+            });
+        }
+    }
+
+    function renderDay(dayIndex, appendToEnd = false) {
+        const day = serviceItemsData.days[dayIndex];
+        if (!day) return;
+
+        const tbody = document.getElementById('servicesTableBody');
+
+        // Remove existing rows for this day
+        const existingRows = document.querySelectorAll(`tr[data-day-index="${dayIndex}"]`);
+        existingRows.forEach(row => row.remove());
+
+        // Calculate rowspan: 1 (header) + subconcepts length
+        const rowspan = 1 + (day.subconcepts?.length || 0);
+
+        // Create header row
+        const headerRow = createDayHeaderRow(day, dayIndex, rowspan);
+
+        // Find insertion point
+        let insertBeforeRow = null;
+        if (!appendToEnd && dayIndex < serviceItemsData.days.length - 1) {
+            insertBeforeRow = tbody.querySelector(`tr[data-day-index="${dayIndex + 1}"]`);
+        }
+
+        // Insert header
+        if (insertBeforeRow) {
+            tbody.insertBefore(headerRow, insertBeforeRow);
+        } else {
+            tbody.appendChild(headerRow);
+        }
+
+        // Insert subconcept rows
+        day.subconcepts.forEach((subconcept, subIdx) => {
+            const subRow = createSubconceptRow(day, dayIndex, subconcept, subIdx);
+
+            if (insertBeforeRow) {
+                tbody.insertBefore(subRow, insertBeforeRow);
+            } else {
+                tbody.appendChild(subRow);
+            }
+        });
+
+        // Add separator after last subconcept
+        if (dayIndex < serviceItemsData.days.length - 1) {
+            const separator = document.createElement('tr');
+            separator.className = 'day-separator';
+            separator.dataset.dayIndex = dayIndex;
+            separator.innerHTML = '<td colspan="8" class="p-0 border-0"></td>';
+
+            if (insertBeforeRow) {
+                tbody.insertBefore(separator, insertBeforeRow);
+            } else {
+                tbody.appendChild(separator);
+            }
+        }
+    }
+
+    function createDayHeaderRow(day, dayIndex, rowspan) {
+        const tr = document.createElement('tr');
+        tr.dataset.dayIndex = dayIndex;
+        tr.dataset.rowType = 'day-header';
+
+        tr.innerHTML = `
+            <td class="text-center">
+                <button class="btn btn-sm btn-danger delete-day-btn"
+                        data-day-index="${dayIndex}"
+                        title="Eliminar día completo">
+                    <i class="ti ti-trash"></i>
+                </button>
+            </td>
+            <td rowspan="${rowspan}" class="text-center align-middle">
+                <span class="badge bg-primary fs-6">Día ${day.dayNumber}</span>
+            </td>
+            <td>
+                <input type="text"
+                       class="form-control form-control-sm mb-2 fw-bold"
+                       data-day-index="${dayIndex}"
+                       data-field="dayTitle"
+                       placeholder="Título del día (ej: Día 1 - Llegada)"
+                       value="${day.dayTitle || ''}">
+                <div class="btn-group w-100" role="group" aria-label="Agregar subconcepto">
+                    <button class="btn btn-sm btn-outline-primary add-subconcept-btn"
+                            data-day-index="${dayIndex}"
+                            data-type="regular"
+                            title="Agregar concepto regular">
+                        <i class="ti ti-plus"></i> Subconcepto
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary add-subconcept-btn"
+                            data-day-index="${dayIndex}"
+                            data-type="traslado"
+                            title="Agregar traslado">
+                        <i class="ti ti-plus"></i> Traslado
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary add-subconcept-btn"
+                            data-day-index="${dayIndex}"
+                            data-type="experiencia"
+                            title="Agregar experiencia">
+                        <i class="ti ti-plus"></i> Experiencia
+                    </button>
+                </div>
+            </td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td rowspan="${rowspan}" class="text-end align-middle bg-light">
+                <div class="day-total-container">
+                    <small class="text-muted d-block mb-1">Total Día ${day.dayNumber}</small>
+                    <span class="day-total-display" data-day-index="${dayIndex}">
+                        ${currencyFormatter.format(day.dayTotal || 0)}
+                    </span>
+                    <small class="text-muted d-block mt-1">MXN</small>
+                </div>
+            </td>
+            <td></td>
+            <td class="text-center">
+                <button class="btn btn-sm btn-danger delete-day-btn"
+                        data-day-index="${dayIndex}"
+                        title="Eliminar día completo">
+                    <i class="ti ti-trash"></i>
+                </button>
+            </td>
+        `;
+
+        // Attach listeners
+        const titleInput = tr.querySelector('input[data-field="dayTitle"]');
+        titleInput.addEventListener('input', (e) => {
+            updateDayField(dayIndex, 'dayTitle', e.target.value);
+        });
+
+        // Attach listeners to all three "add subconcept" buttons
+        const addSubBtns = tr.querySelectorAll('.add-subconcept-btn');
+        addSubBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const type = btn.dataset.type;
+                addSubconcept(dayIndex, type);
+            });
+        });
+
+        // Attach delete day listener
+        const deleteBtn = tr.querySelector('.delete-day-btn');
+        deleteBtn.addEventListener('click', () => openDeleteDayModal(dayIndex));
+
+        return tr;
+    }
+
+    function createSubconceptRow(day, dayIndex, subconcept, subconceptIndex) {
+        const tr = document.createElement('tr');
+        tr.dataset.dayIndex = dayIndex;
+        tr.dataset.subconceptIndex = subconceptIndex;
+        tr.dataset.rowType = 'subconcept';
+        tr.dataset.type = subconcept.type || 'regular';
+
+        const subType = subconcept.type || 'regular';
+
+        // Debug: Log numberOfPeople values
+        console.log(`Creating subconcept row - Type: ${subType}, numberOfPeople: ${subconcept.numberOfPeople}, quoteNumberOfPeople: ${quoteNumberOfPeople}`);
+
+        // Build HTML based on subconcept type
+        let conceptCellHTML = '';
+        let vehicleCellHTML = '';
+
+        // === CONCEPT CELL (varies by type) ===
+        if (subType === 'traslado') {
+            conceptCellHTML = `
+                <td>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="ti ti-clock text-primary"></i>
+                        <input type="text"
+                               class="form-control form-control-sm time-input"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="time"
+                               placeholder="HH:MM"
+                               value="${subconcept.time || ''}"
+                               maxlength="5"
+                               style="max-width: 80px; flex-shrink: 0;">
+                    </div>
+                    <select class="form-select form-select-sm transfer-selector"
+                            data-day-index="${dayIndex}"
+                            data-subconcept-index="${subconceptIndex}"
+                            id="transferSelector_${dayIndex}_${subconceptIndex}">
+                        <option value="">Seleccionar traslado...</option>
+                    </select>
+                    ${subconcept.concept ? `<small class="text-muted mt-1 d-block">${subconcept.concept}</small>` : ''}
+                </td>
+            `;
+        } else if (subType === 'experiencia') {
+            conceptCellHTML = `
+                <td>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <i class="ti ti-clock text-primary"></i>
+                        <input type="text"
+                               class="form-control form-control-sm time-input"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="time"
+                               placeholder="HH:MM"
+                               value="${subconcept.time || ''}"
+                               maxlength="5"
+                               style="max-width: 80px; flex-shrink: 0;">
+                    </div>
+                    <select class="form-select form-select-sm experience-selector"
+                            data-day-index="${dayIndex}"
+                            data-subconcept-index="${subconceptIndex}"
+                            id="experienceSelector_${dayIndex}_${subconceptIndex}">
+                        <option value="">Seleccionar experiencia...</option>
+                    </select>
+                    ${subconcept.concept ? `<small class="text-muted mt-1 d-block">${subconcept.concept}</small>` : ''}
+                    <div id="experiencePackageTable_${dayIndex}_${subconceptIndex}" class="mt-2" style="display: none;"></div>
+                </td>
+            `;
+        } else {
+            // Regular type
+            conceptCellHTML = `
+                <td>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="ti ti-clock text-primary"></i>
+                        <input type="text"
+                               class="form-control form-control-sm time-input"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="time"
+                               placeholder="HH:MM"
+                               value="${subconcept.time || ''}"
+                               maxlength="5"
+                               style="max-width: 80px; flex-shrink: 0;">
+                        <input type="text"
+                               class="form-control form-control-sm"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="concept"
+                               placeholder="Ej: Comida grupal"
+                               value="${subconcept.concept || ''}"
+                               style="flex-grow: 1;">
+                    </div>
+                </td>
+            `;
+        }
+
+        // === VEHICLE CELL (varies by type) ===
+        if (subType === 'regular') {
+            vehicleCellHTML = `
+                <td>
+                    <span class="badge bg-secondary">N/A</span>
+                </td>
+            `;
+        } else if (subType === 'traslado') {
+            // Show badge if vehicle has capacity (either from per-person calc or just has a vehicle selected)
+            const hasVehicle = subconcept.vehicleCapacity || subconcept.vehicleTypeId;
+            const multiplier = subconcept.vehicleMultiplier || 1;
+            vehicleCellHTML = `
+                <td>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="badge bg-info vehicle-multiplier"
+                              data-day-index="${dayIndex}"
+                              data-subconcept-index="${subconceptIndex}"
+                              style="display: ${hasVehicle ? 'inline-block' : 'none'}; min-width: 35px; text-align: center;">
+                            ${multiplier}x
+                        </span>
+                    </div>
+                    <select class="form-select form-select-sm vehicle-type-selector"
+                            data-day-index="${dayIndex}"
+                            data-subconcept-index="${subconceptIndex}"
+                            id="vehicleTypeSelector_${dayIndex}_${subconceptIndex}">
+                        <option value="">Seleccionar vehículo...</option>
+                    </select>
+                </td>
+            `;
+        } else {
+            vehicleCellHTML = `
+                <td>
+                    <span class="badge bg-secondary">N/A</span>
+                </td>
+            `;
+        }
+
+        tr.innerHTML = `
+            <td class="text-center">
+                <button class="btn btn-sm btn-danger delete-subconcept-btn"
+                        data-day-index="${dayIndex}"
+                        data-subconcept-index="${subconceptIndex}"
+                        title="Eliminar subconcepto">
+                    <i class="ti ti-trash"></i>
+                </button>
+            </td>
+            ${conceptCellHTML}
+            ${vehicleCellHTML}
+            <td>
+                <input type="number"
+                       class="form-control form-control-sm text-center"
+                       data-day-index="${dayIndex}"
+                       data-subconcept-index="${subconceptIndex}"
+                       data-field="hours"
+                       min="0"
+                       step="0.5"
+                       placeholder="0"
+                       value="${subconcept.hours !== null && subconcept.hours !== undefined ? subconcept.hours : ''}">
+            </td>
+            <td>
+                ${subType === 'traslado' ? `
+                    <!-- Traslado: Price + Number of People (no checkbox, always calculates vehicles) -->
+                    <div class="d-flex flex-column gap-2">
+                        <!-- Unit Price Input (top) -->
+                        <input type="text"
+                               class="form-control form-control-sm text-end unit-price-input"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="unitPrice"
+                               placeholder="$0.00"
+                               value="${subconcept.unitPrice !== null && subconcept.unitPrice !== undefined ? formatCurrency(subconcept.unitPrice) : ''}">
+
+                        <!-- Number of People Input (bottom) - always enabled for traslados -->
+                        <input type="number"
+                               class="form-control form-control-sm text-center"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="numberOfPeople"
+                               placeholder="${quoteNumberOfPeople} pers."
+                               min="1"
+                               max="${quoteNumberOfPeople}"
+                               step="1"
+                               value="${subconcept.numberOfPeople !== null && subconcept.numberOfPeople !== undefined ? subconcept.numberOfPeople : quoteNumberOfPeople}"
+                               title="Máximo: ${quoteNumberOfPeople} personas">
+                    </div>
+                ` : `
+                    <!-- Regular/Experiencia: Price + Checkbox + Number of People -->
+                    <div class="d-flex flex-column gap-2">
+                        <!-- 1. Unit Price Input (top) -->
+                        <input type="text"
+                               class="form-control form-control-sm text-end unit-price-input"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="unitPrice"
+                               placeholder="$0.00"
+                               value="${subconcept.unitPrice !== null && subconcept.unitPrice !== undefined ? formatCurrency(subconcept.unitPrice) : ''}">
+
+                        <!-- 2. Per-Person Checkbox (middle) -->
+                        <div class="form-check">
+                            <input type="checkbox"
+                                   class="form-check-input"
+                                   data-day-index="${dayIndex}"
+                                   data-subconcept-index="${subconceptIndex}"
+                                   data-field="isPerPerson"
+                                   id="perPerson_${dayIndex}_${subconceptIndex}"
+                                   ${subconcept.isPerPerson ? 'checked' : ''}>
+                            <label class="form-check-label small" for="perPerson_${dayIndex}_${subconceptIndex}">
+                                Por Persona
+                            </label>
+                        </div>
+
+                        <!-- 3. Number of People Input (bottom) -->
+                        <input type="number"
+                               class="form-control form-control-sm text-center"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="numberOfPeople"
+                               placeholder="${quoteNumberOfPeople} pers."
+                               min="1"
+                               max="${quoteNumberOfPeople}"
+                               step="1"
+                               value="${subconcept.numberOfPeople !== null && subconcept.numberOfPeople !== undefined ? subconcept.numberOfPeople : quoteNumberOfPeople}"
+                               title="Máximo: ${quoteNumberOfPeople} personas"
+                               ${!subconcept.isPerPerson ? 'disabled' : ''}>
+                    </div>
+                `}
+            </td>
+            <td>
+                <input type="text"
+                       class="form-control form-control-sm"
+                       data-day-index="${dayIndex}"
+                       data-subconcept-index="${subconceptIndex}"
+                       data-field="notes"
+                       placeholder="Notas adicionales"
+                       value="${subconcept.notes || ''}">
+            </td>
+            <td class="text-center">
+                <button class="btn btn-sm btn-danger delete-subconcept-btn"
+                        data-day-index="${dayIndex}"
+                        data-subconcept-index="${subconceptIndex}"
+                        title="Eliminar subconcepto">
+                    <i class="ti ti-trash"></i>
+                </button>
+            </td>
+        `;
+
+        // Attach input listeners
+        const inputs = tr.querySelectorAll('input');
+        inputs.forEach(input => {
+            const field = input.dataset.field;
+
+            // Special handling for unitPrice with currency formatting
+            if (field === 'unitPrice') {
+                // On input: allow only numbers and decimal point
+                input.addEventListener('input', (e) => {
+                    let value = e.target.value;
+                    // Remove any non-numeric characters except decimal point
+                    value = value.replace(/[^0-9.]/g, '');
+                    // Ensure only one decimal point
+                    const parts = value.split('.');
+                    if (parts.length > 2) {
+                        value = parts[0] + '.' + parts.slice(1).join('');
+                    }
+                    e.target.value = value;
+                });
+
+                // On blur: format as currency for display
+                input.addEventListener('blur', (e) => {
+                    const numValue = parseCurrency(e.target.value);
+                    if (numValue !== null) {
+                        e.target.value = formatCurrency(numValue);
+                        updateSubconceptField(dayIndex, subconceptIndex, field, numValue);
+                    }
+                });
+
+                // On focus: remove formatting to show plain number
+                input.addEventListener('focus', (e) => {
+                    const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+                    if (subconcept && subconcept.unitPrice !== null && subconcept.unitPrice !== undefined) {
+                        e.target.value = subconcept.unitPrice.toString();
+                    }
+                });
+            } else if (field === 'isPerPerson') {
+                // Checkbox handling for per-person pricing
+                input.addEventListener('change', (e) => {
+                    const isChecked = e.target.checked;
+                    updateSubconceptField(dayIndex, subconceptIndex, field, isChecked);
+                });
+            } else if (field === 'numberOfPeople') {
+                // Number of people input handling with validation
+                input.addEventListener('input', (e) => {
+                    let value = e.target.value ? parseInt(e.target.value) : 1;
+
+                    // Validate: must be >= 1
+                    if (value < 1) {
+                        value = 1;
+                        e.target.value = 1;
+                    }
+
+                    // Validate: cannot exceed quote's total numberOfPeople
+                    if (value > quoteNumberOfPeople) {
+                        value = quoteNumberOfPeople;
+                        e.target.value = quoteNumberOfPeople;
+                        showAlert('servicesAlerts',
+                            `El número de personas no puede exceder el total de la cotización (${quoteNumberOfPeople})`,
+                            'warning');
+                    }
+
+                    updateSubconceptField(dayIndex, subconceptIndex, field, value);
+                });
+            } else {
+                // Standard input handling for other fields
+                input.addEventListener('input', (e) => {
+                    let value = e.target.value;
+
+                    if (field === 'hours') {
+                        value = value ? parseFloat(value) : null;
+                    }
+
+                    updateSubconceptField(dayIndex, subconceptIndex, field, value);
+                });
+
+                // Special validation for time
+                if (field === 'time') {
+                    attachTimeInputValidation(input);
+                }
+            }
+        });
+
+        // Attach delete button listeners (both buttons: start and end of row)
+        const deleteBtns = tr.querySelectorAll('.delete-subconcept-btn');
+        deleteBtns.forEach(deleteBtn => {
+            deleteBtn.addEventListener('click', () => {
+                openDeleteSubconceptModal(dayIndex, subconceptIndex);
+            });
+        });
+
+        // Initialize transfer selector for traslado type
+        if (subType === 'traslado') {
+            setTimeout(() => {
+                initTransferSelector(dayIndex, subconceptIndex, subconcept);
+            }, 100);
+        }
+
+        // Initialize experience selector for experiencia type
+        if (subType === 'experiencia') {
+            setTimeout(() => {
+                initExperienceSelector(dayIndex, subconceptIndex, subconcept);
+            }, 100);
+        }
+
+        return tr;
+    }
+
+    function attachTimeInputValidation(input) {
+        // Auto-format: add ":" after 2 digits
+        input.addEventListener('input', (e) => {
+            let value = e.target.value;
+
+            if (value.length === 2 && !value.includes(':')) {
+                e.target.value = value + ':';
+            }
+
+            if (value.length > 5) {
+                e.target.value = value.substring(0, 5);
+            }
+        });
+
+        // Validate on blur
+        input.addEventListener('blur', () => {
+            if (input.value && !/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/.test(input.value)) {
+                input.classList.add('is-invalid');
+                showAlert('servicesAlerts', 'Formato de hora inválido. Use HH:MM (00:00 - 23:59)', 'warning');
+
+                setTimeout(() => {
+                    input.classList.remove('is-invalid');
+                }, 3000);
+            } else {
+                input.classList.remove('is-invalid');
+            }
+        });
+    }
+
+    function updateTotalsDisplay() {
+        const subtotalEl = document.getElementById('subtotalDisplay');
+        const ivaEl = document.getElementById('ivaDisplay');
+        const totalEl = document.getElementById('totalDisplay');
+
+        if (subtotalEl) subtotalEl.textContent = currencyFormatter.format(serviceItemsData.subtotal);
+        if (ivaEl) ivaEl.textContent = currencyFormatter.format(serviceItemsData.iva);
+        if (totalEl) totalEl.textContent = currencyFormatter.format(serviceItemsData.total);
+    }
+
+    // ==================
+    // TRANSFER/TRASLADO FUNCTIONS
+    // ==================
+
+    let availableServices = []; // Cache for available services
+
+    async function loadAvailableServices() {
+        if (availableServices.length > 0) {
+            return availableServices; // Return cached services
+        }
+
+        try {
+            console.log('Loading available services for quote...');
+            const response = await fetch(`/api/quotes/${quoteId}/available-services`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                availableServices = result.data;
+                console.log(`Loaded ${availableServices.length} available services`);
+                return availableServices;
+            } else {
+                console.error('Error loading services:', result.error);
+                return [];
+            }
+        } catch (error) {
+            console.error('Error loading available services:', error);
+            showAlert('servicesAlerts', 'Error al cargar los traslados disponibles', 'danger');
+            return [];
+        }
+    }
+
+    function initTransferSelector(dayIndex, subconceptIndex, subconcept) {
+        const selectElement = document.getElementById(`transferSelector_${dayIndex}_${subconceptIndex}`);
+        if (!selectElement) {
+            console.error('Transfer selector not found');
+            return;
+        }
+
+        // Load services (now grouped by route)
+        loadAvailableServices().then(routes => {
+            if (routes.length === 0) {
+                selectElement.innerHTML = '<option value="">No hay traslados disponibles</option>';
+                return;
+            }
+
+            // Clear existing options
+            selectElement.innerHTML = '<option value="">Seleccionar traslado...</option>';
+
+            // Add route options (simplified - only origin → destination)
+            routes.forEach(route => {
+                const option = document.createElement('option');
+                option.value = route.routeKey;
+                option.textContent = route.label; // Just "Origin → Destination"
+
+                // Store route data including available vehicles
+                option.dataset.routeData = JSON.stringify(route);
+
+                // Pre-select if this subconcept matches this route
+                // (check if any vehicle in this route matches the transferId)
+                if (subconcept.transferId) {
+                    const hasMatchingVehicle = route.vehicles.some(v => v.serviceId === subconcept.transferId);
+                    if (hasMatchingVehicle) {
+                        option.selected = true;
+                    }
+                }
+
+                selectElement.appendChild(option);
+            });
+
+            // Initialize Tom Select
+            const tomSelectInstance = new TomSelect(selectElement, {
+                placeholder: 'Buscar traslado (origen, destino)...',
+                maxOptions: 1000,
+                searchField: ['text'],
+                sortField: 'text',
+                closeAfterSelect: true,
+                onChange: function(routeKey) {
+                    if (!routeKey) return;
+
+                    // Get selected route data
+                    const option = selectElement.querySelector(`option[value="${routeKey}"]`);
+                    if (!option) return;
+
+                    const routeData = JSON.parse(option.dataset.routeData);
+
+                    // Update vehicle type selector with available vehicles for this route
+                    updateVehicleTypeSelector(dayIndex, subconceptIndex, routeData, subconcept);
+                }
+            });
+
+            // If already has a route selected, populate vehicle selector
+            if (selectElement.value) {
+                const option = selectElement.querySelector(`option[value="${selectElement.value}"]`);
+                if (option) {
+                    const routeData = JSON.parse(option.dataset.routeData);
+                    updateVehicleTypeSelector(dayIndex, subconceptIndex, routeData, subconcept);
+                }
+            }
+
+            console.log('Tom Select initialized for transfer selector', {
+                dayIndex,
+                subconceptIndex,
+                routesCount: routes.length
+            });
+        });
+    }
+
+    function updateVehicleTypeSelector(dayIndex, subconceptIndex, routeData, subconcept) {
+        const vehicleSelector = document.getElementById(`vehicleTypeSelector_${dayIndex}_${subconceptIndex}`);
+        if (!vehicleSelector) {
+            console.error('Vehicle type selector not found');
+            return;
+        }
+
+        // Clear existing options
+        vehicleSelector.innerHTML = '<option value="">Seleccionar vehículo...</option>';
+
+        // Sort vehicles by price (lowest to highest)
+        const sortedVehicles = [...routeData.vehicles].sort((a, b) => a.price - b.price);
+
+        // Add vehicle options from this route
+        let preselectedVehicle = null;
+        sortedVehicles.forEach(vehicle => {
+            const option = document.createElement('option');
+            option.value = vehicle.serviceId;
+            option.textContent = vehicle.vehicleType;
+
+            // Store vehicle data
+            option.dataset.vehicleData = JSON.stringify(vehicle);
+
+            // Pre-select if this matches the current transferId
+            if (subconcept.transferId === vehicle.serviceId) {
+                option.selected = true;
+                preselectedVehicle = vehicle; // Store for capacity restoration
+            }
+
+            vehicleSelector.appendChild(option);
+        });
+
+        // If vehicle was pre-selected, restore its capacity
+        if (preselectedVehicle) {
+            // Restore capacity if not already set
+            if (!subconcept.vehicleCapacity) {
+                subconcept.vehicleCapacity = preselectedVehicle.capacity || null;
+                console.log('Restored vehicleCapacity for pre-selected vehicle:', {
+                    vehicleType: preselectedVehicle.vehicleType,
+                    capacity: preselectedVehicle.capacity
+                });
+            }
+        }
+        // Auto-select first vehicle if none selected (cheapest one after sorting)
+        else if (!subconcept.transferId && sortedVehicles.length > 0) {
+            vehicleSelector.value = sortedVehicles[0].serviceId;
+            // Trigger change to populate data
+            const firstVehicle = sortedVehicles[0];
+            populateTransferData(dayIndex, subconceptIndex, {
+                ...routeData,
+                ...firstVehicle
+            });
+        }
+
+        // Attach change listener to vehicle selector
+        vehicleSelector.onchange = function(e) {
+            const serviceId = e.target.value;
+            if (!serviceId) return;
+
+            const option = vehicleSelector.querySelector(`option[value="${serviceId}"]`);
+            if (!option) return;
+
+            const vehicleData = JSON.parse(option.dataset.vehicleData);
+
+            // Update transfer data with new vehicle selection
+            populateTransferData(dayIndex, subconceptIndex, {
+                ...routeData,
+                ...vehicleData
+            });
+        };
+    }
+
+    function populateTransferData(dayIndex, subconceptIndex, transferData) {
+        const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+        if (!subconcept) return;
+
+        // Ensure numberOfPeople is set BEFORE calculating total
+        if (!subconcept.numberOfPeople || subconcept.numberOfPeople === 1) {
+            subconcept.numberOfPeople = quoteNumberOfPeople;
+        }
+
+        // Update subconcept data
+        subconcept.transferId = transferData.serviceId;
+        subconcept.concept = transferData.label;
+        subconcept.vehicleTypeId = transferData.vehicleTypeId;
+        subconcept.vehicleType = transferData.vehicleType;
+        subconcept.vehicleCapacity = transferData.capacity || null; // Store capacity for per-person calculations
+        subconcept.hours = 1; // Default for transfers
+        subconcept.unitPrice = transferData.price;
+        subconcept.notes = transferData.note || '';
+
+        // NOW calculate total with correct numberOfPeople and vehicleCapacity
+        subconcept.total = calculateSubconceptTotal(subconcept);
+
+        // Update the UI fields without full re-render
+        const hoursInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="hours"]`);
+        const priceInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="unitPrice"]`);
+        const notesInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="notes"]`);
+        const peopleInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="numberOfPeople"]`);
+
+        if (hoursInput) hoursInput.value = subconcept.hours;
+        if (priceInput) priceInput.value = formatCurrency(subconcept.unitPrice);
+        if (notesInput) notesInput.value = subconcept.notes;
+        if (peopleInput) peopleInput.value = subconcept.numberOfPeople;
+
+        // Update vehicle multiplier badge
+        const badge = document.querySelector(
+            `.vehicle-multiplier[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"]`
+        );
+        if (badge) {
+            badge.textContent = `${subconcept.vehicleMultiplier || 1}x`;
+            const hasVehicle = subconcept.vehicleCapacity || subconcept.vehicleTypeId;
+            badge.style.display = hasVehicle ? 'inline-block' : 'none';
+        }
+
+        // Recalculate totals
+        recalculateDayTotal(dayIndex);
+        recalculateGeneralTotals();
+
+        markDirty();
+        triggerAutoSave();
+
+        console.log('Transfer data populated:', subconcept);
+    }
+
+    // ==================
+    // EXPERIENCE FUNCTIONS
+    // ==================
+
+    let availableExperiences = []; // Cache for available experiences
+
+    async function loadAvailableExperiences() {
+        if (availableExperiences.length > 0) {
+            return availableExperiences; // Return cached experiences
+        }
+
+        try {
+            console.log('Loading available experiences...');
+            const response = await fetch('/api/experiences?type=Experience&length=1000', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.data && Array.isArray(result.data)) {
+                // Filter only active experiences
+                availableExperiences = result.data.filter(exp => exp.active === true);
+                console.log(`Loaded ${availableExperiences.length} available experiences`);
+                return availableExperiences;
+            } else {
+                console.error('Error loading experiences:', result.error);
+                return [];
+            }
+        } catch (error) {
+            console.error('Error loading available experiences:', error);
+            showAlert('servicesAlerts', 'Error al cargar las experiencias disponibles', 'danger');
+            return [];
+        }
+    }
+
+    function initExperienceSelector(dayIndex, subconceptIndex, subconcept) {
+        const selectElement = document.getElementById(`experienceSelector_${dayIndex}_${subconceptIndex}`);
+        if (!selectElement) {
+            console.error('Experience selector not found');
+            return;
+        }
+
+        // Load experiences
+        loadAvailableExperiences().then(experiences => {
+            if (experiences.length === 0) {
+                selectElement.innerHTML = '<option value="">No hay experiencias disponibles</option>';
+                return;
+            }
+
+            // Clear existing options
+            selectElement.innerHTML = '<option value="">Seleccionar experiencia...</option>';
+
+            // Add experience options (only name)
+            experiences.forEach(experience => {
+                const option = document.createElement('option');
+                option.value = experience.id;
+                option.textContent = experience.name;
+
+                // Pre-select if this matches the current experienceId
+                if (subconcept.experienceId === experience.id) {
+                    option.selected = true;
+                }
+
+                selectElement.appendChild(option);
+            });
+
+            // Initialize Tom Select
+            const tomSelectInstance = new TomSelect(selectElement, {
+                placeholder: 'Buscar experiencia...',
+                maxOptions: 1000,
+                searchField: ['text'],
+                sortField: 'text',
+                closeAfterSelect: true,
+                onChange: function(experienceId) {
+                    if (experienceId) {
+                        populateExperienceData(dayIndex, subconceptIndex, experienceId);
+                    }
+                }
+            });
+
+            // If already has an experience selected, load its details
+            if (subconcept.experienceId) {
+                populateExperienceData(dayIndex, subconceptIndex, subconcept.experienceId);
+            }
+        });
+    }
+
+    async function populateExperienceData(dayIndex, subconceptIndex, experienceId) {
+        const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+        if (!subconcept) return;
+
+        try {
+            console.log(`Loading experience details for ID: ${experienceId}`);
+            const response = await fetch(`/api/experiences/${experienceId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const experience = result.data;
+
+                // Update subconcept data
+                subconcept.experienceId = experience.id;
+                subconcept.experienceName = experience.name;
+                subconcept.concept = experience.name;
+                subconcept.hours = 1; // Always 1 for experiences
+                subconcept.unitPrice = experience.cost || 0;
+                subconcept.total = subconcept.hours * subconcept.unitPrice;
+
+                // Check if it's a package (has nested experiences)
+                const hasIncluded = experience.experienceDetails && experience.experienceDetails.length > 0;
+                subconcept.isPackage = hasIncluded;
+                subconcept.includedExperiences = hasIncluded ? experience.experienceDetails : [];
+
+                // Update the UI fields without full re-render
+                const hoursInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="hours"]`);
+                const priceInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="unitPrice"]`);
+
+                if (hoursInput) hoursInput.value = subconcept.hours;
+                if (priceInput) priceInput.value = formatCurrency(subconcept.unitPrice);
+
+                // Show/hide package table
+                if (hasIncluded) {
+                    renderExperiencePackageTable(dayIndex, subconceptIndex, experience.experienceDetails, experience);
+                } else {
+                    // Hide package table if not a package
+                    const packageTableContainer = document.getElementById(`experiencePackageTable_${dayIndex}_${subconceptIndex}`);
+                    if (packageTableContainer) {
+                        packageTableContainer.style.display = 'none';
+                    }
+                }
+
+                // Recalculate totals
+                recalculateDayTotal(dayIndex);
+                recalculateGeneralTotals();
+
+                markDirty();
+                triggerAutoSave();
+
+                console.log('Experience data populated:', subconcept);
+            }
+        } catch (error) {
+            console.error('Error loading experience details:', error);
+            showAlert('servicesAlerts', 'Error al cargar los detalles de la experiencia', 'danger');
+        }
+    }
+
+    function renderExperiencePackageTable(dayIndex, subconceptIndex, includedExperiences) {
+        const packageTableContainer = document.getElementById(`experiencePackageTable_${dayIndex}_${subconceptIndex}`);
+        if (!packageTableContainer || !includedExperiences || includedExperiences.length === 0) return;
+
+        // Build list items for each included experience
+        let listItems = '';
+        includedExperiences.forEach((exp, index) => {
+            const description = exp.description || '';
+            listItems += `
+                <li class="mb-2">
+                    <div class="d-flex align-items-start">
+                        <i class="ti ti-circle-check text-success me-2 mt-1" style="font-size: 0.875rem;"></i>
+                        <div>
+                            <strong class="d-block" style="font-size: 0.875rem;">${exp.name}</strong>
+                            ${description ? `<small class="text-muted d-block mt-1" style="font-size: 0.75rem;">${description}</small>` : ''}
+                        </div>
+                    </div>
+                </li>
+            `;
+        });
+
+        // Build simple list HTML
+        const listHTML = `
+            <div class="alert alert-info border-info mb-0" style="background-color: rgba(13, 202, 240, 0.05);">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="ti ti-package me-2"></i>
+                    <strong style="font-size: 0.875rem;">Incluye ${includedExperiences.length} experiencia${includedExperiences.length !== 1 ? 's' : ''}:</strong>
+                </div>
+                <ul class="mb-0 ps-3" style="list-style: none;">
+                    ${listItems}
+                </ul>
+            </div>
+        `;
+
+        packageTableContainer.innerHTML = listHTML;
+        packageTableContainer.style.display = 'block';
+    }
+
+    function migrateSubconceptToTyped(subconcept) {
+        // Always update numberOfPeople if it's 1 and should be quoteNumberOfPeople
+        // This handles cases where old data has numberOfPeople: 1 by default
+        const migratedNumberOfPeople = (subconcept.numberOfPeople === 1 && quoteNumberOfPeople > 1)
+            ? quoteNumberOfPeople
+            : (subconcept.numberOfPeople || quoteNumberOfPeople);
+
+        // If already has type and per-person fields, update numberOfPeople if needed
+        if (subconcept.type && subconcept.isPerPerson !== undefined) {
+            return {
+                ...subconcept,
+                numberOfPeople: migratedNumberOfPeople
+            };
+        }
+
+        // If has type but missing per-person fields, add them
+        if (subconcept.type && subconcept.isPerPerson === undefined) {
+            return {
+                ...subconcept,
+                isPerPerson: false,
+                numberOfPeople: migratedNumberOfPeople,
+                vehicleCapacity: subconcept.vehicleCapacity || null,
+                vehicleMultiplier: 1
+            };
+        }
+
+        // Otherwise, treat as "regular" type with per-person fields
+        return {
+            type: "regular",
+            time: subconcept.time || "",
+            concept: subconcept.concept || "",
+            vehicleType: subconcept.vehicleType || "N/A",
+            hours: subconcept.hours ?? 0,
+            unitPrice: subconcept.unitPrice ?? 0,
+            total: subconcept.total || 0,
+            notes: subconcept.notes || "",
+            isPerPerson: false,
+            numberOfPeople: migratedNumberOfPeople,
+            vehicleCapacity: null,
+            vehicleMultiplier: 1
+        };
+    }
+
+    // ==================
+    // CRUD OPERATIONS
+    // ==================
+
+    function addDay() {
+        const newDay = {
+            dayNumber: serviceItemsData.days.length + 1,
+            dayTitle: "",
+            subconcepts: [],
+            dayTotal: 0
+        };
+
+        serviceItemsData.days.push(newDay);
+        renderDay(serviceItemsData.days.length - 1, true);
+
+        // Show table if it was hidden
+        const emptyState = document.getElementById('emptyState');
+        const tableContainer = document.getElementById('servicesTableContainer');
+        if (emptyState && tableContainer) {
+            emptyState.classList.remove('d-flex');
+            emptyState.classList.add('d-none');
+            tableContainer.classList.remove('d-none');
+            tableContainer.classList.add('d-block');
+        }
+
+        markDirty();
+        triggerAutoSave();
+    }
+
+    function updateDayField(dayIndex, field, value) {
+        if (!serviceItemsData.days[dayIndex]) return;
+
+        serviceItemsData.days[dayIndex][field] = value;
+        markDirty();
+        triggerAutoSave();
+    }
+
+    function addSubconcept(dayIndex, type = 'regular') {
+        if (!serviceItemsData.days[dayIndex]) return;
+
+        const newSubconcept = {
+            type: type,
+            time: "",
+            concept: "",
+            vehicleType: type === "regular" ? "N/A" : (type === "experiencia" ? "N/A" : ""),
+            hours: type === "regular" ? 0 : 1,  // traslado and experiencia default to 1
+            unitPrice: 0,
+            total: 0,
+            notes: "",
+            // Per-person pricing fields
+            isPerPerson: false,
+            numberOfPeople: quoteNumberOfPeople, // Default to quote's number of people
+            vehicleCapacity: null,
+            vehicleMultiplier: 1
+        };
+
+        // Additional fields for traslados
+        if (type === "traslado") {
+            newSubconcept.transferId = null;
+            newSubconcept.vehicleTypeId = null;
+        }
+
+        // Additional fields for experiencias
+        if (type === "experiencia") {
+            newSubconcept.experienceId = null;
+            newSubconcept.experienceName = "";
+            newSubconcept.isPackage = false;
+            newSubconcept.includedExperiences = [];
+        }
+
+        serviceItemsData.days[dayIndex].subconcepts.push(newSubconcept);
+        renderDay(dayIndex);
+        markDirty();
+        triggerAutoSave();
+    }
+
+    /**
+     * Calculate subconcept total with per-person pricing logic
+     * @param {Object} subconcept - The subconcept object
+     * @returns {number} - Calculated total
+     */
+    function calculateSubconceptTotal(subconcept) {
+        const hours = parseFloat(subconcept.hours) || 0;
+        const unitPrice = parseFloat(subconcept.unitPrice) || 0;
+        const numberOfPeople = parseInt(subconcept.numberOfPeople) || 1;
+
+        console.log('calculateSubconceptTotal called:', {
+            type: subconcept.type,
+            isPerPerson: subconcept.isPerPerson,
+            numberOfPeople,
+            vehicleCapacity: subconcept.vehicleCapacity,
+            currentMultiplier: subconcept.vehicleMultiplier
+        });
+
+        // TRASLADO: Always calculate based on vehicles needed (no checkbox required)
+        if (subconcept.type === 'traslado' && subconcept.vehicleCapacity) {
+            // Calculate vehicle multiplier based on capacity
+            // unitPrice is PER VEHICLE, so multiply by number of vehicles needed
+            const vehicleMultiplier = Math.ceil(numberOfPeople / subconcept.vehicleCapacity);
+            subconcept.vehicleMultiplier = vehicleMultiplier; // Store for UI display
+            console.log('Traslado vehicle calculation:', {
+                numberOfPeople,
+                vehicleCapacity: subconcept.vehicleCapacity,
+                vehicleMultiplier,
+                calculation: `${hours} hrs × $${unitPrice} × ${vehicleMultiplier} vehicles = $${hours * unitPrice * vehicleMultiplier}`
+            });
+            return Math.round(hours * unitPrice * vehicleMultiplier * 100) / 100;
+        }
+
+        // REGULAR & EXPERIENCIA: Use checkbox to enable per-person pricing
+        if (subconcept.type === 'regular' || subconcept.type === 'experiencia') {
+            if (subconcept.isPerPerson) {
+                // Per-person pricing: unitPrice is per person, multiply by numberOfPeople
+                console.log('Regular/Experiencia per-person calculation:', {
+                    hours,
+                    unitPrice,
+                    numberOfPeople,
+                    calculation: `${hours} hrs × $${unitPrice} × ${numberOfPeople} people = $${hours * unitPrice * numberOfPeople}`
+                });
+                return Math.round(hours * unitPrice * numberOfPeople * 100) / 100;
+            } else {
+                // Standard pricing: just hours × unitPrice
+                console.log('Regular/Experiencia standard calculation:', {
+                    hours,
+                    unitPrice,
+                    calculation: `${hours} hrs × $${unitPrice} = $${hours * unitPrice}`
+                });
+                return Math.round(hours * unitPrice * 100) / 100;
+            }
+        }
+
+        // Fallback for traslados without vehicle capacity
+        console.log('Fallback calculation (traslado without capacity)');
+        subconcept.vehicleMultiplier = 1;
+        return Math.round(hours * unitPrice * 100) / 100;
+    }
+
+    function updateSubconceptField(dayIndex, subconceptIndex, field, value) {
+        const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+        if (!subconcept) return;
+
+        // Handle checkbox field (boolean conversion)
+        if (field === 'isPerPerson') {
+            subconcept.isPerPerson = value === true || value === 'true' || value === 'on';
+
+            // Toggle numberOfPeople input enabled/disabled state
+            const peopleInput = document.querySelector(
+                `input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="numberOfPeople"]`
+            );
+            if (peopleInput) {
+                peopleInput.disabled = !subconcept.isPerPerson;
+            }
+
+            // Update vehicle multiplier badge visibility for traslados
+            if (subconcept.type === 'traslado') {
+                const badge = document.querySelector(
+                    `.vehicle-multiplier[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"]`
+                );
+                if (badge) {
+                    // Show badge if there's a vehicle selected
+                    const hasVehicle = subconcept.vehicleCapacity || subconcept.vehicleTypeId;
+                    badge.style.display = hasVehicle ? 'inline-block' : 'none';
+                }
+            }
+        } else {
+            subconcept[field] = value;
+        }
+
+        // Recalculate total if any pricing field changed
+        if (['hours', 'unitPrice', 'isPerPerson', 'numberOfPeople'].includes(field)) {
+            subconcept.total = calculateSubconceptTotal(subconcept);
+
+            // Update vehicle multiplier badge text if traslado
+            if (subconcept.type === 'traslado') {
+                const badge = document.querySelector(
+                    `.vehicle-multiplier[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"]`
+                );
+                console.log('Updating badge:', {
+                    badgeFound: !!badge,
+                    vehicleMultiplier: subconcept.vehicleMultiplier,
+                    vehicleCapacity: subconcept.vehicleCapacity,
+                    vehicleTypeId: subconcept.vehicleTypeId
+                });
+                if (badge) {
+                    // Update badge text with current multiplier
+                    badge.textContent = `${subconcept.vehicleMultiplier || 1}x`;
+                    console.log('Badge updated to:', badge.textContent);
+
+                    // Update badge visibility
+                    const hasVehicle = subconcept.vehicleCapacity || subconcept.vehicleTypeId;
+                    badge.style.display = hasVehicle ? 'inline-block' : 'none';
+                    console.log('Badge visibility:', badge.style.display);
+                }
+            }
+
+            recalculateDayTotal(dayIndex);
+            recalculateGeneralTotals();
+        }
+
+        markDirty();
+        triggerAutoSave();
+    }
+
+    function recalculateDayTotal(dayIndex) {
+        const day = serviceItemsData.days[dayIndex];
+        if (!day) return;
+
+        const dayTotal = day.subconcepts.reduce((sum, sub) => {
+            return sum + (parseFloat(sub.total) || 0);
+        }, 0);
+
+        day.dayTotal = Math.round(dayTotal * 100) / 100;
+
+        // Update display
+        const totalDisplay = document.querySelector(`.day-total-display[data-day-index="${dayIndex}"]`);
+        if (totalDisplay) {
+            totalDisplay.textContent = currencyFormatter.format(day.dayTotal);
+
+            totalDisplay.classList.add('text-success');
+            setTimeout(() => {
+                totalDisplay.classList.remove('text-success');
+            }, 1000);
+        }
+
+        // DO NOT recalculate general totals yet (as requested)
+    }
+
+    function recalculateGeneralTotals() {
+        // Calculate subtotal from all day totals
+        const subtotal = serviceItemsData.days.reduce((sum, day) => {
+            return sum + (parseFloat(day.dayTotal) || 0);
+        }, 0);
+
+        // Calculate IVA (16%)
+        const iva = subtotal * 0.16;
+
+        // Calculate total
+        const total = subtotal + iva;
+
+        // Round to 2 decimals
+        serviceItemsData.subtotal = Math.round(subtotal * 100) / 100;
+        serviceItemsData.iva = Math.round(iva * 100) / 100;
+        serviceItemsData.total = Math.round(total * 100) / 100;
+
+        // Update display
+        updateTotalsDisplay();
+    }
+
+    function recalculateAllDayTotals() {
+        // Recalculate dayTotal for each day without updating display (for bulk operations)
+        serviceItemsData.days.forEach((day, index) => {
+            const dayTotal = day.subconcepts.reduce((sum, sub) => {
+                return sum + (parseFloat(sub.total) || 0);
+            }, 0);
+            day.dayTotal = Math.round(dayTotal * 100) / 100;
+        });
+    }
+
+    function removeDay(dayIndex) {
+        if (!serviceItemsData.days[dayIndex]) return;
+
+        serviceItemsData.days.splice(dayIndex, 1);
+        renumberDays();
+        renderTable();
+        recalculateGeneralTotals();
+        markDirty();
+        triggerAutoSave();
+    }
+
+    function removeSubconcept(dayIndex, subconceptIndex) {
+        const day = serviceItemsData.days[dayIndex];
+        if (!day?.subconcepts[subconceptIndex]) return;
+
+        day.subconcepts.splice(subconceptIndex, 1);
+        recalculateDayTotal(dayIndex);
+        recalculateGeneralTotals();
+        renderDay(dayIndex);
+        markDirty();
+        triggerAutoSave();
+    }
+
+    function renumberDays() {
+        serviceItemsData.days.forEach((day, index) => {
+            day.dayNumber = index + 1;
+        });
+    }
+
+    // ==================
+    // MODALS
+    // ==================
+
+    function openDeleteDayModal(dayIndex) {
+        deleteContext = { type: 'day', dayIndex, subconceptIndex: null };
+
+        const dayNumber = serviceItemsData.days[dayIndex]?.dayNumber;
+        const deleteDayText = document.getElementById('deleteDayText');
+        if (deleteDayText) {
+            deleteDayText.textContent = `Día ${dayNumber}`;
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('deleteDayModal'));
+        modal.show();
+    }
+
+    function confirmDeleteDay() {
+        if (deleteContext.type === 'day' && deleteContext.dayIndex !== null) {
+            removeDay(deleteContext.dayIndex);
+
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteDayModal'));
+            if (modal) modal.hide();
+
+            deleteContext = { type: null, dayIndex: null, subconceptIndex: null };
+        }
+    }
+
+    function openDeleteSubconceptModal(dayIndex, subconceptIndex) {
+        deleteContext = { type: 'subconcept', dayIndex, subconceptIndex };
+
+        const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+        const deleteSubconceptText = document.getElementById('deleteSubconceptText');
+        if (deleteSubconceptText && subconcept) {
+            const time = subconcept.time || '(Sin hora)';
+            const concept = subconcept.concept || '(Sin descripción)';
+            deleteSubconceptText.textContent = `${time} - ${concept}`;
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('deleteSubconceptModal'));
+        modal.show();
+    }
+
+    function confirmDeleteSubconcept() {
+        if (deleteContext.type === 'subconcept' && deleteContext.dayIndex !== null && deleteContext.subconceptIndex !== null) {
+            removeSubconcept(deleteContext.dayIndex, deleteContext.subconceptIndex);
+
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteSubconceptModal'));
+            if (modal) modal.hide();
+
+            deleteContext = { type: null, dayIndex: null, subconceptIndex: null };
+        }
+    }
+
+    // ==================
+    // AUTO-SAVE
+    // ==================
+
+    function triggerAutoSave() {
+        if (saveTimeout) clearTimeout(saveTimeout);
+
+        saveTimeout = setTimeout(() => {
+            saveServiceItems();
+        }, 2000);
+    }
+
+    async function saveServiceItems() {
+        if (!isDirty || isNewQuote) return;
+
+        showSaveIndicator('saving', 'Guardando...');
+        clearAlerts('servicesAlerts');
+
+        try {
+            const response = await fetch(`/api/quotes/${quoteId}/service-items`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(serviceItemsData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                markClean();
+                showSaveIndicator('saved', 'Guardado');
+
+                setTimeout(() => {
+                    if (!isDirty) {
+                        showSaveIndicator('idle', 'Sin cambios');
+                    }
+                }, 3000);
+            } else {
+                throw new Error(result.error || 'Error al guardar');
+            }
+        } catch (error) {
+            console.error('Error saving service items:', error);
+            showSaveIndicator('error', 'Error al guardar');
+            showAlert('servicesAlerts', error.message || 'Error al guardar los servicios', 'danger');
+        }
+    }
+
+    // ==================
+    // INITIALIZATION
+    // ==================
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        await loadServiceItems();
+
+        // Add Day buttons (top and bottom)
+        const addDayBtn = document.getElementById('addDayBtn');
+        if (addDayBtn) {
+            addDayBtn.addEventListener('click', addDay);
+        }
+
+        const addDayBtnBottom = document.getElementById('addDayBtnBottom');
+        if (addDayBtnBottom) {
+            addDayBtnBottom.addEventListener('click', addDay);
+        }
+
+        const confirmDeleteDayBtn = document.getElementById('confirmDeleteDayBtn');
+        if (confirmDeleteDayBtn) {
+            confirmDeleteDayBtn.addEventListener('click', confirmDeleteDay);
+        }
+
+        const confirmDeleteSubconceptBtn = document.getElementById('confirmDeleteSubconceptBtn');
+        if (confirmDeleteSubconceptBtn) {
+            confirmDeleteSubconceptBtn.addEventListener('click', confirmDeleteSubconcept);
+        }
+
+        window.addEventListener('beforeunload', (e) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = '¿Descartar cambios sin guardar?';
+            }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && isDirty) {
+                saveServiceItems();
+            }
+        });
+    });
+})();
+</script>

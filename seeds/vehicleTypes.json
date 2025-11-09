@@ -1,0 +1,62 @@
+[
+  {
+    "name": "SEDAN",
+    "code": "SEDAN",
+    "description": "",
+    "icon": "car",
+    "defaultCapacity": 4,
+    "sortOrder": 1,
+    "active": true,
+    "exists": true
+  },
+  {
+    "name": "VAN",
+    "code": "VAN",
+    "description": "",
+    "icon": "car",
+    "defaultCapacity": 4,
+    "sortOrder": 2,
+    "active": true,
+    "exists": true
+  },
+  {
+    "name": "SUBURBAN",
+    "code": "SUBURBAN",
+    "description": "",
+    "icon": "car",
+    "defaultCapacity": 4,
+    "sortOrder": 3,
+    "active": true,
+    "exists": true
+  },
+  {
+    "name": "SPRINTER",
+    "code": "SPRINTER",
+    "description": "",
+    "icon": "car",
+    "defaultCapacity": 4,
+    "sortOrder": 4,
+    "active": true,
+    "exists": true
+  },
+  {
+    "name": "MODEL 3",
+    "code": "MODEL 3",
+    "description": "",
+    "icon": "car",
+    "defaultCapacity": 4,
+    "sortOrder": 5,
+    "active": true,
+    "exists": true
+  },
+  {
+    "name": "MODEL Y",
+    "code": "MODEL Y",
+    "description": "",
+    "icon": "car",
+    "defaultCapacity": 4,
+    "sortOrder": 6,
+    "active": true,
+    "exists": true
+  }
+]

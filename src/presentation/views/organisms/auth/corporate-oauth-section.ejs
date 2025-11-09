@@ -1,0 +1,628 @@
+<%
+/**
+ * Corporate OAuth Section Organism
+ * Complex authentication section with corporate branding, department selection, and multiple OAuth providers
+ *
+ * @param {object} corporate - Corporate configuration object
+ * @param {array} departments - Available departments for selection
+ * @param {boolean} requireDepartment - Whether department selection is required
+ * @param {string} preSelectedDepartment - Pre-selected department ID
+ * @param {boolean} showPersonalOption - Whether to show personal account option
+ * @param {string} action - OAuth action (login, register)
+ * @param {object} branding - Additional branding configuration
+ */
+
+// Default parameters
+const corpConfig = typeof corporate !== 'undefined' ? corporate : {};
+const corpDepartments = typeof departments !== 'undefined' ? departments : [];
+const corpRequireDepartment = typeof requireDepartment !== 'undefined' ? requireDepartment : false;
+const corpPreSelected = typeof preSelectedDepartment !== 'undefined' ? preSelectedDepartment : '';
+const corpShowPersonal = typeof showPersonalOption !== 'undefined' ? showPersonalOption : true;
+const corpAction = typeof action !== 'undefined' ? action : 'login';
+const corpBranding = typeof branding !== 'undefined' ? branding : {};
+
+// Corporate detection
+const hasCorporateConfig = corpConfig && (corpConfig.name || corpConfig.domain);
+const hasMultipleDepartments = corpDepartments && corpDepartments.length > 1;
+const hasCorporateOAuth = corpConfig && (corpConfig.googleDomain || corpConfig.microsoftTenant);
+%>
+
+<div class="corporate-oauth-section">
+    <!-- Corporate Header -->
+    <% if (hasCorporateConfig) { %>
+        <div class="corporate-header text-center mb-4">
+            <!-- Corporate Branding -->
+            <div class="corporate-brand-container mb-3">
+                <% if (corpConfig.logo) { %>
+                    <div class="corporate-logo-wrapper">
+                        <img src="<%= corpConfig.logo %>"
+                             alt="<%= corpConfig.name %>"
+                             class="corporate-logo"
+                             style="height: 60px; width: auto;">
+                    </div>
+                <% } %>
+
+                <% if (corpBranding && corpBranding.pattern) { %>
+                    <div class="brand-pattern" style="background-image: url('<%= corpBranding.pattern %>');"></div>
+                <% } %>
+            </div>
+
+            <!-- Corporate Title -->
+            <div class="corporate-title-section">
+                <h3 class="corporate-title fw-bold text-dark mb-2">
+                    <%= corpConfig.name || 'Corporate Access' %>
+                </h3>
+                <p class="corporate-subtitle text-muted mb-0">
+                    <%= corpAction === 'login' ? 'Sign in to your account' : 'Create your account' %>
+                    <% if (corpConfig.domain) { %>
+                        using your @<%= corpConfig.domain %> credentials
+                    <% } %>
+                </p>
+            </div>
+        </div>
+    <% } %>
+
+    <!-- Department Selection -->
+    <% if (hasMultipleDepartments && corpRequireDepartment) { %>
+        <div class="department-selection mb-4">
+            <div class="department-header mb-3">
+                <label class="form-label fw-semibold">
+                    <i class="ti ti-building me-2 text-primary"></i>
+                    Select Your Department
+                    <span class="text-danger">*</span>
+                </label>
+                <small class="text-muted d-block">
+                    Choose the department you belong to for proper access permissions
+                </small>
+            </div>
+
+            <div class="department-options">
+                <div class="row g-2">
+                    <% corpDepartments.forEach(dept => { %>
+                        <div class="col-12 col-md-6">
+                            <div class="department-option">
+                                <input type="radio"
+                                       class="btn-check"
+                                       name="department"
+                                       id="dept-<%= dept.id %>"
+                                       value="<%= dept.id %>"
+                                       <%= corpPreSelected === dept.id ? 'checked' : '' %>
+                                       data-department-name="<%= dept.name %>"
+                                       data-oauth-google="<%= dept.googleDomain || corpConfig.googleDomain || '' %>"
+                                       data-oauth-microsoft="<%= dept.microsoftTenant || corpConfig.microsoftTenant || '' %>">
+
+                                <label class="btn btn-outline-primary w-100 d-flex align-items-center justify-content-start text-start department-btn"
+                                       for="dept-<%= dept.id %>">
+                                    <div class="department-icon me-3">
+                                        <% if (dept.icon) { %>
+                                            <i class="<%= dept.icon %> fs-4"></i>
+                                        <% } else { %>
+                                            <i class="ti ti-building-store fs-4"></i>
+                                        <% } %>
+                                    </div>
+                                    <div class="department-info flex-grow-1">
+                                        <div class="department-name fw-semibold"><%= dept.name %></div>
+                                        <% if (dept.description) { %>
+                                            <small class="text-muted"><%= dept.description %></small>
+                                        <% } %>
+                                    </div>
+                                    <div class="department-check">
+                                        <i class="ti ti-check fs-5"></i>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    <% }) %>
+                </div>
+            </div>
+
+            <!-- Department Selection Feedback -->
+            <div class="department-feedback mt-2 d-none">
+                <div class="alert alert-info d-flex align-items-center py-2">
+                    <i class="ti ti-info-circle me-2"></i>
+                    <small class="selected-department-text"></small>
+                </div>
+            </div>
+        </div>
+    <% } %>
+
+    <!-- OAuth Providers Section -->
+    <div class="oauth-providers-section">
+        <!-- Department-Specific OAuth (if department selected) -->
+        <div class="department-oauth-container d-none">
+            <div class="department-oauth-header mb-3">
+                <div class="d-flex align-items-center">
+                    <div class="selected-dept-icon me-2">
+                        <i class="ti ti-building-store text-primary"></i>
+                    </div>
+                    <div>
+                        <h6 class="selected-dept-name mb-0 fw-semibold"></h6>
+                        <small class="text-muted">Department Authentication</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="department-oauth-buttons">
+                <!-- Buttons will be dynamically populated -->
+            </div>
+        </div>
+
+        <!-- Corporate OAuth Providers -->
+        <% if (hasCorporateOAuth && !corpRequireDepartment) { %>
+            <div class="corporate-oauth-container">
+                <%- include('../../molecules/auth/oauth-providers', {
+                    providers: [],
+                    action: corpAction,
+                    corporate: corpConfig,
+                    showDivider: false,
+                    size: 'md'
+                }) %>
+            </div>
+        <% } %>
+
+        <!-- Standard OAuth Providers (if allowed) -->
+        <% if (corpShowPersonal) { %>
+            <div class="personal-oauth-container">
+                <!-- Divider for personal accounts -->
+                <% if (hasCorporateOAuth || hasMultipleDepartments) { %>
+                    <div class="oauth-divider mb-4">
+                        <div class="divider-line"></div>
+                        <div class="divider-text">
+                            <small class="text-muted bg-white px-3">or use personal account</small>
+                        </div>
+                        <div class="divider-line"></div>
+                    </div>
+                <% } %>
+
+                <%- include('../../molecules/auth/oauth-providers', {
+                    providers: ['google', 'microsoft', 'apple'],
+                    action: corpAction,
+                    showDivider: false,
+                    size: 'md'
+                }) %>
+            </div>
+        <% } %>
+    </div>
+
+    <!-- Corporate Policies Notice -->
+    <% if (corpConfig && (corpConfig.termsUrl || corpConfig.privacyUrl || corpConfig.policies)) { %>
+        <div class="corporate-policies mt-4 pt-3 border-top">
+            <div class="policies-notice">
+                <small class="text-muted d-block text-center">
+                    <i class="ti ti-shield-check me-1"></i>
+                    By signing in, you agree to the
+                    <% if (corpConfig.termsUrl) { %>
+                        <a href="<%= corpConfig.termsUrl %>" class="text-primary text-decoration-none" target="_blank">
+                            <%= corpConfig.name %> Terms of Service
+                        </a>
+                    <% } %>
+                    <% if (corpConfig.termsUrl && corpConfig.privacyUrl) { %>and<% } %>
+                    <% if (corpConfig.privacyUrl) { %>
+                        <a href="<%= corpConfig.privacyUrl %>" class="text-primary text-decoration-none" target="_blank">
+                            Privacy Policy
+                        </a>
+                    <% } %>
+                </small>
+
+                <% if (corpConfig.policies && corpConfig.policies.length > 0) { %>
+                    <div class="additional-policies mt-2">
+                        <% corpConfig.policies.forEach(policy => { %>
+                            <small class="text-muted d-block">
+                                • <a href="<%= policy.url %>" class="text-primary text-decoration-none" target="_blank">
+                                    <%= policy.name %>
+                                </a>
+                            </small>
+                        <% }) %>
+                    </div>
+                <% } %>
+            </div>
+        </div>
+    <% } %>
+
+    <!-- Support Information -->
+    <div class="corporate-support mt-4 pt-3 border-top text-center">
+        <small class="text-muted">
+            <% if (corpConfig.supportEmail) { %>
+                Need help? Contact
+                <a href="mailto:<%= corpConfig.supportEmail %>" class="text-primary text-decoration-none">
+                    <%= corpConfig.name %> IT Support
+                </a>
+            <% } else { %>
+                Need help?
+                <a href="/contact" class="text-primary text-decoration-none">Contact Support</a>
+            <% } %>
+        </small>
+    </div>
+</div>
+
+<style>
+    .corporate-oauth-section {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+
+    /* Corporate Header */
+    .corporate-brand-container {
+        position: relative;
+        overflow: hidden;
+        border-radius: 16px;
+        padding: 1rem;
+        background: rgba(248, 249, 250, 0.8);
+    }
+
+    .corporate-logo-wrapper {
+        position: relative;
+        z-index: 2;
+    }
+
+    .corporate-logo {
+        filter: drop-shadow(0 2px 8px rgba(0,0,0,0.1));
+        transition: all 0.3s ease;
+    }
+
+    .corporate-logo:hover {
+        transform: scale(1.05);
+        filter: drop-shadow(0 4px 15px rgba(0,0,0,0.15));
+    }
+
+    .brand-pattern {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        opacity: 0.1;
+        background-size: cover;
+        background-position: center;
+        z-index: 1;
+    }
+
+    .corporate-title {
+        color: #2c3e50;
+        font-size: 1.75rem;
+    }
+
+    .corporate-subtitle {
+        font-size: 1rem;
+        line-height: 1.5;
+    }
+
+    /* Department Selection */
+    .department-selection {
+        background: rgba(255, 255, 255, 0.8);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .department-option {
+        margin-bottom: 0.5rem;
+    }
+
+    .department-btn {
+        min-height: 70px;
+        border-radius: 10px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .department-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .department-icon {
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(102, 126, 234, 0.1);
+        border-radius: 8px;
+        color: #667eea;
+        transition: all 0.3s ease;
+    }
+
+    .department-check {
+        opacity: 0;
+        transition: all 0.3s ease;
+        color: #28a745;
+    }
+
+    .btn-check:checked + .department-btn {
+        background: rgba(102, 126, 234, 0.1);
+        border-color: #667eea;
+        color: #667eea;
+    }
+
+    .btn-check:checked + .department-btn .department-icon {
+        background: #667eea;
+        color: white;
+        transform: scale(1.1);
+    }
+
+    .btn-check:checked + .department-btn .department-check {
+        opacity: 1;
+        transform: scale(1.1);
+    }
+
+    /* Department OAuth Section */
+    .department-oauth-container {
+        background: rgba(102, 126, 234, 0.05);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid rgba(102, 126, 234, 0.1);
+        margin-bottom: 1.5rem;
+    }
+
+    .department-oauth-container.show {
+        display: block !important;
+        animation: departmentFadeIn 0.5s ease-out;
+    }
+
+    @keyframes departmentFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* OAuth Dividers */
+    .oauth-divider {
+        display: flex;
+        align-items: center;
+        margin: 1.5rem 0;
+    }
+
+    .divider-line {
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, #e0e6ed, transparent);
+    }
+
+    .divider-text {
+        margin: 0 1rem;
+        position: relative;
+        z-index: 2;
+    }
+
+    /* Corporate Policies */
+    .corporate-policies {
+        background: rgba(248, 249, 250, 0.5);
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .policies-notice a:hover {
+        text-decoration: underline !important;
+    }
+
+    /* Loading States */
+    .corporate-oauth-section.loading {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .corporate-oauth-section.loading::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.8);
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .corporate-oauth-section.loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 40px;
+        height: 40px;
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #667eea;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        z-index: 10000;
+    }
+
+    @keyframes spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .corporate-oauth-section {
+            padding: 1rem;
+        }
+
+        .department-options .col-md-6 {
+            margin-bottom: 0.5rem;
+        }
+
+        .department-btn {
+            min-height: 60px;
+        }
+
+        .corporate-title {
+            font-size: 1.5rem;
+        }
+    }
+
+    /* Dark Theme */
+    [data-theme="dark"] .corporate-brand-container,
+    [data-theme="dark"] .department-selection {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    [data-theme="dark"] .corporate-title {
+        color: #fff;
+    }
+
+    [data-theme="dark"] .corporate-subtitle {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    /* High Contrast */
+    @media (prefers-contrast: high) {
+        .department-btn {
+            border-width: 2px;
+        }
+
+        .btn-check:checked + .department-btn {
+            border-width: 3px;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const corporateSection = document.querySelector('.corporate-oauth-section');
+    const departmentInputs = document.querySelectorAll('input[name="department"]');
+    const departmentContainer = document.querySelector('.department-oauth-container');
+    const departmentButtons = document.querySelector('.department-oauth-buttons');
+    const departmentFeedback = document.querySelector('.department-feedback');
+    const selectedDeptText = document.querySelector('.selected-department-text');
+
+    // Department selection handling
+    departmentInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            if (this.checked) {
+                handleDepartmentSelection(this);
+            }
+        });
+    });
+
+    function handleDepartmentSelection(selectedInput) {
+        const deptName = selectedInput.dataset.departmentName;
+        const googleDomain = selectedInput.dataset.oauthGoogle;
+        const microsoftTenant = selectedInput.dataset.oauthMicrosoft;
+
+        // Update UI
+        updateDepartmentUI(deptName);
+
+        // Create department-specific OAuth buttons
+        createDepartmentOAuthButtons(deptName, googleDomain, microsoftTenant);
+
+        // Show department OAuth section
+        if (departmentContainer) {
+            departmentContainer.classList.remove('d-none');
+            departmentContainer.classList.add('show');
+        }
+
+        // Show feedback
+        if (departmentFeedback && selectedDeptText) {
+            selectedDeptText.textContent = `Selected: ${deptName}`;
+            departmentFeedback.classList.remove('d-none');
+        }
+
+        // Track selection
+
+        if (typeof gtag !== 'undefined') {
+            gtag('event', 'department_selected', {
+                department_name: deptName,
+                has_google: !!googleDomain,
+                has_microsoft: !!microsoftTenant
+            });
+        }
+    }
+
+    function updateDepartmentUI(deptName) {
+        const selectedDeptName = document.querySelector('.selected-dept-name');
+        if (selectedDeptName) {
+            selectedDeptName.textContent = deptName;
+        }
+    }
+
+    function createDepartmentOAuthButtons(deptName, googleDomain, microsoftTenant) {
+        if (!departmentButtons) return;
+
+        let buttonsHtml = '';
+
+        if (googleDomain) {
+            buttonsHtml += `
+                <a href="/auth/google/corporate?domain=${googleDomain}&department=${encodeURIComponent(deptName)}"
+                   class="oauth-btn oauth-google btn w-100 py-3 px-4 d-flex align-items-center justify-content-center mb-3"
+                   data-provider="google">
+                    <i class="ti ti-brand-google fs-5 me-3"></i>
+                    <span class="fw-semibold">Continue with ${deptName} Google</span>
+                </a>
+            `;
+        }
+
+        if (microsoftTenant) {
+            buttonsHtml += `
+                <a href="/auth/microsoft/corporate?tenant=${microsoftTenant}&department=${encodeURIComponent(deptName)}"
+                   class="oauth-btn oauth-microsoft btn w-100 py-3 px-4 d-flex align-items-center justify-content-center mb-3"
+                   data-provider="microsoft">
+                    <i class="ti ti-brand-microsoft fs-5 me-3"></i>
+                    <span class="fw-semibold">Continue with ${deptName} Microsoft</span>
+                </a>
+            `;
+        }
+
+        departmentButtons.innerHTML = buttonsHtml;
+
+        // Add click handlers to new buttons
+        const newButtons = departmentButtons.querySelectorAll('.oauth-btn');
+        newButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const provider = this.dataset.provider;
+
+                // Show loading state
+                corporateSection.classList.add('loading');
+            });
+        });
+    }
+
+    // Handle pre-selected department
+    const preSelectedInput = document.querySelector('input[name="department"]:checked');
+    if (preSelectedInput) {
+        handleDepartmentSelection(preSelectedInput);
+    }
+
+    // Corporate logo interaction
+    const corporateLogo = document.querySelector('.corporate-logo');
+    if (corporateLogo) {
+        corporateLogo.addEventListener('click', function() {
+            // Easter egg: triple click for admin mode
+            this.clickCount = (this.clickCount || 0) + 1;
+            if (this.clickCount === 3) {
+                // Could trigger admin features
+                this.clickCount = 0;
+            }
+            setTimeout(() => this.clickCount = 0, 1000);
+        });
+    }
+
+    // Handle OAuth results from URL params
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('oauth') === 'error') {
+        const errorMessage = urlParams.get('message');
+        if (errorMessage) {
+            // Show error message
+            console.error('OAuth error:', errorMessage);
+        }
+    }
+
+        hasCorporate: <%= !!hasCorporateConfig %>,
+        hasDepartments: <%= hasMultipleDepartments %>,
+        requireDepartment: <%= corpRequireDepartment %>,
+        showPersonal: <%= corpShowPersonal %>
+    });
+});
+</script>

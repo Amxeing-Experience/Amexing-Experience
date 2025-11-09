@@ -1,28 +1,63 @@
+/**
+ * Amexing Web Application - Main Server Entry Point.
+ *
+ * This is the primary entry point for the Amexing web application, orchestrating
+ * the initialization of all core components including Parse Server, security
+ * middleware, authentication systems, and routing configuration.
+ * @module index
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 1.0.0
+ * @example
+ * // Start the application
+ * npm start
+ *
+ * // Development mode with hot reloading
+ * npm run dev
+ *
+ * // Production deployment
+ * NODE_ENV=production npm start
+ */
+
 require('dotenv').config({
-  path: `.env.${process.env.NODE_ENV || 'development'}`,
+  path: `./environments/.env.${process.env.NODE_ENV || 'development'}`,
 });
 
 const express = require('express');
 const path = require('path');
-const { ParseServer } = require('parse-server');
-const ParseDashboard = require('parse-dashboard');
 const compression = require('compression');
 const cookieParser = require('cookie-parser');
 const methodOverride = require('method-override');
 
+// Infrastructure
+const swaggerUi = require('swagger-ui-express');
 const logger = require('./infrastructure/logger');
 const securityMiddleware = require('./infrastructure/security/securityMiddleware');
-const parseServerConfig = require('../config/parse-server');
-const parseDashboardConfig = require('../config/parse-dashboard');
+const { initializeParseServer, shutdownParseServer } = require('./infrastructure/server/parseServerInit');
+const { configureStaticFiles } = require('./infrastructure/server/staticFilesConfig');
+const { getHealthCheck, getMetrics } = require('./infrastructure/monitoring/healthCheck');
+
+// Swagger/OpenAPI Documentation
+const { swaggerSpec } = require('./infrastructure/swagger/swagger.config');
+
+// Routes
 const webRoutes = require('./presentation/routes/webRoutes');
 const apiRoutes = require('./presentation/routes/apiRoutes');
+const authRoutes = require('./presentation/routes/authRoutes');
 const docsRoutes = require('./presentation/routes/docsRoutes');
+const dashboardRoutes = require('./presentation/routes/dashboardRoutes');
+const atomicRoutes = require('./presentation/routes/atomicRoutes');
+const publicRoutes = require('./presentation/routes/publicRoutes');
+
+// Middleware
 const errorHandler = require('./application/middleware/errorHandler');
+const sessionRecovery = require('./application/middleware/sessionRecoveryMiddleware');
+const auditContextMiddleware = require('./application/middleware/auditContextMiddleware');
+const { parseContextMiddleware } = require('./infrastructure/parseContext');
 
 // Initialize Express app
 const app = express();
 const PORT = process.env.PORT || 1337;
-const DASHBOARD_PORT = process.env.DASHBOARD_PORT || 4040;
 
 // Trust proxy in production
 if (process.env.NODE_ENV === 'production') {
@@ -33,16 +68,6 @@ if (process.env.NODE_ENV === 'production') {
 app.set('views', path.join(__dirname, 'presentation', 'views'));
 app.set('view engine', 'ejs');
 
-// Apply security middleware (Helmet, CSRF, and other security configurations)
-// Note: CSRF protection is included in securityMiddleware.getAllMiddleware()
-const securityMiddlewares = securityMiddleware.getAllMiddleware();
-securityMiddlewares.forEach((middleware) => {
-  app.use(middleware);
-});
-
-// Session middleware
-app.use(securityMiddleware.getSessionConfig());
-
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -52,231 +77,183 @@ app.use(methodOverride('_method'));
 // Compression middleware
 app.use(compression());
 
-// Static files
-app.use(
-  '/public',
-  express.static(path.join(__dirname, 'presentation', 'public'), {
-    maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
+// Configure static file serving (centralized configuration)
+configureStaticFiles(app);
+
+// Initialize Parse Server (async initialization handled in module)
+let parseServer;
+initializeParseServer()
+  .then((server) => {
+    parseServer = server;
   })
-);
-
-// Initialize Parse Server
-const parseServer = new ParseServer(parseServerConfig);
-
-// Start Parse Server (graceful failure in development)
-(async () => {
-  try {
-    await parseServer.start();
-    logger.info('Parse Server initialized successfully');
-
-    // Initialize Parse SDK for internal use (health checks, etc.)
-    const Parse = require('parse/node');
-    Parse.initialize(
-      parseServerConfig.appId,
-      null,
-      parseServerConfig.masterKey
-    );
-    Parse.serverURL = parseServerConfig.serverURL;
-
-    logger.info('Parse SDK initialized for internal operations');
-  } catch (error) {
-    logger.error('Failed to initialize Parse Server:', error);
-
+  .catch((_error) => {
     if (process.env.NODE_ENV === 'production') {
-      logger.error('Exiting in production due to Parse Server failure');
+      logger.error('Fatal: Parse Server failed to initialize in production');
       process.exit(1);
-    } else {
-      logger.warn(
-        'Continuing in development mode without Parse Server (database may be unavailable)'
-      );
-      // Don't exit in development, allow app to start for other endpoints
     }
-  }
-})();
-
-// Mount Parse Server
-app.use('/parse', parseServer.app);
-
-// Mount Parse Dashboard (separate app for security)
-if (
-  process.env.NODE_ENV !== 'production'
-  || process.env.ENABLE_DASHBOARD === 'true'
-) {
-  const dashboardApp = express();
-
-  // Apply security middleware to dashboard
-  dashboardApp.use(securityMiddleware.getHelmetConfig());
-  dashboardApp.use(securityMiddleware.getStrictRateLimiter());
-
-  // Initialize and mount dashboard
-  const dashboard = new ParseDashboard(parseDashboardConfig, {
-    allowInsecureHTTP: process.env.NODE_ENV === 'development',
   });
 
-  dashboardApp.use('/', dashboard);
+// Mount Parse Server middleware (will be available after initialization)
+app.use('/parse', (req, res, next) => {
+  // In test mode with no local Parse Server, proxy to test server
+  if (process.env.NODE_ENV === 'test' && (!parseServer || parseServer === null)) {
+    // Proxy to test Parse Server at http://localhost:1339/parse
+    const http = require('http');
+    const url = require('url');
 
-  // Start dashboard server
-  dashboardApp.listen(DASHBOARD_PORT, () => {
-    logger.info(
-      `Parse Dashboard running on http://localhost:${DASHBOARD_PORT}`
-    );
+    const targetUrl = url.parse(process.env.PARSE_SERVER_URL || 'http://localhost:1339/parse');
+    const options = {
+      hostname: targetUrl.hostname,
+      port: targetUrl.port,
+      path: targetUrl.pathname + (req.url.startsWith('/') ? req.url : `/${req.url}`),
+      method: req.method,
+      headers: req.headers,
+    };
+
+    const proxyReq = http.request(options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (error) => {
+      logger.error('Parse Server proxy error:', error);
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Test Parse Server is not available',
+      });
+    });
+
+    if (req.body) {
+      proxyReq.write(JSON.stringify(req.body));
+    }
+    proxyReq.end();
+    return;
+  }
+
+  if (parseServer && parseServer.app) {
+    return parseServer.app(req, res, next);
+  }
+  res.status(503).json({
+    error: 'Service Unavailable',
+    message: 'Parse Server is initializing',
+  });
+});
+
+// Session middleware
+app.use(securityMiddleware.getSessionConfig());
+
+// Session recovery middleware - Auto-recover missing CSRF secrets and detect session issues
+// IMPORTANT: Must be applied AFTER session middleware but BEFORE security middleware
+app.use(sessionRecovery.autoRecoverSession());
+app.use(sessionRecovery.sessionHealthCheck());
+
+// Apply security middleware (Helmet, CSRF, and other security configurations)
+// Note: CSRF protection is included in securityMiddleware.getAllMiddleware()
+const securityMiddlewares = securityMiddleware.getAllMiddleware();
+securityMiddlewares.forEach((middleware) => {
+  app.use(middleware);
+});
+
+// Swagger API Documentation (Development and Test only)
+// SECURITY: Disabled in production - configure proper API documentation strategy for production
+if (process.env.NODE_ENV !== 'production') {
+  logger.info('Swagger API Documentation enabled at /api-docs (Development/Test only)');
+
+  app.use(
+    '/api-docs',
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customCss: '.swagger-ui .topbar { display: none }',
+      customSiteTitle: 'AmexingWeb API Documentation',
+      customfavIcon: '/favicon.ico',
+      swaggerOptions: {
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        filter: true,
+        tryItOutEnabled: true,
+        syntaxHighlight: {
+          activate: true,
+          theme: 'monokai',
+        },
+      },
+    })
+  );
+
+  // OpenAPI specification JSON endpoint (Development/Test only)
+  app.get('/api-docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(swaggerSpec);
+  });
+} else {
+  // In production, return 404 for documentation endpoints
+  app.use('/api-docs', (req, res) => {
+    res.status(404).json({
+      error: 'Not Found',
+      message: 'API documentation is not available in production',
+    });
+  });
+
+  app.get('/api-docs.json', (req, res) => {
+    res.status(404).json({
+      error: 'Not Found',
+      message: 'API documentation is not available in production',
+    });
   });
 }
+
+// Session health check endpoint (before other routes)
+app.get('/api/session/health', sessionRecovery.sessionHealthEndpoint);
+
+// Parse context middleware - Global user context propagation for audit trails
+// Uses AsyncLocalStorage to make user context available throughout request lifecycle
+// IMPORTANT: Must be applied BEFORE routes to capture all authenticated requests
+app.use(parseContextMiddleware);
+
+// Audit context middleware - Propagates authenticated user context to Parse hooks
+// IMPORTANT: Must be applied AFTER authentication middleware but BEFORE routes
+app.use(auditContextMiddleware);
+
+// Public Routes (no authentication - must be before other routes)
+app.use('/', publicRoutes);
 
 // API Routes
 app.use('/api', apiRoutes);
 
+// Authentication Routes
+app.use('/auth', authRoutes);
+
 // Documentation Routes
 app.use('/', docsRoutes);
 
-// Web Routes
+// Dashboard Routes
+app.use('/dashboard', dashboardRoutes);
+
+// Atomic Design Routes
+app.use('/atomic', atomicRoutes);
+
+// Web Routes (must be last to avoid route conflicts)
 app.use('/', webRoutes);
 
-// Helper function to test database metrics
-const getDatabaseMetrics = async () => {
-  const dbMetrics = {
-    connected: false,
-    responseTime: null,
-    error: null,
-  };
-
-  try {
-    const startTime = Date.now();
-    const { MongoClient } = require('mongodb');
-
-    // Use the same connection string as in the environment
-    const connectionString = process.env.DATABASE_URI || 'mongodb://localhost:27017/amexingdb';
-
-    const client = new MongoClient(connectionString, {
-      connectTimeoutMS: 3000,
-      serverSelectionTimeoutMS: 3000,
-      maxPoolSize: 1, // Minimal pool for health checks
-    });
-
-    await client.connect();
-
-    // Simple ping to verify connection
-    await client.db().admin().ping();
-
-    const responseTime = Date.now() - startTime;
-    dbMetrics.connected = true;
-    dbMetrics.responseTime = responseTime;
-
-    await client.close();
-  } catch (error) {
-    dbMetrics.connected = false;
-    dbMetrics.error = error.message;
-    logger.debug('Database health check failed:', error.message);
-  }
-
-  return dbMetrics;
-};
-
-// Health check endpoint
+// Health check endpoint (uses centralized health check module)
 app.get('/health', async (req, res) => {
-  const healthCheck = {
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV,
-    version: process.env.npm_package_version || '1.0.0',
-    database: {
-      connected: false,
-      responseTime: null,
-      error: null,
-    },
-    memory: {
-      used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-      total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
-      external: Math.round(process.memoryUsage().external / 1024 / 1024),
-    },
-    system: {
-      platform: process.platform,
-      nodeVersion: process.version,
-      pid: process.pid,
-    },
-  };
-
-  // Test database connectivity (graceful failure)
   try {
-    const dbMetrics = await getDatabaseMetrics();
-    healthCheck.database.connected = dbMetrics.connected;
-    healthCheck.database.responseTime = dbMetrics.responseTime;
-
-    if (dbMetrics.error) {
-      healthCheck.database.error = dbMetrics.error;
-    }
-
-    if (dbMetrics.connected) {
-      logger.debug(
-        `Database health check passed in ${dbMetrics.responseTime}ms`
-      );
-    }
+    const healthCheck = await getHealthCheck();
+    const statusCode = healthCheck.status === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(healthCheck);
   } catch (error) {
-    healthCheck.database.connected = false;
-    healthCheck.database.error = error.message;
-
-    logger.warn(
-      'Database health check failed (continuing gracefully):',
-      error.message
-    );
-
-    // Don't fail the health check completely if database is unavailable
-    // This allows the app to start without MongoDB for development
-    if (process.env.NODE_ENV === 'production') {
-      healthCheck.status = 'unhealthy';
-      return res.status(503).json(healthCheck);
-    }
-    // In development, just log the warning but keep status healthy
-    healthCheck.status = 'healthy (db unavailable)';
+    logger.error('Health check error:', error);
+    res.status(503).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+    });
   }
-
-  res.json(healthCheck);
 });
 
-// Helper function to get system metrics
-const getSystemMetrics = () => ({
-  uptime: process.uptime(),
-  platform: process.platform,
-  nodeVersion: process.version,
-  pid: process.pid,
-  environment: process.env.NODE_ENV,
-  memory: {
-    rss: Math.round(process.memoryUsage().rss / 1024 / 1024),
-    heapTotal: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
-    heapUsed: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-    external: Math.round(process.memoryUsage().external / 1024 / 1024),
-    arrayBuffers: Math.round(process.memoryUsage().arrayBuffers / 1024 / 1024),
-  },
-  cpu: {
-    usage: process.cpuUsage(),
-    loadAverage:
-      process.platform !== 'win32' ? require('os').loadavg() : [0, 0, 0],
-  },
-});
-
-// Metrics endpoint for monitoring
+// Metrics endpoint for monitoring (uses centralized metrics module)
 app.get('/metrics', async (req, res) => {
   try {
-    const metrics = {
-      timestamp: new Date().toISOString(),
-      system: getSystemMetrics(),
-      application: {
-        version: process.env.npm_package_version || '1.0.0',
-        startTime: new Date(Date.now() - process.uptime() * 1000).toISOString(),
-      },
-      database: await getDatabaseMetrics(),
-    };
-
-    // Add Parse Server specific metrics if available
-    if (parseServer && parseServer.adapter) {
-      metrics.parseServer = {
-        version: require('parse-server/package.json').version,
-        appId: process.env.PARSE_APP_ID,
-        serverURL: process.env.PARSE_SERVER_URL,
-      };
-    }
-
+    const metrics = await getMetrics(parseServer);
     res.json(metrics);
   } catch (error) {
     logger.error('Error generating metrics:', error);
@@ -311,36 +288,65 @@ app.use((req, res) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Start server
-const server = app.listen(PORT, () => {
-  logger.info(`AmexingWeb API Server running on http://localhost:${PORT}`);
-  logger.info(`Parse Server endpoint: http://localhost:${PORT}/parse`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+// Start server only if this file is run directly (not imported for testing)
+let server;
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    logger.info(`AmexingWeb API Server running on http://localhost:${PORT}`);
+    logger.info(`Parse Server endpoint: http://localhost:${PORT}/parse`);
+    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
 
-  if (process.env.NODE_ENV === 'production') {
-    logger.info('Running in PRODUCTION mode with enhanced security');
-  }
-});
+    if (process.env.NODE_ENV === 'production') {
+      logger.info('Running in PRODUCTION mode with enhanced security');
+    }
+  });
+}
 
-// Graceful shutdown
+/**
+ * Handles graceful application shutdown for clean process termination.
+ * @param {string} signal - The signal that triggered the shutdown.
+ * @example
+ * // Graceful shutdown is triggered automatically on SIGTERM/SIGINT
+ * process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+ */
+let isShuttingDown = false;
 const gracefulShutdown = async (signal) => {
+  // Prevent multiple shutdown attempts
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
   logger.info(`Received ${signal}, starting graceful shutdown...`);
 
-  server.close(() => {
-    logger.info('HTTP server closed');
-
-    // Close database connections
-    parseServer.handleShutdown();
-
-    // Exit process
-    process.exit(0);
-  });
-
   // Force exit after 10 seconds
-  setTimeout(() => {
+  const forceExitTimer = setTimeout(() => {
     logger.error('Forcefully shutting down...');
     process.exit(1);
   }, 10000);
+
+  try {
+    // Close HTTP server first
+    if (server) {
+      await new Promise((resolve) => {
+        server.close(() => {
+          logger.info('HTTP server closed');
+          resolve();
+        });
+      });
+    }
+
+    // Shutdown Parse Server gracefully
+    await shutdownParseServer(parseServer);
+
+    // Clear force exit timer and exit cleanly
+    clearTimeout(forceExitTimer);
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during graceful shutdown:', error.message);
+    clearTimeout(forceExitTimer);
+    process.exit(1);
+  }
 };
 
 // Handle shutdown signals

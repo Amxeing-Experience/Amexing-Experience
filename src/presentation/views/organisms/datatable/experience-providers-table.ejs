@@ -1,0 +1,646 @@
+<%
+/**
+ * Experience Providers DataTable Organism
+ * DataTable component for experience provider management with simplified structure
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'experience-providers-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/experiences';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-building-store me-2"></i>Proveedores
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Gestión de proveedores y partners</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createProviderBtn">
+                        <i class="ti ti-plus me-1"></i>Nuevo Proveedor
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="providers-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Descripción</th>
+                        <th>Costo</th>
+                        <th>Última Actualización</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<%- include('../modal/experience-images-modal.ejs') %>
+
+<!-- Provider Modal -->
+<div class="modal fade" id="providerModal" tabindex="-1" aria-labelledby="providerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%);">
+                <h5 class="modal-title text-white" id="providerModalLabel">
+                    <i class="ti ti-building-store me-2"></i><span id="modalTitle">Crear Nuevo Proveedor</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="providerModalAlerts"></div>
+
+                <form id="providerForm">
+                    <input type="hidden" id="providerId">
+                    <input type="hidden" id="type" value="Provider">
+
+                    <!-- Nombre -->
+                    <div class="mb-3">
+                        <label for="name" class="form-label">
+                            Nombre del Proveedor <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" id="name" name="name" required maxlength="200" placeholder="Ej: Tours y Experiencias México">
+                        <div class="form-text">Nombre comercial del proveedor (máximo 200 caracteres)</div>
+                    </div>
+
+                    <!-- Descripción -->
+                    <div class="mb-3">
+                        <label for="description" class="form-label">
+                            Descripción <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="description" name="description" rows="4" required maxlength="1000" placeholder="Descripción detallada del proveedor y sus servicios..."></textarea>
+                        <div class="form-text">Descripción completa del proveedor (máximo 1000 caracteres)</div>
+                    </div>
+
+                    <!-- Costo -->
+                    <div class="mb-3">
+                        <label for="cost" class="form-label">
+                            Costo <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="cost" name="cost" required min="0" step="0.01" placeholder="0.00">
+                            <span class="input-group-text">MXN</span>
+                        </div>
+                        <div class="form-text">Costo base del proveedor (mínimo $0.00)</div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%); color: white;" id="saveProviderBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Proveedor</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function initWhenReady() {
+        if (typeof jQuery === 'undefined') {
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+        if (!jQuery.fn.dataTable) {
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+        initProvidersTable();
+    }
+
+    function initProvidersTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        // DataTable initialization with type=Provider filter
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint + '?type=Provider', // Filter by Provider type
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading providers:', error);
+                    showErrorAlert('Error al cargar los proveedores. Por favor, intente nuevamente.');
+                }
+            },
+            columns: [
+                {
+                    data: 'name',
+                    render: function(data) {
+                        return `<div class="fw-semibold">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'description',
+                    render: function(data) {
+                        if (!data) return '<span class="text-muted">Sin descripción</span>';
+                        const truncated = data.length > 100 ? data.substring(0, 100) + '...' : data;
+                        return `<small class="text-muted">${truncated}</small>`;
+                    }
+                },
+                {
+                    data: 'cost',
+                    render: function(data) {
+                        const formatted = new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(data || 0);
+                        return `<div class="fw-bold text-success">${formatted}</div>`;
+                    }
+                },
+                {
+                    data: 'updatedAt',
+                    render: function(data) {
+                        if (!data) return '-';
+                        const date = new Date(data);
+                        return `<small class="text-muted">${date.toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                        })}</small>`;
+                    }
+                },
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data
+                            ? '<span class="badge bg-success">Activo</span>'
+                            : '<span class="badge bg-secondary">Inactivo</span>';
+                    }
+                },
+                ...(showActions ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+                        if (canEdit) {
+                            actions += `<button type="button"
+                                            class="btn btn-primary edit-provider-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Proveedor">
+                                            <i class="ti ti-edit"></i>
+                                        </button>`;
+
+                            actions += `<button type="button"
+                                            class="btn btn-secondary manage-images-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Gestionar Imágenes">
+                                            <i class="ti ti-photo"></i>
+                                        </button>`;
+
+                            const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                            const statusTitle = data.active ? 'Desactivar Proveedor' : 'Activar Proveedor';
+                            const statusClass = data.active ? 'btn-warning' : 'btn-success';
+
+                            actions += `<button type="button"
+                                            class="btn ${statusClass} toggle-provider-status-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-current-status="${data.active}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="${statusTitle}">
+                                            <i class="ti ${statusIcon}"></i>
+                                        </button>`;
+                        }
+
+                        if (canDelete) {
+                            actions += `<button type="button"
+                                            class="btn btn-danger delete-provider-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Eliminar Proveedor">
+                                            <i class="ti ti-trash"></i>
+                                        </button>`;
+                        }
+
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando proveedores...'
+            },
+            order: [[0, 'asc']],
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
+        });
+
+        // Event handlers
+        $('#createProviderBtn').on('click', function() { openProviderModal(); });
+        $(`#${tableId}`).on('click', '.edit-provider-btn', function() { loadProviderData($(this).data('id')); });
+        $(`#${tableId}`).on('click', '.manage-images-btn', function() { manageImages($(this).data('id'), $(this).data('name')); });
+        $(`#${tableId}`).on('click', '.toggle-provider-status-btn', function() {
+            toggleProviderStatus($(this).data('id'), $(this).data('current-status'), $(this).data('name'));
+        });
+        $(`#${tableId}`).on('click', '.delete-provider-btn', function() { deleteProvider($(this).data('id'), $(this).data('name')); });
+        $('#saveProviderBtn').on('click', function() { saveProvider(); });
+
+        function openProviderModal(isEdit = false) {
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('providerModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+
+            $('#providerModal').modal('show');
+            $('#providerForm')[0].reset();
+            $('#providerId').val('');
+            $('#type').val('Provider');
+            $('#modalTitle').text(isEdit ? 'Editar Proveedor' : 'Crear Nuevo Proveedor');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Proveedor');
+        }
+
+        function loadProviderData(providerId) {
+            openProviderModal(true);
+
+            $.ajax({
+                url: `${apiEndpoint}/${providerId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const provider = response.data;
+                        $('#providerId').val(provider.id);
+                        $('#name').val(provider.name);
+                        $('#description').val(provider.description || '');
+                        $('#cost').val(provider.cost || 0);
+                    } else {
+                        showErrorAlert('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr) {
+                    showModalError(xhr.responseJSON?.error || 'Error al cargar el proveedor');
+                }
+            });
+        }
+
+        function saveProvider() {
+            const form = $('#providerForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+
+            const providerId = $('#providerId').val();
+            const isEdit = !!providerId;
+
+            const providerData = {
+                name: $('#name').val().trim(),
+                description: $('#description').val().trim(),
+                type: 'Provider',
+                cost: parseFloat($('#cost').val()) || 0
+            };
+
+            const url = isEdit ? `${apiEndpoint}/${providerId}` : apiEndpoint;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            $('#saveProviderBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
+
+            $.ajax({
+                url,
+                type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(providerData),
+                success: function(response) {
+                    if (response.success) {
+                        $('#providerModal').modal('hide');
+                        dataTable.ajax.reload();
+                        showSuccessAlert(isEdit ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente');
+                    }
+                },
+                error: function(xhr) {
+                    const errorMessage = xhr.responseJSON?.error || 'Error al guardar el proveedor';
+                    showModalError(errorMessage);
+                },
+                complete: function() {
+                    $('#saveProviderBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>' + (isEdit ? 'Guardar Cambios' : 'Crear Proveedor'));
+                }
+            });
+        }
+
+        function manageImages(providerId, providerName) {
+            window.openExperienceImagesModal(providerId, providerName);
+        }
+
+        function toggleProviderStatus(providerId, currentStatus, providerName) {
+            const newStatus = !currentStatus;
+            const action = newStatus ? 'activar' : 'desactivar';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+            // If deactivating, check for dependencies first
+            if (!newStatus) {
+                $.ajax({
+                    url: `${apiEndpoint}/${providerId}/dependencies`,
+                    type: 'GET',
+                    success: function(depResponse) {
+                        if (depResponse.success && !depResponse.canModify) {
+                            // Has dependencies, show error modal
+                            showDependenciesModal(providerName, depResponse.dependencies, 'desactivar');
+                        } else {
+                            // No dependencies, show confirmation modal
+                            showToggleConfirmationModal(providerId, newStatus, action, actionTitle, btnClass, providerName);
+                        }
+                    },
+                    error: function(xhr) {
+                        showErrorAlert('Error al verificar dependencias');
+                    }
+                });
+            } else {
+                // Activating, no validation needed
+                showToggleConfirmationModal(providerId, newStatus, action, actionTitle, btnClass, providerName);
+            }
+        }
+
+        function showToggleConfirmationModal(providerId, newStatus, action, actionTitle, btnClass, providerName) {
+            const modalHtml = `
+                <div class="modal fade" id="confirmToggleProviderModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${actionTitle} Proveedor</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas ${action} el proveedor <strong>"${providerName}"</strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn ${btnClass}" id="confirmToggleProviderBtn">${actionTitle}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#confirmToggleProviderModal').remove();
+            $('body').append(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('confirmToggleProviderModal'));
+            modal.show();
+
+            $('#confirmToggleProviderBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${providerId}`,
+                    type: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showSuccessAlert(`Proveedor ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado del proveedor';
+                        showErrorAlert(error);
+                    }
+                });
+            });
+        }
+
+        function deleteProvider(providerId, providerName) {
+            // Check for dependencies first
+            $.ajax({
+                url: `${apiEndpoint}/${providerId}/dependencies`,
+                type: 'GET',
+                success: function(depResponse) {
+                    if (depResponse.success && !depResponse.canModify) {
+                        // Has dependencies, show error modal
+                        showDependenciesModal(providerName, depResponse.dependencies, 'eliminar');
+                    } else {
+                        // No dependencies, show confirmation modal
+                        showDeleteConfirmationModal(providerId, providerName);
+                    }
+                },
+                error: function(xhr) {
+                    showErrorAlert('Error al verificar dependencias');
+                }
+            });
+        }
+
+        function showDeleteConfirmationModal(providerId, providerName) {
+            const modalHtml = `
+                <div class="modal fade" id="confirmDeleteProviderModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white">Eliminar Proveedor</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas eliminar el proveedor <strong>"${providerName}"</strong>?</p>
+                                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeleteProviderBtn">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#confirmDeleteProviderModal').remove();
+            $('body').append(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteProviderModal'));
+            modal.show();
+
+            $('#confirmDeleteProviderBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${providerId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showSuccessAlert('Proveedor eliminado exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al eliminar el proveedor';
+                        showErrorAlert(error);
+                    }
+                });
+            });
+        }
+
+        function showDependenciesModal(itemName, dependencies, actionText) {
+            const dependenciesList = dependencies.map(dep =>
+                `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    ${dep.name}
+                    <span class="badge bg-primary">${dep.type === 'Experience' ? 'Experiencia' : 'Proveedor'}</span>
+                </li>`
+            ).join('');
+
+            const modalHtml = `
+                <div class="modal fade" id="dependenciesModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning">
+                                <h5 class="modal-title">
+                                    <i class="ti ti-alert-triangle me-2"></i>No se puede ${actionText}
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-warning" role="alert">
+                                    <i class="ti ti-alert-triangle me-2"></i>
+                                    No se puede ${actionText} <strong>"${itemName}"</strong>
+                                </div>
+                                <p>Este proveedor está incluido en <strong>${dependencies.length}</strong> experiencia(s):</p>
+                                <ul class="list-group mb-3">
+                                    ${dependenciesList}
+                                </ul>
+                                <p class="text-muted mb-0">
+                                    <i class="ti ti-info-circle me-1"></i>
+                                    Para continuar, primero actualiza estas experiencias y remueve la dependencia.
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="ti ti-x me-1"></i>Entendido
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#dependenciesModal').remove();
+            $('body').append(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('dependenciesModal'));
+            modal.show();
+        }
+
+        function showModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('providerModalAlerts');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('providers-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('providers-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>

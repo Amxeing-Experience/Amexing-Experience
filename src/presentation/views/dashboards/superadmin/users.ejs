@@ -1,0 +1,173 @@
+<%
+/**
+ * SuperAdmin Users Management Page
+ * Follows main dashboard layout structure with atomic design components
+ *
+ * Layout Structure (matching main dashboard):
+ * - Direct row/column structure (no body-wrapper)
+ * - Container-fluid from Flexy Bootstrap
+ * - Consistent spacing and alignment
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller (pageStyles & footerScripts)
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'superadmin';
+const currentPath = '/dashboard/superadmin/users';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold">Gestión de Usuarios</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/superadmin" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-users me-1"></i>Usuarios
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Users DataTable -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/datatable/users-table', {
+            tableId: 'users-table',
+            apiEndpoint: '/api/amexingusers',
+            userRole: currentUserRole,
+            showActions: true,
+            modalId: 'createUserModal'
+        }) %>
+    </div>
+</div>
+
+<!-- User Management Modals -->
+<!-- Create User Modal -->
+<!--rechargeData:  Used to inject JavaScript into a part of the component code.  -->
+<%- include('../../organisms/dashboard/modals/add-modal.ejs', {
+  data: {
+    addScripts: true,
+    modalId: 'createUserModal',
+    title: 'Agregar Usuario',
+    icon: 'user-plus',
+    description: 'Completa los datos para registrar un nuevo usuario.',
+    dataAction: 'ADD_USER',
+    primaryLabel: 'Agregar Usuario',
+    actionURL: '/api/amexingusers',
+    rechargeData: true,
+    inputs: [
+      {
+        id: 'firstName',
+        name: 'firstName',
+        label: 'Nombre(s)',
+        type: 'text',
+        required: true,
+        maxLength: 100,
+        placeholder: 'Ej. Juan Carlos',
+      },
+      {
+        id: 'lastName',
+        name: 'lastName',
+        label: 'Apellido(s)',
+        type: 'text',
+        required: true,
+        maxLength: 100,
+        placeholder: 'Ej. Pérez García',
+      },
+      {
+        id: 'userEmail',
+        name: 'email',
+        label: 'Correo electrónico',
+        type: 'email',
+        required: true,
+        maxLength: 120,
+        placeholder: 'Ej. user@example.com',
+      },
+      { 
+        id: 'password',
+        name: 'password',
+        label: 'Contraseña',
+        type: 'password',
+        required: true,
+        maxLength: 120,
+        placeholder: '*****',
+        helper: "La contraseña debe tener al menos 12 caracteres, una mayúscula, un número y un símbolo.",
+      },
+      { 
+        id: 'organizationId',
+        name: 'organizationId',
+        label: 'Organización',
+        type: 'text',
+        value: 'amexing',
+        required: true,
+        maxLength: 120,
+        placeholder: '',
+        hidden: true,
+      },
+      { 
+        id: 'userRole',
+        name: 'roleId',
+        label: 'Rol',
+        type: 'select',
+        required: true,
+        helper: 'Ej. admin, superadmin o employee_amexing',
+        multiple: '',
+        options: [
+          { dataName: '',
+            value: '',
+            label: "Ninguno",
+          }
+        ]
+      },
+    ],
+    headerStyle: 'background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%);'
+  }
+}) %>
+
+<!-- Edit User Modal -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editUserModalLabel">
+                    <i class="ti ti-edit me-2"></i>Editar Usuario
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Edit user form will go here -->
+                <p class="text-muted">Formulario de edición de usuario pendiente de implementar</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View User Modal -->
+<div class="modal fade" id="viewUserModal" tabindex="-1" aria-labelledby="viewUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewUserModalLabel">
+                    <i class="ti ti-eye me-2"></i>Detalles de Usuario
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- User details will go here -->
+                <p class="text-muted">Vista de detalles de usuario pendiente de implementar</p>
+            </div>
+        </div>
+    </div>
+</div>
+

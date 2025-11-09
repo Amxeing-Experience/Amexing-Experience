@@ -1,0 +1,104 @@
+#!/bin/bash
+# post-merge hook for AmexingWeb PCI DSS Compliance
+# Generated automatically by scripts/setup-git-hooks.js
+# 
+# This hook enforces security and compliance requirements
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+log_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+log_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+log_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# Check if we're in the right directory
+if [ ! -f "package.json" ]; then
+    log_error "Not in project root directory"
+    exit 1
+fi
+
+
+log_info "Running post-merge automation..."
+
+# 1. Check for dependency changes and notify user
+PACKAGE_CHANGED=false
+YARN_LOCK_CHANGED=false
+
+if git diff HEAD~1 --name-only | grep -q "^package.json$"; then
+    PACKAGE_CHANGED=true
+fi
+
+if git diff HEAD~1 --name-only | grep -q "^yarn.lock$"; then
+    YARN_LOCK_CHANGED=true
+fi
+
+if [ "$PACKAGE_CHANGED" = true ] || [ "$YARN_LOCK_CHANGED" = true ]; then
+    echo ""
+    log_warning "Se detectaron cambios en dependencias"
+    
+    if [ "$PACKAGE_CHANGED" = true ]; then
+        log_info "📦 package.json modificado - pueden haber nuevas dependencias"
+    fi
+    
+    if [ "$YARN_LOCK_CHANGED" = true ]; then
+        log_info "🔒 yarn.lock modificado - versiones actualizadas"
+    fi
+    
+    echo ""
+    log_info "🎯 Comandos recomendados:"
+    echo "  1. yarn deps:update-check    # Verificar qué cambió"
+    echo "  2. yarn install              # Actualizar dependencias" 
+    echo "  3. yarn after-pull           # Setup completo automático"
+    echo "  4. yarn dev                  # Probar que todo funciona"
+    
+    # Check for critical packages
+    if [ "$PACKAGE_CHANGED" = true ]; then
+        if grep -q "parse-server\|parse-dashboard" package.json; then
+            log_warning "Posibles actualizaciones críticas detectadas (Parse Server/Dashboard)"
+            log_info "💡 Ejecuta: yarn after-pull (incluye setup completo)"
+        fi
+    fi
+    echo ""
+fi
+
+# 2. Update changelog draft if package.json changed
+if git diff HEAD~1 package.json | grep '"version"' >/dev/null; then
+    log_info "Version change detected. Updating changelog draft..."
+    if command -v yarn >/dev/null 2>&1; then
+        yarn changelog:unreleased
+        log_success "Changelog draft updated"
+    fi
+fi
+
+# 2. Update compliance tracking if security files changed
+security_files_changed=$(git diff HEAD~1 --name-only | grep -E "(security|auth|encrypt|compliance)" | wc -l)
+if [ "$security_files_changed" -gt 0 ]; then
+    log_info "Security-related files changed. Consider updating compliance tracking."
+fi
+
+# 3. Notify about security merges
+if git log -1 --pretty=format:"%s" | grep -E "^(security|hotfix)" >/dev/null; then
+    log_warning "Security-related merge detected!"
+    log_info "Consider notifying security team and updating incident logs."
+fi
+
+log_success "Post-merge automation completed!"

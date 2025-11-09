@@ -1,0 +1,109 @@
+<%
+/**
+ * SuperAdmin Roles Management Page
+ * Follows main dashboard layout structure with atomic design components
+ *
+ * Layout Structure (matching main dashboard):
+ * - Direct row/column structure (no body-wrapper)
+ * - Container-fluid from Flexy Bootstrap
+ * - Consistent spacing and alignment
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller (pageStyles & footerScripts)
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'superadmin';
+const currentPath = '/dashboard/superadmin/roles';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold">Gestión de Roles del Sistema</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/superadmin" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-shield me-1"></i>Roles
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="text-muted">
+                <small class="d-block">Total roles del sistema</small>
+                <strong id="total-roles-count">-</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Roles DataTable -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/datatable/roles-table', {
+            tableId: 'roles-table',
+            apiEndpoint: '/api/roles',
+            userRole: currentUserRole,
+            showActions: true
+        }) %>
+    </div>
+</div>
+
+<!-- View Role Details Modal -->
+<div class="modal fade" id="viewRoleModal" tabindex="-1" aria-labelledby="viewRoleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewRoleModalLabel">
+                    <i class="ti ti-shield me-2"></i>Detalles del Rol
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Role details will go here -->
+                <p class="text-muted">Vista de detalles del rol pendiente de implementar</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Role Modal (Future Implementation) -->
+<div class="modal fade" id="editRoleModal" tabindex="-1" aria-labelledby="editRoleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editRoleModalLabel">
+                    <i class="ti ti-edit me-2"></i>Editar Rol
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Edit role form will go here -->
+                <div class="alert alert-info">
+                    <i class="ti ti-info-circle me-2"></i>
+                    <strong>Próximamente:</strong> La funcionalidad de edición de roles estará disponible en una futura actualización.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page-specific JavaScript -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update total count when table loads (listen to custom event)
+        document.addEventListener('rolesTableLoaded', function(e) {
+            const count = e.detail?.count || 0;
+            const countEl = document.getElementById('total-roles-count');
+            if (countEl) {
+                countEl.textContent = count;
+            }
+        });
+    });
+</script>

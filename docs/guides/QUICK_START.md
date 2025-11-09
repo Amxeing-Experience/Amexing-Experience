@@ -28,8 +28,8 @@ git clone <your-repo-url>
 cd amexing-web
 
 # Setup environment configuration
-cp .env.example .env
-# Edit .env with your configuration (see Environment section below)
+cp environments/.env.example environments/.env.development
+# Edit environments/.env.development with your configuration (see Environment section below)
 ```
 
 ### 2. Install Dependencies
@@ -42,6 +42,29 @@ yarn install
 # - Install all required packages
 # - Setup git hooks via postinstall script
 ```
+
+### 🔄 ¿Actualizando el proyecto existente?
+
+Si ya tienes el proyecto y acabas de hacer `git pull`, sigue estos pasos:
+
+```bash
+# 1. Verificar si hay cambios en dependencias
+yarn deps:update-check
+
+# 2. Si aparecen cambios importantes, actualizar:
+yarn install
+
+# 3. Para actualizaciones completas (Parse Server, etc.):
+yarn after-pull
+
+# 4. Verificar que todo funciona:
+yarn dev
+```
+
+**⚠️ Actualizaciones Recientes Importantes:**
+- **Parse Server 8.2.4** (desde 7.x) - Cambios significativos en API
+- **Node.js 24** - Usa `--experimental-vm-modules` automáticamente
+- **Security Resolutions** - 86% reducción de vulnerabilidades
 
 ### 3. Git Hooks Setup (PCI DSS Compliance)
 
@@ -140,7 +163,6 @@ Once the application is running:
 | Service | URL | Description |
 |---------|-----|-------------|
 | **Main Application** | http://localhost:1337 | Web interface |
-| **Parse Dashboard** | http://localhost:4040 | Database management |
 | **API Documentation** | http://localhost:1337/docs | Interactive API docs |
 | **Health Check** | http://localhost:1337/health | System status |
 | **Metrics** | http://localhost:1337/metrics | System metrics |
@@ -199,7 +221,6 @@ yarn scripts:help security          # Security-related scripts
 
 # Development
 yarn dev                            # Start development server
-yarn dashboard                      # Open Parse Dashboard
 
 # Testing
 yarn test                           # Run all tests
@@ -222,7 +243,6 @@ When running `yarn dev`:
 - ✅ **Hot reload** with nodemon
 - ✅ **Debug logging** enabled
 - ✅ **Source maps** for debugging
-- ✅ **Development-optimized** Parse Dashboard access
 - ✅ **Comprehensive error reporting**
 
 ---

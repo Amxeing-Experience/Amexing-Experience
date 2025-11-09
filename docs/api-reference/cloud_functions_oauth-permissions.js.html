@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: cloud/functions/oauth-permissions.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: cloud/functions/oauth-permissions.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * OAuth Permissions Cloud Functions
+ * Provides comprehensive permission management functionality for OAuth system.
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @created Sprint 03 - OAuth Permission Management
+ */
+
+const Parse = require('parse/node');
+const OAuthPermissionService = require('../../application/services/OAuthPermissionService');
+const PermissionInheritanceService = require('../../application/services/PermissionInheritanceService');
+const PermissionContextService = require('../../application/services/PermissionContextService');
+const PermissionDelegationService = require('../../application/services/PermissionDelegationService');
+const { PermissionAuditService } = require('../../application/services/PermissionAuditService');
+const logger = require('../../infrastructure/logger');
+
+/**
+ * Gets user permission inheritance status
+ * Endpoint: GET /functions/getUserPermissionInheritance
+ * Access: User can view own permissions, admins can view any.
+ * @param request
+ */
+const getUserPermissionInheritance = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const { userId = request.user.id } = request.params;
+
+    // Check authorization
+    if (userId !== request.user.id) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
+        throw new Parse.Error(
+          Parse.Error.OPERATION_FORBIDDEN,
+          'Cannot view other users\' permission inheritance'
+        );
+      }
+    }
+
+    const inheritance = await PermissionInheritanceService.getInheritanceStatus(userId);
+
+    logger.logSecurityEvent('PERMISSION_INHERITANCE_VIEWED', request.user.id, {
+      targetUserId: userId,
+      viewerRole: request.user.get('role'),
+      hasInheritance: inheritance.hasInheritance,
+    });
+
+    return {
+      success: true,
+      userId,
+      inheritance,
+    };
+  } catch (error) {
+    logger.error('Error getting user permission inheritance:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets available contexts for a user
+ * Endpoint: GET /functions/getAvailableContexts
+ * Access: User can view own contexts.
+ * @param request
+ */
+const getAvailableContexts = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const { userId = request.user.id } = request.params;
+
+    // Only allow users to view their own contexts unless admin
+    if (userId !== request.user.id) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin'].includes(userRole)) {
+        throw new Parse.Error(
+          Parse.Error.OPERATION_FORBIDDEN,
+          'Cannot view other users\' contexts'
+        );
+      }
+    }
+
+    const contexts = await PermissionContextService.getAvailableContexts(userId);
+
+    return {
+      success: true,
+      userId,
+      contexts,
+      count: contexts.length,
+    };
+  } catch (error) {
+    logger.error('Error getting available contexts:', error);
+    throw error;
+  }
+};
+
+/**
+ * Switches user to a specific permission context
+ * Endpoint: POST /functions/switchPermissionContext
+ * Access: User can switch own context.
+ * @param request
+ */
+const switchPermissionContext = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const { contextId } = request.params;
+    const userId = request.user.id;
+    const sessionToken = request.user.getSessionToken();
+
+    if (!contextId) {
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'contextId is required');
+    }
+
+    const switchResult = await PermissionContextService.switchToContext(userId, contextId, sessionToken);
+
+    // Record audit event
+    await PermissionAuditService.recordPermissionAudit({
+      userId,
+      action: 'CONTEXT_SWITCHED',
+      permission: 'context_switch',
+      performedBy: userId,
+      reason: `Switched to context: ${contextId}`,
+      context: contextId,
+      metadata: {
+        fromContext: switchResult.previousContext,
+        toContext: contextId,
+        sessionId: sessionToken,
+      },
+    });
+
+    return {
+      success: true,
+      ...switchResult,
+    };
+  } catch (error) {
+    logger.error('Error switching permission context:', error);
+    throw error;
+  }
+};
+
+/**
+ * Creates permission delegation from manager to employee
+ * Endpoint: POST /functions/createPermissionDelegation
+ * Access: Requires manager role or higher.
+ * @param request
+ */
+const createPermissionDelegation = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['manager', 'admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Insufficient permissions to create delegation'
+      );
+    }
+
+    const {
+      employeeId,
+      permissions,
+      delegationType,
+      duration,
+      reason,
+      context,
+    } = request.params;
+
+    // Validate required parameters
+    if (!employeeId || !permissions || !delegationType || !reason) {
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'Missing required parameters: employeeId, permissions, delegationType, reason'
+      );
+    }
+
+    const managerId = request.user.id;
+
+    const delegationResult = await PermissionDelegationService.createDelegation({
+      managerId,
+      employeeId,
+      permissions: Array.isArray(permissions) ? permissions : [permissions],
+      delegationType,
+      duration,
+      reason,
+      context,
+    });
+
+    // Record audit event
+    await PermissionAuditService.recordPermissionAudit({
+      userId: employeeId,
+      action: 'PERMISSION_DELEGATED',
+      permission: permissions.join(','),
+      performedBy: managerId,
+      reason,
+      context,
+      metadata: {
+        delegationType,
+        duration,
+        delegationId: delegationResult.delegationId,
+      },
+    });
+
+    return {
+      success: true,
+      ...delegationResult,
+    };
+  } catch (error) {
+    logger.error('Error creating permission delegation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Revokes permission delegation
+ * Endpoint: POST /functions/revokePermissionDelegation
+ * Access: Original manager or admin.
+ * @param request
+ */
+const revokePermissionDelegation = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const { delegationId, reason } = request.params;
+
+    if (!delegationId || !reason) {
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'Missing required parameters: delegationId, reason'
+      );
+    }
+
+    const revokedBy = request.user.id;
+
+    const revocationResult = await PermissionDelegationService.revokeDelegation(delegationId, revokedBy, reason);
+
+    return {
+      success: true,
+      ...revocationResult,
+      message: 'Permission delegation revoked successfully',
+    };
+  } catch (error) {
+    logger.error('Error revoking permission delegation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Creates emergency permission elevation
+ * Endpoint: POST /functions/createEmergencyElevation
+ * Access: Requires admin role.
+ * @param request
+ */
+const createEmergencyElevation = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Admin access required for emergency elevation'
+      );
+    }
+
+    const {
+      userId,
+      permissions,
+      reason,
+      duration = 4 * 60 * 60 * 1000, // 4 hours default
+      context = 'emergency',
+    } = request.params;
+
+    if (!userId || !permissions || !reason) {
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'Missing required parameters: userId, permissions, reason'
+      );
+    }
+
+    const elevatedBy = request.user.id;
+
+    const elevationResult = await PermissionDelegationService.createEmergencyElevation({
+      userId,
+      permissions: Array.isArray(permissions) ? permissions : [permissions],
+      reason,
+      duration,
+      elevatedBy,
+      context,
+    });
+
+    // Record critical audit event
+    await PermissionAuditService.recordPermissionAudit({
+      userId,
+      action: 'EMERGENCY_PERMISSION',
+      permission: permissions.join(','),
+      performedBy: elevatedBy,
+      reason,
+      context,
+      severity: 'critical',
+      metadata: {
+        duration,
+        expiresAt: elevationResult.expiresAt,
+      },
+    });
+
+    return {
+      success: true,
+      ...elevationResult,
+      message: 'Emergency permission elevation created',
+    };
+  } catch (error) {
+    logger.error('Error creating emergency elevation:', error);
+    throw error;
+  }
+};
+
+/**
+ * Creates individual permission override
+ * Endpoint: POST /functions/createPermissionOverride
+ * Access: Requires admin role.
+ * @param request
+ */
+const createPermissionOverride = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Admin access required for permission overrides'
+      );
+    }
+
+    const {
+      userId,
+      overrideType,
+      permission,
+      reason,
+      context,
+      expiresAt,
+    } = request.params;
+
+    if (!userId || !overrideType || !permission || !reason) {
+      throw new Parse.Error(
+        Parse.Error.INVALID_QUERY,
+        'Missing required parameters: userId, overrideType, permission, reason'
+      );
+    }
+
+    const grantedBy = request.user.id;
+
+    const override = await PermissionInheritanceService.createPermissionOverride({
+      userId,
+      type: overrideType,
+      permission,
+      reason,
+      grantedBy,
+      context,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+    });
+
+    // Record audit event
+    await PermissionAuditService.recordPermissionAudit({
+      userId,
+      action: 'OVERRIDE_CREATED',
+      permission,
+      performedBy: grantedBy,
+      reason,
+      context,
+      metadata: {
+        overrideType,
+        overrideId: override.id,
+        expiresAt,
+      },
+    });
+
+    return {
+      success: true,
+      overrideId: override.id,
+      userId,
+      overrideType,
+      permission,
+      expiresAt,
+      message: 'Permission override created successfully',
+    };
+  } catch (error) {
+    logger.error('Error creating permission override:', error);
+    throw error;
+  }
+};
+
+/**
+ * Checks if user has specific permission
+ * Endpoint: GET /functions/checkUserPermission
+ * Access: User can check own permissions, admins can check any.
+ * @param request
+ */
+const checkUserPermission = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const {
+      userId = request.user.id,
+      permission,
+      context,
+    } = request.params;
+
+    if (!permission) {
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'permission parameter is required');
+    }
+
+    // Check authorization
+    if (userId !== request.user.id) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
+        throw new Parse.Error(
+          Parse.Error.OPERATION_FORBIDDEN,
+          'Cannot check other users\' permissions'
+        );
+      }
+    }
+
+    const hasPermission = await OAuthPermissionService.hasPermission(userId, permission, context);
+
+    return {
+      success: true,
+      userId,
+      permission,
+      context: context || null,
+      hasPermission,
+      checkedAt: new Date(),
+    };
+  } catch (error) {
+    logger.error('Error checking user permission:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets active delegations for a manager
+ * Endpoint: GET /functions/getActiveDelegations
+ * Access: Manager can view own delegations.
+ * @param request
+ */
+const getActiveDelegations = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const { managerId = request.user.id } = request.params;
+
+    // Check authorization
+    if (managerId !== request.user.id) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin'].includes(userRole)) {
+        throw new Parse.Error(
+          Parse.Error.OPERATION_FORBIDDEN,
+          'Cannot view other managers\' delegations'
+        );
+      }
+    }
+
+    const delegations = await PermissionDelegationService.getActiveDelegations(managerId);
+
+    return {
+      success: true,
+      managerId,
+      delegations,
+      count: delegations.length,
+    };
+  } catch (error) {
+    logger.error('Error getting active delegations:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets delegated permissions for an employee
+ * Endpoint: GET /functions/getDelegatedPermissions
+ * Access: Employee can view own delegated permissions.
+ * @param request
+ */
+const getDelegatedPermissions = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const { employeeId = request.user.id } = request.params;
+
+    // Check authorization
+    if (employeeId !== request.user.id) {
+      const userRole = request.user.get('role');
+      if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
+        throw new Parse.Error(
+          Parse.Error.OPERATION_FORBIDDEN,
+          'Cannot view other employees\' delegated permissions'
+        );
+      }
+    }
+
+    const delegations = await PermissionDelegationService.getDelegatedPermissions(employeeId);
+
+    return {
+      success: true,
+      employeeId,
+      delegations,
+      count: delegations.length,
+    };
+  } catch (error) {
+    logger.error('Error getting delegated permissions:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets permission audit report
+ * Endpoint: GET /functions/getPermissionAuditReport
+ * Access: Requires admin role.
+ * @param request
+ */
+const getPermissionAuditReport = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Admin access required for audit reports'
+      );
+    }
+
+    const {
+      startDate,
+      endDate,
+      userId,
+      complianceFramework = 'PCI_DSS',
+      includeMetadata = false,
+      format = 'summary',
+    } = request.params;
+
+    const report = await PermissionAuditService.generateComplianceReport({
+      startDate,
+      endDate,
+      userId,
+      complianceFramework,
+      includeMetadata,
+      format,
+    });
+
+    logger.logSecurityEvent('PERMISSION_AUDIT_REPORT_ACCESSED', request.user.id, {
+      framework: complianceFramework,
+      format,
+      recordCount: report.summary.totalRecords,
+      requestedBy: request.user.get('username'),
+    });
+
+    return {
+      success: true,
+      report,
+    };
+  } catch (error) {
+    logger.error('Error generating permission audit report:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets permission audit statistics
+ * Endpoint: GET /functions/getPermissionAuditStats
+ * Access: Requires admin role.
+ * @param request
+ */
+const getPermissionAuditStats = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Admin access required for audit statistics'
+      );
+    }
+
+    const {
+      timeFrame = '30d',
+      complianceFramework = 'PCI_DSS',
+    } = request.params;
+
+    const stats = await PermissionAuditService.getAuditStatistics({
+      timeFrame,
+      complianceFramework,
+    });
+
+    return {
+      success: true,
+      timeFrame,
+      complianceFramework,
+      stats,
+    };
+  } catch (error) {
+    logger.error('Error getting permission audit statistics:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets all available permissions in the system
+ * Endpoint: GET /functions/getAvailablePermissions
+ * Access: Requires manager role or higher.
+ * @param request
+ */
+const getAvailablePermissions = async (request) => {
+  try {
+    if (!request.user) {
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
+    }
+
+    const userRole = request.user.get('role');
+    if (!['manager', 'admin', 'superadmin'].includes(userRole)) {
+      throw new Parse.Error(
+        Parse.Error.OPERATION_FORBIDDEN,
+        'Manager access required to view available permissions'
+      );
+    }
+
+    const { provider } = request.params;
+
+    let permissions;
+    if (provider) {
+      permissions = OAuthPermissionService.getProviderPermissionMappings(provider);
+    } else {
+      permissions = OAuthPermissionService.getAllAvailablePermissions();
+    }
+
+    return {
+      success: true,
+      permissions,
+      provider: provider || 'all',
+      count: Array.isArray(permissions) ? permissions.length : Object.keys(permissions).length,
+    };
+  } catch (error) {
+    logger.error('Error getting available permissions:', error);
+    throw error;
+  }
+};
+
+module.exports = {
+  getUserPermissionInheritance,
+  getAvailableContexts,
+  switchPermissionContext,
+  createPermissionDelegation,
+  revokePermissionDelegation,
+  createEmergencyElevation,
+  createPermissionOverride,
+  checkUserPermission,
+  getActiveDelegations,
+  getDelegatedPermissions,
+  getPermissionAuditReport,
+  getPermissionAuditStats,
+  getAvailablePermissions,
+};
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

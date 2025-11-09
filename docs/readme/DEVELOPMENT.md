@@ -21,7 +21,7 @@ open http://localhost:1337
 # Development
 yarn dev              # Start with nodemon
 yarn start            # Production mode
-yarn dashboard        # Parse Dashboard (port 4040)
+
 
 # Code Quality
 yarn lint             # Check code style
@@ -89,7 +89,7 @@ DATABASE_URI=mongodb://localhost:27017/amexingdb
 ### Parse Server Issues
 ```bash
 # Verify Parse Server configuration
-yarn dashboard
+
 ```
 
 For more troubleshooting: [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)

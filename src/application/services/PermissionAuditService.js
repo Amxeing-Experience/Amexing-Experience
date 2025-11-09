@@ -1,0 +1,823 @@
+/* eslint-disable max-lines */
+/**
+ * Permission Audit Service - Comprehensive permission audit and compliance tracking
+ * Implements OAUTH-3-06: Auditoría Completa Cambios Permisos OAuth.
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 1.0.0
+ * @example
+ * // Service method usage
+ * const result = await permissionauditservice.require({ 'parse/node': 'example' });
+ * // Returns: { success: true, data: {...} }
+ */
+
+const Parse = require('parse/node');
+const logger = require('../../infrastructure/logger');
+
+/**
+ * Permission Audit Service - Handles audit logging for permission changes and OAuth activities.
+ * Provides comprehensive audit trails for PCI DSS compliance and security monitoring.
+ * @class PermissionAuditService
+ * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
+ * const auditService = new PermissionAuditService();
+ * await auditService.recordPermissionAudit({ userId: '123' , action: 'oauth_login' });
+ */
+class PermissionAuditService {
+  constructor() {
+    // Audit event types
+    this.auditEventTypes = {
+      PERMISSION_GRANTED: {
+        severity: 'medium',
+        category: 'permission_change',
+        requiresReview: false,
+      },
+      PERMISSION_REVOKED: {
+        severity: 'medium',
+        category: 'permission_change',
+        requiresReview: true,
+      },
+      PERMISSION_INHERITED: {
+        severity: 'low',
+        category: 'automated',
+        requiresReview: false,
+      },
+      PERMISSION_DELEGATED: {
+        severity: 'medium',
+        category: 'delegation',
+        requiresReview: true,
+      },
+      PERMISSION_ELEVATION: {
+        severity: 'high',
+        category: 'elevation',
+        requiresReview: true,
+      },
+      EMERGENCY_PERMISSION: {
+        severity: 'critical',
+        category: 'emergency',
+        requiresReview: true,
+      },
+      CONTEXT_SWITCHED: {
+        severity: 'low',
+        category: 'context',
+        requiresReview: false,
+      },
+      DELEGATION_EXPIRED: {
+        severity: 'low',
+        category: 'automated',
+        requiresReview: false,
+      },
+      OVERRIDE_CREATED: {
+        severity: 'medium',
+        category: 'override',
+        requiresReview: true,
+      },
+    };
+
+    // Compliance frameworks
+    this.complianceFrameworks = {
+      PCI_DSS: {
+        name: 'PCI DSS Level 1',
+        requiredFields: ['userId', 'permission', 'action', 'timestamp', 'performedBy', 'reason'],
+        retentionPeriod: 365 * 24 * 60 * 60 * 1000, // 1 year
+        encryptionRequired: true,
+      },
+      SOX: {
+        name: 'Sarbanes-Oxley Act',
+        requiredFields: ['userId', 'permission', 'action', 'timestamp', 'performedBy', 'businessJustification'],
+        retentionPeriod: 7 * 365 * 24 * 60 * 60 * 1000, // 7 years
+        encryptionRequired: true,
+      },
+      GDPR: {
+        name: 'General Data Protection Regulation',
+        requiredFields: ['userId', 'action', 'timestamp', 'legalBasis'],
+        retentionPeriod: 6 * 365 * 24 * 60 * 60 * 1000, // 6 years
+        encryptionRequired: true,
+      },
+    };
+  }
+
+  /**
+   * Records a permission audit event.
+   * @param {object} eventData - Audit event data.
+   * @returns {Promise<Parse.Object>} - Created audit record.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.recordPermissionAudit({ eventData: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const auditRecord = await service.recordPermissionAudit({ userId: 'user123' , action: 'PERMISSION_GRANTED' });
+   */
+  async recordPermissionAudit(eventData) {
+    try {
+      const {
+        userId,
+        action,
+        permission,
+        performedBy,
+        reason,
+        context,
+        metadata = {},
+        complianceFramework = 'PCI_DSS',
+        severity,
+        businessJustification,
+      } = eventData;
+
+      // Validate required fields based on compliance framework
+      this.validateComplianceFields(eventData, complianceFramework);
+
+      // Determine event severity if not provided
+      const eventSeverity = severity || this.determineEventSeverity(action);
+
+      // Create audit record
+      const auditRecord = await this.createAuditRecord({
+        userId,
+        action,
+        permission,
+        performedBy,
+        reason,
+        context,
+        metadata,
+        severity: eventSeverity,
+        complianceFramework,
+        businessJustification,
+        requiresReview: this.requiresReview(action),
+        timestamp: new Date(),
+      });
+
+      // Create compliance-specific records if required
+      if (complianceFramework !== 'PCI_DSS') {
+        await this.createComplianceRecord(auditRecord, complianceFramework);
+      }
+
+      // Check if immediate review is required
+      if (eventSeverity === 'critical' || eventSeverity === 'high') {
+        await this.triggerImmediateReview(auditRecord);
+      }
+
+      logger.logSecurityEvent('PERMISSION_AUDIT_RECORDED', userId, {
+        auditId: auditRecord.id,
+        action,
+        permission,
+        performedBy,
+        severity: eventSeverity,
+        complianceFramework,
+      });
+
+      return auditRecord;
+    } catch (error) {
+      logger.error('Error recording permission audit:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Validates compliance fields for audit record.
+   * @param {object} eventData - Event data to validate.
+   * @param {string} framework - Compliance framework.
+   * @returns {void} - No return value Throws error if validation fails.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.validateComplianceFields({ eventData: 'example', framework: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * service.validateComplianceFields(eventData, 'PCI_DSS');
+   */
+  validateComplianceFields(eventData, framework) {
+    const frameworkConfig = this.complianceFrameworks[framework];
+    if (!frameworkConfig) {
+      throw new Error(`Unknown compliance framework: ${framework}`);
+    }
+
+    const { requiredFields } = frameworkConfig;
+    const missingFields = [];
+
+    for (const field of requiredFields) {
+      if (!eventData[field]) {
+        missingFields.push(field);
+      }
+    }
+
+    if (missingFields.length > 0) {
+      throw new Error(`Missing required fields for ${framework}: ${missingFields.join(', ')}`);
+    }
+  }
+
+  /**
+   * Determines event severity based on action.
+   * @param {string} action - Action performed.
+   * @returns {string} - Operation result Severity level.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.determineEventSeverity({ action: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const severity = service.determineEventSeverity('PERMISSION_ELEVATION');
+   */
+  determineEventSeverity(action) {
+    const eventConfig = this.auditEventTypes[action];
+    return eventConfig ? eventConfig.severity : 'medium';
+  }
+
+  /**
+   * Checks if action requires manual review.
+   * @param {string} action - Action performed.
+   * @returns {boolean} - Boolean result True if requires review.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.requiresReview({ action: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const needsReview = service.requiresReview('EMERGENCY_PERMISSION');
+   */
+  requiresReview(action) {
+    const eventConfig = this.auditEventTypes[action];
+    return eventConfig ? eventConfig.requiresReview : true;
+  }
+
+  /**
+   * Creates audit record in database.
+   * @param {object} data - Audit data.
+   * @returns {Promise<Parse.Object>} - Created audit record.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.createAuditRecord({ data: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const record = await service.createAuditRecord(auditData);
+   */
+  async createAuditRecord(data) {
+    try {
+      const AuditClass = Parse.Object.extend('PermissionAudit');
+      const audit = new AuditClass();
+
+      audit.set('userId', data.userId);
+      audit.set('action', data.action);
+      audit.set('permission', data.permission);
+      audit.set('performedBy', data.performedBy);
+      audit.set('reason', data.reason);
+      audit.set('context', data.context);
+      audit.set('metadata', this.encryptSensitiveData(data.metadata));
+      audit.set('severity', data.severity);
+      audit.set('complianceFramework', data.complianceFramework);
+      audit.set('businessJustification', data.businessJustification);
+      audit.set('requiresReview', data.requiresReview);
+      audit.set('timestamp', data.timestamp);
+      audit.set('reviewed', false);
+      audit.set('active', true);
+
+      // Add PCI DSS specific fields
+      audit.set('pciRelevant', true);
+      audit.set('dataClassification', this.classifyDataSensitivity(data));
+      audit.set('retentionDate', this.calculateRetentionDate(data.complianceFramework));
+
+      await audit.save(null, { useMasterKey: true });
+
+      return audit;
+    } catch (error) {
+      logger.error('Error creating audit record:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Encrypts sensitive data in metadata.
+   * @param {object} metadata - Metadata to encrypt.
+   * @returns {string} - Operation result Encrypted metadata.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.encryptSensitiveData({ metadata: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const encrypted = service.encryptSensitiveData({ userAgent: 'browser', ip: '192.168.1.1' });
+   */
+  encryptSensitiveData(metadata) {
+    try {
+      const crypto = require('crypto');
+      const algorithm = 'aes-256-gcm';
+      const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+      const iv = crypto.randomBytes(16);
+
+      const cipher = crypto.createCipheriv(algorithm, key, iv);
+      let encrypted = cipher.update(JSON.stringify(metadata), 'utf8', 'hex');
+      encrypted += cipher.final('hex');
+
+      const authTag = cipher.getAuthTag();
+
+      return JSON.stringify({
+        encrypted,
+        iv: iv.toString('hex'),
+        authTag: authTag.toString('hex'),
+      });
+    } catch (error) {
+      logger.error('Error encrypting audit metadata:', error);
+      return JSON.stringify(metadata); // Fallback to unencrypted
+    }
+  }
+
+  /**
+   * Classifies data sensitivity level.
+   * @param {object} data - Audit data.
+   * @returns {string} - Operation result Sensitivity classification.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.classifyDataSensitivity({ data: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * const service = new PermissionAuditService();
+   * const classification = service.classifyDataSensitivity(auditData);
+   */
+  classifyDataSensitivity(data) {
+    // High sensitivity permissions
+    const highSensitivityPermissions = [
+      'admin_full',
+      'system_admin',
+      'financial_access',
+      'compliance_admin',
+      'user_management',
+    ];
+
+    if (highSensitivityPermissions.includes(data.permission)) {
+      return 'high';
+    }
+
+    if (data.action === 'EMERGENCY_PERMISSION' || data.severity === 'critical') {
+      return 'high';
+    }
+
+    return 'medium';
+  }
+
+  /**
+   * Calculates retention date based on compliance framework.
+   * @param {string} framework - Compliance framework.
+   * @returns {Date} - Operation result Retention date.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.calculateRetentionDate({ framework: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const retentionDate = service.calculateRetentionDate('PCI_DSS');
+   */
+  calculateRetentionDate(framework) {
+    const frameworkConfig = this.complianceFrameworks[framework];
+    const retentionPeriod = frameworkConfig ? frameworkConfig.retentionPeriod : 365 * 24 * 60 * 60 * 1000;
+
+    return new Date(Date.now() + retentionPeriod);
+  }
+
+  /**
+   * Creates compliance-specific record.
+   * @param {Parse.Object} auditRecord - Main audit record.
+   * @param {string} framework - Compliance framework.
+   * @returns {Promise<void>} - Completes when compliance record is created.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.createComplianceRecord({ auditRecord: 'example', framework: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * await service.createComplianceRecord(auditRecord, 'SOX');
+   */
+  async createComplianceRecord(auditRecord, framework) {
+    try {
+      const ComplianceClass = Parse.Object.extend('ComplianceAudit');
+      const compliance = new ComplianceClass();
+
+      compliance.set('auditRecordId', auditRecord.id);
+      compliance.set('framework', framework);
+      compliance.set('frameworkVersion', this.getFrameworkVersion(framework));
+      compliance.set('complianceStatus', 'pending');
+      compliance.set('createdAt', new Date());
+
+      await compliance.save(null, { useMasterKey: true });
+    } catch (error) {
+      logger.error('Error creating compliance record:', error);
+    }
+  }
+
+  /**
+   * Gets framework version.
+   * @param {string} framework - Compliance framework.
+   * @returns {string} - Operation result Framework version.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.getFrameworkVersion({ framework: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const version = service.getFrameworkVersion('GDPR');
+   */
+  getFrameworkVersion(framework) {
+    const versions = {
+      PCI_DSS: '4.0',
+      SOX: '2002',
+      GDPR: '2018',
+    };
+    return versions[framework] || '1.0';
+  }
+
+  /**
+   * Triggers immediate review for critical events.
+   * @param {Parse.Object} auditRecord - Audit record.
+   * @returns {Promise<void>} - Completes when review is triggered.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.triggerImmediateReview({ auditRecord: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * await service.triggerImmediateReview(criticalAuditRecord);
+   */
+  async triggerImmediateReview(auditRecord) {
+    try {
+      // Create review task
+      const ReviewTaskClass = Parse.Object.extend('AuditReviewTask');
+      const reviewTask = new ReviewTaskClass();
+
+      reviewTask.set('auditRecordId', auditRecord.id);
+      reviewTask.set('priority', 'immediate');
+      reviewTask.set('assignedTo', 'security_team');
+      reviewTask.set('dueDate', new Date(Date.now() + 60 * 60 * 1000)); // 1 hour
+      reviewTask.set('status', 'pending');
+      reviewTask.set('createdAt', new Date());
+
+      await reviewTask.save(null, { useMasterKey: true });
+
+      // Send notification (would integrate with notification system)
+      logger.logSecurityEvent('IMMEDIATE_REVIEW_TRIGGERED', auditRecord.get('userId'), {
+        auditId: auditRecord.id,
+        reviewTaskId: reviewTask.id,
+        severity: auditRecord.get('severity'),
+        action: auditRecord.get('action'),
+      });
+    } catch (error) {
+      logger.error('Error triggering immediate review:', error);
+    }
+  }
+
+  /**
+   * Generates compliance audit report.
+   * @param {object} reportParams - Report parameters.
+   * @returns {Promise<object>} - Audit report.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.generateComplianceReport({ reportParams: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const report = await service.generateComplianceReport({ startDate: '2024-01-01', endDate: '2024-12-31' });
+   */
+  async generateComplianceReport(reportParams) {
+    try {
+      const {
+        startDate,
+        endDate,
+        userId,
+        complianceFramework = 'PCI_DSS',
+        includeMetadata = false,
+        format = 'summary',
+      } = reportParams;
+
+      // Build query
+      const auditQuery = new Parse.Query('PermissionAudit');
+
+      if (startDate) {
+        auditQuery.greaterThanOrEqualTo('timestamp', new Date(startDate));
+      }
+      if (endDate) {
+        auditQuery.lessThanOrEqualTo('timestamp', new Date(endDate));
+      }
+      if (userId) {
+        auditQuery.equalTo('userId', userId);
+      }
+      if (complianceFramework) {
+        auditQuery.equalTo('complianceFramework', complianceFramework);
+      }
+
+      auditQuery.descending('timestamp');
+      auditQuery.limit(1000); // Limit for performance
+
+      const auditRecords = await auditQuery.find({ useMasterKey: true });
+
+      // Generate report
+      const report = await this.processAuditRecords(auditRecords, format, includeMetadata);
+
+      logger.logSecurityEvent('COMPLIANCE_REPORT_GENERATED', null, {
+        framework: complianceFramework,
+        recordCount: auditRecords.length,
+        startDate,
+        endDate,
+        format,
+      });
+
+      return report;
+    } catch (error) {
+      logger.error('Error generating compliance report:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Processes audit records for report generation.
+   * @param {Array} auditRecords - Audit records.
+   * @param {string} format - Report format.
+   * @param {boolean} includeMetadata - Include metadata flag.
+   * @returns {Promise<object>} - Processed report.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.processAuditRecords({ auditRecords: 'example', format: 'example', includeMetadata: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const processedReport = await service.processAuditRecords(auditRecords, 'detailed', true);
+   */
+  async processAuditRecords(auditRecords, format, includeMetadata) {
+    try {
+      const report = {
+        summary: {
+          totalRecords: auditRecords.length,
+          recordsByAction: {},
+          recordsBySeverity: {},
+          recordsByUser: {},
+          complianceStatus: 'compliant',
+          generatedAt: new Date(),
+        },
+        records: [],
+      };
+
+      // Process each record
+      for (const record of auditRecords) {
+        const action = record.get('action');
+        const severity = record.get('severity');
+        const userId = record.get('userId');
+
+        // Count by action
+        report.summary.recordsByAction[action] = (report.summary.recordsByAction[action] || 0) + 1;
+
+        // Count by severity
+        report.summary.recordsBySeverity[severity] = (report.summary.recordsBySeverity[severity] || 0) + 1;
+
+        // Count by user
+        report.summary.recordsByUser[userId] = (report.summary.recordsByUser[userId] || 0) + 1;
+
+        // Add record to detail if requested
+        if (format === 'detailed') {
+          const recordData = {
+            id: record.id,
+            userId: record.get('userId'),
+            action: record.get('action'),
+            permission: record.get('permission'),
+            performedBy: record.get('performedBy'),
+            timestamp: record.get('timestamp'),
+            severity: record.get('severity'),
+            reviewed: record.get('reviewed'),
+            requiresReview: record.get('requiresReview'),
+          };
+
+          if (includeMetadata) {
+            recordData.metadata = this.decryptSensitiveData(record.get('metadata'));
+            recordData.reason = record.get('reason');
+            recordData.context = record.get('context');
+          }
+
+          report.records.push(recordData);
+        }
+      }
+
+      // Determine overall compliance status
+      const criticalCount = report.summary.recordsBySeverity.critical || 0;
+      const highCount = report.summary.recordsBySeverity.high || 0;
+
+      if (criticalCount > 0) {
+        report.summary.complianceStatus = 'non-compliant';
+      } else if (highCount > 10) {
+        // Threshold for review
+        report.summary.complianceStatus = 'requires-review';
+      }
+
+      return report;
+    } catch (error) {
+      logger.error('Error processing audit records:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Decrypts sensitive data from metadata.
+   * @param {string} encryptedData - Encrypted metadata.
+   * @returns {object} - Operation result Decrypted metadata.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.decryptSensitiveData({ encryptedData: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const decrypted = service.decryptSensitiveData(encryptedString);
+   */
+  decryptSensitiveData(encryptedData) {
+    try {
+      const data = JSON.parse(encryptedData);
+
+      if (!data.encrypted) {
+        // Data is not encrypted, return as is
+        return data;
+      }
+
+      const crypto = require('crypto');
+      const algorithm = 'aes-256-gcm';
+      const key = Buffer.from(process.env.ENCRYPTION_KEY, 'hex');
+
+      // Create decipher with explicit options for GCM mode
+      const decipherOptions = { authTagLength: 16 }; // Explicit 16-byte auth tag length
+      const decipher = crypto.createDecipheriv(algorithm, key, Buffer.from(data.iv, 'hex'), decipherOptions);
+
+      // Set authentication tag with explicit length validation for GCM mode
+      const authTag = Buffer.from(data.authTag, 'hex');
+      if (authTag.length !== 16) {
+        throw new Error('Invalid authentication tag length. Expected 16 bytes for GCM mode');
+      }
+      decipher.setAuthTag(authTag);
+
+      let decrypted = decipher.update(data.encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+
+      return JSON.parse(decrypted);
+    } catch (error) {
+      logger.error('Error decrypting audit metadata:', error);
+      return { error: 'Failed to decrypt metadata' };
+    }
+  }
+
+  /**
+   * Gets audit statistics for dashboard.
+   * @param {object} params - Query parameters.
+   * @returns {Promise<object>} - Audit statistics.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.getAuditStatistics({ params: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const stats = await service.getAuditStatistics({ timeFrame: '30d', complianceFramework: 'PCI_DSS' });
+   */
+  async getAuditStatistics(params = {}) {
+    try {
+      const { timeFrame = '30d', complianceFramework = 'PCI_DSS' } = params;
+
+      // Calculate date range
+      const endDate = new Date();
+      const startDate = new Date();
+
+      switch (timeFrame) {
+        case '24h':
+          startDate.setHours(startDate.getHours() - 24);
+          break;
+        case '7d':
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+        case '30d':
+          startDate.setDate(startDate.getDate() - 30);
+          break;
+        case '90d':
+          startDate.setDate(startDate.getDate() - 90);
+          break;
+        default:
+          // Default to 24 hours if timeFrame is not recognized
+          startDate.setHours(startDate.getHours() - 24);
+          break;
+      }
+
+      // Query audit records
+      const auditQuery = new Parse.Query('PermissionAudit');
+      auditQuery.greaterThanOrEqualTo('timestamp', startDate);
+      auditQuery.lessThanOrEqualTo('timestamp', endDate);
+      auditQuery.equalTo('complianceFramework', complianceFramework);
+
+      const auditRecords = await auditQuery.find({ useMasterKey: true });
+
+      // Calculate statistics
+      const stats = {
+        totalEvents: auditRecords.length,
+        eventsBySeverity: {
+          low: 0,
+          medium: 0,
+          high: 0,
+          critical: 0,
+        },
+        eventsByAction: {},
+        pendingReviews: 0,
+        complianceScore: 100,
+        timeFrame,
+        generatedAt: new Date(),
+      };
+
+      // Process records
+      for (const record of auditRecords) {
+        const severity = record.get('severity');
+        const action = record.get('action');
+        const requiresReview = record.get('requiresReview');
+        const reviewed = record.get('reviewed');
+
+        // Count by severity
+        stats.eventsBySeverity[severity] = (stats.eventsBySeverity[severity] || 0) + 1;
+
+        // Count by action
+        stats.eventsByAction[action] = (stats.eventsByAction[action] || 0) + 1;
+
+        // Count pending reviews
+        if (requiresReview && !reviewed) {
+          stats.pendingReviews++;
+        }
+      }
+
+      // Calculate compliance score
+      const criticalEvents = stats.eventsBySeverity.critical;
+      const highEvents = stats.eventsBySeverity.high;
+      const { pendingReviews } = stats;
+
+      stats.complianceScore = Math.max(0, 100 - criticalEvents * 20 - highEvents * 5 - pendingReviews * 2);
+
+      return stats;
+    } catch (error) {
+      logger.error('Error getting audit statistics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Archives old audit records based on retention policy.
+   * @returns {Promise<object>} - Archive result.
+   * @example
+   * // Service method usage
+   * const result = await permissionauditservice.archiveOldRecords({ params: 'example' });
+   * // Returns: { success: true, data: {...} }
+   * // const result = await service.methodName(parameters);
+   * // Returns: Promise resolving to operation result
+   * const service = new PermissionAuditService();
+   * const archiveResult = await service.archiveOldRecords();
+   */
+  async archiveOldRecords() {
+    try {
+      const currentDate = new Date();
+
+      // Query records past retention date
+      const archiveQuery = new Parse.Query('PermissionAudit');
+      archiveQuery.lessThan('retentionDate', currentDate);
+      archiveQuery.equalTo('active', true);
+
+      const recordsToArchive = await archiveQuery.find({ useMasterKey: true });
+
+      let archivedCount = 0;
+
+      for (const record of recordsToArchive) {
+        // Move to archive table or mark as archived
+        record.set('active', false);
+        record.set('archivedAt', currentDate);
+        record.set('archivedBy', 'system');
+
+        await record.save(null, { useMasterKey: true });
+        archivedCount++;
+      }
+
+      logger.logSecurityEvent('AUDIT_RECORDS_ARCHIVED', null, {
+        archivedCount,
+        archiveDate: currentDate.toISOString(),
+      });
+
+      return {
+        success: true,
+        archivedCount,
+        archiveDate: currentDate,
+      };
+    } catch (error) {
+      logger.error('Error archiving audit records:', error);
+      throw error;
+    }
+  }
+}
+
+module.exports = { PermissionAuditService };

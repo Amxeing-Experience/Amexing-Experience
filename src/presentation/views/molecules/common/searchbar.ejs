@@ -1,0 +1,140 @@
+<%
+/**
+ * SearchBar Molecule
+ * Reusable search input with icon and clear functionality
+ *
+ * @param {string} name - Input name attribute
+ * @param {string} id - Input ID attribute
+ * @param {string} placeholder - Search placeholder text
+ * @param {string} value - Current search value
+ * @param {string} size - Search bar size (sm, default, lg)
+ * @param {boolean} clearable - Whether to show clear button
+ * @param {boolean} disabled - Whether search is disabled
+ * @param {string} submitText - Text for submit button (optional)
+ * @param {string} submitIcon - Icon for submit button
+ * @param {string} onSearch - JavaScript function name to call on search
+ * @param {string} onClear - JavaScript function name to call on clear
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const searchName = typeof name !== 'undefined' ? name : 'search';
+const searchId = typeof id !== 'undefined' ? id : `search-${Math.random().toString(36).substr(2, 9)}`;
+const searchPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Buscar...';
+const searchValue = typeof value !== 'undefined' ? value : '';
+const searchSize = typeof size !== 'undefined' ? size : 'default';
+const searchClearable = typeof clearable !== 'undefined' ? clearable : true;
+const searchDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const searchSubmitText = typeof submitText !== 'undefined' ? submitText : '';
+const searchSubmitIcon = typeof submitIcon !== 'undefined' ? submitIcon : 'search';
+const searchOnSearch = typeof onSearch !== 'undefined' ? onSearch : '';
+const searchOnClear = typeof onClear !== 'undefined' ? onClear : '';
+const searchAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const searchAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build classes
+let inputGroupClasses = ['input-group'];
+if (searchSize === 'sm') {
+    inputGroupClasses.push('input-group-sm');
+} else if (searchSize === 'lg') {
+    inputGroupClasses.push('input-group-lg');
+}
+if (searchAdditionalClasses) {
+    inputGroupClasses.push(searchAdditionalClasses);
+}
+
+// Build input classes
+let inputClasses = ['form-control'];
+
+// Build attributes string (sanitized for security)
+let attributesString = '';
+if (searchAttributes && typeof searchAttributes === 'object') {
+    // Whitelist allowed attributes for security
+    const allowedAttributes = ['aria-label', 'aria-describedby', 'data-testid', 'tabindex', 'title'];
+    attributesString = Object.entries(searchAttributes)
+        .filter(([key]) => allowedAttributes.includes(key))
+        .map(([key, value]) => {
+            // Escape attribute values to prevent XSS
+            const escapedValue = String(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            return `${key}="${escapedValue}"`;
+        })
+        .join(' ');
+}
+
+// Sanitize IDs to prevent XSS in JavaScript
+const safeSearchId = searchId.replace(/[^a-zA-Z0-9_-]/g, '');
+const clearButtonId = safeSearchId + '-clear';
+const searchButtonId = safeSearchId + '-submit';
+%>
+
+<div class="<%= inputGroupClasses.join(' ') %>">
+    <!-- Search Icon -->
+    <span class="input-group-text bg-light border-end-0">
+        <i class="ti ti-search text-muted"></i>
+    </span>
+
+    <!-- Search Input -->
+    <input type="text"
+           class="<%= inputClasses.join(' ') %> border-start-0 border-end-0 ps-0"
+           id="<%= safeSearchId %>"
+           name="<%= searchName %>"
+           data-search-id="<%= safeSearchId %>"
+           data-clear-btn="<%= clearButtonId %>"
+           placeholder="<%= searchPlaceholder %>"
+           value="<%= searchValue %>"
+           <% if (searchDisabled) { %>disabled<% } %>
+           <% if (attributesString) { %><%= attributesString %><% } %>
+           style="box-shadow: none;"
+           <% if (searchOnSearch) { %>
+           onkeypress="if(event.key==='Enter'){<%= searchOnSearch %>(this.value);}"
+           oninput="if(this.value.length > 2){<%= searchOnSearch %>(this.value);}"
+           <% } %>>
+
+    <!-- Clear Button -->
+    <% if (searchClearable) { %>
+    <button type="button"
+            class="btn btn-light border-start-0 border-end-0"
+            id="<%= clearButtonId %>"
+            style="display: <%= searchValue ? 'block' : 'none' %>;"
+            onclick="document.getElementById('<%= searchId %>').value=''; this.style.display='none'; <% if (searchOnClear) { %><%= searchOnClear %>();<% } %>"
+            title="Limpiar búsqueda">
+        <i class="ti ti-x text-muted"></i>
+    </button>
+    <% } %>
+
+    <!-- Search/Submit Button -->
+    <% if (searchSubmitText || searchSubmitIcon) { %>
+    <button type="button"
+            class="btn btn-primary"
+            id="<%= searchButtonId %>"
+            <% if (searchOnSearch) { %>onclick="<%= searchOnSearch %>(document.getElementById('<%= searchId %>').value);"<% } %>
+            <% if (searchDisabled) { %>disabled<% } %>>
+        <% if (searchSubmitIcon) { %>
+            <i class="ti ti-<%= searchSubmitIcon %>"></i>
+        <% } %>
+        <% if (searchSubmitText) { %>
+            <%= searchSubmitText %>
+        <% } %>
+    </button>
+    <% } %>
+</div>
+
+<script>
+// Auto-show/hide clear button based on input value
+(function() {
+    // Find elements using safer data attributes
+    const searchInputs = document.querySelectorAll('[data-search-id]');
+
+    searchInputs.forEach(function(searchInput) {
+        const clearBtnId = searchInput.getAttribute('data-clear-btn');
+        const clearBtn = clearBtnId ? document.getElementById(clearBtnId) : null;
+
+        if (clearBtn) {
+            searchInput.addEventListener('input', function() {
+                clearBtn.style.display = this.value.trim() ? 'block' : 'none';
+            });
+        }
+    });
+})();
+</script>

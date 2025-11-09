@@ -12,8 +12,11 @@ npm-shrinkwrap.json
 .env
 .env.local
 .env.development
-.env.test
+.env.test                        # CRITICAL: Contains real AWS test credentials (root)
+environments/.env.test           # CRITICAL: Contains real AWS test credentials (environments/)
 .env.production
+*.env.backup
+**/.env.test                     # Prevent .env.test leaks in subdirectories
 
 # IDE
 .vscode/
@@ -75,6 +78,22 @@ uploads/
 public/uploads/
 
 # Claude Code files
+.claude
 claude.md
 CLAUDE.md
 planning/
+
+# Local Development Scripts - NO COMMIT
+scripts/local/
+scripts/oauth-real-*.js
+scripts/*-real-*.js
+scripts/seed-test-users.js
+scripts/debug-*.js
+scripts/clean-*.js
+
+# Development Testing - NO COMMIT
+tests/oauth/real-flow/
+reports/
+*.env.development
+*.env.local
+backups/

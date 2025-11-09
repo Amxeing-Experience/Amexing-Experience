@@ -1,0 +1,1358 @@
+<%
+/**
+ * Quote Summary Section
+ * Complete read-only summary of the quote for client viewing and PDF export
+ */
+%>
+
+<style>
+    /* Summary Styles */
+    .quote-summary-container {
+        background: #fff;
+        max-width: 1200px;
+        margin: 0 auto;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .summary-banner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 2rem;
+        border-bottom: 3px solid #0d6efd;
+        margin-bottom: 2rem;
+    }
+
+    .summary-banner-logo img {
+        max-width: 250px;
+        height: auto;
+    }
+
+    .summary-banner-address {
+        text-align: right;
+        color: #495057;
+        line-height: 1.6;
+    }
+
+    .summary-banner-address div {
+        margin-bottom: 0.25rem;
+    }
+
+    .summary-section {
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        background: #f8f9fa;
+        border-radius: 0.5rem;
+    }
+
+    .summary-section-title {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #212529;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #dee2e6;
+        padding-bottom: 0.5rem;
+    }
+
+    .summary-info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+
+    .summary-info-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .summary-info-label {
+        font-weight: 600;
+        color: #6c757d;
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .summary-info-value {
+        color: #212529;
+        font-size: 1rem;
+    }
+
+    .summary-attention {
+        font-size: 1.5rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        color: #0d6efd;
+        padding: 1rem;
+        background: #e7f1ff;
+        border-radius: 0.5rem;
+        text-align: center;
+    }
+
+    .summary-table {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+
+    .summary-table th {
+        background: #0d6efd;
+        color: #fff;
+        font-weight: 600;
+        padding: 0.75rem;
+        text-align: left;
+    }
+
+    .summary-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .summary-day-header {
+        background: #e7f1ff;
+        font-weight: 600;
+        color: #0d6efd;
+    }
+
+    .summary-subconcept-row {
+        background: #fff;
+    }
+
+    .summary-subconcept-row:hover {
+        background: #f8f9fa;
+    }
+
+    .summary-totals {
+        margin-top: 1.5rem;
+        padding: 1.5rem;
+        background: #fff;
+        border: 2px solid #0d6efd;
+        border-radius: 0.5rem;
+    }
+
+    .summary-total-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        font-size: 1.1rem;
+    }
+
+    .summary-total-row.total {
+        border-top: 2px solid #0d6efd;
+        padding-top: 1rem;
+        margin-top: 0.5rem;
+        font-weight: 700;
+        font-size: 1.5rem;
+        color: #0d6efd;
+    }
+
+    .summary-footer {
+        text-align: center;
+        padding: 2rem;
+        font-style: italic;
+        color: #6c757d;
+        border-top: 2px solid #dee2e6;
+        margin-top: 2rem;
+    }
+
+    .experience-included-list {
+        margin: 0.5rem 0 0 1.5rem;
+        padding: 0;
+        list-style: none;
+    }
+
+    .experience-included-list li {
+        padding: 0.25rem 0;
+        color: #6c757d;
+        font-size: 0.875rem;
+    }
+
+    .experience-included-list li:before {
+        content: "✓ ";
+        color: #198754;
+        font-weight: bold;
+        margin-right: 0.5rem;
+    }
+
+    /* Print Styles */
+    @media print {
+        .sidebar-nav,
+        .topbar,
+        .card-header,
+        .btn,
+        body {
+            display: none !important;
+        }
+
+        .quote-summary-container {
+            display: block !important;
+        }
+
+        .summary-banner,
+        .summary-section,
+        .summary-table,
+        .summary-totals,
+        .summary-footer {
+            break-inside: avoid;
+        }
+
+        .summary-table th {
+            background-color: #0d6efd !important;
+            color: #fff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        .summary-day-header {
+            background-color: #e7f1ff !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+    }
+
+    /* PDF Export Optimization - Improved Layout Strategy */
+    .pdf-export-mode {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 15px !important;
+        font-size: 0.9rem !important;
+        box-sizing: border-box !important;
+        line-height: 1.4 !important;
+    }
+
+    .pdf-export-mode .summary-banner {
+        padding: 15px 0 !important;
+        margin-bottom: 15px !important;
+        page-break-inside: avoid;
+    }
+
+    .pdf-export-mode .summary-banner-logo img {
+        max-width: 200px !important;
+        height: auto !important;
+    }
+
+    .pdf-export-mode .summary-banner-address {
+        font-size: 0.8rem !important;
+        line-height: 1.5 !important;
+    }
+
+    .pdf-export-mode .summary-section {
+        margin-bottom: 15px !important;
+        padding: 12px !important;
+        page-break-inside: avoid;
+    }
+
+    .pdf-export-mode .summary-section-title {
+        font-size: 1.1rem !important;
+        margin-bottom: 10px !important;
+        padding-bottom: 5px !important;
+        page-break-after: avoid;
+    }
+
+    .pdf-export-mode .summary-attention {
+        font-size: 1.3rem !important;
+        padding: 12px !important;
+        page-break-inside: avoid;
+    }
+
+    .pdf-export-mode .summary-table {
+        width: 100% !important;
+        table-layout: auto !important;
+        font-size: 10px !important;
+        border-collapse: collapse !important;
+        page-break-inside: auto;
+        margin: 0 !important;
+        visibility: visible !important;
+        display: table !important;
+    }
+
+    .pdf-export-mode .summary-table th {
+        padding: 6px 4px !important;
+        font-size: 9px !important;
+        word-wrap: break-word !important;
+        border: 1px solid #000 !important;
+        background-color: #0d6efd !important;
+        color: white !important;
+        font-weight: bold !important;
+        text-align: center !important;
+        visibility: visible !important;
+        display: table-cell !important;
+    }
+
+    .pdf-export-mode .summary-table td {
+        padding: 6px 4px !important;
+        font-size: 9px !important;
+        word-wrap: break-word !important;
+        border: 1px solid #000 !important;
+        vertical-align: top !important;
+        visibility: visible !important;
+        display: table-cell !important;
+        background-color: white !important;
+        color: black !important;
+    }
+
+    /* Simplified column widths for better PDF rendering */
+    .pdf-export-mode .summary-table th:nth-child(1),
+    .pdf-export-mode .summary-table td:nth-child(1) {
+        width: 10% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(2),
+    .pdf-export-mode .summary-table td:nth-child(2) {
+        width: 30% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(3),
+    .pdf-export-mode .summary-table td:nth-child(3) {
+        width: 15% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(4),
+    .pdf-export-mode .summary-table td:nth-child(4) {
+        width: 10% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(5),
+    .pdf-export-mode .summary-table td:nth-child(5) {
+        width: 15% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(6),
+    .pdf-export-mode .summary-table td:nth-child(6) {
+        width: 10% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(7),
+    .pdf-export-mode .summary-table td:nth-child(7) {
+        width: 10% !important;
+    }
+
+    .pdf-export-mode .summary-day-header {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        color-adjust: exact;
+        background-color: #e7f1ff !important;
+        page-break-after: avoid;
+    }
+
+    .pdf-export-mode .summary-subconcept-row {
+        page-break-inside: avoid;
+    }
+
+    .pdf-export-mode .summary-totals {
+        margin-top: 15px !important;
+        padding: 15px !important;
+        font-size: 0.95rem !important;
+        page-break-inside: avoid;
+    }
+
+    .pdf-export-mode .summary-footer {
+        padding: 15px !important;
+        font-size: 0.8rem !important;
+        page-break-inside: avoid;
+    }
+
+    .pdf-export-mode .summary-info-grid {
+        display: block !important;
+    }
+
+    .pdf-export-mode .summary-info-item {
+        display: inline-block !important;
+        width: 48% !important;
+        margin-bottom: 8px !important;
+        margin-right: 2% !important;
+        vertical-align: top !important;
+    }
+
+    /* Additional PDF table optimizations */
+    .pdf-export-mode .summary-table th,
+    .pdf-export-mode .summary-table td {
+        white-space: normal !important;
+        word-break: break-word !important;
+        line-height: 1.3 !important;
+        max-width: none !important;
+        overflow: visible !important;
+    }
+
+    .pdf-export-mode .summary-day-header {
+        background-color: #e7f1ff !important;
+        color: #0d6efd !important;
+        font-weight: bold !important;
+        visibility: visible !important;
+        display: table-row !important;
+    }
+
+    .pdf-export-mode .summary-subconcept-row {
+        background-color: white !important;
+        color: black !important;
+        visibility: visible !important;
+        display: table-row !important;
+    }
+
+    /* Ensure wrapper doesn't exceed page width */
+    .pdf-export-mode {
+        max-width: 720px !important;
+        overflow: hidden !important;
+    }
+
+    /* Ensure backgrounds are visible in PDF */
+    .summary-table th,
+    .summary-day-header,
+    .bg-light {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+        color-adjust: exact;
+    }
+
+    /* Font rendering optimization */
+    .quote-summary-container {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+</style>
+
+<div class="card border-0 shadow-sm">
+    <% if (!locals.isPublicView) { %>
+    <div class="card-header bg-white border-bottom d-print-none">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                <i class="ti ti-file-description me-2"></i>Resumen de la Cotización
+            </h5>
+            <div class="d-flex gap-2">
+                <button id="shareLinkBtn" class="btn btn-success" style="display: none;">
+                    <i class="ti ti-share me-2"></i>Compartir
+                </button>
+                <button id="exportPdfBtn" class="btn btn-primary" style="display: none;">
+                    <i class="ti ti-download me-2"></i>Exportar a PDF
+                </button>
+            </div>
+        </div>
+    </div>
+    <% } %>
+
+    <div class="card-body">
+        <!-- Loading State -->
+        <div id="summaryLoading" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando resumen...</span>
+            </div>
+            <p class="mt-3 text-muted">Cargando información de la cotización...</p>
+        </div>
+
+        <!-- Summary Content -->
+        <div id="summaryContent" class="quote-summary-container" style="display: none;">
+            <!-- Banner -->
+            <div class="summary-banner">
+                <div class="summary-banner-logo">
+                    <img src="/img/amexing_logo_horizontal.avif" alt="Amexing Experience">
+                </div>
+                <div class="summary-banner-address">
+                    <div>Vicente Suarez 5, Colonia Independencia</div>
+                    <div>San Miguel de Allende, Guanajuato 37732</div>
+                    <div>+52 (415) 167 39 90</div>
+                    <div>contact@amexingexperience.com</div>
+                </div>
+            </div>
+
+            <!-- Summary Information -->
+            <div class="summary-section d-print-none">
+                <div class="summary-section-title">
+                    <i class="ti ti-info-circle me-2"></i>Información del Resumen
+                </div>
+                <div class="summary-info-grid">
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Folio de Cotización</span>
+                        <span class="summary-info-value" id="summaryFolio">-</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Fecha Actual</span>
+                        <span class="summary-info-value" id="summaryCurrentDate">-</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Fecha de Generación</span>
+                        <span class="summary-info-value" id="summaryGenerationDate">-</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Estado</span>
+                        <span id="summaryStatus">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Atención a -->
+            <div class="summary-section">
+                <div class="summary-section-title">
+                    <i class="ti ti-user me-2"></i>Atención a
+                </div>
+                <div class="summary-attention" id="summaryContactPerson">
+                    -
+                </div>
+            </div>
+
+            <!-- Quote Details -->
+            <div class="summary-section">
+                <div class="summary-section-title">
+                    <i class="ti ti-clipboard-list me-2"></i>Detalles de la Cotización
+                </div>
+                <div class="summary-info-grid">
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Concepto/Evento</span>
+                        <span class="summary-info-value" id="summaryEventType">-</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Número de Personas</span>
+                        <span class="summary-info-value" id="summaryNumberOfPeople">-</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Cliente</span>
+                        <span class="summary-info-value" id="summaryClientName">-</span>
+                    </div>
+                    <div class="summary-info-item">
+                        <span class="summary-info-label">Tarifa Aplicada</span>
+                        <span id="summaryRateName">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services Table -->
+            <div class="summary-section">
+                <div class="summary-section-title">
+                    <i class="ti ti-calendar-event me-2"></i>Servicios e Itinerario
+                </div>
+                <div class="table-responsive">
+                    <table class="summary-table table table-bordered">
+                        <thead>
+                            <tr>
+                                <th style="width: 8%;">Día</th>
+                                <th style="width: 30%;">Concepto</th>
+                                <th style="width: 12%;">Tipo Vehículo</th>
+                                <th style="width: 8%;">Horas</th>
+                                <th style="width: 10%;">Precio Unit.</th>
+                                <th style="width: 10%;">Total</th>
+                                <th style="width: 22%;">Notas</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryServicesTableBody">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    No hay servicios agregados
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Totals -->
+                <div class="summary-totals">
+                    <div class="summary-total-row">
+                        <span>Subtotal:</span>
+                        <span id="summarySubtotal">$0.00 MXN</span>
+                    </div>
+                    <div class="summary-total-row">
+                        <span>IVA (16%):</span>
+                        <span id="summaryIVA">$0.00 MXN</span>
+                    </div>
+                    <div class="summary-total-row total">
+                        <span>Total:</span>
+                        <span id="summaryTotal">$0.00 MXN</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Message -->
+            <div class="summary-footer">
+                Agradecemos su preferencia y quedamos a sus órdenes para cualquier duda o comentario
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PDF Libraries - Try jsPDF first, fallback to html2pdf -->
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" 
+        crossorigin="anonymous" 
+        referrerpolicy="no-referrer"></script>
+
+<script>
+    // Currency formatter
+    const currencyFormatter = new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+        minimumFractionDigits: 2
+    });
+
+    // Date formatter for Spanish
+    function formatDateSpanish(date) {
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        return new Date(date).toLocaleDateString('es-MX', options);
+    }
+
+    // Get access token
+    function getAccessToken() {
+        return document.cookie
+            .split('; ')
+            .find(row => row.startsWith('accessToken='))
+            ?.split('=')[1];
+    }
+
+    // Get quote status badge
+    function getStatusBadge(status) {
+        const statusMap = {
+            'draft': { label: 'Borrador', class: 'bg-secondary' },
+            'sent': { label: 'Enviada', class: 'bg-info' },
+            'accepted': { label: 'Aceptada', class: 'bg-success' },
+            'rejected': { label: 'Rechazada', class: 'bg-danger' }
+        };
+
+        const statusInfo = statusMap[status] || { label: status, class: 'bg-secondary' };
+        return `<span class="badge ${statusInfo.class}">${statusInfo.label}</span>`;
+    }
+
+    // Load quote summary
+    async function loadQuoteSummary() {
+        try {
+            const quoteId = '<%= quoteId %>';
+            const token = getAccessToken();
+
+            const response = await fetch(`/api/quotes/${quoteId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (!result.success || !result.data) {
+                throw new Error(result.error || 'Error al cargar la cotización');
+            }
+
+            const quote = result.data;
+            console.log('Quote data loaded:', quote);
+
+            // Populate summary information
+            document.getElementById('summaryFolio').textContent = quote.folio || quoteId;
+            document.getElementById('summaryCurrentDate').textContent = formatDateSpanish(new Date());
+            document.getElementById('summaryGenerationDate').textContent = formatDateSpanish(quote.createdAt);
+            document.getElementById('summaryStatus').innerHTML = getStatusBadge(quote.status);
+
+            // Atención a
+            const contactPerson = quote.contactPerson || 'No especificado';
+            document.getElementById('summaryContactPerson').textContent = contactPerson.toUpperCase();
+
+            // Quote details
+            document.getElementById('summaryEventType').textContent = quote.eventType || 'No especificado';
+            document.getElementById('summaryNumberOfPeople').textContent = quote.numberOfPeople || '0';
+
+            // Client name
+            let clientName = 'No especificado';
+            if (quote.client) {
+                if (quote.client.companyName) {
+                    clientName = quote.client.companyName;
+                } else if (quote.client.firstName || quote.client.lastName) {
+                    clientName = `${quote.client.firstName || ''} ${quote.client.lastName || ''}`.trim();
+                }
+            }
+            document.getElementById('summaryClientName').textContent = clientName;
+
+            // Rate name
+            if (quote.rate) {
+                const rateColor = quote.rate.color || '#6c757d';
+                document.getElementById('summaryRateName').innerHTML =
+                    `<span class="badge" style="background-color: ${rateColor};">${quote.rate.name}</span>`;
+            } else {
+                document.getElementById('summaryRateName').textContent = 'No especificada';
+            }
+
+            // Render services table
+            renderServicesTable(quote.serviceItems);
+
+            // Show summary content
+            document.getElementById('summaryLoading').style.display = 'none';
+            document.getElementById('summaryContent').style.display = 'block';
+
+            // Show and attach buttons (only if not in public view)
+            <% if (!locals.isPublicView) { %>
+            const exportBtn = document.getElementById('exportPdfBtn');
+            exportBtn.style.display = 'inline-block';
+
+            // Attach export event listener (remove previous if exists)
+            const newExportBtn = exportBtn.cloneNode(true);
+            exportBtn.parentNode.replaceChild(newExportBtn, exportBtn);
+            newExportBtn.addEventListener('click', exportToPdf);
+
+            // Show and attach share button
+            const shareBtn = document.getElementById('shareLinkBtn');
+            shareBtn.style.display = 'inline-block';
+
+            // Attach share event listener
+            const newShareBtn = shareBtn.cloneNode(true);
+            shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
+            newShareBtn.addEventListener('click', () => generateShareLink(quote.id));
+            <% } %>
+
+        } catch (error) {
+            console.error('Error loading quote summary:', error);
+            document.getElementById('summaryLoading').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    Error al cargar el resumen de la cotización: ${error.message}
+                </div>
+            `;
+        }
+    }
+
+    // Render services table
+    function renderServicesTable(serviceItems) {
+        const tbody = document.getElementById('summaryServicesTableBody');
+        tbody.innerHTML = '';
+
+        if (!serviceItems || !serviceItems.days || serviceItems.days.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No hay servicios agregados a esta cotización
+                    </td>
+                </tr>
+            `;
+
+            document.getElementById('summarySubtotal').textContent = currencyFormatter.format(0);
+            document.getElementById('summaryIVA').textContent = currencyFormatter.format(0);
+            document.getElementById('summaryTotal').textContent = currencyFormatter.format(0);
+            return;
+        }
+
+        // Render each day
+        serviceItems.days.forEach((day, dayIndex) => {
+            const subconceptsCount = day.subconcepts?.length || 0;
+            const rowspan = subconceptsCount + 1; // +1 for day header row
+
+            // Day header row
+            const dayHeaderRow = document.createElement('tr');
+            dayHeaderRow.className = 'summary-day-header';
+            dayHeaderRow.innerHTML = `
+                <td rowspan="${rowspan}" class="text-center align-middle"><strong>Día ${day.dayNumber}</strong></td>
+                <td colspan="3"><strong>${day.dayTitle || `Día ${day.dayNumber}`}</strong></td>
+                <td rowspan="${rowspan}" class="text-end align-middle bg-light"><strong>${currencyFormatter.format(day.dayTotal || 0)}</strong></td>
+                <td></td>
+            `;
+            tbody.appendChild(dayHeaderRow);
+
+            // Render subconcepts
+            if (day.subconcepts && day.subconcepts.length > 0) {
+                day.subconcepts.forEach((subconcept, subIndex) => {
+                    const subRow = document.createElement('tr');
+                    subRow.className = 'summary-subconcept-row';
+
+                    // Format concept based on type
+                    let conceptHTML = '';
+                    const time = subconcept.time || '';
+                    const timeDisplay = time ? `<span class="text-muted">${time}</span> - ` : '';
+
+                    if (subconcept.type === 'experiencia') {
+                        conceptHTML = `
+                            <div>${timeDisplay}<strong>${subconcept.concept || 'Experiencia'}</strong></div>
+                            ${subconcept.isPackage && subconcept.includedExperiences ? renderIncludedExperiences(subconcept.includedExperiences) : ''}
+                        `;
+                    } else {
+                        conceptHTML = `${timeDisplay}${subconcept.concept || 'Sin especificar'}`;
+                    }
+
+                    // Vehicle type with badge for traslados
+                    let vehicleTypeHTML = '';
+                    if (subconcept.type === 'traslado') {
+                        const vehicleType = subconcept.vehicleType || '-';
+                        const vehicleMultiplier = subconcept.vehicleMultiplier || 1;
+                        const showBadge = subconcept.vehicleCapacity && vehicleMultiplier > 1;
+                        vehicleTypeHTML = showBadge
+                            ? `<span class="badge bg-info me-1">${vehicleMultiplier}x</span>${vehicleType}`
+                            : vehicleType;
+                    } else {
+                        vehicleTypeHTML = subconcept.vehicleType || (subconcept.type === 'regular' || subconcept.type === 'experiencia' ? 'N/A' : '-');
+                    }
+
+                    // Hours
+                    const hours = subconcept.hours !== null && subconcept.hours !== undefined ? subconcept.hours : '-';
+
+                    // Unit price with per-person info
+                    let unitPriceHTML = '';
+                    if (subconcept.unitPrice !== null && subconcept.unitPrice !== undefined) {
+                        const priceFormatted = currencyFormatter.format(subconcept.unitPrice);
+
+                        if (subconcept.type === 'traslado') {
+                            // Traslado: Show price + people count
+                            const peopleCount = subconcept.numberOfPeople || 1;
+                            unitPriceHTML = `
+                                <div style="line-height: 1.4;">
+                                    <div>${priceFormatted}</div>
+                                    <small class="text-muted">${peopleCount} persona${peopleCount !== 1 ? 's' : ''}</small>
+                                </div>
+                            `;
+                        } else if (subconcept.isPerPerson) {
+                            // Regular/Experiencia with per-person enabled
+                            const peopleCount = subconcept.numberOfPeople || 1;
+                            unitPriceHTML = `
+                                <div style="line-height: 1.4;">
+                                    <div>${priceFormatted}</div>
+                                    <small class="text-success">✓ Por Persona</small>
+                                    <small class="text-muted d-block">${peopleCount} persona${peopleCount !== 1 ? 's' : ''}</small>
+                                </div>
+                            `;
+                        } else {
+                            // Standard pricing
+                            unitPriceHTML = priceFormatted;
+                        }
+                    } else {
+                        unitPriceHTML = '-';
+                    }
+
+                    // Total subconcept
+                    const total = subconcept.total !== null && subconcept.total !== undefined
+                        ? currencyFormatter.format(subconcept.total)
+                        : '-';
+
+                    // Notes - show actual notes or empty if none
+                    const notes = subconcept.notes ? `<small>${subconcept.notes}</small>` : '';
+
+                    // Calculate the subconcept total to display
+                    const subTotal = subconcept.total !== null && subconcept.total !== undefined
+                        ? currencyFormatter.format(subconcept.total)
+                        : '-';
+
+                    // Note: columns are: Día (skipped - rowspan), Concepto, Vehículo, Horas, Precio Unit., Total (skipped - rowspan), Notas
+                    subRow.innerHTML = `
+                        <td>${conceptHTML}</td>
+                        <td>${vehicleTypeHTML}</td>
+                        <td class="text-center">${hours}</td>
+                        <td class="text-end">${unitPriceHTML}</td>
+                        <td>${notes}</td>
+                    `;
+
+                    tbody.appendChild(subRow);
+                });
+            }
+        });
+
+        // Update totals
+        document.getElementById('summarySubtotal').textContent = currencyFormatter.format(serviceItems.subtotal || 0);
+        document.getElementById('summaryIVA').textContent = currencyFormatter.format(serviceItems.iva || 0);
+        document.getElementById('summaryTotal').textContent = currencyFormatter.format(serviceItems.total || 0);
+    }
+
+    // Render included experiences for packages
+    function renderIncludedExperiences(experiences) {
+        if (!experiences || experiences.length === 0) return '';
+
+        let html = '<ul class="experience-included-list">';
+        experiences.forEach(exp => {
+            html += `<li>${exp.name}${exp.description ? ': ' + exp.description : ''}</li>`;
+        });
+        html += '</ul>';
+
+        return html;
+    }
+
+    // Load summary when section is active
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if this section is active
+        const urlParams = new URLSearchParams(window.location.search);
+        const section = urlParams.get('section');
+
+        if (section === 'summary') {
+            loadQuoteSummary();
+        }
+    });
+
+    // Also load when section becomes visible (for tab switching)
+    const summaryTab = document.querySelector('a[href*="section=summary"]');
+    if (summaryTab) {
+        summaryTab.addEventListener('click', function() {
+            setTimeout(loadQuoteSummary, 100);
+        });
+    }
+
+    // Export to PDF function with fallback support
+    function exportToPdf() {
+        // Try jsPDF first
+        if (tryJsPDFExport()) {
+            return;
+        }
+        
+        // Fallback to html2pdf if jsPDF fails
+        console.log('Falling back to html2pdf...');
+        tryHtml2PdfExport();
+    }
+
+    // Try jsPDF approach
+    function tryJsPDFExport() {
+        // Check if jsPDF is loaded with multiple possible locations
+        let jsPDF;
+        if (typeof window.jsPDF !== 'undefined') {
+            jsPDF = window.jsPDF.jsPDF || window.jsPDF;
+        } else if (typeof window.jsPDF === 'undefined' && typeof jsPDF !== 'undefined') {
+            // Global jsPDF variable
+        } else {
+            console.log('jsPDF not available, will try html2pdf fallback');
+            return false;
+        }
+
+        const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
+        const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
+        // Apply PDF export mode to original element
+        element.classList.add('pdf-export-mode');
+
+        // Create wrapper using percentage-based width for dynamic PDF sizing
+        // 100% width adapts to page size automatically
+        const wrapper = document.createElement('div');
+        wrapper.id = 'pdf-generation-wrapper';
+        wrapper.style.cssText = `
+            width: 100%;
+            max-width: 100%;
+            margin: 0;
+            padding: 10px;
+            background: #ffffff;
+            box-sizing: border-box;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        `;
+
+        // Move original content into wrapper temporarily
+        const parent = element.parentNode;
+        const nextSibling = element.nextSibling;
+
+        wrapper.appendChild(element);
+        document.body.appendChild(wrapper);
+
+        // PDF generation options using percentage-based sizing
+        // Letter page: 215.9mm x 279.4mm - dynamic width calculation
+        const opt = {
+            margin:       [8, 8, 8, 8], // Balanced margins (8mm) for centered content
+            filename:     filename,
+            image:        { type: 'jpeg', quality: 0.98 },
+            html2canvas:  {
+                scale: 2,              // High quality rendering (2x resolution)
+                // No fixed width - let it calculate dynamically from wrapper
+                windowWidth: 800,      // Reference width for consistent rendering
+                useCORS: true,         // Allow external images (logo)
+                letterRendering: true, // Better text rendering
+                scrollY: 0,            // No vertical scroll offset
+                scrollX: 0,            // No horizontal scroll offset
+                backgroundColor: '#ffffff',
+                logging: false         // Disable console logs
+            },
+            jsPDF:        {
+                unit: 'mm',
+                format: 'letter',      // US Letter (215.9mm x 279.4mm)
+                orientation: 'portrait',
+                compress: true
+            },
+            pagebreak: {
+                mode: ['css', 'legacy'],
+                avoid: ['.summary-day-header', '.summary-totals', '.summary-banner', 'tr']
+            }
+        };
+
+        // UI feedback
+        const btn = document.getElementById('exportPdfBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando PDF...';
+        btn.disabled = true;
+
+        try {
+            console.log('Starting manual PDF generation...');
+            
+            // Create new jsPDF instance
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'letter'
+            });
+
+            // Set font
+            doc.setFont('helvetica');
+            
+            let yPosition = 20;
+            const pageWidth = doc.internal.pageSize.width;
+            const margin = 15;
+            const contentWidth = pageWidth - (margin * 2);
+
+            // Company Header
+            doc.setFontSize(16);
+            doc.setTextColor(13, 110, 253); // Blue color
+            doc.text('AMEXING EXPERIENCE', margin, yPosition);
+            
+            yPosition += 6;
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            doc.text('Vicente Suarez 5, Colonia Independencia', margin, yPosition);
+            yPosition += 4;
+            doc.text('San Miguel de Allende, Guanajuato 37732', margin, yPosition);
+            yPosition += 4;
+            doc.text('+52 (415) 167 39 90', margin, yPosition);
+            yPosition += 4;
+            doc.text('contact@amexingexperience.com', margin, yPosition);
+            
+            // Line separator
+            yPosition += 8;
+            doc.setDrawColor(13, 110, 253);
+            doc.setLineWidth(0.5);
+            doc.line(margin, yPosition, pageWidth - margin, yPosition);
+            yPosition += 10;
+
+            // Quote Info
+            doc.setFontSize(14);
+            doc.setTextColor(13, 110, 253);
+            doc.text(`COTIZACIÓN: ${folio}`, margin, yPosition);
+            
+            yPosition += 8;
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            
+            // Get quote details
+            const contactPerson = document.getElementById('summaryContactPerson')?.textContent || 'No especificado';
+            const eventType = document.getElementById('summaryEventType')?.textContent || 'No especificado';
+            const numberOfPeople = document.getElementById('summaryNumberOfPeople')?.textContent || '0';
+            const clientName = document.getElementById('summaryClientName')?.textContent || 'No especificado';
+            
+            doc.text(`ATENCIÓN A: ${contactPerson}`, margin, yPosition);
+            yPosition += 5;
+            doc.text(`CLIENTE: ${clientName}`, margin, yPosition);
+            yPosition += 5;
+            doc.text(`EVENTO: ${eventType}`, margin, yPosition);
+            yPosition += 5;
+            doc.text(`PERSONAS: ${numberOfPeople}`, margin, yPosition);
+            yPosition += 10;
+
+            // Services Section
+            doc.setFontSize(12);
+            doc.setTextColor(13, 110, 253);
+            doc.text('SERVICIOS E ITINERARIO', margin, yPosition);
+            yPosition += 8;
+
+            // Get table data
+            const tableBody = document.querySelector('#summaryServicesTableBody');
+            if (tableBody) {
+                const rows = tableBody.querySelectorAll('tr');
+                console.log(`Processing ${rows.length} service rows for PDF`);
+                
+                doc.setFontSize(9);
+                doc.setTextColor(0, 0, 0);
+                
+                rows.forEach((row, index) => {
+                    // Check if we need a new page
+                    if (yPosition > 250) {
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    if (row.className.includes('summary-day-header')) {
+                        // Day header
+                        const dayTitle = row.querySelector('td')?.textContent || '';
+                        
+                        yPosition += 5;
+                        doc.setFontSize(11);
+                        doc.setTextColor(13, 110, 253);
+                        doc.setFillColor(231, 241, 255);
+                        doc.rect(margin, yPosition - 4, contentWidth, 8, 'F');
+                        doc.text(dayTitle.toUpperCase(), margin + 2, yPosition + 1);
+                        yPosition += 8;
+                        
+                    } else if (row.className.includes('summary-subconcept-row')) {
+                        // Service item
+                        const cells = row.querySelectorAll('td');
+                        const cellData = Array.from(cells).map(cell => cell.textContent?.trim() || '');
+                        
+                        doc.setFontSize(9);
+                        doc.setTextColor(0, 0, 0);
+                        
+                        if (cellData[0]) {
+                            doc.text(`• ${cellData[0]}`, margin + 5, yPosition);
+                            yPosition += 4;
+                        }
+                        if (cellData[1]) {
+                            doc.text(`  Vehículo: ${cellData[1]}`, margin + 8, yPosition);
+                            yPosition += 4;
+                        }
+                        if (cellData[2]) {
+                            doc.text(`  Horas: ${cellData[2]}`, margin + 8, yPosition);
+                            yPosition += 4;
+                        }
+                        if (cellData[3]) {
+                            doc.text(`  Precio: ${cellData[3]}`, margin + 8, yPosition);
+                            yPosition += 4;
+                        }
+                        if (cellData[4]) {
+                            const notes = doc.splitTextToSize(`  Notas: ${cellData[4]}`, contentWidth - 10);
+                            doc.text(notes, margin + 8, yPosition);
+                            yPosition += notes.length * 4;
+                        }
+                        yPosition += 3;
+                    }
+                });
+            }
+
+            // Financial Summary
+            yPosition += 10;
+            if (yPosition > 240) {
+                doc.addPage();
+                yPosition = 20;
+            }
+
+            doc.setFontSize(12);
+            doc.setTextColor(13, 110, 253);
+            doc.text('RESUMEN FINANCIERO', margin, yPosition);
+            yPosition += 8;
+
+            // Draw totals box
+            const boxHeight = 25;
+            doc.setDrawColor(13, 110, 253);
+            doc.setLineWidth(0.5);
+            doc.rect(margin, yPosition, contentWidth, boxHeight);
+
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            
+            const subtotal = document.getElementById('summarySubtotal')?.textContent || '$0.00';
+            const iva = document.getElementById('summaryIVA')?.textContent || '$0.00';
+            const total = document.getElementById('summaryTotal')?.textContent || '$0.00';
+
+            yPosition += 6;
+            doc.text('Subtotal:', margin + 5, yPosition);
+            doc.text(subtotal, pageWidth - margin - 5, yPosition, { align: 'right' });
+            
+            yPosition += 5;
+            doc.text('IVA (16%):', margin + 5, yPosition);
+            doc.text(iva, pageWidth - margin - 5, yPosition, { align: 'right' });
+            
+            yPosition += 5;
+            doc.setDrawColor(13, 110, 253);
+            doc.line(margin + 5, yPosition, pageWidth - margin - 5, yPosition);
+            
+            yPosition += 5;
+            doc.setFontSize(12);
+            doc.setTextColor(13, 110, 253);
+            doc.text('TOTAL:', margin + 5, yPosition);
+            doc.text(total, pageWidth - margin - 5, yPosition, { align: 'right' });
+
+            // Footer
+            yPosition += 15;
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            const footerText = 'Agradecemos su preferencia y quedamos a sus órdenes para cualquier duda o comentario';
+            const footerLines = doc.splitTextToSize(footerText, contentWidth);
+            doc.text(footerLines, margin, yPosition, { align: 'center' });
+
+            // Add metadata
+            doc.setProperties({
+                title: `Cotización ${folio}`,
+                subject: 'Cotización Amexing Experience',
+                author: 'Amexing Experience',
+                keywords: 'cotización, transporte, servicios',
+                creator: 'AmexingWeb Platform'
+            });
+
+            // Save the PDF
+            doc.save(filename);
+            
+            console.log('PDF generated successfully with manual jsPDF');
+            return true;
+
+        } catch (error) {
+            console.error('Error generating PDF with jsPDF:', error);
+            return false;
+        } finally {
+            // Restore button
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    // Fallback html2pdf approach (simplified)
+    function tryHtml2PdfExport() {
+        if (typeof html2pdf === 'undefined') {
+            alert('No se pudo cargar ninguna librería de PDF. Por favor recargue la página.');
+            return;
+        }
+
+        const element = document.getElementById('summaryContent');
+        const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
+        const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
+
+        // UI feedback
+        const btn = document.getElementById('exportPdfBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando PDF...';
+        btn.disabled = true;
+
+        // Simple html2pdf options
+        const opt = {
+            margin: 10,
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 1, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf()
+            .set(opt)
+            .from(element)
+            .save()
+            .then(() => {
+                console.log('PDF generated successfully with html2pdf fallback');
+            })
+            .catch((error) => {
+                console.error('Error generating PDF with html2pdf:', error);
+                alert('Error al generar el PDF. Por favor intente nuevamente.');
+            })
+            .finally(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            });
+    }
+
+    // Generate share link function
+    async function generateShareLink(quoteId) {
+        try {
+            // Show loading state
+            const btn = document.getElementById('shareLinkBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando...';
+            btn.disabled = true;
+
+            // Get CSRF token from meta tag or cookie
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            // Call API to generate share link (credentials: 'include' sends cookies automatically)
+            const response = await fetch(`/api/quotes/${quoteId}/share-link`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
+                credentials: 'include' // Important: sends cookies (JWT token) automatically
+            });
+
+            const result = await response.json();
+
+            // Restore button state
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Error al generar el enlace');
+            }
+
+            // Show modal with share link
+            showShareModal(result.data);
+
+        } catch (error) {
+            console.error('Error generating share link:', error);
+            alert(`Error al generar enlace: ${error.message}`);
+
+            // Restore button state
+            const btn = document.getElementById('shareLinkBtn');
+            btn.innerHTML = '<i class="ti ti-share me-2"></i>Compartir';
+            btn.disabled = false;
+        }
+    }
+
+    // Show share modal with copy functionality
+    function showShareModal(data) {
+        // Create modal HTML
+        const modalHtml = `
+            <div class="modal fade" id="shareLinkModal" tabindex="-1" aria-labelledby="shareLinkModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-success text-white">
+                            <h5 class="modal-title" id="shareLinkModalLabel">
+                                <i class="ti ti-share me-2"></i>Enlace de Compartir
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted mb-3">
+                                <i class="ti ti-info-circle me-2"></i>
+                                Comparta este enlace con su cliente para que pueda ver la cotización sin necesidad de iniciar sesión.
+                            </p>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">Folio</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" value="${data.folio}" readonly>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">URL Pública</label>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="shareUrlInput" value="${data.shareUrl}" readonly>
+                                    <button class="btn btn-outline-primary" type="button" id="copyShareUrlBtn">
+                                        <i class="ti ti-copy me-1"></i>Copiar
+                                    </button>
+                                </div>
+                                <small class="text-muted">
+                                    <i class="ti ti-lock-open me-1"></i>
+                                    Este enlace es público y no requiere autenticación
+                                </small>
+                            </div>
+
+                            <div class="alert alert-info mb-0">
+                                <i class="ti ti-bulb me-2"></i>
+                                <strong>Consejo:</strong> Puede copiar este enlace y enviarlo por correo electrónico o WhatsApp a su cliente.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                            <a href="${data.shareUrl}" target="_blank" class="btn btn-primary">
+                                <i class="ti ti-external-link me-2"></i>Abrir en Nueva Pestaña
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        const existingModal = document.getElementById('shareLinkModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Insert modal into DOM
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Get modal element and show it
+        const modalElement = document.getElementById('shareLinkModal');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+
+        // Attach copy button event listener
+        document.getElementById('copyShareUrlBtn').addEventListener('click', () => {
+            const input = document.getElementById('shareUrlInput');
+            input.select();
+            input.setSelectionRange(0, 99999); // For mobile devices
+
+            // Copy to clipboard
+            navigator.clipboard.writeText(input.value).then(() => {
+                const btn = document.getElementById('copyShareUrlBtn');
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="ti ti-check me-1"></i>¡Copiado!';
+                btn.classList.remove('btn-outline-primary');
+                btn.classList.add('btn-success');
+
+                setTimeout(() => {
+                    btn.innerHTML = originalHtml;
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-outline-primary');
+                }, 2000);
+            }).catch(err => {
+                console.error('Error copying to clipboard:', err);
+                alert('Error al copiar el enlace. Por favor cópielo manualmente.');
+            });
+        });
+
+        // Clean up modal when hidden
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            modalElement.remove();
+        });
+    }
+</script>

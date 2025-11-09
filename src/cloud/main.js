@@ -1,167 +1,956 @@
 /* eslint-disable no-unused-vars */
+// IMPORTANT: Do NOT require 'parse/node' in cloud code files
+// Parse Server provides Parse.Cloud automatically in cloud code context
+// Requiring parse/node will override it with SDK version that doesn't have Cloud functions
 const logger = require('../infrastructure/logger');
+
+// Import models and services
+const AmexingUser = require('../domain/models/AmexingUser');
+const AuthenticationService = require('../application/services/AuthenticationService');
+const OAuthService = require('../application/services/OAuthService');
 
 // Import cloud functions
 const helloWorldFunction = require('./functions/helloWorld');
 const testFunction = require('./functions/test');
+const oauthAdminFunctions = require('./functions/oauth-admin');
+const corporateLandingFunctions = require('./functions/corporate-landing');
+const corporateSyncFunctions = require('./functions/corporate-sync');
+const oauthPermissionsFunctions = require('./functions/oauth-permissions');
+const departmentOAuthFunctions = require('./functions/department-oauth');
+const appleOAuthFunctions = require('./functions/apple-oauth');
 
-// Register Cloud Functions
-Parse.Cloud.define('hello', helloWorldFunction);
-Parse.Cloud.define('test', testFunction);
+// Import audit trail hooks
+const { registerAuditHooks } = require('./hooks/auditTrailHooks');
 
-// Before Save Triggers
-Parse.Cloud.beforeSave(Parse.User, async (request) => {
-  const { object: user, master } = request;
-
-  // Skip validation for master key requests
-  if (master) {
-    return;
-  }
-
-  // Log user registration/update
-  if (!user.existed()) {
-    logger.logSecurityEvent('USER_REGISTRATION', {
-      username: user.get('username'),
-      email: user.get('email')
-        ? `${user.get('email').substring(0, 3)}***`
-        : undefined,
-    });
-  } else {
-    logger.logSecurityEvent('USER_UPDATE', {
-      userId: user.id,
-      username: user.get('username'),
-    });
-  }
-
-  // Validate email format if provided
-  const email = user.get('email');
-  if (email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      throw new Parse.Error(
-        Parse.Error.VALIDATION_ERROR,
-        'Invalid email format'
-      );
-    }
-  }
-
-  // Ensure username is provided
-  if (!user.get('username')) {
-    throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Username is required');
-  }
-});
-
-// After Save Triggers
-Parse.Cloud.afterSave(Parse.User, async (request) => {
-  const { object: user } = request;
-
-  if (!user.existed()) {
-    logger.info(`New user created: ${user.id}`);
-
-    // Initialize user profile or perform other setup tasks
-    // This is where you might create related objects, send welcome emails, etc.
-  }
-});
-
-// Before Delete Triggers
-Parse.Cloud.beforeDelete(Parse.User, async (request) => {
-  const { object: user, master } = request;
-
-  // Only allow user deletion with master key
-  if (!master) {
-    throw new Parse.Error(
-      Parse.Error.OPERATION_FORBIDDEN,
-      'Users can only be deleted with master key'
-    );
-  }
-
-  logger.logSecurityEvent('USER_DELETION', {
-    userId: user.id,
-    username: user.get('username'),
-  });
-});
-
-// After Login Trigger
-Parse.Cloud.afterLogin(async (request) => {
-  const { object: user } = request;
-
-  logger.logAccessAttempt(true, user.get('username'), request.ip);
-
-  // Update last login timestamp
-  user.set('lastLoginAt', new Date());
-  await user.save(null, { useMasterKey: true });
-});
-
-// After Logout Trigger
-Parse.Cloud.afterLogout(async (request) => {
-  const { object: session } = request;
-
-  logger.logSecurityEvent('USER_LOGOUT', {
-    sessionToken: `${session.get('sessionToken').substring(0, 8)}***`,
-  });
-});
-
-// Job Functions (Scheduled Tasks)
-Parse.Cloud.job('cleanupExpiredSessions', async (request) => {
-  const { message } = request;
-  message('Starting expired sessions cleanup...');
-
+/**
+ * Registers all Parse Cloud Functions for the Amexing platform.
+ * Centralizes the registration of OAuth authentication, corporate synchronization,
+ * department management, and administrative functions with comprehensive error handling
+ * and security logging for Parse Server integration.
+ *
+ * This function orchestrates the registration of all cloud functions including OAuth
+ * admin operations, corporate landing configuration, sync management, permission
+ * handling, department OAuth flows, and Apple authentication integration.
+ * @function registerCloudFunctions
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 1.0.0
+ * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', parameters);
+ * // Returns: function result
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Register all cloud functions during Parse Server initialization
+ * registerCloudFunctions();
+ *
+ * // Cloud functions become available via Parse SDK
+ * const result = await Parse.Cloud.run('getAvailableCorporateDomains');
+ * const oauthUrl = await Parse.Cloud.run('generateCorporateOAuthURL', { domain: 'example.com' });
+ * const syncStatus = await Parse.Cloud.run('triggerCorporateSync', { domain: 'company.com' });
+ * @returns {*} - Operation result.
+ */
+function registerCloudFunctions() {
   try {
-    const Session = Parse.Object.extend('_Session');
-    const query = new Parse.Query(Session);
-    query.lessThan('expiresAt', new Date());
+    // Register Cloud Functions
+    Parse.Cloud.define('hello', helloWorldFunction);
+    Parse.Cloud.define('test', testFunction);
 
-    const expiredSessions = await query.find({ useMasterKey: true });
+    // Register OAuth Admin Functions
+    Parse.Cloud.define('getAvailableCorporateDomains', oauthAdminFunctions.getAvailableCorporateDomains);
+    Parse.Cloud.define('addCorporateDomain', oauthAdminFunctions.addCorporateDomain);
+    Parse.Cloud.define('getOAuthProviderStatus', oauthAdminFunctions.getOAuthProviderStatus);
+    Parse.Cloud.define('testCorporateDomain', oauthAdminFunctions.testCorporateDomain);
+    Parse.Cloud.define('getOAuthAuditLogs', oauthAdminFunctions.getOAuthAuditLogs);
 
-    if (expiredSessions.length > 0) {
-      await Parse.Object.destroyAll(expiredSessions, { useMasterKey: true });
-      message(`Deleted ${expiredSessions.length} expired sessions`);
-      logger.info(
-        `Cleanup job: Deleted ${expiredSessions.length} expired sessions`
-      );
-    } else {
-      message('No expired sessions found');
-    }
+    // Register Corporate Landing Functions
+    Parse.Cloud.define('getCorporateLandingConfig', corporateLandingFunctions.getCorporateLandingConfig);
+    Parse.Cloud.define('generateCorporateOAuthURL', corporateLandingFunctions.generateCorporateOAuthURL);
+    Parse.Cloud.define('validateCorporateLandingAccess', corporateLandingFunctions.validateCorporateLandingAccess);
+    Parse.Cloud.define('getCorporateClientDepartments', corporateLandingFunctions.getCorporateClientDepartments);
 
-    return { success: true, deletedCount: expiredSessions.length };
+    // Register Corporate Sync Functions
+    Parse.Cloud.define('triggerCorporateSync', corporateSyncFunctions.triggerCorporateSync);
+    Parse.Cloud.define('startPeriodicSync', corporateSyncFunctions.startPeriodicSync);
+    Parse.Cloud.define('stopPeriodicSync', corporateSyncFunctions.stopPeriodicSync);
+    Parse.Cloud.define('getAllSyncStatuses', corporateSyncFunctions.getAllSyncStatuses);
+    Parse.Cloud.define('getCorporateSyncHistory', corporateSyncFunctions.getCorporateSyncHistory);
+
+    // Register OAuth Permissions Functions
+    Parse.Cloud.define('getUserPermissionInheritance', oauthPermissionsFunctions.getUserPermissionInheritance);
+    Parse.Cloud.define('getAvailableContexts', oauthPermissionsFunctions.getAvailableContexts);
+    Parse.Cloud.define('switchPermissionContext', oauthPermissionsFunctions.switchPermissionContext);
+    Parse.Cloud.define('createPermissionDelegation', oauthPermissionsFunctions.createPermissionDelegation);
+    Parse.Cloud.define('revokePermissionDelegation', oauthPermissionsFunctions.revokePermissionDelegation);
+    Parse.Cloud.define('createEmergencyElevation', oauthPermissionsFunctions.createEmergencyElevation);
+    Parse.Cloud.define('createPermissionOverride', oauthPermissionsFunctions.createPermissionOverride);
+    Parse.Cloud.define('checkUserPermission', oauthPermissionsFunctions.checkUserPermission);
+    Parse.Cloud.define('getActiveDelegations', oauthPermissionsFunctions.getActiveDelegations);
+    Parse.Cloud.define('getDelegatedPermissions', oauthPermissionsFunctions.getDelegatedPermissions);
+    Parse.Cloud.define('getPermissionAuditReport', oauthPermissionsFunctions.getPermissionAuditReport);
+    Parse.Cloud.define('getPermissionAuditStats', oauthPermissionsFunctions.getPermissionAuditStats);
+    Parse.Cloud.define('getAvailablePermissions', oauthPermissionsFunctions.getAvailablePermissions);
+
+    // Register Department OAuth Functions
+    Parse.Cloud.define('getAvailableDepartments', departmentOAuthFunctions.getAvailableDepartments);
+    Parse.Cloud.define('initiateDepartmentOAuth', departmentOAuthFunctions.initiateDepartmentOAuth);
+    Parse.Cloud.define('handleDepartmentOAuthCallback', departmentOAuthFunctions.handleDepartmentOAuthCallback);
+    Parse.Cloud.define('getDepartmentOAuthConfig', departmentOAuthFunctions.getDepartmentOAuthConfig);
+    Parse.Cloud.define('switchToDepartmentContext', departmentOAuthFunctions.switchToDepartmentContext);
+    Parse.Cloud.define('getDepartmentOAuthProviders', departmentOAuthFunctions.getDepartmentOAuthProviders);
+    Parse.Cloud.define('validateDepartmentOAuthAccess', departmentOAuthFunctions.validateDepartmentOAuthAccess);
+    Parse.Cloud.define('getDepartmentOAuthAnalytics', departmentOAuthFunctions.getDepartmentOAuthAnalytics);
+
+    // Register Apple OAuth Functions
+    Parse.Cloud.define('initiateAppleOAuth', appleOAuthFunctions.initiateAppleOAuth);
+    Parse.Cloud.define('handleAppleOAuthCallback', appleOAuthFunctions.handleAppleOAuthCallback);
+    Parse.Cloud.define('getAppleOAuthConfig', appleOAuthFunctions.getAppleOAuthConfig);
+    Parse.Cloud.define('revokeAppleOAuth', appleOAuthFunctions.revokeAppleOAuth);
+    Parse.Cloud.define('handleAppleWebhook', appleOAuthFunctions.handleAppleWebhook);
+    Parse.Cloud.define('getAppleUserData', appleOAuthFunctions.getAppleUserData);
+    Parse.Cloud.define('validateAppleDomain', appleOAuthFunctions.validateAppleDomain);
+    Parse.Cloud.define('getAppleOAuthAnalytics', appleOAuthFunctions.getAppleOAuthAnalytics);
+
+    // Authentication Cloud Functions
+    /**
+     * Creates a session token for an AmexingUser by user ID.
+     * Used for authentication after password validation to establish a Parse session.
+     * @function createSessionForUser
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<string>} - Promise resolving to the session token string.
+     * @throws {Parse.Error} - Throws error if user not found or session creation fails.
+     * @example
+     * // Call from authController
+     * const sessionToken = await Parse.Cloud.run('createSessionForUser', { userId: 'abc123' });
+     */
+    Parse.Cloud.define('createSessionForUser', async (request) => {
+      const { params } = request;
+      const { userId } = params;
+
+      try {
+        if (!userId) {
+          throw new Parse.Error(Parse.Error.INVALID_QUERY, 'User ID is required');
+        }
+
+        // Query AmexingUser to get the user
+        const userQuery = new Parse.Query('AmexingUser');
+        userQuery.equalTo('objectId', userId);
+        userQuery.equalTo('active', true);
+        userQuery.equalTo('exists', true);
+
+        const user = await userQuery.first({ useMasterKey: true });
+
+        if (!user) {
+          throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found or inactive');
+        }
+
+        // Create a new session for this user
+        const sessionData = {
+          user: {
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: userId,
+          },
+          createdWith: {
+            action: 'login',
+            authProvider: 'password',
+          },
+          restricted: false,
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
+        };
+
+        const Session = Parse.Object.extend('_Session');
+        const session = new Session();
+        session.set('user', sessionData.user);
+        session.set('createdWith', sessionData.createdWith);
+        session.set('restricted', sessionData.restricted);
+        session.set('expiresAt', sessionData.expiresAt);
+
+        await session.save(null, { useMasterKey: true });
+
+        logger.info('Session created for AmexingUser', {
+          userId,
+          sessionToken: session.get('sessionToken'),
+        });
+
+        return session.get('sessionToken');
+      } catch (error) {
+        logger.error('Error creating session for user', {
+          userId,
+          error: error.message,
+        });
+        throw new Parse.Error(Parse.Error.INTERNAL_SERVER_ERROR, `Failed to create session: ${error.message}`);
+      }
+    });
+
+    /**
+     * Retrieves user information by user ID with role-based access control.
+     * SuperAdmin and Admin roles can access any user, while other users can only access their own data.
+     * @function getUserById
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to sanitized user data including id, username, email, role, and timestamps.
+     * @example
+     * // Call from client
+     * const userData = await Parse.Cloud.run('getUserById', { userId: 'abc123' });
+     */
+    Parse.Cloud.define('getUserById', async (request) => {
+      const { params, user } = request;
+      const { userId } = params;
+
+      try {
+        // Allow superadmin/admin to get any user, others can only get their own
+        if (user && (user.get('role') === 'superadmin' || user.get('role') === 'admin' || user.id === userId)) {
+          // Query AmexingUser (all users are stored in AmexingUser table)
+          const AmexingUserQuery = new Parse.Query('AmexingUser');
+          AmexingUserQuery.equalTo('objectId', userId);
+          AmexingUserQuery.equalTo('exists', true);
+
+          const foundUser = await AmexingUserQuery.first({ useMasterKey: true });
+
+          if (!foundUser) {
+            throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
+          }
+
+          // Return sanitized user data
+          return {
+            id: foundUser.id,
+            username: foundUser.get('username'),
+            email: foundUser.get('email'),
+            firstName: foundUser.get('firstName'),
+            lastName: foundUser.get('lastName'),
+            role: foundUser.get('role') || 'user',
+            displayName: foundUser.get('displayName') || `${foundUser.get('firstName')} ${foundUser.get('lastName')}`,
+            isActive: foundUser.get('isActive') !== false,
+            emailVerified: foundUser.get('emailVerified') === true,
+            lastLoginAt: foundUser.get('lastLoginAt'),
+            createdAt: foundUser.get('createdAt'),
+            updatedAt: foundUser.get('updatedAt'),
+          };
+        }
+        throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Not authorized to access user data');
+      } catch (error) {
+        logger.error('Get user by ID error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Registers a new user account with the provided credentials and profile information.
+     * Logs the registration attempt and delegates to AuthenticationService for processing.
+     * @function registerUser
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to registration result with user data and tokens.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('registerUser', {
+     *   username: 'johndoe',
+     *   email: 'john@example.com',
+     *   password: 'user-password',
+     *   firstName: 'John',
+     *   lastName: 'Doe'
+     * });
+     */
+    Parse.Cloud.define('registerUser', async (request) => {
+      const { params, ip } = request;
+
+      try {
+        logger.info(`User registration attempt from IP: ${ip}`);
+
+        const result = await AuthenticationService.registerUser(params);
+
+        return result;
+      } catch (error) {
+        logger.error('Registration cloud function error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Authenticates a user with username/email and password credentials.
+     * Logs the login attempt and delegates to AuthenticationService for validation.
+     * @function loginUser
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to authentication result with user data and tokens.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('loginUser', {
+     *   identifier: 'johndoe',
+     *   password: 'user-password'
+     * });
+     */
+    Parse.Cloud.define('loginUser', async (request) => {
+      const { params, ip } = request;
+      const { identifier, password } = params;
+
+      try {
+        logger.info(`Login attempt for ${identifier} from IP: ${ip}`);
+
+        const result = await AuthenticationService.loginUser(identifier, password);
+
+        return result;
+      } catch (error) {
+        logger.error('Login cloud function error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Refreshes an expired access token using a valid refresh token.
+     * Validates the refresh token and issues new access and refresh tokens.
+     * @function refreshToken
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to new token pair.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('refreshToken', {
+     *   refreshToken: 'eyJhbGciOiJIUzI1NiIs...'
+     * });
+     */
+    Parse.Cloud.define('refreshToken', async (request) => {
+      const { params } = request;
+      const { refreshToken } = params;
+
+      try {
+        const result = await AuthenticationService.refreshToken(refreshToken);
+        return result;
+      } catch (error) {
+        logger.error('Token refresh cloud function error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Changes the password for an authenticated user.
+     * Requires current password verification before allowing password change.
+     * @function changePassword
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to password change result.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('changePassword', {
+     *   currentPassword: 'OldPass123',
+     *   newPassword: 'NewPass456'
+     * });
+     */
+    Parse.Cloud.define('changePassword', async (request) => {
+      const { params, user } = request;
+      const { currentPassword, newPassword } = params;
+
+      if (!user) {
+        throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'Authentication required');
+      }
+
+      try {
+        const result = await AuthenticationService.changePassword(user.id, currentPassword, newPassword);
+        return result;
+      } catch (error) {
+        logger.error('Password change cloud function error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Initiates a password reset process by sending a reset token to the user's email.
+     * Generates a secure reset token and sends password reset instructions.
+     * @function initiatePasswordReset
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to password reset initiation result.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('initiatePasswordReset', {
+     *   email: 'john@example.com'
+     * });
+     */
+    Parse.Cloud.define('initiatePasswordReset', async (request) => {
+      const { params } = request;
+      const { email } = params;
+
+      try {
+        const result = await AuthenticationService.initiatePasswordReset(email);
+        return result;
+      } catch (error) {
+        logger.error('Password reset initiation error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Completes the password reset process using a valid reset token.
+     * Validates the reset token and updates the user's password.
+     * @function resetPassword
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to password reset result.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('resetPassword', {
+     *   resetToken: 'abc123xyz',
+     *   newPassword: 'NewSecurePass789'
+     * });
+     */
+    Parse.Cloud.define('resetPassword', async (request) => {
+      const { params } = request;
+      const { resetToken, newPassword } = params;
+
+      try {
+        const result = await AuthenticationService.resetPassword(resetToken, newPassword);
+        return result;
+      } catch (error) {
+        logger.error('Password reset error:', error);
+        throw error;
+      }
+    });
+
+    // OAuth Cloud Functions
+    /**
+     * Generates an OAuth authorization URL for the specified provider.
+     * Creates a secure authorization URL with state parameter for CSRF protection.
+     * @function generateOAuthUrl
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to object containing the OAuth authorization URL.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('generateOAuthUrl', {
+     *   _provider: 'google',
+     *   state: 'random_state_string'
+     * });
+     */
+    Parse.Cloud.define('generateOAuthUrl', async (request) => {
+      const { params } = request;
+      const { _provider, state } = params;
+
+      try {
+        const authUrl = await OAuthService.generateAuthorizationUrl(_provider, state);
+        return { authUrl };
+      } catch (error) {
+        logger.error('OAuth URL generation error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Handles the OAuth callback from the provider after user authorization.
+     * Exchanges authorization code for tokens and creates or links user account.
+     * @function handleOAuthCallback
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to authentication result with user data and tokens.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('handleOAuthCallback', {
+     *   _provider: 'google',
+     *   code: 'authorization_code',
+     *   state: 'random_state_string'
+     * });
+     */
+    Parse.Cloud.define('handleOAuthCallback', async (request) => {
+      const { params, ip } = request;
+      const { _provider, code, state } = params;
+
+      try {
+        logger.info(`OAuth ${_provider} callback from IP: ${ip}`);
+
+        const result = await OAuthService.handleCallback(_provider, code, state);
+        return result;
+      } catch (error) {
+        logger.error('OAuth callback error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Links an OAuth account to an existing authenticated user.
+     * Requires active user session and adds OAuth provider to user's linked accounts.
+     * @function linkOAuthAccount
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to OAuth account linking result.
+     * @example
+     * // Call from client (requires authentication)
+     * const result = await Parse.Cloud.run('linkOAuthAccount', {
+     *   _provider: 'google',
+     *   oauthData: { providerId: '123456', accessToken: 'token' }
+     * });
+     */
+    Parse.Cloud.define('linkOAuthAccount', async (request) => {
+      const { params, user } = request;
+      const { _provider, oauthData } = params;
+
+      if (!user) {
+        throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'Authentication required');
+      }
+
+      try {
+        const result = await OAuthService.linkOAuthAccount(user.id, _provider, oauthData);
+        return result;
+      } catch (error) {
+        logger.error('OAuth account linking error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Unlinks an OAuth account from the authenticated user.
+     * Requires active user session and removes OAuth provider from user's linked accounts.
+     * @function unlinkOAuthAccount
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to OAuth account unlinking result.
+     * @example
+     * // Call from client (requires authentication)
+     * const result = await Parse.Cloud.run('unlinkOAuthAccount', {
+     *   _provider: 'google'
+     * });
+     */
+    Parse.Cloud.define('unlinkOAuthAccount', async (request) => {
+      const { params, user } = request;
+      const { _provider } = params;
+
+      if (!user) {
+        throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'Authentication required');
+      }
+
+      try {
+        const result = await OAuthService.unlinkOAuthAccount(user.id, _provider);
+        return result;
+      } catch (error) {
+        logger.error('OAuth account unlinking error:', error);
+        throw error;
+      }
+    });
+
+    /**
+     * Retrieves the list of available OAuth providers and their configurations.
+     * Returns provider information including supported authentication methods.
+     * @function getOAuthProviders
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to object containing array of provider configurations.
+     * @example
+     * // Call from client
+     * const result = await Parse.Cloud.run('getOAuthProviders');
+     * // Returns: { providers: [{ name: 'google', ... }, { name: 'apple', ... }] }
+     */
+    Parse.Cloud.define('getOAuthProviders', async (request) => {
+      try {
+        const providers = OAuthService.getAvailableProviders();
+        const providerConfigs = providers.map((_provider) => OAuthService.getProviderConfig(_provider));
+
+        return { providers: providerConfigs };
+      } catch (error) {
+        // Check if error is due to OAuthService initialization
+        if (error.message && (error.message.includes('not initialized') || error.message.includes('initialization'))) {
+          // Use debug logging for initialization-related errors (expected during startup)
+          logger.debug('getOAuthProviders called during OAuthService initialization', {
+            error: error.message,
+            timestamp: new Date().toISOString(),
+            phase: 'startup',
+          });
+
+          // Return empty providers gracefully during initialization
+          return { providers: [] };
+        }
+
+        // For other errors, use error logging (unexpected runtime errors)
+        logger.error('Get OAuth providers error:', error);
+        throw error;
+      }
+    });
+
+    // AmexingUser Triggers
+    /**
+     * BeforeSave trigger for AmexingUser that validates and normalizes user data before persistence.
+     * Enforces required fields, validates email and username formats, sets lifecycle defaults,
+     * and logs security events for user registration and updates.
+     * @function beforeSaveAmexingUser
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when validation is complete.
+     */
+    Parse.Cloud.beforeSave(AmexingUser, async (request) => {
+      const { object: user, master } = request;
+
+      // Skip validation for master key requests
+      if (master) {
+        return;
+      }
+
+      // Set default values for new users
+      if (!user.existed()) {
+        // Set createdAt and updatedAt if not set
+        if (!user.get('createdAt')) {
+          user.set('createdAt', new Date());
+        }
+        user.set('updatedAt', new Date());
+
+        // Set lifecycle defaults for new users (moved from BaseModel constructor)
+        if (user.get('active') === undefined) {
+          user.set('active', true);
+        }
+        if (user.get('exists') === undefined) {
+          user.set('exists', true);
+        }
+
+        // Log user registration
+        logger.logSecurityEvent('AMEXING_USER_REGISTRATION', {
+          username: user.get('username'),
+          email: user.get('email') ? `${user.get('email').substring(0, 3)}***` : undefined,
+          role: user.get('role'),
+          authMethod: user.get('primaryOAuthProvider') || 'password',
+        });
+      } else {
+        // Update the updatedAt field
+        user.set('updatedAt', new Date());
+
+        logger.logSecurityEvent('AMEXING_USER_UPDATE', {
+          userId: user.id,
+          username: user.get('username'),
+        });
+      }
+
+      // Validate required fields
+      const requiredFields = ['username', 'email', 'firstName', 'lastName', 'role'];
+      for (const field of requiredFields) {
+        if (!user.get(field)) {
+          throw new Parse.Error(Parse.Error.VALIDATION_ERROR, `${field} is required`);
+        }
+      }
+
+      // Validate email format
+      const email = user.get('email');
+      if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Invalid email format');
+        }
+        // Normalize email to lowercase
+        user.set('email', email.toLowerCase());
+      }
+
+      // Validate username format
+      const username = user.get('username');
+      if (username) {
+        const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+        if (!usernameRegex.test(username)) {
+          throw new Parse.Error(
+            Parse.Error.VALIDATION_ERROR,
+            'Username must be 3-20 characters, alphanumeric and underscores only'
+          );
+        }
+        // Normalize username to lowercase
+        user.set('username', username.toLowerCase());
+      }
+
+      // Validate role
+      const validRoles = ['user', 'client', 'employee', 'admin', 'superadmin'];
+      const role = user.get('role');
+      if (role && !validRoles.includes(role)) {
+        throw new Parse.Error(Parse.Error.VALIDATION_ERROR, `Invalid role. Must be one of: ${validRoles.join(', ')}`);
+      }
+
+      // Validate OAuth accounts format
+      const oauthAccounts = user.get('oauthAccounts');
+      if (oauthAccounts && Array.isArray(oauthAccounts)) {
+        for (const account of oauthAccounts) {
+          if (!account.provider || !account.providerId) {
+            throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'OAuth accounts must have provider and providerId');
+          }
+        }
+      }
+    });
+
+    /**
+     * AfterSave trigger for AmexingUser that performs post-save operations.
+     * Logs new user creation and can be extended for additional setup tasks.
+     * @function afterSaveAmexingUser
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when post-save operations are complete.
+     */
+    Parse.Cloud.afterSave(AmexingUser, async (request) => {
+      const { object: user } = request;
+
+      if (!user.existed()) {
+        logger.info(`New AmexingUser created: ${user.id} (${user.get('username')})`);
+
+        // Initialize any additional setup for new users
+        // This could include creating related objects, sending welcome emails, etc.
+      }
+    });
+
+    /**
+     * BeforeDelete trigger for AmexingUser that enforces deletion security.
+     * Requires master key for deletion and logs security event for audit trail.
+     * @function beforeDeleteAmexingUser
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when deletion validation is complete.
+     */
+    Parse.Cloud.beforeDelete(AmexingUser, async (request) => {
+      const { object: user, master } = request;
+
+      // Only allow user deletion with master key
+      if (!master) {
+        throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'AmexingUser can only be deleted with master key');
+      }
+
+      logger.logSecurityEvent('AMEXING_USER_DELETION', {
+        userId: user.id,
+        username: user.get('username'),
+        email: user.get('email') ? `${user.get('email').substring(0, 3)}***` : undefined,
+      });
+    });
+
+    // Legacy Parse.User triggers (for backward compatibility if needed)
+    /**
+     * BeforeSave trigger for legacy Parse.User that provides basic validation.
+     * Validates required fields and email format, logs security events for backward compatibility.
+     * @function beforeSaveParseUser
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when validation is complete.
+     */
+    Parse.Cloud.beforeSave(Parse.User, async (request) => {
+      const { object: user, master } = request;
+
+      // EMAIL UNIQUENESS VALIDATION (runs even with masterKey for data integrity)
+      const email = user.get('email');
+      if (email) {
+        // Trim and lowercase email for consistent validation
+        const normalizedEmail = email.trim().toLowerCase();
+        user.set('email', normalizedEmail);
+
+        // Check if email is being changed
+        const isCreating = !user.existed();
+        const isEmailChanged = isCreating || (request.original && request.original.get('email') !== normalizedEmail);
+
+        if (isEmailChanged) {
+          // Query for existing users with this email
+          const query = new Parse.Query(Parse.User);
+          query.equalTo('email', normalizedEmail);
+          if (!isCreating && user.id) {
+            query.notEqualTo('objectId', user.id);
+          }
+          query.limit(1);
+
+          const existingUser = await query.first({ useMasterKey: true });
+          if (existingUser) {
+            logger.warn('Duplicate email attempt detected', {
+              attemptedEmail: normalizedEmail,
+              existingUserId: existingUser.id,
+              attemptedBy: request.user?.id || 'unauthenticated',
+              isCreating,
+            });
+
+            throw new Parse.Error(
+              Parse.Error.DUPLICATE_VALUE,
+              'Email address is already registered. Please use a different email or contact support.'
+            );
+          }
+        }
+      }
+
+      // Skip remaining validation for master key requests (non-critical validations)
+      if (master) {
+        return;
+      }
+
+      // Log legacy user operations
+      if (!user.existed()) {
+        logger.logSecurityEvent('LEGACY_USER_REGISTRATION', {
+          username: user.get('username'),
+          email: user.get('email') ? `${user.get('email').substring(0, 3)}***` : undefined,
+        });
+      }
+
+      // Basic validation for legacy users
+      if (!user.get('username')) {
+        throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Username is required');
+      }
+
+      if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Invalid email format');
+        }
+      }
+    });
+
+    // After Save Triggers
+    /**
+     * AfterSave trigger for legacy Parse.User that performs post-save operations.
+     * Logs new user creation and can be extended for profile initialization.
+     * @function afterSaveParseUser
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when post-save operations are complete.
+     */
+    Parse.Cloud.afterSave(Parse.User, async (request) => {
+      const { object: user } = request;
+
+      if (!user.existed()) {
+        logger.info(`New user created: ${user.id}`);
+
+        // Initialize user profile or perform other setup tasks
+        // This is where you might create related objects, send welcome emails, etc.
+      }
+    });
+
+    // Before Delete Triggers
+    /**
+     * BeforeDelete trigger for legacy Parse.User that enforces deletion security.
+     * Requires master key for deletion and logs security event for audit trail.
+     * @function beforeDeleteParseUser
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when deletion validation is complete.
+     */
+    Parse.Cloud.beforeDelete(Parse.User, async (request) => {
+      const { object: user, master } = request;
+
+      // Only allow user deletion with master key
+      if (!master) {
+        throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Users can only be deleted with master key');
+      }
+
+      logger.logSecurityEvent('USER_DELETION', {
+        userId: user.id,
+        username: user.get('username'),
+      });
+    });
+
+    // After Login Trigger
+    /**
+     * AfterLogin trigger that logs successful login attempts and updates user metadata.
+     * Records access attempt in audit log and updates lastLoginAt timestamp.
+     * @function afterLogin
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when post-login operations are complete.
+     */
+    Parse.Cloud.afterLogin(async (request) => {
+      const { object: user } = request;
+
+      logger.logAccessAttempt(true, user.get('username'), request.ip);
+
+      // Update last login timestamp
+      user.set('lastLoginAt', new Date());
+      await user.save(null, { useMasterKey: true });
+    });
+
+    // After Logout Trigger
+    /**
+     * AfterLogout trigger that logs user logout events for security audit.
+     * Records session termination in security event log.
+     * @function afterLogout
+     * @param {Parse.Cloud.TriggerRequest} request - The Parse Cloud trigger request object.
+     * @returns {Promise<void>} - Promise that resolves when post-logout operations are complete.
+     */
+    Parse.Cloud.afterLogout(async (request) => {
+      const { object: session } = request;
+
+      logger.logSecurityEvent('USER_LOGOUT', {
+        sessionToken: `${session.get('sessionToken').substring(0, 8)}***`,
+      });
+    });
+
+    // Job Functions (Scheduled Tasks)
+    /**
+     * Scheduled job that cleans up expired Parse sessions from the database.
+     * Queries for sessions past their expiration date and removes them to maintain database hygiene.
+     * @function cleanupExpiredSessions
+     * @param {Parse.Cloud.JobRequest} request - The Parse Cloud job request object.
+     * @returns {Promise<object>} - Promise resolving to cleanup result with success status and deleted count.
+     * @example
+     * // Schedule this job in Parse Dashboard or via command line
+     * // Returns: { success: true, deletedCount: 42 }
+     */
+    Parse.Cloud.job('cleanupExpiredSessions', async (request) => {
+      const { message } = request;
+      message('Starting expired sessions cleanup...');
+
+      try {
+        const Session = Parse.Object.extend('_Session');
+        const query = new Parse.Query(Session);
+        query.lessThan('expiresAt', new Date());
+
+        const expiredSessions = await query.find({ useMasterKey: true });
+
+        if (expiredSessions.length > 0) {
+          await Parse.Object.destroyAll(expiredSessions, {
+            useMasterKey: true,
+          });
+          message(`Deleted ${expiredSessions.length} expired sessions`);
+          logger.info(`Cleanup job: Deleted ${expiredSessions.length} expired sessions`);
+        } else {
+          message('No expired sessions found');
+        }
+
+        return { success: true, deletedCount: expiredSessions.length };
+      } catch (error) {
+        logger.error('Error in cleanup job:', error);
+        throw error;
+      }
+    });
+
+    // Security audit job
+    /**
+     * Scheduled job that performs security audits on user accounts.
+     * Checks for unverified email addresses and generates audit reports for compliance monitoring.
+     * @function securityAudit
+     * @param {Parse.Cloud.JobRequest} request - The Parse Cloud job request object.
+     * @returns {Promise<object>} - Promise resolving to audit results with user statistics and timestamp.
+     * @example
+     * // Schedule this job in Parse Dashboard or via command line
+     * // Returns: { totalUsers: 150, unverifiedUsers: 12, timestamp: '2025-10-01T...' }
+     */
+    Parse.Cloud.job('securityAudit', async (request) => {
+      const { message } = request;
+      message('Running security audit...');
+
+      try {
+        // Check for users with weak passwords (this is a placeholder)
+        const User = Parse.Object.extend('_User');
+        const query = new Parse.Query(User);
+        const totalUsers = await query.count({ useMasterKey: true });
+
+        // Check for users without email verification
+        const unverifiedQuery = new Parse.Query(User);
+        unverifiedQuery.equalTo('emailVerified', false);
+        const unverifiedUsers = await unverifiedQuery.count({
+          useMasterKey: true,
+        });
+
+        const auditResults = {
+          totalUsers,
+          unverifiedUsers,
+          timestamp: new Date().toISOString(),
+        };
+
+        logger.logSecurityEvent('SECURITY_AUDIT', auditResults);
+        message(`Audit complete. Total users: ${totalUsers}, Unverified: ${unverifiedUsers}`);
+
+        return auditResults;
+      } catch (error) {
+        logger.error('Error in security audit:', error);
+        throw error;
+      }
+    });
+
+    logger.info('Cloud Code loaded successfully');
+
+    // Register audit trail hooks INSIDE registerCloudFunctions to ensure Parse.Cloud is available
+    logger.info('Registering audit trail hooks...');
+    registerAuditHooks();
+    logger.info('✅ Audit trail hooks registered successfully');
+    logger.info('✅ Email uniqueness validation enabled for Parse.User (cloud/main.js beforeSave hook)');
   } catch (error) {
-    logger.error('Error in cleanup job:', error);
-    throw error;
+    logger.error('Error registering cloud functions:', error);
   }
-});
+}
 
-// Security audit job
-Parse.Cloud.job('securityAudit', async (request) => {
-  const { message } = request;
-  message('Running security audit...');
+// The retry mechanism is not needed since Parse Server loads this file directly
+// and Parse.Cloud is always available in this context
 
-  try {
-    // Check for users with weak passwords (this is a placeholder)
-    const User = Parse.Object.extend('_User');
-    const query = new Parse.Query(User);
-    const totalUsers = await query.count({ useMasterKey: true });
-
-    // Check for users without email verification
-    const unverifiedQuery = new Parse.Query(User);
-    unverifiedQuery.equalTo('emailVerified', false);
-    const unverifiedUsers = await unverifiedQuery.count({ useMasterKey: true });
-
-    const auditResults = {
-      totalUsers,
-      unverifiedUsers,
-      timestamp: new Date().toISOString(),
-    };
-
-    logger.logSecurityEvent('SECURITY_AUDIT', auditResults);
-    message(
-      `Audit complete. Total users: ${totalUsers}, Unverified: ${unverifiedUsers}`
-    );
-
-    return auditResults;
-  } catch (error) {
-    logger.error('Error in security audit:', error);
-    throw error;
-  }
-});
-
-logger.info('Cloud Code loaded successfully');
+// Register cloud functions immediately
+// Parse Server loads this file and Parse.Cloud is available
+try {
+  logger.info('Starting cloud functions registration (including audit hooks)...');
+  registerCloudFunctions();
+  logger.info('Cloud functions and audit hooks registration completed successfully');
+} catch (error) {
+  logger.error('Failed to register cloud functions:', error);
+  logger.error('Cloud function registration error details:', {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+  });
+}

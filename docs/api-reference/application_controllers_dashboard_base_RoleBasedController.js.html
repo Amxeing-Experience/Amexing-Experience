@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: application/controllers/dashboard/base/RoleBasedController.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: application/controllers/dashboard/base/RoleBasedController.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>const DashboardController = require('./DashboardController');
+
+/**
+ * RoleBasedController - Liskov Substitution Principle (LSP) &amp; Interface Segregation Principle (ISP)
+ * Child classes can be substituted for parent class
+ * Provides role-specific interfaces without forcing unnecessary implementations.
+ */
+class RoleBasedController extends DashboardController {
+  constructor(role) {
+    super();
+    this.role = role;
+    this.permissions = this.getDefaultPermissions();
+  }
+
+  /**
+   * Get default permissions for the role.
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  getDefaultPermissions() {
+    const permissionMap = {
+      superadmin: ['*'], // All permissions
+      admin: [
+        'view_all_clients',
+        'manage_clients',
+        'view_all_users',
+        'manage_bookings',
+        'view_reports',
+        'manage_fleet',
+        'manage_drivers',
+      ],
+      client: [
+        'view_own_company',
+        'manage_departments',
+        'manage_employees',
+        'view_company_reports',
+        'manage_budgets',
+        'approve_bookings',
+      ],
+      department_manager: [
+        'view_department',
+        'manage_team',
+        'approve_team_bookings',
+        'view_department_budget',
+        'allocate_budget',
+        'view_department_reports',
+      ],
+      employee: [
+        'view_own_profile',
+        'create_booking',
+        'view_own_bookings',
+        'view_own_budget',
+        'submit_feedback',
+      ],
+      driver: [
+        'view_own_profile',
+        'view_assigned_trips',
+        'update_trip_status',
+        'view_earnings',
+        'manage_vehicle',
+      ],
+      guest: [
+        'view_event_info',
+        'view_transport_details',
+      ],
+    };
+
+    return permissionMap[this.role] || [];
+  }
+
+  /**
+   * Check if user has required role.
+   * @param requiredRole
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  requireRole(requiredRole) {
+    return (req, res, next) => {
+      if (!req.user) {
+        return this.redirectWithMessage(res, '/login', 'Please login to continue', 'error');
+      }
+
+      const roleHierarchy = {
+        superadmin: 7,
+        admin: 6,
+        client: 5,
+        department_manager: 4,
+        employee: 3,
+        driver: 2,
+        guest: 1,
+      };
+
+      const userLevel = roleHierarchy[req.user.role] || 0;
+      const requiredLevel = roleHierarchy[requiredRole] || 0;
+
+      if (userLevel &lt; requiredLevel) {
+        return this.handleError(res, new Error('Insufficient permissions'), 403);
+      }
+
+      next();
+    };
+  }
+
+  /**
+   * Get role-specific view path.
+   * @param viewName
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  getRoleViewPath(viewName) {
+    return `dashboards/${this.role}/${viewName}`;
+  }
+
+  /**
+   * Render role-specific view.
+   * @param req
+   * @param res
+   * @param viewName
+   * @param data
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  async renderRoleView(req, res, viewName, data = {}) {
+    const viewPath = this.getRoleViewPath(viewName);
+    const roleData = {
+      ...data,
+      userRole: this.role,
+      permissions: this.permissions,
+    };
+
+    return this.renderDashboard(req, res, viewPath, roleData);
+  }
+
+  /**
+   * Get role-specific menu items.
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  getRoleMenuItems() {
+    // This will be overridden by specific role controllers
+    return [];
+  }
+
+  /**
+   * Get role-specific dashboard widgets.
+   * @param userId
+   * @param _userId
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  async getRoleWidgets(_userId) {
+    // This will be overridden by specific role controllers
+    return [];
+  }
+
+  /**
+   * Apply role-specific data filters.
+   * @param query
+   * @param user
+   * @param _user
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  applyRoleFilters(query, _user) {
+    // This will be overridden by specific role controllers
+    return query;
+  }
+
+  /**
+   * Get role-specific notifications.
+   * @param userId
+   * @param _userId
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  async getRoleNotifications(_userId) {
+    // This will be overridden by specific role controllers
+    return [];
+  }
+
+  /**
+   * Validate role-specific actions.
+   * @param action
+   * @param user
+   * @param _user
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  validateRoleAction(action, _user) {
+    if (this.permissions.includes('*')) {
+      return true;
+    }
+
+    return this.permissions.includes(action);
+  }
+
+  /**
+   * Get role dashboard route.
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  getRoleDashboardRoute() {
+    return `/dashboard/${this.role}`;
+  }
+
+  /**
+   * Handle role-specific redirects.
+   * @param req
+   * @param res
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  handleRoleRedirect(req, res) {
+    const dashboardRoute = this.getRoleDashboardRoute();
+    return res.redirect(dashboardRoute);
+  }
+
+  /**
+   * Log role-specific activity.
+   * @param userId
+   * @param action
+   * @param details
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  async logRoleActivity(userId, action, details = {}) {
+    const activityData = {
+      ...details,
+      role: this.role,
+      timestamp: new Date(),
+    };
+
+    return this.logActivity(userId, action, activityData);
+  }
+
+  /**
+   * Get role-specific settings.
+   * @example
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   */
+  getRoleSettings() {
+    const settingsMap = {
+      superadmin: {
+        showSystemStats: true,
+        showAllClients: true,
+        canModifySystem: true,
+        canViewAuditLogs: true,
+      },
+      admin: {
+        showOperationalStats: true,
+        showClientManagement: true,
+        canManageFleet: true,
+        canViewReports: true,
+      },
+      client: {
+        showCompanyStats: true,
+        showDepartments: true,
+        canManageBudgets: true,
+        canApproveBookings: true,
+      },
+      department_manager: {
+        showDepartmentStats: true,
+        showTeamManagement: true,
+        canAllocateBudget: true,
+        canApproveTeamBookings: true,
+      },
+      employee: {
+        showPersonalStats: true,
+        canCreateBookings: true,
+        canViewBudget: true,
+        canSubmitFeedback: true,
+      },
+      driver: {
+        showTripStats: true,
+        showEarnings: true,
+        canUpdateTripStatus: true,
+        canManageVehicle: true,
+      },
+      guest: {
+        showEventInfo: true,
+        showTransportInfo: true,
+        canViewOnly: true,
+      },
+    };
+
+    return settingsMap[this.role] || {};
+  }
+}
+
+module.exports = RoleBasedController;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

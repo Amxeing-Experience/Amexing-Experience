@@ -1,0 +1,75 @@
+<%
+/**
+ * Badge Atom
+ * Reusable badge/tag component for status indicators
+ *
+ * @param {string} text - Badge text content
+ * @param {string} variant - Badge variant (primary, secondary, success, danger, warning, info, light, dark)
+ * @param {string} size - Badge size (sm, default, lg)
+ * @param {boolean} pill - Whether badge should be pill-shaped
+ * @param {boolean} outline - Whether badge should be outline style
+ * @param {string} icon - Icon name to include in badge (optional)
+ * @param {string} iconPosition - Icon position (left, right)
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const badgeText = typeof text !== 'undefined' ? text : '';
+const badgeVariant = typeof variant !== 'undefined' ? variant : 'primary';
+const badgeSize = typeof size !== 'undefined' ? size : 'default';
+const badgePill = typeof pill !== 'undefined' ? pill : false;
+const badgeOutline = typeof outline !== 'undefined' ? outline : false;
+const badgeIcon = typeof icon !== 'undefined' ? icon : '';
+const badgeIconPosition = typeof iconPosition !== 'undefined' ? iconPosition : 'left';
+const badgeAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const badgeAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Build classes
+let badgeClasses = ['badge'];
+
+// Variant class
+if (badgeOutline) {
+    badgeClasses.push(`border border-${badgeVariant} text-${badgeVariant}`);
+    badgeClasses.push('bg-transparent');
+} else {
+    badgeClasses.push(`bg-${badgeVariant}`);
+}
+
+// Size classes
+if (badgeSize === 'sm') {
+    badgeClasses.push('fs-7');
+} else if (badgeSize === 'lg') {
+    badgeClasses.push('fs-6');
+}
+
+// Shape class
+if (badgePill) {
+    badgeClasses.push('rounded-pill');
+}
+
+// Additional classes
+if (badgeAdditionalClasses) {
+    badgeClasses.push(badgeAdditionalClasses);
+}
+
+// Build attributes string
+let attributesString = '';
+if (badgeAttributes && typeof badgeAttributes === 'object') {
+    attributesString = Object.entries(badgeAttributes)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+}
+
+// Icon HTML
+const iconHtml = badgeIcon ? `<i class="ti ti-${badgeIcon}"></i>` : '';
+const iconSpacing = badgeIcon && badgeText ? ' ' : '';
+
+const finalClasses = badgeClasses.join(' ');
+%>
+
+<span class="<%= finalClasses %>" <% if (attributesString) { %><%= attributesString %><% } %>>
+    <% if (badgeIcon && badgeIconPosition === 'left') { %><%= iconHtml %><%= iconSpacing %><% } %>
+    <%= badgeText %>
+    <% if (badgeIcon && badgeIconPosition === 'right') { %><%= iconSpacing %><%= iconHtml %><% } %>
+</span>

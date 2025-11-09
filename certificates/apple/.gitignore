@@ -1,0 +1,18 @@
+# Apple OAuth Certificate Files
+# NEVER commit these files to version control
+
+# Private key files
+*.p8
+AuthKey_*.p8
+
+# Certificate files  
+*.cer
+*.pem
+
+# Backup files
+*.bak
+*.backup
+
+# Temporary files
+*.tmp
+.DS_Store

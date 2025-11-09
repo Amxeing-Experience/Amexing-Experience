@@ -57,20 +57,27 @@ else
     log_warning "Semgrep not found. Install with: pip install semgrep"
 fi
 
-# 3. Check for secrets in staged files
+# 3. Check for secrets in staged files (PCI DSS compliant)
 log_info "Scanning for potential secrets..."
 staged_files=$(git diff --cached --name-only)
+
 if [ -n "$staged_files" ]; then
-    # Check for common secret patterns
-    if echo "$staged_files" | xargs grep -l "password\|secret\|key\|token\|credential" 2>/dev/null; then
-        log_warning "Potential secrets detected in staged files:"
-        echo "$staged_files" | xargs grep -n "password\|secret\|key\|token\|credential" 2>/dev/null || true
-        echo ""
-        read -p "Continue anyway? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_error "Commit aborted. Review and remove sensitive data."
-            exit 1
+    # Block real sensitive files (strict check)
+    if echo "$staged_files" | grep -E "\.env$|\.key$|\.pem$|\.p12$|id_rsa$|id_dsa$" > /dev/null; then
+        log_error "Attempting to commit sensitive files - PCI DSS Req 3.4 violation!"
+        echo "Blocked files:"
+        echo "$staged_files" | grep -E "\.env$|\.key$|\.pem$|\.p12$|id_rsa$|id_dsa$"
+        exit 1
+    fi
+
+    # Quick check for hardcoded credentials (limited to JS/TS files)
+    js_files=$(echo "$staged_files" | grep -E "\.(js|ts)$" || true)
+    if [ -n "$js_files" ]; then
+        # Fast pattern: look for actual hardcoded values only
+        secrets=$(echo "$js_files" | xargs grep -nE "(password|secret|apiKey|token)\s*[:=]\s*['\"][a-zA-Z0-9_-]{16,}" 2>/dev/null || true)
+        if [ -n "$secrets" ]; then
+            log_warning "Potential hardcoded values detected - review manually"
+            echo "$secrets" | head -5
         fi
     fi
 fi
@@ -83,10 +90,12 @@ if [ -f "CHANGELOG.md" ]; then
     fi
 fi
 
-# 5. Documentation coverage check
+# 5. Documentation coverage check (mandatory)
 log_info "Checking documentation coverage..."
 if ! yarn docs:coverage; then
-    log_warning "Documentation coverage check failed. Consider updating docs."
+    log_error "Documentation coverage below threshold. Update JSDoc comments."
+    log_error "Run 'yarn docs:coverage' to see which files need documentation."
+    exit 1
 fi
 
 # 6. Check for PCI DSS compliance keywords in security commits

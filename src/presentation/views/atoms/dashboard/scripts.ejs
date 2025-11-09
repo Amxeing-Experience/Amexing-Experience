@@ -1,0 +1,236 @@
+<%
+/**
+ * Dashboard Scripts Atom
+ * Global dashboard JavaScript functionality
+ *
+ * @param {array} additionalScripts - Optional array of additional JavaScript files
+ * @param {string} userRole - Current user role
+ * @param {string} userId - Current user ID
+ */
+
+// Default parameters
+const dashboardAdditionalScripts = typeof additionalScripts !== 'undefined' ? additionalScripts : [];
+const dashboardUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
+const dashboardUserId = typeof userId !== 'undefined' ? userId : null;
+%>
+
+<!-- Additional Scripts -->
+<% if (dashboardAdditionalScripts && dashboardAdditionalScripts.length > 0) { %>
+    <% dashboardAdditionalScripts.forEach(function(script) { %>
+        <%
+        // Security: Allowlist of safe script patterns
+        const safeScriptPattern = /^(\/|\.\/|\.\.\/|https?:\/\/(localhost|127\.0\.0\.1|[a-zA-Z0-9.-]+\.trusted\.domain))/;
+        const relativeDashboardPattern = /^\/dashboard\//;
+        const relativePublicPattern = /^\/public\//;
+
+        if (script && (relativeDashboardPattern.test(script) || relativePublicPattern.test(script) || script.startsWith('/flexy-bootstrap'))) {
+        %>
+        <script src="<%= script %>"></script> <!-- nosemgrep: allowlisted safe script paths -->
+        <% } %>
+    <% }); %>
+<% } %>
+
+<script>
+    // Global Dashboard Configuration
+    window.AmexingConfig = {
+        userRole: '<%= dashboardUserRole %>',
+        userId: '<%= dashboardUserId %>',
+        apiEndpoint: '/api/v1'
+    };
+
+    // Dashboard Initialization Class
+    class AmexingDashboard {
+        constructor() {
+            this.userRole = window.AmexingConfig.userRole;
+            this.userId = window.AmexingConfig.userId;
+            this.notifications = [];
+            this.searchDebounceTimer = null;
+        }
+
+        init() {
+            this.initializeBootstrapComponents();
+            this.setupNotifications();
+            this.setupSearch();
+            this.setupThemeToggle();
+            this.setupSidebar();
+            this.logInitialization();
+        }
+
+        initializeBootstrapComponents() {
+            // Initialize Bootstrap tooltips
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl =>
+                new bootstrap.Tooltip(tooltipTriggerEl)
+            );
+
+            // Initialize Bootstrap popovers
+            const popoverTriggerList = document.querySelectorAll('[data-bs-toggle="popover"]');
+            const popoverList = [...popoverTriggerList].map(popoverTriggerEl =>
+                new bootstrap.Popover(popoverTriggerEl)
+            );
+        }
+
+        setupNotifications() {
+            // Setup real-time notifications based on user role
+            // WebSocket functionality disabled - not implemented yet
+        }
+
+        // WebSocket methods commented out - to be implemented in future
+        // initializeWebSocketConnection() {
+        //     // WebSocket connection for real-time updates
+        //     try {
+        //         const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws`;
+        //         this.ws = new WebSocket(wsUrl);
+        //
+        //         this.ws.onmessage = (event) => this.handleWebSocketMessage(event);
+        //         this.ws.onerror = (error) => console.error('❌ WebSocket error:', error);
+        //     } catch (error) {
+        //     }
+        // }
+        //
+        // handleWebSocketMessage(event) {
+        //     try {
+        //         const data = JSON.parse(event.data);
+        //         this.showNotification(data.message, data.type || 'info');
+        //     } catch (error) {
+        //         console.error('Error parsing WebSocket message:', error);
+        //     }
+        // }
+
+        setupSearch() {
+            const searchInput = document.querySelector('#global-search');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    clearTimeout(this.searchDebounceTimer);
+                    this.searchDebounceTimer = setTimeout(() => {
+                        this.performSearch(e.target.value);
+                    }, 300);
+                });
+            }
+        }
+
+        performSearch(query) {
+            if (query.length < 2) return;
+
+
+            // Implement search logic based on user role
+            const searchEndpoint = `/api/v1/search?q=${encodeURIComponent(query)}&role=${this.userRole}`;
+
+            fetch(searchEndpoint)
+                .then(response => response.json())
+                .then(data => this.displaySearchResults(data))
+                .catch(error => console.error('Search error:', error));
+        }
+
+        displaySearchResults(results) {
+            const searchResults = document.querySelector('#search-results');
+            if (searchResults && results.data) {
+                // Display search results
+            }
+        }
+
+        setupThemeToggle() {
+            const themeToggle = document.querySelector('#theme-toggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', () => {
+                    this.toggleTheme();
+                });
+            }
+
+            // Apply saved theme
+            this.applySavedTheme();
+        }
+
+        toggleTheme() {
+            const isDarkMode = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('amexing_theme', isDarkMode ? 'dark' : 'light');
+
+            // Update theme toggle icon
+            const themeIcon = document.querySelector('#theme-toggle i');
+            if (themeIcon) {
+                themeIcon.className = isDarkMode ? 'ti ti-sun' : 'ti ti-moon';
+            }
+        }
+
+        applySavedTheme() {
+            const savedTheme = localStorage.getItem('amexing_theme');
+            if (savedTheme === 'dark') {
+                document.body.classList.add('dark-mode');
+                const themeIcon = document.querySelector('#theme-toggle i');
+                if (themeIcon) themeIcon.className = 'ti ti-sun';
+            }
+        }
+
+        setupSidebar() {
+            // Handle sidebar toggle for mobile
+            const sidebarToggle = document.querySelector('#sidebarCollapse');
+            const sidebar = document.querySelector('.left-sidebar');
+
+            if (sidebarToggle && sidebar) {
+                sidebarToggle.addEventListener('click', () => {
+                    sidebar.classList.toggle('show');
+                });
+
+                // Close sidebar on overlay click (mobile)
+                document.addEventListener('click', (e) => {
+                    if (window.innerWidth <= 991.98 &&
+                        !sidebar.contains(e.target) &&
+                        !sidebarToggle.contains(e.target) &&
+                        sidebar.classList.contains('show')) {
+                        sidebar.classList.remove('show');
+                    }
+                });
+            }
+        }
+
+        showNotification(message, type = 'info') {
+            // Create and show toast notification
+            const toastHtml = `
+                <div class="toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} border-0" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">${message}</div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+
+            let toastContainer = document.querySelector('#toast-container');
+            if (!toastContainer) {
+                toastContainer = document.createElement('div');
+                toastContainer.id = 'toast-container';
+                toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                toastContainer.style.zIndex = '9999';
+                document.body.appendChild(toastContainer);
+            }
+
+            toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+            const toastElement = toastContainer.lastElementChild;
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
+
+            // Remove toast element after it's hidden
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        }
+
+        logInitialization() {
+            // Dashboard initialized silently
+        }
+    }
+
+    // Global instance
+    window.amexingDashboard = new AmexingDashboard();
+
+    // Initialize on DOM ready
+    document.addEventListener('DOMContentLoaded', function() {
+        window.amexingDashboard.init();
+    });
+
+    // Handle page visibility changes
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            // Refresh dashboard data if needed
+        }
+    });
+</script>

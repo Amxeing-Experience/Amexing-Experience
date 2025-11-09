@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Icon Test</title>
+    <link rel="stylesheet" href="/flexy-bootstrap-lite-1.0.0/assets/css/icons/tabler-icons/tabler-icons.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: white;
+        }
+        .test-icon {
+            font-size: 24px;
+            margin: 10px;
+            color: #333;
+            display: inline-block;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+        }
+    </style>
+</head>
+<body>
+    <h1>Tabler Icons Test</h1>
+
+    <div class="test-section">
+        <h2>Basic Icons Test</h2>
+        <i class="ti ti-user test-icon"></i> User
+        <i class="ti ti-lock test-icon"></i> Lock
+        <i class="ti ti-eye test-icon"></i> Eye
+        <i class="ti ti-mail test-icon"></i> Mail
+        <i class="ti ti-home test-icon"></i> Home
+        <i class="ti ti-login test-icon"></i> Login
+        <i class="ti ti-arrow-left test-icon"></i> Arrow Left
+    </div>
+
+    <div class="test-section">
+        <h2>Button Test</h2>
+        <button style="padding: 10px; margin: 5px;">
+            <i class="ti ti-home test-icon"></i> Go to Homepage
+        </button>
+        <button style="padding: 10px; margin: 5px;">
+            <i class="ti ti-arrow-left test-icon"></i> Go Back
+        </button>
+    </div>
+
+    <div class="test-section">
+        <h2>Font Loading Test</h2>
+        <p>Font family should be: <span style="font-family: 'tabler-icons';">Test Text</span></p>
+    </div>
+
+    <div class="test-section">
+        <h2>Raw Unicode Test</h2>
+        <span style="font-family: 'tabler-icons'; font-size: 24px;">&#xea62;</span> (Should be user icon)
+    </div>
+</body>
+</html>

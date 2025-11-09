@@ -4,9 +4,13 @@ const logger = require('../../infrastructure/logger');
  * Test Cloud Function.
  * A simple test endpoint for checking Parse Cloud functionality.
  * @param {object} request - Parse Cloud Function request object.
- * @param {object} request.params - Request parameters to echo back.
- * @returns {Promise<object>} Test response with success status and echoed parameters.
+ * @returns {Promise<object>} - Test response with success status and echoed parameters.
  * @example
+ * // Cloud function usage
+ * Parse.Cloud.run('functionName', { request: 'example' });
+ * // Returns: function result
+ * // const isValid = validator.validate(data);
+ * // Returns: boolean or validation result object
  * // Call from client
  * Parse.Cloud.run('test', { data: 'sample' })
  */

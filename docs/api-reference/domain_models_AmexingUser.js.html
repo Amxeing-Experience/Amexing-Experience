@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: domain/models/AmexingUser.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: domain/models/AmexingUser.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * AmexingUser Model - Custom User Entity for Amexing Platform
+ * Replaces Parse.User with enhanced OAuth and PCI DSS compliance features.
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @created 2024-09-12
+ */
+
+const Parse = require('parse/node');
+const bcrypt = require('bcrypt');
+const logger = require('../../infrastructure/logger');
+const BaseModel = require('./BaseModel');
+
+/**
+ * AmexingUser Model - Extended Parse User with comprehensive PCI DSS compliance features.
+ * Provides secure authentication, password management, OAuth integration, account lockout
+ * protection, and comprehensive audit capabilities for the Amexing platform.
+ *
+ * This model replaces Parse.User with enhanced security features including bcrypt password
+ * hashing, failed login attempt tracking, account lockout mechanisms, OAuth account
+ * management, and detailed audit logging for PCI DSS compliance.
+ *
+ * Features:
+ * - PCI DSS compliant password hashing with bcrypt
+ * - Account lockout protection with configurable thresholds
+ * - Multi-provider OAuth account management (Google, Microsoft, Apple)
+ * - Failed login attempt tracking and security logging
+ * - Password strength validation with customizable requirements
+ * - Safe JSON serialization excluding sensitive data
+ * - Comprehensive audit trails for security monitoring
+ * - Email verification and user activation workflows
+ * - Role-based access control integration
+ * - Session management and authentication tracking.
+ * @class AmexingUser
+ * @augments Parse.Object
+ * @author Amexing Development Team
+ * @version 2.0.0
+ * @since 1.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Create new user with secure password
+ * const userData = {
+ *   username: 'john.doe',
+ *   email: 'john@example.com',
+ *   firstName: 'John',
+ *   lastName: 'Doe'
+ * };
+ * const user = AmexingUser.create(userData);
+ * await user.setPassword('user-password');
+ * await user.save();
+ *
+ * // Validate user password
+ * const isValid = await user.validatePassword('user-password');
+ * if (isValid) {
+ *   await user.recordSuccessfulLogin('password');
+ * } else {
+ *   const isLocked = await user.recordFailedLogin();
+ * }
+ *
+ * // OAuth account management
+ * user.addOAuthAccount({
+ *   provider: 'google',
+ *   providerId: '123456789',
+ *   email: 'john@gmail.com',
+ *   accessToken: 'oauth_token'
+ * });
+ *
+ * // Safe user data for API responses
+ * const safeUserData = user.toSafeJSON();
+ */
+class AmexingUser extends BaseModel {
+  constructor() {
+    super('AmexingUser');
+  }
+
+  /**
+   * Creates a new AmexingUser instance.
+   * @param {object} userData - User data object.
+   * @returns {AmexingUser} New AmexingUser instance.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  static create(userData) {
+    const user = new AmexingUser();
+
+    // Required fields
+    user.set('username', userData.username);
+    user.set('email', userData.email);
+    user.set('firstName', userData.firstName);
+    user.set('lastName', userData.lastName);
+
+    // Default values
+    user.set('role', userData.role || 'user');
+    user.set('active', userData.active !== undefined ? userData.active : true);
+    user.set('exists', userData.exists !== undefined ? userData.exists : true);
+    user.set('emailVerified', false);
+    user.set('loginAttempts', 0);
+    user.set('lockedUntil', null);
+    user.set('lastLoginAt', null);
+    user.set('passwordChangedAt', new Date());
+    user.set('mustChangePassword', false);
+
+    // OAuth fields
+    user.set('oauthAccounts', userData.oauthAccounts || []);
+    user.set('primaryOAuthProvider', userData.primaryOAuthProvider || null);
+    user.set('lastAuthMethod', userData.lastAuthMethod || 'password');
+
+    // Organizational relationships
+    user.set('clientId', userData.clientId || null);
+    user.set('departmentId', userData.departmentId || null);
+
+    // Audit fields
+    user.set('createdBy', userData.createdBy || null);
+    user.set('modifiedBy', userData.modifiedBy || null);
+
+    return user;
+  }
+
+  /**
+   * Sets password with bcrypt hashing and PCI DSS validation.
+   * @param {string} password - Plain text password.
+   * @param {boolean} validateStrength - Whether to validate password strength.
+   * @example
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
+   */
+  async setPassword(password, validateStrength = true) {
+    if (validateStrength) {
+      this.validatePasswordStrength(password);
+    }
+
+    const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    this.set('passwordHash', hashedPassword);
+    this.set('passwordChangedAt', new Date());
+    this.set('mustChangePassword', false);
+    this.set('loginAttempts', 0);
+    this.set('lockedUntil', null);
+  }
+
+  /**
+   * Validates password against stored hash.
+   * @param {string} password - Plain text password.
+   * @returns {boolean} True if password matches.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  /**
+   * Validates user password against stored hash with bcrypt comparison.
+   * Performs secure password verification using bcrypt hashing algorithm
+   * for authentication validation with timing attack protection.
+   * @function validatePassword
+   * @param {string} password - Plain text password to validate.
+   * @returns {Promise&lt;boolean>} True if password matches stored hash, false otherwise.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Validate user password during login
+   * const isValid = await user.validatePassword('userPassword123!');
+   * if (isValid) {
+   *   // Proceed with authentication
+   * }
+   */
+  async validatePassword(password) {
+    const hashedPassword = this.get('passwordHash');
+    if (!hashedPassword) {
+      return false;
+    }
+    return bcrypt.compare(password, hashedPassword);
+  }
+
+  /**
+   * Validates password strength according to PCI DSS requirements.
+   * @param {string} password - Plain text password.
+   * @throws {Parse.Error} If password doesn't meet requirements.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  validatePasswordStrength(password) {
+    const minLength = parseInt(process.env.PASSWORD_MIN_LENGTH, 10) || 12;
+    const requireUppercase = process.env.PASSWORD_REQUIRE_UPPERCASE === 'true';
+    const requireLowercase = process.env.PASSWORD_REQUIRE_LOWERCASE === 'true';
+    const requireNumbers = process.env.PASSWORD_REQUIRE_NUMBERS === 'true';
+    const requireSpecial = process.env.PASSWORD_REQUIRE_SPECIAL === 'true';
+
+    const errors = [];
+
+    /**
+     * Validates minimum password length according to PCI DSS requirements.
+     * Ensures password meets configured minimum length for security compliance.
+     */
+    if (password.length &lt; minLength) {
+      errors.push(`Password must be at least ${minLength} characters long`);
+    }
+
+    /**
+     * Validates password contains required uppercase letters for security.
+     * Ensures compliance with uppercase letter requirements when enabled.
+     */
+    if (requireUppercase &amp;&amp; !/[A-Z]/.test(password)) {
+      errors.push('Password must contain at least one uppercase letter');
+    }
+
+    /**
+     * Validates password contains required lowercase letters for security.
+     * Ensures compliance with lowercase letter requirements when enabled.
+     */
+    if (requireLowercase &amp;&amp; !/[a-z]/.test(password)) {
+      errors.push('Password must contain at least one lowercase letter');
+    }
+
+    /**
+     * Validates password contains required numeric characters for security.
+     * Ensures compliance with number requirements when enabled.
+     */
+    if (requireNumbers &amp;&amp; !/\d/.test(password)) {
+      errors.push('Password must contain at least one number');
+    }
+
+    /**
+     * Validates password contains required special characters for security.
+     * Ensures compliance with special character requirements when enabled.
+     */
+    if (requireSpecial &amp;&amp; !/[!@#$%^&amp;*(),.?":{}|&lt;>]/.test(password)) {
+      errors.push('Password must contain at least one special character');
+    }
+
+    /**
+     * Throws Parse validation error if any password requirements fail.
+     * Aggregates all validation errors into comprehensive error message.
+     */
+    if (errors.length > 0) {
+      throw new Parse.Error(
+        Parse.Error.VALIDATION_ERROR,
+        `Password validation failed: ${errors.join(', ')}`
+      );
+    }
+  }
+
+  /**
+   * Records a failed login attempt.
+   * @returns {boolean} True if account is now locked.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  async recordFailedLogin() {
+    const maxAttempts = parseInt(process.env.MAX_LOGIN_ATTEMPTS, 10) || 5;
+    const lockoutDuration = parseInt(process.env.ACCOUNT_LOCKOUT_DURATION_MINUTES, 10) || 30;
+
+    let attempts = this.get('loginAttempts') || 0;
+    attempts += 1;
+    this.set('loginAttempts', attempts);
+
+    /**
+     * Implements account lockout mechanism when max attempts exceeded.
+     * Locks user account for configured duration and logs security event
+     * for compliance and monitoring purposes.
+     */
+    if (attempts >= maxAttempts) {
+      const lockoutTime = new Date();
+      lockoutTime.setMinutes(lockoutTime.getMinutes() + lockoutDuration);
+      this.set('lockedUntil', lockoutTime);
+
+      logger.logSecurityEvent('ACCOUNT_LOCKED', {
+        userId: this.id,
+        username: this.get('username'),
+        attempts,
+        lockoutUntil: lockoutTime.toISOString(),
+      });
+
+      return true;
+    }
+
+    await this.save(null, { useMasterKey: true });
+    return false;
+  }
+
+  /**
+   * Records successful login with authentication method tracking and security logging.
+   * Resets failed login attempts, updates last login timestamp, and logs successful
+   * authentication event for audit trail and user activity monitoring.
+   * @function recordSuccessfulLogin
+   * @param {string} [authMethod] - Authentication method used (password, oauth, etc.).
+   * @returns {Promise&lt;void>} Saves user with updated login information.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   * // Record successful password login
+   * await user.recordSuccessfulLogin('password');
+   *
+   * // Record successful OAuth login
+   * await user.recordSuccessfulLogin('google_oauth');
+   */
+  async recordSuccessfulLogin(authMethod = 'password') {
+    this.set('loginAttempts', 0);
+    this.set('lockedUntil', null);
+    this.set('lastLoginAt', new Date());
+    this.set('lastAuthMethod', authMethod);
+
+    await this.save(null, { useMasterKey: true });
+  }
+
+  /**
+   * Checks if account is currently locked.
+   * @returns {boolean} True if account is locked.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  isAccountLocked() {
+    const lockedUntil = this.get('lockedUntil');
+    if (!lockedUntil) {
+      return false;
+    }
+    return new Date() &lt; lockedUntil;
+  }
+
+  /**
+   * Adds OAuth account information.
+   * @param {object} oauthData - OAuth account data.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  addOAuthAccount(oauthData) {
+    const existingAccounts = this.get('oauthAccounts') || [];
+
+    // Check if account already exists
+    const existingIndex = existingAccounts.findIndex(
+      (account) => account.provider === oauthData.provider &amp;&amp; account.providerId === oauthData.providerId
+    );
+
+    if (existingIndex >= 0) {
+      // Update existing account
+      existingAccounts[existingIndex] = {
+        ...existingAccounts[existingIndex],
+        ...oauthData,
+        updatedAt: new Date(),
+      };
+    } else {
+      // Add new account
+      existingAccounts.push({
+        ...oauthData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+
+    this.set('oauthAccounts', existingAccounts);
+
+    // Set as primary if it's the first OAuth account
+    if (!this.get('primaryOAuthProvider')) {
+      this.set('primaryOAuthProvider', oauthData.provider);
+    }
+  }
+
+  /**
+   * Removes OAuth account.
+   * @param {string} provider - OAuth provider name.
+   * @param {string} providerId - Provider user ID.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  removeOAuthAccount(provider, providerId) {
+    const existingAccounts = this.get('oauthAccounts') || [];
+    const filteredAccounts = existingAccounts.filter(
+      (account) => !(account.provider === provider &amp;&amp; account.providerId === providerId)
+    );
+
+    this.set('oauthAccounts', filteredAccounts);
+
+    // Update primary provider if needed
+    if (this.get('primaryOAuthProvider') === provider) {
+      this.set('primaryOAuthProvider', filteredAccounts.length > 0 ? filteredAccounts[0].provider : null);
+    }
+  }
+
+  /**
+   * Gets OAuth account by provider.
+   * @param {string} provider - OAuth provider name.
+   * @returns {object | null} OAuth account data or null.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  getOAuthAccount(provider) {
+    const accounts = this.get('oauthAccounts') || [];
+    return accounts.find((account) => account.provider === provider) || null;
+  }
+
+  /**
+   * Checks if user has OAuth account for provider.
+   * @param {string} provider - OAuth provider name.
+   * @returns {boolean} True if user has account for provider.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  hasOAuthAccount(provider) {
+    return this.getOAuthAccount(provider) !== null;
+  }
+
+  /**
+   * Gets user's full name.
+   * @returns {string} Full name.
+   * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+   */
+  getFullName() {
+    const firstName = this.get('firstName') || '';
+    const lastName = this.get('lastName') || '';
+    return `${firstName} ${lastName}`.trim();
+  }
+
+  /**
+   * Gets user's display name (full name or username).
+   * @returns {string} Display name.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  getDisplayName() {
+    const fullName = this.getFullName();
+    return fullName || this.get('username');
+  }
+
+  /**
+   * Get the client this user belongs to.
+   * Uses AI agent compliant queries.
+   * @returns {Promise&lt;object | null>} Client object or null.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  async getClient() {
+    try {
+      if (!this.get('clientId')) {
+        return null;
+      }
+
+      const Client = require('./Client');
+      const query = BaseModel.queryActive('Client');
+      query.equalTo('objectId', this.get('clientId'));
+
+      return await query.first({ useMasterKey: true });
+    } catch (error) {
+      logger.error('Error fetching user client', {
+        userId: this.id,
+        clientId: this.get('clientId'),
+        error: error.message,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Get the department this user belongs to.
+   * Uses AI agent compliant queries.
+   * @returns {Promise&lt;object | null>} Department object or null.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  async getDepartment() {
+    try {
+      if (!this.get('departmentId')) {
+        return null;
+      }
+
+      const Department = require('./Department');
+      const query = BaseModel.queryActive('Department');
+      query.equalTo('objectId', this.get('departmentId'));
+
+      return await query.first({ useMasterKey: true });
+    } catch (error) {
+      logger.error('Error fetching user department', {
+        userId: this.id,
+        departmentId: this.get('departmentId'),
+        error: error.message,
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Check if user belongs to a specific client.
+   * @param {string} clientId - Client ID to check.
+   * @returns {boolean} True if user belongs to client.
+   * @example
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
+   */
+  belongsToClient(clientId) {
+    return this.get('clientId') === clientId;
+  }
+
+  /**
+   * Check if user belongs to a specific department.
+   * @param {string} departmentId - Department ID to check.
+   * @returns {boolean} True if user belongs to department.
+   * @example
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
+   */
+  belongsToDepartment(departmentId) {
+    return this.get('departmentId') === departmentId;
+  }
+
+  /**
+   * Assign user to a client.
+   * @param {string} clientId - Client ID to assign to.
+   * @param {string} modifiedBy - User ID making the change.
+   * @returns {Promise&lt;boolean>} Success status.
+   * @example
+   * // const isValid = validator.validate(data);
+   * // Returns: boolean or validation result object
+   */
+  async assignToClient(clientId, modifiedBy) {
+    try {
+      this.set('clientId', clientId);
+      this.set('modifiedBy', modifiedBy);
+      this.set('updatedAt', new Date());
+
+      await this.save(null, { useMasterKey: true });
+
+      logger.info('User assigned to client', {
+        userId: this.id,
+        clientId,
+        modifiedBy,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error('Error assigning user to client', {
+        userId: this.id,
+        clientId,
+        modifiedBy,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Assign user to a department.
+   * @param {string} departmentId - Department ID to assign to.
+   * @param {string} modifiedBy - User ID making the change.
+   * @returns {Promise&lt;boolean>} Success status.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  async assignToDepartment(departmentId, modifiedBy) {
+    try {
+      this.set('departmentId', departmentId);
+      this.set('modifiedBy', modifiedBy);
+      this.set('updatedAt', new Date());
+
+      await this.save(null, { useMasterKey: true });
+
+      logger.info('User assigned to department', {
+        userId: this.id,
+        departmentId,
+        modifiedBy,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error('Error assigning user to department', {
+        userId: this.id,
+        departmentId,
+        modifiedBy,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Converts user to safe JSON (excludes sensitive data).
+   * @returns {object} Safe user data.
+   * @example
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // Returns appropriate result based on operation
+   */
+  toSafeJSON() {
+    return {
+      id: this.id,
+      username: this.get('username'),
+      email: this.get('email'),
+      firstName: this.get('firstName'),
+      lastName: this.get('lastName'),
+      fullName: this.getFullName(),
+      role: this.get('role'),
+      active: this.get('active'),
+      exists: this.get('exists'),
+      lifecycleStatus: this.getLifecycleStatus(),
+      emailVerified: this.get('emailVerified'),
+      lastLoginAt: this.get('lastLoginAt'),
+      primaryOAuthProvider: this.get('primaryOAuthProvider'),
+      hasOAuth: (this.get('oauthAccounts') || []).length > 0,
+      clientId: this.get('clientId'),
+      departmentId: this.get('departmentId'),
+      createdAt: this.get('createdAt'),
+      updatedAt: this.get('updatedAt'),
+      createdBy: this.get('createdBy'),
+      modifiedBy: this.get('modifiedBy'),
+    };
+  }
+}
+
+// Register the subclass
+Parse.Object.registerSubclass('AmexingUser', AmexingUser);
+
+module.exports = AmexingUser;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

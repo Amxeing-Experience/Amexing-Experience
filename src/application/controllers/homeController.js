@@ -1,5 +1,40 @@
 const logger = require('../../infrastructure/logger');
 
+/**
+ * Home Controller - Handles public web pages and landing page functionality.
+ * Manages the main website interface including home, about, and informational pages
+ * with proper session handling and responsive rendering.
+ *
+ * This controller provides the public-facing web interface for the Amexing platform,
+ * handling the presentation layer for marketing content, feature showcases, and
+ * general information pages with user session awareness.
+ *
+ * Features:
+ * - Home page with feature highlights and platform overview
+ * - About page with platform description and compliance information
+ * - Session-aware user interface (logged in vs anonymous)
+ * - Responsive page rendering with EJS templates
+ * - Error handling with graceful fallbacks
+ * - Security compliance information display
+ * - Platform feature and technology showcasing.
+ * @class HomeController
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 1.0.0
+ * @example
+ * // const result = await authService.login(credentials);
+ * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Initialize home controller (singleton pattern)
+ * const homeController = require('./homeController');
+ *
+ * // Express route integration
+ * router.get('/', homeController.index.bind(homeController));
+ * router.get('/about', homeController.about.bind(homeController));
+ *
+ * // Example page data structure
+ * // Homepage: { title: 'AmexingWeb', features: ['PCI DSS Compliant', 'Secure Payment'], user: userSession }
+ * // About: { title: 'About AmexingWeb', description: 'Secure e-commerce platform...', user: userSession }
+ */
 class HomeController {
   async index(req, res, next) {
     try {
@@ -23,6 +58,24 @@ class HomeController {
     }
   }
 
+  /**
+   * Renders the about page with platform information and user context.
+   * Displays comprehensive information about the AmexingWeb platform including
+   * security features, PCI DSS compliance, and platform capabilities.
+   * @function about
+   * @param {object} req - Express request object with optional user session.
+   * @param {object} res - Express response object.
+   * @param {Function} next - Express next middleware function for error handling.
+   * @returns {Promise<void>} - Renders about page template.
+   * @example
+   * // Usage example
+   * const result = await about(parameters);
+   * // Returns: operation result
+   * // GET /api/endpoint
+   * // Response: { "success": true, "data": [...] }
+   * // GET /about
+   * // Renders about page with platform information and user context
+   */
   async about(req, res, next) {
     try {
       const data = {

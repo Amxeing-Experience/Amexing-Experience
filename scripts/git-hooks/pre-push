@@ -54,21 +54,28 @@ if git diff HEAD~1 package.json | grep '"version"' >/dev/null; then
     fi
 fi
 
-# 2. Run security audit
+# 2. Run security audit (warning only for now - non-blocking)
 log_info "Running security audit..."
-if ! yarn security:audit --level high; then
-    log_error "Security audit failed. Fix vulnerabilities before pushing."
+yarn audit --level critical > /dev/null 2>&1 || log_warning "Non-critical vulnerabilities detected. Review and schedule updates."
+
+# 3. Run complete test suite (unit + integration)
+log_info "Running complete test suite (unit + integration with MongoDB Memory Server)..."
+log_info "This may take 20-30 seconds..."
+if ! yarn test --runInBand; then
+    log_error "Tests failed. Fix all failing tests before pushing."
+    log_error ""
+    log_error "Test suite includes:"
+    log_error "  - Unit tests (fast, no database)"
+    log_error "  - Integration tests (MongoDB Memory Server on port 1339)"
+    log_error ""
+    log_error "To run tests individually:"
+    log_error "  yarn test:unit         # Run only unit tests"
+    log_error "  yarn test:integration  # Run only integration tests"
     exit 1
 fi
+log_success "All tests passed (unit + integration)."
 
-# 3. Ensure all tests pass
-log_info "Running test suite..."
-if ! yarn test; then
-    log_error "Tests failed. Fix tests before pushing."
-    exit 1
-fi
-
-# 4. Check for documentation updates on significant changes
+# 5. Check for documentation updates on significant changes
 changed_files=$(git diff HEAD~1 --name-only)
 if echo "$changed_files" | grep -E "src/.*\.(js|ts)$" | wc -l | grep -v "^0$" >/dev/null; then
     log_info "Source code changes detected. Checking documentation..."

@@ -1,0 +1,306 @@
+<%
+/**
+ * Navigation Item Molecule
+ * Individual sidebar navigation item with icon, text, and optional badge
+ *
+ * @param {string} href - Link URL
+ * @param {string} icon - Icon name (Tabler Icons)
+ * @param {string} text - Navigation item text
+ * @param {boolean} active - Whether item is active (default: false)
+ * @param {object} badge - Badge object with {text, color} (optional)
+ * @param {array} submenu - Submenu items array (optional)
+ * @param {string} id - Navigation item ID for tracking
+ * @param {boolean} external - Whether link is external (default: false)
+ */
+
+// Default parameters
+const navHref = typeof href !== 'undefined' ? href : '#';
+const navIcon = typeof icon !== 'undefined' ? icon : 'circle';
+const navText = typeof text !== 'undefined' ? text : 'Nav Item';
+const navActive = typeof active !== 'undefined' ? active : false;
+const navBadge = typeof badge !== 'undefined' ? badge : null;
+const navSubmenu = typeof submenu !== 'undefined' ? submenu : [];
+const navId = typeof id !== 'undefined' ? id : '';
+const navExternal = typeof external !== 'undefined' ? external : false;
+const hasDropdown = dropdown !== 'undefined' ? dropdown.length > 0 ? true : false : false;
+const listDropdown = dropdown !== 'undefined' ? dropdown : [];
+
+// Classes
+const itemClasses = ['sidebar-item', navActive ? 'selected' : ''].filter(cls => cls.length > 0).join(' ');
+let linkClasses = ['sidebar-link', navActive ? 'active' : ''].filter(cls => cls.length > 0).join(' ');
+const hasSubmenu = navSubmenu && navSubmenu.length > 0;
+linkClasses = hasDropdown ? linkClasses + ' dropdown-toggle' : linkClasses
+%>
+
+<li class="<%= itemClasses %>"
+  <% if (hasDropdown) { %>id="dropdownMenuButton-<%= navId %>" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"<% } %>>
+    <a class="<%= linkClasses %>"
+      href="<%= navHref %>"
+      <% if (hasSubmenu) { %>
+      data-bs-toggle="collapse"
+      data-bs-target="#submenu-<%= navId %>"
+      aria-expanded="<%= navActive %>"
+      aria-controls="submenu-<%= navId %>"
+      <% } else { %>
+      aria-expanded="false"
+      <% } %>
+      <% if (navId) { %>data-nav-id="<%= navId %>"<% } %>
+      <% if (navExternal) { %>target="_blank" rel="noopener noreferrer"<% } %>
+      >
+
+        <!-- Icon -->
+        <% if(navIcon) {%>
+          <span class="nav-icon">
+              <i class="ti ti-<%= navIcon %>"></i>
+          </span>
+        <% } %>
+
+        <!-- Text -->
+        <span class="hide-menu nav-text"><%= navText %></span>
+
+        <!-- Badge -->
+        <% if (navBadge && navBadge.text) { %>
+            <span class="badge bg-<%= navBadge.color || 'primary' %> ms-auto nav-badge">
+                <%= navBadge.text %>
+            </span>
+        <% } %>
+
+        <!-- External Link Indicator -->
+        <% if (navExternal) { %>
+            <i class="ti ti-external-link ms-auto nav-external"></i>
+        <% } %>
+
+        <!-- Submenu Arrow -->
+        <% if (hasSubmenu) { %>
+            <i class="ti ti-chevron-right ms-auto nav-arrow"></i>
+        <% } %>
+    </a>
+
+    <!-- Submenu -->
+    <% if (hasSubmenu) { %>
+        <ul id="submenu-<%= navId %>"
+            class="collapse <%= navActive ? 'show' : '' %> first-level"
+            aria-labelledby="nav-<%= navId %>">
+            <% navSubmenu.forEach(function(subitem, index) { %>
+                <li class="sidebar-item <%= subitem.active ? 'selected' : '' %>">
+                    <a href="<%= subitem.href || '#' %>"
+                      class="sidebar-link <%= subitem.active ? 'active' : '' %>"
+                      <% if (subitem.id) { %>data-nav-id="<%= subitem.id %>"<% } %>
+                      <% if (subitem.external) { %>target="_blank" rel="noopener noreferrer"<% } %>>
+
+                        <div class="round-16 d-flex align-items-center justify-content-center">
+                            <% if (subitem.icon) { %>
+                                <i class="ti ti-<%= subitem.icon %>"></i>
+                            <% } else { %>
+                                <i class="ti ti-circle"></i>
+                            <% } %>
+                        </div>
+
+                        <span class="hide-menu"><%= subitem.text || 'Submenu Item' %></span>
+
+                        <% if (subitem.badge && subitem.badge.text) { %>
+                            <span class="badge bg-<%= subitem.badge.color || 'secondary' %> ms-auto">
+                                <%= subitem.badge.text %>
+                            </span>
+                        <% } %>
+
+                        <% if (subitem.external) { %>
+                            <i class="ti ti-external-link ms-auto"></i>
+                        <% } %>
+                    </a>
+                </li>
+            <% }); %>
+        </ul>
+    <% } %>
+</li>
+
+<% if (hasDropdown) { %>
+  <ul class="dropdown-menu dropdown-menu-sidebar animated flipInX" aria-labelledby="dropdownMenuButton-<%= navId %>">
+    <% listDropdown.forEach(function(item, index) { %>
+      <li class="<%= itemClasses %>">
+          <a class="dropdown-item <%= linkClasses.replace('dropdown-toggle', '') %>" href="<%= item.path || '#' %>">
+            <% if (item.icon) { %>
+              <span class="nav-icon">
+                <i class="ti ti-<%=item.icon%>"></i>
+              </span>
+            <% } %>
+            <span class="hide-menu nav-text"><%= item.name ? item.name : ' ' %></span>
+          </a>
+      </li>
+    <% }) %>
+  </ul>
+<% } %>
+
+<style>
+    /* Navigation Item Styles */
+    .sidebar-item {
+        margin-bottom: 2px;
+    }
+
+    .sidebar-link {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        color: #6c757d;
+        text-decoration: none;
+        border-radius: 0;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .sidebar-link:hover {
+        background: linear-gradient(135deg, var(--primary-color, #5d87ff)08, var(--secondary-color, #49beff)08);
+        color: var(--primary-color, #5d87ff);
+        border-radius: 0 25px 25px 0;
+        margin-right: 15px;
+        transform: translateX(5px);
+    }
+
+    .sidebar-item.selected .sidebar-link,
+    .sidebar-link.active {
+        background: linear-gradient(135deg, var(--primary-color, #5d87ff)10, var(--secondary-color, #49beff)10);
+        color: var(--primary-color, #5d87ff);
+        border-radius: 0 50px 50px 0;
+        margin-right: 10px;
+        font-weight: 600;
+        box-shadow: 0 3px 10px rgba(93, 135, 255, 0.15);
+    }
+
+    .nav-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        margin-right: 12px;
+        flex-shrink: 0;
+    }
+
+    .nav-text {
+        flex-grow: 1;
+        font-size: 0.875rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .nav-badge {
+        font-size: 0.625rem;
+        padding: 2px 6px;
+        border-radius: 10px;
+        min-width: auto;
+        flex-shrink: 0;
+    }
+
+    .nav-external,
+    .nav-arrow {
+        flex-shrink: 0;
+        font-size: 0.75rem;
+        margin-left: 8px;
+        opacity: 0.7;
+    }
+
+    .nav-arrow {
+        transition: transform 0.3s ease;
+    }
+
+    .sidebar-link[aria-expanded="true"] .nav-arrow {
+        transform: rotate(90deg);
+    }
+
+    /* Submenu Styles */
+    .first-level {
+        padding-left: 0;
+        margin-left: 0;
+        background: transparent;
+    }
+
+    .first-level .sidebar-item {
+        margin-left: 20px;
+        margin-bottom: 1px;
+    }
+
+    .first-level .sidebar-link {
+        padding: 8px 16px;
+        font-size: 0.8125rem;
+        color: #8a92a5;
+    }
+
+    .first-level .sidebar-link:hover {
+        background: rgba(93, 135, 255, 0.05);
+        color: var(--primary-color, #5d87ff);
+        border-radius: 0 20px 20px 0;
+        margin-right: 20px;
+    }
+
+    .first-level .sidebar-item.selected .sidebar-link,
+    .first-level .sidebar-link.active {
+        background: rgba(93, 135, 255, 0.08);
+        color: var(--primary-color, #5d87ff);
+        border-radius: 0 25px 25px 0;
+        margin-right: 15px;
+        font-weight: 600;
+    }
+
+    .round-16 {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        margin-right: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .round-16 i {
+        font-size: 0.625rem;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 991.98px) {
+        .sidebar-link {
+            padding: 14px 20px;
+        }
+
+        .nav-text {
+            font-size: 0.9375rem;
+        }
+    }
+
+    /* Loading state */
+    .nav-loading {
+        position: relative;
+        pointer-events: none;
+    }
+
+    .nav-loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        right: 20px;
+        width: 12px;
+        height: 12px;
+        border: 1px solid transparent;
+        border-top: 1px solid var(--primary-color, #5d87ff);
+        border-radius: 50%;
+        animation: nav-spin 1s linear infinite;
+        transform: translateY(-50%);
+    }
+
+    @keyframes nav-spin {
+        0% { transform: translateY(-50%) rotate(0deg); }
+        100% { transform: translateY(-50%) rotate(360deg); }
+    }
+
+    .dropdown-menu-sidebar {
+      position: fixed !important;
+      inset: 0px auto auto 1% !important;
+    }
+
+    .left-sidebar.collapsed .sidebar-link.dropdown-toggle .nav-icon{
+      margin-right: -20px;
+    }
+</style>

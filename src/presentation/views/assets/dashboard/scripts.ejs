@@ -1,0 +1,446 @@
+<!-- Flexy Bootstrap Lite Core Scripts -->
+<script src="/flexy-bootstrap-lite-1.0.0/assets/libs/jquery/dist/jquery.min.js"></script>
+<script src="/flexy-bootstrap-lite-1.0.0/assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/flexy-bootstrap-lite-1.0.0/assets/js/sidebarmenu.js"></script>
+<script src="/flexy-bootstrap-lite-1.0.0/assets/js/app.min.js"></script>
+<script src="/flexy-bootstrap-lite-1.0.0/assets/libs/simplebar/dist/simplebar.js"></script>
+
+<!-- Amexing Session Manager - Auto-initializes session keepalive -->
+<script src="/dashboard/js/session-manager.js" data-auto-init data-debug="<%= process.env.NODE_ENV === 'development' ? 'true' : 'false' %>"></script>
+
+<!-- Solar Icons (Iconify) - Disabled due to CSP restrictions -->
+<!-- <script src="https://cdn.jsdelivr.net/npm/iconify-icon@1.0.8/dist/iconify-icon.min.js"></script> -->
+
+<!-- Amexing Dashboard Extensions -->
+<script>
+/**
+ * Amexing Dashboard Integration with Flexy Bootstrap Lite
+ * Enhanced with DataTables integration and modern UI interactions
+ */
+
+// Global dashboard configuration
+const AmexingDashboard = {
+    config: {
+        userRole: '<%= typeof userRole !== "undefined" ? userRole : "guest" %>',
+        userId: '<%= typeof userId !== "undefined" ? userId : null %>',
+        apiBase: '/api',
+        theme: {
+            primary: '#5d87ff',
+            secondary: '#49beff',
+            success: '#13ce66',
+            info: '#49beff',
+            warning: '#ffae1f',
+            danger: '#ff4961'
+        },
+        dataTables: {
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+            },
+            responsive: true,
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
+            buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+            processing: true,
+            searchDelay: 500,
+            dom: '<"row"<"col-md-6"l><"col-md-6"f>>' +
+                 '<"row"<"col-md-12"B>>' +
+                 '<"row"<"col-md-12"tr>>' +
+                 '<"row"<"col-md-5"i><"col-md-7"p>>',
+            order: [[1, 'asc']]
+        }
+    },
+
+    // Initialize dashboard
+    init: function() {
+        this.setupGlobalComponents();
+        this.setupEventHandlers();
+        this.setupNotifications();
+        this.initializeDataTables();
+        this.enhanceFlexyComponents();
+    },
+
+    // Setup global UI components
+    setupGlobalComponents: function() {
+        // Initialize tooltips
+        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+            new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        // Initialize popovers
+        const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'));
+        popoverTriggerList.forEach(function (popoverTriggerEl) {
+            new bootstrap.Popover(popoverTriggerEl);
+        });
+
+        // Setup custom search functionality
+        this.setupCustomSearch();
+    },
+
+    // Enhance Flexy components with Amexing features
+    enhanceFlexyComponents: function() {
+        // Add smooth scrolling to sidebar
+        const sidebar = document.querySelector('.sidebar-nav');
+        if (sidebar && typeof SimpleBar !== 'undefined') {
+            new SimpleBar(sidebar, {
+                autoHide: false
+            });
+        }
+
+        // Enhance cards with loading states
+        this.setupCardLoadingStates();
+
+        // Setup auto-refresh for certain components
+        this.setupAutoRefresh();
+    },
+
+    // Setup card loading states
+    setupCardLoadingStates: function() {
+        document.querySelectorAll('.card').forEach(card => {
+            const loadingOverlay = document.createElement('div');
+            loadingOverlay.className = 'card-loading-overlay d-none position-absolute w-100 h-100 d-flex align-items-center justify-content-center';
+            loadingOverlay.style.cssText = 'background: rgba(255,255,255,0.8); z-index: 10; border-radius: 12px;';
+            loadingOverlay.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>';
+            card.style.position = 'relative';
+            card.appendChild(loadingOverlay);
+        });
+    },
+
+    // Setup auto-refresh functionality
+    setupAutoRefresh: function() {
+        // Auto-refresh data tables every 5 minutes
+        setInterval(() => {
+            if (window.jQuery && jQuery.fn.DataTable) {
+                jQuery('.data-table').each(function() {
+                    const table = jQuery(this).DataTable();
+                    if (table.ajax && table.ajax.url) {
+                        table.ajax.reload(null, false);
+                    }
+                });
+            }
+        }, 300000); // 5 minutes
+    },
+
+    // Initialize DataTables
+    initializeDataTables: function() {
+        if (typeof jQuery === 'undefined' || !jQuery.fn.DataTable) {
+            console.warn('⚠️ DataTables not available');
+            return;
+        }
+
+        // Auto-initialize tables with class 'data-table'
+        jQuery('.data-table').each(function() {
+            const $table = jQuery(this);
+            const customConfig = $table.data('config') || {};
+
+            // Merge custom config with default config
+            const config = jQuery.extend(true, {}, AmexingDashboard.config.dataTables, customConfig);
+
+            // Initialize DataTable
+            const dt = $table.DataTable(config);
+
+            // Store reference for later use
+            $table.data('dt-instance', dt);
+
+        });
+    },
+
+    // Setup custom search with debouncing
+    setupCustomSearch: function() {
+        let searchTimeout;
+        jQuery(document).on('input', '.dt-search-custom', function() {
+            const $input = jQuery(this);
+            const tableId = $input.data('table');
+            const $table = jQuery('#' + tableId);
+
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(function() {
+                if ($table.length && $table.data('dt-instance')) {
+                    $table.data('dt-instance').search($input.val()).draw();
+                }
+            }, 500);
+        });
+    },
+
+    // Setup global event handlers
+    setupEventHandlers: function() {
+        // Handle form submissions with loading states
+        document.addEventListener('submit', function(e) {
+            if (e.target.classList.contains('ajax-form')) {
+                e.preventDefault();
+                AmexingDashboard.handleFormSubmission(e.target);
+            }
+        });
+
+        // Handle AJAX delete buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-delete') || e.target.closest('.btn-delete')) {
+                e.preventDefault();
+                const btn = e.target.classList.contains('btn-delete') ? e.target : e.target.closest('.btn-delete');
+                AmexingDashboard.confirmDelete(btn);
+            }
+        });
+
+        // Handle status toggle buttons
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('btn-toggle-status')) {
+                e.preventDefault();
+                AmexingDashboard.toggleStatus(e.target);
+            }
+        });
+    },
+
+    // Handle form submissions
+    handleFormSubmission: function(form) {
+        const submitBtn = form.querySelector('[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+
+        // Show loading state
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        submitBtn.disabled = true;
+
+        // Prepare form data
+        const formData = new FormData(form);
+        const url = form.action || window.location.href;
+        const method = form.method || 'POST';
+
+        // Make AJAX request
+        fetch(url, {
+            method: method,
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.showNotification('success', data.message || 'Operación completada exitosamente');
+
+                // Reload DataTable if present
+                if (jQuery.fn.DataTable && jQuery('.data-table').length) {
+                    jQuery('.data-table').DataTable().ajax.reload(null, false);
+                }
+
+                // Reset form or redirect
+                if (data.redirect) {
+                    setTimeout(() => window.location.href = data.redirect, 1500);
+                } else {
+                    form.reset();
+                }
+            } else {
+                this.showNotification('error', data.message || 'Error al procesar la solicitud');
+            }
+        })
+        .catch(error => {
+            console.error('Form submission error:', error);
+            this.showNotification('error', 'Error de conexión. Inténtalo de nuevo.');
+        })
+        .finally(() => {
+            // Restore button state
+            submitBtn.innerHTML = originalText;
+            submitBtn.disabled = false;
+        });
+    },
+
+    // Confirm delete with SweetAlert2 (if available) or native confirm
+    confirmDelete: function(btn) {
+        const url = btn.getAttribute('href') || btn.dataset.url;
+        const title = btn.dataset.title || 'Confirmar eliminación';
+        const text = btn.dataset.text || '¿Estás seguro de que quieres eliminar este elemento?';
+
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: title,
+                text: text,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: AmexingDashboard.config.theme.danger,
+                cancelButtonColor: AmexingDashboard.config.theme.secondary,
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                reverseButtons: true
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    this.performDelete(url);
+                }
+            });
+        } else {
+            if (confirm(text)) {
+                this.performDelete(url);
+            }
+        }
+    },
+
+    // Perform delete operation
+    performDelete: function(url) {
+        fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.showNotification('success', data.message || 'Elemento eliminado exitosamente');
+
+                // Reload DataTable
+                if (jQuery.fn.DataTable && jQuery('.data-table').length) {
+                    jQuery('.data-table').DataTable().ajax.reload(null, false);
+                }
+            } else {
+                this.showNotification('error', data.message || 'Error al eliminar el elemento');
+            }
+        })
+        .catch(error => {
+            console.error('Delete error:', error);
+            this.showNotification('error', 'Error de conexión. Inténtalo de nuevo.');
+        });
+    },
+
+    // Toggle status (active/inactive)
+    toggleStatus: function(btn) {
+        const url = btn.dataset.url;
+        const currentStatus = btn.dataset.status;
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+        fetch(url, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update button
+                btn.dataset.status = newStatus;
+                btn.className = btn.className.replace(/badge-\w+/, `badge-${newStatus}`);
+                btn.innerHTML = newStatus === 'active' ?
+                    '<i class="ti ti-check me-1"></i>Activo' :
+                    '<i class="ti ti-x me-1"></i>Inactivo';
+
+                this.showNotification('success', data.message || 'Estado actualizado');
+            } else {
+                btn.innerHTML = originalHtml;
+                this.showNotification('error', data.message || 'Error al actualizar el estado');
+            }
+        })
+        .catch(error => {
+            console.error('Toggle status error:', error);
+            btn.innerHTML = originalHtml;
+            this.showNotification('error', 'Error de conexión');
+        })
+        .finally(() => {
+            btn.disabled = false;
+        });
+    },
+
+    // Setup notifications
+    setupNotifications: function() {
+        // Check for flash messages
+        const flashSuccess = document.querySelector('[data-flash="success"]');
+        const flashError = document.querySelector('[data-flash="error"]');
+        const flashInfo = document.querySelector('[data-flash="info"]');
+
+        if (flashSuccess) {
+            this.showNotification('success', flashSuccess.textContent);
+            flashSuccess.remove();
+        }
+
+        if (flashError) {
+            this.showNotification('error', flashError.textContent);
+            flashError.remove();
+        }
+
+        if (flashInfo) {
+            this.showNotification('info', flashInfo.textContent);
+            flashInfo.remove();
+        }
+    },
+
+    // Show notification (SweetAlert2 if available, otherwise console)
+    showNotification: function(type, message, title = null) {
+        if (typeof Swal !== 'undefined') {
+            const icons = {
+                success: 'success',
+                error: 'error',
+                info: 'info',
+                warning: 'warning'
+            };
+
+            Swal.fire({
+                icon: icons[type] || 'info',
+                title: title,
+                text: message,
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 4000,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                }
+            });
+        } else {
+            // Fallback to console and simple alert
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            if (type === 'error') {
+                alert(message);
+            }
+        }
+    },
+
+    // Utility function to show loading overlay
+    showLoading: function() {
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.remove('d-none');
+        }
+    },
+
+    // Utility function to hide loading overlay
+    hideLoading: function() {
+        const loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay) {
+            loadingOverlay.classList.add('d-none');
+        }
+    }
+};
+
+// Initialize when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    AmexingDashboard.init();
+});
+
+// Make AmexingDashboard globally available (avoid conflicts)
+if (typeof window.AmexingDashboard === 'undefined') {
+    window.AmexingDashboard = AmexingDashboard;
+}
+if (typeof window.AmexingAdmin === 'undefined') {
+    window.AmexingAdmin = AmexingDashboard; // Backward compatibility
+}
+
+// jQuery document ready (for DataTables and other jQuery-dependent features)
+if (typeof jQuery !== 'undefined') {
+    jQuery(document).ready(function() {
+
+        // Set global AJAX defaults for DataTables
+        jQuery.ajaxSetup({
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': jQuery('meta[name="csrf-token"]').attr('content')
+            }
+        });
+    });
+}
+</script>

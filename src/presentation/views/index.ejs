@@ -1,41 +1,43 @@
-<%- include('layout', { body: ` 
-    <div style="text-align: center; padding: 3rem 0;">
-        <h1 style="font-size: 3rem; color: #667eea; margin-bottom: 1rem;">
-            ${message}
-        </h1>
-        
-        <p style="font-size: 1.25rem; color: #666; margin-bottom: 2rem;">
-            Secure, Fast, and PCI DSS Compliant E-Commerce Solution
-        </p>
-        
-        <div style="margin: 3rem 0;">
-            <a href="/api/status" class="btn" style="margin-right: 1rem;">Check API Status</a>
-            <a href="/parse" class="btn">Parse Server</a>
-        </div>
-        
-        <div style="margin-top: 4rem;">
-            <h2 style="color: #333; margin-bottom: 2rem;">Key Features</h2>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; text-align: left;">
-                ${features.map(feature => `
-                    <div style="padding: 1.5rem; background: #f7f7f7; border-radius: 8px;">
-                        <div style="color: #667eea; font-size: 2rem; margin-bottom: 0.5rem;">✓</div>
-                        <h3 style="color: #333; margin-bottom: 0.5rem;">${feature}</h3>
-                    </div>
-                `).join('')}
+<%- include('layout', {
+    body: `
+        <div style="text-align: center; padding: 3rem 0;">
+            <h1 style="font-size: 3rem; color: #667eea; margin-bottom: 1rem;">
+                ` + (typeof message !== 'undefined' ? message : 'Welcome to AmexingWeb') + `
+            </h1>
+
+            <p style="font-size: 1.25rem; color: #666; margin-bottom: 2rem;">
+                Secure, Fast, and PCI DSS Compliant E-Commerce Solution
+            </p>
+
+            <div style="margin: 3rem 0;">
+                <a href="/api/status" class="btn" style="margin-right: 1rem;">Check API Status</a>
+                <a href="/parse" class="btn">Parse Server</a>
+            </div>
+
+            <div style="margin-top: 4rem;">
+                <h2 style="color: #333; margin-bottom: 2rem;">Key Features</h2>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; text-align: left;">
+                    ` + (typeof features !== 'undefined' && features ? features.map(feature =>
+                        `<div style="padding: 1.5rem; background: #f7f7f7; border-radius: 8px;">
+                            <div style="color: #667eea; font-size: 2rem; margin-bottom: 0.5rem;">✓</div>
+                            <h3 style="color: #333; margin-bottom: 0.5rem;">` + feature + `</h3>
+                        </div>`
+                    ).join('') : '') + `
+                </div>
+            </div>
+
+            <div style="margin-top: 4rem; padding: 2rem; background: #f0f4ff; border-radius: 8px;">
+                <h3 style="color: #667eea; margin-bottom: 1rem;">Test Cloud Function</h3>
+                <p style="color: #666; margin-bottom: 1rem;">
+                    Try our Hello World cloud function endpoint:
+                </p>
+                <code style="display: block; padding: 1rem; background: #333; color: #0f0; border-radius: 4px; font-family: monospace;">
+                    curl -X POST http://localhost:1337/parse/functions/hello \\<br>
+                    -H "X-Parse-Application-Id: amexing-app-id" \\<br>
+                    -H "Content-Type: application/json" \\<br>
+                    -d '{"name": "Developer"}'
+                </code>
             </div>
         </div>
-        
-        <div style="margin-top: 4rem; padding: 2rem; background: #f0f4ff; border-radius: 8px;">
-            <h3 style="color: #667eea; margin-bottom: 1rem;">Test Cloud Function</h3>
-            <p style="color: #666; margin-bottom: 1rem;">
-                Try our Hello World cloud function endpoint:
-            </p>
-            <code style="display: block; padding: 1rem; background: #333; color: #0f0; border-radius: 4px; font-family: monospace;">
-                curl -X POST http://localhost:1337/parse/functions/hello \\<br>
-                -H "X-Parse-Application-Id: amexing-app-id" \\<br>
-                -H "Content-Type: application/json" \\<br>
-                -d '{"name": "Developer"}'
-            </code>
-        </div>
-    </div>
-` }) %>
+    `
+}) %>

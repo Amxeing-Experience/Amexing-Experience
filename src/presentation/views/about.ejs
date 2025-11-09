@@ -1,53 +1,55 @@
-<%- include('layout', { body: `
-    <div style="max-width: 800px; margin: 0 auto;">
-        <h1 style="color: #667eea; margin-bottom: 2rem;">About AmexingWeb</h1>
-        
-        <p style="font-size: 1.1rem; line-height: 1.8; color: #666; margin-bottom: 2rem;">
-            ${description}
-        </p>
-        
-        <div style="margin: 3rem 0;">
-            <h2 style="color: #333; margin-bottom: 1.5rem;">Our Technology Stack</h2>
-            
-            <div style="display: grid; gap: 1.5rem;">
-                <div style="padding: 1.5rem; background: #f7f7f7; border-left: 4px solid #667eea;">
-                    <h3 style="color: #667eea; margin-bottom: 0.5rem;">Backend</h3>
-                    <p>Parse Server, Node.js, Express.js</p>
-                </div>
-                
-                <div style="padding: 1.5rem; background: #f7f7f7; border-left: 4px solid #764ba2;">
-                    <h3 style="color: #764ba2; margin-bottom: 0.5rem;">Database</h3>
-                    <p>MongoDB with advanced security configurations</p>
-                </div>
-                
-                <div style="padding: 1.5rem; background: #f7f7f7; border-left: 4px solid #667eea;">
-                    <h3 style="color: #667eea; margin-bottom: 0.5rem;">Security</h3>
-                    <p>Helmet.js, Rate Limiting, XSS Protection, CORS, Session Management</p>
-                </div>
-                
-                <div style="padding: 1.5rem; background: #f7f7f7; border-left: 4px solid #764ba2;">
-                    <h3 style="color: #764ba2; margin-bottom: 0.5rem;">Architecture</h3>
-                    <p>Clean Architecture, MVC Pattern, SOLID Principles</p>
+<%- include('layout', {
+    body: `
+        <div style="max-width: 800px; margin: 0 auto;">
+            <h1 style="color: #667eea; margin-bottom: 2rem;">About AmexingWeb</h1>
+
+            <p style="font-size: 1.1rem; line-height: 1.8; color: #666; margin-bottom: 2rem;">
+                ` + (typeof description !== 'undefined' ? description : 'AmexingWeb is a modern transportation management platform built with cutting-edge technology.') + `
+            </p>
+
+            <div style="margin: 3rem 0;">
+                <h2 style="color: #333; margin-bottom: 1.5rem;">Our Technology Stack</h2>
+
+                <div style="display: grid; gap: 1.5rem;">
+                    <div style="padding: 1.5rem; background: #f7f7f7; border-left: 4px solid #667eea;">
+                        <h3 style="color: #667eea; margin-bottom: 0.5rem;">Backend</h3>
+                        <p>Parse Server, Node.js, Express.js</p>
+                    </div>
+
+                    <div style="padding: 1.5rem; background: #f7f7f7; border-left: 4px solid #764ba2;">
+                        <h3 style="color: #764ba2; margin-bottom: 0.5rem;">Database</h3>
+                        <p>MongoDB with advanced security configurations</p>
+                    </div>
+
+                    <div style="padding: 1.5rem; background: #f7f7f7; border-left: 4px solid #667eea;">
+                        <h3 style="color: #667eea; margin-bottom: 0.5rem;">Security</h3>
+                        <p>Helmet.js, Rate Limiting, XSS Protection, CORS, Session Management</p>
+                    </div>
+
+                    <div style="padding: 1.5rem; background: #f7f7f7; border-left: 4px solid #764ba2;">
+                        <h3 style="color: #764ba2; margin-bottom: 0.5rem;">Architecture</h3>
+                        <p>Clean Architecture, MVC Pattern, SOLID Principles</p>
+                    </div>
                 </div>
             </div>
+
+            <div style="margin: 3rem 0;">
+                <h2 style="color: #333; margin-bottom: 1.5rem;">PCI DSS Compliance</h2>
+                <p style="line-height: 1.8; color: #666;">
+                    Our platform is designed from the ground up to meet PCI DSS 4.0 requirements:
+                </p>
+                <ul style="margin-top: 1rem; line-height: 2; color: #666;">
+                    <li>✓ Secure network and systems architecture</li>
+                    <li>✓ Protection of cardholder data</li>
+                    <li>✓ Strong access control measures</li>
+                    <li>✓ Regular monitoring and testing</li>
+                    <li>✓ Information security policy maintenance</li>
+                </ul>
+            </div>
+
+            <div style="text-align: center; margin-top: 3rem;">
+                <a href="/" class="btn">Back to Home</a>
+            </div>
         </div>
-        
-        <div style="margin: 3rem 0;">
-            <h2 style="color: #333; margin-bottom: 1.5rem;">PCI DSS Compliance</h2>
-            <p style="line-height: 1.8; color: #666;">
-                Our platform is designed from the ground up to meet PCI DSS 4.0 requirements:
-            </p>
-            <ul style="margin-top: 1rem; line-height: 2; color: #666;">
-                <li>✓ Secure network and systems architecture</li>
-                <li>✓ Protection of cardholder data</li>
-                <li>✓ Strong access control measures</li>
-                <li>✓ Regular monitoring and testing</li>
-                <li>✓ Information security policy maintenance</li>
-            </ul>
-        </div>
-        
-        <div style="text-align: center; margin-top: 3rem;">
-            <a href="/" class="btn">Back to Home</a>
-        </div>
-    </div>
-` }) %>
+    `
+}) %>

@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="en" data-atomic-showcase="true">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><%= typeof title !== 'undefined' ? title : 'Atomic Design Components - Amexing' %></title>
+
+    <!-- Favicon -->
+    <link rel="shortcut icon" type="image/png" href="/flexy-bootstrap-lite-1.0.0/assets/images/logos/favicon.png" />
+
+    <!-- Core CSS -->
+    <link rel="stylesheet" href="/flexy-bootstrap-lite-1.0.0/assets/css/styles.min.css" />
+
+    <!-- Tabler Icons -->
+    <link rel="stylesheet" href="/flexy-bootstrap-lite-1.0.0/assets/css/icons/tabler-icons/tabler-icons.css">
+
+    <!-- Prism.js for code highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+
+    <!-- Atomic Showcase Styles -->
+    <style>
+        :root {
+            --atomic-primary: #667eea;
+            --atomic-secondary: #764ba2;
+            --atomic-success: #28a745;
+            --atomic-warning: #ffc107;
+            --atomic-danger: #dc3545;
+            --atomic-info: #17a2b8;
+            --atomic-light: #f8f9fa;
+            --atomic-dark: #343a40;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f8f9fa;
+            color: #343a40;
+        }
+
+        /* Header */
+        .atomic-header {
+            background: linear-gradient(135deg, var(--atomic-primary) 0%, var(--atomic-secondary) 100%);
+            color: white;
+            padding: 2rem 0;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .atomic-header h1 {
+            font-weight: 700;
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .atomic-header .subtitle {
+            font-size: 1.125rem;
+            opacity: 0.9;
+        }
+
+        /* Navigation */
+        .atomic-nav {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .atomic-nav .nav-link {
+            color: #6c757d;
+            font-weight: 500;
+            padding: 1rem 1.5rem;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+
+        .atomic-nav .nav-link:hover,
+        .atomic-nav .nav-link.active {
+            color: var(--atomic-primary);
+            border-bottom-color: var(--atomic-primary);
+        }
+
+        /* Breadcrumbs */
+        .atomic-breadcrumb {
+            background: rgba(102, 126, 234, 0.1);
+            padding: 1rem 0;
+            margin-bottom: 2rem;
+        }
+
+        .breadcrumb {
+            margin-bottom: 0;
+            background: transparent;
+        }
+
+        .breadcrumb-item + .breadcrumb-item::before {
+            content: "›";
+            color: var(--atomic-primary);
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        .atomic-content {
+            min-height: calc(100vh - 200px);
+        }
+
+        /* Component Cards */
+        .component-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .component-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+        }
+
+        .component-header {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            padding: 1.5rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .component-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--atomic-dark);
+            margin-bottom: 0.5rem;
+        }
+
+        .component-description {
+            color: #6c757d;
+            margin-bottom: 0;
+        }
+
+        .component-meta {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .component-badge {
+            background: var(--atomic-primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .component-badge.atom { background: var(--atomic-success); }
+        .component-badge.molecule { background: var(--atomic-info); }
+        .component-badge.organism { background: var(--atomic-warning); }
+
+        /* Component Preview */
+        .component-preview {
+            padding: 2rem;
+            border-bottom: 1px solid #e9ecef;
+            position: relative;
+        }
+
+        .preview-label {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        /* Component Code */
+        .component-code {
+            background: #2d3748;
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .code-header {
+            background: #4a5568;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #2d3748;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .code-header .title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #e2e8f0;
+        }
+
+        .copy-btn {
+            background: var(--atomic-primary);
+            color: white;
+            border: none;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .copy-btn:hover {
+            background: var(--atomic-secondary);
+        }
+
+        .code-content {
+            padding: 1rem;
+            overflow-x: auto;
+        }
+
+        pre {
+            margin: 0;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        /* Statistics Cards */
+        .stats-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+        }
+
+        .stats-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .stats-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .stats-label {
+            color: #6c757d;
+            font-weight: 500;
+            text-transform: uppercase;
+            font-size: 0.875rem;
+            letter-spacing: 0.5px;
+        }
+
+        /* Category Cards */
+        .category-card {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            transition: all 0.3s ease;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+            height: 100%;
+        }
+
+        .category-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .category-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1rem;
+            font-size: 2rem;
+        }
+
+        .category-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .category-description {
+            color: #6c757d;
+            margin-bottom: 1.5rem;
+        }
+
+        .category-stats {
+            display: flex;
+            justify-content: space-around;
+            padding-top: 1rem;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .category-stat {
+            text-align: center;
+        }
+
+        .category-stat .number {
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: block;
+        }
+
+        .category-stat .label {
+            font-size: 0.75rem;
+            color: #6c757d;
+            text-transform: uppercase;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+        }
+
+        /* Search and Filters */
+        .search-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            margin-bottom: 2rem;
+        }
+
+        .search-input {
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .search-input:focus {
+            border-color: var(--atomic-primary);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            outline: none;
+        }
+
+        /* Footer */
+        .atomic-footer {
+            background: var(--atomic-dark);
+            color: white;
+            padding: 2rem 0;
+            margin-top: 4rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .atomic-header h1 {
+                font-size: 2rem;
+            }
+
+            .component-preview {
+                padding: 1rem;
+            }
+
+            .category-card {
+                padding: 1.5rem;
+            }
+
+            .category-icon {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5rem;
+            }
+        }
+
+        /* Dark Theme Support */
+        [data-theme="dark"] {
+            --atomic-light: #343a40;
+            --atomic-dark: #f8f9fa;
+        }
+
+        [data-theme="dark"] body {
+            background: #1a1a1a;
+            color: #e9ecef;
+        }
+
+        [data-theme="dark"] .component-card,
+        [data-theme="dark"] .category-card,
+        [data-theme="dark"] .stats-card,
+        [data-theme="dark"] .search-section {
+            background: #2d3748;
+            color: #e9ecef;
+        }
+
+        /* Animation classes */
+        .fade-in {
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Loading states */
+        .component-loading {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+
+        @keyframes loading {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+    </style>
+
+    <!-- Page-specific styles -->
+    <% if (typeof additionalStyles !== 'undefined' && additionalStyles && Array.isArray(additionalStyles)) { %>
+        <% additionalStyles.forEach(function(style) { %>
+            <% if (typeof style === 'string' && (style.startsWith('/') || style.startsWith('https://cdnjs.cloudflare.com/'))) { %>
+            <link rel="stylesheet" href="<%= style %>" />
+            <% } %>
+        <% }); %>
+    <% } %>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="atomic-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1>
+                        <i class="ti ti-components me-3"></i>
+                        <%= typeof headerTitle !== 'undefined' ? headerTitle : 'Atomic Design Components' %>
+                    </h1>
+                    <p class="subtitle">
+                        <%= typeof headerSubtitle !== 'undefined' ? headerSubtitle : 'Interactive component library and design system documentation' %>
+                    </p>
+                </div>
+                <div class="col-md-4 text-md-end">
+                    <a href="/dashboard" class="btn btn-outline-light">
+                        <i class="ti ti-arrow-left me-2"></i>Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="atomic-nav">
+        <div class="container">
+            <ul class="nav nav-pills">
+                <li class="nav-item">
+                    <a class="nav-link <%= typeof category === 'undefined' || category === 'index' ? 'active' : '' %>" href="/atomic">
+                        <i class="ti ti-home me-2"></i>Overview
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <%= typeof category !== 'undefined' && category === 'dashboard' ? 'active' : '' %>" href="/atomic/dashboard">
+                        <i class="ti ti-layout-dashboard me-2"></i>Dashboard
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <%= typeof category !== 'undefined' && category === 'auth' ? 'active' : '' %>" href="/atomic/auth">
+                        <i class="ti ti-shield-lock me-2"></i>Authentication
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link <%= typeof category !== 'undefined' && category === 'common' ? 'active' : '' %>" href="/atomic/common">
+                        <i class="ti ti-components me-2"></i>Common
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Breadcrumbs -->
+    <% if (typeof breadcrumbs !== 'undefined' && breadcrumbs && breadcrumbs.length > 0) { %>
+        <div class="atomic-breadcrumb">
+            <div class="container">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <% breadcrumbs.forEach((crumb, index) => { %>
+                            <li class="breadcrumb-item <%= index === breadcrumbs.length - 1 ? 'active' : '' %>">
+                                <% if (index === breadcrumbs.length - 1) { %>
+                                    <%= crumb.text %>
+                                <% } else { %>
+                                    <a href="<%= crumb.url %>" class="text-decoration-none">
+                                        <%= crumb.text %>
+                                    </a>
+                                <% } %>
+                            </li>
+                        <% }) %>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    <% } %>
+
+    <!-- Main Content -->
+    <main class="atomic-content">
+        <div class="container py-4">
+            <% if (typeof body !== 'undefined' && body) { %>
+                <%- body %> <!-- nosemgrep: trusted pre-rendered template content -->
+            <% } else if (category === 'index') { %>
+                <%- include('../atomic/index-content') %> <!-- nosemgrep: trusted template include -->
+            <% } else if (category === 'dashboard') { %>
+                <%- include('../atomic/dashboard/index-content') %> <!-- nosemgrep: trusted template include -->
+            <% } else if (category === 'auth') { %>
+                <%- include('../atomic/auth/index-content') %> <!-- nosemgrep: trusted template include -->
+            <% } else if (category === 'common') { %>
+                <%- include('../atomic/common/index-content') %> <!-- nosemgrep: trusted template include -->
+            <% } else { %>
+                <p>Content not found for category: <%= category %></p>
+            <% } %>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="atomic-footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Atomic Design System</h5>
+                    <p class="text-muted mb-0">
+                        Built with ❤️ for the Amexing platform. Components follow atomic design principles
+                        for maximum reusability and consistency.
+                    </p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="text-muted mb-0">
+                        <small>
+                            Last updated: <%= new Date().toLocaleDateString() %> |
+                            <a href="/docs" class="text-light">Documentation</a> |
+                            <a href="https://github.com/AmexingExperience/amexing-web" class="text-light">GitHub</a>
+                        </small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Core JavaScript -->
+    <script src="/flexy-bootstrap-lite-1.0.0/assets/libs/jquery/dist/jquery.min.js"></script>
+    <script src="/flexy-bootstrap-lite-1.0.0/assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Prism.js for code highlighting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+
+    <!-- Atomic Showcase JavaScript -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Copy to clipboard functionality
+            const copyButtons = document.querySelectorAll('.copy-btn');
+            copyButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const codeBlock = this.closest('.component-code').querySelector('pre code, pre');
+                    const text = codeBlock.textContent;
+
+                    navigator.clipboard.writeText(text).then(() => {
+                        const originalText = this.textContent;
+                        this.textContent = 'Copied!';
+                        this.style.background = '#28a745';
+
+                        setTimeout(() => {
+                            this.textContent = originalText;
+                            this.style.background = '';
+                        }, 2000);
+                    }).catch(err => {
+                        console.error('Failed to copy: ', err);
+                    });
+                });
+            });
+
+            // Search functionality
+            const searchInput = document.getElementById('componentSearch');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    const query = this.value.toLowerCase();
+                    const componentCards = document.querySelectorAll('.component-card');
+
+                    componentCards.forEach(card => {
+                        const title = card.querySelector('.component-title').textContent.toLowerCase();
+                        const description = card.querySelector('.component-description').textContent.toLowerCase();
+
+                        if (title.includes(query) || description.includes(query)) {
+                            card.style.display = 'block';
+                            card.classList.add('fade-in');
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                });
+            }
+
+            // Filter functionality
+            const filterButtons = document.querySelectorAll('[data-filter]');
+            filterButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const filter = this.getAttribute('data-filter');
+                    const componentCards = document.querySelectorAll('.component-card');
+
+                    // Update active state
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    this.classList.add('active');
+
+                    componentCards.forEach(card => {
+                        const type = card.getAttribute('data-type');
+
+                        if (filter === 'all' || type === filter) {
+                            card.style.display = 'block';
+                            card.classList.add('fade-in');
+                        } else {
+                            card.style.display = 'none';
+                        }
+                    });
+                });
+            });
+
+            // Smooth scroll for anchor links
+            const anchorLinks = document.querySelectorAll('a[href^="#"]');
+            anchorLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const target = document.querySelector(this.getAttribute('href'));
+                    if (target) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                });
+            });
+
+            // Theme toggle
+            const themeToggle = document.getElementById('themeToggle');
+            if (themeToggle) {
+                themeToggle.addEventListener('click', function() {
+                    const html = document.documentElement;
+                    const currentTheme = html.getAttribute('data-theme');
+                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+                    html.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('atomic-theme', newTheme);
+
+                    // Update button icon
+                    const icon = this.querySelector('i');
+                    if (newTheme === 'dark') {
+                        icon.className = 'ti ti-sun';
+                    } else {
+                        icon.className = 'ti ti-moon';
+                    }
+                });
+            }
+
+            // Load saved theme
+            const savedTheme = localStorage.getItem('atomic-theme');
+            if (savedTheme) {
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            }
+
+            // Add fade-in animation to all cards
+            const cards = document.querySelectorAll('.component-card, .category-card, .stats-card');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('fade-in');
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            cards.forEach(card => observer.observe(card));
+
+        });
+    </script>
+
+    <!-- Page-specific scripts -->
+    <% if (typeof additionalScripts !== 'undefined' && additionalScripts && Array.isArray(additionalScripts)) { %>
+        <% additionalScripts.forEach(function(script) { %>
+            <% if (typeof script === 'string' && (script.startsWith('/') || script.startsWith('https://cdnjs.cloudflare.com/'))) { %>
+            <script src="<%= script %>"></script> <!-- nosemgrep: allowlisted script paths -->
+            <% } %>
+        <% }); %>
+    <% } %>
+
+</body>
+
+</html>

@@ -1,0 +1,494 @@
+/**
+ * Mobile OAuth Experience Styles - Sprint 04
+ * Enhanced mobile-first styling for OAuth components
+ * Responsive design with touch-optimized interactions
+ */
+
+/* Mobile-First Base Styles */
+.oauth-container {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+    box-sizing: border-box;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* Enhanced Mobile Button Styling */
+.oauth-btn {
+    min-height: 48px;
+    padding: 12px 16px;
+    font-size: 16px;
+    line-height: 1.4;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    background: white;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.oauth-btn:active {
+    transform: scale(0.98);
+}
+
+.oauth-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    transition: width 0.3s, height 0.3s, top 0.3s, left 0.3s;
+    transform: translate(-50%, -50%);
+}
+
+.oauth-btn:active::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* Provider-Specific Styling */
+.oauth-btn[data-provider="google"] {
+    border-color: #db4437;
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+}
+
+.oauth-btn[data-provider="google"]:hover {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e8eaed 100%);
+    border-color: #c23321;
+}
+
+.oauth-btn[data-provider="microsoft"] {
+    border-color: #0078d4;
+    background: linear-gradient(135deg, #ffffff 0%, #f3f9fd 100%);
+}
+
+.oauth-btn[data-provider="microsoft"]:hover {
+    background: linear-gradient(135deg, #f3f9fd 0%, #e1effa 100%);
+    border-color: #106ebe;
+}
+
+.oauth-btn[data-provider="apple"] {
+    border-color: #000000;
+    background: linear-gradient(135deg, #ffffff 0%, #f5f5f7 100%);
+}
+
+.oauth-btn[data-provider="apple"]:hover {
+    background: linear-gradient(135deg, #f5f5f7 0%, #e8e8ed 100%);
+}
+
+.oauth-btn[data-provider="github"] {
+    border-color: #24292e;
+    background: linear-gradient(135deg, #ffffff 0%, #f6f8fa 100%);
+}
+
+.oauth-btn[data-provider="github"]:hover {
+    background: linear-gradient(135deg, #f6f8fa 0%, #e1e4e8 100%);
+}
+
+/* Button Icons and Text */
+.oauth-btn-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 12px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.oauth-btn-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.oauth-btn-text {
+    flex: 1;
+    text-align: center;
+    font-weight: 500;
+}
+
+/* Mobile Form Elements */
+.oauth-form {
+    width: 100%;
+    margin-top: 20px;
+}
+
+.oauth-input {
+    width: 100%;
+    height: 48px;
+    padding: 12px 16px;
+    font-size: 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    background: white;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.oauth-input:focus {
+    outline: none;
+    border-color: #007AFF;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.oauth-input::placeholder {
+    color: #8e8e93;
+}
+
+/* Loading States */
+.oauth-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.oauth-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid transparent;
+    border-top: 2px solid currentColor;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Provider Selection Enhancement */
+.oauth-providers {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.oauth-provider-suggested {
+    position: relative;
+}
+
+.oauth-provider-suggested::before {
+    content: '⭐ Recommended';
+    position: absolute;
+    top: -8px;
+    right: 8px;
+    background: #007AFF;
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 8px;
+    z-index: 1;
+}
+
+/* Department Selection */
+.department-selector {
+    margin-bottom: 20px;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+.department-selector select {
+    width: 100%;
+    height: 48px;
+    padding: 12px 16px;
+    font-size: 16px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    background: white;
+    cursor: pointer;
+}
+
+/* Keyboard Navigation Styles */
+.keyboard-navigation .oauth-btn:focus {
+    outline: 2px solid #007AFF;
+    outline-offset: 2px;
+}
+
+.keyboard-navigation .oauth-input:focus {
+    outline: 2px solid #007AFF;
+    outline-offset: 2px;
+}
+
+/* Orientation-Specific Styles */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+    .oauth-container.landscape {
+        min-height: auto;
+        padding: 15px 20px;
+        justify-content: flex-start;
+    }
+
+    .oauth-header.landscape h1 {
+        font-size: 1.5rem;
+        margin-bottom: 15px;
+    }
+
+    .oauth-providers.landscape {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin-bottom: 15px;
+    }
+
+    .oauth-btn.landscape {
+        margin-bottom: 0;
+        min-height: 44px;
+        padding: 10px 12px;
+        font-size: 15px;
+    }
+}
+
+/* Keyboard Handling */
+.oauth-container.keyboard-visible {
+    padding-bottom: 10px;
+}
+
+body.oauth-keyboard-active {
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Touch Feedback */
+.oauth-btn.touch-active {
+    transform: scale(0.98);
+    opacity: 0.8;
+}
+
+/* Biometric Authentication */
+.oauth-btn.biometric-auth {
+    background: linear-gradient(135deg, #34C759 0%, #30D158 100%);
+    color: white;
+    border-color: #30A14E;
+}
+
+.oauth-btn.biometric-auth:hover {
+    background: linear-gradient(135deg, #30D158 0%, #32D760 100%);
+}
+
+/* Corporate Branding Mobile Adaptations */
+.oauth-container.corporate-branded {
+    --brand-primary: var(--corporate-primary, #007AFF);
+    --brand-secondary: var(--corporate-secondary, #5856D6);
+}
+
+.oauth-container.corporate-branded .oauth-btn.primary {
+    background: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-secondary) 100%);
+    color: white;
+    border-color: var(--brand-primary);
+}
+
+/* Accessibility Enhancements */
+@media (prefers-reduced-motion: reduce) {
+    .oauth-btn,
+    .oauth-input,
+    .oauth-loading::after {
+        animation: none !important;
+        transition: none !important;
+    }
+    
+    .oauth-btn::before {
+        transition: none !important;
+    }
+}
+
+@media (prefers-color-scheme: dark) {
+    .oauth-container {
+        background: #1c1c1e;
+        color: #ffffff;
+    }
+
+    .oauth-btn {
+        background: #2c2c2e;
+        border-color: #48484a;
+        color: #ffffff;
+    }
+
+    .oauth-input {
+        background: #2c2c2e;
+        border-color: #48484a;
+        color: #ffffff;
+    }
+
+    .oauth-input::placeholder {
+        color: #8e8e93;
+    }
+
+    .department-selector {
+        background: #2c2c2e;
+    }
+}
+
+@media (prefers-contrast: high) {
+    .oauth-btn {
+        border-width: 2px;
+        font-weight: 600;
+    }
+
+    .oauth-input {
+        border-width: 3px;
+    }
+}
+
+/* High DPI Display Optimizations */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    .oauth-btn-icon img {
+        image-rendering: -webkit-optimize-contrast;
+        image-rendering: crisp-edges;
+    }
+}
+
+/* Safe Area Handling for Modern Mobile Devices */
+.oauth-container {
+    padding-left: max(20px, env(safe-area-inset-left));
+    padding-right: max(20px, env(safe-area-inset-right));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-top: max(20px, env(safe-area-inset-top));
+}
+
+/* Small Mobile Devices */
+@media screen and (max-width: 375px) {
+    .oauth-container {
+        padding: 16px;
+    }
+
+    .oauth-btn {
+        font-size: 15px;
+        min-height: 44px;
+        padding: 10px 14px;
+    }
+
+    .oauth-input {
+        font-size: 15px;
+        height: 44px;
+        padding: 10px 14px;
+    }
+}
+
+/* Large Mobile Devices */
+@media screen and (min-width: 414px) and (max-width: 768px) {
+    .oauth-container {
+        max-width: 450px;
+        padding: 24px;
+    }
+
+    .oauth-btn {
+        min-height: 52px;
+        padding: 14px 18px;
+        font-size: 17px;
+    }
+}
+
+/* Tablet Adaptations */
+@media screen and (min-width: 768px) and (max-width: 1024px) {
+    .oauth-container {
+        max-width: 500px;
+        padding: 40px;
+    }
+
+    .oauth-providers {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+    }
+
+    .oauth-btn {
+        min-height: 56px;
+        font-size: 18px;
+    }
+}
+
+/* Error States */
+.oauth-error {
+    background: #ff3b30;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 15px;
+    text-align: center;
+}
+
+.oauth-input.error {
+    border-color: #ff3b30;
+    box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.1);
+}
+
+/* Success States */
+.oauth-success {
+    background: #34c759;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    font-size: 15px;
+    text-align: center;
+}
+
+/* Progressive Enhancement */
+@supports not (display: grid) {
+    .oauth-providers.landscape {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .oauth-btn.landscape {
+        flex: 1;
+        min-width: calc(50% - 6px);
+    }
+}
+
+@supports (backdrop-filter: blur(10px)) {
+    .oauth-container.glass-effect {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+}
+
+/* Performance Optimizations */
+.oauth-btn,
+.oauth-input {
+    will-change: transform;
+}
+
+.oauth-btn::before {
+    will-change: width, height, top, left;
+}
+
+/* Print Styles */
+@media print {
+    .oauth-container {
+        background: white !important;
+        color: black !important;
+        box-shadow: none !important;
+    }
+
+    .oauth-btn {
+        border: 2px solid black !important;
+        background: white !important;
+        color: black !important;
+    }
+}

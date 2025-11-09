@@ -1,0 +1,801 @@
+<%
+/**
+ * Quote Information Section
+ * Basic information form for quote creation/editing
+ */
+%>
+
+<div class="card border-0 shadow-sm" id="quoteInformationCard">
+    <!-- Page Loader -->
+    <%- include('../../../atoms/common/page-loader', {
+        text: 'Cargando información de la cotización...',
+        spinnerColor: 'primary',
+        containerId: 'quoteInformationCard'
+    }) %>
+
+    <div class="card-header bg-white border-bottom">
+        <h5 class="card-title mb-0">
+            <i class="ti ti-info-circle me-2"></i>Información de la Cotización
+        </h5>
+    </div>
+
+    <div class="card-body">
+        <!-- Alerts Container -->
+        <div id="quoteInformationAlerts"></div>
+
+        <form id="quoteInformationForm" class="needs-validation" novalidate>
+            <!-- Hidden field for quote ID (for editing) -->
+            <input type="hidden" id="quoteId" name="quoteId" value="<%= typeof quoteId !== 'undefined' ? quoteId : '' %>">
+
+            <!-- Sección: Información del Cliente -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                    <i class="ti ti-user me-1"></i>
+                    Información del Cliente
+                </h6>
+
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <%- include('../../../atoms/common/tom-select', {
+                            id: 'clientId',
+                            name: 'clientId',
+                            multiple: false,
+                            placeholder: 'Buscar cliente por nombre o empresa',
+                            label: 'Cliente',
+                            required: true,
+                            helpText: 'Selecciona un cliente existente o crea uno nuevo',
+                            options: [],
+                            selected: []
+                        }) %>
+                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
+                            <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección: Detalles del Evento -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                    <i class="ti ti-calendar-event me-1"></i>
+                    Detalles del Evento
+                </h6>
+
+                <div class="row">
+                    <div class="col-md-8 mb-3">
+                        <label for="eventType" class="form-label">Tipo de Evento / Motivo <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="eventType" name="eventType"
+                               placeholder="Ej: Experiencias para despedida de soltera" required>
+                        <div class="form-text">Describe el tipo de evento o el motivo del viaje</div>
+                        <div class="invalid-feedback">Por favor ingresa el tipo de evento o motivo</div>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label for="numberOfPeople" class="form-label">Número de Personas <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="numberOfPeople" name="numberOfPeople"
+                               min="1" placeholder="0" required>
+                        <div class="form-text">Cantidad de personas/asistentes</div>
+                        <div class="invalid-feedback">Por favor ingresa el número de personas</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección: Información de Contacto -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                    <i class="ti ti-phone me-1"></i>
+                    Información de Contacto
+                </h6>
+                <div class="alert alert-info d-flex align-items-start" role="alert">
+                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <small>Esta información se autocompletará al seleccionar un cliente, pero puedes editarla para esta cotización específica.</small>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="contactPerson" class="form-label">Persona de Contacto</label>
+                        <input type="text" class="form-control" id="contactPerson" name="contactPerson" placeholder="Nombre completo">
+                        <div class="form-text">Nombre de la persona que recibirá la cotización</div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="contactEmail" class="form-label">Email de Contacto</label>
+                        <input type="email" class="form-control" id="contactEmail" name="contactEmail" placeholder="email@ejemplo.com">
+                        <div class="form-text">Email para enviar la cotización</div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label for="contactPhone" class="form-label">Teléfono de Contacto</label>
+                        <input type="tel" class="form-control" id="contactPhone" name="contactPhone" placeholder="+52 123 456 7890">
+                        <div class="form-text">Teléfono de contacto directo</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección: Información de Tarifa -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                    <i class="ti ti-percentage me-1"></i>
+                    Tarifa Aplicable
+                </h6>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="rateId" class="form-label">Tarifa <span class="text-danger">*</span></label>
+                        <select class="form-select" id="rateId" name="rateId" required>
+                            <option value="">Seleccionar tarifa</option>
+                        </select>
+                        <div class="form-text">Tarifa que se aplicará a todos los servicios de esta cotización</div>
+                        <div class="invalid-feedback">Por favor selecciona una tarifa</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sección: Notas Adicionales -->
+            <div class="mb-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                    <i class="ti ti-notes me-1"></i>
+                    Notas Adicionales
+                </h6>
+
+                <div class="mb-3">
+                    <label for="notes" class="form-label">Notas</label>
+                    <textarea class="form-control" id="notes" name="notes" rows="3" maxlength="500" placeholder="Notas adicionales sobre la cotización..."></textarea>
+                    <div class="form-text">Máximo 500 caracteres (opcional)</div>
+                </div>
+            </div>
+
+            <!-- Sección: Estado de la Cotización (solo visible en modo edición) -->
+            <% if (typeof quoteId !== 'undefined' && quoteId !== '' && quoteId !== 'new') { %>
+            <div class="mb-4">
+                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                    <i class="ti ti-flag me-1"></i>
+                    Estado de la Cotización
+                </h6>
+
+                <div class="mb-3">
+                    <label for="status" class="form-label">Estado</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="draft">Borrador</option>
+                        <option value="sent">Enviado</option>
+                        <option value="accepted">Aceptado</option>
+                        <option value="rejected">Rechazado</option>
+                    </select>
+                    <div class="form-text">El estado actual de la cotización</div>
+                </div>
+            </div>
+            <% } %>
+
+            <!-- Alert informativo -->
+            <div class="alert alert-success d-flex align-items-start" role="alert">
+                <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                <div>
+                    <strong>Cotización:</strong>
+                    <p class="mb-0 mt-1">Define la información básica del cliente y la tarifa aplicable. Una vez creada, podrás agregar servicios en la siguiente sección.</p>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="d-flex justify-content-end gap-2">
+                <a href="/dashboard/admin/quotes" class="btn btn-secondary">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </a>
+                <button type="submit" class="btn btn-primary" id="createQuoteBtn">
+                    <i class="ti ti-check me-1"></i>Crear Cotización
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Quick Client Creation Modal -->
+<div class="modal fade" id="quickClientModal" tabindex="-1" aria-labelledby="quickClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="quickClientModalLabel">
+                    <i class="ti ti-user-plus me-2"></i>Crear Cliente Rápido
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alerts Container -->
+                <div id="quickClientModalAlerts"></div>
+
+                <form id="quickClientForm" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="qc_firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="qc_firstName" name="firstName" required placeholder="Ej: Juan">
+                        <div class="invalid-feedback">Por favor ingresa el nombre</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="qc_lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="qc_lastName" name="lastName" required placeholder="Ej: Pérez">
+                        <div class="invalid-feedback">Por favor ingresa el apellido</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="qc_email" class="form-label">Email <span class="text-muted">(opcional)</span></label>
+                        <input type="email" class="form-control" id="qc_email" name="email" placeholder="email@ejemplo.com">
+                        <div class="form-text">Si no lo proporcionas, se generará un email temporal</div>
+                        <div class="invalid-feedback">Por favor ingresa un email válido</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="qc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
+                        <input type="text" class="form-control" id="qc_companyName" name="companyName" placeholder="Ej: Empresa S.A. de C.V.">
+                        <div class="form-text">Nombre de la empresa del cliente</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="qc_phone" class="form-label">Teléfono <span class="text-muted">(opcional)</span></label>
+                        <input type="tel" class="form-control" id="qc_phone" name="phone" placeholder="+52 123 456 7890">
+                    </div>
+
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <small><strong>Cliente rápido:</strong> Este cliente se creará con la información mínima necesaria. Podrás completar sus datos desde la sección de Clientes más adelante.</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveQuickClientBtn">
+                    <i class="ti ti-check me-1"></i>Crear Cliente
+                </button>
+            </div>
+
+            <%- include('../../../atoms/common/modal-loader', { text: 'Creando cliente...' }) %>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    let clientTomSelect = null;
+
+    // Get JWT token from cookies
+    function getAccessToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'accessToken') {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    // Helper function to wait for Tom Select to be initialized
+    function waitForTomSelect(elementId, maxAttempts = 50) {
+        return new Promise((resolve, reject) => {
+            let attempts = 0;
+            const checkInterval = setInterval(() => {
+                const element = document.getElementById(elementId);
+                if (element && element.tomselect) {
+                    clearInterval(checkInterval);
+                    resolve(element.tomselect);
+                } else {
+                    attempts++;
+                    if (attempts >= maxAttempts) {
+                        clearInterval(checkInterval);
+                        reject(new Error(`Tom Select not initialized on #${elementId}`));
+                    }
+                }
+            }, 100);
+        });
+    }
+
+    // Show alert in a container
+    function showAlert(containerId, message, type = 'danger') {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        container.appendChild(alertDiv);
+
+        // Auto-dismiss after 5 seconds with null check
+        setTimeout(() => {
+            if (alertDiv && alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // Clear alerts from a container
+    function clearAlerts(containerId) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.querySelectorAll('.alert').forEach(el => el.remove());
+        }
+    }
+
+    // Show modal loader (for quick client modal only)
+    function showQuickClientModalLoader(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            const loader = modal.querySelector('.modal-loader-overlay');
+            if (loader) {
+                loader.style.display = 'flex';
+            }
+        }
+    }
+
+    // Hide modal loader (for quick client modal only)
+    function hideQuickClientModalLoader(modalId) {
+        const modal = document.getElementById(modalId);
+        if (modal) {
+            const loader = modal.querySelector('.modal-loader-overlay');
+            if (loader) {
+                loader.style.display = 'none';
+            }
+        }
+    }
+
+    // Load active clients for Tom Select
+    async function loadActiveClients() {
+        try {
+            const response = await fetch('/api/clients/active', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const clientTS = await waitForTomSelect('clientId');
+
+                // Clear existing options
+                clientTS.clearOptions();
+
+                // Add client options
+                result.data.forEach(client => {
+                    clientTS.addOption({
+                        value: client.value,
+                        text: client.label,
+                        email: client.email,
+                        contactPerson: client.contactPerson,
+                        phone: client.phone
+                    });
+                });
+
+                // Refresh to apply changes
+                clientTS.refreshOptions(false);
+            }
+        } catch (error) {
+            console.error('Error loading clients:', error);
+            showAlert('quoteInformationAlerts', 'Error al cargar la lista de clientes', 'danger');
+        }
+    }
+
+    // Load active rates
+    async function loadActiveRates() {
+        try {
+            const response = await fetch('/api/rates/active', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const rateSelect = document.getElementById('rateId');
+                result.data.forEach(rate => {
+                    const option = document.createElement('option');
+                    option.value = rate.value;
+                    option.textContent = rate.label;
+                    rateSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading rates:', error);
+            showAlert('quoteInformationAlerts', 'Error al cargar las tarifas', 'danger');
+        }
+    }
+
+    // Auto-fill contact information when client is selected
+    async function handleClientSelection() {
+        try {
+            const clientTS = await waitForTomSelect('clientId');
+
+            clientTS.on('change', function(value) {
+                if (value) {
+                    // Get selected option data
+                    const option = this.options[value];
+                    if (option) {
+                        // Auto-fill contact fields
+                        document.getElementById('contactPerson').value = option.contactPerson || '';
+                        document.getElementById('contactEmail').value = option.email || '';
+                        document.getElementById('contactPhone').value = option.phone || '';
+                    }
+                } else {
+                    // Clear contact fields when no client selected
+                    document.getElementById('contactPerson').value = '';
+                    document.getElementById('contactEmail').value = '';
+                    document.getElementById('contactPhone').value = '';
+                }
+            });
+        } catch (error) {
+            console.error('Error setting up client selection handler:', error);
+        }
+    }
+
+    // Open quick client modal
+    function openQuickClientModal() {
+        clearAlerts('quickClientModalAlerts');
+        document.getElementById('quickClientForm').reset();
+        document.getElementById('quickClientForm').classList.remove('was-validated');
+
+        const modal = new bootstrap.Modal(document.getElementById('quickClientModal'));
+        modal.show();
+    }
+
+    // Save quick client
+    async function saveQuickClient() {
+        const form = document.getElementById('quickClientForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Get form data
+        const formData = {
+            firstName: document.getElementById('qc_firstName').value.trim(),
+            lastName: document.getElementById('qc_lastName').value.trim(),
+            email: document.getElementById('qc_email').value.trim() || undefined,
+            companyName: document.getElementById('qc_companyName').value.trim() || undefined,
+            phone: document.getElementById('qc_phone').value.trim() || undefined
+        };
+
+        // Show loader
+        showQuickClientModalLoader('quickClientModal');
+        clearAlerts('quickClientModalAlerts');
+
+        try {
+            const response = await fetch('/api/clients/quick', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                // Add new client to Tom Select
+                const clientTS = await waitForTomSelect('clientId');
+
+                clientTS.addOption({
+                    value: result.data.value,
+                    text: result.data.label,
+                    email: result.data.email,
+                    contactPerson: result.data.contactPerson,
+                    phone: result.data.phone
+                });
+
+                // Select the new client
+                clientTS.setValue(result.data.value);
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('quickClientModal'));
+                modal.hide();
+
+                // Show success message
+                showAlert('quoteInformationAlerts', 'Cliente creado exitosamente', 'success');
+            } else {
+                // Handle specific error cases
+                let errorMessage = result.error || 'Error al crear el cliente';
+
+                if (response.status === 409 || errorMessage.includes('email') || errorMessage.includes('Email')) {
+                    errorMessage = 'Ya existe un cliente con este nombre. Por favor, usa un nombre diferente o proporciona un email único.';
+                }
+
+                showAlert('quickClientModalAlerts', errorMessage, 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating quick client:', error);
+            showAlert('quickClientModalAlerts', 'Error de conexión al crear el cliente', 'danger');
+        } finally {
+            hideQuickClientModalLoader('quickClientModal');
+        }
+    }
+
+    // Load existing quote data
+    async function loadQuoteData(quoteId) {
+        try {
+            const response = await fetch(`/api/quotes/${quoteId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                const quote = result.data;
+
+                // Wait for Tom Select to be ready
+                const clientTS = await waitForTomSelect('clientId');
+
+                // Populate client (Tom Select)
+                if (quote.client && quote.client.id) {
+                    clientTS.setValue(quote.client.id);
+                }
+
+                // Populate form fields
+                if (quote.eventType) {
+                    document.getElementById('eventType').value = quote.eventType;
+                }
+
+                if (quote.numberOfPeople) {
+                    document.getElementById('numberOfPeople').value = quote.numberOfPeople;
+                }
+
+                if (quote.contactPerson) {
+                    document.getElementById('contactPerson').value = quote.contactPerson;
+                }
+
+                if (quote.contactEmail) {
+                    document.getElementById('contactEmail').value = quote.contactEmail;
+                }
+
+                if (quote.contactPhone) {
+                    document.getElementById('contactPhone').value = quote.contactPhone;
+                }
+
+                if (quote.rate && quote.rate.id) {
+                    document.getElementById('rateId').value = quote.rate.id;
+                }
+
+                if (quote.notes) {
+                    document.getElementById('notes').value = quote.notes;
+                }
+
+                // Populate status if exists
+                const statusSelect = document.getElementById('status');
+                if (statusSelect && quote.status) {
+                    statusSelect.value = quote.status;
+                }
+
+                // Change button text to "Actualizar"
+                const submitBtn = document.getElementById('createQuoteBtn');
+                submitBtn.innerHTML = '<i class="ti ti-check me-1"></i>Actualizar Cotización';
+            } else {
+                showAlert('quoteInformationAlerts', 'Error al cargar la cotización', 'danger');
+            }
+        } catch (error) {
+            console.error('Error loading quote data:', error);
+            showAlert('quoteInformationAlerts', 'Error al cargar los datos de la cotización', 'danger');
+        }
+    }
+
+    // Update existing quote
+    async function updateQuote(quoteId, event) {
+        event.preventDefault();
+
+        const form = document.getElementById('quoteInformationForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        clearAlerts('quoteInformationAlerts');
+
+        // Get Tom Select value
+        const clientTS = await waitForTomSelect('clientId');
+        const clientId = clientTS.getValue();
+
+        if (!clientId) {
+            showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
+            return;
+        }
+
+        // Get form data
+        const formData = {
+            eventType: document.getElementById('eventType').value.trim() || undefined,
+            numberOfPeople: document.getElementById('numberOfPeople').value ? parseInt(document.getElementById('numberOfPeople').value, 10) : undefined,
+            contactPerson: document.getElementById('contactPerson').value.trim() || undefined,
+            contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
+            contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
+            notes: document.getElementById('notes').value.trim() || undefined
+        };
+
+        // Include status if exists
+        const statusSelect = document.getElementById('status');
+        if (statusSelect) {
+            formData.status = statusSelect.value;
+        }
+
+        // Disable submit button
+        const submitBtn = document.getElementById('createQuoteBtn');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="ti ti-loader-2 me-1 spinner-border spinner-border-sm"></i>Actualizando...';
+
+        try {
+            const response = await fetch(`/api/quotes/${quoteId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                showAlert('quoteInformationAlerts', 'Cotización actualizada exitosamente', 'success');
+
+                // Keep the button disabled for a moment
+                setTimeout(() => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalText;
+                }, 2000);
+            } else {
+                showAlert('quoteInformationAlerts', result.error || 'Error al actualizar la cotización', 'danger');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            console.error('Error updating quote:', error);
+            showAlert('quoteInformationAlerts', 'Error de conexión al actualizar la cotización', 'danger');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    }
+
+    // Create quote
+    async function createQuote(event) {
+        event.preventDefault();
+
+        const form = document.getElementById('quoteInformationForm');
+
+        // Validate form
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        clearAlerts('quoteInformationAlerts');
+
+        // Get Tom Select value
+        const clientTS = await waitForTomSelect('clientId');
+        const clientId = clientTS.getValue();
+
+        if (!clientId) {
+            showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
+            return;
+        }
+
+        // Get form data
+        const formData = {
+            clientId: clientId,
+            eventType: document.getElementById('eventType').value.trim() || undefined,
+            numberOfPeople: document.getElementById('numberOfPeople').value ? parseInt(document.getElementById('numberOfPeople').value, 10) : undefined,
+            contactPerson: document.getElementById('contactPerson').value.trim() || undefined,
+            contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
+            contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
+            rateId: document.getElementById('rateId').value,
+            notes: document.getElementById('notes').value.trim() || undefined
+        };
+
+        // Disable submit button
+        const submitBtn = document.getElementById('createQuoteBtn');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="ti ti-loader-2 me-1 spinner-border spinner-border-sm"></i>Creando...';
+
+        try {
+            const response = await fetch('/api/quotes', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                showAlert('quoteInformationAlerts', result.message || 'Cotización creada exitosamente', 'success');
+
+                // Redirect to quote detail page with services section
+                setTimeout(() => {
+                    window.location.href = `/dashboard/admin/quotes/${result.data.id}?section=services`;
+                }, 1500);
+            } else {
+                showAlert('quoteInformationAlerts', result.error || 'Error al crear la cotización', 'danger');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalText;
+            }
+        } catch (error) {
+            console.error('Error creating quote:', error);
+            showAlert('quoteInformationAlerts', 'Error de conexión al crear la cotización', 'danger');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Show loader immediately
+        showPageLoader('quoteInformationCard');
+
+        try {
+            // Load dropdown data in parallel
+            await Promise.all([
+                loadActiveClients(),
+                loadActiveRates()
+            ]);
+
+            // Setup client selection handler
+            await handleClientSelection();
+
+            // Check if we're in edit mode
+            const quoteIdInput = document.getElementById('quoteId');
+            const quoteId = quoteIdInput ? quoteIdInput.value : '';
+            const isEditMode = quoteId && quoteId !== '' && quoteId !== 'new';
+
+            // If edit mode, load quote data
+            if (isEditMode) {
+                await loadQuoteData(quoteId);
+            }
+
+            // Event listeners
+            document.getElementById('createQuickClientBtn').addEventListener('click', openQuickClientModal);
+            document.getElementById('saveQuickClientBtn').addEventListener('click', saveQuickClient);
+
+            // Form submission - use appropriate function based on mode
+            document.getElementById('quoteInformationForm').addEventListener('submit', function(event) {
+                if (isEditMode) {
+                    updateQuote(quoteId, event);
+                } else {
+                    createQuote(event);
+                }
+            });
+
+            // Hide loader after everything is loaded
+            hidePageLoader('quoteInformationCard');
+        } catch (error) {
+            console.error('Error initializing quote information form:', error);
+            showAlert('quoteInformationAlerts', 'Error al inicializar el formulario', 'danger');
+
+            // Hide loader even if there's an error
+            hidePageLoader('quoteInformationCard');
+        }
+    });
+})();
+</script>

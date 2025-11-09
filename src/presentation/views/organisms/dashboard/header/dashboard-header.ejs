@@ -1,0 +1,403 @@
+<%
+/**
+ * Dashboard Header Organism
+ * Top navigation bar with user menu, notifications, and search
+ *
+ * @param {string} userRole - Current user role
+ * @param {object} user - Current user object
+ * @param {string} title - Page title
+ */
+
+// Default parameters
+const headerUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
+const headerUser = (typeof user !== 'undefined' && user !== null) ? user : {};
+const headerTitle = typeof title !== 'undefined' ? title : 'Dashboard';
+
+// User data extraction with null safety
+const userName = (headerUser && (headerUser.name || headerUser.fullName)) || 'User';
+const userEmail = (headerUser && headerUser.email) || '';
+const userAvatar = (headerUser && (headerUser.avatar || headerUser.profilePicture)) || '';
+
+// Generate user initials
+function getInitials(name) {
+    return name.split(' ')
+        .map(word => word.charAt(0))
+        .join('')
+        .substring(0, 2)
+        .toUpperCase();
+}
+
+const userInitials = getInitials(userName);
+
+// Role colors
+const roleColors = {
+    superadmin: { primary: '#ff6b6b', secondary: '#4ecdc4' },
+    admin: { primary: '#5d87ff', secondary: '#49beff' },
+    client: { primary: '#8b5cf6', secondary: '#ec4899' },
+    department_manager: { primary: '#10b981', secondary: '#3b82f6' },
+    employee: { primary: '#06b6d4', secondary: '#8b5cf6' },
+    driver: { primary: '#f59e0b', secondary: '#ef4444' },
+    guest: { primary: '#6b7280', secondary: '#9ca3af' }
+};
+
+const colors = roleColors[headerUserRole] || roleColors.guest;
+%>
+
+<div class="app-header bg-white border-bottom">
+    <nav class="navbar navbar-expand-lg navbar-light px-4 py-3">
+        <div class="d-flex align-items-center justify-content-between w-100">
+            <!-- Left Section -->
+            <div class="d-flex align-items-center">
+                <!-- Mobile Sidebar Toggle -->
+                <button class="btn btn-link d-lg-none p-0 me-3 text-muted sidebar-toggle-mobile"
+                        type="button"
+                        aria-label="Abrir menú">
+                    <i class="ti ti-menu-2 fs-5"></i>
+                </button>
+
+                <!-- Desktop Sidebar Toggle -->
+                <button class="btn btn-link d-none d-lg-block p-0 me-3 text-muted sidebar-toggle-desktop"
+                        type="button"
+                        aria-label="Colapsar menú">
+                    <i class="ti ti-menu-2 fs-5"></i>
+                </button>
+            </div>
+
+
+            <!-- Right Section -->
+            <div class="d-flex align-items-center">
+
+                <!-- TODO: Implementar notificaciones en el futuro -->
+                <!--
+                <div class="dropdown me-3">
+                    <button class="btn btn-link p-0 position-relative"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            data-bs-toggle="tooltip"
+                            title="Notifications">
+                        <i class="ti ti-bell fs-6 text-muted"></i>
+                        <span class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill"
+                              id="notification-count"
+                              style="font-size: 0.625rem;">
+                            3
+                        </span>
+                    </button>
+
+                    <div class="dropdown-menu dropdown-menu-end shadow-lg border-0 p-0"
+                         style="width: 320px;">
+                        <div class="d-flex align-items-center justify-content-between p-3 border-bottom">
+                            <h6 class="mb-0 fw-semibold">Notifications</h6>
+                            <button class="btn btn-link btn-sm p-0 text-primary"
+                                    onclick="markAllAsRead()">
+                                Mark all as read
+                            </button>
+                        </div>
+
+                        <div class="notifications-list" style="max-height: 300px; overflow-y: auto;">
+                            <div class="p-3 text-center text-muted">
+                                <i class="ti ti-bell-off fs-3 d-block mb-2"></i>
+                                <p class="mb-0">No notifications</p>
+                            </div>
+                        </div>
+
+                        <div class="border-top p-2">
+                            <a href="/dashboard/<%= headerUserRole %>/notifications"
+                               class="btn btn-link w-100 text-center">
+                                View All Notifications
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                -->
+
+
+                <!-- User Menu (Refactored to use Molecular Component) -->
+                <%- include('../../../molecules/dashboard/user-menu', {
+                    user: headerUser,
+                    userRole: headerUserRole,
+                    colors: colors,
+                    userName: userName,
+                    userEmail: userEmail,
+                    userAvatar: userAvatar,
+                    userInitials: userInitials
+                }) %>
+            </div>
+        </div>
+    </nav>
+</div>
+
+<style>
+    /* Header Styles */
+    .app-header {
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+
+
+    /* Notification Badge (preserved for future use) */
+    #notification-count {
+        transform: translate(50%, -50%);
+        min-width: 16px;
+        height: 16px;
+        line-height: 1;
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 991.98px) {
+        .app-header .navbar {
+            padding: 1rem;
+        }
+    }
+
+    /* Loading states */
+    .header-loading {
+        pointer-events: none;
+        opacity: 0.7;
+    }
+
+    .header-loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 20px;
+        height: 20px;
+        border: 2px solid transparent;
+        border-top: 2px solid var(--primary-color, #5d87ff);
+        border-radius: 50%;
+        animation: header-loading-spin 1s linear infinite;
+        transform: translate(-50%, -50%);
+    }
+
+    @keyframes header-loading-spin {
+        0% { transform: translate(-50%, -50%) rotate(0deg); }
+        100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Sidebar toggle functionality
+    const sidebar = document.querySelector('.left-sidebar');
+    const mainContent = document.querySelector('.main-content');
+    const mobileToggle = document.querySelector('.sidebar-toggle-mobile');
+    const desktopToggle = document.querySelector('.sidebar-toggle-desktop');
+
+    // Mobile sidebar toggle
+    if (mobileToggle && sidebar) {
+        mobileToggle.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const isCurrentlyOpen = sidebar.classList.contains('show');
+
+            if (isCurrentlyOpen) {
+                // Close sidebar
+                sidebar.classList.remove('show');
+                sidebar.style.setProperty('left', '-270px', 'important');
+                sidebar.style.setProperty('transform', 'none', 'important');
+                this.setAttribute('aria-label', 'Abrir menú');
+            } else {
+                // Open sidebar
+                sidebar.classList.add('show');
+                sidebar.style.setProperty('left', '0', 'important');
+                sidebar.style.setProperty('transform', 'none', 'important');
+                this.setAttribute('aria-label', 'Cerrar menú');
+            }
+        });
+
+        // Close sidebar when clicking outside
+        document.addEventListener('click', function(e) {
+            if (window.innerWidth <= 991.98 &&
+                sidebar.classList.contains('show') &&
+                !sidebar.contains(e.target) &&
+                !mobileToggle.contains(e.target)) {
+                sidebar.classList.remove('show');
+                sidebar.style.setProperty('left', '-270px', 'important');
+                sidebar.style.setProperty('transform', 'none', 'important');
+                mobileToggle.setAttribute('aria-label', 'Abrir menú');
+            }
+        });
+    } else {
+        console.error('Mobile toggle or sidebar not found!');
+    }
+
+    // Desktop sidebar toggle with collapse
+    if (desktopToggle && sidebar && mainContent) {
+        // Check localStorage for saved state (default: expanded/false)
+        const savedState = localStorage.getItem('sidebarCollapsed');
+        const isCollapsed = savedState === 'true';
+
+        // Apply initial state
+        if (isCollapsed) {
+            sidebar.classList.add('collapsed');
+            mainContent.classList.add('sidebar-collapsed');
+        } else {
+            // Ensure it's expanded by default
+            sidebar.classList.remove('collapsed');
+            mainContent.classList.remove('sidebar-collapsed');
+        }
+
+        desktopToggle.addEventListener('click', function() {
+            const willBeCollapsed = sidebar.classList.toggle('collapsed');
+            mainContent.classList.toggle('sidebar-collapsed');
+
+            // Save state to localStorage
+            localStorage.setItem('sidebarCollapsed', willBeCollapsed);
+
+            this.setAttribute('aria-label', willBeCollapsed ? 'Expandir menú' : 'Colapsar menú');
+        });
+    }
+
+    // Handle window resize and initial load
+    function handleSidebarResponsive() {
+        const isDesktop = window.innerWidth > 991.98;
+
+        if (isDesktop && sidebar && mainContent) {
+            sidebar.classList.remove('show');
+            // Remove all inline styles for desktop
+            sidebar.style.removeProperty('left');
+            sidebar.style.removeProperty('transform');
+
+            // Force desktop position
+            sidebar.style.setProperty('left', '0', 'important');
+
+            // Restore collapsed state if it was saved (default: expanded)
+            const savedState = localStorage.getItem('sidebarCollapsed');
+            const isCollapsed = savedState === 'true';
+
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+                mainContent.classList.add('sidebar-collapsed');
+            } else {
+                // Default to expanded
+                sidebar.classList.remove('collapsed');
+                mainContent.classList.remove('sidebar-collapsed');
+            }
+
+            if (mobileToggle) {
+                mobileToggle.setAttribute('aria-label', 'Abrir menú');
+            }
+
+        } else if (!isDesktop && sidebar && mainContent && !sidebar.classList.contains('show')) {
+            // Ensure hidden in mobile
+            sidebar.style.setProperty('left', '-270px', 'important');
+            sidebar.style.setProperty('transform', 'none', 'important');
+
+            // Remove desktop collapsed states in mobile
+            sidebar.classList.remove('collapsed');
+            mainContent.classList.remove('sidebar-collapsed');
+        }
+    }
+
+    // Run on load
+    handleSidebarResponsive();
+
+    // Run on resize
+    window.addEventListener('resize', handleSidebarResponsive);
+
+    /* TODO: Implementar notificaciones en el futuro
+    // Load notifications
+    loadNotifications();
+
+    function loadNotifications() {
+        fetch('/api/v1/notifications')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateNotificationCount(data.unreadCount);
+                    displayNotifications(data.notifications);
+                }
+            })
+            .catch(error => {
+                console.error('Notifications error:', error);
+            });
+    }
+
+    function updateNotificationCount(count) {
+        const badge = document.getElementById('notification-count');
+        if (badge) {
+            if (count > 0) {
+                badge.textContent = count > 99 ? '99+' : count;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    }
+
+    function displayNotifications(notifications) {
+        const notificationsList = document.querySelector('.notifications-list');
+        if (!notificationsList) return;
+
+        if (notifications.length === 0) {
+            notificationsList.innerHTML = `
+                <div class="p-3 text-center text-muted">
+                    <i class="ti ti-bell-off fs-3 d-block mb-2"></i>
+                    <p class="mb-0">No notifications</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        notifications.forEach(notification => {
+            html += `
+                <div class="notification-item p-3 border-bottom ${notification.read ? '' : 'bg-light'}" data-id="${notification.id}">
+                    <div class="d-flex align-items-start">
+                        <div class="notification-icon me-3">
+                            <div class="round-20 bg-${notification.type}-subtle d-flex align-items-center justify-content-center">
+                                <i class="ti ti-${notification.icon} text-${notification.type}"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="fw-semibold text-truncate">${notification.title}</div>
+                            <div class="text-muted small">${notification.message}</div>
+                            <div class="text-muted small">${formatNotificationTime(notification.createdAt)}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        notificationsList.innerHTML = html;
+    }
+
+    function formatNotificationTime(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diffInMinutes = Math.floor((now - date) / (1000 * 60));
+
+        if (diffInMinutes < 1) return 'Just now';
+        if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+        if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+        return date.toLocaleDateString();
+    }
+
+    // Mark all notifications as read
+    window.markAllAsRead = function() {
+        fetch('/api/v1/notifications/mark-all-read', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateNotificationCount(0);
+                document.querySelectorAll('.notification-item').forEach(item => {
+                    item.classList.remove('bg-light');
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Mark as read error:', error);
+        });
+    };
+    */
+});
+</script>

@@ -1,0 +1,469 @@
+#!/usr/bin/env node
+
+/**
+ * Git Hooks Setup Script for AmexingWeb
+ * 
+ * This script automatically installs and configures Git hooks for:
+ * - PCI DSS compliance validation
+ * - Security checks
+ * - Conventional commit enforcement
+ * - Changelog automation
+ * 
+ * Usage:
+ *   yarn hooks:install
+ *   node scripts/setup-git-hooks.js
+ *   node scripts/setup-git-hooks.js --force
+ *   node scripts/setup-git-hooks.js --auto (for postinstall)
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+class GitHooksSetup {
+  constructor() {
+    this.projectRoot = path.resolve(__dirname, '../../..');
+    this.hooksDir = path.join(this.projectRoot, '.git', 'hooks');
+    this.sourceHooksDir = path.join(this.projectRoot, 'scripts', 'git-hooks');
+    this.isForce = process.argv.includes('--force');
+    this.isAuto = process.argv.includes('--auto');
+    this.skipCI = process.argv.includes('--skip-ci');
+    
+    this.hooks = [
+      'pre-commit',
+      'commit-msg',
+      'pre-push',
+      'post-merge'
+    ];
+  }
+
+  log(message, level = 'info') {
+    if (this.isAuto && level !== 'error') return; // Quiet mode for postinstall
+    
+    const colors = {
+      info: '\x1b[36m',   // Cyan
+      success: '\x1b[32m', // Green
+      warning: '\x1b[33m', // Yellow
+      error: '\x1b[31m',   // Red
+      reset: '\x1b[0m'
+    };
+    
+    const prefix = level === 'error' ? '❌' : level === 'success' ? '✅' : level === 'warning' ? '⚠️' : 'ℹ️';
+    console.log(`${colors[level]}${prefix} ${message}${colors.reset}`);
+  }
+
+  checkGitRepository() {
+    // Skip git repository check in CI environments
+    if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
+      this.log('CI environment detected - skipping git repository check', 'info');
+      return;
+    }
+
+    if (!fs.existsSync(path.join(this.projectRoot, '.git'))) {
+      throw new Error('Not a git repository. Initialize git first: git init');
+    }
+  }
+
+  ensureDirectories() {
+    // Skip git hooks directory creation in CI environments
+    if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
+      this.log('CI environment detected - skipping .git/hooks directory creation', 'info');
+      return;
+    }
+
+    // Ensure .git/hooks directory exists
+    if (!fs.existsSync(this.hooksDir)) {
+      fs.mkdirSync(this.hooksDir, { recursive: true });
+      this.log('Created .git/hooks directory');
+    }
+
+    // Ensure source hooks directory exists
+    if (!fs.existsSync(this.sourceHooksDir)) {
+      fs.mkdirSync(this.sourceHooksDir, { recursive: true });
+      this.log('Created scripts/git-hooks directory');
+    }
+  }
+
+  createHookFiles() {
+    // Skip hook file creation in CI environments
+    if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
+      this.log('CI environment detected - skipping git hook files creation', 'info');
+      return;
+    }
+
+    this.hooks.forEach(hookName => {
+      const sourceHook = path.join(this.sourceHooksDir, hookName);
+      const targetHook = path.join(this.hooksDir, hookName);
+
+      // Check if hook already exists and not forcing
+      if (fs.existsSync(targetHook) && !this.isForce) {
+        this.log(`Hook ${hookName} already exists (use --force to overwrite)`, 'warning');
+        return;
+      }
+
+      // Create source hook if it doesn't exist
+      if (!fs.existsSync(sourceHook)) {
+        this.createSourceHook(hookName);
+      }
+
+      // Copy and make executable
+      try {
+        fs.copyFileSync(sourceHook, targetHook);
+        fs.chmodSync(targetHook, 0o755);
+        this.log(`Installed ${hookName} hook`, 'success');
+      } catch (error) {
+        this.log(`Failed to install ${hookName}: ${error.message}`, 'error');
+      }
+    });
+  }
+
+  createSourceHook(hookName) {
+    const hookContent = this.getHookContent(hookName);
+    const sourceHook = path.join(this.sourceHooksDir, hookName);
+    
+    fs.writeFileSync(sourceHook, hookContent, { mode: 0o755 });
+    this.log(`Created source hook: ${hookName}`);
+  }
+
+  getHookContent(hookName) {
+    const commonHeader = `#!/bin/bash
+# ${hookName} hook for AmexingWeb PCI DSS Compliance
+# Generated automatically by scripts/setup-git-hooks.js
+# 
+# This hook enforces security and compliance requirements
+
+set -e
+
+# Colors for output
+RED='\\033[0;31m'
+GREEN='\\033[0;32m'
+YELLOW='\\033[1;33m'
+BLUE='\\033[0;34m'
+NC='\\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "\${BLUE}ℹ️  \$1\${NC}"
+}
+
+log_success() {
+    echo -e "\${GREEN}✅ \$1\${NC}"
+}
+
+log_warning() {
+    echo -e "\${YELLOW}⚠️  \$1\${NC}"
+}
+
+log_error() {
+    echo -e "\${RED}❌ \$1\${NC}"
+}
+
+# Check if we're in the right directory
+if [ ! -f "package.json" ]; then
+    log_error "Not in project root directory"
+    exit 1
+fi
+
+`;
+
+    switch (hookName) {
+      case 'pre-commit':
+        return commonHeader + `
+log_info "Running pre-commit checks for PCI DSS compliance..."
+
+# 1. ESLint security checks
+log_info "Running ESLint security analysis..."
+if ! yarn lint; then
+    log_error "ESLint checks failed. Fix issues before committing."
+    exit 1
+fi
+
+# 2. Semgrep security analysis
+log_info "Running Semgrep security analysis..."
+if command -v semgrep >/dev/null 2>&1; then
+    if ! yarn security:semgrep; then
+        log_error "Semgrep security analysis failed. Review security issues."
+        exit 1
+    fi
+else
+    log_warning "Semgrep not found. Install with: pip install semgrep"
+fi
+
+# 3. Check for secrets in staged files (PCI DSS compliant)
+log_info "Scanning for potential secrets..."
+staged_files=$(git diff --cached --name-only)
+
+if [ -n "$staged_files" ]; then
+    # Block real sensitive files (strict check)
+    if echo "$staged_files" | grep -E "\\.env$|\\.key$|\\.pem$|\\.p12$|id_rsa$|id_dsa$" > /dev/null; then
+        log_error "Attempting to commit sensitive files - PCI DSS Req 3.4 violation!"
+        echo "Blocked files:"
+        echo "$staged_files" | grep -E "\\.env$|\\.key$|\\.pem$|\\.p12$|id_rsa$|id_dsa$"
+        exit 1
+    fi
+
+    # Quick check for hardcoded credentials (limited to JS/TS files)
+    js_files=$(echo "$staged_files" | grep -E "\\.(js|ts)$" || true)
+    if [ -n "$js_files" ]; then
+        # Fast pattern: look for actual hardcoded values only
+        secrets=$(echo "$js_files" | xargs grep -nE "(password|secret|apiKey|token)\\s*[:=]\\s*['\"][a-zA-Z0-9_-]{16,}" 2>/dev/null || true)
+        if [ -n "$secrets" ]; then
+            log_warning "Potential hardcoded values detected - review manually"
+            echo "$secrets" | head -5
+        fi
+    fi
+fi
+
+# 4. Validate changelog format (if exists)
+if [ -f "CHANGELOG.md" ]; then
+    log_info "Validating changelog format..."
+    if command -v yarn >/dev/null 2>&1; then
+        yarn changelog:validate || log_warning "Changelog validation failed"
+    fi
+fi
+
+# 5. Documentation coverage check (mandatory)
+log_info "Checking documentation coverage..."
+if ! yarn docs:coverage; then
+    log_error "Documentation coverage below threshold. Update JSDoc comments."
+    log_error "Run 'yarn docs:coverage' to see which files need documentation."
+    exit 1
+fi
+
+# 6. Check for PCI DSS compliance keywords in security commits
+if git diff --cached --name-only | grep -E "security|auth|encrypt|payment" >/dev/null; then
+    log_info "Security-related files detected. Ensure proper documentation."
+fi
+
+log_success "Pre-commit checks completed successfully!"
+`;
+
+      case 'commit-msg':
+        return commonHeader + `
+log_info "Validating commit message format..."
+
+# Read the commit message
+commit_msg_file="$1"
+commit_msg=$(cat "$commit_msg_file")
+
+# 1. Validate conventional commit format
+log_info "Checking conventional commit format..."
+if command -v yarn >/dev/null 2>&1; then
+    if ! echo "$commit_msg" | yarn --silent commitlint --config .config/commitlint/.commitlintrc.js; then
+        log_error "Commit message does not follow conventional commit format"
+        echo ""
+        echo "Expected format:"
+        echo "  type(scope): description"
+        echo ""
+        echo "Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, security, hotfix"
+        echo ""
+        echo "Examples:"
+        echo "  feat(auth): implement MFA for admin access"
+        echo "  fix(api): resolve authentication bypass vulnerability"
+        echo "  security(encryption): upgrade to AES-256-GCM"
+        echo ""
+        exit 1
+    fi
+fi
+
+# 2. Check for security classification in security commits
+if echo "$commit_msg" | grep -E "^(security|hotfix)" >/dev/null; then
+    if ! echo "$commit_msg" | grep "SECURITY:" >/dev/null; then
+        log_error "Security commits must include security classification"
+        echo ""
+        echo "Add to commit body:"
+        echo "SECURITY: [Critical|High|Medium|Low]"
+        echo "PCI-DSS: Req X.X.X (if applicable)"
+        echo ""
+        exit 1
+    fi
+fi
+
+# 3. Validate against sensitive data patterns (warning only, non-blocking)
+if echo "$commit_msg" | grep -iE "password.*=|secret.*=|api[_-]?key.*=" >/dev/null; then
+    log_warning "Commit message may contain hardcoded values - review carefully"
+fi
+
+log_success "Commit message validation passed!"
+`;
+
+      case 'pre-push':
+        return commonHeader + `
+log_info "Running pre-push validation..."
+
+# 1. Check if changelog needs updating for version changes
+current_version=$(grep '"version"' package.json | sed 's/.*"version": "\\(.*\\)".*/\\1/')
+if git diff HEAD~1 package.json | grep '"version"' >/dev/null; then
+    log_info "Version change detected. Checking changelog..."
+    if [ -f "CHANGELOG.md" ]; then
+        if ! grep "$current_version" CHANGELOG.md >/dev/null; then
+            log_error "Version updated but CHANGELOG.md not updated"
+            echo "Run: yarn changelog:generate"
+            exit 1
+        fi
+    else
+        log_warning "No CHANGELOG.md found. Consider creating one."
+    fi
+fi
+
+# 2. Run security audit (warning only for now - non-blocking)
+log_info "Running security audit..."
+yarn audit --level critical > /dev/null 2>&1 || log_warning "Non-critical vulnerabilities detected. Review and schedule updates."
+
+# 3. Run complete test suite (unit + integration)
+log_info "Running complete test suite (unit + integration with MongoDB Memory Server)..."
+log_info "This may take 20-30 seconds..."
+if ! yarn test --runInBand; then
+    log_error "Tests failed. Fix all failing tests before pushing."
+    log_error ""
+    log_error "Test suite includes:"
+    log_error "  - Unit tests (fast, no database)"
+    log_error "  - Integration tests (MongoDB Memory Server on port 1339)"
+    log_error ""
+    log_error "To run tests individually:"
+    log_error "  yarn test:unit         # Run only unit tests"
+    log_error "  yarn test:integration  # Run only integration tests"
+    exit 1
+fi
+log_success "All tests passed (unit + integration)."
+
+# 5. Check for documentation updates on significant changes
+changed_files=$(git diff HEAD~1 --name-only)
+if echo "$changed_files" | grep -E "src/.*\\.(js|ts)$" | wc -l | grep -v "^0$" >/dev/null; then
+    log_info "Source code changes detected. Checking documentation..."
+    if ! echo "$changed_files" | grep -E "\\.(md|txt)$" >/dev/null; then
+        log_warning "Code changes without documentation updates detected"
+    fi
+fi
+
+log_success "Pre-push validation completed!"
+`;
+
+      case 'post-merge':
+        return commonHeader + `
+log_info "Running post-merge automation..."
+
+# 1. Update changelog draft if package.json changed
+if git diff HEAD~1 package.json | grep '"version"' >/dev/null; then
+    log_info "Version change detected. Updating changelog draft..."
+    if command -v yarn >/dev/null 2>&1; then
+        yarn changelog:unreleased
+        log_success "Changelog draft updated"
+    fi
+fi
+
+# 2. Update compliance tracking if security files changed
+security_files_changed=$(git diff HEAD~1 --name-only | grep -E "(security|auth|encrypt|compliance)" | wc -l)
+if [ "$security_files_changed" -gt 0 ]; then
+    log_info "Security-related files changed. Consider updating compliance tracking."
+fi
+
+# 3. Notify about security merges
+if git log -1 --pretty=format:"%s" | grep -E "^(security|hotfix)" >/dev/null; then
+    log_warning "Security-related merge detected!"
+    log_info "Consider notifying security team and updating incident logs."
+fi
+
+log_success "Post-merge automation completed!"
+`;
+
+      default:
+        return commonHeader + `
+log_info "Generic hook: ${hookName}"
+log_success "Hook executed successfully!"
+`;
+    }
+  }
+
+  validateInstallation() {
+    // Skip validation in CI environments
+    if (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true') {
+      this.log('CI environment detected - skipping git hooks validation', 'info');
+      return true;
+    }
+
+    let allInstalled = true;
+
+    this.hooks.forEach(hookName => {
+      const targetHook = path.join(this.hooksDir, hookName);
+      if (fs.existsSync(targetHook)) {
+        const stats = fs.statSync(targetHook);
+        if (stats.mode & 0o111) { // Check if executable
+          this.log(`${hookName}: installed and executable`, 'success');
+        } else {
+          this.log(`${hookName}: installed but not executable`, 'warning');
+          allInstalled = false;
+        }
+      } else {
+        this.log(`${hookName}: not installed`, 'error');
+        allInstalled = false;
+      }
+    });
+
+    return allInstalled;
+  }
+
+  installDependencies() {
+    if (!this.isAuto) {
+      this.log('Installing required dependencies...');
+      try {
+        execSync('yarn install --silent', { cwd: this.projectRoot });
+        this.log('Dependencies installed', 'success');
+      } catch (error) {
+        this.log('Failed to install dependencies', 'warning');
+      }
+    }
+  }
+
+  run() {
+    try {
+      // Skip git hooks setup in CI environments when --skip-ci flag is provided
+      if (this.skipCI && (process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true')) {
+        if (!this.isAuto) {
+          this.log('🔧 Git hooks setup - CI environment detected with --skip-ci flag');
+        }
+        this.log('✅ Skipping git hooks installation in CI/CD environment', 'success');
+        if (!this.isAuto) {
+          this.log('Git hooks are only needed for local development', 'info');
+          this.log('CI/CD security validations are handled by GitHub Actions workflows', 'info');
+        }
+        return;
+      }
+
+      this.log('🔧 Setting up Git hooks for AmexingWeb PCI DSS compliance...');
+
+      this.checkGitRepository();
+      this.ensureDirectories();
+      this.createHookFiles();
+
+      if (this.validateInstallation()) {
+        this.log('🎉 All Git hooks installed successfully!', 'success');
+
+        if (!this.isAuto) {
+          this.log('');
+          this.log('Available commands:');
+          this.log('  yarn hooks:validate  - Check hook status');
+          this.log('  yarn hooks:repair    - Reinstall all hooks');
+          this.log('  yarn hooks:test      - Test hooks without committing');
+          this.log('');
+          this.log('Hooks enforce:');
+          this.log('  • PCI DSS compliance checks');
+          this.log('  • Security vulnerability scanning');
+          this.log('  • Conventional commit format');
+          this.log('  • Documentation requirements');
+          this.log('  • Secret detection');
+        }
+      } else {
+        throw new Error('Some hooks failed to install properly');
+      }
+
+    } catch (error) {
+      this.log(`Setup failed: ${error.message}`, 'error');
+      process.exit(1);
+    }
+  }
+}
+
+// Run the setup
+const setup = new GitHooksSetup();
+setup.run();

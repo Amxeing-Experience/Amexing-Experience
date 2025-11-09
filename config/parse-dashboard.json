@@ -1,0 +1,28 @@
+{
+  "apps": [
+    {
+      "serverURL": "http://localhost:1337/parse",
+      "appId": "amexing-app-id",
+      "masterKey": "master-key-change-in-production",
+      "appName": "AmexingWeb",
+      "production": false,
+      "primaryBackgroundColor": "#1E3A8A",
+      "secondaryBackgroundColor": "#3B82F6"
+    }
+  ],
+  "users": [
+    {
+      "user": "admin",
+      "pass": "admin-password-change-in-production",
+      "apps": [
+        {
+          "appId": "amexing-app-id"
+        }
+      ]
+    }
+  ],
+  "useEncryptedPasswords": false,
+  "trustProxy": false,
+  "cookieSessionSecret": "session-secret-change-in-production",
+  "allowInsecureHTTP": true
+}

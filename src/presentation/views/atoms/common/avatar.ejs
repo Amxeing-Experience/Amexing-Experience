@@ -1,0 +1,96 @@
+<%
+/**
+ * Avatar Atom
+ * Reusable avatar component with fallback support
+ *
+ * @param {string} src - Image source URL
+ * @param {string} alt - Alt text for the image
+ * @param {string} size - Avatar size (xs, sm, default, lg, xl, xxl)
+ * @param {string} shape - Avatar shape (circle, rounded, square)
+ * @param {string} fallbackText - Text to show if image fails (initials)
+ * @param {string} fallbackColor - Background color for fallback (primary, secondary, etc.)
+ * @param {string} status - Status indicator (online, offline, away, busy)
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} attributes - Additional HTML attributes
+ */
+
+// Default parameters
+const avatarSrc = typeof src !== 'undefined' ? src : '';
+const avatarAlt = typeof alt !== 'undefined' ? alt : 'Avatar';
+const avatarSize = typeof size !== 'undefined' ? size : 'default';
+const avatarShape = typeof shape !== 'undefined' ? shape : 'circle';
+const avatarFallbackText = typeof fallbackText !== 'undefined' ? fallbackText : '?';
+const avatarFallbackColor = typeof fallbackColor !== 'undefined' ? fallbackColor : 'primary';
+const avatarStatus = typeof status !== 'undefined' ? status : '';
+const avatarAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+const avatarAttributes = typeof attributes !== 'undefined' ? attributes : {};
+
+// Size mapping
+const sizeClasses = {
+    'xs': '24',
+    'sm': '32',
+    'default': '40',
+    'lg': '48',
+    'xl': '64',
+    'xxl': '80'
+};
+
+const avatarSizePx = sizeClasses[avatarSize] || sizeClasses['default'];
+
+// Shape classes
+let shapeClass = '';
+if (avatarShape === 'circle') {
+    shapeClass = 'rounded-circle';
+} else if (avatarShape === 'rounded') {
+    shapeClass = 'rounded';
+} else if (avatarShape === 'square') {
+    shapeClass = 'rounded-0';
+}
+
+// Status classes
+const statusClasses = {
+    'online': 'bg-success',
+    'offline': 'bg-secondary',
+    'away': 'bg-warning',
+    'busy': 'bg-danger'
+};
+
+// Build wrapper classes
+let wrapperClasses = ['position-relative', 'd-inline-block'];
+if (avatarAdditionalClasses) wrapperClasses.push(avatarAdditionalClasses);
+
+// Build attributes string
+let attributesString = '';
+if (avatarAttributes && typeof avatarAttributes === 'object') {
+    attributesString = Object.entries(avatarAttributes)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+}
+
+const fallbackId = `avatar-${Math.random().toString(36).substr(2, 9)}`;
+%>
+
+<div class="<%= wrapperClasses.join(' ') %>" <% if (attributesString) { %><%= attributesString %><% } %>>
+    <% if (avatarSrc) { %>
+        <img src="<%= avatarSrc %>"
+             alt="<%= avatarAlt %>"
+             class="<%= shapeClass %>"
+             width="<%= avatarSizePx %>"
+             height="<%= avatarSizePx %>"
+             onerror="this.style.display='none'; document.getElementById('<%= fallbackId %>').style.display='flex';">
+    <% } %>
+
+    <!-- Fallback -->
+    <div id="<%= fallbackId %>"
+         class="d-flex align-items-center justify-content-center text-white bg-<%= avatarFallbackColor %> <%= shapeClass %>"
+         style="width: <%= avatarSizePx %>px; height: <%= avatarSizePx %>px; font-size: <%= Math.round(avatarSizePx * 0.4) %>px; font-weight: 600; <% if (avatarSrc) { %>display: none;<% } %>">
+        <%= avatarFallbackText.substring(0, 2).toUpperCase() %>
+    </div>
+
+    <!-- Status indicator -->
+    <% if (avatarStatus && statusClasses[avatarStatus]) { %>
+        <span class="position-absolute bottom-0 end-0 <%= statusClasses[avatarStatus] %> border border-2 border-white <%= shapeClass %>"
+              style="width: <%= Math.round(avatarSizePx * 0.25) %>px; height: <%= Math.round(avatarSizePx * 0.25) %>px;"
+              title="<%= avatarStatus %>"></span>
+    <% } %>
+</div>

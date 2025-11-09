@@ -1,0 +1,50 @@
+<%
+/**
+ * Reports Page - Audit Trail
+ * SuperAdmin dashboard page for audit log visualization and compliance reporting
+ * Follows main dashboard layout structure with atomic design components
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'superadmin';
+const currentPath = '/dashboard/superadmin/reports';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold">Reportes de Auditoría</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/superadmin" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-report me-1"></i>Reportes
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="text-muted">
+                <small class="d-block">Trazabilidad de operaciones</small>
+                <strong>PCI DSS Compliant</strong>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Audit Log DataTable -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/datatable/audit-table', {
+            tableId: 'audit-table',
+            apiEndpoint: '/api/audit/logs',
+            userRole: currentUserRole,
+            showActions: false
+        }) %>
+    </div>
+</div>

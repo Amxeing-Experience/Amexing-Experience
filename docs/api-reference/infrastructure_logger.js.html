@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: infrastructure/logger.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: infrastructure/logger.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * Logger Infrastructure - Comprehensive logging system for Amexing platform.
+ * Provides centralized logging with Winston, daily rotation, PCI DSS compliance,
+ * and specialized security event logging for comprehensive audit trails.
+ *
+ * This logging system implements enterprise-grade logging with multiple transports,
+ * structured logging, automatic rotation, and PCI DSS compliant security event
+ * tracking for compliance and security monitoring requirements.
+ *
+ * Features:
+ * - Winston-based structured logging with custom formatters
+ * - Daily log rotation with compression and retention policies
+ * - Separate error and audit log streams
+ * - PCI DSS compliant security event logging
+ * - Development-friendly console output with colors
+ * - Automatic directory creation and file management
+ * - HTTP request logging integration with Morgan
+ * - Uncaught exception and rejection handling
+ * - Configurable log levels and retention periods
+ * - JSON audit logs for compliance reporting.
+ * @file Infrastructure logging system for Amexing platform.
+ * @author Amexing Development Team
+ * @version 2.0.0
+ * @since 1.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Basic logging
+ * const logger = require('./infrastructure/logger');
+ * logger.info('Application started', { port: 3000, env: 'production' });
+ * logger.error('Database connection failed', { error: dbError });
+ *
+ * // Security event logging
+ * logger.logSecurityEvent('FAILED_LOGIN', {
+ *   username: 'user@example.com',
+ *   ip: '192.168.1.1',
+ *   attempts: 3
+ * });
+ *
+ * // Access attempt logging
+ * logger.logAccessAttempt(false, 'john.doe', '10.0.0.1', 'Invalid password');
+ * logger.logAccessAttempt(true, 'jane.smith', '10.0.0.2');
+ *
+ * // Data access auditing
+ * logger.logDataAccess('user123', 'customer_data', 'READ', true);
+ * logger.logSystemChange('admin456', 'user_permissions', 'read', 'read,write');
+ */
+
+const winston = require('winston');
+const DailyRotateFile = require('winston-daily-rotate-file');
+const path = require('path');
+const fs = require('fs');
+
+// Create logs directory if it doesn't exist
+const logDir = process.env.LOG_DIR || 'logs';
+// eslint-disable-next-line security/detect-non-literal-fs-filename
+if (!fs.existsSync(logDir)) {
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  fs.mkdirSync(logDir, { recursive: true });
+}
+
+// Custom format for better readability
+const customFormat = winston.format.combine(
+  winston.format.timestamp({
+    format: 'YYYY-MM-DD HH:mm:ss',
+  }),
+  winston.format.errors({ stack: true }),
+  winston.format.splat(),
+  winston.format.printf(({
+    level, message, timestamp, stack, ...metadata
+  }) => {
+    let msg = `${timestamp} [${level.toUpperCase()}]: ${message}`;
+
+    if (Object.keys(metadata).length > 0) {
+      msg += ` ${JSON.stringify(metadata)}`;
+    }
+
+    if (stack) {
+      msg += `\n${stack}`;
+    }
+
+    return msg;
+  })
+);
+
+// Console format for development
+const consoleFormat = winston.format.combine(
+  winston.format.colorize(),
+  winston.format.simple(),
+  winston.format.printf(
+    ({ level, message, timestamp }) => `${timestamp} ${level}: ${message}`
+  )
+);
+
+// Create Winston logger
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: customFormat,
+  defaultMeta: { service: 'amexing-api' },
+  exitOnError: false,
+  transports: [
+    // Console transport
+    new winston.transports.Console({
+      format:
+        process.env.NODE_ENV === 'development' ? consoleFormat : customFormat,
+      handleExceptions: true,
+      handleRejections: true,
+    }),
+
+    // Daily rotate file for all logs
+    new DailyRotateFile({
+      filename: path.join(logDir, 'application-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: process.env.LOG_RETENTION_DAYS || '30d',
+      format: customFormat,
+    }),
+
+    // Daily rotate file for error logs
+    new DailyRotateFile({
+      filename: path.join(logDir, 'error-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '20m',
+      maxFiles: process.env.LOG_RETENTION_DAYS || '30d',
+      level: 'error',
+      format: customFormat,
+    }),
+  ],
+});
+
+// Add audit log transport if enabled
+if (process.env.ENABLE_AUDIT_LOGGING === 'true') {
+  logger.add(
+    new DailyRotateFile({
+      filename: path.join(logDir, 'audit-%DATE%.log'),
+      datePattern: 'YYYY-MM-DD',
+      zippedArchive: true,
+      maxSize: '50m',
+      maxFiles: process.env.AUDIT_LOG_RETENTION_DAYS || '365d',
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+      ),
+      auditMode: true,
+    })
+  );
+}
+
+/**
+ * Logs security events for PCI DSS compliance and security monitoring.
+ * Creates structured security event logs with standardized format for
+ * compliance reporting, security analysis, and incident investigation.
+ * @function logSecurityEvent
+ * @param {string} event - Security event type (e.g., 'FAILED_LOGIN', 'ACCOUNT_LOCKED', 'PERMISSION_DENIED').
+ * @param {object} details - Additional event details and context.
+ * @author Amexing Development Team
+ * @version 2.0.0
+ * @since 1.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Log failed login attempt
+ * logger.logSecurityEvent('FAILED_LOGIN', {
+ *   username: 'user@example.com',
+ *   ip: '192.168.1.100',
+ *   userAgent: 'Mozilla/5.0...',
+ *   attempts: 3
+ * });
+ *
+ * // Log account lockout
+ * logger.logSecurityEvent('ACCOUNT_LOCKED', {
+ *   userId: 'user123',
+ *   reason: 'Too many failed attempts',
+ *   lockoutDuration: '30 minutes'
+ * });
+ *
+ * // Log permission violation
+ * logger.logSecurityEvent('PERMISSION_DENIED', {
+ *   userId: 'user456',
+ *   resource: '/api/admin/users',
+ *   action: 'DELETE',
+ *   requiredRole: 'admin'
+ * });
+ */
+logger.logSecurityEvent = (event, details) => {
+  logger.info('SECURITY_EVENT', {
+    event,
+    ...details,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+/**
+ * Logs authentication access attempts with privacy protection and PCI DSS compliance.
+ * Tracks both successful and failed login attempts with partial username masking
+ * for security while maintaining audit trail requirements.
+ * @function logAccessAttempt
+ * @param {boolean} success - Whether the access attempt was successful.
+ * @param {string} username - Username attempting access (will be partially masked).
+ * @param {string} ip - IP address of the access attempt.
+ * @param {string|null} [reason] - Reason for failure (if applicable).
+ * @author Amexing Development Team
+ * @version 2.0.0
+ * @since 1.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Log successful login
+ * logger.logAccessAttempt(true, 'john.doe@company.com', '192.168.1.10');
+ *
+ * // Log failed login with reason
+ * logger.logAccessAttempt(false, 'user@example.com', '10.0.0.1', 'Invalid password');
+ *
+ * // Log failed login with account lockout
+ * logger.logAccessAttempt(false, 'admin@domain.com', '172.16.0.5', 'Account locked');
+ */
+logger.logAccessAttempt = (success, username, ip, reason = null) => {
+  const logData = {
+    type: 'ACCESS_ATTEMPT',
+    success,
+    username: username ? `${username.substring(0, 3)}***` : 'unknown',
+    ip,
+    timestamp: new Date().toISOString(),
+  };
+
+  if (reason) {
+    logData.reason = reason;
+  }
+
+  if (success) {
+    logger.info('Successful login', logData);
+  } else {
+    logger.warn('Failed login attempt', logData);
+  }
+};
+
+/**
+ * Logs data access events for compliance and audit requirements.
+ * Tracks all data access operations including reads, writes, updates, and deletions
+ * with user attribution for PCI DSS and regulatory compliance.
+ * @function logDataAccess
+ * @param {string} userId - Unique identifier of the user accessing the data.
+ * @param {string} resource - Resource or data type being accessed (e.g., 'customer_data', 'payment_info').
+ * @param {string} action - Action performed (READ, WRITE, UPDATE, DELETE).
+ * @param {boolean} success - Whether the data access was successful.
+ * @author Amexing Development Team
+ * @version 2.0.0
+ * @since 1.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Log successful customer data read
+ * logger.logDataAccess('user123', 'customer_data', 'READ', true);
+ *
+ * // Log failed attempt to access payment information
+ * logger.logDataAccess('user456', 'payment_info', 'READ', false);
+ *
+ * // Log successful update to user profile
+ * logger.logDataAccess('admin789', 'user_profile', 'UPDATE', true);
+ */
+logger.logDataAccess = (userId, resource, action, success) => {
+  logger.info('DATA_ACCESS', {
+    userId,
+    resource,
+    action,
+    success,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+/**
+ * Logs system configuration and data changes for audit trails and compliance.
+ * Tracks modifications to system settings, user permissions, and critical data
+ * with privacy protection for sensitive values while maintaining audit requirements.
+ * @function logSystemChange
+ * @param {string} userId - Unique identifier of the user making the change.
+ * @param {string} change - Description of what was changed (e.g., 'user_permissions', 'system_config').
+ * @param {string|null} oldValue - Previous value (will be masked with *** for privacy).
+ * @param {string|null} newValue - New value (will be masked with *** for privacy).
+ * @author Amexing Development Team
+ * @version 2.0.0
+ * @since 1.0.0
+ * @example
+   * // const result = await authService.login(credentials);
+   * // Returns: { success: true, user: {...}, tokens: {...} }
+ * // Log permission change
+ * logger.logSystemChange('admin123', 'user_permissions', 'read', 'read,write,delete');
+ *
+ * // Log configuration update
+ * logger.logSystemChange('sysadmin456', 'max_login_attempts', '3', '5');
+ *
+ * // Log user role change
+ * logger.logSystemChange('hr789', 'user_role', 'employee', 'manager');
+ */
+logger.logSystemChange = (userId, change, oldValue, newValue) => {
+  logger.info('SYSTEM_CHANGE', {
+    userId,
+    change,
+    oldValue: oldValue ? '***' : null,
+    newValue: newValue ? '***' : null,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+// Stream for Morgan HTTP logger
+logger.stream = {
+  write: (message) => {
+    logger.info(message.trim());
+  },
+};
+
+// Handle uncaught exceptions and unhandled rejections
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+module.exports = logger;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="AdminController.html">AdminController</a></li><li><a href="AmexingAuthMiddleware.html">AmexingAuthMiddleware</a></li><li><a href="AmexingAuthService.html">AmexingAuthService</a></li><li><a href="AmexingUser.html">AmexingUser</a></li><li><a href="ApiController.html">ApiController</a></li><li><a href="AppleIdTokenValidator.html">AppleIdTokenValidator</a></li><li><a href="AppleOAuthService.html">AppleOAuthService</a></li><li><a href="AppleOAuthServiceCore.html">AppleOAuthServiceCore</a></li><li><a href="AppleSignInButton.html">AppleSignInButton</a></li><li><a href="AppleTokenExchanger.html">AppleTokenExchanger</a></li><li><a href="AuthController.html">AuthController</a></li><li><a href="AuthMiddleware.html">AuthMiddleware</a></li><li><a href="AuthenticationService.html">AuthenticationService</a></li><li><a href="AuthenticationServiceCore.html">AuthenticationServiceCore</a></li><li><a href="BaseController.html">BaseController</a></li><li><a href="Client.html">Client</a></li><li><a href="ClientController.html">ClientController</a></li><li><a href="CorporateOAuthInterface.html">CorporateOAuthInterface</a></li><li><a href="CorporateOAuthService.html">CorporateOAuthService</a></li><li><a href="CorporateSyncService.html">CorporateSyncService</a></li><li><a href="DashboardAuthMiddleware.html">DashboardAuthMiddleware</a></li><li><a href="DashboardController.html">DashboardController</a></li><li><a href="Department.html">Department</a></li><li><a href="DepartmentManagerController.html">DepartmentManagerController</a></li><li><a href="DepartmentOAuthFlowService.html">DepartmentOAuthFlowService</a></li><li><a href="DriverController.html">DriverController</a></li><li><a href="EmployeeController.html">EmployeeController</a></li><li><a href="GuestController.html">GuestController</a></li><li><a href="HomeController.html">HomeController</a></li><li><a href="IntelligentProviderSelector.html">IntelligentProviderSelector</a></li><li><a href="MobileOAuthOptimizer.html">MobileOAuthOptimizer</a></li><li><a href="NotificationsController.html">NotificationsController</a></li><li><a href="OAuthPermissionService.html">OAuthPermissionService</a></li><li><a href="OAuthProvider.html">OAuthProvider</a></li><li><a href="OAuthSecurityValidator.html">OAuthSecurityValidator</a></li><li><a href="OAuthService.html">OAuthService</a></li><li><a href="PermissionAuditService.html">PermissionAuditService</a></li><li><a href="PermissionContextService.html">PermissionContextService</a></li><li><a href="PermissionDelegationService.html">PermissionDelegationService</a></li><li><a href="PermissionInheritanceService.html">PermissionInheritanceService</a></li><li><a href="PermissionService.html">PermissionService</a></li><li><a href="RoleBasedController.html">RoleBasedController</a></li><li><a href="SecureSecretsManager.html">SecureSecretsManager</a></li><li><a href="SecurityMiddleware.html">SecurityMiddleware</a></li><li><a href="SuperAdminController.html">SuperAdminController</a></li><li><a href="UserManagementController.html">UserManagementController</a></li><li><a href="global.html#UserManagementService">UserManagementService</a></li><li><a href="ValidationMiddleware.html">ValidationMiddleware</a></li></ul><h3>Global</h3><ul><li><a href="global.html#BaseModel">BaseModel</a></li><li><a href="global.html#Parse">Parse</a></li><li><a href="global.html#about">about</a></li><li><a href="global.html#addCorporateDomain">addCorporateDomain</a></li><li><a href="global.html#authRateLimit">authRateLimit</a></li><li><a href="global.html#authenticateOptional">authenticateOptional</a></li><li><a href="global.html#authenticateToken">authenticateToken</a></li><li><a href="global.html#autoRefreshToken">autoRefreshToken</a></li><li><a href="global.html#checkUserPermission">checkUserPermission</a></li><li><a href="global.html#createEmergencyElevation">createEmergencyElevation</a></li><li><a href="global.html#createPermissionDelegation">createPermissionDelegation</a></li><li><a href="global.html#createPermissionOverride">createPermissionOverride</a></li><li><a href="global.html#crypto">crypto</a></li><li><a href="global.html#errorHandler">errorHandler</a></li><li><a href="global.html#express">express</a></li><li><a href="global.html#expressRateLimit">expressRateLimit</a></li><li><a href="global.html#extractUser">extractUser</a></li><li><a href="global.html#findUserById">findUserById</a></li><li><a href="global.html#generateCorporateOAuthURL">generateCorporateOAuthURL</a></li><li><a href="global.html#generateTokens">generateTokens</a></li><li><a href="global.html#getActiveDelegations">getActiveDelegations</a></li><li><a href="global.html#getAllSyncStatuses">getAllSyncStatuses</a></li><li><a href="global.html#getAppleOAuthAnalytics">getAppleOAuthAnalytics</a></li><li><a href="global.html#getAppleOAuthConfig">getAppleOAuthConfig</a></li><li><a href="global.html#getAppleUserData">getAppleUserData</a></li><li><a href="global.html#getAvailableContexts">getAvailableContexts</a></li><li><a href="global.html#getAvailableCorporateDomains">getAvailableCorporateDomains</a></li><li><a href="global.html#getAvailableDepartments">getAvailableDepartments</a></li><li><a href="global.html#getAvailablePermissions">getAvailablePermissions</a></li><li><a href="global.html#getCorporateClientDepartments">getCorporateClientDepartments</a></li><li><a href="global.html#getCorporateLandingConfig">getCorporateLandingConfig</a></li><li><a href="global.html#getCorporateSyncHistory">getCorporateSyncHistory</a></li><li><a href="global.html#getData">getData</a></li><li><a href="global.html#getDatabaseMetrics">getDatabaseMetrics</a></li><li><a href="global.html#getDelegatedPermissions">getDelegatedPermissions</a></li><li><a href="global.html#getDepartmentOAuthAnalytics">getDepartmentOAuthAnalytics</a></li><li><a href="global.html#getDepartmentOAuthConfig">getDepartmentOAuthConfig</a></li><li><a href="global.html#getDepartmentOAuthProviders">getDepartmentOAuthProviders</a></li><li><a href="global.html#getDepartmentPermissions">getDepartmentPermissions</a></li><li><a href="global.html#getErrorDetails">getErrorDetails</a></li><li><a href="global.html#getOAuthAuditLogs">getOAuthAuditLogs</a></li><li><a href="global.html#getOAuthProviderStatus">getOAuthProviderStatus</a></li><li><a href="global.html#getPermissionAuditReport">getPermissionAuditReport</a></li><li><a href="global.html#getPermissionAuditStats">getPermissionAuditStats</a></li><li><a href="global.html#getProviderDisplayName">getProviderDisplayName</a></li><li><a href="global.html#getRequestProperty">getRequestProperty</a></li><li><a href="global.html#getRolePermissions">getRolePermissions</a></li><li><a href="global.html#getSecretsManager">getSecretsManager</a></li><li><a href="global.html#getStatus">getStatus</a></li><li><a href="global.html#getSystemMetrics">getSystemMetrics</a></li><li><a href="global.html#getUserEffectivePermissions">getUserEffectivePermissions</a></li><li><a href="global.html#getUserPermissionInheritance">getUserPermissionInheritance</a></li><li><a href="global.html#getUserProfile">getUserProfile</a></li><li><a href="global.html#getVersion">getVersion</a></li><li><a href="global.html#gracefulShutdown">gracefulShutdown</a></li><li><a href="global.html#handleAppleOAuthCallback">handleAppleOAuthCallback</a></li><li><a href="global.html#handleAppleWebhook">handleAppleWebhook</a></li><li><a href="global.html#handleDepartmentOAuthCallback">handleDepartmentOAuthCallback</a></li><li><a href="global.html#handleMongoError">handleMongoError</a></li><li><a href="global.html#handleParseError">handleParseError</a></li><li><a href="global.html#handleValidationError">handleValidationError</a></li><li><a href="global.html#hasPermission">hasPermission</a></li><li><a href="global.html#https">https</a></li><li><a href="global.html#initialize">initialize</a></li><li><a href="global.html#initiateAppleOAuth">initiateAppleOAuth</a></li><li><a href="global.html#initiateDepartmentOAuth">initiateDepartmentOAuth</a></li><li><a href="global.html#jwt">jwt</a></li><li><a href="global.html#loadPrivateKey">loadPrivateKey</a></li><li><a href="global.html#logAccessAttempt">logAccessAttempt</a></li><li><a href="global.html#logDataAccess">logDataAccess</a></li><li><a href="global.html#logError">logError</a></li><li><a href="global.html#logSecurityEvent">logSecurityEvent</a></li><li><a href="global.html#logSystemChange">logSystemChange</a></li><li><a href="global.html#logger">logger</a></li><li><a href="global.html#login">login</a></li><li><a href="global.html#logout">logout</a></li><li><a href="global.html#optionalAuth">optionalAuth</a></li><li><a href="global.html#recordSuccessfulLogin">recordSuccessfulLogin</a></li><li><a href="global.html#register">register</a></li><li><a href="global.html#registerCloudFunctions">registerCloudFunctions</a></li><li><a href="global.html#requireRole">requireRole</a></li><li><a href="global.html#revokeAppleOAuth">revokeAppleOAuth</a></li><li><a href="global.html#revokePermissionDelegation">revokePermissionDelegation</a></li><li><a href="global.html#setRequestProperty">setRequestProperty</a></li><li><a href="global.html#showForgotPassword">showForgotPassword</a></li><li><a href="global.html#showLogin">showLogin</a></li><li><a href="global.html#showRegister">showRegister</a></li><li><a href="global.html#showResetPassword">showResetPassword</a></li><li><a href="global.html#startPeriodicSync">startPeriodicSync</a></li><li><a href="global.html#stopPeriodicSync">stopPeriodicSync</a></li><li><a href="global.html#switchPermissionContext">switchPermissionContext</a></li><li><a href="global.html#switchToDepartmentContext">switchToDepartmentContext</a></li><li><a href="global.html#testCorporateDomain">testCorporateDomain</a></li><li><a href="global.html#triggerCorporateSync">triggerCorporateSync</a></li><li><a href="global.html#updateUserProfile">updateUserProfile</a></li><li><a href="global.html#validateAppleDomain">validateAppleDomain</a></li><li><a href="global.html#validateCorporateLandingAccess">validateCorporateLandingAccess</a></li><li><a href="global.html#validateDepartmentOAuthAccess">validateDepartmentOAuthAccess</a></li><li><a href="global.html#validateLogin">validateLogin</a></li><li><a href="global.html#validateNewPassword">validateNewPassword</a></li><li><a href="global.html#validatePassword">validatePassword</a></li><li><a href="global.html#validatePasswordReset">validatePasswordReset</a></li><li><a href="global.html#validateRegistration">validateRegistration</a></li><li><a href="global.html#validateRequest">validateRequest</a></li><li><a href="global.html#validateUpdateProfile">validateUpdateProfile</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Sep 24 2025 12:14:54 GMT-0600 (hora estándar central)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

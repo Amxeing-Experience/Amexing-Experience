@@ -1,0 +1,141 @@
+<%
+/**
+ * FormField Molecule
+ * Complete form field with label, input, help text and error message
+ *
+ * @param {string} type - Input type (text, email, password, select, textarea, checkbox, radio)
+ * @param {string} name - Input name attribute
+ * @param {string} id - Input ID attribute
+ * @param {string} label - Field label
+ * @param {boolean} required - Whether field is required
+ * @param {string} value - Input value
+ * @param {string} placeholder - Input placeholder
+ * @param {string} helpText - Help text below input
+ * @param {string} errorMessage - Error message to display
+ * @param {boolean} disabled - Whether field is disabled
+ * @param {array} options - Options for select/radio (array of {value, text})
+ * @param {string} size - Field size (sm, default, lg)
+ * @param {object} inputAttributes - Additional attributes for input
+ * @param {string} additionalClasses - Additional CSS classes for wrapper
+ */
+
+// Default parameters
+const fieldType = typeof type !== 'undefined' ? type : 'text';
+const fieldName = typeof name !== 'undefined' ? name : '';
+const fieldId = typeof id !== 'undefined' ? id : `field-${Math.random().toString(36).substr(2, 9)}`;
+const fieldLabel = typeof label !== 'undefined' ? label : '';
+const fieldRequired = typeof required !== 'undefined' ? required : false;
+const fieldValue = typeof value !== 'undefined' ? value : '';
+const fieldPlaceholder = typeof placeholder !== 'undefined' ? placeholder : '';
+const fieldHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const fieldErrorMessage = typeof errorMessage !== 'undefined' ? errorMessage : '';
+const fieldDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const fieldOptions = typeof options !== 'undefined' ? options : [];
+const fieldSize = typeof size !== 'undefined' ? size : 'default';
+const fieldInputAttributes = typeof inputAttributes !== 'undefined' ? inputAttributes : {};
+const fieldAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+
+// Build wrapper classes
+let wrapperClasses = ['mb-3'];
+if (fieldAdditionalClasses) wrapperClasses.push(fieldAdditionalClasses);
+
+// Build input attributes string
+let attributesString = '';
+if (fieldInputAttributes && typeof fieldInputAttributes === 'object') {
+    attributesString = Object.entries(fieldInputAttributes)
+        .map(([key, value]) => `${key}="${value}"`)
+        .join(' ');
+}
+
+const finalWrapperClasses = wrapperClasses.join(' ');
+%>
+
+<div class="<%= finalWrapperClasses %>">
+    <!-- Label -->
+    <% if (fieldLabel && fieldType !== 'checkbox') { %>
+        <%- include('../../atoms/common/label', {
+            text: fieldLabel,
+            htmlFor: fieldId,
+            required: fieldRequired
+        }) %>
+    <% } %>
+
+    <!-- Input Field -->
+    <% if (fieldType === 'textarea') { %>
+        <%- include('../../atoms/common/textarea', {
+            name: fieldName,
+            id: fieldId,
+            value: fieldValue,
+            placeholder: fieldPlaceholder,
+            disabled: fieldDisabled,
+            required: fieldRequired,
+            size: fieldSize,
+            attributes: fieldInputAttributes
+        }) %>
+    <% } else if (fieldType === 'select') { %>
+        <select class="form-control <%= fieldSize === 'sm' ? 'form-control-sm' : fieldSize === 'lg' ? 'form-control-lg' : '' %> <%= fieldErrorMessage ? 'is-invalid' : '' %>"
+                id="<%= fieldId %>"
+                <% if (fieldName) { %>name="<%= fieldName %>"<% } %>
+                <% if (fieldDisabled) { %>disabled<% } %>
+                <% if (fieldRequired) { %>required<% } %>
+                <% if (attributesString) { %><%= attributesString %><% } %>>
+            <% if (fieldPlaceholder) { %>
+                <option value=""><%= fieldPlaceholder %></option>
+            <% } %>
+            <% fieldOptions.forEach(function(option) { %>
+                <option value="<%= option.value %>" <%= fieldValue === option.value ? 'selected' : '' %>>
+                    <%= option.text %>
+                </option>
+            <% }); %>
+        </select>
+    <% } else if (fieldType === 'checkbox') { %>
+        <%- include('../../atoms/common/checkbox', {
+            name: fieldName,
+            id: fieldId,
+            value: fieldValue,
+            label: fieldLabel,
+            checked: fieldValue === 'true' || fieldValue === true,
+            disabled: fieldDisabled,
+            size: fieldSize,
+            attributes: fieldInputAttributes
+        }) %>
+    <% } else if (fieldType === 'radio') { %>
+        <% fieldOptions.forEach(function(option, index) { %>
+            <%- include('../../atoms/common/radio', {
+                name: fieldName,
+                id: fieldId + '-' + index,
+                value: option.value,
+                label: option.text,
+                checked: fieldValue === option.value,
+                disabled: fieldDisabled,
+                size: fieldSize,
+                attributes: fieldInputAttributes
+            }) %>
+        <% }); %>
+    <% } else { %>
+        <!-- Regular input field -->
+        <input type="<%= fieldType %>"
+               class="form-control <%= fieldSize === 'sm' ? 'form-control-sm' : fieldSize === 'lg' ? 'form-control-lg' : '' %> <%= fieldErrorMessage ? 'is-invalid' : '' %>"
+               id="<%= fieldId %>"
+               <% if (fieldName) { %>name="<%= fieldName %>"<% } %>
+               <% if (fieldValue) { %>value="<%= fieldValue %>"<% } %>
+               <% if (fieldPlaceholder) { %>placeholder="<%= fieldPlaceholder %>"<% } %>
+               <% if (fieldDisabled) { %>disabled<% } %>
+               <% if (fieldRequired) { %>required<% } %>
+               <% if (attributesString) { %><%= attributesString %><% } %>>
+    <% } %>
+
+    <!-- Help Text -->
+    <% if (fieldHelpText && !fieldErrorMessage) { %>
+        <div class="form-text">
+            <small class="text-muted"><%= fieldHelpText %></small>
+        </div>
+    <% } %>
+
+    <!-- Error Message -->
+    <% if (fieldErrorMessage) { %>
+        <div class="invalid-feedback">
+            <%= fieldErrorMessage %>
+        </div>
+    <% } %>
+</div>

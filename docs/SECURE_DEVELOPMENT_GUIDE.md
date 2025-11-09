@@ -198,8 +198,12 @@ class SecureDataHandler {
       throw new Error('Data and key required for encryption');
     }
 
+    // Ensure key is properly formatted for AES-256 (32 bytes)
+    const keyBuffer = Buffer.isBuffer(key) ? key : Buffer.from(key, 'hex');
+    const finalKey = keyBuffer.subarray(0, 32);
+    
     const iv = crypto.randomBytes(this.ivLength);
-    const cipher = crypto.createCipher(this.algorithm, key);
+    const cipher = crypto.createCipheriv(this.algorithm, finalKey, iv);
     cipher.setAAD(Buffer.from('PCI-DSS-AmexingWeb', 'utf8'));
 
     let encrypted = cipher.update(data, 'utf8', 'hex');
@@ -215,7 +219,11 @@ class SecureDataHandler {
 
   // REQUIRED: Decrypt data securely
   decryptSensitiveData(encryptedData, key) {
-    const decipher = crypto.createDecipher(this.algorithm, key);
+    // Ensure key is properly formatted for AES-256 (32 bytes)
+    const keyBuffer = Buffer.isBuffer(key) ? key : Buffer.from(key, 'hex');
+    const finalKey = keyBuffer.subarray(0, 32);
+    
+    const decipher = crypto.createDecipheriv(this.algorithm, finalKey, Buffer.from(encryptedData.iv, 'hex'));
     decipher.setAAD(Buffer.from('PCI-DSS-AmexingWeb', 'utf8'));
     decipher.setAuthTag(Buffer.from(encryptedData.authTag, 'hex'));
 
@@ -226,7 +234,8 @@ class SecureDataHandler {
 }
 
 // ❌ FORBIDDEN: Weak encryption methods
-// crypto.createCipher('des', key); // DANGEROUS! Weak algorithm
+// crypto.createCipher('des', key); // DEPRECATED! Use createCipheriv instead
+// crypto.createCipher('aes-256-gcm', key); // DEPRECATED! Use createCipheriv with IV
 // Buffer.from(data).toString('base64'); // NOT ENCRYPTION!
 ```
 

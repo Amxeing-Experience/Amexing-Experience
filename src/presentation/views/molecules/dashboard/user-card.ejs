@@ -1,0 +1,318 @@
+<%
+/**
+ * User Card Molecule
+ * Display user information in card format
+ *
+ * @param {object} user - User object with name, email, role, avatar, etc.
+ * @param {string} size - Card size (sm, md, lg, default: 'md')
+ * @param {boolean} showRole - Whether to show user role (default: true)
+ * @param {boolean} showEmail - Whether to show email (default: true)
+ * @param {boolean} showActions - Whether to show action buttons (default: false)
+ * @param {array} actions - Array of action buttons (optional)
+ * @param {boolean} clickable - Whether card is clickable (default: false)
+ */
+
+// Default parameters and user object handling
+const cardUser = typeof user !== 'undefined' ? user : {};
+const cardSize = typeof size !== 'undefined' ? size : 'md';
+const cardShowRole = typeof showRole !== 'undefined' ? showRole : true;
+const cardShowEmail = typeof showEmail !== 'undefined' ? showEmail : true;
+const cardShowActions = typeof showActions !== 'undefined' ? showActions : false;
+const cardActions = typeof actions !== 'undefined' ? actions : [];
+const cardClickable = typeof clickable !== 'undefined' ? clickable : false;
+
+// User data extraction with defaults
+const userName = cardUser.name || cardUser.fullName || 'Usuario';
+const userEmail = cardUser.email || '';
+const userRole = cardUser.role || 'user';
+const userAvatar = cardUser.avatar || cardUser.profilePicture || '';
+const userStatus = cardUser.status || cardUser.active || 'active';
+const userId = cardUser.id || cardUser.objectId || '';
+const userLastSeen = cardUser.lastSeen || cardUser.updatedAt || '';
+
+// Size configurations
+const sizeConfig = {
+    sm: {
+        cardPadding: 'p-3',
+        avatarSize: 'width: 40px; height: 40px;',
+        avatarClass: 'me-2',
+        nameSize: 'fs-6',
+        emailSize: 'fs-7',
+        roleSize: 'fs-8'
+    },
+    md: {
+        cardPadding: 'p-4',
+        avatarSize: 'width: 48px; height: 48px;',
+        avatarClass: 'me-3',
+        nameSize: 'fs-5',
+        emailSize: 'fs-6',
+        roleSize: 'fs-7'
+    },
+    lg: {
+        cardPadding: 'p-5',
+        avatarSize: 'width: 60px; height: 60px;',
+        avatarClass: 'me-3',
+        nameSize: 'fs-4',
+        emailSize: 'fs-5',
+        roleSize: 'fs-6'
+    }
+};
+
+const config = sizeConfig[cardSize] || sizeConfig.md;
+
+// Role configuration for styling
+const roleConfig = {
+    superadmin: { color: 'danger', icon: 'crown' },
+    admin: { color: 'primary', icon: 'shield-check' },
+    department_manager: { color: 'success', icon: 'users' },
+    employee: { color: 'info', icon: 'user' },
+    driver: { color: 'warning', icon: 'car' },
+    client: { color: 'secondary', icon: 'building' },
+    guest: { color: 'light', icon: 'user-question' }
+};
+
+const roleInfo = roleConfig[userRole] || roleConfig.guest;
+
+// Status configuration
+const statusConfig = {
+    active: { color: 'success', text: 'Activo', icon: 'circle-filled' },
+    inactive: { color: 'secondary', text: 'Inactivo', icon: 'circle' },
+    suspended: { color: 'danger', text: 'Suspendido', icon: 'circle-x' },
+    pending: { color: 'warning', text: 'Pendiente', icon: 'clock' }
+};
+
+const statusInfo = statusConfig[userStatus] || statusConfig.active;
+
+// Generate initials from name
+function getInitials(name) {
+    return name.split(' ')
+        .map(word => word.charAt(0))
+        .join('')
+        .substring(0, 2)
+        .toUpperCase();
+}
+
+const userInitials = getInitials(userName);
+%>
+
+<div class="card border-0 shadow-sm user-card <%= cardClickable ? 'user-card-clickable' : '' %>"
+     <% if (userId) { %>data-user-id="<%= userId %>"<% } %>>
+    <div class="card-body <%= config.cardPadding %>">
+        <div class="d-flex align-items-center">
+            <!-- Avatar -->
+            <div class="user-avatar <%= config.avatarClass %>" style="<%= config.avatarSize %>">
+                <% if (userAvatar) { %>
+                    <img src="<%= userAvatar %>"
+                         alt="<%= userName %>"
+                         class="rounded-circle w-100 h-100 object-fit-cover"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                    <div class="avatar-placeholder rounded-circle w-100 h-100 bg-<%= roleInfo.color %> d-none align-items-center justify-content-center text-white fw-bold"
+                         style="display: none !important;">
+                        <%= userInitials %>
+                    </div>
+                <% } else { %>
+                    <div class="avatar-placeholder rounded-circle w-100 h-100 bg-<%= roleInfo.color %> d-flex align-items-center justify-content-center text-white fw-bold">
+                        <%= userInitials %>
+                    </div>
+                <% } %>
+
+                <!-- Status Indicator -->
+                <span class="status-indicator bg-<%= statusInfo.color %> position-absolute"
+                      data-bs-toggle="tooltip"
+                      title="<%= statusInfo.text %>">
+                </span>
+            </div>
+
+            <!-- User Info -->
+            <div class="user-info flex-grow-1 min-w-0">
+                <!-- Name -->
+                <h6 class="user-name mb-1 <%= config.nameSize %> fw-semibold text-dark text-truncate">
+                    <%= userName %>
+                </h6>
+
+                <!-- Email -->
+                <% if (cardShowEmail && userEmail) { %>
+                    <p class="user-email mb-1 <%= config.emailSize %> text-muted text-truncate">
+                        <i class="ti ti-mail me-1"></i><%= userEmail %>
+                    </p>
+                <% } %>
+
+                <!-- Role -->
+                <% if (cardShowRole && userRole) { %>
+                    <div class="user-role">
+                        <span class="badge bg-<%= roleInfo.color %>-subtle text-<%= roleInfo.color %> <%= config.roleSize %>">
+                            <i class="ti ti-<%= roleInfo.icon %> me-1"></i>
+                            <% if (userRole === 'department_manager') { %>
+                                Jefe de Departamento
+                            <% } else if (userRole === 'superadmin') { %>
+                                Super Admin
+                            <% } else { %>
+                                <%= userRole.charAt(0).toUpperCase() + userRole.slice(1) %>
+                            <% } %>
+                        </span>
+                    </div>
+                <% } %>
+
+                <!-- Last Seen -->
+                <% if (userLastSeen && cardSize === 'lg') { %>
+                    <small class="text-muted d-block mt-1">
+                        <i class="ti ti-clock me-1"></i>
+                        Última actividad: <span class="last-seen-time" data-timestamp="<%= userLastSeen %>">
+                            <%= new Date(userLastSeen).toLocaleDateString() %>
+                        </span>
+                    </small>
+                <% } %>
+            </div>
+
+            <!-- Actions -->
+            <% if (cardShowActions && cardActions.length > 0) { %>
+                <div class="user-actions ms-2">
+                    <div class="btn-group" role="group">
+                        <% cardActions.forEach(function(action, index) { %>
+                            <% if (action.type === 'dropdown') { %>
+                                <div class="dropdown">
+                                    <button class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                                            type="button"
+                                            data-bs-toggle="dropdown"
+                                            aria-expanded="false">
+                                        <i class="ti ti-dots-vertical"></i>
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <% action.items.forEach(function(item) { %>
+                                            <li>
+                                                <% if (item.href) { %>
+                                                    <a class="dropdown-item" href="<%= item.href %>">
+                                                        <% if (item.icon) { %><i class="ti ti-<%= item.icon %> me-2"></i><% } %>
+                                                        <%= item.text %>
+                                                    </a>
+                                                <% } else { %>
+                                                    <button class="dropdown-item"
+                                                            <% if (item.onclick) { %>onclick="<%= item.onclick %>"<% } %>
+                                                            <% if (item.id) { %>id="<%= item.id %>"<% } %>>
+                                                        <% if (item.icon) { %><i class="ti ti-<%= item.icon %> me-2"></i><% } %>
+                                                        <%= item.text %>
+                                                    </button>
+                                                <% } %>
+                                            </li>
+                                        <% }); %>
+                                    </ul>
+                                </div>
+                            <% } else { %>
+                                <% if (action.href) { %>
+                                    <a href="<%= action.href %>"
+                                       class="btn btn-outline-<%= action.variant || 'secondary' %> btn-sm"
+                                       <% if (action.title) { %>title="<%= action.title %>"<% } %>>
+                                        <% if (action.icon) { %><i class="ti ti-<%= action.icon %>"></i><% } %>
+                                        <% if (action.text) { %><%= action.text %><% } %>
+                                    </a>
+                                <% } else { %>
+                                    <button type="button"
+                                            class="btn btn-outline-<%= action.variant || 'secondary' %> btn-sm"
+                                            <% if (action.onclick) { %>onclick="<%= action.onclick %>"<% } %>
+                                            <% if (action.id) { %>id="<%= action.id %>"<% } %>
+                                            <% if (action.title) { %>title="<%= action.title %>"<% } %>>
+                                        <% if (action.icon) { %><i class="ti ti-<%= action.icon %>"></i><% } %>
+                                        <% if (action.text) { %><%= action.text %><% } %>
+                                    </button>
+                                <% } %>
+                            <% } %>
+                        <% }); %>
+                    </div>
+                </div>
+            <% } %>
+        </div>
+    </div>
+</div>
+
+<style>
+    .user-card {
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .user-card-clickable {
+        cursor: pointer;
+    }
+
+    .user-card-clickable:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.15) !important;
+    }
+
+    .user-avatar {
+        position: relative;
+        flex-shrink: 0;
+    }
+
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        bottom: 2px;
+        right: 2px;
+        border: 2px solid white;
+    }
+
+    .user-info {
+        min-width: 0; /* Allows text truncation to work properly */
+    }
+
+    .user-name {
+        line-height: 1.2;
+        margin-bottom: 4px;
+    }
+
+    .user-email {
+        line-height: 1.1;
+        margin-bottom: 4px;
+    }
+
+    .user-role .badge {
+        font-size: 0.625rem;
+        padding: 4px 8px;
+        font-weight: 500;
+    }
+
+    .user-actions .btn {
+        border-radius: 6px;
+    }
+
+    .user-actions .btn-group .btn:not(:last-child) {
+        margin-right: 4px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 576px) {
+        .user-card .card-body {
+            padding: 1rem !important;
+        }
+
+        .user-actions {
+            margin-left: 0.5rem;
+        }
+
+        .user-actions .btn {
+            padding: 0.25rem 0.5rem;
+        }
+    }
+
+    /* Loading skeleton */
+    .user-card-loading {
+        pointer-events: none;
+    }
+
+    .user-card-loading .user-name,
+    .user-card-loading .user-email {
+        background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+        background-size: 200% 100%;
+        animation: loading-shimmer 1.5s infinite;
+        border-radius: 4px;
+        height: 1rem;
+    }
+
+    @keyframes loading-shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
+</style>

@@ -1,0 +1,528 @@
+<%
+/**
+ * Register Form Molecule
+ * Complete registration form with validation and security features
+ *
+ * @param {string} error - Error message to display (optional)
+ * @param {string} csrfToken - CSRF token for form security
+ * @param {object} formData - Previously submitted form data (optional)
+ * @param {string} redirectTo - Optional redirect URL after registration
+ */
+
+// Default parameters
+const registerError = typeof error !== 'undefined' ? error : '';
+const registerCsrfToken = typeof csrfToken !== 'undefined' ? csrfToken : '';
+const registerFormData = typeof formData !== 'undefined' ? formData : {};
+const registerRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
+%>
+
+<div class="register-form-container">
+    <div class="text-center mb-4">
+        <h2 class="fw-bold text-primary mb-3">Create Account</h2>
+        <p class="text-muted">Join Amexing and start managing your transportation</p>
+    </div>
+
+    <!-- Error Alert -->
+    <% if (registerError) { %>
+        <div class="alert alert-danger d-flex align-items-center mb-4" role="alert">
+            <i class="ti ti-alert-circle me-2"></i>
+            <div><%= registerError %></div>
+        </div>
+    <% } %>
+
+    <!-- Registration Form -->
+    <form action="/auth/register" method="POST" class="needs-validation" novalidate id="registerForm">
+        <input type="hidden" name="csrfToken" value="<%= registerCsrfToken %>">
+        <% if (registerRedirectTo) { %>
+            <input type="hidden" name="redirectTo" value="<%= registerRedirectTo %>">
+        <% } %>
+
+        <!-- Personal Information Section -->
+        <div class="form-section mb-4">
+            <h6 class="form-section-title mb-3">
+                <i class="ti ti-user me-2"></i>Personal Information
+            </h6>
+
+            <div class="row">
+                <!-- First Name -->
+                <div class="col-md-6 mb-3">
+                    <label for="firstName" class="form-label text-dark fw-semibold">
+                        First Name *
+                    </label>
+                    <input
+                        type="text"
+                        class="form-control form-control-lg"
+                        id="firstName"
+                        name="firstName"
+                        placeholder="Enter your first name"
+                        required
+                        minlength="2"
+                        maxlength="50"
+                        value="<%= registerFormData.firstName || '' %>"
+                        autocomplete="given-name"
+                    >
+                    <div class="invalid-feedback">
+                        First name must be at least 2 characters.
+                    </div>
+                </div>
+
+                <!-- Last Name -->
+                <div class="col-md-6 mb-3">
+                    <label for="lastName" class="form-label text-dark fw-semibold">
+                        Last Name *
+                    </label>
+                    <input
+                        type="text"
+                        class="form-control form-control-lg"
+                        id="lastName"
+                        name="lastName"
+                        placeholder="Enter your last name"
+                        required
+                        minlength="2"
+                        maxlength="50"
+                        value="<%= registerFormData.lastName || '' %>"
+                        autocomplete="family-name"
+                    >
+                    <div class="invalid-feedback">
+                        Last name must be at least 2 characters.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Account Information Section -->
+        <div class="form-section mb-4">
+            <h6 class="form-section-title mb-3">
+                <i class="ti ti-key me-2"></i>Account Information
+            </h6>
+
+            <!-- Username -->
+            <div class="mb-3">
+                <label for="username" class="form-label text-dark fw-semibold">
+                    Username *
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="ti ti-at"></i>
+                    </span>
+                    <input
+                        type="text"
+                        class="form-control form-control-lg"
+                        id="username"
+                        name="username"
+                        placeholder="Choose a unique username"
+                        required
+                        minlength="3"
+                        maxlength="30"
+                        pattern="^[a-zA-Z0-9_.-]+$"
+                        value="<%= registerFormData.username || '' %>"
+                        autocomplete="username"
+                    >
+                    <div class="invalid-feedback">
+                        Username must be 3-30 characters, alphanumeric only.
+                    </div>
+                </div>
+                <div class="form-text">
+                    <i class="ti ti-info-circle me-1"></i>
+                    Only letters, numbers, dots, dashes and underscores allowed.
+                </div>
+            </div>
+
+            <!-- Email -->
+            <div class="mb-3">
+                <label for="email" class="form-label text-dark fw-semibold">
+                    Email Address *
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <i class="ti ti-mail"></i>
+                    </span>
+                    <input
+                        type="email"
+                        class="form-control form-control-lg"
+                        id="email"
+                        name="email"
+                        placeholder="Enter your email address"
+                        required
+                        value="<%= registerFormData.email || '' %>"
+                        autocomplete="email"
+                    >
+                    <div class="invalid-feedback">
+                        Please enter a valid email address.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Password Section -->
+        <div class="form-section mb-4">
+            <h6 class="form-section-title mb-3">
+                <i class="ti ti-lock me-2"></i>Password
+            </h6>
+
+            <!-- Password -->
+            <div class="mb-3">
+                <label for="password" class="form-label text-dark fw-semibold">
+                    Password *
+                </label>
+                <div class="input-group">
+                    <input
+                        type="password"
+                        class="form-control form-control-lg"
+                        id="password"
+                        name="password"
+                        placeholder="Create a strong password"
+                        required
+                        minlength="12"
+                        autocomplete="new-password"
+                    >
+                    <button
+                        class="btn btn-outline-secondary"
+                        type="button"
+                        id="togglePassword"
+                        aria-label="Show/hide password"
+                    >
+                        <i class="ti ti-eye" id="passwordToggleIcon"></i>
+                    </button>
+                </div>
+                <div class="invalid-feedback">
+                    Password must be at least 12 characters.
+                </div>
+
+                <!-- Password Strength Indicator -->
+                <div class="password-strength mt-2">
+                    <div class="progress" style="height: 4px;">
+                        <div class="progress-bar" id="passwordStrengthBar" style="width: 0%"></div>
+                    </div>
+                    <small class="form-text" id="passwordStrengthText">
+                        Password strength will appear here
+                    </small>
+                </div>
+
+                <!-- Password Requirements -->
+                <div class="password-requirements mt-2">
+                    <small class="text-muted">Password must contain:</small>
+                    <ul class="list-unstyled small mt-1">
+                        <li class="requirement" data-requirement="length">
+                            <i class="ti ti-x text-danger me-1"></i>At least 12 characters
+                        </li>
+                        <li class="requirement" data-requirement="uppercase">
+                            <i class="ti ti-x text-danger me-1"></i>One uppercase letter
+                        </li>
+                        <li class="requirement" data-requirement="lowercase">
+                            <i class="ti ti-x text-danger me-1"></i>One lowercase letter
+                        </li>
+                        <li class="requirement" data-requirement="number">
+                            <i class="ti ti-x text-danger me-1"></i>One number
+                        </li>
+                        <li class="requirement" data-requirement="special">
+                            <i class="ti ti-x text-danger me-1"></i>One special character
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Confirm Password -->
+            <div class="mb-3">
+                <label for="confirmPassword" class="form-label text-dark fw-semibold">
+                    Confirm Password *
+                </label>
+                <div class="input-group">
+                    <input
+                        type="password"
+                        class="form-control form-control-lg"
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        placeholder="Confirm your password"
+                        required
+                        autocomplete="new-password"
+                    >
+                    <button
+                        class="btn btn-outline-secondary"
+                        type="button"
+                        id="toggleConfirmPassword"
+                        aria-label="Show/hide confirm password"
+                    >
+                        <i class="ti ti-eye" id="confirmPasswordToggleIcon"></i>
+                    </button>
+                </div>
+                <div class="invalid-feedback" id="confirmPasswordFeedback">
+                    Passwords must match.
+                </div>
+            </div>
+        </div>
+
+        <!-- Terms and Conditions -->
+        <div class="mb-4">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="acceptTerms" name="acceptTerms" required>
+                <label class="form-check-label" for="acceptTerms">
+                    I agree to the
+                    <a href="/terms" target="_blank" class="text-primary text-decoration-none">Terms of Service</a>
+                    and
+                    <a href="/privacy" target="_blank" class="text-primary text-decoration-none">Privacy Policy</a>
+                </label>
+                <div class="invalid-feedback">
+                    You must agree to the terms and conditions.
+                </div>
+            </div>
+        </div>
+
+        <!-- Newsletter Subscription -->
+        <div class="mb-4">
+            <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="newsletter" name="newsletter" value="true">
+                <label class="form-check-label" for="newsletter">
+                    <i class="ti ti-mail me-1"></i>
+                    Subscribe to our newsletter for updates and tips
+                </label>
+            </div>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary btn-lg w-100 mb-4" id="submitBtn">
+            <i class="ti ti-user-plus me-2"></i>Create Account
+        </button>
+    </form>
+
+    <!-- Login Link -->
+    <div class="text-center">
+        <p class="text-muted mb-0">
+            Already have an account?
+            <a href="/auth/login<% if (registerRedirectTo) { %>?redirectTo=<%= encodeURIComponent(registerRedirectTo) %><% } %>"
+               class="text-primary text-decoration-none fw-semibold">
+                Sign in here
+            </a>
+        </p>
+    </div>
+</div>
+
+<style>
+    .register-form-container {
+        max-width: 500px;
+        margin: 0 auto;
+    }
+
+    .form-section {
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1.5rem;
+        background: rgba(248, 249, 250, 0.3);
+    }
+
+    .form-section-title {
+        color: #495057;
+        font-weight: 600;
+        font-size: 1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .password-strength .progress-bar {
+        transition: all 0.3s ease;
+    }
+
+    .password-strength .progress-bar.weak {
+        background-color: #dc3545;
+    }
+
+    .password-strength .progress-bar.fair {
+        background-color: #fd7e14;
+    }
+
+    .password-strength .progress-bar.good {
+        background-color: #ffc107;
+    }
+
+    .password-strength .progress-bar.strong {
+        background-color: #28a745;
+    }
+
+    .requirement.met i {
+        color: #28a745 !important;
+    }
+
+    .requirement.met i::before {
+        content: "\ea5b"; /* ti-check icon */
+    }
+
+    .form-control:focus {
+        border-color: var(--primary-color, #5d87ff);
+        box-shadow: 0 0 0 0.2rem rgba(93, 135, 255, 0.25);
+    }
+
+    .input-group .form-control:focus {
+        z-index: 3;
+    }
+
+    .btn-outline-secondary {
+        border-left: none;
+    }
+
+    .btn-outline-secondary:hover {
+        background-color: #f8f9fa;
+        border-color: #dee2e6;
+        color: #6c757d;
+    }
+
+    .form-check-input:checked {
+        background-color: var(--primary-color, #5d87ff);
+        border-color: var(--primary-color, #5d87ff);
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('registerForm');
+    const passwordInput = document.getElementById('password');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const submitBtn = document.getElementById('submitBtn');
+
+    // Password visibility toggles
+    setupPasswordToggle('togglePassword', 'password', 'passwordToggleIcon');
+    setupPasswordToggle('toggleConfirmPassword', 'confirmPassword', 'confirmPasswordToggleIcon');
+
+    // Password strength checker
+    if (passwordInput) {
+        passwordInput.addEventListener('input', function() {
+            checkPasswordStrength(this.value);
+            validatePasswordMatch();
+        });
+    }
+
+    // Confirm password validation
+    if (confirmPasswordInput) {
+        confirmPasswordInput.addEventListener('input', validatePasswordMatch);
+    }
+
+    // Form validation
+    form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        // Check if passwords match
+        if (!validatePasswordMatch()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        // Check password strength
+        const strength = calculatePasswordStrength(passwordInput.value);
+        if (strength < 3) {
+            alert('Please create a stronger password before proceeding.');
+            return;
+        }
+
+        if (form.checkValidity()) {
+            // Show loading state
+            submitBtn.innerHTML = `
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Creating Account...
+            `;
+            submitBtn.disabled = true;
+
+            // Submit the form
+            form.submit();
+        }
+
+        form.classList.add('was-validated');
+    });
+
+    function setupPasswordToggle(toggleId, inputId, iconId) {
+        const toggle = document.getElementById(toggleId);
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+
+        if (toggle && input && icon) {
+            toggle.addEventListener('click', function() {
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                icon.className = isPassword ? 'ti ti-eye-off' : 'ti ti-eye';
+            });
+        }
+    }
+
+    function checkPasswordStrength(password) {
+        const requirements = {
+            length: password.length >= 12,
+            uppercase: /[A-Z]/.test(password),
+            lowercase: /[a-z]/.test(password),
+            number: /\d/.test(password),
+            special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+        };
+
+        // Update requirement indicators
+        Object.keys(requirements).forEach(req => {
+            const element = document.querySelector(`[data-requirement="${req}"]`);
+            if (element) {
+                if (requirements[req]) {
+                    element.classList.add('met');
+                } else {
+                    element.classList.remove('met');
+                }
+            }
+        });
+
+        // Calculate strength
+        const strength = calculatePasswordStrength(password);
+        updatePasswordStrengthUI(strength);
+
+        return strength;
+    }
+
+    function calculatePasswordStrength(password) {
+        let score = 0;
+        if (password.length >= 12) score++;
+        if (/[A-Z]/.test(password)) score++;
+        if (/[a-z]/.test(password)) score++;
+        if (/\d/.test(password)) score++;
+        if (/[!@#$%^&*(),.?":{}|<>]/.test(password)) score++;
+        return score;
+    }
+
+    function updatePasswordStrengthUI(strength) {
+        const bar = document.getElementById('passwordStrengthBar');
+        const text = document.getElementById('passwordStrengthText');
+
+        if (!bar || !text) return;
+
+        const strengthLevels = {
+            0: { width: '0%', class: '', text: 'Enter a password' },
+            1: { width: '20%', class: 'weak', text: 'Very weak' },
+            2: { width: '40%', class: 'weak', text: 'Weak' },
+            3: { width: '60%', class: 'fair', text: 'Fair' },
+            4: { width: '80%', class: 'good', text: 'Good' },
+            5: { width: '100%', class: 'strong', text: 'Strong' }
+        };
+
+        const level = strengthLevels[strength];
+        bar.style.width = level.width;
+        bar.className = `progress-bar ${level.class}`;
+        text.textContent = level.text;
+    }
+
+    function validatePasswordMatch() {
+        const password = passwordInput.value;
+        const confirmPassword = confirmPasswordInput.value;
+        const feedback = document.getElementById('confirmPasswordFeedback');
+
+        if (confirmPassword && password !== confirmPassword) {
+            confirmPasswordInput.setCustomValidity('Passwords do not match');
+            feedback.textContent = 'Passwords do not match';
+            return false;
+        } else {
+            confirmPasswordInput.setCustomValidity('');
+            feedback.textContent = 'Passwords must match';
+            return true;
+        }
+    }
+
+    // Auto-focus first input
+    const firstInput = document.getElementById('firstName');
+    if (firstInput) {
+        firstInput.focus();
+    }
+
+});
+</script>

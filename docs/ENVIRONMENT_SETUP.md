@@ -63,7 +63,7 @@ const { getSecretsManager } = require('./src/infrastructure/secrets/secretsManag
 
 const manager = getSecretsManager();
 manager.initialize(process.env.ENCRYPTION_KEY);
-const secrets = manager.loadEncryptedEnv('.env.development.vault');
+const secrets = manager.loadEncryptedEnv('./environments/.env.development.vault');
 ```
 
 ## 🏠 Development Environment
@@ -76,7 +76,7 @@ The development environment uses auto-generated secure secrets for local develop
 # Generate development secrets
 node scripts/generate-secrets.js development
 
-# Generated file: .env.development
+# Generated file: environments/.env.development
 # Contains: Auto-generated secure secrets for all services
 ```
 
@@ -84,7 +84,7 @@ node scripts/generate-secrets.js development
 
 1. **Copy example environment:**
    ```bash
-   cp .env.example .env.development
+   cp environments/.env.example environments/.env.development
    ```
 
 2. **Generate encryption key:**
@@ -138,7 +138,7 @@ The staging environment mimics production security while allowing for testing:
 # Generate staging secrets
 node scripts/generate-secrets.js staging --encrypt
 
-# Generated file: .env.staging.vault (encrypted)
+# Generated file: environments/.env.staging.vault (encrypted)
 ```
 
 ### Staging Configuration
@@ -190,6 +190,95 @@ LOG_LEVEL=info
 SESSION_TIMEOUT_MINUTES=30
 BCRYPT_ROUNDS=12
 ENABLE_AUDIT_LOGGING=true
+```
+
+## 🏠 Production-Local Environment
+
+### Localhost Testing with Production Database
+
+**Purpose**: Run production database locally for testing and debugging without HTTPS requirements.
+
+The `production-local` environment provides a hybrid configuration:
+- Uses **production database** (MongoDB Atlas)
+- Uses **production security settings** (encryption, PCI DSS compliance)
+- BUT: **HTTP-compatible cookies** for localhost testing (no HTTPS required)
+
+**⚠️ IMPORTANT**: This environment is ONLY for local development/testing. DO NOT deploy to actual production servers.
+
+### Quick Start
+
+```bash
+# Start server with production-local environment
+yarn dev:prod-local
+
+# Server will run on http://localhost:1338 with production database
+```
+
+### Key Differences from Production
+
+| Setting | Production | Production-Local |
+|---------|-----------|------------------|
+| Database | MongoDB Atlas | Same (MongoDB Atlas) |
+| Cookie Secure | `true` (requires HTTPS) | `false` (HTTP compatible) |
+| Cookie SameSite | `strict` | `lax` |
+| Cookie Domain | Configured | `undefined` (localhost) |
+| OAUTH_REQUIRE_HTTPS | `true` | `false` |
+| Server URL | `https://amexing.com` | `http://localhost:1338` |
+
+### Configuration File
+
+File: `environments/.env.production-local`
+
+```bash
+# Environment identifier
+NODE_ENV=production-local
+
+# Production database
+DATABASE_URI=mongodb+srv://...your-production-atlas-connection...
+DATABASE_NAME=AmexingPROD
+
+# HTTP-compatible cookie settings
+COOKIE_SECURE=false
+COOKIE_SAMESITE=lax
+# No COOKIE_DOMAIN for localhost
+
+# Server configuration
+PARSE_SERVER_URL=http://localhost:1338/parse
+PORT=1338
+
+# Same security as production
+SESSION_SECRET=...same-as-production...
+JWT_SECRET=...same-as-production...
+ENCRYPTION_KEY=...same-as-production...
+```
+
+### Use Cases
+
+1. **Login Testing**: Test authentication flows with production data on localhost
+2. **CSRF Debugging**: Debug session and CSRF issues without HTTPS complexity
+3. **Data Verification**: Verify production data integrity locally
+4. **Development**: Develop features against production database schema
+5. **Troubleshooting**: Debug production issues in local environment
+
+### Security Notes
+
+- Uses MongoStore (MongoDB session storage) like production
+- Full PCI DSS compliance enabled
+- Audit logging active
+- Same password requirements as production
+- Only cookie settings are relaxed for HTTP compatibility
+
+### Switching Between Environments
+
+```bash
+# Development (local database, relaxed security)
+yarn dev
+
+# Production-Local (production database, HTTP-compatible)
+yarn dev:prod-local
+
+# Production (production server, full HTTPS security)
+yarn dev:prod
 ```
 
 ## 🏭 Production Environment
@@ -331,13 +420,14 @@ EMAIL_PASS=manually_configured_production_email_credentials
 
 ```
 project-root/
-├── .env.example              # Template with all variables
-├── .env.development          # Development configuration
-├── .env.staging             # Staging configuration
-├── .env.production          # Production configuration (if used)
-├── .env.development.vault   # Encrypted development file
-├── .env.staging.vault       # Encrypted staging file
-└── .env.production.vault    # Encrypted production file (not recommended)
+├── environments/
+│   ├── .env.example              # Template with all variables
+│   ├── .env.development          # Development configuration
+│   ├── .env.staging             # Staging configuration
+│   ├── .env.production          # Production configuration (if used)
+│   ├── .env.development.vault   # Encrypted development file
+│   ├── .env.staging.vault       # Encrypted staging file
+│   └── .env.production.vault    # Encrypted production file (not recommended)
 ```
 
 ### Variable Categories
@@ -347,8 +437,6 @@ project-root/
 PARSE_APP_ID=application-identifier
 PARSE_MASTER_KEY=server-master-key
 PARSE_SERVER_URL=server-endpoint
-PARSE_DASHBOARD_USER=dashboard-username
-PARSE_DASHBOARD_PASS=dashboard-password
 ```
 
 #### 2. Security Variables
@@ -433,9 +521,9 @@ node scripts/audit-secrets.js
 1. **Never commit secrets to version control**
    ```bash
    # Add to .gitignore
-   .env*
-   !.env.example
-   *.vault
+   environments/.env*
+   !environments/.env.example
+   environments/*.vault
    ```
 
 2. **Use separate secrets per environment**
@@ -565,11 +653,10 @@ Pre-configured debug setups available via `F5` or Debug panel:
 #### Testing & Development
 - **Debug Current Test File** - Debug active test file
 - **Debug All Tests** - Debug complete test suite
-- **Debug Parse Dashboard** - Debug dashboard separately
 - **Debug Cloud Functions** - Debug Parse cloud code
 
 #### Full Application
-- **Launch Full Application** - Debug server + dashboard together
+- **Launch Full Application** - Debug server
 
 ### Development Tasks
 
@@ -578,7 +665,6 @@ Quick access to common tasks via `Ctrl+Shift+P` → "Tasks: Run Task":
 #### Build & Run
 - **Start Development Server** - `yarn dev`
 - **Start Production Server** - `yarn start`
-- **Start Parse Dashboard** - `yarn dashboard`
 
 #### Testing
 - **Run Tests** - `yarn test`

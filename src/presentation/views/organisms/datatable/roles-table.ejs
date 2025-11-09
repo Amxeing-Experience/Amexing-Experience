@@ -1,0 +1,807 @@
+<%
+/**
+ * Roles DataTable Organism
+ * Advanced DataTable component for system role management with editing capabilities
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * Component Dependencies:
+ * - Requires: jQuery, Bootstrap 5, DataTables library
+ * - Uses: Bootstrap buttons, badges, modals (molecules)
+ * - Integrates: Alert system, loading states (atoms)
+ *
+ * @param {string} tableId - Unique table identifier (default: 'roles-table')
+ * @param {string} apiEndpoint - API endpoint for data loading (default: '/api/roles')
+ * @param {string} userRole - Current user role for permission-based features (default: 'superadmin')
+ * @param {boolean} showActions - Whether to show action buttons (default: true)
+ *
+ * Features:
+ * - Real-time data loading from API
+ * - Edit role displayName and description (SuperAdmin only)
+ * - Real-time validation with character counters
+ * - Server-side rendering with client-side DataTable enhancement
+ * - Accessibility compliant (ARIA labels, keyboard navigation)
+ * - Responsive design with mobile-friendly layout
+ * - CSP-compliant event handling (no inline handlers)
+ */
+
+// Component Configuration
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'roles-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/roles';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'superadmin';
+
+// Role-Based Permission Checks
+const canEdit = dtUserRole === 'superadmin'; // Only superadmin can view roles
+const canView = dtUserRole === 'superadmin';
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #DC2626 0%, #991B1B 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-shield me-2"></i>
+                    Roles del Sistema
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Administración y consulta de roles con sus permisos</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <!-- DataTable Container -->
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover data-table" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre del Rol</th>
+                        <th>Descripción</th>
+                        <th>Estado</th>
+                        <th>Creado</th>
+                        <% if (dtShowActions && canEdit) { %>
+                            <th>Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be loaded via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- DataTable Configuration and Initialization Script -->
+<script>
+/**
+ * Roles DataTable JavaScript Module
+ *
+ * Structure:
+ * 1. Data Loading & Initialization
+ * 2. DataTable Configuration
+ * 3. Alert/Notification System
+ * 4. Event Delegation Setup
+ * 5. Module Initialization
+ */
+
+// ============================================================================
+// 1. Data Loading & Initialization
+// ============================================================================
+
+/**
+ * Load roles from API and initialize DataTable
+ * Implements exponential backoff retry for library loading
+ * @param {number} retryCount - Current retry attempt
+ */
+async function loadRolesAndInitializeTable(retryCount = 0) {
+    const MAX_RETRIES = 5;
+    const BASE_DELAY = 200; // ms
+
+    // Check if jQuery and DataTables are loaded
+    if (typeof jQuery === 'undefined' || typeof $ === 'undefined' || typeof $.fn.DataTable === 'undefined') {
+        if (retryCount >= MAX_RETRIES) {
+            console.error('❌ DataTables failed to load after', MAX_RETRIES, 'attempts');
+            return;
+        }
+
+        // Exponential backoff: 200ms, 400ms, 800ms, 1600ms, 3200ms
+        const delay = BASE_DELAY * Math.pow(2, retryCount);
+        setTimeout(() => loadRolesAndInitializeTable(retryCount + 1), delay);
+        return;
+    }
+
+    const apiEndpoint = '<%= dtApiEndpoint %>';
+
+    try {
+        // Load roles data from API
+        const response = await fetch(apiEndpoint, {
+            method: 'GET',
+            credentials: 'include', // Send cookies
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (!data.success) {
+            throw new Error(data.error || 'API error');
+        }
+
+        const roles = data.data?.roles || [];
+
+        // Initialize DataTable with the loaded data
+        initializeDataTableWithData(roles);
+
+        // Dispatch custom event for page to listen
+        document.dispatchEvent(new CustomEvent('rolesTableLoaded', {
+            detail: { count: roles.length, roles }
+        }));
+
+    } catch (error) {
+        console.error('Error loading roles:', error.message);
+        // Initialize empty table on error
+        initializeDataTableWithData([]);
+    }
+}
+
+// ============================================================================
+// 2. DataTable Configuration
+// ============================================================================
+
+/**
+ * Initialize DataTable with pre-loaded role data
+ * Configures columns, rendering, permissions, and event handlers
+ * @param {Array} rolesData - Array of role objects from API
+ */
+function initializeDataTableWithData(rolesData) {
+    const tableId = '<%= dtTableId %>';
+    const canEdit = <%= canEdit %>;
+
+    // DataTable configuration
+    const tableConfig = {
+        data: rolesData,
+        columns: [
+            {
+                title: 'Nombre del Rol',
+                data: 'displayName',
+                className: 'fw-bold'
+            },
+            {
+                title: 'Descripción',
+                data: 'description',
+                className: 'text-muted',
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        return data || '<span class="text-muted fst-italic">Sin descripción</span>';
+                    }
+                    return data;
+                }
+            },
+            {
+                title: 'Estado',
+                data: 'active',
+                className: 'text-center',
+                render: function(data, type, row) {
+                    if (type === 'display') {
+                        const isActive = row.active === true;
+                        const statusClass = isActive ? 'success' : 'warning';
+                        const statusText = isActive ? 'Activo' : 'Inactivo';
+                        const icon = isActive ? 'ti-check' : 'ti-x';
+                        return `<span class="badge bg-${statusClass}">
+                                    <i class="ti ${icon} me-1"></i>${statusText}
+                                </span>`;
+                    }
+                    return data;
+                }
+            },
+            {
+                title: 'Creado',
+                data: 'createdAt',
+                className: 'text-center',
+                render: function(data, type, row) {
+                    if (type === 'display' && data) {
+                        const date = new Date(data);
+                        return date.toLocaleDateString('es-ES', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                    }
+                    return data;
+                }
+            }
+        ],
+        language: {
+            url: '/assets/libs/datatables/es-ES.json'
+        },
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "Todos"]],
+        processing: false,
+        serverSide: false,
+        searching: true,
+        ordering: true,
+        order: [[0, 'asc']], // Sort by role name ascending
+        responsive: true
+    };
+
+    // Add actions column if permissions allow
+    <% if (dtShowActions && canEdit) { %>
+    if (canEdit) {
+        tableConfig.columns.push({
+            title: 'Acciones',
+            data: null,
+            orderable: false,
+            searchable: false,
+            className: 'text-center',
+            width: '100px',
+            render: function(data, type, row) {
+                if (type === 'display') {
+                    const roleName = row.displayName;
+                    const isSystemRole = row.isSystemRole;
+
+                    let actions = '<div class="btn-group" role="group">';
+
+                    // Edit button - allows editing displayName and description
+                    const roleDescription = row.description || '';
+                    actions += `<button type="button"
+                                class="btn btn-sm btn-primary btn-edit-role"
+                                data-role-id="${row.id}"
+                                data-role-name="${roleName}"
+                                data-role-description="${roleDescription.replace(/"/g, '&quot;')}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="Editar rol">
+                                <i class="ti ti-edit"></i>
+                            </button>`;
+
+                    actions += '</div>';
+                    return actions;
+                }
+                return '';
+            }
+        });
+    }
+    <% } %>
+
+    // Initialize DataTable
+    try {
+        // Destroy existing instance if exists
+        if ($.fn.DataTable.isDataTable('#' + tableId)) {
+            $('#' + tableId).DataTable().destroy();
+        }
+
+        const rolesTable = $('#' + tableId).DataTable(tableConfig);
+
+        // Store reference globally
+        window.rolesTable = rolesTable;
+
+        // Initialize Bootstrap tooltips after table draws
+        rolesTable.on('draw', function() {
+            // Initialize tooltips for action buttons
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+        });
+
+        // Initialize tooltips on initial load
+        setTimeout(() => {
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            const tooltipList = [...tooltipTriggerList].map(tooltipTriggerEl => new bootstrap.Tooltip(tooltipTriggerEl));
+        }, 100);
+
+    } catch (error) {
+        console.error('Failed to initialize DataTable:', error);
+    }
+}
+
+// ============================================================================
+// 3. Alert/Notification System
+// ============================================================================
+
+/**
+ * Display alert notification to user
+ * @param {string} message - Alert message to display
+ * @param {string} type - Alert type (success, danger, warning, info)
+ * @param {number} duration - Auto-dismiss duration in ms (0 = no auto-dismiss)
+ */
+function showAlert(message, type = 'info', duration = 5000) {
+    // Remove any existing alerts
+    const existingAlert = document.querySelector('.role-management-alert');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+
+    // Create alert element
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show role-management-alert`;
+    alertDiv.setAttribute('role', 'alert');
+    alertDiv.style.cssText = 'position: fixed; top: 80px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+
+    // Icon mapping
+    const icons = {
+        success: 'ti-check-circle',
+        danger: 'ti-alert-circle',
+        warning: 'ti-alert-triangle',
+        info: 'ti-info-circle'
+    };
+
+    alertDiv.innerHTML = `
+        <i class="ti ${icons[type] || icons.info} me-2"></i>
+        <strong>${message}</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+
+    document.body.appendChild(alertDiv);
+
+    // Auto-dismiss after duration
+    if (duration > 0) {
+        setTimeout(() => {
+            alertDiv.classList.remove('show');
+            setTimeout(() => alertDiv.remove(), 150);
+        }, duration);
+    }
+}
+
+function showSuccessAlert(message) {
+    showAlert(message, 'success', 5000);
+}
+
+function showErrorAlert(message) {
+    showAlert(message, 'danger', 0); // Don't auto-dismiss errors
+}
+
+function showInfoAlert(message) {
+    showAlert(message, 'info', 5000);
+}
+
+function showValidationError(message) {
+    showAlert(message, 'warning', 5000);
+}
+
+// ============================================================================
+// 3.5. Edit Role Modal & Validation Functions
+// ============================================================================
+
+/**
+ * Validate role displayName input
+ * @param {string} displayName - Role display name to validate
+ * @param {string} currentDisplayName - Current display name for comparison
+ * @returns {object} - { valid: boolean, error: string }
+ */
+function validateRoleDisplayName(displayName, currentDisplayName) {
+    // Check if empty
+    if (!displayName || !displayName.trim()) {
+        return {
+            valid: false,
+            error: 'El nombre del rol es obligatorio y no puede estar vacío'
+        };
+    }
+
+    const trimmedName = displayName.trim();
+
+    // Check if same as current
+    if (trimmedName === currentDisplayName) {
+        return {
+            valid: false,
+            error: 'El nuevo nombre debe ser diferente al actual'
+        };
+    }
+
+    // Check max length
+    if (trimmedName.length > 100) {
+        return {
+            valid: false,
+            error: 'El nombre del rol no puede exceder 100 caracteres'
+        };
+    }
+
+    return {
+        valid: true,
+        error: null
+    };
+}
+
+/**
+ * Validate role description input
+ * @param {string} description - Role description to validate
+ * @param {string} currentDescription - Current description for comparison
+ * @returns {object} - { valid: boolean, error: string }
+ */
+function validateRoleDescription(description, currentDescription) {
+    // Description is optional, allow empty
+    if (description === undefined || description === null) {
+        return {
+            valid: true,
+            error: null
+        };
+    }
+
+    const trimmedDesc = description.trim();
+
+    // Check max length
+    if (trimmedDesc.length > 500) {
+        return {
+            valid: false,
+            error: 'La descripción no puede exceder 500 caracteres'
+        };
+    }
+
+    return {
+        valid: true,
+        error: null
+    };
+}
+
+/**
+ * Validate if any changes were made
+ * @param {string} displayName - New display name
+ * @param {string} currentDisplayName - Current display name
+ * @param {string} description - New description
+ * @param {string} currentDescription - Current description
+ * @returns {object} - { hasChanges: boolean, error: string }
+ */
+function validateHasChanges(displayName, currentDisplayName, description, currentDescription) {
+    const displayNameChanged = displayName.trim() !== currentDisplayName;
+    const descriptionChanged = description.trim() !== currentDescription;
+
+    if (!displayNameChanged && !descriptionChanged) {
+        return {
+            hasChanges: false,
+            error: 'No se detectaron cambios. Los valores son idénticos a los actuales'
+        };
+    }
+
+    return {
+        hasChanges: true,
+        error: null
+    };
+}
+
+/**
+ * Show edit role modal with validation
+ * @param {string} roleId - Role ID
+ * @param {string} currentDisplayName - Current role display name
+ * @param {string} currentDescription - Current role description
+ */
+function showEditRoleModal(roleId, currentDisplayName, currentDescription = '') {
+    // Create modal HTML
+    const modalHtml = `
+        <div class="modal fade" id="editRoleModal" tabindex="-1" aria-labelledby="editRoleModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title" id="editRoleModalLabel">
+                            <i class="ti ti-edit me-2"></i>
+                            Editar Rol
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted mb-4">
+                            Modifica el nombre y/o descripción del rol. Los cambios serán visibles para todos los usuarios del sistema.
+                        </p>
+
+                        <div class="mb-3">
+                            <label for="roleDisplayNameInput" class="form-label fw-bold">
+                                Nombre del Rol <span class="text-danger">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="roleDisplayNameInput"
+                                value="${currentDisplayName}"
+                                maxlength="100"
+                                placeholder="Ingresa el nombre del rol"
+                                aria-label="Nombre del rol"
+                                required>
+                            <div class="form-text">
+                                <i class="ti ti-info-circle me-1"></i>
+                                Máximo 100 caracteres
+                            </div>
+                            <div id="displayNameValidationError" class="invalid-feedback" style="display: none;"></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="roleDescriptionInput" class="form-label fw-bold">
+                                Descripción
+                            </label>
+                            <textarea
+                                class="form-control"
+                                id="roleDescriptionInput"
+                                rows="4"
+                                maxlength="500"
+                                placeholder="Ingresa una descripción del rol (opcional)"
+                                aria-label="Descripción del rol">${currentDescription}</textarea>
+                            <div class="d-flex justify-content-between">
+                                <div class="form-text">
+                                    <i class="ti ti-info-circle me-1"></i>
+                                    Máximo 500 caracteres (opcional)
+                                </div>
+                                <small id="descriptionCharCount" class="text-muted">
+                                    ${currentDescription.length}/500
+                                </small>
+                            </div>
+                            <div id="descriptionValidationError" class="invalid-feedback" style="display: none;"></div>
+                        </div>
+
+                        <div class="alert alert-info d-flex align-items-center" role="alert">
+                            <i class="ti ti-info-circle me-2 fs-5"></i>
+                            <small>Solo se puede modificar el nombre y la descripción. Los permisos y configuraciones del rol permanecen sin cambios.</small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                            <i class="ti ti-x me-1"></i>
+                            Cancelar
+                        </button>
+                        <button type="button" class="btn btn-primary" data-action="update-role">
+                            <i class="ti ti-check me-1"></i>
+                            Actualizar Rol
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if present
+    const existingModal = document.getElementById('editRoleModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Insert modal into DOM
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Get modal elements
+    const modalElement = document.getElementById('editRoleModal');
+    const modal = new bootstrap.Modal(modalElement);
+    const updateBtn = modalElement.querySelector('[data-action="update-role"]');
+    const displayNameInput = document.getElementById('roleDisplayNameInput');
+    const descriptionInput = document.getElementById('roleDescriptionInput');
+    const displayNameErrorDiv = document.getElementById('displayNameValidationError');
+    const descriptionErrorDiv = document.getElementById('descriptionValidationError');
+    const charCountElement = document.getElementById('descriptionCharCount');
+
+    // Focus input when modal opens
+    modalElement.addEventListener('shown.bs.modal', function() {
+        displayNameInput.focus();
+        displayNameInput.select();
+    });
+
+    // Update character count for description
+    descriptionInput.addEventListener('input', function() {
+        const length = this.value.length;
+        charCountElement.textContent = `${length}/500`;
+
+        // Change color based on length
+        if (length > 450) {
+            charCountElement.classList.add('text-warning');
+            charCountElement.classList.remove('text-muted');
+        } else if (length === 500) {
+            charCountElement.classList.add('text-danger');
+            charCountElement.classList.remove('text-warning', 'text-muted');
+        } else {
+            charCountElement.classList.remove('text-warning', 'text-danger');
+            charCountElement.classList.add('text-muted');
+        }
+    });
+
+    // Real-time validation function
+    function validateInputs() {
+        let isValid = true;
+
+        // Validate displayName
+        const displayNameValidation = validateRoleDisplayName(displayNameInput.value, currentDisplayName);
+        if (!displayNameValidation.valid) {
+            displayNameInput.classList.add('is-invalid');
+            displayNameErrorDiv.textContent = displayNameValidation.error;
+            displayNameErrorDiv.style.display = 'block';
+            isValid = false;
+        } else {
+            displayNameInput.classList.remove('is-invalid');
+            displayNameErrorDiv.style.display = 'none';
+        }
+
+        // Validate description
+        const descriptionValidation = validateRoleDescription(descriptionInput.value, currentDescription);
+        if (!descriptionValidation.valid) {
+            descriptionInput.classList.add('is-invalid');
+            descriptionErrorDiv.textContent = descriptionValidation.error;
+            descriptionErrorDiv.style.display = 'block';
+            isValid = false;
+        } else {
+            descriptionInput.classList.remove('is-invalid');
+            descriptionErrorDiv.style.display = 'none';
+        }
+
+        // Check if any changes were made
+        if (isValid) {
+            const changesValidation = validateHasChanges(
+                displayNameInput.value,
+                currentDisplayName,
+                descriptionInput.value,
+                currentDescription
+            );
+
+            if (!changesValidation.hasChanges) {
+                // Disable button but don't show error until submit
+                updateBtn.disabled = true;
+                return false;
+            }
+        }
+
+        updateBtn.disabled = !isValid;
+        return isValid;
+    }
+
+    // Real-time validation on input
+    displayNameInput.addEventListener('input', validateInputs);
+    descriptionInput.addEventListener('input', validateInputs);
+
+    // Handle Enter key in displayName
+    displayNameInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (!updateBtn.disabled) {
+                updateBtn.click();
+            }
+        }
+    });
+
+    // Handle update button click
+    updateBtn.addEventListener('click', async function() {
+        const newDisplayName = displayNameInput.value;
+        const newDescription = descriptionInput.value;
+
+        // Final validation
+        const displayNameValidation = validateRoleDisplayName(newDisplayName, currentDisplayName);
+        const descriptionValidation = validateRoleDescription(newDescription, currentDescription);
+        const changesValidation = validateHasChanges(newDisplayName, currentDisplayName, newDescription, currentDescription);
+
+        // Show validation errors
+        if (!displayNameValidation.valid) {
+            displayNameInput.classList.add('is-invalid');
+            displayNameErrorDiv.textContent = displayNameValidation.error;
+            displayNameErrorDiv.style.display = 'block';
+            return;
+        }
+
+        if (!descriptionValidation.valid) {
+            descriptionInput.classList.add('is-invalid');
+            descriptionErrorDiv.textContent = descriptionValidation.error;
+            descriptionErrorDiv.style.display = 'block';
+            return;
+        }
+
+        if (!changesValidation.hasChanges) {
+            showValidationError(changesValidation.error);
+            return;
+        }
+
+        // Execute update
+        await executeUpdateRole(roleId, newDisplayName.trim(), newDescription.trim(), modal);
+    });
+
+    // Clean up modal on hide
+    modalElement.addEventListener('hidden.bs.modal', function() {
+        modalElement.remove();
+    });
+
+    // Show modal
+    modal.show();
+}
+
+/**
+ * Execute role update via API
+ * @param {string} roleId - Role ID to update
+ * @param {string} newDisplayName - New display name
+ * @param {string} newDescription - New description
+ * @param {object} modal - Bootstrap modal instance
+ */
+async function executeUpdateRole(roleId, newDisplayName, newDescription, modal) {
+    const updateBtn = document.querySelector('#editRoleModal [data-action="update-role"]');
+    const displayNameInput = document.getElementById('roleDisplayNameInput');
+    const descriptionInput = document.getElementById('roleDescriptionInput');
+
+    // Disable button and show loading state
+    updateBtn.disabled = true;
+    const originalBtnContent = updateBtn.innerHTML;
+    updateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Actualizando...';
+
+    try {
+        // Build request body with both fields
+        const requestBody = {
+            displayName: newDisplayName,
+            description: newDescription
+        };
+
+        const response = await fetch(`/api/roles/${roleId}`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Error al actualizar el rol');
+        }
+
+        // Success
+        modal.hide();
+        showSuccessAlert(`Rol "${newDisplayName}" actualizado exitosamente`);
+
+        // Reload table data
+        if (window.rolesTable) {
+            await loadRolesAndInitializeTable();
+        }
+
+    } catch (error) {
+        console.error('Error updating role:', error);
+        showErrorAlert(error.message || 'Error al actualizar el rol. Por favor, intenta nuevamente.');
+
+        // Restore button state
+        updateBtn.disabled = false;
+        updateBtn.innerHTML = originalBtnContent;
+        displayNameInput.focus();
+    }
+}
+
+// ============================================================================
+// 4. Event Delegation Setup (CSP-Compliant)
+// ============================================================================
+
+/**
+ * Setup event delegation for action buttons
+ * Uses event bubbling to handle dynamically created buttons
+ * CSP-compliant: No inline event handlers
+ */
+function setupEventDelegation() {
+    // Use event delegation on document to handle dynamically created buttons
+    document.addEventListener('click', function(event) {
+        const target = event.target.closest('button');
+        if (!target) return;
+
+        // Edit button - opens modal to edit displayName and description
+        if (target.classList.contains('btn-edit-role')) {
+            const roleId = target.getAttribute('data-role-id');
+            const roleName = target.getAttribute('data-role-name');
+            const roleDescription = target.getAttribute('data-role-description') || '';
+            showEditRoleModal(roleId, roleName, roleDescription);
+            return;
+        }
+    });
+}
+
+// ============================================================================
+// 5. Module Initialization
+// ============================================================================
+
+/**
+ * Initialize the Roles DataTable module
+ * Sets up event delegation and loads data
+ */
+function initializeRolesTableModule() {
+    setupEventDelegation();
+    loadRolesAndInitializeTable();
+}
+
+// Start initialization when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeRolesTableModule);
+} else {
+    initializeRolesTableModule();
+}
+</script>
