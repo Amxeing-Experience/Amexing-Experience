@@ -1,0 +1,2639 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "AmexingWeb API",
+    "version": "0.1.0",
+    "description": "\n# AmexingWeb E-Commerce Platform API\n\nPCI DSS Level 1 compliant e-commerce platform with comprehensive security features.\n\n## Features\n- **Authentication**: Multi-provider OAuth 2.0 (Username/Password, Apple, Corporate)\n- **Security**: JWT Bearer tokens with secure HTTP-only cookies\n- **Authorization**: Role-based access control (RBAC) with 7 role levels\n- **Data Protection**: Encryption at rest and in transit\n- **Audit Logging**: Comprehensive audit trails for all operations\n\n## Security Standards\n- PCI DSS 4.0.1 Compliant\n- OWASP Top 10 Protection\n- Rate Limiting on all endpoints\n- CSRF Protection for state-changing operations\n- Security Headers (Helmet.js)\n\n## Authentication Flow\n1. Obtain JWT token via `/auth/login` or OAuth providers\n2. Include token in `Authorization: Bearer <token>` header\n3. Token lifetime: 8 hours (access), 7 days (refresh)\n4. Use `/auth/refresh` to renew tokens before expiration\n\n## Rate Limiting\n- Authentication endpoints: 50 requests / 15 minutes\n- API endpoints: 100 requests / 15 minutes\n- Write operations: 30 requests / 15 minutes\n- Password reset: 10 requests / 5 minutes\n\n## Support\nFor API support, contact the Amexing Development Team.\n      ",
+    "contact": {
+      "name": "Amexing Development Team",
+      "email": "dev@amexing.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:1337",
+      "description": "Development server"
+    },
+    {
+      "url": "https://staging-api.amexing.com",
+      "description": "Staging server"
+    },
+    {
+      "url": "https://api.amexing.com",
+      "description": "Production server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "\nJWT Bearer token authentication.\n\n**Token Lifetime (PCI DSS Compliant):**\n- Access Token: 8 hours\n- Refresh Token: 7 days\n\n**How to obtain a token:**\n1. Use `POST /auth/login` with credentials\n2. Or authenticate via OAuth providers\n3. Token will be returned in response and set as HTTP-only cookie\n\n**Token includes:**\n- userId: User unique identifier\n- username: Username\n- email: User email\n- role: User role (superadmin, admin, client, etc.)\n- roleId: Role object ID\n- organizationId: Organization identifier\n- name: User display name\n\n**Security Features:**\n- Tokens are signed with HS256 algorithm\n- HTTP-only cookies prevent XSS attacks\n- Secure flag in production (HTTPS only)\n- SameSite=strict prevents CSRF\n          "
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "accessToken",
+        "description": "\nHTTP-only cookie containing JWT access token.\n\n**Security Features:**\n- HttpOnly: Cannot be accessed via JavaScript\n- Secure: Only transmitted over HTTPS in production\n- SameSite=strict: Prevents CSRF attacks\n- Max-Age: 8 hours\n\nThis is automatically set by the server upon successful authentication.\n          "
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Authentication required or token invalid/expired",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Authentication required"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ForbiddenError": {
+        "description": "Insufficient permissions to access this resource",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Insufficient permissions"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotFoundError": {
+        "description": "Resource not found or access denied",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Resource not found"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Request validation failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Validation failed: Email is required, Password must be at least 8 characters"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RateLimitError": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Too many requests, please try again later"
+                },
+                "retryAfter": {
+                  "type": "string",
+                  "example": "15 minutes"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Internal server error"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "PageParameter": {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "description": "Page number for pagination"
+      },
+      "LimitParameter": {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 25
+        },
+        "description": "Number of items per page (max: 100)"
+      },
+      "SortFieldParameter": {
+        "in": "query",
+        "name": "sortField",
+        "schema": {
+          "type": "string",
+          "default": "lastName"
+        },
+        "description": "Field to sort by"
+      },
+      "SortDirectionParameter": {
+        "in": "query",
+        "name": "sortDirection",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "default": "asc"
+        },
+        "description": "Sort direction"
+      }
+    },
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "identifier",
+          "password"
+        ],
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Email or username",
+            "example": "john.doe@amexing.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "description": "User password",
+            "example": "SecureP@ssw0rd!"
+          },
+          "returnTo": {
+            "type": "string",
+            "description": "Redirect URL after successful login (for web forms)",
+            "example": "/dashboard/employee"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Login successful"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "abc123"
+              },
+              "username": {
+                "type": "string",
+                "example": "john.doe"
+              },
+              "role": {
+                "type": "string",
+                "example": "employee"
+              },
+              "name": {
+                "type": "string",
+                "example": "John Doe"
+              }
+            }
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "email",
+          "password",
+          "confirmPassword",
+          "firstName",
+          "lastName"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Unique username",
+            "example": "john.doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User email address",
+            "example": "john.doe@amexing.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "description": "Password (minimum 8 characters)",
+            "example": "SecureP@ssw0rd!"
+          },
+          "confirmPassword": {
+            "type": "string",
+            "format": "password",
+            "description": "Password confirmation (must match password)",
+            "example": "SecureP@ssw0rd!"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "User's first name",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "User's last name",
+            "example": "Doe"
+          }
+        }
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Registration successful"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "abc123"
+              },
+              "username": {
+                "type": "string",
+                "example": "john.doe"
+              },
+              "email": {
+                "type": "string",
+                "example": "john.doe@amexing.com"
+              },
+              "role": {
+                "type": "string",
+                "example": "user"
+              }
+            }
+          }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address for password reset",
+            "example": "john.doe@amexing.com"
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": [
+          "token",
+          "password",
+          "confirmPassword"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Password reset token (received via email)",
+            "example": "reset_token_abc123"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "description": "New password",
+            "example": "NewSecureP@ssw0rd!"
+          },
+          "confirmPassword": {
+            "type": "string",
+            "format": "password",
+            "description": "Password confirmation",
+            "example": "NewSecureP@ssw0rd!"
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": [
+          "currentPassword",
+          "newPassword",
+          "confirmPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "format": "password",
+            "description": "Current password for verification",
+            "example": "CurrentP@ssw0rd!"
+          },
+          "newPassword": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "description": "New password",
+            "example": "NewSecureP@ssw0rd!"
+          },
+          "confirmPassword": {
+            "type": "string",
+            "format": "password",
+            "description": "New password confirmation",
+            "example": "NewSecureP@ssw0rd!"
+          }
+        }
+      },
+      "OAuthProvidersResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "apple",
+                    "corporate"
+                  ],
+                  "example": "apple"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "Apple"
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "Icon URL or CSS class",
+                  "example": "fab fa-apple"
+                }
+              }
+            }
+          }
+        }
+      },
+      "OAuthLinkRequest": {
+        "type": "object",
+        "required": [
+          "oauthData"
+        ],
+        "properties": {
+          "oauthData": {
+            "type": "object",
+            "description": "OAuth provider-specific data",
+            "properties": {
+              "accessToken": {
+                "type": "string",
+                "description": "OAuth access token",
+                "example": "oauth_token_abc123"
+              },
+              "refreshToken": {
+                "type": "string",
+                "description": "OAuth refresh token (if available)",
+                "example": "oauth_refresh_token_xyz789"
+              },
+              "expiresIn": {
+                "type": "integer",
+                "description": "Token expiration time in seconds",
+                "example": 3600
+              }
+            }
+          }
+        }
+      },
+      "TokenRefreshResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "abc123"
+              },
+              "username": {
+                "type": "string",
+                "example": "john.doe"
+              },
+              "role": {
+                "type": "string",
+                "example": "employee"
+              }
+            }
+          }
+        }
+      },
+      "AuthSuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Operation successful"
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Operation successful"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-01T12:00:00.000Z"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Error message"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-01T12:00:00.000Z"
+          }
+        }
+      },
+      "PaginationInfo": {
+        "type": "object",
+        "properties": {
+          "currentPage": {
+            "type": "integer",
+            "description": "Current page number",
+            "example": 1
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total number of pages",
+            "example": 10
+          },
+          "totalItems": {
+            "type": "integer",
+            "description": "Total number of items",
+            "example": 250
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Number of items per page",
+            "example": 25
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether there is a next page",
+            "example": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Whether there is a previous page",
+            "example": false
+          }
+        }
+      },
+      "SystemStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded",
+              "down"
+            ],
+            "example": "healthy"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-01T12:00:00.000Z"
+          },
+          "services": {
+            "type": "object",
+            "properties": {
+              "database": {
+                "type": "string",
+                "enum": [
+                  "connected",
+                  "disconnected"
+                ],
+                "example": "connected"
+              },
+              "parseServer": {
+                "type": "string",
+                "enum": [
+                  "running",
+                  "stopped"
+                ],
+                "example": "running"
+              }
+            }
+          }
+        }
+      },
+      "VersionInfo": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "API version",
+            "example": "0.1.0"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "development",
+              "staging",
+              "production"
+            ],
+            "example": "development"
+          },
+          "nodeVersion": {
+            "type": "string",
+            "example": "20.0.0"
+          }
+        }
+      },
+      "ProfileUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "description": "Update first name",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Update last name",
+            "example": "Doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Update email (requires verification)",
+            "example": "john.doe@amexing.com"
+          },
+          "phone": {
+            "type": "string",
+            "description": "Update phone number",
+            "example": "+1234567890"
+          },
+          "preferences": {
+            "type": "object",
+            "description": "User preferences",
+            "additionalProperties": true
+          }
+        }
+      },
+      "ProfileResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "user": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-01T12:00:00.000Z"
+          }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Notification unique identifier",
+            "example": "notif123"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Target user ID",
+            "example": "user123"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error",
+              "success"
+            ],
+            "description": "Notification type",
+            "example": "info"
+          },
+          "title": {
+            "type": "string",
+            "description": "Notification title",
+            "example": "New Message"
+          },
+          "message": {
+            "type": "string",
+            "description": "Notification content",
+            "example": "You have a new message from admin"
+          },
+          "read": {
+            "type": "boolean",
+            "description": "Whether notification has been read",
+            "example": false
+          },
+          "data": {
+            "type": "object",
+            "description": "Additional notification data",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Notification creation timestamp",
+            "example": "2025-10-01T10:00:00.000Z"
+          }
+        }
+      },
+      "NotificationsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Notifications retrieved successfully"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "notifications": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              },
+              "unreadCount": {
+                "type": "integer",
+                "description": "Number of unread notifications",
+                "example": 5
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "Total number of notifications",
+                "example": 50
+              }
+            }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "firstName",
+          "lastName",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique user identifier (Parse ObjectId)",
+            "example": "abc123def456"
+          },
+          "username": {
+            "type": "string",
+            "description": "User's unique username",
+            "example": "john.doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address",
+            "example": "john.doe@amexing.com"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "User's first name",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "User's last name",
+            "example": "Doe"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "User's full display name",
+            "example": "John Doe"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "superadmin",
+              "admin",
+              "client",
+              "department_manager",
+              "employee",
+              "employee_amexing",
+              "driver",
+              "guest"
+            ],
+            "description": "User's role name",
+            "example": "employee"
+          },
+          "roleId": {
+            "type": "string",
+            "description": "Reference to Role object",
+            "example": "role123"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether user account is active",
+            "example": true
+          },
+          "exists": {
+            "type": "boolean",
+            "description": "Logical deletion flag (false = soft deleted)",
+            "example": true
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Whether user's email has been verified",
+            "example": true
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Organization identifier",
+            "example": "org123"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Client identifier (for client-assigned users)",
+            "example": "client123"
+          },
+          "departmentId": {
+            "type": "string",
+            "description": "Department identifier (for department-assigned users)",
+            "example": "dept123"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "User creation timestamp",
+            "example": "2025-10-01T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp",
+            "example": "2025-10-01T12:00:00.000Z"
+          }
+        }
+      },
+      "UserCreateRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "firstName",
+          "lastName",
+          "role"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address (must be unique)",
+            "example": "new.user@amexing.com"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User's first name",
+            "example": "Jane"
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User's last name",
+            "example": "Smith"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "client",
+              "department_manager",
+              "employee",
+              "employee_amexing",
+              "driver",
+              "guest"
+            ],
+            "description": "User's role (superadmin can only be created by another superadmin)",
+            "example": "employee"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "description": "Initial password (if not provided, a secure password will be generated)",
+            "example": "SecureP@ssw0rd!"
+          },
+          "roleId": {
+            "type": "string",
+            "description": "Role object ID (alternative to role string)",
+            "example": "role123"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Assign user to specific client",
+            "example": "client123"
+          },
+          "departmentId": {
+            "type": "string",
+            "description": "Assign user to specific department",
+            "example": "dept123"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Set email verification status",
+            "example": false,
+            "default": false
+          }
+        }
+      },
+      "UserUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "description": "Update first name",
+            "example": "Jane"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Update last name",
+            "example": "Smith"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Update email address",
+            "example": "updated.email@amexing.com"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "client",
+              "department_manager",
+              "employee",
+              "employee_amexing",
+              "driver",
+              "guest"
+            ],
+            "description": "Update user role (requires appropriate permissions)",
+            "example": "department_manager"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Update active status",
+            "example": true
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "description": "Update password",
+            "example": "NewSecureP@ssw0rd!"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Update client assignment",
+            "example": "client456"
+          },
+          "departmentId": {
+            "type": "string",
+            "description": "Update department assignment",
+            "example": "dept456"
+          }
+        }
+      },
+      "UserListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Users retrieved successfully"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "users": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/User"
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "currentPage": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "totalPages": {
+                    "type": "integer",
+                    "example": 5
+                  },
+                  "totalUsers": {
+                    "type": "integer",
+                    "example": 123
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "example": 25
+                  },
+                  "hasNextPage": {
+                    "type": "boolean",
+                    "example": true
+                  },
+                  "hasPreviousPage": {
+                    "type": "boolean",
+                    "example": false
+                  }
+                }
+              },
+              "requestMetadata": {
+                "type": "object",
+                "properties": {
+                  "endpoint": {
+                    "type": "string",
+                    "example": "getUsers"
+                  },
+                  "requestedBy": {
+                    "type": "string",
+                    "example": "user123"
+                  },
+                  "requestedRole": {
+                    "type": "string",
+                    "example": "admin"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2025-10-01T12:00:00.000Z"
+                  }
+                }
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-01T12:00:00.000Z"
+          }
+        }
+      },
+      "UserStatistics": {
+        "type": "object",
+        "properties": {
+          "totalUsers": {
+            "type": "integer",
+            "description": "Total number of users in the system",
+            "example": 500
+          },
+          "activeUsers": {
+            "type": "integer",
+            "description": "Number of active users",
+            "example": 450
+          },
+          "newThisMonth": {
+            "type": "integer",
+            "description": "Users created this month",
+            "example": 25
+          },
+          "pendingVerification": {
+            "type": "integer",
+            "description": "Users with unverified emails",
+            "example": 10
+          },
+          "roleDistribution": {
+            "type": "object",
+            "description": "User count by role",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "example": {
+              "superadmin": 2,
+              "admin": 10,
+              "department_manager": 15,
+              "employee": 400,
+              "driver": 50,
+              "client": 20,
+              "guest": 3
+            }
+          },
+          "registrationTrends": {
+            "type": "array",
+            "description": "Monthly registration trends",
+            "items": {
+              "type": "object",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "example": "2025-09"
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 35
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "User authentication and authorization endpoints"
+    },
+    {
+      "name": "OAuth",
+      "description": "OAuth 2.0 provider integration (Apple, Corporate)"
+    },
+    {
+      "name": "User Management",
+      "description": "User CRUD operations with RBAC"
+    },
+    {
+      "name": "Notifications",
+      "description": "User notification management"
+    },
+    {
+      "name": "Profile",
+      "description": "User profile management"
+    },
+    {
+      "name": "System",
+      "description": "System status and health endpoints"
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "User login with credentials",
+        "description": "Authenticate user with email/username and password.\nReturns JWT token in response and sets HTTP-only cookie.\n\n**Security Features:**\n- Rate limited: 50 requests per 15 minutes\n- Account lockout after 5 failed attempts\n- Secure password validation\n- JWT token lifetime: 8 hours\n\n**Response Behavior:**\n- HTML clients: Redirects to role-specific dashboard\n- API clients: Returns JSON with user data\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "headers": {
+              "Set-Cookie": {
+                "description": "JWT access token (HTTP-only, Secure, SameSite=strict)",
+                "schema": {
+                  "type": "string",
+                  "example": "accessToken=eyJhbGc...; HttpOnly; Secure; SameSite=strict; Max-Age=28800"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect to dashboard (for HTML clients)",
+            "headers": {
+              "Location": {
+                "description": "Redirect URL based on user role",
+                "schema": {
+                  "type": "string",
+                  "example": "/dashboard/employee"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid credentials or account locked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Register new user account",
+        "description": "Create a new user account with email verification.\nReturns JWT tokens and automatically logs in the user.\n\n**Security Features:**\n- Rate limited: 50 requests per 15 minutes\n- Password strength validation\n- Email uniqueness check\n- Automatic email verification flow\n\n**Default Role:** user\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registration successful",
+            "headers": {
+              "Set-Cookie": {
+                "description": "JWT tokens set as HTTP-only cookies",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponse"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect to dashboard (for HTML clients)"
+          },
+          "400": {
+            "description": "Validation error or registration failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Logout user session",
+        "description": "Clears authentication cookies and terminates user session.\n\n**Security:**\n- Clears both access and refresh tokens\n- Invalidates HTTP-only cookies\n",
+        "responses": {
+          "200": {
+            "description": "Logout successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Logout failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Refresh JWT access token",
+        "description": "Renew access token using refresh token before expiration.\n\n**Token Lifetimes:**\n- Access Token: 8 hours\n- Refresh Token: 7 days\n\n**Security:**\n- Requires valid refresh token in cookie\n- Issues new access and refresh tokens\n- PCI DSS compliant token rotation\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token refresh successful",
+            "headers": {
+              "Set-Cookie": {
+                "description": "New JWT tokens",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenRefreshResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh token required or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Request password reset",
+        "description": "Initiate password reset process by sending reset token via email.\n\n**Security Features:**\n- Strict rate limiting: 10 requests per 5 minutes\n- Time-limited reset tokens\n- Email verification required\n- No user enumeration (always returns success)\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset email sent (or user not found)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "description": "Password reset request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Complete password reset",
+        "description": "Complete password reset process using token from email.\n\n**Security Features:**\n- Strict rate limiting: 10 requests per 5 minutes\n- Token validation and expiration check\n- Password strength validation\n- Single-use tokens\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or password reset failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          }
+        }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Change password for authenticated user",
+        "description": "Change password for currently authenticated user.\n\n**Security Features:**\n- Requires authentication (JWT token)\n- Current password verification\n- Password strength validation\n- Audit logging\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or password change failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/auth/oauth/providers": {
+      "get": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Get list of available OAuth providers",
+        "description": "Retrieve list of configured OAuth 2.0 providers.\n\n**Available Providers:**\n- Apple (Sign in with Apple)\n- Corporate (Internal company OAuth)\n",
+        "responses": {
+          "200": {
+            "description": "List of OAuth providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthProvidersResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to get OAuth providers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}": {
+      "get": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Initiate OAuth authentication flow",
+        "description": "Redirect user to OAuth provider for authentication.\n\n**Flow:**\n1. User clicks \"Sign in with Provider\"\n2. Redirects to provider's auth page\n3. User authorizes application\n4. Provider redirects to callback URL\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apple",
+                "corporate"
+              ]
+            },
+            "description": "OAuth provider ID"
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string",
+              "default": "default"
+            },
+            "description": "State parameter for CSRF protection"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to OAuth provider",
+            "headers": {
+              "Location": {
+                "description": "OAuth provider authorization URL",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "302_error": {
+            "description": "Redirect to login page with error"
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}/callback": {
+      "get": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "OAuth provider callback handler",
+        "description": "Handle OAuth provider callback after user authorization.\n\n**Flow:**\n1. OAuth provider redirects here after user authorizes\n2. Validates authorization code\n3. Exchanges code for tokens\n4. Creates/updates user account\n5. Sets JWT cookies\n6. Redirects to dashboard\n",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apple",
+                "corporate"
+              ]
+            },
+            "description": "OAuth provider ID"
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Authorization code from OAuth provider"
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            },
+            "description": "State parameter for CSRF validation"
+          },
+          {
+            "in": "query",
+            "name": "error",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Error code if authorization failed"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirect to dashboard on success",
+            "headers": {
+              "Location": {
+                "description": "Role-specific dashboard URL",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Set-Cookie": {
+                "description": "JWT tokens",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "302_error": {
+            "description": "Redirect to login page with error"
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}/link": {
+      "post": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Link OAuth account to existing user",
+        "description": "Link an OAuth provider account to the currently authenticated user.\n\n**Use Cases:**\n- Enable Sign in with Apple for existing account\n- Link corporate OAuth to personal account\n- Add alternative login methods\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apple",
+                "corporate"
+              ]
+            },
+            "description": "OAuth provider to link"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OAuthLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OAuth account linked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "OAuth account linking failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}/unlink": {
+      "delete": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Unlink OAuth account from user",
+        "description": "Remove OAuth provider link from the currently authenticated user.\n\n**Security:**\n- Ensures user has alternative login method\n- Prevents account lockout\n- Audit logging\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apple",
+                "corporate"
+              ]
+            },
+            "description": "OAuth provider to unlink"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth account unlinked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthSuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "OAuth account unlinking failed (e.g., last login method)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Get API status",
+        "description": "Check API health and service availability.\n\n**Public Endpoint** - No authentication required\n**Rate Limited:** 100 requests per 15 minutes\n\n**Health Checks:**\n- API server status\n- Database connectivity\n- Parse Server status\n",
+        "responses": {
+          "200": {
+            "description": "API is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Get API version information",
+        "description": "Retrieve API version and environment information.\n\n**Public Endpoint** - No authentication required\n**Rate Limited:** 100 requests per 15 minutes\n",
+        "responses": {
+          "200": {
+            "description": "Version information retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Get user notifications",
+        "description": "Retrieve notifications for authenticated user.\n\n**Access:** Requires 'notifications.read' permission\n**Rate Limited:** 100 requests per 15 minutes\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/notifications/{notificationId}/read": {
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark notification as read",
+        "description": "Mark a specific notification as read.\n\n**Access:** Requires 'notifications.update' permission\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notificationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Notification ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification marked as read"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/notifications/mark-all-read": {
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark all notifications as read",
+        "description": "Mark all user notifications as read.\n\n**Access:** Requires 'notifications.update' permission\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All notifications marked as read"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/user/profile": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get current user profile",
+        "description": "Retrieve authenticated user's profile information.\n\n**Access:** Requires 'profile.read' permission (all authenticated users)\n**Rate Limited:** 100 requests per 15 minutes\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Update current user profile",
+        "description": "Update authenticated user's profile information.\n\n**Updatable Fields:**\n- firstName, lastName\n- Email (requires re-verification)\n- Phone\n- Preferences\n\n**Access:** Requires 'profile.update' permission\n**Rate Limited:** 100 requests per 15 minutes\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Get list of users with filtering and pagination",
+        "description": "Retrieve paginated list of users with advanced filtering options.\n\n**Access Control:**\n- Requires authentication (JWT token)\n- Requires 'users.list' permission\n- SuperAdmin/Admin: See all users\n- DepartmentManager: See users in their department\n- Others: Limited access based on role\n\n**Features:**\n- Pagination (default: 25 items, max: 100)\n- Filter by role, status, client, department\n- Sort by any field\n- Search functionality\n- Rate limited: 100 requests per 15 minutes\n\n**PCI DSS:**\n- Audit logged per requirement 10.2.1\n- Role-based data filtering\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageParameter"
+          },
+          {
+            "$ref": "#/components/parameters/LimitParameter"
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superadmin",
+                "admin",
+                "client",
+                "department_manager",
+                "employee",
+                "employee_amexing",
+                "driver",
+                "guest"
+              ]
+            },
+            "description": "Filter by user role"
+          },
+          {
+            "in": "query",
+            "name": "active",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter by active status"
+          },
+          {
+            "in": "query",
+            "name": "emailVerified",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter by email verification status"
+          },
+          {
+            "in": "query",
+            "name": "clientId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by client (admin only)"
+          },
+          {
+            "in": "query",
+            "name": "departmentId",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by department"
+          },
+          {
+            "$ref": "#/components/parameters/SortFieldParameter"
+          },
+          {
+            "$ref": "#/components/parameters/SortDirectionParameter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Create new user",
+        "description": "Create a new user account with role assignment.\n\n**Access:** Requires 'users.create' permission\n**Password:** Auto-generated if not provided\n**Rate Limited:** 30 requests per 15 minutes\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/api/users/search": {
+      "get": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Search users with advanced filtering",
+        "description": "Search users by email, name, or username with filters.\n\n**Search Capabilities:**\n- Email (partial match)\n- First name (partial match)\n- Last name (partial match)\n- Username (partial match)\n- Combined with role/status filters\n\n**Access Control:**\n- Requires 'users.search' permission\n- Results filtered by user's access level\n\n**Rate Limited:** 100 requests per 15 minutes\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search term (min 2 characters)",
+            "example": "john"
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter results by role"
+          },
+          {
+            "in": "query",
+            "name": "active",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter by active status"
+          },
+          {
+            "$ref": "#/components/parameters/PageParameter"
+          },
+          {
+            "$ref": "#/components/parameters/LimitParameter"
+          },
+          {
+            "$ref": "#/components/parameters/SortFieldParameter"
+          },
+          {
+            "$ref": "#/components/parameters/SortDirectionParameter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          }
+        }
+      }
+    },
+    "/api/users/statistics": {
+      "get": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Get user statistics for dashboard",
+        "description": "Retrieve comprehensive user statistics and metrics.\n\n**Statistics Included:**\n- Total users count\n- Active users count\n- New users this month\n- Pending email verification\n- Role distribution\n- Monthly registration trends\n\n**Access:**\n- Requires role level 6+ (Admin/SuperAdmin)\n- Rate limited: 100 requests per 15 minutes\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Statistics retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/UserStatistics"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Statistics retrieved successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Get user by ID",
+        "description": "Retrieve detailed user information by user ID.\n\n**Access Control:**\n- Requires 'users.read' permission\n- Users can view their own data\n- Admins can view any user in their scope\n- Department Managers: Users in their department only\n\n**PCI DSS:**\n- No sensitive payment data returned\n- Audit logged per requirement 10.2.1\n",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ObjectId",
+            "example": "abc123def456"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "user": {
+                          "$ref": "#/components/schemas/User"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "User retrieved successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Update user",
+        "description": "Update user information (requires 'users.update' permission)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Deactivate user (soft delete)",
+        "description": "Sets user exists=false (requires 'users.deactivate' permission)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deactivated successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/reactivate": {
+      "put": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Reactivate deactivated user",
+        "description": "Sets exists=true (requires 'users.reactivate' permission)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User reactivated successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/toggle-status": {
+      "patch": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Toggle user active status",
+        "description": "Switch between active/inactive (requires 'users.update' permission)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "active": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Status toggled successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/archive": {
+      "patch": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Archive user (SuperAdmin only)",
+        "description": "Sets active=false and exists=false (permanent soft delete)\n**Access:** Requires role level 7 (SuperAdmin only)\n",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User archived successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    }
+  }
+}

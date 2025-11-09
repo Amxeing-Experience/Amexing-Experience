@@ -1,0 +1,57 @@
+<%
+/**
+ * Coming Soon Card Molecule
+ * Displays a placeholder card for features under development
+ *
+ * Atomic Design Level: Molecule
+ * Category: Cards
+ *
+ * @param {string} title - Card title (default: "Próximamente")
+ * @param {string} message - Description message (default: "Esta sección estará disponible pronto.")
+ * @param {string} icon - Tabler icon name without 'ti-' prefix (default: "clock-hour-4")
+ * @param {string} iconColor - Icon color class (default: "text-muted")
+ * @param {string} gradientFrom - Gradient start color for header (optional)
+ * @param {string} gradientTo - Gradient end color for header (optional)
+ */
+
+const cardTitle = typeof title !== 'undefined' ? title : 'Próximamente';
+const cardMessage = typeof message !== 'undefined' ? message : 'Esta sección estará disponible pronto.';
+const cardIcon = typeof icon !== 'undefined' ? icon : 'clock-hour-4';
+const cardIconColor = typeof iconColor !== 'undefined' ? iconColor : 'text-muted';
+const hasGradient = typeof gradientFrom !== 'undefined' && typeof gradientTo !== 'undefined';
+%>
+
+<div class="card border-0 shadow-sm">
+    <% if (hasGradient) { %>
+        <div class="card-header text-white text-center" style="background: linear-gradient(135deg, <%= gradientFrom %> 0%, <%= gradientTo %> 100%); border: none;">
+            <h5 class="card-title mb-0 text-white">
+                <i class="ti ti-<%= cardIcon %> me-2"></i><%= cardTitle %>
+            </h5>
+        </div>
+    <% } %>
+
+    <div class="card-body text-center py-5">
+        <% if (!hasGradient) { %>
+            <i class="ti ti-<%= cardIcon %> <%= cardIconColor %>" style="font-size: 4rem; opacity: 0.5;"></i>
+            <h4 class="fw-bold mb-3 mt-3"><%= cardTitle %></h4>
+        <% } else { %>
+            <i class="ti ti-<%= cardIcon %> <%= cardIconColor %>" style="font-size: 3rem; opacity: 0.5;"></i>
+            <p class="text-muted mb-3 mt-3" style="font-size: 1rem;"><%= cardMessage %></p>
+        <% } %>
+
+        <% if (!hasGradient) { %>
+            <p class="text-muted mb-4" style="font-size: 1rem;">
+                <%= cardMessage %>
+            </p>
+        <% } %>
+
+        <div class="d-flex justify-content-center gap-2 flex-wrap">
+            <span class="badge bg-light text-dark px-3 py-2">
+                <i class="ti ti-code me-1"></i>En Desarrollo
+            </span>
+            <span class="badge bg-light text-dark px-3 py-2">
+                <i class="ti ti-calendar me-1"></i>Próximamente
+            </span>
+        </div>
+    </div>
+</div>

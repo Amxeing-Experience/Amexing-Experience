@@ -1,271 +1,50 @@
-<!-- Admin Dashboard - Employee Management -->
-<div class="row">
-    <!-- Page Header -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-sm-flex d-block align-items-center justify-content-between mb-3">
-                    <div class="mb-3 mb-sm-0">
-                        <h5 class="card-title fw-semibold">Employee Management</h5>
-                        <p class="card-subtitle mb-0">Manage employees across all clients and departments</p>
-                    </div>
-                    <div>
-                        <span class="badge bg-light-info text-info fs-2">
-                            Admin View
-                        </span>
-                    </div>
-                </div>
+<%
+/**
+ * Admin Employees Management Page
+ * Manages Amexing internal employees (employee_amexing role)
+ *
+ * Layout Structure:
+ * - Direct row/column structure
+ * - Container-fluid from Flexy Bootstrap
+ * - DataTables for employee listing
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller
+ */
 
-                <!-- Quick Stats -->
-                <div class="row">
-                    <div class="col-md-3">
-                        <%- include('../../atoms/dashboard/stats-card', {
-                            icon: 'ti ti-users',
-                            title: 'Total Employees',
-                            value: typeof stats !== 'undefined' ? stats.totalEmployees : '1,247',
-                            color: 'primary',
-                            trend: '+45 this month',
-                            trendColor: 'success'
-                        }) %>
-                    </div>
-                    <div class="col-md-3">
-                        <%- include('../../atoms/dashboard/stats-card', {
-                            icon: 'ti ti-user-check',
-                            title: 'Active Employees',
-                            value: typeof stats !== 'undefined' ? stats.activeEmployees : '1,198',
-                            color: 'success',
-                            trend: '96% active rate',
-                            trendColor: 'success'
-                        }) %>
-                    </div>
-                    <div class="col-md-3">
-                        <%- include('../../atoms/dashboard/stats-card', {
-                            icon: 'ti ti-calendar-event',
-                            title: 'Employee Bookings',
-                            value: typeof stats !== 'undefined' ? stats.employeeBookings : '3,456',
-                            color: 'info',
-                            trend: '+12% this month',
-                            trendColor: 'success'
-                        }) %>
-                    </div>
-                    <div class="col-md-3">
-                        <%- include('../../atoms/dashboard/stats-card', {
-                            icon: 'ti ti-brand-oauth',
-                            title: 'OAuth Provisioned',
-                            value: typeof stats !== 'undefined' ? stats.oauthEmployees : '892',
-                            color: 'warning',
-                            trend: '72% coverage',
-                            trendColor: 'info'
-                        }) %>
-                    </div>
-                </div>
-            </div>
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const currentPath = '/dashboard/admin/employees';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="mb-4">
+            <h2 class="mb-1 fw-bold">Gestión de Empleados</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item">
+                        <a href="/dashboard/admin" class="text-decoration-none">
+                            <i class="ti ti-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">
+                        <i class="ti ti-users me-1"></i>Empleados
+                    </li>
+                </ol>
+            </nav>
         </div>
     </div>
 </div>
 
-<!-- Employee Management -->
+<!-- Employees DataTable -->
 <div class="row">
     <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <!-- Navigation Tabs -->
-                <ul class="nav nav-pills mb-3" id="employeeTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="all-employees-tab" data-bs-toggle="pill" data-bs-target="#all-employees" type="button" role="tab">
-                            <i class="ti ti-users me-2"></i>All Employees
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="new-employees-tab" data-bs-toggle="pill" data-bs-target="#new-employees" type="button" role="tab">
-                            <i class="ti ti-user-plus me-2"></i>New Employees
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="oauth-employees-tab" data-bs-toggle="pill" data-bs-target="#oauth-employees" type="button" role="tab">
-                            <i class="ti ti-brand-oauth me-2"></i>OAuth Provisioned
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="inactive-employees-tab" data-bs-toggle="pill" data-bs-target="#inactive-employees" type="button" role="tab">
-                            <i class="ti ti-user-off me-2"></i>Inactive
-                        </button>
-                    </li>
-                </ul>
-
-                <!-- Tab Content -->
-                <div class="tab-content" id="employeeTabsContent">
-                    <!-- All Employees Tab -->
-                    <div class="tab-pane fade show active" id="all-employees" role="tabpanel">
-                        <div id="employeeTableContainer"></div>
-                    </div>
-
-                    <!-- New Employees Tab -->
-                    <div class="tab-pane fade" id="new-employees" role="tabpanel">
-                        <div id="newEmployeeTableContainer"></div>
-                    </div>
-
-                    <!-- OAuth Employees Tab -->
-                    <div class="tab-pane fade" id="oauth-employees" role="tabpanel">
-                        <div id="oauthEmployeeTableContainer"></div>
-                    </div>
-
-                    <!-- Inactive Employees Tab -->
-                    <div class="tab-pane fade" id="inactive-employees" role="tabpanel">
-                        <div id="inactiveEmployeeTableContainer"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <%- include('../../organisms/datatable/amexing-employees-table', {
+            tableId: 'employees-table',
+            apiEndpoint: '/api/employees',
+            userRole: currentUserRole,
+            showActions: true
+        }) %>
     </div>
 </div>
-
-<!-- Include CSS -->
-<link rel="stylesheet" href="/css/components/user-management.css">
-
-<!-- JavaScript -->
-<script src="/js/components/UserTableManager.js"></script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Get current user context
-    const currentUser = {
-        id: '<%= user.id %>',
-        role: '<%= user.role %>',
-        email: '<%= user.email %>'
-    };
-
-    // Initialize All Employees Table
-    window.employeeTable = new UserTableManager('employeeTableContainer', {
-        userRole: 'employee',
-        userId: currentUser.id,
-        currentUserRole: currentUser.role,
-        pageSize: 25,
-        apiBaseUrl: '/api',
-        permissions: {
-            canCreateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canDeactivateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
-        },
-        filters: {
-            role: 'employee',
-            active: true
-        },
-        customizations: {
-            title: 'All Active Employees',
-            showBulkActions: true,
-            showExport: true,
-            showFilters: true,
-            extraColumns: ['departmentId', 'clientId']
-        }
-    });
-
-    // Initialize New Employees Table (last 30 days)
-    window.newEmployeeTable = new UserTableManager('newEmployeeTableContainer', {
-        userRole: 'employee',
-        userId: currentUser.id,
-        currentUserRole: currentUser.role,
-        pageSize: 25,
-        apiBaseUrl: '/api',
-        permissions: {
-            canCreateUsers: false,
-            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canDeactivateUsers: false,
-            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
-        },
-        filters: {
-            role: 'employee',
-            active: true,
-            createdWithin: 30 // days
-        },
-        customizations: {
-            title: 'New Employees (Last 30 Days)',
-            showBulkActions: false,
-            showExport: true,
-            showFilters: false,
-            highlightNew: true
-        }
-    });
-
-    // Initialize OAuth Employees Table
-    window.oauthEmployeeTable = new UserTableManager('oauthEmployeeTableContainer', {
-        userRole: 'employee',
-        userId: currentUser.id,
-        currentUserRole: currentUser.role,
-        pageSize: 25,
-        apiBaseUrl: '/api',
-        permissions: {
-            canCreateUsers: false,
-            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canDeactivateUsers: false,
-            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
-        },
-        filters: {
-            role: 'employee',
-            active: true,
-            isOAuthProvisioned: true
-        },
-        customizations: {
-            title: 'OAuth Auto-Provisioned Employees',
-            showBulkActions: false,
-            showExport: true,
-            showFilters: true
-        }
-    });
-
-    // Initialize Inactive Employees Table
-    window.inactiveEmployeeTable = new UserTableManager('inactiveEmployeeTableContainer', {
-        userRole: 'employee',
-        userId: currentUser.id,
-        currentUserRole: currentUser.role,
-        pageSize: 25,
-        apiBaseUrl: '/api',
-        permissions: {
-            canCreateUsers: false,
-            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canDeactivateUsers: false,
-            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canReactivateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>
-        },
-        filters: {
-            role: 'employee',
-            active: false
-        },
-        customizations: {
-            title: 'Inactive Employees',
-            showBulkActions: true,
-            showExport: true,
-            showFilters: true,
-            showReactivateButton: true
-        }
-    });
-
-    // Tab switching logic
-    const tabs = document.querySelectorAll('[data-bs-toggle="pill"]');
-    tabs.forEach(tab => {
-        tab.addEventListener('shown.bs.tab', function(event) {
-            const targetTab = event.target.getAttribute('data-bs-target');
-
-            // Refresh the appropriate table when tab is shown
-            switch(targetTab) {
-                case '#all-employees':
-                    window.employeeTable.refresh();
-                    break;
-                case '#new-employees':
-                    window.newEmployeeTable.refresh();
-                    break;
-                case '#oauth-employees':
-                    window.oauthEmployeeTable.refresh();
-                    break;
-                case '#inactive-employees':
-                    window.inactiveEmployeeTable.refresh();
-                    break;
-            }
-        });
-    });
-
-    // Load initial data
-    window.employeeTable.loadUsers();
-});
-</script>

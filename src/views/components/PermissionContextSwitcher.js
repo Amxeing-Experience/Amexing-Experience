@@ -12,7 +12,41 @@
 
 const Parse = require('parse/node');
 
+/**
+ * Permission Context Switcher UI Component
+ * Frontend component for switching between permission contexts (user/client/department).
+ * Provides visual interface for context selection with auto-refresh capability.
+ * @class PermissionContextSwitcher
+ */
 class PermissionContextSwitcher {
+  /**
+   * Creates a new PermissionContextSwitcher instance.
+   * Initializes the component with the specified container and options, sets up default configuration,
+   * and automatically triggers initialization of the context switcher UI.
+   * @function
+   * @param {string} containerId - The ID of the DOM element that will contain the context switcher component.
+   * @param {object} [options] - Optional configuration object for customizing the component behavior and appearance.
+   * @param {string} [options.theme] - The theme to apply to the component ('default', 'dark', 'light', etc.). Defaults to 'default'.
+   * @param {string} [options.position] - Position of the component when fixed ('top-right', 'top-left', 'bottom-right', 'bottom-left'). Defaults to 'top-right'.
+   * @param {boolean} [options.showIcons] - Whether to display icons alongside context information. Defaults to true.
+   * @param {number} [options.autoRefresh] - Auto-refresh interval in milliseconds (0 to disable). Defaults to 30000 (30 seconds).
+   * @example
+   * // Basic usage with default options
+   * const switcher = new PermissionContextSwitcher('context-container');
+   * @example
+   * // Custom configuration
+   * const switcher = new PermissionContextSwitcher('context-container', {
+   *   theme: 'dark',
+   *   position: 'bottom-left',
+   *   showIcons: false,
+   *   autoRefresh: 60000
+   * });
+   * @example
+   * // Disable auto-refresh
+   * const switcher = new PermissionContextSwitcher('context-container', {
+   *   autoRefresh: 0
+   * });
+   */
   constructor(containerId, options = {}) {
     this.container = document.getElementById(containerId);
     this.currentUser = null;
@@ -224,9 +258,7 @@ class PermissionContextSwitcher {
       return '<span class="no-context">Sin contexto activo</span>';
     }
 
-    const iconHtml = this.options.showIcons
-      ? `<i class="icon-${this.currentContext.icon}"></i>`
-      : '';
+    const iconHtml = this.options.showIcons ? `<i class="icon-${this.currentContext.icon}"></i>` : '';
     const colorStyle = `style="border-left: 4px solid ${this.currentContext.color}"`;
 
     return `
@@ -259,9 +291,7 @@ class PermissionContextSwitcher {
     return this.availableContexts
       .map((context) => {
         const isActive = this.currentContext && this.currentContext.id === context.id;
-        const iconHtml = this.options.showIcons
-          ? `<i class="icon-${context.icon}"></i>`
-          : '';
+        const iconHtml = this.options.showIcons ? `<i class="icon-${context.icon}"></i>` : '';
         const activeClass = isActive ? 'active' : '';
         const colorStyle = `style="border-left: 3px solid ${context.color}"`;
 
@@ -340,14 +370,12 @@ class PermissionContextSwitcher {
    */
   setupEventListeners() {
     // Context selection
-    this.container
-      .querySelectorAll('.context-item:not(.current)')
-      .forEach((item) => {
-        item.addEventListener('click', (e) => {
-          const { contextId } = e.currentTarget.dataset;
-          this.selectContext(contextId);
-        });
+    this.container.querySelectorAll('.context-item:not(.current)').forEach((item) => {
+      item.addEventListener('click', (e) => {
+        const { contextId } = e.currentTarget.dataset;
+        this.selectContext(contextId);
       });
+    });
 
     // Switch button
     const switchBtn = this.container.querySelector('.switch-btn');
@@ -358,9 +386,7 @@ class PermissionContextSwitcher {
     }
 
     // View permissions button
-    const viewPermissionsBtn = this.container.querySelector(
-      '.view-permissions-btn'
-    );
+    const viewPermissionsBtn = this.container.querySelector('.view-permissions-btn');
     if (viewPermissionsBtn) {
       viewPermissionsBtn.addEventListener('click', () => {
         this.showPermissionsModal();
@@ -400,9 +426,7 @@ class PermissionContextSwitcher {
       item.classList.remove('selected');
     });
 
-    const selectedItem = this.container.querySelector(
-      `[data-context-id="${contextId}"]`
-    );
+    const selectedItem = this.container.querySelector(`[data-context-id="${contextId}"]`);
     if (selectedItem) {
       selectedItem.classList.add('selected');
     }
@@ -975,9 +999,7 @@ class PermissionContextSwitcher {
     }
 
     // Remove styles
-    const styles = document.getElementById(
-      'permission-context-switcher-styles'
-    );
+    const styles = document.getElementById('permission-context-switcher-styles');
     if (styles) {
       styles.remove();
     }

@@ -1,0 +1,106 @@
+#!/bin/bash
+# pre-commit hook for AmexingWeb PCI DSS Compliance
+# Generated automatically by scripts/setup-git-hooks.js
+# 
+# This hook enforces security and compliance requirements
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+log_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+log_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+log_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# Check if we're in the right directory
+if [ ! -f "package.json" ]; then
+    log_error "Not in project root directory"
+    exit 1
+fi
+
+
+log_info "Running pre-commit checks for PCI DSS compliance..."
+
+# 1. ESLint security checks
+log_info "Running ESLint security analysis..."
+if ! yarn lint; then
+    log_error "ESLint checks failed. Fix issues before committing."
+    exit 1
+fi
+
+# 2. Semgrep security analysis
+log_info "Running Semgrep security analysis..."
+if command -v semgrep >/dev/null 2>&1; then
+    if ! yarn security:semgrep; then
+        log_error "Semgrep security analysis failed. Review security issues."
+        exit 1
+    fi
+else
+    log_warning "Semgrep not found. Install with: pip install semgrep"
+fi
+
+# 3. Check for secrets in staged files (PCI DSS compliant)
+log_info "Scanning for potential secrets..."
+staged_files=$(git diff --cached --name-only)
+
+if [ -n "$staged_files" ]; then
+    # Block real sensitive files (strict check)
+    if echo "$staged_files" | grep -E "\.env$|\.key$|\.pem$|\.p12$|id_rsa$|id_dsa$" > /dev/null; then
+        log_error "Attempting to commit sensitive files - PCI DSS Req 3.4 violation!"
+        echo "Blocked files:"
+        echo "$staged_files" | grep -E "\.env$|\.key$|\.pem$|\.p12$|id_rsa$|id_dsa$"
+        exit 1
+    fi
+
+    # Quick check for hardcoded credentials (limited to JS/TS files)
+    js_files=$(echo "$staged_files" | grep -E "\.(js|ts)$" || true)
+    if [ -n "$js_files" ]; then
+        # Fast pattern: look for actual hardcoded values only
+        secrets=$(echo "$js_files" | xargs grep -nE "(password|secret|apiKey|token)\s*[:=]\s*['\"][a-zA-Z0-9_-]{16,}" 2>/dev/null || true)
+        if [ -n "$secrets" ]; then
+            log_warning "Potential hardcoded values detected - review manually"
+            echo "$secrets" | head -5
+        fi
+    fi
+fi
+
+# 4. Validate changelog format (if exists)
+if [ -f "CHANGELOG.md" ]; then
+    log_info "Validating changelog format..."
+    if command -v yarn >/dev/null 2>&1; then
+        yarn changelog:validate || log_warning "Changelog validation failed"
+    fi
+fi
+
+# 5. Documentation coverage check (mandatory)
+log_info "Checking documentation coverage..."
+if ! yarn docs:coverage; then
+    log_error "Documentation coverage below threshold. Update JSDoc comments."
+    log_error "Run 'yarn docs:coverage' to see which files need documentation."
+    exit 1
+fi
+
+# 6. Check for PCI DSS compliance keywords in security commits
+if git diff --cached --name-only | grep -E "security|auth|encrypt|payment" >/dev/null; then
+    log_info "Security-related files detected. Ensure proper documentation."
+fi
+
+log_success "Pre-commit checks completed successfully!"

@@ -1,0 +1,657 @@
+<%
+/**
+ * Destinations DataTable Organism
+ * DataTable component for Destinations (Points of Interest) management
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'pois-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/pois';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-map-pin me-2"></i>Destinos
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Gestión de ubicaciones frecuentes</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createPOIBtn">
+                        <i class="ti ti-plus me-1"></i>Nuevo Destino
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="pois-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Tipo de Traslado</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Destination Modal -->
+<div class="modal fade" id="poiModal" tabindex="-1" aria-labelledby="poiModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="poiModalLabel">
+                    <i class="ti ti-map-pin me-2"></i><span id="modalTitle">Crear Nuevo Destino</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="poiModalAlerts"></div>
+
+                <form id="poiForm">
+                    <input type="hidden" id="poiId">
+
+                    <!-- Sección: Información Básica -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Información Básica
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Nombre <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" required maxlength="200" placeholder="Ej: Aeropuerto Internacional de Querétaro">
+                            <div class="form-text">Nombre del destino</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="serviceType" class="form-label">Tipo de Traslado <span class="text-danger">*</span></label>
+                            <select class="form-select" id="serviceType" name="serviceType" required>
+                                <option value="">Seleccionar tipo...</option>
+                            </select>
+                            <div class="form-text">Clasifica el destino según el tipo de servicio</div>
+                        </div>
+                    </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Destino:</strong>
+                            <p class="mb-0 mt-1">Los destinos se usarán para identificar ubicaciones frecuentes como aeropuertos, hoteles, y otros puntos relevantes.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="savePOIBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Destino</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Wait for DOM and all dependencies to be ready
+    function initWhenReady() {
+        // Check if jQuery and DataTables are loaded
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        if (!jQuery.fn.dataTable) {
+            console.warn('DataTables not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        initPOIsTable();
+    }
+
+    function initPOIsTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        // Get JWT token from cookies
+        function getAccessToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Load service types for dropdown
+        function loadServiceTypes() {
+            $.ajax({
+                url: '/api/service-types/active',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const select = $('#serviceType');
+                        select.find('option:not(:first)').remove(); // Clear all except first option
+
+                        response.data.forEach(function(type) {
+                            select.append(new Option(type.label, type.value));
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading service types:', error);
+                }
+            });
+        }
+
+        // Load service types on init
+        loadServiceTypes();
+
+        // Setup global AJAX configuration to include JWT token
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
+        });
+
+        // DataTable Configuration
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint,
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading Destinations:', error);
+                    if (xhr.status === 401) {
+                        showErrorAlert('Sesión expirada. Por favor, inicia sesión nuevamente.');
+                        setTimeout(() => {
+                            window.location.href = '/auth/login';
+                        }, 2000);
+                    } else {
+                        showErrorAlert('Error al cargar los destinos');
+                    }
+                }
+            },
+            columns: [
+                {
+                    data: 'name',
+                    render: function(data) {
+                        return `<div class="fw-semibold">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'serviceType',
+                    render: function(data) {
+                        if (data && data.name) {
+                            return `<span class="badge bg-info">${data.name}</span>`;
+                        }
+                        return '<span class="text-muted">Sin tipo</span>';
+                    }
+                },
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data
+                            ? '<span class="badge bg-success">Activo</span>'
+                            : '<span class="badge bg-secondary">Inactivo</span>';
+                    }
+                },
+                ...(showActions ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+                        if (canEdit) {
+                            // Edit button
+                            actions += `<button type="button"
+                                            class="btn btn-primary edit-poi-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Destino">
+                                            <i class="ti ti-edit"></i>
+                                        </button>`;
+
+                            // Toggle status button - usar iconos más descriptivos
+                            const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                            const statusTitle = data.active ? 'Desactivar Destino' : 'Activar Destino';
+                            const statusClass = data.active ? 'btn-warning' : 'btn-success';
+
+                            actions += `<button type="button"
+                                            class="btn ${statusClass} toggle-status-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-current-status="${data.active}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="${statusTitle}">
+                                            <i class="ti ${statusIcon}"></i>
+                                        </button>`;
+                        }
+
+                        if (canDelete) {
+                            // Delete button
+                            actions += `<button type="button"
+                                            class="btn btn-danger delete-poi-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Eliminar Destino">
+                                            <i class="ti ti-trash"></i>
+                                        </button>`;
+                        }
+
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando destinos...'
+            },
+            order: [[0, 'asc']], // Sort by name by default
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                // Reinitialize tooltips after table redraw
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
+        });
+
+        // Event Handlers
+        $('#createPOIBtn').on('click', function() {
+            openPOIModal();
+        });
+
+        // Edit POI
+        $(`#${tableId}`).on('click', '.edit-poi-btn', function() {
+            const poiId = $(this).data('id');
+            loadPOIData(poiId);
+        });
+
+        // Toggle status
+        $(`#${tableId}`).on('click', '.toggle-status-btn', function() {
+            const poiId = $(this).data('id');
+            const currentStatus = $(this).data('current-status');
+            const poiName = $(this).data('name');
+            togglePOIStatus(poiId, currentStatus, poiName);
+        });
+
+        // Delete POI
+        $(`#${tableId}`).on('click', '.delete-poi-btn', function() {
+            const poiId = $(this).data('id');
+            const poiName = $(this).data('name');
+            deletePOI(poiId, poiName);
+        });
+
+        // Save POI
+        $('#savePOIBtn').on('click', function() {
+            savePOI();
+        });
+
+        // Functions
+        function openPOIModal(isEdit = false) {
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('poiModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+
+            $('#poiModal').modal('show');
+            $('#poiForm')[0].reset();
+            $('#poiId').val('');
+            $('#modalTitle').text(isEdit ? 'Editar Destino' : 'Crear Nuevo Destino');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Destino');
+        }
+
+        function loadPOIData(poiId) {
+            // Open modal first in edit mode (this will reset the form)
+            openPOIModal(true);
+
+            $.ajax({
+                url: `${apiEndpoint}/${poiId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const poi = response.data;
+
+                        // Populate the form with the data
+                        $('#poiId').val(poi.id);
+                        $('#name').val(poi.name);
+                        if (poi.serviceType && poi.serviceType.id) {
+                            $('#serviceType').val(poi.serviceType.id);
+                        }
+                    } else {
+                        showErrorAlert('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', { xhr, status, error });
+                    const errorMessage = xhr.responseJSON?.error || 'Error al cargar el destino';
+                    showModalError(errorMessage);
+                }
+            });
+        }
+
+        function savePOI() {
+            const form = $('#poiForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+
+            const poiId = $('#poiId').val();
+            const isEdit = !!poiId;
+
+            const poiData = {
+                name: $('#name').val().trim(),
+                serviceTypeId: $('#serviceType').val()
+            };
+
+            const url = isEdit ? `${apiEndpoint}/${poiId}` : apiEndpoint;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            $.ajax({
+                url,
+                type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(poiData),
+                success: function(response) {
+                    if (response.success) {
+                        $('#poiModal').modal('hide');
+                        dataTable.ajax.reload();
+                        showSuccessAlert(isEdit ? 'Destino actualizado exitosamente' : 'Destino creado exitosamente');
+                    }
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Error al guardar el destino';
+
+                    if (xhr.responseJSON?.error) {
+                        const error = xhr.responseJSON.error;
+                        if (error.includes('already exists') || error.includes('nombre')) {
+                            errorMessage = 'Ya existe un destino con ese nombre.';
+                        } else if (error.includes('required')) {
+                            errorMessage = 'El nombre es requerido.';
+                        } else {
+                            errorMessage = error;
+                        }
+                    }
+
+                    showModalError(errorMessage);
+                }
+            });
+        }
+
+        function togglePOIStatus(poiId, currentStatus, poiName) {
+            const newStatus = !currentStatus;
+            const action = newStatus ? 'activar' : 'desactivar';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmTogglePOIModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${actionTitle} Destino</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas ${action} el destino <strong>"${poiName}"</strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn ${btnClass}" id="confirmTogglePOIBtn">${actionTitle}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmTogglePOIModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmTogglePOIModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmTogglePOIBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${poiId}/toggle-status`,
+                    type: 'PATCH',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(function() {}, false);
+                            showAlert('success', `Destino ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+                        } else {
+                            modal.hide();
+                            showAlert('danger', response.error || 'Error desconocido');
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error('Toggle error:', xhr);
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado del destino';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        function deletePOI(poiId, poiName) {
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmDeletePOIModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white">Eliminar Destino</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas eliminar el destino <strong>"${poiName}"</strong>?</p>
+                                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeletePOIBtn">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmDeletePOIModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeletePOIModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmDeletePOIBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${poiId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showAlert('success', 'Destino eliminado exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al eliminar el destino';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        /**
+         * Show success alert message
+         * @param {string} message - Success message to display
+         */
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('pois-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        /**
+         * Show error alert inside modal
+         * @param {string} message - Error message to display
+         */
+        function showModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('poiModalAlerts');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+
+        /**
+         * Show error alert message
+         * @param {string} message - Error message to display
+         */
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('pois-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        }
+
+        // Legacy function for backward compatibility
+        function showAlert(type, message) {
+            if (type === 'success') {
+                showSuccessAlert(message);
+            } else {
+                showErrorAlert(message);
+            }
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>

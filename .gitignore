@@ -12,8 +12,11 @@ npm-shrinkwrap.json
 .env
 .env.local
 .env.development
-.env.test
+.env.test                        # CRITICAL: Contains real AWS test credentials (root)
+environments/.env.test           # CRITICAL: Contains real AWS test credentials (environments/)
 .env.production
+*.env.backup
+**/.env.test                     # Prevent .env.test leaks in subdirectories
 
 # IDE
 .vscode/

@@ -124,8 +124,13 @@ function analyzeDocumentation(content) {
         'get', 'set', 'has', 'is', 'can', 'should', 'will'
       ];
 
+      // Filter out conditional keywords (if/else/for/while/switch/catch/try)
+      // These are control flow statements, not function declarations
+      const conditionalKeywords = ['if', 'else', 'for', 'while', 'switch', 'catch', 'try'];
+
       if (!name.startsWith('_') &&
           !skipMethods.includes(name) &&
+          !conditionalKeywords.includes(name) &&
           !skipMethods.some(skip => name.toLowerCase().startsWith(skip.toLowerCase()) && name.length > skip.length + 2)) {
         type = 'function';
         items.push({ name, line: lineNum, type });
@@ -196,7 +201,7 @@ function main() {
   fileResults.forEach((result) => {
     const status = result.coverage >= 80 ? '✅' : result.coverage >= 60 ? '⚠️' : '❌';
     console.log(`${status} ${result.file}: ${result.coverage}% (${result.documented}/${result.total})`);
-    
+
     if (result.undocumented > 0 && result.coverage < 80) {
       result.undocumentedItems.forEach((item) => {
         console.log(`   - Missing: ${item.type} ${item.name} (line ${item.line})`);
@@ -214,8 +219,8 @@ function main() {
   console.log(`Undocumented: ${totalFunctions - totalDocumented}`);
   console.log(`Overall Coverage: ${overallCoverage}%\n`);
   
-  // Set minimum coverage threshold
-  const minCoverage = 60;
+  // Set minimum coverage threshold (100% - all functions documented)
+  const minCoverage = 100;
   
   if (overallCoverage >= minCoverage) {
     console.log(`✅ Documentation coverage meets minimum threshold (${minCoverage}%)`);

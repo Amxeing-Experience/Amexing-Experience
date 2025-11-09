@@ -1,0 +1,155 @@
+<%
+/**
+ * Tom Select Atom
+ * Enhanced select component with search and multi-select capabilities
+ * Uses Tom Select library for improved UX over native select
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Components
+ *
+ * @param {string} id - Select element ID (required)
+ * @param {string} name - Name attribute for form submission
+ * @param {boolean} multiple - Enable multi-select (default: false)
+ * @param {string} placeholder - Placeholder text
+ * @param {number} maxItems - Maximum selectable items (default: null = unlimited)
+ * @param {string} label - Field label text
+ * @param {boolean} required - Mark field as required
+ * @param {string} helpText - Help text below field
+ * @param {array} options - Initial options [{value, text}]
+ * @param {array} selected - Pre-selected values
+ * @param {string} additionalClasses - Additional CSS classes
+ * @param {object} tomSelectConfig - Additional Tom Select configuration
+ *
+ * @example
+ * include('atoms/common/tom-select', {
+ *   id: 'mySelect',
+ *   name: 'items',
+ *   multiple: true,
+ *   placeholder: 'Select items...',
+ *   maxItems: 5,
+ *   label: 'Choose Items',
+ *   options: [{value: '1', text: 'Option 1'}]
+ * })
+ */
+
+// Required parameters
+if (typeof id === 'undefined') {
+    throw new Error('Tom Select component requires an "id" parameter');
+}
+
+// Default parameters
+const selectId = id;
+const selectName = typeof name !== 'undefined' ? name : selectId;
+const selectMultiple = typeof multiple !== 'undefined' ? multiple : false;
+const selectPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Seleccionar...';
+const selectMaxItems = typeof maxItems !== 'undefined' ? maxItems : null;
+const selectLabel = typeof label !== 'undefined' ? label : '';
+const selectRequired = typeof required !== 'undefined' ? required : false;
+const selectHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const selectOptions = typeof options !== 'undefined' ? options : [];
+const selectSelected = typeof selected !== 'undefined' ? selected : [];
+const selectAdditionalClasses = typeof additionalClasses !== 'undefined' ? additionalClasses : '';
+
+// Build Tom Select configuration - all values are server-controlled (no user input)
+const defaultConfig = {
+    plugins: selectMultiple ? ['remove_button'] : [],
+    maxOptions: 1000,
+    hideSelected: selectMultiple,
+    placeholder: selectPlaceholder,
+    maxItems: selectMaxItems !== null ? selectMaxItems : (selectMultiple ? null : 1),
+    highlight: true,
+    searchField: ['text'],
+    valueField: 'value',
+    labelField: 'text',
+    sortField: 'text',
+    closeAfterSelect: !selectMultiple,
+    persist: false
+};
+
+// Merge with custom config
+const customConfig = typeof tomSelectConfig !== 'undefined' ? tomSelectConfig : {};
+const finalConfig = Object.assign({}, defaultConfig, customConfig);
+
+// Generate unique config key for this instance
+const configKey = 'tsconfig_' + selectId.replace(/[^a-zA-Z0-9]/g, '_');
+%>
+
+<div class="mb-3 <%= selectAdditionalClasses %>">
+    <% if (selectLabel) { %>
+        <label for="<%= selectId %>" class="form-label">
+            <%= selectLabel %>
+            <% if (selectRequired) { %><span class="text-danger">*</span><% } %>
+        </label>
+    <% } %>
+
+    <select
+        id="<%= selectId %>"
+        name="<%= selectName %>"
+        <% if (selectMultiple) { %>multiple<% } %>
+        <% if (selectRequired) { %>required<% } %>
+        class="form-select"
+        autocomplete="off">
+
+        <% if (selectOptions && selectOptions.length > 0) { %>
+            <% selectOptions.forEach(function(option) { %>
+                <option
+                    value="<%= option.value %>"
+                    <% if (selectSelected.includes(option.value)) { %>selected<% } %>>
+                    <%= option.text %>
+                </option>
+            <% }); %>
+        <% } %>
+    </select>
+
+    <% if (selectHelpText) { %>
+        <div class="form-text"><%= selectHelpText %></div>
+    <% } %>
+</div>
+
+<script>
+// Store config in global namespace temporarily
+// SAFE: All config values are server-controlled (no user input), JSON.stringify ensures valid JSON
+// nosemgrep
+window.<%= configKey %> = <%- JSON.stringify(finalConfig) %>;
+
+(function() {
+    // Wait for Tom Select library to be loaded
+    function initTomSelect() {
+        if (typeof TomSelect === 'undefined') {
+            setTimeout(initTomSelect, 100);
+            return;
+        }
+
+        const selectElement = document.getElementById('<%= selectId %>');
+        if (!selectElement) {
+            return;
+        }
+
+        // Check if already initialized
+        if (selectElement.tomselect) {
+            return;
+        }
+
+        try {
+            // Get configuration from global namespace (server-side controlled, safe)
+            const config = window.<%= configKey %> || {};
+            const tomSelectInstance = new TomSelect('#<%= selectId %>', config);
+
+            // Store instance reference on the element
+            selectElement.tomselect = tomSelectInstance;
+
+            // Cleanup global config
+            delete window.<%= configKey %>;
+        } catch (error) {
+            console.error('Error initializing Tom Select on #<%= selectId %>:', error);
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTomSelect);
+    } else {
+        initTomSelect();
+    }
+})();
+</script>

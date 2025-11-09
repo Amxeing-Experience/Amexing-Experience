@@ -1,0 +1,702 @@
+<%
+/**
+ * Amexing Employees DataTable Organism
+ * DataTable component for Amexing employee management (employee_amexing role)
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'employees-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/employees';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #ea580c 0%, #f97316 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-users me-2"></i>Gestión de Empleados
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Administra empleados de Amexing</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createEmployeeBtn">
+                        <i class="ti ti-plus me-1"></i>Nuevo Empleado
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Email</th>
+                        <th>Teléfono</th>
+                        <th>Rol</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Employee Modal -->
+<div class="modal fade" id="employeeModal" tabindex="-1" aria-labelledby="employeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="employeeModalLabel">
+                    <i class="ti ti-user-plus me-2"></i><span id="modalTitle">Crear Nuevo Empleado</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="employeeModalAlerts"></div>
+
+                <form id="employeeForm">
+                    <input type="hidden" id="employeeId">
+
+                    <!-- Sección: Información Personal -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-user me-1"></i>
+                            Información Personal
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="firstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="firstName" name="firstName" required maxlength="100" placeholder="Ej: Juan">
+                                <div class="form-text">Nombre del empleado</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="lastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="lastName" name="lastName" required maxlength="100" placeholder="Ej: Pérez García">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email Corporativo <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="email" name="email" required maxlength="255" placeholder="empleado@amexing.com">
+                            <div class="form-text">Email del empleado para acceso al sistema</div>
+                        </div>
+                    </div>
+
+                    <!-- Sección: Asignación de Rol -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-shield-check me-1"></i>
+                            Asignación de Rol
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="role" class="form-label">Rol <span class="text-danger">*</span></label>
+                            <select class="form-select" id="role" name="role" required>
+                                <option value="">Seleccionar rol...</option>
+                                <option value="employee_amexing">Empleado Amexing (Empleado administrativo con acceso completo)</option>
+                                <option value="driver">Conductor (Conductor con acceso a app móvil)</option>
+                            </select>
+                            <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
+                        </div>
+
+                        <!-- Role descriptions -->
+                        <div class="alert alert-info role-description d-none" id="roleDescriptionEmployeeAmexing">
+                            <strong><i class="ti ti-briefcase me-1"></i>Empleado Amexing:</strong>
+                            Empleado administrativo con acceso completo al sistema de gestión.
+                        </div>
+                        <div class="alert alert-warning role-description d-none" id="roleDescriptionDriver">
+                            <strong><i class="ti ti-truck me-1"></i>Conductor:</strong>
+                            Conductor con acceso a la aplicación móvil para gestión de viajes.
+                        </div>
+                    </div>
+
+                    <!-- Sección: Datos Adicionales -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-clipboard me-1"></i>
+                            Datos Adicionales (Opcional)
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="phone" class="form-label">Teléfono de Contacto</label>
+                            <input type="tel" class="form-control" id="phone" name="phone" maxlength="20" placeholder="+52 (999) 123-4567">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="department" class="form-label">Departamento</label>
+                                <input type="text" class="form-control" id="department" name="department" maxlength="100">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="position" class="form-label">Puesto</label>
+                                <input type="text" class="form-control" id="position" name="position" maxlength="100">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="notes" class="form-label">Notas Adicionales</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" maxlength="500" placeholder="Información relevante sobre el empleado..."></textarea>
+                            <div class="form-text">Máximo 500 caracteres</div>
+                            <small id="notesCharCount" class="text-muted float-end">0/500</small>
+                        </div>
+                    </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert" id="passwordInfo">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Acceso al sistema:</strong>
+                            <p class="mb-0 mt-1">Se generará una contraseña temporal automáticamente. El empleado recibirá instrucciones para configurar una nueva contraseña en su primer acceso.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveEmployeeBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Empleado</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Wait for DOM and all dependencies to be ready
+    function initWhenReady() {
+        // Check if jQuery and DataTables are loaded
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        if (!jQuery.fn.dataTable) {
+            console.warn('DataTables not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        // All dependencies loaded, initialize
+        initEmployeesTable();
+    }
+
+    function initEmployeesTable() {
+        const API = '<%= dtApiEndpoint %>';
+        let table;
+
+        table = $('#<%= dtTableId %>').DataTable({
+        processing: true,
+        serverSide: true,
+        deferRender: true,
+        ajax: function(data, callback, settings) {
+            const params = {
+                page: Math.floor(data.start / data.length) + 1,
+                limit: data.length
+            };
+
+            if (data.search.value) {
+                params.search = data.search.value;
+            }
+
+            $.ajax({
+                url: API,
+                type: 'GET',
+                data: params,
+                success: function(json) {
+                    if (!json.success) {
+                        showErrorAlert('Error al cargar los datos de empleados: ' + (json.error || 'Error desconocido'));
+                        callback({
+                            draw: data.draw,
+                            recordsTotal: 0,
+                            recordsFiltered: 0,
+                            data: []
+                        });
+                        return;
+                    }
+
+                    const totalCount = json.data?.pagination?.totalCount || json.data?.pagination?.total || 0;
+                    $('#total-employees-count').text(totalCount);
+
+                    const users = json.data?.users || [];
+
+                    callback({
+                        draw: data.draw,
+                        recordsTotal: totalCount,
+                        recordsFiltered: totalCount,
+                        data: users
+                    });
+                },
+                error: function(xhr, status, error) {
+                    showErrorAlert('Error al cargar los datos de empleados: ' + error);
+                    callback({
+                        draw: data.draw,
+                        recordsTotal: 0,
+                        recordsFiltered: 0,
+                        data: []
+                    });
+                }
+            });
+        },
+        columns: [
+            {
+                data: null,
+                render: function(data, type, row) {
+                    return `<div><strong>${row.firstName || ''} ${row.lastName || ''}</strong></div>`;
+                }
+            },
+            {
+                data: 'email',
+                defaultContent: '-'
+            },
+            {
+                data: 'phone',
+                defaultContent: '-',
+                render: function(data, type, row) {
+                    return data || '-';
+                }
+            },
+            {
+                data: null,
+                render: function(data, type, row) {
+                    const roleLabels = {
+                        employee_amexing: 'Empleado',
+                        driver: 'Conductor'
+                    };
+                    const role = row.role || row.roleId?.name || 'employee_amexing';
+                    const roleName = typeof role === 'string' ? role : role.name || 'employee_amexing';
+                    const roleLabel = roleLabels[roleName] || roleName;
+                    const badgeClass = roleName === 'driver' ? 'bg-warning' : 'bg-secondary';
+                    return `<span class="badge ${badgeClass}">${roleLabel}</span>`;
+                }
+            },
+            {
+                data: 'active',
+                defaultContent: false,
+                render: function(data, type, row) {
+                    if (data) {
+                        return '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activo</span>';
+                    } else {
+                        return '<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Inactivo</span>';
+                    }
+                }
+            },
+            <% if (dtShowActions) { %>
+            {
+                data: null,
+                orderable: false,
+                render: function(data, type, row) {
+                    let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+                    <% if (canEdit) { %>
+                    /* Edit button */
+                    actions += `<button type="button"
+                                class="btn btn-primary edit-btn"
+                                data-id="${row.id || row.objectId}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="Editar">
+                                <i class="ti ti-edit"></i>
+                            </button>`;
+                    <% } %>
+
+                    <% if (canEdit) { %>
+                    /* Toggle status button */
+                    const statusIcon = row.active ? 'ti-user-off' : 'ti-user-check';
+                    const statusTitle = row.active ? 'Desactivar' : 'Activar';
+                    const statusClass = row.active ? 'btn-warning' : 'btn-success';
+
+                    actions += `<button type="button"
+                                class="btn ${statusClass} toggle-btn"
+                                data-id="${row.id || row.objectId}"
+                                data-active="${row.active}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="${statusTitle}">
+                                <i class="ti ${statusIcon}"></i>
+                            </button>`;
+                    <% } %>
+
+                    <% if (canDelete) { %>
+                    /* Delete button */
+                    actions += `<button type="button"
+                                class="btn btn-danger delete-btn"
+                                data-id="${row.id || row.objectId}"
+                                data-employee-name="${row.firstName} ${row.lastName}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="Eliminar">
+                                <i class="ti ti-trash"></i>
+                            </button>`;
+                    <% } %>
+
+                    actions += '</div>';
+                    return actions;
+                }
+            }
+            <% } %>
+        ],
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+        // responsive: true,  // Removed: Bootstrap .table-responsive handles horizontal scroll
+        order: [[0, 'asc']],
+        pagingType: 'full_numbers',
+        language: {
+            processing: "Procesando...",
+            search: "Buscar:",
+            lengthMenu: "Mostrar _MENU_ registros",
+            info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+            infoEmpty: "Mostrando 0 a 0 de 0 registros",
+            infoFiltered: "(filtrado de _MAX_ registros totales)",
+            loadingRecords: "Cargando...",
+            zeroRecords: "No se encontraron registros coincidentes",
+            emptyTable: "No hay datos disponibles en la tabla",
+            paginate: {
+                first: "Primero",
+                previous: "Anterior",
+                next: "Siguiente",
+                last: "Último"
+            }
+        },
+        drawCallback: function(settings) {
+            // Reinitialize tooltips after table redraw
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        }
+    });
+    
+    // Role selector change handler
+    $('#role').on('change', function() {
+        const selectedRole = $(this).val();
+        $('.role-description').addClass('d-none');
+
+        if (selectedRole === 'employee_amexing') {
+            $('#roleDescriptionEmployeeAmexing').removeClass('d-none');
+        } else if (selectedRole === 'driver') {
+            $('#roleDescriptionDriver').removeClass('d-none');
+        }
+    });
+
+    // Notes character counter
+    $('#notes').on('input', function() {
+        const length = $(this).val().length;
+        $('#notesCharCount').text(`${length}/500`);
+    });
+
+    $('#<%= dtTableId %>').on('click', '.edit-btn', function() {
+        const id = $(this).data('id');
+        $.ajax({
+            url: `${API}/${id}`,
+            type: 'GET',
+            success: function(data) {
+                if (data.success) {
+                    const e = data.data.employee;
+                    $('#employeeId').val(e.id || e.objectId);
+                    $('#firstName').val(e.firstName);
+                    $('#lastName').val(e.lastName);
+                    $('#email').val(e.email);
+                    $('#phone').val(e.phone || '');
+                    $('#role').val(e.role || e.roleId?.name || 'employee_amexing');
+                    $('#department').val(e.contextualData?.department || '');
+                    $('#position').val(e.contextualData?.position || '');
+                    $('#notes').val(e.contextualData?.notes || '');
+                    $('#notesCharCount').text(`${(e.contextualData?.notes || '').length}/500`);
+                    $('#modalTitle').text('Editar Empleado');
+                    $('#saveButtonText').text('Actualizar Empleado');
+                    $('#passwordInfo').hide();
+                    $('#role').trigger('change');
+
+                    // Clear any previous modal alerts
+                    const alertsContainer = document.getElementById('employeeModalAlerts');
+                    if (alertsContainer) {
+                        alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+                    }
+
+                    $('#employeeModal').modal('show');
+                }
+            },
+            error: function(xhr) {
+                showModalError(xhr.responseJSON?.error || 'Error al cargar el empleado');
+            }
+        });
+    });
+
+    $('#createEmployeeBtn').click(() => {
+        // Clear any previous modal alerts
+        const alertsContainer = document.getElementById('employeeModalAlerts');
+        if (alertsContainer) {
+            alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+        }
+
+        $('#employeeForm')[0].reset();
+        $('#employeeId').val('');
+        $('#modalTitle').text('Crear Nuevo Empleado');
+        $('#saveButtonText').text('Crear Empleado');
+        $('#notesCharCount').text('0/500');
+        $('.role-description').addClass('d-none');
+        $('#passwordInfo').show();
+        $('#employeeModal').modal('show');
+    });
+
+    $('#saveEmployeeBtn').click(function() {
+        const id = $('#employeeId').val();
+        const data = {
+            firstName: $('#firstName').val(),
+            lastName: $('#lastName').val(),
+            email: $('#email').val(),
+            role: $('#role').val(),
+            phone: $('#phone').val() || null,
+            department: $('#department').val() || null,
+            position: $('#position').val() || null,
+            notes: $('#notes').val() || null
+        };
+
+        // Validate required fields
+        if (!data.firstName || !data.lastName || !data.email || !data.role) {
+            showModalError('Por favor completa todos los campos requeridos');
+            return;
+        }
+
+        $.ajax({
+            url: id ? `${API}/${id}` : API,
+            type: id ? 'PUT' : 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(data),
+            success: function(result) {
+                if (result.success) {
+                    showSuccessAlert(`Empleado ${id?'actualizado':'creado'} exitosamente`);
+                    $('#employeeModal').modal('hide');
+                    table.ajax.reload(null, false);
+                } else {
+                    showModalError(result.error || 'Error al guardar el empleado');
+                }
+            },
+            error: function(xhr) {
+                showModalError(xhr.responseJSON?.error || 'Error al guardar el empleado');
+            }
+        });
+    });
+    
+    $('#<%= dtTableId %>').on('click', '.toggle-btn', function() {
+        const id = $(this).data('id');
+        const active = $(this).data('active');
+        toggleEmployeeStatus(id, active);
+    });
+
+    $('#<%= dtTableId %>').on('click', '.delete-btn', function() {
+        const id = $(this).data('id');
+        const name = $(this).data('employee-name');
+        deleteEmployee(id, name);
+    });
+
+    function toggleEmployeeStatus(employeeId, currentStatus) {
+        const newStatus = !currentStatus;
+        const action = newStatus ? 'activar' : 'desactivar';
+        const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+        const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+        const modalHtml = `
+            <div class="modal fade" id="confirmToggleEmployeeModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">${actionTitle} Empleado</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>¿Estás seguro de que deseas ${action} este empleado?</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn ${btnClass}" id="confirmToggleEmployeeBtn">${actionTitle}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        $('#confirmToggleEmployeeModal').remove();
+        $('body').append(modalHtml);
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('confirmToggleEmployeeModal'));
+        modal.show();
+
+        // Handle confirmation
+        $('#confirmToggleEmployeeBtn').on('click', function() {
+            $.ajax({
+                url: `${API}/${employeeId}/toggle-status`,
+                type: 'PATCH',
+                contentType: 'application/json',
+                data: JSON.stringify({ active: newStatus }),
+                success: function(result) {
+                    if (result.success) {
+                        modal.hide();
+                        table.ajax.reload(null, false);
+                        showSuccessAlert(`Empleado ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+                    } else {
+                        modal.hide();
+                        showErrorAlert(result.error || 'Error al cambiar el estado del empleado');
+                    }
+                },
+                error: function(xhr) {
+                    modal.hide();
+                    const errorMsg = xhr.responseJSON?.error || 'Error al cambiar el estado del empleado';
+                    showErrorAlert(errorMsg);
+                }
+            });
+        });
+    }
+
+    function deleteEmployee(employeeId, employeeName) {
+        const modalHtml = `
+            <div class="modal fade" id="confirmDeleteEmployeeModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title">Eliminar Empleado</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>¿Estás seguro de que deseas eliminar el empleado <strong>"${employeeName}"</strong>?</p>
+                            <p class="text-muted mb-0">Esta acción se puede revertir.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-danger" id="confirmDeleteEmployeeBtn">Eliminar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any (jQuery pattern like POI)
+        $('#confirmDeleteEmployeeModal').remove();
+
+        // Add modal to body (jQuery pattern like POI)
+        $('body').append(modalHtml);
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('confirmDeleteEmployeeModal'));
+        modal.show();
+
+        // Handle confirmation (jQuery pattern like POI)
+        $('#confirmDeleteEmployeeBtn').on('click', function() {
+            $.ajax({
+                url: `${API}/${employeeId}`,
+                type: 'DELETE',
+                success: function(result) {
+                    if (result.success) {
+                        modal.hide();
+                        table.ajax.reload(null, false);
+                        showSuccessAlert(`Empleado "${employeeName}" eliminado exitosamente`);
+                    } else {
+                        modal.hide();
+                        showErrorAlert(result.error || 'Error al eliminar el empleado');
+                    }
+                },
+                error: function(xhr) {
+                    modal.hide();
+                    const error = xhr.responseJSON?.error || 'Error al eliminar el empleado';
+                    showErrorAlert(error);
+                }
+            });
+        });
+    }
+
+    function showModalError(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+
+        const container = document.getElementById('employeeModalAlerts');
+        if (container) {
+            container.querySelectorAll('.alert').forEach(el => el.remove());
+            container.insertAdjacentHTML('afterbegin', alertHtml);
+
+            setTimeout(() => {
+                container.querySelectorAll('.alert').forEach(el => {
+                    el.classList.remove('show');
+                    setTimeout(() => el.remove(), 150);
+                });
+            }, 8000);
+        }
+    }
+
+    function showSuccessAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="ti ti-check-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        document.querySelectorAll('.alert').forEach(el => el.remove());
+        const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
+        cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+        setTimeout(() => {
+            document.querySelectorAll('.alert').forEach(el => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 150);
+            });
+        }, 5000);
+    }
+
+    function showErrorAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        document.querySelectorAll('.alert').forEach(el => el.remove());
+        const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
+        cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+    }
+    }
+
+    // Start initialization when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        // DOM already loaded
+        initWhenReady();
+    }
+})();
+</script>

@@ -319,7 +319,7 @@ async function migrateUsers(createdRoles) {
       'manager': 'department_manager', // Fix inconsistency
       'department_manager': 'department_manager',
       'employee': 'employee',
-      'driver': 'employee_amexing', // Map driver to employee_amexing
+      'driver': 'driver', // Keep driver as separate role
       'guest': 'guest',
       'user': 'guest' // Map generic user to guest
     };
@@ -355,7 +355,7 @@ async function migrateUsers(createdRoles) {
         user.set('roleId', targetRole);
 
         // Set organization based on role
-        if (targetRoleName === 'employee_amexing' || targetRoleName === 'admin' || targetRoleName === 'superadmin') {
+        if (targetRoleName === 'employee_amexing' || targetRoleName === 'driver' || targetRoleName === 'admin' || targetRoleName === 'superadmin') {
           user.set('organizationId', 'amexing');
         }
 
@@ -432,8 +432,8 @@ async function validateMigration() {
       validation.issues.push(`${validation.users.withoutRoleId} users without roleId`);
     }
 
-    if (validation.roles.systemRoles < 7) {
-      validation.issues.push(`Only ${validation.roles.systemRoles} system roles created (expected 7)`);
+    if (validation.roles.systemRoles < 8) {
+      validation.issues.push(`Only ${validation.roles.systemRoles} system roles created (expected 8)`);
     }
 
     logger.success('Migration validation completed', validation);

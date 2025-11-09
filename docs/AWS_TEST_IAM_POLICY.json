@@ -1,0 +1,64 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowTestPrefixListBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket"
+      ],
+      "Resource": "arn:aws:s3:::amexing-bucket",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "test/*",
+            "deleted/test/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "AllowTestPrefixOperations",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject",
+        "s3:GetObjectAcl",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": "arn:aws:s3:::amexing-bucket/test/*"
+    },
+    {
+      "Sid": "AllowCopyToDeletedFolder",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject"
+      ],
+      "Resource": "arn:aws:s3:::amexing-bucket/deleted/test/*"
+    },
+    {
+      "Sid": "DenyProductionAccess",
+      "Effect": "Deny",
+      "Action": "s3:*",
+      "Resource": [
+        "arn:aws:s3:::amexing-bucket/prod/*",
+        "arn:aws:s3:::amexing-bucket/dev/*"
+      ]
+    },
+    {
+      "Sid": "DenyBucketModification",
+      "Effect": "Deny",
+      "Action": [
+        "s3:DeleteBucket",
+        "s3:PutBucketPolicy",
+        "s3:PutBucketAcl",
+        "s3:PutBucketVersioning",
+        "s3:PutBucketLogging",
+        "s3:PutEncryptionConfiguration"
+      ],
+      "Resource": "arn:aws:s3:::amexing-bucket"
+    }
+  ]
+}

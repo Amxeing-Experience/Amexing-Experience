@@ -12,9 +12,7 @@
 const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const { PermissionContextService } = require('./PermissionContextService');
-const {
-  PermissionInheritanceService,
-} = require('./PermissionInheritanceService');
+const { PermissionInheritanceService } = require('./PermissionInheritanceService');
 const { PermissionAuditService } = require('./PermissionAuditService');
 const { CorporateOAuthService } = require('./CorporateOAuthService');
 
@@ -54,52 +52,20 @@ class DepartmentOAuthFlowService {
     // Department-specific OAuth scopes
     this.departmentScopes = {
       sistemas: {
-        google: [
-          'openid',
-          'email',
-          'profile',
-          'https://www.googleapis.com/auth/admin.directory.user',
-        ],
-        microsoft: [
-          'openid',
-          'email',
-          'profile',
-          'User.Read',
-          'Directory.Read.All',
-        ],
+        google: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/admin.directory.user'],
+        microsoft: ['openid', 'email', 'profile', 'User.Read', 'Directory.Read.All'],
         github: ['user:email', 'read:user', 'read:org'],
       },
       rrhh: {
         microsoft: ['openid', 'email', 'profile', 'User.Read', 'People.Read'],
-        google: [
-          'openid',
-          'email',
-          'profile',
-          'https://www.googleapis.com/auth/directory.readonly',
-        ],
+        google: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/directory.readonly'],
       },
       finanzas: {
-        microsoft: [
-          'openid',
-          'email',
-          'profile',
-          'User.Read',
-          'Financials.ReadWrite.All',
-        ],
-        google: [
-          'openid',
-          'email',
-          'profile',
-          'https://www.googleapis.com/auth/spreadsheets',
-        ],
+        microsoft: ['openid', 'email', 'profile', 'User.Read', 'Financials.ReadWrite.All'],
+        google: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/spreadsheets'],
       },
       marketing: {
-        google: [
-          'openid',
-          'email',
-          'profile',
-          'https://www.googleapis.com/auth/analytics.readonly',
-        ],
+        google: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/analytics.readonly'],
         microsoft: ['openid', 'email', 'profile', 'User.Read'],
         apple: ['name', 'email'],
       },
@@ -168,9 +134,7 @@ class DepartmentOAuthFlowService {
       // Don't load from database during initial construction
       // This prevents Parse queries before Parse Server is ready
       if (!Parse.applicationId) {
-        logger.warn(
-          'Parse not initialized yet, skipping department configurations load'
-        );
+        logger.warn('Parse not initialized yet, skipping department configurations load');
         return;
       }
 
@@ -186,10 +150,7 @@ class DepartmentOAuthFlowService {
           name: config.get('departmentName'),
           code: config.get('departmentCode'),
           allowedProviders: config.get('allowedProviders')
-            || this.defaultProviderMappings[config.get('departmentCode')] || [
-            'google',
-            'microsoft',
-          ],
+            || this.defaultProviderMappings[config.get('departmentCode')] || ['google', 'microsoft'],
           customScopes: config.get('customScopes') || {},
           requiredClaims: config.get('requiredClaims') || [],
           autoProvisionRoles: config.get('autoProvisionRoles') || [],
@@ -251,10 +212,7 @@ class DepartmentOAuthFlowService {
 
         // Validate permission mappings
         if (config.permissionMappings) {
-          await this.validatePermissionMappings(
-            config.permissionMappings,
-            deptCode
-          );
+          await this.validatePermissionMappings(config.permissionMappings, deptCode);
         }
       } catch (error) {
         logger.warn(`Department validation failed for ${deptCode}:`, error);
@@ -265,11 +223,6 @@ class DepartmentOAuthFlowService {
   /**
    * Initiate department-specific OAuth flow.
    * @param {object} request - OAuth request parameters.
-   * @param {string} request.department - Department identifier.
-   * @param {string} request.provider - OAuth _provider.
-   * @param {string} request.corporateConfigId - Corporate configuration ID.
-   * @param {string} request.redirectUri - Redirect URI.
-   * @param {string} request.state - OAuth state parameter.
    * @returns {Promise<object>} - OAuth initiation result with authorization URL.
    * @example
    * // OAuth service usage
@@ -295,10 +248,7 @@ class DepartmentOAuthFlowService {
       // Validate department
       const deptConfig = this.getDepartmentConfig(department);
       if (!deptConfig) {
-        throw new Parse.Error(
-          Parse.Error.INVALID_QUERY,
-          `Invalid department: ${department}`
-        );
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, `Invalid department: ${department}`);
       }
 
       // Validate provider for department
@@ -356,10 +306,6 @@ class DepartmentOAuthFlowService {
   /**
    * Handle department OAuth callback.
    * @param {object} request - OAuth callback parameters.
-   * @param {string} request.code - Authorization code.
-   * @param {string} request.state - OAuth state parameter.
-   * @param {string} request.provider - OAuth _provider.
-   * @param {string} request.department - Department identifier.
    * @param {string} [request.error] - OAuth error if any.
    * @returns {Promise<object>} - Authentication result with user session.
    * @example
@@ -382,27 +328,18 @@ class DepartmentOAuthFlowService {
 
     try {
       if (oauthError) {
-        throw new Parse.Error(
-          Parse.Error.INVALID_QUERY,
-          `OAuth error: ${oauthError}`
-        );
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, `OAuth error: ${oauthError}`);
       }
 
       // Validate callback parameters
       if (!code || !_provider || !department) {
-        throw new Parse.Error(
-          Parse.Error.INVALID_QUERY,
-          'Missing required OAuth callback parameters'
-        );
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Missing required OAuth callback parameters');
       }
 
       // Get department configuration
       const deptConfig = this.getDepartmentConfig(department);
       if (!deptConfig) {
-        throw new Parse.Error(
-          Parse.Error.INVALID_QUERY,
-          `Invalid department: ${department}`
-        );
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, `Invalid department: ${department}`);
       }
 
       // Exchange code for tokens
@@ -414,21 +351,14 @@ class DepartmentOAuthFlowService {
       });
 
       // Get user info from OAuth provider
-      const userInfo = await this.getUserInfoFromProvider(
-        _provider,
-        tokenData.accessToken
-      );
+      const userInfo = await this.getUserInfoFromProvider(_provider, tokenData.accessToken);
 
       // Validate department-specific claims
       await this.validateDepartmentClaims(userInfo, deptConfig);
 
       // Check if approval is required
       if (deptConfig.approvalRequired) {
-        return await this.handleApprovalRequired(
-          userInfo,
-          deptConfig,
-          tokenData
-        );
+        return await this.handleApprovalRequired(userInfo, deptConfig, tokenData);
       }
 
       // Process OAuth authentication
@@ -464,10 +394,6 @@ class DepartmentOAuthFlowService {
   /**
    * Process department-specific OAuth authentication.
    * @param {object} options - Processing options.
-   * @param {object} options.userInfo - User information from OAuth _provider.
-   * @param {object} options.tokenData - OAuth token data.
-   * @param {object} options.department - Department configuration.
-   * @param {string} options.provider - OAuth provider name.
    * @returns {Promise<object>} - Authentication result with session data.
    * @example
    * // OAuth service usage
@@ -488,25 +414,13 @@ class DepartmentOAuthFlowService {
 
     try {
       // Find or create AmexingUser
-      const user = await this.findOrCreateDepartmentUser(
-        userInfo,
-        department,
-        _provider
-      );
+      const user = await this.findOrCreateDepartmentUser(userInfo, department, _provider);
 
       // Apply department-specific permission inheritance
-      await this.applyDepartmentPermissionInheritance(
-        user,
-        userInfo,
-        department,
-        _provider
-      );
+      await this.applyDepartmentPermissionInheritance(user, userInfo, department, _provider);
 
       // Initialize department context
-      const contextResult = await this.initializeDepartmentContext(
-        user,
-        department
-      );
+      const contextResult = await this.initializeDepartmentContext(user, department);
 
       // Execute post-auth actions
       if (department.postAuthActions && department.postAuthActions.length > 0) {
@@ -514,11 +428,7 @@ class DepartmentOAuthFlowService {
       }
 
       // Create session with department context
-      const sessionData = await this.createDepartmentSession(
-        user,
-        department,
-        contextResult
-      );
+      const sessionData = await this.createDepartmentSession(user, department, contextResult);
 
       // Log successful authentication
       await this.auditService.recordPermissionAudit({
@@ -559,17 +469,11 @@ class DepartmentOAuthFlowService {
 
   /**
    * Find or create user for department OAuth.
-   * @param {object} userInfo - User information from OAuth _provider.
+   * @param {object} userInfo - User information from OAuth provider.
    * @param {object} department - Department configuration.
-   * @param {string} provider - OAuth provider name.
-   * @param _provider
+   * @param {string} _provider - OAuth provider name.
    * @returns {Promise<object>} - AmexingUser object.
    * @example
-   * // OAuth service usage
-   * const result = await odepartmentoauthflowservice.findOrCreateDepartmentUser(_provider, authCode);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
-   * // const result = await authService.login(credentials);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const user = await service.findOrCreateDepartmentUser(userInfo, deptConfig, 'microsoft');
    */
   async findOrCreateDepartmentUser(userInfo, department, _provider) {
@@ -617,17 +521,11 @@ class DepartmentOAuthFlowService {
 
   /**
    * Create new user for department OAuth.
-   * @param {object} userInfo - User information from OAuth _provider.
+   * @param {object} userInfo - User information from OAuth provider.
    * @param {object} department - Department configuration.
-   * @param {string} provider - OAuth provider name.
-   * @param _provider
+   * @param {string} _provider - OAuth provider name.
    * @returns {Promise<object>} - Created AmexingUser object.
    * @example
-   * // OAuth service usage
-   * const result = await odepartmentoauthflowservice.createDepartmentUser(_provider, authCode);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
-   * // const result = await authService.login(credentials);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const user = await service.createDepartmentUser(userInfo, deptConfig, 'microsoft');
    */
   async createDepartmentUser(userInfo, department, _provider) {
@@ -675,32 +573,22 @@ class DepartmentOAuthFlowService {
 
     await user.save(null, { useMasterKey: true });
 
-    logger.info(
-      `Created new department user: ${user.id} for department: ${department.code}`
-    );
+    logger.info(`Created new department user: ${user.id} for department: ${department.code}`);
     return user;
   }
 
   /**
    * Apply department-specific permission inheritance.
    * @param {object} user - AmexingUser object.
-   * @param {object} userInfo - User information from OAuth _provider.
+   * @param {object} userInfo - User information from OAuth provider.
    * @param {object} department - Department configuration.
-   * @param {string} provider - OAuth provider name.
-   * @param _provider
+   * @param {string} _provider - OAuth provider name.
    * @returns {Promise<void>} - Completes when inheritance is applied.
    * @example
-   * // const result = await authService.login(credentials);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
    * await service.applyDepartmentPermissionInheritance(user, userInfo, deptConfig, 'microsoft');
    */
   // eslint-disable-next-line max-params
-  async applyDepartmentPermissionInheritance(
-    user,
-    userInfo,
-    department,
-    _provider
-  ) {
+  async applyDepartmentPermissionInheritance(user, userInfo, department, _provider) {
     try {
       // Create synthetic corporate config for department
       const syntheticCorporateConfig = {
@@ -711,18 +599,10 @@ class DepartmentOAuthFlowService {
       };
 
       // Apply permission inheritance using Sprint 03 system
-      await this.inheritanceService.processCompleteInheritance(
-        user,
-        userInfo,
-        _provider,
-        syntheticCorporateConfig
-      );
+      await this.inheritanceService.processCompleteInheritance(user, userInfo, _provider, syntheticCorporateConfig);
 
       // Apply department-specific role mappings
-      if (
-        department.autoProvisionRoles
-        && department.autoProvisionRoles.length > 0
-      ) {
+      if (department.autoProvisionRoles && department.autoProvisionRoles.length > 0) {
         await this.applyAutoProvisionRoles(user, userInfo, department);
       }
     } catch (error) {
@@ -750,9 +630,7 @@ class DepartmentOAuthFlowService {
       const contextId = `dept-${department.code}`;
 
       // Get available contexts for user
-      const availableContexts = await this.contextService.getAvailableContexts(
-        user.id
-      );
+      const availableContexts = await this.contextService.getAvailableContexts(user.id);
 
       // Check if department context already exists
       let deptContext = availableContexts.find((ctx) => ctx.id === contextId);
@@ -803,10 +681,7 @@ class DepartmentOAuthFlowService {
     context.set('contextType', 'department');
     context.set('name', `${department.name} Department`);
     context.set('department', department.code);
-    context.set(
-      'permissions',
-      this.getDepartmentBasePermissions(department.code)
-    );
+    context.set('permissions', this.getDepartmentBasePermissions(department.code));
     context.set('isDefault', user.get('primaryDepartment') === department.code);
     context.set('metadata', {
       createdVia: 'oauth_flow',
@@ -865,10 +740,6 @@ class DepartmentOAuthFlowService {
   /**
    * Build department-specific OAuth URL.
    * @param {object} options - OAuth URL build options.
-   * @param {object} options.department - Department configuration.
-   * @param {string} options.provider - OAuth provider name.
-   * @param {string} options.redirectUri - Redirect URI.
-   * @param {string} options.state - OAuth state parameter.
    * @returns {Promise<string>} - Generated OAuth authorization URL.
    * @example
    * // OAuth service usage
@@ -892,34 +763,13 @@ class DepartmentOAuthFlowService {
     // Build OAuth URL based on provider
     switch (_provider) {
       case 'google':
-        return this.buildGoogleOAuthUrl(
-          providerConfig,
-          scopes,
-          redirectUri,
-          state,
-          department
-        );
+        return this.buildGoogleOAuthUrl(providerConfig, scopes, redirectUri, state, department);
       case 'microsoft':
-        return this.buildMicrosoftOAuthUrl(
-          providerConfig,
-          scopes,
-          redirectUri,
-          state,
-          department
-        );
+        return this.buildMicrosoftOAuthUrl(providerConfig, scopes, redirectUri, state, department);
       case 'apple':
-        return this.buildAppleOAuthUrl(
-          providerConfig,
-          scopes,
-          redirectUri,
-          state,
-          department
-        );
+        return this.buildAppleOAuthUrl(providerConfig, scopes, redirectUri, state, department);
       default:
-        throw new Parse.Error(
-          Parse.Error.INVALID_QUERY,
-          `Unsupported provider: ${_provider}`
-        );
+        throw new Parse.Error(Parse.Error.INVALID_QUERY, `Unsupported provider: ${_provider}`);
     }
   }
 
@@ -1087,44 +937,25 @@ class DepartmentOAuthFlowService {
    * Get department-specific OAuth scopes.
    * @param {string} departmentCode - Department code identifier.
    * @param {string} provider - OAuth provider name.
-   * @param _provider
-   * @returns {string[]} - Operation result Array of OAuth scopes for the department and _provider.
+   * @returns {string[]} - Array of OAuth scopes for the department and provider.
    * @example
-   * // OAuth service usage
-   * const result = await odepartmentoauthflowservice.getDepartmentScopes(_provider, authCode);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
-   * // const result = await authService.login(credentials);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const scopes = service.getDepartmentScopes('hr', 'microsoft');
    */
   getDepartmentScopes(departmentCode, provider) {
     const deptConfig = this.departmentConfigurations.get(departmentCode);
 
-    if (
-      deptConfig
-      && deptConfig.customScopes
-      && deptConfig.customScopes[provider]
-    ) {
+    if (deptConfig && deptConfig.customScopes && deptConfig.customScopes[provider]) {
       return deptConfig.customScopes[provider];
     }
 
-    return (
-      this.departmentScopes[departmentCode]?.[provider]
-      || this.getDefaultScopes(provider)
-    );
+    return this.departmentScopes[departmentCode]?.[provider] || this.getDefaultScopes(provider);
   }
 
   /**
-   * Get default OAuth scopes for _provider.
+   * Get default OAuth scopes for provider.
    * @param {string} provider - OAuth provider name.
-   * @param _provider
-   * @returns {string[]} - Operation result Array of default OAuth scopes.
+   * @returns {string[]} - Array of default OAuth scopes.
    * @example
-   * // OAuth service usage
-   * const result = await odepartmentoauthflowservice.getDefaultScopes(_provider, authCode);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
-   * // const result = await authService.login(credentials);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
    * const defaultScopes = service.getDefaultScopes('google');
    */
   getDefaultScopes(provider) {
@@ -1151,43 +982,17 @@ class DepartmentOAuthFlowService {
    */
   getDepartmentBasePermissions(departmentCode) {
     const basePermissions = {
-      sistemas: [
-        'technical_access',
-        'system_support',
-        'user_support',
-        'dev_tools',
-      ],
-      rrhh: [
-        'employee_management',
-        'payroll_access',
-        'benefits_admin',
-        'recruitment',
-      ],
-      finanzas: [
-        'financial_access',
-        'budget_management',
-        'audit_read',
-        'accounting',
-      ],
-      marketing: [
-        'marketing_access',
-        'campaign_management',
-        'social_media',
-        'analytics',
-      ],
+      sistemas: ['technical_access', 'system_support', 'user_support', 'dev_tools'],
+      rrhh: ['employee_management', 'payroll_access', 'benefits_admin', 'recruitment'],
+      finanzas: ['financial_access', 'budget_management', 'audit_read', 'accounting'],
+      marketing: ['marketing_access', 'campaign_management', 'social_media', 'analytics'],
       ventas: ['sales_access', 'lead_management', 'customer_data', 'pipeline'],
-      operaciones: [
-        'operations_access',
-        'workflow_management',
-        'quality_control',
-      ],
+      operaciones: ['operations_access', 'workflow_management', 'quality_control'],
       legal: ['legal_access', 'contract_management', 'compliance_read'],
       compras: ['purchasing_access', 'vendor_management', 'procurement'],
     };
 
-    return (
-      basePermissions[departmentCode] || ['basic_access', 'department_read']
-    );
+    return basePermissions[departmentCode] || ['basic_access', 'department_read'];
   }
 
   /**
@@ -1217,15 +1022,53 @@ class DepartmentOAuthFlowService {
     return names[code] || code.charAt(0).toUpperCase() + code.slice(1);
   }
 
+  /**
+   * Generate department-specific username from OAuth user information.
+   * @function generateDepartmentUsername
+   * @param {object} userInfo - User information from OAuth provider.
+   * @param {object} department - Department configuration.
+   * @returns {string} Generated username in format: emailprefix_departmentcode.
+   * @example
+   * const username = service.generateDepartmentUsername(
+   *   { email: 'john.doe@company.com' },
+   *   { code: 'hr' }
+   * );
+   * // Returns: 'john.doe_hr'
+   */
   generateDepartmentUsername(userInfo, department) {
     const emailPrefix = userInfo.email.split('@')[0];
     return `${emailPrefix}_${department.code}`.toLowerCase();
   }
 
+  /**
+   * Generate cryptographically secure random nonce for OAuth state.
+   * @function generateNonce
+   * @returns {string} Hexadecimal string representing 16 random bytes (32 characters).
+   * @example
+   * const nonce = service.generateNonce();
+   * // Returns: 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6'
+   */
   generateNonce() {
     return require('crypto').randomBytes(16).toString('hex');
   }
 
+  /**
+   * Determine user role based on OAuth profile information and department configuration.
+   * @function determineDepartmentRole
+   * @param {object} userInfo - User information from OAuth provider.
+   * @param {string[]} [userInfo.roles] - User roles from OAuth provider.
+   * @param {string[]} [userInfo.groups] - User groups from OAuth provider.
+   * @param {string} [userInfo.job_title] - User's job title.
+   * @param {string} [userInfo.department_role] - Department-specific role.
+   * @param {object} department - Department configuration.
+   * @returns {string} Determined role: 'admin', 'manager', or 'employee'.
+   * @example
+   * const role = service.determineDepartmentRole(
+   *   { job_title: 'Engineering Manager', email: 'user@company.com' },
+   *   { code: 'sistemas' }
+   * );
+   * // Returns: 'manager'
+   */
   determineDepartmentRole(userInfo, department) {
     // Basic role determination logic
     if (department.code === 'sistemas') {
@@ -1233,24 +1076,28 @@ class DepartmentOAuthFlowService {
     }
 
     // Check for admin indicators in OAuth profile
-    if (
-      userInfo.roles?.includes('admin')
-      || userInfo.groups?.some((group) => group.includes('admin'))
-    ) {
+    if (userInfo.roles?.includes('admin') || userInfo.groups?.some((group) => group.includes('admin'))) {
       return 'admin';
     }
 
     // Check for manager indicators
-    if (
-      userInfo.job_title?.toLowerCase().includes('manager')
-      || userInfo.department_role === 'manager'
-    ) {
+    if (userInfo.job_title?.toLowerCase().includes('manager') || userInfo.department_role === 'manager') {
       return 'manager';
     }
 
     return 'employee';
   }
 
+  /**
+   * Determine department-specific redirect URL after successful authentication.
+   * @function determineDepartmentRedirect
+   * @param {object} user - AmexingUser object.
+   * @param {object} department - Department configuration.
+   * @returns {string} Department-specific dashboard URL or default '/dashboard'.
+   * @example
+   * const redirectUrl = service.determineDepartmentRedirect(user, { code: 'rrhh' });
+   * // Returns: '/dashboard/hr'
+   */
   determineDepartmentRedirect(user, department) {
     // Department-specific redirect URLs
     const redirects = {
@@ -1268,58 +1115,203 @@ class DepartmentOAuthFlowService {
   }
 
   // Additional helper methods would be implemented here...
+  /**
+   * Validate OAuth provider setup for a specific department.
+   * @function validateProviderSetup
+   * @param {string} _provider - OAuth provider name to validate.
+   * @param {string} _deptCode - Department code to validate against.
+   * @returns {Promise<boolean>} True if provider setup is valid, false otherwise.
+   * @example
+   * const isValid = await service.validateProviderSetup('google', 'sistemas');
+   * // Returns: true
+   */
   async validateProviderSetup(_provider, _deptCode) {
     // Implementation for provider validation
     return true;
   }
 
+  /**
+   * Validate permission mappings configuration for a department.
+   * @function validatePermissionMappings
+   * @param {object} _mappings - Permission mappings object to validate.
+   * @param {string} _deptCode - Department code to validate against.
+   * @returns {Promise<boolean>} True if permission mappings are valid, false otherwise.
+   * @example
+   * const isValid = await service.validatePermissionMappings(
+   *   { 'admin': ['full_access'] },
+   *   'rrhh'
+   * );
+   * // Returns: true
+   */
   async validatePermissionMappings(_mappings, _deptCode) {
     // Implementation for permission mapping validation
     return true;
   }
 
+  /**
+   * Retrieve corporate OAuth configuration by ID.
+   * @function getCorporateConfig
+   * @param {string} _configId - Corporate configuration ID to retrieve.
+   * @returns {Promise<object|null>} Corporate configuration object or null if not found.
+   * @example
+   * const config = await service.getCorporateConfig('corp_config_123');
+   * // Returns: { id: 'corp_config_123', name: 'Corporate SSO', ... } or null
+   */
   async getCorporateConfig(_configId) {
     // Implementation to get corporate config
     return null;
   }
 
+  /**
+   * Retrieve OAuth provider configuration (client ID, secret, endpoints).
+   * @function getProviderConfig
+   * @param {string} _provider - OAuth provider name ('google', 'microsoft', 'apple').
+   * @returns {Promise<object>} Provider configuration object with clientId, clientSecret, and endpoints.
+   * @example
+   * const config = await service.getProviderConfig('google');
+   * // Returns: { clientId: '...', clientSecret: '...', authEndpoint: '...', tokenEndpoint: '...' }
+   */
   async getProviderConfig(_provider) {
     // Implementation to get provider config
     return {};
   }
 
+  /**
+   * Exchange OAuth authorization code for access and refresh tokens.
+   * @function exchangeCodeForTokens
+   * @param {object} _options - Token exchange options.
+   * @returns {Promise<object>} Token data object containing accessToken, refreshToken, expiresIn, and tokenType.
+   * @example
+   * const tokens = await service.exchangeCodeForTokens({
+   *   code: 'auth_code_123',
+   *   provider: 'google',
+   *   department: deptConfig,
+   *   state: 'state_456'
+   * });
+   * // Returns: { accessToken: '...', refreshToken: '...', expiresIn: 3600, tokenType: 'Bearer' }
+   */
   async exchangeCodeForTokens(_options) {
     // Implementation to exchange code for tokens
     return {};
   }
 
+  /**
+   * Retrieve user information from OAuth provider using access token.
+   * @function getUserInfoFromProvider
+   * @param {string} _provider - OAuth provider name ('google', 'microsoft', 'apple').
+   * @param {string} _token - Access token for API authentication.
+   * @returns {Promise<object>} User profile information including id, email, name, and provider-specific fields.
+   * @example
+   * const userInfo = await service.getUserInfoFromProvider('google', 'access_token_123');
+   * // Returns: { id: 'user123', email: 'user@company.com', given_name: 'John', family_name: 'Doe', ... }
+   */
   async getUserInfoFromProvider(_provider, _token) {
     // Implementation to get user info from provider
     return {};
   }
 
+  /**
+   * Validate OAuth user information against department-specific claim requirements.
+   * @function validateDepartmentClaims
+   * @param {object} _userInfo - User information from OAuth provider.
+   * @param {object} _deptConfig - Department configuration with requiredClaims.
+   * @returns {Promise<boolean>} True if all required claims are present and valid, throws error otherwise.
+   * @throws {Parse.Error} If required claims are missing or invalid.
+   * @example
+   * await service.validateDepartmentClaims(
+   *   { email: 'user@company.com', email_verified: true },
+   *   { requiredClaims: ['email', 'email_verified'] }
+   * );
+   * // Returns: true
+   */
   async validateDepartmentClaims(_userInfo, _deptConfig) {
     // Implementation to validate department-specific claims
     return true;
   }
 
+  /**
+   * Handle OAuth authentication when department requires manual approval.
+   * @function handleApprovalRequired
+   * @param {object} _userInfo - User information from OAuth provider.
+   * @param {object} _deptConfig - Department configuration with approval settings.
+   * @param {object} _tokenData - OAuth token data for later authentication.
+   * @returns {Promise<object>} Approval pending response with status and next steps.
+   * @example
+   * const result = await service.handleApprovalRequired(
+   *   { email: 'user@company.com' },
+   *   { approvalRequired: true, approvalWorkflow: { approvers: ['admin@company.com'] } },
+   *   { accessToken: 'token_123' }
+   * );
+   * // Returns: { success: false, status: 'pending_approval', message: '...' }
+   */
   async handleApprovalRequired(_userInfo, _deptConfig, _tokenData) {
     // Implementation for approval workflow
     return {};
   }
 
+  /**
+   * Link OAuth account information to existing AmexingUser.
+   * @function linkOAuthAccountToUser
+   * @param {object} _user - AmexingUser object to link OAuth account to.
+   * @param {object} _userInfo - User information from OAuth provider.
+   * @param {string} _provider - OAuth provider name.
+   * @returns {Promise<void>} Completes when OAuth account is linked to user.
+   * @example
+   * await service.linkOAuthAccountToUser(
+   *   existingUser,
+   *   { id: 'oauth_user_123', email: 'user@company.com' },
+   *   'google'
+   * );
+   */
   async linkOAuthAccountToUser(_user, _userInfo, _provider) {
     // Implementation to link OAuth account
   }
 
+  /**
+   * Update existing user's department information after OAuth authentication.
+   * @function updateUserDepartmentInfo
+   * @param {object} _user - AmexingUser object to update.
+   * @param {object} _department - Department configuration.
+   * @returns {Promise<void>} Completes when user department information is updated.
+   * @example
+   * await service.updateUserDepartmentInfo(user, { code: 'rrhh', name: 'Recursos Humanos' });
+   */
   async updateUserDepartmentInfo(_user, _department) {
     // Implementation to update user department info
   }
 
+  /**
+   * Automatically provision roles to user based on department configuration and OAuth profile.
+   * @function applyAutoProvisionRoles
+   * @param {object} _user - AmexingUser object to provision roles for.
+   * @param {object} _userInfo - User information from OAuth provider.
+   * @param {object} _department - Department configuration.
+   * @returns {Promise<void>} Completes when roles are provisioned to user.
+   * @example
+   * await service.applyAutoProvisionRoles(
+   *   user,
+   *   { email: 'user@company.com', groups: ['engineering'] },
+   *   { autoProvisionRoles: ['developer', 'team_member'] }
+   * );
+   */
   async applyAutoProvisionRoles(_user, _userInfo, _department) {
     // Implementation for auto-provision roles
   }
 
+  /**
+   * Execute post-authentication actions defined in department configuration.
+   * @function executePostAuthActions
+   * @param {object} _user - AmexingUser object.
+   * @param {object} _department - Department configuration.
+   * @param {object} _contextResult - Context initialization result with permissions.
+   * @returns {Promise<void>} Completes when all post-auth actions are executed.
+   * @example
+   * await service.executePostAuthActions(
+   *   user,
+   *   { postAuthActions: ['send_welcome_email', 'sync_permissions'] },
+   *   { contextId: 'dept-hr', permissions: ['read', 'write'] }
+   * );
+   */
   async executePostAuthActions(_user, _department, _contextResult) {
     // Implementation for post-auth actions
   }

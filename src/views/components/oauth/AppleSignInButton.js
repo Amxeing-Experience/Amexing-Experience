@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Apple Sign In Button Component - Native Apple ID authentication with privacy compliance.
  * Provides secure Apple Sign In integration with corporate department flows, mobile
@@ -20,7 +21,7 @@
  * - Graceful degradation for unsupported browsers.
  * @class AppleSignInButton
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -56,6 +57,18 @@
  */
 
 class AppleSignInButton {
+  /**
+   * Creates a new AppleSignInButton instance with the specified configuration.
+   * Initializes the Apple Sign In component with OAuth settings, department configuration,
+   * and event handlers for authentication flow management.
+   * @class
+   * @param {object} options - Configuration options for Apple Sign In.
+   * @example
+   * const appleButton = new AppleSignInButton({
+   *   clientId: 'com.amexing.service',
+   *   onSuccess: (response) => console.log('Success:', response)
+   * });
+   */
   constructor(options = {}) {
     this.options = {
       clientId: options.clientId || window.APPLE_CLIENT_ID,
@@ -80,7 +93,17 @@ class AppleSignInButton {
     this.init();
   }
 
+  /**
+   * Initializes the Apple Sign In component by loading the SDK and setting up authentication.
+   * Checks for Apple ID support and loads the Apple ID SDK, then configures the authentication flow.
+   * @function init
+   * @returns {void}
+   * @example
+   * const button = new AppleSignInButton(options);
+   * // init() is called automatically in constructor
+   */
   init() {
+    // Check if Apple ID is supported
     if (!this.supportsAppleID) {
       // eslint-disable-next-line no-console
       console.warn('Apple ID is not supported in this browser');
@@ -99,18 +122,49 @@ class AppleSignInButton {
       });
   }
 
+  /**
+   * Detects if the current device is an Apple device based on user agent.
+   * Checks for iPhone, iPad, iPod, Mac, or Safari in the browser user agent string.
+   * @function detectAppleDevice
+   * @returns {boolean} - True if device is detected as Apple device, false otherwise.
+   * @example
+   * const isApple = this.detectAppleDevice();
+   * // Returns: true on Mac/iPhone/iPad, false on Windows/Android
+   */
   detectAppleDevice() {
     const { userAgent } = navigator;
     return /iPhone|iPad|iPod|Mac|Safari/i.test(userAgent);
   }
 
+  /**
+   * Checks if the browser supports Apple ID authentication.
+   * Verifies if the AppleID SDK is available in the window object or if the device is an Apple device.
+   * @function checkAppleIDSupport
+   * @returns {boolean} - True if Apple ID is supported, false otherwise.
+   * @example
+   * const isSupported = this.checkAppleIDSupport();
+   * // Returns: true if AppleID SDK available or on Apple device
+   */
   checkAppleIDSupport() {
     // Check if browser supports Apple ID
     return 'AppleID' in window || this.isAppleDevice;
   }
 
+  /**
+   * Asynchronously loads the Apple ID SDK from Apple's CDN.
+   * Creates a script element, injects it into the document head, and waits for the SDK to load.
+   * Includes a 10-second timeout fallback to prevent indefinite waiting.
+   * @async
+   * @function loadAppleIDSDK
+   * @returns {Promise<void>} - Promise that resolves when SDK is loaded, rejects on error or timeout.
+   * @throws {Error} - Throws error if SDK fails to load or timeout occurs.
+   * @example
+   * await this.loadAppleIDSDK();
+   * // window.AppleID is now available
+   */
   async loadAppleIDSDK() {
     return new Promise((resolve, reject) => {
+      // Check if SDK already loaded
       if (window.AppleID) {
         resolve();
         return;
@@ -144,9 +198,20 @@ class AppleSignInButton {
     });
   }
 
+  /**
+   * Configures and initializes the Apple ID SDK with authentication parameters.
+   * Generates cryptographic state and nonce for CSRF protection, initializes the Apple ID SDK,
+   * and creates the sign-in button with proper configuration.
+   * @async
+   * @function setupAppleID
+   * @returns {Promise<void>} - Promise that resolves when setup is complete.
+   * @example
+   * await this.setupAppleID();
+   * // Apple ID SDK is now configured and button is rendered
+   */
   async setupAppleID() {
     try {
-      // Generate state and nonce
+      // Generate state and nonce for CSRF protection
       this.state = this.generateRandomString(32);
       this.nonce = this.generateRandomString(32);
 
@@ -154,9 +219,7 @@ class AppleSignInButton {
       AppleID.auth.init({
         clientId: this.options.clientId,
         scope: this.options.scope,
-        redirectURI:
-          this.options.redirectUri
-          || `${window.location.origin}/auth/oauth/apple/callback`,
+        redirectURI: this.options.redirectUri || `${window.location.origin}/auth/oauth/apple/callback`,
         state: this.state,
         nonce: this.nonce,
         usePopup: this.options.usePopup,
@@ -170,6 +233,16 @@ class AppleSignInButton {
     }
   }
 
+  /**
+   * Creates and renders the Apple Sign In button in the DOM.
+   * Finds or creates a container element, clears existing content, and renders either
+   * the native Apple ID button or a fallback button based on browser support.
+   * @function createSignInButton
+   * @returns {void}
+   * @example
+   * this.createSignInButton();
+   * // Apple Sign In button is now rendered in the DOM
+   */
   createSignInButton() {
     // Find or create container
     const container = document.getElementById('apple-signin-container')
@@ -179,16 +252,27 @@ class AppleSignInButton {
     // Clear existing content
     container.innerHTML = '';
 
+    // Render appropriate button type
     if (this.supportsAppleID && window.AppleID) {
-      this.createNativeAppleButton(_container); // eslint-disable-line no-undef
+      this.createNativeAppleButton(container);
     } else {
-      this.createFallbackButton(_container); // eslint-disable-line no-undef
+      this.createFallbackButton(container);
     }
 
     // Add mobile optimizations
-    this.applyMobileOptimizations(_container); // eslint-disable-line no-undef
+    this.applyMobileOptimizations(container);
   }
 
+  /**
+   * Creates a new DOM container for the Apple Sign In button.
+   * Generates a div element with appropriate ID and classes, then appends it to
+   * the OAuth providers container or document body as a fallback.
+   * @function createButtonContainer
+   * @returns {HTMLDivElement} - The created container element.
+   * @example
+   * const container = this.createButtonContainer();
+   * // Returns: <div id="apple-signin-container" class="apple-signin-container oauth-provider-apple">
+   */
   createButtonContainer() {
     const container = document.createElement('div');
     container.id = 'apple-signin-container';
@@ -197,37 +281,42 @@ class AppleSignInButton {
     // Find OAuth providers container
     const providersContainer = document.querySelector('.oauth-providers');
     if (providersContainer) {
-      providersContainer.appendChild(_container); // eslint-disable-line no-undef
+      providersContainer.appendChild(container);
     } else {
-      document.body.appendChild(_container); // eslint-disable-line no-undef
+      document.body.appendChild(container);
     }
 
     return container;
   }
 
-  createNativeAppleButton(_container) {
+  /**
+   * Creates and renders the native Apple ID sign-in button using the Apple SDK.
+   * Configures the official Apple button with proper styling attributes, renders it using
+   * the AppleID SDK, and attaches success/failure event listeners.
+   * @function createNativeAppleButton
+   * @param {HTMLElement} container - The container element to append the button to.
+   * @returns {void}
+   * @example
+   * this.createNativeAppleButton(containerElement);
+   * // Native Apple ID button is rendered with SDK
+   */
+  createNativeAppleButton(container) {
     // Create Apple ID sign-in button
     const buttonDiv = document.createElement('div');
     buttonDiv.id = 'appleid-signin';
     buttonDiv.className = 'apple-signin-button native';
 
     // Apple's official button styling attributes
-    buttonDiv.setAttribute(
-      'data-color',
-      this.isAppleDevice ? 'black' : 'white'
-    );
+    buttonDiv.setAttribute('data-color', this.isAppleDevice ? 'black' : 'white');
     buttonDiv.setAttribute('data-border', 'true');
     buttonDiv.setAttribute('data-type', 'sign-in');
     buttonDiv.setAttribute('data-border-radius', '12');
     buttonDiv.setAttribute('data-size', 'medium');
-    buttonDiv.setAttribute(
-      'data-logo-color',
-      this.isAppleDevice ? 'white' : 'black'
-    );
+    buttonDiv.setAttribute('data-logo-color', this.isAppleDevice ? 'white' : 'black');
 
-    container.appendChild(buttonDiv); // eslint-disable-line no-undef
+    container.appendChild(buttonDiv);
 
-    // Render the button
+    // Render the button using Apple SDK
     try {
       AppleID.auth.renderButton(buttonDiv, {
         color: this.isAppleDevice ? 'black' : 'white',
@@ -239,22 +328,27 @@ class AppleSignInButton {
       });
 
       // Add event listeners
-      document.addEventListener(
-        'AppleIDSignInOnSuccess',
-        this.handleSuccess.bind(this)
-      );
-      document.addEventListener(
-        'AppleIDSignInOnFailure',
-        this.handleError.bind(this)
-      );
+      document.addEventListener('AppleIDSignInOnSuccess', this.handleSuccess.bind(this));
+      document.addEventListener('AppleIDSignInOnFailure', this.handleError.bind(this));
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error('Failed to render Apple button:', error);
-      this.createFallbackButton(_container);
+      this.createFallbackButton(container);
     }
   }
 
-  createFallbackButton(_container) {
+  /**
+   * Creates a fallback Apple Sign In button for browsers without native Apple ID support.
+   * Builds a custom button with Apple branding, proper styling, click handlers,
+   * and mobile touch optimizations for cross-platform compatibility.
+   * @function createFallbackButton
+   * @param {HTMLElement} container - The container element to append the button to.
+   * @returns {void}
+   * @example
+   * this.createFallbackButton(containerElement);
+   * // Custom Apple-styled button is rendered
+   */
+  createFallbackButton(container) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'oauth-btn apple-signin-fallback';
@@ -311,9 +405,20 @@ class AppleSignInButton {
       });
     }
 
-    container.appendChild(button); // eslint-disable-line no-undef
+    container.appendChild(button);
   }
 
+  /**
+   * Returns the Apple logo icon as an SVG string.
+   * Provides the official Apple logo SVG markup for use in fallback buttons.
+   * Note: This method is deprecated in favor of createAppleIconSVG() for XSS prevention.
+   * @function getAppleIcon
+   * @returns {string} - SVG markup string for the Apple logo.
+   * @deprecated Use createAppleIconSVG() instead for safer DOM manipulation.
+   * @example
+   * const iconSVG = this.getAppleIcon();
+   * // Returns: "<svg width="18" height="22"...>...</svg>"
+   */
   getAppleIcon() {
     return `
             <svg width="18" height="22" viewBox="0 0 814 1000" style="fill: currentColor;">
@@ -322,6 +427,16 @@ class AppleSignInButton {
         `;
   }
 
+  /**
+   * Creates the Apple logo icon as an SVG DOM element.
+   * Programmatically builds an SVG element with the official Apple logo path,
+   * preventing XSS vulnerabilities by avoiding innerHTML usage.
+   * @function createAppleIconSVG
+   * @returns {SVGElement} - SVG DOM element containing the Apple logo.
+   * @example
+   * const svgElement = this.createAppleIconSVG();
+   * iconContainer.appendChild(svgElement);
+   */
   createAppleIconSVG() {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('width', '18');
@@ -339,6 +454,17 @@ class AppleSignInButton {
     return svg;
   }
 
+  /**
+   * Applies mobile-specific optimizations and responsive styling to the button container.
+   * Injects CSS for touch interactions, responsive sizing, and dark mode support
+   * when the oauthMobileOptimizer is available.
+   * @function applyMobileOptimizations
+   * @param {HTMLElement} _container - The container element to optimize.
+   * @returns {void}
+   * @example
+   * this.applyMobileOptimizations(containerElement);
+   * // Mobile-optimized styles are applied
+   */
   applyMobileOptimizations(_container) {
     if (!window.oauthMobileOptimizer) return;
 
@@ -349,7 +475,7 @@ class AppleSignInButton {
                 width: 100%;
                 margin-bottom: 12px;
             }
-            
+
             .apple-signin-button,
             .apple-signin-fallback {
                 width: 100%;
@@ -357,7 +483,7 @@ class AppleSignInButton {
                 -webkit-tap-highlight-color: transparent;
                 touch-action: manipulation;
             }
-            
+
             @media (max-width: 768px) {
                 .apple-signin-button,
                 .apple-signin-fallback {
@@ -366,7 +492,7 @@ class AppleSignInButton {
                     border-radius: 12px;
                 }
             }
-            
+
             @media (prefers-color-scheme: dark) {
                 .apple-signin-fallback {
                     background: #1c1c1e !important;
@@ -382,6 +508,18 @@ class AppleSignInButton {
     }
   }
 
+  /**
+   * Handles the fallback button click event to initiate Apple OAuth flow.
+   * Calls the backend API to generate an Apple authorization URL, displays loading state,
+   * and redirects to Apple's authentication page on success.
+   * @async
+   * @function handleFallbackClick
+   * @param {Event} event - The click event object.
+   * @returns {Promise<void>} - Promise that resolves when OAuth flow is initiated.
+   * @example
+   * button.addEventListener('click', this.handleFallbackClick.bind(this));
+   * // User is redirected to Apple authorization page
+   */
   async handleFallbackClick(event) {
     event.preventDefault();
 
@@ -393,8 +531,7 @@ class AppleSignInButton {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Parse-Application-Id':
-            window.Parse?.applicationId || process.env.PARSE_APP_ID,
+          'X-Parse-Application-Id': window.Parse?.applicationId || process.env.PARSE_APP_ID,
         },
         body: JSON.stringify({
           department: this.options.department,
@@ -405,6 +542,7 @@ class AppleSignInButton {
 
       const data = await response.json();
 
+      // Check for successful response
       if (data.success && data.authUrl) {
         // Redirect to Apple authorization
         window.location.href = data.authUrl;
@@ -419,6 +557,17 @@ class AppleSignInButton {
     }
   }
 
+  /**
+   * Handles successful Apple authentication response from the native SDK.
+   * Extracts user data and authorization information from the event detail,
+   * then invokes the onSuccess callback with formatted response data.
+   * @function handleSuccess
+   * @param {Event} event - The AppleIDSignInOnSuccess event object.
+   * @returns {void}
+   * @example
+   * document.addEventListener('AppleIDSignInOnSuccess', this.handleSuccess.bind(this));
+   * // onSuccess callback is invoked with authentication data
+   */
   handleSuccess(event) {
     const { detail } = event;
 
@@ -437,9 +586,21 @@ class AppleSignInButton {
     }
   }
 
+  /**
+   * Handles Apple authentication errors from the native SDK.
+   * Distinguishes between user cancellation and actual errors, invoking
+   * the appropriate callback (onCancel or onError) based on error type.
+   * @function handleError
+   * @param {Event} event - The AppleIDSignInOnFailure event object.
+   * @returns {void}
+   * @example
+   * document.addEventListener('AppleIDSignInOnFailure', this.handleError.bind(this));
+   * // onError or onCancel callback is invoked
+   */
   handleError(event) {
     const { detail } = event;
 
+    // Check if user cancelled the authentication
     if (detail.error === 'popup_closed_by_user') {
       this.options.onCancel();
     } else {
@@ -449,6 +610,17 @@ class AppleSignInButton {
     }
   }
 
+  /**
+   * Displays a loading spinner on the button during authentication processing.
+   * Disables the button, hides text by making it transparent, and adds an animated
+   * loading spinner to indicate processing state.
+   * @function showLoading
+   * @param {HTMLElement} button - The button element to show loading state on.
+   * @returns {void}
+   * @example
+   * this.showLoading(buttonElement);
+   * // Button shows loading spinner and is disabled
+   */
   showLoading(button) {
     if (!button) return;
 
@@ -474,6 +646,16 @@ class AppleSignInButton {
     button.appendChild(spinner);
   }
 
+  /**
+   * Removes the loading spinner and restores the button to its normal state.
+   * Re-enables the button, restores text color, and removes the loading spinner element.
+   * @function hideLoading
+   * @param {HTMLElement} button - The button element to hide loading state on.
+   * @returns {void}
+   * @example
+   * this.hideLoading(buttonElement);
+   * // Button returns to normal state without spinner
+   */
   hideLoading(button) {
     if (!button) return;
 
@@ -486,16 +668,36 @@ class AppleSignInButton {
     }
   }
 
+  /**
+   * Generates a cryptographically secure random string for state and nonce values.
+   * Uses the Web Crypto API to create random bytes and converts them to a hexadecimal string
+   * for CSRF protection in OAuth flows.
+   * @function generateRandomString
+   * @param {number} length - The desired length of the random byte array.
+   * @returns {string} - Hexadecimal string representation of random bytes (length * 2 characters).
+   * @example
+   * const state = this.generateRandomString(32);
+   * // Returns: "a1b2c3d4e5f6..." (64 hex characters from 32 bytes)
+   */
   generateRandomString(length) {
     const array = new Uint8Array(length);
     crypto.getRandomValues(array);
-    return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join(
-      ''
-    );
+    return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('');
   }
 
+  /**
+   * Refreshes the Apple Sign In button by reinitializing the SDK and re-rendering the button.
+   * Useful for updating the button when configuration options change or to recover from errors.
+   * @async
+   * @function refresh
+   * @returns {Promise<void>} - Promise that resolves when refresh is complete.
+   * @example
+   * await appleButton.refresh();
+   * // Button is re-rendered with current configuration
+   */
   async refresh() {
     try {
+      // Check if Apple ID SDK is available
       if (window.AppleID && this.supportsAppleID) {
         await this.setupAppleID();
         this.createSignInButton();
@@ -506,23 +708,73 @@ class AppleSignInButton {
     }
   }
 
+  /**
+   * Sets the department identifier for corporate authentication flows.
+   * Updates the department option used in OAuth requests for department-specific configurations.
+   * @function setDepartment
+   * @param {string} department - The department identifier to set.
+   * @returns {void}
+   * @example
+   * appleButton.setDepartment('engineering');
+   * // Department is set for subsequent authentication requests
+   */
   setDepartment(department) {
     this.options.department = department;
   }
 
+  /**
+   * Sets the corporate configuration ID for enterprise authentication flows.
+   * Updates the corporate config option used in OAuth requests for organization-specific settings.
+   * @function setCorporateConfig
+   * @param {string} corporateConfigId - The corporate configuration ID to set.
+   * @returns {void}
+   * @example
+   * appleButton.setCorporateConfig('corp-config-123');
+   * // Corporate config is set for subsequent authentication requests
+   */
   setCorporateConfig(corporateConfigId) {
     this.options.corporateConfigId = corporateConfigId;
   }
 
+  /**
+   * Updates component options and refreshes the button to reflect changes.
+   * Merges new options with existing configuration and triggers a button refresh.
+   * @function updateOptions
+   * @param {object} newOptions - New options to merge with existing configuration.
+   * @returns {void}
+   * @example
+   * appleButton.updateOptions({ department: 'sales', locale: 'es_ES' });
+   * // Options are updated and button is refreshed
+   */
   updateOptions(newOptions) {
     this.options = { ...this.options, ...newOptions };
     this.refresh();
   }
 
+  /**
+   * Checks if Apple Sign In is available in the current environment.
+   * Returns the cached support status determined during component initialization.
+   * @function isAvailable
+   * @returns {boolean} - True if Apple Sign In is supported, false otherwise.
+   * @example
+   * if (appleButton.isAvailable()) {
+   *   // Apple Sign In is available
+   * }
+   */
   isAvailable() {
     return this.supportsAppleID;
   }
 
+  /**
+   * Returns detailed information about the Apple OAuth provider.
+   * Provides metadata including availability, native support, privacy features,
+   * and recommendations for the current environment.
+   * @function getProviderInfo
+   * @returns {object} Provider information object with name, displayName, available, native, privacyCompliant, supportsPrivateEmail, and recommended properties.
+   * @example
+   * const info = appleButton.getProviderInfo();
+   * // Returns: { name: 'apple', displayName: 'Apple', available: true, ... }
+   */
   getProviderInfo() {
     return {
       name: 'apple',
@@ -535,16 +787,19 @@ class AppleSignInButton {
     };
   }
 
+  /**
+   * Destroys the component and cleans up all resources, event listeners, and DOM elements.
+   * Removes event listeners, button container, and injected styles to prevent memory leaks.
+   * @function destroy
+   * @returns {void}
+   * @example
+   * appleButton.destroy();
+   * // All component resources are cleaned up
+   */
   destroy() {
     // Clean up event listeners
-    document.removeEventListener(
-      'AppleIDSignInOnSuccess',
-      this.handleSuccess.bind(this)
-    );
-    document.removeEventListener(
-      'AppleIDSignInOnFailure',
-      this.handleError.bind(this)
-    );
+    document.removeEventListener('AppleIDSignInOnSuccess', this.handleSuccess.bind(this));
+    document.removeEventListener('AppleIDSignInOnFailure', this.handleError.bind(this));
 
     // Remove button container
     const container = document.getElementById('apple-signin-container');
@@ -562,12 +817,32 @@ class AppleSignInButton {
     console.log('Apple Sign In component destroyed');
   }
 
-  // Static method for quick initialization
+  /**
+   * Static factory method for quick component initialization.
+   * Creates and returns a new AppleSignInButton instance with the provided options.
+   * @static
+   * @function create
+   * @param {object} options - Configuration options for the component.
+   * @returns {AppleSignInButton} New AppleSignInButton instance.
+   * @example
+   * const button = AppleSignInButton.create({ clientId: 'com.example.app' });
+   * // New instance is created and initialized
+   */
   static create(options = {}) {
     return new AppleSignInButton(options);
   }
 
-  // Static method to check availability
+  /**
+   * Static method to check if Apple Sign In is supported in the current environment.
+   * Checks for AppleID SDK availability or Apple device user agent without creating an instance.
+   * @static
+   * @function isSupported
+   * @returns {boolean} - True if Apple Sign In is supported, false otherwise.
+   * @example
+   * if (AppleSignInButton.isSupported()) {
+   *   const button = AppleSignInButton.create(options);
+   * }
+   */
   static isSupported() {
     const { userAgent } = navigator;
     const isAppleDevice = /iPhone|iPad|iPod|Mac|Safari/i.test(userAgent);

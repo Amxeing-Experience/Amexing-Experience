@@ -56,6 +56,9 @@ module.exports = {
     'class-methods-use-this': 'off', // Allow class methods that don't use this
     'global-require': 'off', // Allow require() in functions
     'func-names': 'off', // Allow anonymous functions
+    'no-underscore-dangle': ['error', {
+      allow: ['_cachedRole'], // Allow internal cache property for role objects
+    }],
     'comma-dangle': ['error', {
       arrays: 'always-multiline',
       objects: 'always-multiline',
@@ -68,7 +71,7 @@ module.exports = {
     'max-depth': 'warn', // Downgraded to warning
     'max-lines': 'warn', // Downgraded to warning
     'max-lines-per-function': 'warn', // Downgraded to warning
-    'max-params': 'warn', // Downgraded to warning
+    'max-params': ['warn', 4], // Downgraded to warning
     'no-restricted-syntax': 'warn', // Downgraded to warning
     'no-await-in-loop': 'warn', // Downgraded to warning
     'no-plusplus': 'warn', // Downgraded to warning
@@ -83,8 +86,12 @@ module.exports = {
     'jsdoc/check-indentation': 'error',
     'jsdoc/check-line-alignment': 'error',
     'jsdoc/check-syntax': 'error',
-    'jsdoc/check-tag-names': 'error',
+    'jsdoc/check-tag-names': ['error', { definedTags: ['swagger'] }],
     'jsdoc/check-types': 'error',
+    // Fortified JSDoc Rules - Elevated to warnings (2024-10-16)
+    // TODO: Elevate to 'error' once all @since/@version tags are standardized
+    'jsdoc/check-values': 'warn', // Validate @since dates and @version tags
+    'jsdoc/check-param-names': 'warn', // Validate parameter names (reduced from 78 to 59 violations)
   },
   globals: {
     Parse: 'readonly', // Make Parse available as global
@@ -173,6 +180,16 @@ module.exports = {
         'default-case': 'warn',
         'no-trailing-spaces': 'warn',
         'no-return-await': 'warn'
+      }
+    },
+    {
+      files: [
+        'src/infrastructure/swagger/**/*.js',
+        'src/presentation/routes/**/*.js'
+      ],
+      rules: {
+        'jsdoc/check-indentation': 'off', // Swagger YAML blocks need indentation
+        'max-lines': 'off' // Swagger docs can make files longer
       }
     },
   ],

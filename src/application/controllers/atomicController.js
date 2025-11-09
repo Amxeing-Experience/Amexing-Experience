@@ -34,6 +34,8 @@ class AtomicController {
    * // GET /atomic
    * // Shows atomic design component showcase index page
    */
+  /* eslint-disable max-lines-per-function */
+  /* eslint-disable max-lines */
   static async index(req, res) {
     try {
       logger.info('Atomic showcase index accessed', {
@@ -56,22 +58,19 @@ class AtomicController {
           total: 12,
         },
         common: {
-          atoms: 9, // icon, button, label, checkbox, radio, toggle, textarea, avatar, badge, spinner, divider
-          molecules: 3, // form-field, searchbar, card
-          organisms: 1, // modal
-          total: 13,
+          atoms: 10, // icon, button, label, checkbox, radio, toggle, textarea, avatar, badge, spinner, divider, vertical-menu-item
+          molecules: 4, // form-field, searchbar, card, vertical-navigation-menu
+          organisms: 2, // modal, client-detail-layout
+          total: 16,
         },
       };
 
-      const totalComponents = componentStats.dashboard.total
-        + componentStats.auth.total
-        + componentStats.common.total;
+      const totalComponents = componentStats.dashboard.total + componentStats.auth.total + componentStats.common.total;
 
       res.render('templates/atomic-showcase-layout', {
         title: 'Atomic Design Components - Amexing',
         headerTitle: 'Atomic Design System',
-        headerSubtitle:
-          'Interactive component library and design system documentation',
+        headerSubtitle: 'Interactive component library and design system documentation',
         category: 'index',
         componentStats,
         totalComponents,
@@ -126,6 +125,8 @@ class AtomicController {
    * // GET /atomic/dashboard
    * // Shows dashboard-specific atomic design components
    */
+  /* eslint-disable max-lines-per-function */
+  /* eslint-disable max-lines */
   static async dashboard(req, res) {
     try {
       logger.info('Dashboard components showcase accessed', {
@@ -191,15 +192,7 @@ class AtomicController {
             description:
               'Dropdown user menu with profile and navigation options. User info displays first, then avatar as clickable trigger (no chevron).',
             path: 'molecules/dashboard/user-menu',
-            params: [
-              'user',
-              'userRole',
-              'colors',
-              'userName',
-              'userEmail',
-              'userAvatar',
-              'userInitials',
-            ],
+            params: ['user', 'userRole', 'colors', 'userName', 'userEmail', 'userAvatar', 'userInitials'],
             usage: 'Header user menu dropdown with modern UX design',
           },
         ],
@@ -239,8 +232,7 @@ class AtomicController {
           {
             name: 'DataTable',
             file: 'users-table.ejs',
-            description:
-              'Advanced data table with search, filters, and pagination',
+            description: 'Advanced data table with search, filters, and pagination',
             path: 'organisms/datatable/users-table',
             params: ['tableId', 'apiEndpoint', 'userRole', 'showActions'],
             usage: 'Comprehensive data table for any data type',
@@ -255,10 +247,7 @@ class AtomicController {
         headerSubtitle: 'Components designed for admin dashboard interfaces',
         category: 'dashboard',
         components,
-        breadcrumbs: [
-          { text: 'Atomic Design', url: '/atomic' },
-          { text: 'Dashboard Components' },
-        ],
+        breadcrumbs: [{ text: 'Atomic Design', url: '/atomic' }, { text: 'Dashboard Components' }],
       });
     } catch (error) {
       logger.error('Error in dashboard components showcase', {
@@ -284,6 +273,8 @@ class AtomicController {
    * // GET /atomic/auth
    * // Shows authentication-related atomic design components
    */
+  /* eslint-disable max-lines-per-function */
+  /* eslint-disable max-lines */
   static async auth(req, res) {
     try {
       logger.info('Auth components showcase accessed', {
@@ -304,8 +295,7 @@ class AtomicController {
           {
             name: 'Auth Input',
             file: 'auth-input.ejs',
-            description:
-              'Enhanced form inputs with validation and Flexy styling',
+            description: 'Enhanced form inputs with validation and Flexy styling',
             path: 'atoms/auth/auth-input',
             params: ['type', 'name', 'label', 'required', 'validation', 'icon'],
             usage: 'Form inputs in authentication pages',
@@ -315,14 +305,7 @@ class AtomicController {
             file: 'oauth-button.ejs',
             description: 'Provider-specific OAuth buttons with branding',
             path: 'atoms/auth/oauth-button',
-            params: [
-              'provider',
-              'text',
-              'href',
-              'size',
-              'variant',
-              'corporate',
-            ],
+            params: ['provider', 'text', 'href', 'size', 'variant', 'corporate'],
             usage: 'OAuth authentication buttons',
           },
           {
@@ -330,13 +313,7 @@ class AtomicController {
             file: 'password-input.ejs',
             description: 'Advanced password input with strength indicator',
             path: 'atoms/auth/password-input',
-            params: [
-              'name',
-              'label',
-              'showStrength',
-              'requirements',
-              'showTips',
-            ],
+            params: ['name', 'label', 'showStrength', 'requirements', 'showTips'],
             usage: 'Password fields with security features',
           },
         ],
@@ -413,14 +390,10 @@ class AtomicController {
       res.render('templates/atomic-showcase-layout', {
         title: 'Authentication Components - Atomic Design',
         headerTitle: 'Authentication Components',
-        headerSubtitle:
-          'Components designed for login, registration and auth flows',
+        headerSubtitle: 'Components designed for login, registration and auth flows',
         category: 'auth',
         components,
-        breadcrumbs: [
-          { text: 'Atomic Design', url: '/atomic' },
-          { text: 'Auth Components' },
-        ],
+        breadcrumbs: [{ text: 'Atomic Design', url: '/atomic' }, { text: 'Auth Components' }],
       });
     } catch (error) {
       logger.error('Error in auth components showcase', {
@@ -446,6 +419,8 @@ class AtomicController {
    * // GET /atomic/common
    * // Shows common shared atomic design components
    */
+  /* eslint-disable max-lines-per-function */
+  /* eslint-disable max-lines */
   static async common(req, res) {
     try {
       logger.info('Common components showcase accessed', {
@@ -468,22 +443,13 @@ class AtomicController {
             file: 'button.ejs',
             description: 'Styled buttons with various states and sizes',
             path: 'atoms/common/button',
-            params: [
-              'text',
-              'type',
-              'variant',
-              'size',
-              'icon',
-              'disabled',
-              'href',
-            ],
+            params: ['text', 'type', 'variant', 'size', 'icon', 'disabled', 'href'],
             usage: 'Consistent button styling and behavior',
           },
           {
             name: 'Label',
             file: 'label.ejs',
-            description:
-              'Form labels with consistent styling and required indicators',
+            description: 'Form labels with consistent styling and required indicators',
             path: 'atoms/common/label',
             params: ['text', 'htmlFor', 'required', 'variant', 'color'],
             usage: 'Form field labels with validation states',
@@ -493,15 +459,7 @@ class AtomicController {
             file: 'checkbox.ejs',
             description: 'Styled checkboxes with multiple sizes and states',
             path: 'atoms/common/checkbox',
-            params: [
-              'name',
-              'id',
-              'value',
-              'checked',
-              'disabled',
-              'label',
-              'size',
-            ],
+            params: ['name', 'id', 'value', 'checked', 'disabled', 'label', 'size'],
             usage: 'Form checkbox inputs with consistent styling',
           },
           {
@@ -509,15 +467,7 @@ class AtomicController {
             file: 'radio.ejs',
             description: 'Radio button inputs with consistent styling',
             path: 'atoms/common/radio',
-            params: [
-              'name',
-              'id',
-              'value',
-              'checked',
-              'disabled',
-              'label',
-              'size',
-            ],
+            params: ['name', 'id', 'value', 'checked', 'disabled', 'label', 'size'],
             usage: 'Form radio button inputs',
           },
           {
@@ -525,15 +475,7 @@ class AtomicController {
             file: 'toggle.ejs',
             description: 'Toggle switches for on/off controls',
             path: 'atoms/common/toggle',
-            params: [
-              'name',
-              'id',
-              'checked',
-              'disabled',
-              'label',
-              'size',
-              'color',
-            ],
+            params: ['name', 'id', 'checked', 'disabled', 'label', 'size', 'color'],
             usage: 'Switch controls for boolean settings',
           },
           {
@@ -541,15 +483,7 @@ class AtomicController {
             file: 'textarea.ejs',
             description: 'Multi-line text input with resize controls',
             path: 'atoms/common/textarea',
-            params: [
-              'name',
-              'id',
-              'value',
-              'placeholder',
-              'rows',
-              'disabled',
-              'resize',
-            ],
+            params: ['name', 'id', 'value', 'placeholder', 'rows', 'disabled', 'resize'],
             usage: 'Multi-line text input fields',
           },
           {
@@ -589,19 +523,9 @@ class AtomicController {
           {
             name: 'Form Field',
             file: 'form-field.ejs',
-            description:
-              'Complete form field with label, input, help text and validation',
+            description: 'Complete form field with label, input, help text and validation',
             path: 'molecules/common/form-field',
-            params: [
-              'type',
-              'name',
-              'label',
-              'required',
-              'value',
-              'placeholder',
-              'helpText',
-              'errorMessage',
-            ],
+            params: ['type', 'name', 'label', 'required', 'value', 'placeholder', 'helpText', 'errorMessage'],
             usage: 'Complete form fields with all states',
           },
           {
@@ -609,14 +533,7 @@ class AtomicController {
             file: 'searchbar.ejs',
             description: 'Search input with clear and submit functionality',
             path: 'molecules/common/searchbar',
-            params: [
-              'name',
-              'placeholder',
-              'value',
-              'clearable',
-              'onSearch',
-              'size',
-            ],
+            params: ['name', 'placeholder', 'value', 'clearable', 'onSearch', 'size'],
             usage: 'Search functionality across the application',
           },
           {
@@ -624,14 +541,7 @@ class AtomicController {
             file: 'card.ejs',
             description: 'Flexible card container with header, body and footer',
             path: 'molecules/common/card',
-            params: [
-              'title',
-              'subtitle',
-              'bodyContent',
-              'variant',
-              'shadow',
-              'hoverable',
-            ],
+            params: ['title', 'subtitle', 'bodyContent', 'variant', 'shadow', 'hoverable'],
             usage: 'Content containers with flexible layouts',
           },
         ],
@@ -641,14 +551,7 @@ class AtomicController {
             file: 'modal.ejs',
             description: 'Complete modal dialog with header, body and footer',
             path: 'organisms/common/modal',
-            params: [
-              'id',
-              'title',
-              'size',
-              'centered',
-              'bodyContent',
-              'primaryButtonText',
-            ],
+            params: ['id', 'title', 'size', 'centered', 'bodyContent', 'primaryButtonText'],
             usage: 'Modal dialogs for complex interactions',
           },
         ],
@@ -660,10 +563,7 @@ class AtomicController {
         headerSubtitle: 'Reusable components shared across different contexts',
         category: 'common',
         components,
-        breadcrumbs: [
-          { text: 'Atomic Design', url: '/atomic' },
-          { text: 'Common Components' },
-        ],
+        breadcrumbs: [{ text: 'Atomic Design', url: '/atomic' }, { text: 'Common Components' }],
       });
     } catch (error) {
       logger.error('Error in common components showcase', {

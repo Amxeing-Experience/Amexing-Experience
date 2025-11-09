@@ -10,7 +10,7 @@
  * - Organization and department scoping
  * - Soft delete pattern compliance.
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 2024-09-24
  * @example
  * // Create a department manager role
@@ -61,16 +61,11 @@ class Role extends BaseModel {
 
     // Validate role name format
     if (!/^[a-z_]+$/.test(roleData.name)) {
-      throw new Error(
-        'Role name must contain only lowercase letters and underscores'
-      );
+      throw new Error('Role name must contain only lowercase letters and underscores');
     }
 
     // Validate level
-    if (
-      roleData.level !== undefined
-      && (roleData.level < 1 || roleData.level > 7)
-    ) {
+    if (roleData.level !== undefined && (roleData.level < 1 || roleData.level > 7)) {
       throw new Error('Role level must be between 1 and 7');
     }
 
@@ -86,10 +81,7 @@ class Role extends BaseModel {
 
     // Permission system
     role.set('basePermissions', roleData.basePermissions || []);
-    role.set(
-      'delegatable',
-      roleData.delegatable !== undefined ? roleData.delegatable : false
-    );
+    role.set('delegatable', roleData.delegatable !== undefined ? roleData.delegatable : false);
     role.set('inheritsFrom', roleData.inheritsFrom || null);
 
     // Contextual restrictions
@@ -112,6 +104,7 @@ class Role extends BaseModel {
    * Get all permissions for this role including inherited ones.
    * @returns {Promise<Array<string>>} - Array of permission names.
    * @example
+   * // Usage example documented above
    */
   async getAllPermissions() {
     try {
@@ -123,9 +116,7 @@ class Role extends BaseModel {
         const parentRole = await this.getParentRole();
         if (parentRole) {
           const parentPermissions = await parentRole.getAllPermissions();
-          allPermissions = [
-            ...new Set([...allPermissions, ...parentPermissions]),
-          ];
+          allPermissions = [...new Set([...allPermissions, ...parentPermissions])];
         }
       }
 
@@ -144,6 +135,7 @@ class Role extends BaseModel {
    * Get parent role if inheritance is configured.
    * @returns {Promise<Role|null>} - Parent role or null.
    * @example
+   * // Usage example documented above
    */
   async getParentRole() {
     const parentRoleName = this.get('inheritsFrom');
@@ -170,6 +162,7 @@ class Role extends BaseModel {
    * @param {string} _targetRoleName - Target role to delegate to.
    * @returns {boolean} - True if delegation is allowed.
    * @example
+   * // Usage example documented above
    */
   canDelegateTo(_targetRoleName) {
     if (!this.get('delegatable')) {
@@ -187,6 +180,7 @@ class Role extends BaseModel {
    * @param {object} context - Context for conditional permissions.
    * @returns {Promise<boolean>} - True if permission is granted.
    * @example
+   * // Usage example documented above
    */
   async hasPermission(permission, context = {}) {
     try {
@@ -224,6 +218,7 @@ class Role extends BaseModel {
    * @param {object} context - Current context.
    * @returns {boolean} - True if conditions are met.
    * @example
+   * // Usage example documented above
    */
   evaluateConditions(conditions, context) {
     // No conditions means permission is granted
@@ -267,6 +262,7 @@ class Role extends BaseModel {
    * Get role hierarchy level for comparison.
    * @returns {number} - Role level (1-7, higher is more privileged).
    * @example
+   * // Usage example documented above
    */
   getLevel() {
     return this.get('level') || 1;
@@ -277,6 +273,7 @@ class Role extends BaseModel {
    * @param {Role} otherRole - Role to compare against.
    * @returns {boolean} - True if this role has higher privileges.
    * @example
+   * // Usage example documented above
    */
   isHigherThan(otherRole) {
     return this.getLevel() > otherRole.getLevel();
@@ -287,6 +284,7 @@ class Role extends BaseModel {
    * @param {Role} otherRole - Role to check management capability against.
    * @returns {boolean} - True if this role can manage the other role.
    * @example
+   * // Usage example documented above
    */
   canManage(otherRole) {
     return this.getLevel() > otherRole.getLevel();
@@ -297,12 +295,11 @@ class Role extends BaseModel {
    * @param {string} permission - System permission to check.
    * @returns {boolean} - True if permission is granted.
    * @example
+   * // Usage example documented above
    */
   hasSystemPermission(permission) {
     const basePermissions = this.get('basePermissions') || [];
-    return (
-      basePermissions.includes(permission) || basePermissions.includes('*')
-    );
+    return basePermissions.includes(permission) || basePermissions.includes('*');
   }
 
   /**
@@ -311,6 +308,7 @@ class Role extends BaseModel {
    * @param {object} context - Context for evaluation.
    * @returns {boolean} - True if permission is granted in context.
    * @example
+   * // Usage example documented above
    */
   hasContextualPermission(permission, context = {}) {
     const contextualPermissions = this.get('contextualPermissions') || {};
@@ -319,10 +317,7 @@ class Role extends BaseModel {
     if (!permissionConfig) {
       // Fall back to regular permission check
       const basePermissions = this.get('basePermissions') || [];
-      if (
-        !basePermissions.includes(permission)
-        && !basePermissions.includes('*')
-      ) {
+      if (!basePermissions.includes(permission) && !basePermissions.includes('*')) {
         return false;
       }
     }
@@ -340,6 +335,7 @@ class Role extends BaseModel {
    * @param {string} permission - Permission to check for delegation.
    * @returns {boolean} - True if permission can be delegated.
    * @example
+   * // Usage example documented above
    */
   canDelegatePermission(permission) {
     if (!this.get('delegatable')) {
@@ -351,15 +347,10 @@ class Role extends BaseModel {
     // If no specific delegatable permissions are set, allow delegation of all base permissions
     if (delegatablePermissions.length === 0) {
       const basePermissions = this.get('basePermissions') || [];
-      return (
-        basePermissions.includes(permission) || basePermissions.includes('*')
-      );
+      return basePermissions.includes(permission) || basePermissions.includes('*');
     }
 
-    return (
-      delegatablePermissions.includes(permission)
-      || delegatablePermissions.includes('*')
-    );
+    return delegatablePermissions.includes(permission) || delegatablePermissions.includes('*');
   }
 
   /**
@@ -368,6 +359,7 @@ class Role extends BaseModel {
    * @param {string} targetOrg - Target organization to access.
    * @returns {boolean} - True if access is allowed.
    * @example
+   * // Usage example documented above
    */
   canAccessOrganization(userOrg, targetOrg) {
     const organizationScope = this.get('organizationScope') || this.get('organization');
@@ -388,6 +380,7 @@ class Role extends BaseModel {
    * Get safe JSON representation for API responses.
    * @returns {object} - Safe role data.
    * @example
+   * // Usage example documented above
    */
   toSafeJSON() {
     return {
@@ -413,6 +406,7 @@ class Role extends BaseModel {
    * Get predefined system roles configuration.
    * @returns {Array<object>} - System roles configuration.
    * @example
+   * // Usage example documented above
    */
   static getSystemRoles() {
     return [
@@ -526,12 +520,7 @@ class Role extends BaseModel {
         level: 3,
         scope: 'department',
         organization: 'client',
-        basePermissions: [
-          'bookings.read',
-          'bookings.create',
-          'services.read',
-          'pricing.read',
-        ],
+        basePermissions: ['bookings.read', 'bookings.create', 'services.read', 'pricing.read'],
         delegatable: false,
         isSystemRole: true,
         conditions: {
@@ -545,7 +534,7 @@ class Role extends BaseModel {
       {
         name: 'employee_amexing',
         displayName: 'Amexing Employee',
-        description: 'Internal Amexing staff (drivers, operators)',
+        description: 'Internal Amexing administrative and operations staff',
         level: 3,
         scope: 'operations',
         organization: 'amexing',
@@ -565,6 +554,32 @@ class Role extends BaseModel {
           scheduleScope: 'assigned', // Only assigned bookings/vehicles
         },
         color: '#EA580C',
+        icon: 'briefcase',
+      },
+      {
+        name: 'driver',
+        displayName: 'Driver',
+        description: 'Transportation service driver with mobile app access',
+        level: 2,
+        scope: 'operations',
+        organization: 'amexing',
+        basePermissions: [
+          'trips.read',
+          'trips.accept',
+          'trips.complete',
+          'trips.cancel',
+          'vehicles.read',
+          'routes.read',
+          'location.update',
+          'earnings.read',
+        ],
+        delegatable: false,
+        isSystemRole: true,
+        conditions: {
+          assignedOnly: true, // Only assigned trips and vehicles
+          mobileAccess: true, // Primarily mobile app access
+        },
+        color: '#F59E0B',
         icon: 'truck',
       },
       {

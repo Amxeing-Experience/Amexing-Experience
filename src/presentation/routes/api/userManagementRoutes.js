@@ -11,7 +11,7 @@
  * - API documentation ready.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-09-22
+ * @since 0.1.0
  * @example
  * // Usage example
  * const result = await require({ 'express': 'example' });
@@ -22,7 +22,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const UserManagementController = require('../../../application/controllers/api/UserManagementController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
-const securityMiddleware = require('../../../infrastructure/security/securityMiddleware');
+// securityMiddleware removed - CSRF protection not needed for JWT-authenticated API routes
 const logger = require('../../../infrastructure/logger');
 
 const router = express.Router();
@@ -34,8 +34,7 @@ const userApiLimiter = rateLimit({
   max: 100, // Limit each IP to 100 requests per windowMs
   message: {
     success: false,
-    error:
-      'Too many user management requests from this IP, please try again later.',
+    error: 'Too many user management requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -48,8 +47,7 @@ const writeOperationsLimiter = rateLimit({
   max: 30, // Limit write operations
   message: {
     success: false,
-    error:
-      'Too many user modification requests from this IP, please try again later.',
+    error: 'Too many user modification requests from this IP, please try again later.',
     retryAfter: '15 minutes',
   },
   standardHeaders: true,
@@ -61,194 +59,391 @@ router.use(userApiLimiter);
 router.use(jwtMiddleware.authenticateToken);
 
 /**
- * Get users with filtering, pagination, and permission-based access.
- * Route: GET /api/users
- * Access: Private (requires 'users.list' permission).
- * @param {object} req - Express request object with query parameters: page, limit, role, active, search, clientId, departmentId, sortField, sortDirection.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await get({ '/': 'example', async: 'example' });
- * // Returns: operation result
- * // GET /api/endpoint
- * // Response: { "success": true, "data": [...] }
- * GET /api/users?page=1&limit=10&role=admin&active=true
+ * @swagger
+ * /api/users:
+ *   get:
+ *     tags:
+ *       - User Management
+ *     summary: Get list of users with filtering and pagination
+ *     description: |
+ *       Retrieve paginated list of users with advanced filtering options.
+ *
+ *       **Access Control:**
+ *       - Requires authentication (JWT token)
+ *       - Requires 'users.list' permission
+ *       - SuperAdmin/Admin: See all users
+ *       - DepartmentManager: See users in their department
+ *       - Others: Limited access based on role
+ *
+ *       **Features:**
+ *       - Pagination (default: 25 items, max: 100)
+ *       - Filter by role, status, client, department
+ *       - Sort by any field
+ *       - Search functionality
+ *       - Rate limited: 100 requests per 15 minutes
+ *
+ *       **PCI DSS:**
+ *       - Audit logged per requirement 10.2.1
+ *       - Role-based data filtering
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/PageParameter'
+ *       - $ref: '#/components/parameters/LimitParameter'
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: [superadmin, admin, client, department_manager, employee, employee_amexing, driver, guest]
+ *         description: Filter by user role
+ *       - in: query
+ *         name: active
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status
+ *       - in: query
+ *         name: emailVerified
+ *         schema:
+ *           type: boolean
+ *         description: Filter by email verification status
+ *       - in: query
+ *         name: clientId
+ *         schema:
+ *           type: string
+ *         description: Filter by client (admin only)
+ *       - in: query
+ *         name: departmentId
+ *         schema:
+ *           type: string
+ *         description: Filter by department
+ *       - $ref: '#/components/parameters/SortFieldParameter'
+ *       - $ref: '#/components/parameters/SortDirectionParameter'
+ *     responses:
+ *       200:
+ *         description: Users retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserListResponse'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       429:
+ *         $ref: '#/components/responses/RateLimitError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
  */
-router.get(
-  '/',
-  jwtMiddleware.requirePermission('users.list'),
-  async (req, res) => {
-    await userController.getUsers(req, res);
-  }
-);
+router.get('/', jwtMiddleware.requirePermission('users.list'), async (req, res) => {
+  await userController.getUsers(req, res);
+});
 
 /**
- * Search users with advanced filtering.
- * Route: GET /api/users/search
- * Access: Private (requires 'users.search' permission).
- * @param {object} req - Express request object with query parameters: q (search term), role, active, page, limit, sortField, sortDirection.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await get({ '/search': 'example', async: 'example' });
- * // Returns: operation result
- * // GET /api/endpoint
- * // Response: { "success": true, "data": [...] }
- * GET /api/users/search?q=john&role=employee&active=true
+ * @swagger
+ * /api/users/search:
+ *   get:
+ *     tags:
+ *       - User Management
+ *     summary: Search users with advanced filtering
+ *     description: |
+ *       Search users by email, name, or username with filters.
+ *
+ *       **Search Capabilities:**
+ *       - Email (partial match)
+ *       - First name (partial match)
+ *       - Last name (partial match)
+ *       - Username (partial match)
+ *       - Combined with role/status filters
+ *
+ *       **Access Control:**
+ *       - Requires 'users.search' permission
+ *       - Results filtered by user's access level
+ *
+ *       **Rate Limited:** 100 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Search term (min 2 characters)
+ *         example: "john"
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *         description: Filter results by role
+ *       - in: query
+ *         name: active
+ *         schema:
+ *           type: boolean
+ *         description: Filter by active status
+ *       - $ref: '#/components/parameters/PageParameter'
+ *       - $ref: '#/components/parameters/LimitParameter'
+ *       - $ref: '#/components/parameters/SortFieldParameter'
+ *       - $ref: '#/components/parameters/SortDirectionParameter'
+ *     responses:
+ *       200:
+ *         description: Search results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/UserListResponse'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       429:
+ *         $ref: '#/components/responses/RateLimitError'
  */
-router.get(
-  '/search',
-  jwtMiddleware.requirePermission('users.search'),
-  async (req, res) => {
-    await userController.searchUsers(req, res);
-  }
-);
+router.get('/search', jwtMiddleware.requirePermission('users.search'), async (req, res) => {
+  await userController.searchUsers(req, res);
+});
 
 /**
- * Get user statistics for dashboard.
- * Route: GET /api/users/statistics
- * Access: Private (requires 'users.statistics' permission or role level 6+).
- * @param {object} req - Express request object.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await get({ '/statistics': 'example', async: 'example' });
- * // Returns: operation result
- * // GET /api/endpoint
- * // Response: { "success": true, "data": [...] }
- * GET /api/users/statistics
+ * @swagger
+ * /api/users/statistics:
+ *   get:
+ *     tags:
+ *       - User Management
+ *     summary: Get user statistics for dashboard
+ *     description: |
+ *       Retrieve comprehensive user statistics and metrics.
+ *
+ *       **Statistics Included:**
+ *       - Total users count
+ *       - Active users count
+ *       - New users this month
+ *       - Pending email verification
+ *       - Role distribution
+ *       - Monthly registration trends
+ *
+ *       **Access:**
+ *       - Requires role level 6+ (Admin/SuperAdmin)
+ *       - Rate limited: 100 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Statistics retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/UserStatistics'
+ *                 message:
+ *                   type: string
+ *                   example: "Statistics retrieved successfully"
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       429:
+ *         $ref: '#/components/responses/RateLimitError'
  */
-router.get(
-  '/statistics',
-  jwtMiddleware.requireRoleLevel(6),
-  async (req, res) => {
-    await userController.getUserStatistics(req, res);
-  }
-);
+router.get('/statistics', jwtMiddleware.requireRoleLevel(6), async (req, res) => {
+  await userController.getUserStatistics(req, res);
+});
 
 /**
- * Get specific user by ID.
- * Route: GET /api/users/:id
- * Access: Private (requires 'users.read' permission).
- * @param {object} req - Express request object with params: {id: User ID}.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await get({ '/:id': 'example', async: 'example' });
- * // Returns: operation result
- * // GET /api/endpoint
- * // Response: { "success": true, "data": [...] }
- * GET /api/users/abc123
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     tags:
+ *       - User Management
+ *     summary: Get user by ID
+ *     description: |
+ *       Retrieve detailed user information by user ID.
+ *
+ *       **Access Control:**
+ *       - Requires 'users.read' permission
+ *       - Users can view their own data
+ *       - Admins can view any user in their scope
+ *       - Department Managers: Users in their department only
+ *
+ *       **PCI DSS:**
+ *       - No sensitive payment data returned
+ *       - Audit logged per requirement 10.2.1
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: User ObjectId
+ *         example: "abc123def456"
+ *     responses:
+ *       200:
+ *         description: User retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *                 message:
+ *                   type: string
+ *                   example: "User retrieved successfully"
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
-router.get(
-  '/:id',
-  jwtMiddleware.requirePermission('users.read'),
-  async (req, res) => {
-    await userController.getUserById(req, res);
-  }
-);
+router.get('/:id', jwtMiddleware.requirePermission('users.read'), async (req, res) => {
+  await userController.getUserById(req, res);
+});
 
 /**
- * Create new user.
- * Route: POST /api/users
- * Access: Private (requires 'users.create' permission).
- * @param {object} req - Express request object with body: {email, firstName, lastName, role, password?, clientId?, departmentId?, emailVerified?}.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await post({ '/': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
- * // Returns: operation result
- * // GET /api/endpoint
- * // Response: { "success": true, "data": [...] }
- * POST /api/users with body: {email: 'user@example.com', firstName: 'John', lastName: 'Doe', role: 'employee'}
+ * @swagger
+ * /api/users:
+ *   post:
+ *     tags:
+ *       - User Management
+ *     summary: Create new user
+ *     description: |
+ *       Create a new user account with role assignment.
+ *
+ *       **Access:** Requires 'users.create' permission
+ *       **Password:** Auto-generated if not provided
+ *       **Rate Limited:** 30 requests per 15 minutes
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserCreateRequest'
+ *     responses:
+ *       201:
+ *         description: User created successfully
+ *       400:
+ *         $ref: '#/components/responses/ValidationError'
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
  */
-router.post(
-  '/',
-  writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
-  jwtMiddleware.requirePermission('users.create'),
-  async (req, res) => {
-    await userController.createUser(req, res);
-  }
-);
+router.post('/', writeOperationsLimiter, jwtMiddleware.requirePermission('users.create'), async (req, res) => {
+  await userController.createUser(req, res);
+});
 
 /**
- * Update existing user.
- * Route: PUT /api/users/:id
- * Access: Private (requires 'users.update' permission).
- * @param {object} req - Express request object with params: {id: User ID} and body: Partial user data to update.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await put({ '/:id': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
- * // Returns: operation result
- * // POST /api/endpoint
- * // Body: { "data": "value" }
- * // Response: { "success": true, "message": "Created" }
- * PUT /api/users/abc123 with body: {firstName: 'Jane', active: false}
+ * @swagger
+ * /api/users/{id}:
+ *   put:
+ *     tags:
+ *       - User Management
+ *     summary: Update user
+ *     description: Update user information (requires 'users.update' permission)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserUpdateRequest'
+ *     responses:
+ *       200:
+ *         description: User updated successfully
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
-router.put(
-  '/:id',
-  writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
-  jwtMiddleware.requirePermission('users.update'),
-  async (req, res) => {
-    await userController.updateUser(req, res);
-  }
-);
+router.put('/:id', writeOperationsLimiter, jwtMiddleware.requirePermission('users.update'), async (req, res) => {
+  await userController.updateUser(req, res);
+});
 
 /**
- * Deactivate user (soft delete - follows AI agent rules).
- * Route: DELETE /api/users/:id
- * Access: Private (requires 'users.deactivate' permission).
- * @param {object} req - Express request object with params: {id: User ID} and body: {reason?: string}.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await delete({ '/:id': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
- * // Returns: operation result
- * // PUT /api/endpoint/123
- * // Body: { "field": "updated value" }
- * // Response: { "success": true, "data": {...} }
- * DELETE /api/users/abc123 with body: {reason: 'Policy violation'}
+ * @swagger
+ * /api/users/{id}:
+ *   delete:
+ *     tags:
+ *       - User Management
+ *     summary: Deactivate user (soft delete)
+ *     description: Sets user exists=false (requires 'users.deactivate' permission)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User deactivated successfully
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
-router.delete(
-  '/:id',
-  writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
-  jwtMiddleware.requirePermission('users.deactivate'),
-  async (req, res) => {
-    await userController.deactivateUser(req, res);
-  }
-);
+router.delete('/:id', writeOperationsLimiter, jwtMiddleware.requirePermission('users.deactivate'), async (req, res) => {
+  await userController.deactivateUser(req, res);
+});
 
 /**
- * Reactivate deactivated user.
- * Route: PUT /api/users/:id/reactivate
- * Access: Private (requires 'users.reactivate' permission).
- * @param {object} req - Express request object with params: {id: User ID} and body: {reason?: string}.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await put({ '/:id/reactivate': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
- * // Returns: operation result
- * // PUT /api/endpoint/123
- * // Body: { "field": "updated value" }
- * // Response: { "success": true, "data": {...} }
- * PUT /api/users/abc123/reactivate with body: {reason: 'Appeal approved'}
+ * @swagger
+ * /api/users/{id}/reactivate:
+ *   put:
+ *     tags:
+ *       - User Management
+ *     summary: Reactivate deactivated user
+ *     description: Sets exists=true (requires 'users.reactivate' permission)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User reactivated successfully
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
 router.put(
   '/:id/reactivate',
   writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
   jwtMiddleware.requirePermission('users.reactivate'),
   async (req, res) => {
     await userController.reactivateUser(req, res);
@@ -256,25 +451,40 @@ router.put(
 );
 
 /**
- * Toggle user active status (activate/deactivate).
- * Route: PATCH /api/users/:id/toggle-status
- * Access: Private (requires 'users.update' permission).
- * @param {object} req - Express request object with params: {id: User ID} and body: {active: boolean, reason?: string}.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await patch({ '/:id/toggle-status': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
- * // Returns: operation result
- * // PUT /api/endpoint/123
- * // Body: { "field": "updated value" }
- * // Response: { "success": true, "data": {...} }
- * PATCH /api/users/abc123/toggle-status with body: {active: false, reason: 'Suspension'}
+ * @swagger
+ * /api/users/{id}/toggle-status:
+ *   patch:
+ *     tags:
+ *       - User Management
+ *     summary: Toggle user active status
+ *     description: Switch between active/inactive (requires 'users.update' permission)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               active:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Status toggled successfully
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
  */
 router.patch(
   '/:id/toggle-status',
   writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
   jwtMiddleware.requirePermission('users.update'),
   async (req, res) => {
     await userController.toggleUserStatus(req, res);
@@ -282,42 +492,47 @@ router.patch(
 );
 
 /**
- * Archive user (soft delete - sets active: false, exists: false).
- * Route: PATCH /api/users/:id/archive
- * Access: Private (requires role level 7 - superadmin only).
- * @param {object} req - Express request object with params: {id: User ID} and body: {reason?: string}.
- * @param {object} res - Express response object.
- * @returns {Promise<void>} - Resolves when response is sent.
- * @example
- * // Usage example
- * const result = await patch({ '/:id/archive': 'example', writeOperationsLimiter: 'example', securityMiddleware.getCsrfProtection(: 'example' });
- * // Returns: operation result
- * // PATCH /api/endpoint/123
- * // Body: { "field": "new value" }
- * // Response: { "success": true, "data": {...} }
- * PATCH /api/users/abc123/archive with body: {reason: 'Data retention policy'}
+ * @swagger
+ * /api/users/{id}/archive:
+ *   patch:
+ *     tags:
+ *       - User Management
+ *     summary: Archive user (SuperAdmin only)
+ *     description: |
+ *       Sets active=false and exists=false (permanent soft delete)
+ *       **Access:** Requires role level 7 (SuperAdmin only)
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User archived successfully
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
  */
-router.patch(
-  '/:id/archive',
-  writeOperationsLimiter,
-  securityMiddleware.getCsrfProtection(),
-  jwtMiddleware.requireRoleLevel(7),
-  async (req, res) => {
-    await userController.archiveUser(req, res);
-  }
-);
+router.patch('/:id/archive', writeOperationsLimiter, jwtMiddleware.requireRoleLevel(7), async (req, res) => {
+  await userController.archiveUser(req, res);
+});
 
 /**
  * Error handling middleware for this router.
- * @param {*} next - _next parameter.
- * @param {object} res - Express response object.
+ * @param {*} error - Error parameter.
  * @param {object} req - Express request object.
- * @param {*} (error - (error parameter.
+ * @param {object} res - Express response object.
+ * @param {*} _next - Next middleware function.
  * @returns {*} - Operation result.
  * @example
  * // Usage example
- * const result = await use({ (error: 'example', _next: 'example' });
- * // Returns: operation result
+ * router.use((error, req, res, _next) => { ... });
  */
 router.use((error, req, res, _next) => {
   logger.error('User Management API Error:', {

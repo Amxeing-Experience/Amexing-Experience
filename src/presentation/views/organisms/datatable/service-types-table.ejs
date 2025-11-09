@@ -1,0 +1,616 @@
+<%
+/**
+ * Service Types DataTable Organism
+ * DataTable component for service type catalog management (transportation/transfer types)
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'service-types-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/service-types';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole); // Admin and superadmin can delete
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-list me-2"></i>Tipos de Traslado
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Catálogo de tipos de traslados del sistema</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createServiceTypeBtn" disabled>
+                        <i class="ti ti-plus me-1"></i>Nuevo Tipo
+                        <i class="ti ti-lock ms-1"
+                           data-bs-toggle="tooltip"
+                           data-bs-placement="top"
+                           title="Temporalmente deshabilitado por seguridad del sistema"></i>
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="service-types-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Service Type Modal -->
+<div class="modal fade" id="serviceTypeModal" tabindex="-1" aria-labelledby="serviceTypeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="serviceTypeModalLabel">
+                    <i class="ti ti-list-plus me-2"></i><span id="modalTitle">Crear Nuevo Tipo de Traslado</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="serviceTypeModalAlerts"></div>
+
+                <form id="serviceTypeForm">
+                    <input type="hidden" id="serviceTypeId">
+
+                    <!-- Sección: Información Básica -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Información Básica
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Nombre <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" required maxlength="100" placeholder="Ej: Aeropuerto">
+                            <div class="form-text">Nombre del tipo de traslado</div>
+                        </div>
+                    </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Tipo de traslado:</strong>
+                            <p class="mb-0 mt-1">Los tipos de traslado se usarán para clasificar los servicios en el sistema. Ejemplos: Aeropuerto, Punto a Punto, Local.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveServiceTypeBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Tipo</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Wait for DOM and all dependencies to be ready
+    function initWhenReady() {
+        // Check if jQuery and DataTables are loaded
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        if (!jQuery.fn.dataTable) {
+            console.warn('DataTables not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        initServiceTypesTable();
+    }
+
+    function initServiceTypesTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        // Define system-protected service types (cannot be edited/deleted)
+        const PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local'];
+
+        // Helper function to check if type is protected
+        function isProtectedType(typeName) {
+            return PROTECTED_TYPES.includes(typeName);
+        }
+
+        // DataTable Configuration
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint,
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading service types:', error);
+                    showErrorAlert('Error al cargar los tipos de traslado. El endpoint del backend aún no está implementado.');
+                }
+            },
+            columns: [
+                {
+                    data: 'name',
+                    render: function(data) {
+                        return `<div class="fw-semibold">${data || '-'}</div>`;
+                    }
+                },
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data
+                            ? '<span class="badge bg-success">Activo</span>'
+                            : '<span class="badge bg-secondary">Inactivo</span>';
+                    }
+                },
+                ...(showActions ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        // Check if this is a system-protected type
+                        const isProtected = isProtectedType(data.name);
+
+                        // If protected, show lock indicator instead of action buttons
+                        if (isProtected) {
+                            return `<div class="text-center">
+                                        <span class="badge bg-info"
+                                              data-bs-toggle="tooltip"
+                                              data-bs-placement="top"
+                                              title="Tipo de sistema protegido - No se puede editar ni eliminar">
+                                            <i class="ti ti-lock"></i> Sistema
+                                        </span>
+                                    </div>`;
+                        }
+
+                        // Regular action buttons for non-protected types
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+                        if (canEdit) {
+                            // Edit button
+                            actions += `<button type="button"
+                                            class="btn btn-primary edit-type-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Tipo de Traslado">
+                                            <i class="ti ti-edit"></i>
+                                        </button>`;
+
+                            // Toggle status button
+                            const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                            const statusTitle = data.active ? 'Desactivar Tipo' : 'Activar Tipo';
+                            const statusClass = data.active ? 'btn-warning' : 'btn-success';
+
+                            actions += `<button type="button"
+                                            class="btn ${statusClass} toggle-status-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-current-status="${data.active}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="${statusTitle}">
+                                            <i class="ti ${statusIcon}"></i>
+                                        </button>`;
+                        }
+
+                        if (canDelete) {
+                            // Delete button
+                            actions += `<button type="button"
+                                            class="btn btn-danger delete-type-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Eliminar Tipo de Traslado">
+                                            <i class="ti ti-trash"></i>
+                                        </button>`;
+                        }
+
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tipos de traslado...'
+            },
+            order: [[0, 'asc']], // Sort by name by default
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                // Reinitialize tooltips after table redraw
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
+        });
+
+        // Event Handlers
+        $('#createServiceTypeBtn').on('click', function() {
+            openServiceTypeModal();
+        });
+
+        // Edit type
+        $(`#${tableId}`).on('click', '.edit-type-btn', function() {
+            const typeId = $(this).data('id');
+            loadServiceTypeData(typeId);
+        });
+
+        // Toggle status
+        $(`#${tableId}`).on('click', '.toggle-status-btn', function() {
+            const typeId = $(this).data('id');
+            const currentStatus = $(this).data('current-status');
+            const typeName = $(this).data('name');
+            toggleServiceTypeStatus(typeId, currentStatus, typeName);
+        });
+
+        // Delete type
+        $(`#${tableId}`).on('click', '.delete-type-btn', function() {
+            const typeId = $(this).data('id');
+            const typeName = $(this).data('name');
+            deleteServiceType(typeId, typeName);
+        });
+
+        // Save type
+        $('#saveServiceTypeBtn').on('click', function() {
+            saveServiceType();
+        });
+
+        // Functions
+        function openServiceTypeModal(isEdit = false) {
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('serviceTypeModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+
+            $('#serviceTypeModal').modal('show');
+            $('#serviceTypeForm')[0].reset();
+            $('#serviceTypeId').val('');
+            $('#modalTitle').text(isEdit ? 'Editar Tipo de Traslado' : 'Crear Nuevo Tipo de Traslado');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Tipo');
+        }
+
+        function loadServiceTypeData(typeId) {
+
+            // Open modal first in edit mode (this will reset the form)
+            openServiceTypeModal(true);
+
+            $.ajax({
+                url: `${apiEndpoint}/${typeId}`,
+                type: 'GET',
+                success: function(response) {
+
+                    if (response.success && response.data) {
+                        const type = response.data;
+
+                        // Now populate the form with the data
+                        $('#serviceTypeId').val(type.id);
+                        $('#name').val(type.name);
+                    } else {
+                        showErrorAlert('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', { xhr, status, error });
+                    const errorMessage = xhr.responseJSON?.error || 'Error al cargar el tipo de traslado';
+                    showModalError(errorMessage);
+                }
+            });
+        }
+
+        function saveServiceType() {
+            const form = $('#serviceTypeForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+
+            const typeId = $('#serviceTypeId').val();
+            const isEdit = !!typeId;
+
+            const typeData = {
+                name: $('#name').val()
+            };
+
+            const url = isEdit ? `${apiEndpoint}/${typeId}` : apiEndpoint;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            $.ajax({
+                url,
+                type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(typeData),
+                success: function(response) {
+                    if (response.success) {
+                        $('#serviceTypeModal').modal('hide');
+                        dataTable.ajax.reload();
+                        showSuccessAlert(isEdit ? 'Tipo de traslado actualizado exitosamente' : 'Tipo de traslado creado exitosamente');
+                    }
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Error al guardar el tipo de traslado';
+
+                    if (xhr.responseJSON?.error) {
+                        // Translate common errors to Spanish
+                        const error = xhr.responseJSON.error;
+                        if (error.includes('already exists') || error.includes('nombre')) {
+                            errorMessage = 'El nombre del tipo de traslado ya existe. Por favor, usa uno diferente.';
+                        } else if (error.includes('required')) {
+                            errorMessage = 'Todos los campos requeridos deben ser completados.';
+                        } else {
+                            errorMessage = error;
+                        }
+                    }
+
+                    showModalError(errorMessage);
+                }
+            });
+        }
+
+        function toggleServiceTypeStatus(typeId, currentStatus, typeName) {
+            const newStatus = !currentStatus;
+            const action = newStatus ? 'activar' : 'desactivar';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmToggleTypeModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${actionTitle} Tipo de Traslado</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas ${action} el tipo <strong>"${typeName}"</strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn ${btnClass}" id="confirmToggleTypeBtn">${actionTitle}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmToggleTypeModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmToggleTypeModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmToggleTypeBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${typeId}/toggle-status`,
+                    type: 'PATCH',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            // Force a full reload to see changes
+                            dataTable.ajax.reload(function() {
+                            }, false);
+                            showAlert('success', `Tipo ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+                        } else {
+                            modal.hide();
+                            showAlert('danger', response.error || 'Error desconocido');
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error('Toggle error:', xhr);
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado del tipo';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        function deleteServiceType(typeId, typeName) {
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmDeleteTypeModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white">Eliminar Tipo de Traslado</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas eliminar el tipo <strong>"${typeName}"</strong>?</p>
+                                <p class="text-muted mb-0">Esta acción solo se permite si no hay traslados usando este tipo.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeleteTypeBtn">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmDeleteTypeModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteTypeModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmDeleteTypeBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${typeId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showAlert('success', 'Tipo eliminado exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al eliminar el tipo';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        /**
+         * Show success alert message
+         * @param {string} message - Success message to display
+         */
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            // Remove existing alerts from this specific section
+            const container = document.getElementById('service-types-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+
+                // Insert new alert at the beginning of the content
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        /**
+         * Show error alert inside modal
+         * @param {string} message - Error message to display
+         */
+        function showModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('serviceTypeModalAlerts');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+
+        /**
+         * Show error alert message
+         * @param {string} message - Error message to display
+         */
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            // Remove existing alerts from this specific section
+            const container = document.getElementById('service-types-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+
+                // Insert new alert at the beginning of the content
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        }
+
+        // Legacy function for backward compatibility
+        function showAlert(type, message) {
+            if (type === 'success') {
+                showSuccessAlert(message);
+            } else {
+                showErrorAlert(message);
+            }
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>

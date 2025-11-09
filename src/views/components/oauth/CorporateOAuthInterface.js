@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * Corporate OAuth Interface Component - Sprint 04
  * Handles corporate-specific OAuth flows with branding and customization
@@ -83,16 +84,13 @@ class CorporateOAuthInterface {
     }
 
     try {
-      const response = await fetch(
-        `/api/corporate/config/${this.config.corporateConfigId}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-        }
-      );
+      const response = await fetch(`/api/corporate/config/${this.config.corporateConfigId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
 
       if (response.ok) {
         this.corporateData = await response.json();
@@ -160,16 +158,13 @@ class CorporateOAuthInterface {
     if (!_domain || _domain === 'localhost') return null;
 
     try {
-      const response = await fetch(
-        `/api/corporate/detect/domain/${encodeURIComponent(_domain)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-        }
-      );
+      const response = await fetch(`/api/corporate/detect/domain/${encodeURIComponent(_domain)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
 
       if (response.ok) {
         return await response.json();
@@ -198,16 +193,13 @@ class CorporateOAuthInterface {
     if (!subdomain || subdomain === 'www' || subdomain === 'localhost') return null;
 
     try {
-      const response = await fetch(
-        `/api/corporate/detect/subdomain/${encodeURIComponent(subdomain)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-        }
-      );
+      const response = await fetch(`/api/corporate/detect/subdomain/${encodeURIComponent(subdomain)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
 
       if (response.ok) {
         return await response.json();
@@ -236,16 +228,13 @@ class CorporateOAuthInterface {
     if (!param) return null;
 
     try {
-      const response = await fetch(
-        `/api/corporate/detect/param/${encodeURIComponent(param)}`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-        }
-      );
+      const response = await fetch(`/api/corporate/detect/param/${encodeURIComponent(param)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
 
       if (response.ok) {
         return await response.json();
@@ -435,8 +424,7 @@ class CorporateOAuthInterface {
 
     // Update favicon
     if (branding.favicon) {
-      const favicon = document.querySelector('link[rel="icon"]')
-        || document.querySelector('link[rel="shortcut icon"]');
+      const favicon = document.querySelector('link[rel="icon"]') || document.querySelector('link[rel="shortcut icon"]');
       if (favicon) {
         favicon.href = branding.favicon;
       } else {
@@ -457,9 +445,7 @@ class CorporateOAuthInterface {
 
     // Apply corporate imagery to OAuth sections
     if (branding.oauthBackground) {
-      const oauthContainers = document.querySelectorAll(
-        '.oauth-provider-container , .corporate-branding'
-      );
+      const oauthContainers = document.querySelectorAll('.oauth-provider-container , .corporate-branding');
       oauthContainers.forEach((container) => {
         container.style.backgroundImage = `url(${branding.oauthBackground})`;
         container.style.backgroundSize = 'cover';
@@ -492,25 +478,16 @@ class CorporateOAuthInterface {
 
     // Apply font family settings
     if (fonts.primaryFont) {
-      document.documentElement.style.setProperty(
-        '--font-primary',
-        fonts.primaryFont
-      );
+      document.documentElement.style.setProperty('--font-primary', fonts.primaryFont);
     }
 
     if (fonts.secondaryFont) {
-      document.documentElement.style.setProperty(
-        '--font-secondary',
-        fonts.secondaryFont
-      );
+      document.documentElement.style.setProperty('--font-secondary', fonts.secondaryFont);
     }
 
     // Apply font sizes if specified
     if (fonts.baseFontSize) {
-      document.documentElement.style.setProperty(
-        '--font-size-base',
-        fonts.baseFontSize
-      );
+      document.documentElement.style.setProperty('--font-size-base', fonts.baseFontSize);
     }
   }
 
@@ -591,11 +568,7 @@ class CorporateOAuthInterface {
     }
 
     if (meta.twitterDescription) {
-      this.updateMetaTag(
-        'name',
-        'twitter:description',
-        meta.twitterDescription
-      );
+      this.updateMetaTag('name', 'twitter:description', meta.twitterDescription);
     }
 
     if (meta.twitterImage) {
@@ -645,10 +618,7 @@ class CorporateOAuthInterface {
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
       };
 
-      localStorage.setItem(
-        'amexing_corporate_config',
-        JSON.stringify(storageData)
-      );
+      localStorage.setItem('amexing_corporate_config', JSON.stringify(storageData));
     } catch (error) {
       // eslint-disable-next-line no-console
       console.warn('Failed to store corporate config:', error);
@@ -671,13 +641,8 @@ class CorporateOAuthInterface {
     const oauthConfig = {
       corporateMode: true,
       corporateConfig: this.corporateData,
-      departmentRequired:
-        this.corporateData?.requireDepartmentSelection || false,
-      allowedProviders: this.corporateData?.allowedProviders || [
-        'google',
-        'microsoft',
-        'apple',
-      ],
+      departmentRequired: this.corporateData?.requireDepartmentSelection || false,
+      allowedProviders: this.corporateData?.allowedProviders || ['google', 'microsoft', 'apple'],
       mobile: this.detectMobile(),
     };
 
@@ -702,34 +667,19 @@ class CorporateOAuthInterface {
    */
   setupCorporateEventHandlers() {
     // Handle corporate domain email detection
-    document.addEventListener(
-      'emailDomainDetected',
-      this.handleEmailDomainDetection.bind(this)
-    );
+    document.addEventListener('emailDomainDetected', this.handleEmailDomainDetection.bind(this));
 
     // Handle department changes
-    document.addEventListener(
-      'departmentChanged',
-      this.handleDepartmentChange.bind(this)
-    );
+    document.addEventListener('departmentChanged', this.handleDepartmentChange.bind(this));
 
     // Handle OAuth success with corporate context
-    document.addEventListener(
-      'oauthSuccess',
-      this.handleCorporateOAuthSuccess.bind(this)
-    );
+    document.addEventListener('oauthSuccess', this.handleCorporateOAuthSuccess.bind(this));
 
     // Handle corporate branding updates
-    document.addEventListener(
-      'corporateBrandingUpdate',
-      this.handleBrandingUpdate.bind(this)
-    );
+    document.addEventListener('corporateBrandingUpdate', this.handleBrandingUpdate.bind(this));
 
     // Handle page visibility changes (for session management)
-    document.addEventListener(
-      'visibilitychange',
-      this.handleVisibilityChange.bind(this)
-    );
+    document.addEventListener('visibilitychange', this.handleVisibilityChange.bind(this));
   }
 
   /**
@@ -756,7 +706,6 @@ class CorporateOAuthInterface {
   /**
    * Highlight corporate login options.
    * @param {string} email - User email address.
-   * @param email
    * @param _email
    * @example
    * // Usage example
@@ -771,9 +720,7 @@ class CorporateOAuthInterface {
     if (!oauthContainer) return;
 
     // Remove existing corporate highlights
-    oauthContainer
-      .querySelectorAll('.corporate-highlight')
-      .forEach((el) => el.remove());
+    oauthContainer.querySelectorAll('.corporate-highlight').forEach((el) => el.remove());
 
     // Add corporate user notice
     const notice = document.createElement('div');
@@ -1117,16 +1064,13 @@ class CorporateOAuthInterface {
     if (!this.corporateData?.id) return;
 
     try {
-      const response = await fetch(
-        `/api/corporate/config/${this.corporateData.id}/version`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-          },
-        }
-      );
+      const response = await fetch(`/api/corporate/config/${this.corporateData.id}/version`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      });
 
       if (response.ok) {
         const { version, hasUpdates } = await response.json();
@@ -1210,9 +1154,7 @@ class CorporateOAuthInterface {
   detectMobile() {
     return (
       window.innerWidth <= 768
-      || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent
-      )
+      || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
     );
   }
 

@@ -374,7 +374,15 @@ describe('JWT Middleware RBAC Functions', () => {
         user: {
           id: 'user-123',
           username: 'admin',
-          email: 'admin@amexing.com'
+          email: 'admin@amexing.com',
+          get: jest.fn((field) => {
+            const data = {
+              active: true,
+              exists: true,
+              email: 'admin@amexing.com'
+            };
+            return data[field];
+          })
         }
       };
 

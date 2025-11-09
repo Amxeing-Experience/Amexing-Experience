@@ -14,6 +14,8 @@ const expressRateLimit = require('express-rate-limit');
 const AuthenticationService = require('../services/AuthenticationService');
 const logger = require('../../infrastructure/logger');
 
+/* eslint-disable max-lines */
+/* eslint-disable max-lines-per-function */
 /**
  * Middleware to validate JWT tokens from cookies or Authorization header.
  * @param {object} req - Express request object.
@@ -44,9 +46,7 @@ const authenticateToken = async (req, res, next) => {
       logger.debug('JWT Middleware - Auth header:', {
         headerPresent: !!authHeader,
       });
-      token = authHeader && authHeader.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : null;
+      token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
     }
 
     if (!token) {
@@ -70,11 +70,47 @@ const authenticateToken = async (req, res, next) => {
     req.userRole = result.role; // Backward compatibility
     req.roleObject = result.roleObject; // New role object
 
+    // Check if user is active and exists (not deleted)
+    if (req.user) {
+      const isActive = req.user.get('active');
+      const exists = req.user.get('exists');
+
+      if (isActive === false) {
+        logger.warn('Active session with deactivated account detected', {
+          userId: req.userId,
+          email: req.user.get('email'),
+        });
+        return res.status(401).json({
+          success: false,
+          error: 'Your account has been deactivated',
+          code: 'ACCOUNT_DEACTIVATED',
+        });
+      }
+
+      if (exists === false) {
+        logger.warn('Active session with deleted account detected', {
+          userId: req.userId,
+          email: req.user.get('email'),
+        });
+        return res.status(401).json({
+          success: false,
+          error: 'Account not found',
+          code: 'ACCOUNT_DELETED',
+        });
+      }
+    }
+
+    // Cache the roleObject in the user instance to avoid re-fetching
+    if (req.user && req.roleObject) {
+      req.user._cachedRole = req.roleObject;
+    }
+
     logger.debug('JWT Middleware - User attached:', {
       userId: req.userId,
       role: req.userRole,
       organizationId: result.user?.organizationId,
     });
+
     next();
   } catch (error) {
     logger.error('JWT authentication error:', error);
@@ -119,9 +155,7 @@ const authenticateOptional = async (req, res, next) => {
 
     if (!token) {
       const authHeader = req.headers.authorization;
-      token = authHeader && authHeader.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : null;
+      token = authHeader && authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
     }
 
     if (!token) {
@@ -213,9 +247,7 @@ const requirePermission = (permission, contextExtractor = () => ({})) => async (
     }
 
     // Extract context for permission check
-    const context = typeof contextExtractor === 'function'
-      ? contextExtractor(req)
-      : contextExtractor || {};
+    const context = typeof contextExtractor === 'function' ? contextExtractor(req) : contextExtractor || {};
 
     // Check if user has permission
     const hasPermission = await req.user.hasPermission(permission, context);
@@ -324,10 +356,7 @@ const requireOrganizationScope = (requiredScope = 'own') => async (req, res, nex
 
     switch (requiredScope) {
       case 'own':
-        if (
-          targetOrganizationId
-            && userOrganizationId !== targetOrganizationId
-        ) {
+        if (targetOrganizationId && userOrganizationId !== targetOrganizationId) {
           return res.status(403).json({
             success: false,
             error: 'Access limited to your own organization',
@@ -340,10 +369,7 @@ const requireOrganizationScope = (requiredScope = 'own') => async (req, res, nex
           // Amexing users can access any client organization
           break;
         }
-        if (
-          targetOrganizationId
-            && userOrganizationId !== targetOrganizationId
-        ) {
+        if (targetOrganizationId && userOrganizationId !== targetOrganizationId) {
           return res.status(403).json({
             success: false,
             error: 'Access limited to your own organization',

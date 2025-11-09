@@ -1,0 +1,116 @@
+<%
+// Page Loader Atom - Full-page loading overlay for blocking page interaction during data loading
+// Parameters:
+//   text - Loading message text (default: 'Cargando datos...')
+//   spinnerColor - Bootstrap color for spinner (default: 'primary')
+//   containerId - ID of the container to apply loader to (default: 'pageLoaderContainer')
+
+// Default parameters
+const loaderText = typeof text !== 'undefined' ? text : 'Cargando datos...';
+const loaderSpinnerColor = typeof spinnerColor !== 'undefined' ? spinnerColor : 'primary';
+const loaderContainerId = typeof containerId !== 'undefined' ? containerId : 'pageLoaderContainer';
+%>
+
+<!-- Page Loader Overlay -->
+<div class="page-loader-overlay" id="<%= loaderContainerId %>Loader" style="display: none;">
+    <div class="page-loader-content">
+        <div class="spinner-border text-<%= loaderSpinnerColor %>" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3 mb-0 text-<%= loaderSpinnerColor %> fw-semibold"><%= loaderText %></p>
+    </div>
+</div>
+
+<style>
+/* Page Loader Overlay Styles */
+.page-loader-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.95);
+    z-index: 1050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: inherit;
+}
+
+.page-loader-overlay.show {
+    display: flex !important;
+}
+
+.page-loader-content {
+    text-align: center;
+    padding: 2rem;
+}
+
+.page-loader-content .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.3em;
+}
+
+/* Container that has loader must be positioned */
+.card:has(.page-loader-overlay) {
+    position: relative;
+}
+
+/* Disable pointer events when loader is visible */
+.card:has(.page-loader-overlay.show) .card-body > *:not(.page-loader-overlay),
+.card:has(.page-loader-overlay.show) .card-header {
+    pointer-events: none;
+    user-select: none;
+    opacity: 0.6;
+}
+</style>
+
+<script>
+/**
+ * Show page loader overlay
+ * @param {string} containerId - ID of the container (without 'Loader' suffix)
+ */
+function showPageLoader(containerId = 'pageLoaderContainer') {
+    const loader = document.getElementById(containerId + 'Loader');
+    if (loader) {
+        loader.classList.add('show');
+    }
+}
+
+/**
+ * Hide page loader overlay
+ * @param {string} containerId - ID of the container (without 'Loader' suffix)
+ */
+function hidePageLoader(containerId = 'pageLoaderContainer') {
+    const loader = document.getElementById(containerId + 'Loader');
+    if (loader) {
+        loader.classList.remove('show');
+    }
+}
+
+/**
+ * Check if page loader is currently visible
+ * @param {string} containerId - ID of the container (without 'Loader' suffix)
+ * @returns {boolean} True if loader is visible
+ */
+function isPageLoaderVisible(containerId = 'pageLoaderContainer') {
+    const loader = document.getElementById(containerId + 'Loader');
+    return loader && loader.classList.contains('show');
+}
+
+/**
+ * Update page loader text
+ * @param {string} newText - New loading text to display
+ * @param {string} containerId - ID of the container (without 'Loader' suffix)
+ */
+function updatePageLoaderText(newText, containerId = 'pageLoaderContainer') {
+    const loader = document.getElementById(containerId + 'Loader');
+    if (loader) {
+        const textElement = loader.querySelector('p');
+        if (textElement) {
+            textElement.textContent = newText;
+        }
+    }
+}
+</script>

@@ -80,25 +80,15 @@ class AuthenticationServiceCore {
 
     required.forEach((field) => {
       // eslint-disable-next-line security/detect-object-injection
-      if (
-        !userData[field]
-        || typeof userData[field] !== 'string'
-        || userData[field].trim() === ''
-      ) {
-        throw new Parse.Error(
-          Parse.Error.VALIDATION_ERROR,
-          `${field} is required`
-        );
+      if (!userData[field] || typeof userData[field] !== 'string' || userData[field].trim() === '') {
+        throw new Parse.Error(Parse.Error.VALIDATION_ERROR, `${field} is required`);
       }
     });
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(userData.email)) {
-      throw new Parse.Error(
-        Parse.Error.VALIDATION_ERROR,
-        'Invalid email format'
-      );
+      throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Invalid email format');
     }
 
     // Validate username format (alphanumeric and underscores only)
@@ -114,7 +104,6 @@ class AuthenticationServiceCore {
   /**
    * Checks if user already exists.
    * @param {string} email - Email to check.
-   * @param email
    * @param {string} username - Username to check.
    * @throws {Parse.Error} If user exists.
    * @example
@@ -132,6 +121,7 @@ class AuthenticationServiceCore {
     emailQuery.equalTo('email', email.toLowerCase());
     const existingEmail = await emailQuery.first({ useMasterKey: true });
 
+    // Throw error if email already registered
     if (existingEmail) {
       throw new Parse.Error(Parse.Error.USERNAME_TAKEN, 'Email already exists');
     }
@@ -141,11 +131,9 @@ class AuthenticationServiceCore {
     usernameQuery.equalTo('username', username.toLowerCase());
     const existingUsername = await usernameQuery.first({ useMasterKey: true });
 
+    // Throw error if username already taken
     if (existingUsername) {
-      throw new Parse.Error(
-        Parse.Error.USERNAME_TAKEN,
-        'Username already exists'
-      );
+      throw new Parse.Error(Parse.Error.USERNAME_TAKEN, 'Username already exists');
     }
   }
 
@@ -176,7 +164,6 @@ class AuthenticationServiceCore {
   /**
    * Finds user by email.
    * @param {string} email - User email.
-   * @param email
    * @returns {Promise<AmexingUser|null>} - User object or null.
    * @example
    * // Authentication service usage
@@ -240,9 +227,10 @@ class AuthenticationServiceCore {
     let roleObjectId = null;
     const rolePointer = user.get('roleId');
 
+    // Process role pointer if it exists
     if (rolePointer) {
       try {
-        // Check if rolePointer is already a fetched object or just a pointer
+        // Check if role is already fetched or just a pointer
         if (rolePointer.get && typeof rolePointer.get === 'function') {
           // Role object is already fetched
           roleName = rolePointer.get('name') || 'guest';
@@ -250,8 +238,10 @@ class AuthenticationServiceCore {
         } else if (typeof rolePointer === 'string') {
           // rolePointer is a string ID (backward compatibility)
           const roleQuery = new Parse.Query('Role');
-          roleQuery.equalTo('objectId', rolePointer);
-          const roleObject = await roleQuery.first({ useMasterKey: true });
+          const roleObject = await roleQuery.get(rolePointer, {
+            useMasterKey: true,
+          });
+          // Extract role name if found
           if (roleObject) {
             roleName = roleObject.get('name') || 'guest';
             roleObjectId = roleObject.id;
@@ -259,8 +249,10 @@ class AuthenticationServiceCore {
         } else {
           // rolePointer is a pointer object, fetch it
           const roleQuery = new Parse.Query('Role');
-          roleQuery.equalTo('objectId', rolePointer.id);
-          const roleObject = await roleQuery.first({ useMasterKey: true });
+          const roleObject = await roleQuery.get(rolePointer.id, {
+            useMasterKey: true,
+          });
+          // Extract role name if found
           if (roleObject) {
             roleName = roleObject.get('name') || 'guest';
             roleObjectId = roleObject.id;
@@ -269,13 +261,10 @@ class AuthenticationServiceCore {
       } catch (roleError) {
         // Fall back to old role field if new relationship fails
         roleName = user.get('role') || 'guest';
-        logger.warn(
-          'Failed to resolve role from Pointer, falling back to string role',
-          {
-            userId: user.id,
-            error: roleError.message,
-          }
-        );
+        logger.warn('Failed to resolve role from Pointer, falling back to string role', {
+          userId: user.id,
+          error: roleError.message,
+        });
       }
     } else {
       // Fall back to old role field if no roleId
@@ -292,17 +281,11 @@ class AuthenticationServiceCore {
       iat: Math.floor(Date.now() / 1000),
     };
 
-    const accessToken = jwt.sign(
-      { ...payload, type: 'access' },
-      this.jwtSecret,
-      { expiresIn: this.jwtExpiresIn }
-    );
+    const accessToken = jwt.sign({ ...payload, type: 'access' }, this.jwtSecret, { expiresIn: this.jwtExpiresIn });
 
-    const refreshToken = jwt.sign(
-      { ...payload, type: 'refresh' },
-      this.jwtSecret,
-      { expiresIn: this.refreshExpiresIn }
-    );
+    const refreshToken = jwt.sign({ ...payload, type: 'refresh' }, this.jwtSecret, {
+      expiresIn: this.refreshExpiresIn,
+    });
 
     return {
       accessToken,
@@ -315,7 +298,6 @@ class AuthenticationServiceCore {
   /**
    * Masks email for logging purposes.
    * @param {string} email - Email to mask.
-   * @param email
    * @returns {string} - Operation result Masked email.
    * @example
    * // Authentication service usage

@@ -1,0 +1,10 @@
+(AGU) Aeropuerto Internacional de Aguascalientes
+San Miguel de Allende
+(AIFA) Aeropuerto Internacional Felipe Angeles
+(BJX) Aeropuerto Internacional de Leon
+(GDL) Aeropuerto Internacional de Guadalajara
+(MEX) Aeropuerto Internacional Benito Juarez
+(MLM) Aeropuerto Internacional de Morelia
+(QRO) Aeropuerto Internacional de Queretaro
+(SLP) Aeropuerto Internacional de San Luis Potosi
+(TLC) Aeropuerto Internacional de Toluca

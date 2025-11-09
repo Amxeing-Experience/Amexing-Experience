@@ -36,11 +36,11 @@ function getTrendIcon(trend, color) {
 
     const trendStr = trend.toString().toLowerCase();
     if (trendStr.includes('+') || trendStr.includes('up') || trendStr.includes('excellent')) {
-        return 'ti-arrow-up-right';
+        return 'ti ti-arrow-up-right';
     } else if (trendStr.includes('-') || trendStr.includes('down') || trendStr.includes('poor')) {
-        return 'ti-arrow-down-right';
+        return 'ti ti-arrow-down-right';
     } else {
-        return 'ti-arrow-right';
+        return 'ti ti-arrow-right';
     }
 }
 

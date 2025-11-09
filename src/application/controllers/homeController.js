@@ -19,7 +19,7 @@ const logger = require('../../infrastructure/logger');
  * - Platform feature and technology showcasing.
  * @class HomeController
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);

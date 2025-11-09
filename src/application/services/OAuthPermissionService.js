@@ -63,56 +63,26 @@ class OAuthPermissionService {
     this.permissionMappings = new Map([
       // Google Workspace Groups
       ['google_admin', ['admin_full', 'user_management', 'system_config']],
-      [
-        'google_manager',
-        ['team_management', 'employee_access', 'department_admin'],
-      ],
+      ['google_manager', ['team_management', 'employee_access', 'department_admin']],
       ['google_employee', ['basic_access', 'profile_management']],
       ['google_hr', ['employee_management', 'department_access', 'audit_read']],
       ['google_it', ['system_admin', 'user_support', 'technical_access']],
-      [
-        'google_finance',
-        ['financial_access', 'billing_management', 'report_access'],
-      ],
+      ['google_finance', ['financial_access', 'billing_management', 'report_access']],
 
       // Microsoft Azure AD Groups
-      [
-        'azure_global_admin',
-        ['admin_full', 'user_management', 'system_config', 'compliance_admin'],
-      ],
-      [
-        'azure_user_admin',
-        ['user_management', 'employee_access', 'department_admin'],
-      ],
-      [
-        'azure_helpdesk_admin',
-        ['user_support', 'basic_admin', 'password_reset'],
-      ],
-      [
-        'azure_security_admin',
-        ['security_config', 'audit_full', 'compliance_read'],
-      ],
-      [
-        'azure_billing_admin',
-        ['billing_management', 'financial_access', 'subscription_admin'],
-      ],
+      ['azure_global_admin', ['admin_full', 'user_management', 'system_config', 'compliance_admin']],
+      ['azure_user_admin', ['user_management', 'employee_access', 'department_admin']],
+      ['azure_helpdesk_admin', ['user_support', 'basic_admin', 'password_reset']],
+      ['azure_security_admin', ['security_config', 'audit_full', 'compliance_read']],
+      ['azure_billing_admin', ['billing_management', 'financial_access', 'subscription_admin']],
 
       // Department-specific permissions
       ['dept_sistemas', ['technical_access', 'system_support', 'user_support']],
-      [
-        'dept_recursos_humanos',
-        ['employee_management', 'hr_access', 'compliance_read'],
-      ],
+      ['dept_recursos_humanos', ['employee_management', 'hr_access', 'compliance_read']],
       ['dept_finanzas', ['financial_access', 'billing_read', 'report_access']],
-      [
-        'dept_operaciones',
-        ['operations_access', 'logistics_management', 'vendor_access'],
-      ],
+      ['dept_operaciones', ['operations_access', 'logistics_management', 'vendor_access']],
       ['dept_eventos', ['event_management', 'client_access', 'booking_admin']],
-      [
-        'dept_administracion',
-        ['admin_access', 'document_management', 'general_admin'],
-      ],
+      ['dept_administracion', ['admin_access', 'document_management', 'general_admin']],
     ]);
 
     // Permission levels hierarchy
@@ -162,10 +132,7 @@ class OAuthPermissionService {
       const sourceGroups = [];
 
       // Extract groups from OAuth profile based on provider
-      const groups = await this.extractGroupsFromProfile(
-        oauthProfile,
-        _provider
-      );
+      const groups = await this.extractGroupsFromProfile(oauthProfile, _provider);
 
       for (const group of groups) {
         const normalizedGroup = this.normalizeGroupName(group, _provider);
@@ -192,11 +159,7 @@ class OAuthPermissionService {
       });
 
       // Apply permissions to user
-      await this.applyPermissionsToUser(
-        user,
-        Array.from(inheritedPermissions),
-        'oauth_inherited'
-      );
+      await this.applyPermissionsToUser(user, Array.from(inheritedPermissions), 'oauth_inherited');
 
       logger.logSecurityEvent('OAUTH_PERMISSIONS_INHERITED', userId, {
         provider, // eslint-disable-line no-undef
@@ -246,13 +209,8 @@ class OAuthPermissionService {
         }
 
         // Try to get groups from Google Admin SDK if available
-        if (
-          oauthProfile.hd
-          && process.env.GOOGLE_ADMIN_SDK_ENABLED === 'true'
-        ) {
-          const adminGroups = await this.getGoogleAdminGroups(
-            oauthProfile.email
-          );
+        if (oauthProfile.hd && process.env.GOOGLE_ADMIN_SDK_ENABLED === 'true') {
+          const adminGroups = await this.getGoogleAdminGroups(oauthProfile.email);
           groups = groups.concat(adminGroups);
         }
       } else if (_provider === 'microsoft') {
@@ -272,15 +230,10 @@ class OAuthPermissionService {
 
         // Try to get groups from Microsoft Graph API
         try {
-          const graphGroups = await this.getMicrosoftGraphGroups(
-            oauthProfile.accesstoken
-          );
+          const graphGroups = await this.getMicrosoftGraphGroups(oauthProfile.accesstoken);
           groups = groups.concat(graphGroups);
         } catch (graphError) {
-          logger.warn(
-            'Could not fetch Microsoft Graph groups:',
-            graphError.message
-          );
+          logger.warn('Could not fetch Microsoft Graph groups:', graphError.message);
         }
       }
 
@@ -333,15 +286,12 @@ class OAuthPermissionService {
    */
   async getMicrosoftGraphGroups(accessToken) {
     try {
-      const response = await fetch(
-        'https://graph.microsoft.com/v1.0/me/memberOf',
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      const response = await fetch('https://graph.microsoft.com/v1.0/me/memberOf', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       if (!response.ok) {
         throw new Error(`Microsoft Graph API error: ${response.status}`);
@@ -398,9 +348,7 @@ class OAuthPermissionService {
    */
   async createPermissionInheritance(inheritanceData) {
     try {
-      const PermissionInheritanceClass = Parse.Object.extend(
-        'PermissionInheritance'
-      );
+      const PermissionInheritanceClass = Parse.Object.extend('PermissionInheritance');
       const inheritance = new PermissionInheritanceClass();
 
       inheritance.set('userId', inheritanceData.userId);
@@ -478,9 +426,7 @@ class OAuthPermissionService {
    */
   async getDepartmentPermissions(userId, departmentId) {
     try {
-      const departmentPermissions = this.permissionMappings.get(
-        `dept_${departmentId}`
-      );
+      const departmentPermissions = this.permissionMappings.get(`dept_${departmentId}`);
 
       if (!departmentPermissions) {
         return [];
@@ -528,10 +474,7 @@ class OAuthPermissionService {
 
       // Check context-specific permissions
       if (context) {
-        const contextPermissions = await this.getContextPermissions(
-          userId,
-          context
-        );
+        const contextPermissions = await this.getContextPermissions(userId, context);
         if (contextPermissions.includes(permission)) {
           return true;
         }
@@ -587,7 +530,6 @@ class OAuthPermissionService {
   /**
    * Masks email for logging.
    * @param {string} email - Email address.
-   * @param email
    * @returns {string} - Operation result Masked email.
    * @example
    * // OAuth service usage

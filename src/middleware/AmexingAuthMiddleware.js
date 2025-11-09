@@ -10,8 +10,8 @@
  * - Context-aware authorization
  * - Rate limiting per user role.
  * @author Claude Code + Technical Team
- * @version 2.0
- * @date 2025-09-11
+ * @version 1.0
+ * @date 2024-09-11
  * @example
  * // Authentication middleware usage
  * app.use('/api', authMiddleware);
@@ -43,8 +43,8 @@ const PermissionService = require('../services/PermissionService');
  * - Token expiration and renewal mechanisms.
  * @class AmexingAuthMiddleware
  * @author Claude Code + Technical Team
- * @version 2.0
- * @since 2025-09-11
+ * @version 1.0
+ * @since 2024-09-11
  * @example
  * // const result = await authService.login(credentials);
  * // Returns: { success: true, user: {...}, tokens: {...} }
@@ -242,9 +242,7 @@ class AmexingAuthMiddleware {
       }
 
       // Normalize permissions to array
-      const requiredPermissions = Array.isArray(permissions)
-        ? permissions
-        : [permissions];
+      const requiredPermissions = Array.isArray(permissions) ? permissions : [permissions];
 
       // Build context for permission checking
       const context = this.buildPermissionContext(req, options);
@@ -627,7 +625,6 @@ class AmexingAuthMiddleware {
   /**
    * Update session activity timestamp.
    * @param {string} jti - JWT ID.
-   * @param {*} jti - _jti parameter.
    * @param _jti
    * @example
    * // Authentication middleware usage
@@ -701,11 +698,7 @@ class AmexingAuthMiddleware {
       if (requireAll) {
         // User must have all permissions
         for (const permission of permissions) {
-          const hasPermission = await PermissionService.hasPermission(
-            userId,
-            permission,
-            context
-          );
+          const hasPermission = await PermissionService.hasPermission(userId, permission, context);
           if (!hasPermission) {
             return false;
           }
@@ -714,11 +707,7 @@ class AmexingAuthMiddleware {
       }
       // User must have at least one permission
       for (const permission of permissions) {
-        const hasPermission = await PermissionService.hasPermission(
-          userId,
-          permission,
-          context
-        );
+        const hasPermission = await PermissionService.hasPermission(userId, permission, context);
         if (hasPermission) {
           return true;
         }
@@ -757,25 +746,21 @@ class AmexingAuthMiddleware {
 
       if (user.departmentId) {
         // Load department information
-        const department = await this.authService.db
-          .collection('Department')
-          .findOne({
-            id: user.departmentId,
-            active: true,
-            deleted: false,
-          });
+        const department = await this.authService.db.collection('Department').findOne({
+          id: user.departmentId,
+          active: true,
+          deleted: false,
+        });
         context.department = department;
       }
 
       if (user.employeeId) {
         // Load employee information
-        const employee = await this.authService.db
-          .collection('ClientEmployee')
-          .findOne({
-            id: user.employeeId,
-            active: true,
-            deleted: false,
-          });
+        const employee = await this.authService.db.collection('ClientEmployee').findOne({
+          id: user.employeeId,
+          active: true,
+          deleted: false,
+        });
         context.employee = employee;
       }
 
@@ -789,7 +774,6 @@ class AmexingAuthMiddleware {
   /**
    * Validate OAuth token.
    * @param {string} token - OAuth token.
-   * @param token
    * @param _token
    * @returns {object | null} - Operation result Token data.
    * @example

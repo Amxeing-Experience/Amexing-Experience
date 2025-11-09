@@ -39,16 +39,23 @@ describe('Dashboard Header Organism - Baseline Tests', () => {
     test('should include mobile sidebar toggle', async () => {
       const html = await renderComponent(componentPath);
       expect(html).toContain('d-lg-none');
-      expect(html).toContain('headerCollapse');
+      expect(html).toContain('sidebar-toggle-mobile');
       expect(html).toContain('ti-menu-2');
     });
 
     test('should have proper mobile toggle attributes', async () => {
       const html = await renderComponent(componentPath);
 
-      expect(html).toContain('id="headerCollapse"');
+      expect(html).toContain('sidebar-toggle-mobile');
       expect(html).toContain('type="button"');
-      expect(html).toContain('aria-label="Toggle sidebar"');
+      expect(html).toContain('aria-label="Abrir menú"');
+    });
+
+    test('should include desktop sidebar toggle', async () => {
+      const html = await renderComponent(componentPath);
+      expect(html).toContain('d-none d-lg-block');
+      expect(html).toContain('sidebar-toggle-desktop');
+      expect(html).toContain('ti-menu-2');
     });
   });
 
@@ -240,13 +247,19 @@ describe('Dashboard Header Organism - Baseline Tests', () => {
     test('should have proper ARIA attributes', async () => {
       const html = await renderComponent(componentPath);
       expect(html).toContain('aria-expanded="false"');
-      expect(html).toContain('aria-label="Toggle sidebar"');
+      // Updated to match new sidebar toggle implementation
+      expect(html).toContain('aria-label="Abrir menú"');
     });
 
     test('should have tooltip attributes', async () => {
       const html = await renderComponent(componentPath);
       expect(html).toContain('data-bs-toggle="tooltip"');
       expect(html).toContain('title="Online"');
+    });
+
+    test('should have desktop sidebar toggle ARIA attributes', async () => {
+      const html = await renderComponent(componentPath);
+      expect(html).toContain('aria-label="Colapsar menú"');
     });
   });
 

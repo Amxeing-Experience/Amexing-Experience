@@ -417,14 +417,10 @@ class PermissionContextService {
     try {
       // Get available contexts to validate the switch
       const availableContexts = await this.getAvailableContexts(userId);
-      const targetContext = availableContexts.find(
-        (ctx) => ctx.id === contextId
-      );
+      const targetContext = availableContexts.find((ctx) => ctx.id === contextId);
 
       if (!targetContext) {
-        throw new Error(
-          `Context ${contextId} not available for user ${userId}`
-        );
+        throw new Error(`Context ${contextId} not available for user ${userId}`);
       }
 
       // Validate context access if required
@@ -433,10 +429,7 @@ class PermissionContextService {
       }
 
       // Get or create permission context record
-      const contextRecord = await this.getOrCreateContextRecord(
-        userId,
-        sessionId
-      );
+      const contextRecord = await this.getOrCreateContextRecord(userId, sessionId);
 
       // Update current context
       contextRecord.set('currentContext', contextId);
@@ -539,10 +532,7 @@ class PermissionContextService {
     try {
       switch (context.type) {
         case 'department':
-          await this.validateDepartmentAccess(
-            userId,
-            context.metadata.departmentId
-          );
+          await this.validateDepartmentAccess(userId, context.metadata.departmentId);
           break;
         case 'project':
           await this.validateProjectAccess(userId, context.metadata.projectId);

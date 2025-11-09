@@ -54,6 +54,9 @@ const currentTheme = roleThemes[dashboardUserRole] || roleThemes.guest;
     /* Dashboard Layout Fixes */
     .app-header {
         top: 0 !important;
+        position: relative !important;
+        z-index: 10;
+        width: 100% !important;
     }
 
     @media (max-width: 991.98px) {

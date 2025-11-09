@@ -1,0 +1,100 @@
+<%
+// Modal Loader Atom - Loading overlay for blocking modal interaction during data loading
+// Default parameters
+const loaderText = typeof text !== 'undefined' ? text : 'Cargando datos...';
+const loaderSpinnerColor = typeof spinnerColor !== 'undefined' ? spinnerColor : 'primary';
+%>
+
+<!-- Modal Loader Overlay -->
+<div class="modal-loader-overlay" style="display: none;">
+    <div class="modal-loader-content">
+        <div class="spinner-border text-<%= loaderSpinnerColor %>" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3 mb-0 text-<%= loaderSpinnerColor %> fw-semibold"><%= loaderText %></p>
+    </div>
+</div>
+
+<style>
+.modal-loader-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.95);
+    z-index: 1060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-loader-overlay.show {
+    display: flex !important;
+}
+
+.modal-loader-content {
+    text-align: center;
+    padding: 2rem;
+}
+
+.modal-loader-content .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.3em;
+}
+
+.modal-content {
+    position: relative;
+}
+
+.modal-content:has(.modal-loader-overlay.show) .modal-body,
+.modal-content:has(.modal-loader-overlay.show) .modal-footer {
+    pointer-events: none;
+    user-select: none;
+}
+</style>
+
+<script>
+/**
+ * Show modal loader overlay
+ * @param {string} modalId - ID of the modal to show loader in
+ */
+function showModalLoader(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        const loader = modal.querySelector('.modal-loader-overlay');
+        if (loader) {
+            loader.classList.add('show');
+        }
+    }
+}
+
+/**
+ * Hide modal loader overlay
+ * @param {string} modalId - ID of the modal to hide loader from
+ */
+function hideModalLoader(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        const loader = modal.querySelector('.modal-loader-overlay');
+        if (loader) {
+            loader.classList.remove('show');
+        }
+    }
+}
+
+/**
+ * Check if modal loader is currently visible
+ * @param {string} modalId - ID of the modal to check
+ * @returns {boolean} True if loader is visible
+ */
+function isModalLoaderVisible(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        const loader = modal.querySelector('.modal-loader-overlay');
+        return loader && loader.classList.contains('show');
+    }
+    return false;
+}
+</script>

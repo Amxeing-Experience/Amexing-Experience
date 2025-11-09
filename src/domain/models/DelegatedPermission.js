@@ -10,7 +10,7 @@
  * - Automatic expiration and cleanup
  * - Hierarchical delegation validation.
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 2024-09-24
  * @example
  * // Delegate booking approval permission with amount limit
@@ -59,11 +59,7 @@ class DelegatedPermission extends BaseModel {
   static create(delegationData) {
     // Validate required fields
     const hasPermission = delegationData.permission || delegationData.permissions;
-    if (
-      !delegationData.fromUserId
-      || !delegationData.toUserId
-      || !hasPermission
-    ) {
+    if (!delegationData.fromUserId || !delegationData.toUserId || !hasPermission) {
       throw new Error('From user, to user, and permission are required');
     }
 
@@ -105,15 +101,9 @@ class DelegatedPermission extends BaseModel {
 
     // Metadata
     delegation.set('reason', delegationData.reason || '');
-    delegation.set(
-      'delegationType',
-      delegationData.delegationType || 'temporary'
-    ); // 'temporary', 'permanent', 'emergency'
+    delegation.set('delegationType', delegationData.delegationType || 'temporary'); // 'temporary', 'permanent', 'emergency'
     delegation.set('priority', delegationData.priority || 0);
-    delegation.set(
-      'approvalRequired',
-      delegationData.approvalRequired || false
-    );
+    delegation.set('approvalRequired', delegationData.approvalRequired || false);
     delegation.set('approvedBy', delegationData.approvedBy || null);
     delegation.set('approvedAt', delegationData.approvedAt || null);
 
@@ -126,21 +116,24 @@ class DelegatedPermission extends BaseModel {
     delegation.set('usageHistory', []); // Initialize empty usage history
     delegation.set('extensionHistory', []); // Initialize empty extension history
 
-    // Audit information
-    delegation.set('createdBy', delegationData.fromUserId);
+    // Audit information - Set createdBy as Pointer to AmexingUser
+    if (delegationData.fromUserId) {
+      if (typeof delegationData.fromUserId === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const createdByPointer = new AmexingUser();
+        createdByPointer.id = delegationData.fromUserId;
+        delegation.set('createdBy', createdByPointer);
+      } else {
+        delegation.set('createdBy', delegationData.fromUserId);
+      }
+    }
     delegation.set('revokedBy', null);
     delegation.set('revokedAt', null);
     delegation.set('revocationReason', null);
 
     // Base model fields
-    delegation.set(
-      'active',
-      delegationData.active !== undefined ? delegationData.active : true
-    );
-    delegation.set(
-      'exists',
-      delegationData.exists !== undefined ? delegationData.exists : true
-    );
+    delegation.set('active', delegationData.active !== undefined ? delegationData.active : true);
+    delegation.set('exists', delegationData.exists !== undefined ? delegationData.exists : true);
 
     return delegation;
   }
@@ -149,6 +142,7 @@ class DelegatedPermission extends BaseModel {
    * Check if delegation is currently valid.
    * @returns {boolean} - True if delegation is valid and active.
    * @example
+   * // Usage example documented above
    */
   isValid() {
     const now = new Date();
@@ -177,6 +171,7 @@ class DelegatedPermission extends BaseModel {
    * Check if delegation has expired.
    * @returns {boolean} - True if delegation has expired.
    * @example
+   * // Usage example documented above
    */
   isExpired() {
     const expiresAt = this.get('expiresAt') || this.get('validUntil');
@@ -190,6 +185,7 @@ class DelegatedPermission extends BaseModel {
    * Check if delegation is active.
    * @returns {boolean} - True if delegation is active.
    * @example
+   * // Usage example documented above
    */
   isActive() {
     return this.get('active') === true && this.get('status') === 'active';
@@ -201,6 +197,7 @@ class DelegatedPermission extends BaseModel {
    * @param {object} context - Context for conditional validation.
    * @returns {boolean} - Returns true if permission is delegated and valid.
    * @example
+   * // Usage example documented above
    */
   hasPermission(permission, context = {}) {
     // Check if delegation is valid
@@ -217,8 +214,7 @@ class DelegatedPermission extends BaseModel {
     const singlePermission = this.get('permission');
     const delegatedPermissions = this.get('permissions') || [];
 
-    const hasPermissionMatch = singlePermission === permission
-      || delegatedPermissions.includes(permission);
+    const hasPermissionMatch = singlePermission === permission || delegatedPermissions.includes(permission);
     if (!hasPermissionMatch) {
       return false;
     }
@@ -244,10 +240,7 @@ class DelegatedPermission extends BaseModel {
     if (delegationContext.timeRestriction && context.timestamp) {
       const time = new Date(context.timestamp);
       const hour = time.getHours();
-      if (
-        delegationContext.timeRestriction === 'business'
-        && (hour < 9 || hour > 17)
-      ) {
+      if (delegationContext.timeRestriction === 'business' && (hour < 9 || hour > 17)) {
         return false;
       }
     }
@@ -266,6 +259,7 @@ class DelegatedPermission extends BaseModel {
    * @param {object} context - Context of the usage.
    * @returns {boolean} - Returns true if usage was tracked successfully.
    * @example
+   * // Usage example documented above
    */
   trackUsage(context = {}) {
     const currentCount = this.get('usageCount') || 0;
@@ -305,6 +299,7 @@ class DelegatedPermission extends BaseModel {
    * @param {object} context - Context of the usage.
    * @returns {boolean} - Returns true if usage was recorded successfully.
    * @example
+   * // Usage example documented above
    */
   recordUsage(context = {}) {
     return this.trackUsage(context);
@@ -314,6 +309,7 @@ class DelegatedPermission extends BaseModel {
    * Check if usage limit has been reached.
    * @returns {boolean} - True if limit reached or exceeded.
    * @example
+   * // Usage example documented above
    */
   hasReachedUsageLimit() {
     const usageCount = this.get('usageCount') || 0;
@@ -332,6 +328,7 @@ class DelegatedPermission extends BaseModel {
    * @param {string} revokedBy - ID of user revoking the delegation (optional).
    * @returns {void}
    * @example
+   * // Usage example documented above
    */
   revoke(reason = '', revokedBy = null) {
     this.set('status', 'revoked');
@@ -346,6 +343,7 @@ class DelegatedPermission extends BaseModel {
    * @param {Date} newExpiration - New expiration date.
    * @returns {void}
    * @example
+   * // Usage example documented above
    */
   extendExpiration(newExpiration) {
     if (newExpiration <= new Date()) {
@@ -373,15 +371,13 @@ class DelegatedPermission extends BaseModel {
    * @param {object} context - Context to validate.
    * @returns {boolean} - True if context is valid.
    * @example
+   * // Usage example documented above
    */
   validateContext(context = {}) {
     const delegationContext = this.get('context') || this.get('conditions') || {};
 
     // If amount is required but not provided
-    if (
-      delegationContext.maxAmount !== undefined
-      && context.amount === undefined
-    ) {
+    if (delegationContext.maxAmount !== undefined && context.amount === undefined) {
       return false;
     }
 
@@ -394,10 +390,7 @@ class DelegatedPermission extends BaseModel {
 
     // Check department constraint
     if (delegationContext.departmentId) {
-      if (
-        !context.departmentId
-        || context.departmentId !== delegationContext.departmentId
-      ) {
+      if (!context.departmentId || context.departmentId !== delegationContext.departmentId) {
         return false;
       }
     }
@@ -418,10 +411,7 @@ class DelegatedPermission extends BaseModel {
       // Check time of day (using UTC to match test expectations)
       if (restrictions.startTime && restrictions.endTime) {
         const currentTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
-        if (
-          currentTime < restrictions.startTime
-          || currentTime > restrictions.endTime
-        ) {
+        if (currentTime < restrictions.startTime || currentTime > restrictions.endTime) {
           return false;
         }
       }
@@ -435,6 +425,7 @@ class DelegatedPermission extends BaseModel {
    * @param {object} context - Context to validate.
    * @returns {boolean} - True if context is valid.
    * @example
+   * // Usage example documented above
    */
   validateTimeContext(context = {}) {
     return this.validateContext(context);
@@ -444,6 +435,7 @@ class DelegatedPermission extends BaseModel {
    * Generate audit report for this delegation.
    * @returns {object} - Audit report data.
    * @example
+   * // Usage example documented above
    */
   generateAuditReport() {
     return {
@@ -477,6 +469,7 @@ class DelegatedPermission extends BaseModel {
    * @param {string} userId - User ID to search for.
    * @returns {Promise<Array>} - List of delegations.
    * @example
+   * // Usage example documented above
    */
   static async findForUser(userId) {
     const query = new Parse.Query(DelegatedPermission);
@@ -493,6 +486,7 @@ class DelegatedPermission extends BaseModel {
    * @param {string} delegatorId - Delegator user ID.
    * @returns {Promise<Array>} - List of delegations.
    * @example
+   * // Usage example documented above
    */
   static async findByDelegator(delegatorId) {
     const query = new Parse.Query(DelegatedPermission);
@@ -508,6 +502,7 @@ class DelegatedPermission extends BaseModel {
    * @param {string} userId - User ID to search for.
    * @returns {Promise<Array>} - List of delegations.
    * @example
+   * // Usage example documented above
    */
   static async findDelegationsForUser(userId) {
     return this.findForUser(userId);
@@ -518,6 +513,7 @@ class DelegatedPermission extends BaseModel {
    * @param {string} delegatorId - Delegator user ID.
    * @returns {Promise<Array>} - List of delegations.
    * @example
+   * // Usage example documented above
    */
   static async findDelegationsByDelegator(delegatorId) {
     return this.findByDelegator(delegatorId);
@@ -529,6 +525,7 @@ class DelegatedPermission extends BaseModel {
    * @param {object} context - Current context.
    * @returns {Promise<object>} - Validation result.
    * @example
+   * // Usage example documented above
    */
   async validateConditions(conditions, context) {
     // Amount restrictions
@@ -569,10 +566,7 @@ class DelegatedPermission extends BaseModel {
 
     // Custom conditions
     if (conditions.customValidator) {
-      const customResult = await this.executeCustomValidator(
-        conditions.customValidator,
-        context
-      );
+      const customResult = await this.executeCustomValidator(conditions.customValidator, context);
       if (!customResult.valid) {
         return customResult;
       }
@@ -587,6 +581,7 @@ class DelegatedPermission extends BaseModel {
    * @param {object} context - Current context.
    * @returns {Promise<object>} - Validation result.
    * @example
+   * // Usage example documented above
    */
   async validateRestrictions(restrictions, context) {
     // Usage limit restrictions
@@ -613,10 +608,7 @@ class DelegatedPermission extends BaseModel {
 
     // IP address restrictions
     if (restrictions.allowedIpRanges && context.ipAddress) {
-      const isAllowed = this.isIpAddressAllowed(
-        context.ipAddress,
-        restrictions.allowedIpRanges
-      );
+      const isAllowed = this.isIpAddressAllowed(context.ipAddress, restrictions.allowedIpRanges);
       if (!isAllowed) {
         return {
           valid: false,
@@ -635,6 +627,7 @@ class DelegatedPermission extends BaseModel {
    * @param {string} reason - Reason for extension.
    * @returns {Promise<boolean>} - Success status.
    * @example
+   * // Usage example documented above
    */
   async extend(newValidUntil, extendedBy, reason = '') {
     try {
@@ -671,6 +664,7 @@ class DelegatedPermission extends BaseModel {
    * Get user who delegated the permissions.
    * @returns {Promise<object|null>} - Delegator user or null.
    * @example
+   * // Usage example documented above
    */
   async getFromUser() {
     try {
@@ -692,6 +686,7 @@ class DelegatedPermission extends BaseModel {
    * Get user who received the delegated permissions.
    * @returns {Promise<object|null>} - Recipient user or null.
    * @example
+   * // Usage example documented above
    */
   async getToUser() {
     try {
@@ -713,6 +708,7 @@ class DelegatedPermission extends BaseModel {
    * Get usage count for today.
    * @returns {Promise<number>} - Today's usage count.
    * @example
+   * // Usage example documented above
    */
   async getTodayUsageCount() {
     // This would query a usage log table
@@ -726,6 +722,7 @@ class DelegatedPermission extends BaseModel {
    * @param {Array<string>} allowedRanges - Allowed IP ranges.
    * @returns {boolean} - True if allowed.
    * @example
+   * // Usage example documented above
    */
   isIpAddressAllowed(ipAddress, allowedRanges) {
     // Basic implementation - would need proper CIDR validation
@@ -738,6 +735,7 @@ class DelegatedPermission extends BaseModel {
    * @param {object} context - Validation context.
    * @returns {Promise<object>} - Validation result.
    * @example
+   * // Usage example documented above
    */
   async executeCustomValidator(validatorName, context) {
     // This would integrate with custom validation service
@@ -754,6 +752,7 @@ class DelegatedPermission extends BaseModel {
    * Get safe JSON representation for API responses.
    * @returns {object} - Safe delegation data.
    * @example
+   * // Usage example documented above
    */
   toSafeJSON() {
     return {
@@ -784,6 +783,7 @@ class DelegatedPermission extends BaseModel {
    * Static method to clean up expired delegations.
    * @returns {Promise<number>} - Number of cleaned delegations.
    * @example
+   * // Usage example documented above
    */
   static async cleanupExpired() {
     try {

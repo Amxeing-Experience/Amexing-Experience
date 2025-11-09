@@ -75,13 +75,10 @@ const getCorporateLandingConfig = async (request) => {
 
           // If client has OAuth configured, set as corporate config
           if (clientInfo.oauthEnabled && clientInfo.corporateDomain) {
-            const domainConfig = OAuthService.getCorporateDomainConfig(
-              `test@${clientInfo.corporateDomain}`
-            );
+            const domainConfig = OAuthService.getCorporateDomainConfig(`test@${clientInfo.corporateDomain}`);
             if (domainConfig) {
               corporateConfig = _domainConfig; // eslint-disable-line no-undef
-              suggestedProvider = clientInfo.primaryOAuthProvider
-                || _domainConfig.primaryProvider; // eslint-disable-line no-undef
+              suggestedProvider = clientInfo.primaryOAuthProvider || _domainConfig.primaryProvider; // eslint-disable-line no-undef
             }
           }
         }
@@ -195,8 +192,7 @@ const generateCorporateOAuthURL = async (request) => {
 
     const authURL = await OAuthService.generateAuthorizationURL(
       _provider,
-      redirectUri
-        || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/${_provider}/callback`,
+      redirectUri || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/${_provider}/callback`,
       state
     );
 
@@ -241,10 +237,7 @@ const validateCorporateLandingAccess = async (request) => {
 
     // Basic validation
     if (!clientSlug) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'Client slug is required'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Client slug is required');
     }
 
     // Find client
@@ -328,9 +321,7 @@ const validateCorporateLandingAccess = async (request) => {
         corporateDomain: client.get('corporateDomain'),
       },
       departmentInfo,
-      message: accessGranted
-        ? 'Access granted to corporate landing page'
-        : 'Access restricted - SSO required',
+      message: accessGranted ? 'Access granted to corporate landing page' : 'Access restricted - SSO required',
     };
   } catch (error) {
     logger.error('Error validating corporate landing access:', error);
@@ -356,10 +347,7 @@ const getCorporateClientDepartments = async (request) => {
     const { clientSlug } = request.params;
 
     if (!clientSlug) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'Client slug is required'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Client slug is required');
     }
 
     // Find client

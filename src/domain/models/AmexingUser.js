@@ -38,7 +38,7 @@ const BaseModel = require('./BaseModel');
  * @class AmexingUser
  * @augments Parse.Object
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -96,18 +96,12 @@ class AmexingUser extends BaseModel {
     }
 
     // Validate organization ID format
-    if (
-      userData.organizationId
-      && !/^[a-z0-9_-]+$/i.test(userData.organizationId)
-    ) {
+    if (userData.organizationId && !/^[a-z0-9_-]+$/i.test(userData.organizationId)) {
       throw new Error('Invalid organization ID format');
     }
 
     // Validate contextual data structure
-    if (
-      userData.contextualData
-      && typeof userData.contextualData !== 'object'
-    ) {
+    if (userData.contextualData && typeof userData.contextualData !== 'object') {
       throw new Error('Contextual data must be an object');
     }
 
@@ -121,9 +115,17 @@ class AmexingUser extends BaseModel {
 
     // Role system (new RBAC) - Handle both Pointer objects and string IDs
     if (userData.roleId) {
-      // If roleId is a Role object (Pointer), set it directly
-      // If it's a string ID, we'll need to convert it to a Pointer in the service layer
-      user.set('roleId', userData.roleId);
+      // If roleId is a string, create a Pointer object
+      if (typeof userData.roleId === 'string') {
+        // Create a pointer-like object that Parse Server will understand
+        const Role = require('./Role');
+        const rolePointer = new Role();
+        rolePointer.id = userData.roleId;
+        user.set('roleId', rolePointer);
+      } else {
+        // Already a Pointer object
+        user.set('roleId', userData.roleId);
+      }
     }
     if (userData.role) {
       // Backward compatibility: set legacy role field when provided
@@ -154,9 +156,29 @@ class AmexingUser extends BaseModel {
     // Contextual data for permissions
     user.set('contextualData', userData.contextualData || {});
 
-    // Audit fields
-    user.set('createdBy', userData.createdBy || null);
-    user.set('modifiedBy', userData.modifiedBy || null);
+    // Audit fields - Handle both User objects and string IDs as Pointers
+    if (userData.createdBy) {
+      if (typeof userData.createdBy === 'string') {
+        // Create a Pointer to AmexingUser
+        const createdByPointer = new AmexingUser();
+        createdByPointer.id = userData.createdBy;
+        user.set('createdBy', createdByPointer);
+      } else {
+        // Already a User object
+        user.set('createdBy', userData.createdBy);
+      }
+    }
+    if (userData.modifiedBy) {
+      if (typeof userData.modifiedBy === 'string') {
+        // Create a Pointer to AmexingUser
+        const modifiedByPointer = new AmexingUser();
+        modifiedByPointer.id = userData.modifiedBy;
+        user.set('modifiedBy', modifiedByPointer);
+      } else {
+        // Already a User object
+        user.set('modifiedBy', userData.modifiedBy);
+      }
+    }
 
     return user;
   }
@@ -181,6 +203,10 @@ class AmexingUser extends BaseModel {
     const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
+    // Save hash in both fields for compatibility
+    // 'password' is used by authentication system
+    // 'passwordHash' kept for backwards compatibility
+    this.set('password', hashedPassword);
     this.set('passwordHash', hashedPassword);
     this.set('passwordChangedAt', new Date());
     this.set('mustChangePassword', false);
@@ -216,7 +242,9 @@ class AmexingUser extends BaseModel {
    * }
    */
   async validatePassword(password) {
-    const hashedPassword = this.get('passwordHash');
+    // Try 'password' field first (used by authentication system)
+    // Fall back to 'passwordHash' for backwards compatibility
+    const hashedPassword = this.get('password') || this.get('passwordHash');
     if (!hashedPassword) {
       return false;
     }
@@ -325,10 +353,7 @@ class AmexingUser extends BaseModel {
      * // Returns: model operation result
      */
     if (errors.length > 0) {
-      throw new Parse.Error(
-        Parse.Error.VALIDATION_ERROR,
-        `Password validation failed: ${errors.join(', ')}`
-      );
+      throw new Parse.Error(Parse.Error.VALIDATION_ERROR, `Password validation failed: ${errors.join(', ')}`);
     }
   }
 
@@ -442,8 +467,7 @@ class AmexingUser extends BaseModel {
 
     // Check if account already exists
     const existingIndex = existingAccounts.findIndex(
-      (account) => account.provider === oauthData.provider
-        && account.providerId === oauthData.providerId
+      (account) => account.provider === oauthData.provider && account.providerId === oauthData.providerId
     );
 
     if (existingIndex >= 0) {
@@ -493,10 +517,7 @@ class AmexingUser extends BaseModel {
 
     // Update primary provider if needed
     if (this.get('primaryOAuthProvider') === provider) {
-      this.set(
-        'primaryOAuthProvider',
-        filteredAccounts.length > 0 ? filteredAccounts[0].provider : null
-      );
+      this.set('primaryOAuthProvider', filteredAccounts.length > 0 ? filteredAccounts[0].provider : null);
     }
   }
 
@@ -742,9 +763,15 @@ class AmexingUser extends BaseModel {
    * Get the user's role object.
    * @returns {Promise<object|null>} - Role object or null.
    * @example
+   * // Usage example documented above
    */
   async getRole() {
     try {
+      // Check if we have a cached role from JWT middleware
+      if (this._cachedRole) {
+        return this._cachedRole;
+      }
+
       const rolePointer = this.get('roleId');
       if (!rolePointer) {
         return null;
@@ -767,10 +794,25 @@ class AmexingUser extends BaseModel {
       }
 
       const Role = require('./Role');
-      const query = BaseModel.queryActive('Role');
-      query.equalTo('objectId', roleId);
+      // IMPORTANT: Use new Parse.Query(Role) to get Role class instances
+      // NOT BaseModel.queryActive() which returns generic Parse.Objects
+      const query = new Parse.Query(Role);
+      query.equalTo('active', true);
+      query.equalTo('exists', true);
 
-      return await query.first({ useMasterKey: true });
+      const roleObject = await query.get(roleId, { useMasterKey: true });
+
+      // If the object is not already a Role instance, wrap it
+      if (roleObject && !(roleObject instanceof Role)) {
+        // Create a new Role instance from the generic object
+        const role = Parse.Object.fromJSON({
+          className: 'Role',
+          ...roleObject.toJSON(),
+        });
+        return role;
+      }
+
+      return roleObject;
     } catch (error) {
       logger.error('Error fetching user role', {
         userId: this.id,
@@ -785,6 +827,7 @@ class AmexingUser extends BaseModel {
    * Get user's role name for backward compatibility.
    * @returns {Promise<string>} - Role name or 'guest'.
    * @example
+   * // Usage example documented above
    */
   async getRoleName() {
     try {
@@ -805,6 +848,7 @@ class AmexingUser extends BaseModel {
    * @param {object} context - Context for conditional permissions.
    * @returns {Promise<boolean>} - True if user has permission.
    * @example
+   * // Usage example documented above
    */
   async hasPermission(permission, context = {}) {
     try {
@@ -834,10 +878,7 @@ class AmexingUser extends BaseModel {
           };
         }
 
-        rolePermission = await role.hasContextualPermission(
-          permission,
-          finalContext
-        );
+        rolePermission = await role.hasContextualPermission(permission, finalContext);
       }
 
       if (rolePermission) {
@@ -845,10 +886,7 @@ class AmexingUser extends BaseModel {
       }
 
       // Check delegated permissions
-      const hasDelegatedPermission = await this.hasDelegatedPermission(
-        permission,
-        context
-      );
+      const hasDelegatedPermission = await this.hasDelegatedPermission(permission, context);
       return hasDelegatedPermission;
     } catch (error) {
       logger.error('Error checking user permission', {
@@ -867,6 +905,7 @@ class AmexingUser extends BaseModel {
    * @param {object} context - Context for validation.
    * @returns {Promise<boolean>} - True if user has delegated permission.
    * @example
+   * // Usage example documented above
    */
   async hasDelegatedPermission(permission, context = {}) {
     try {
@@ -897,6 +936,7 @@ class AmexingUser extends BaseModel {
    * Get all delegated permissions for this user.
    * @returns {Promise<Array>} - Array of delegated permissions.
    * @example
+   * // Usage example documented above
    */
   async getDelegatedPermissions() {
     try {
@@ -920,6 +960,7 @@ class AmexingUser extends BaseModel {
    * @param {Array<object>} delegationsData - Array of delegation data objects.
    * @returns {Promise<Array>} - Array of created delegations.
    * @example
+   * // Usage example documented above
    */
   async delegatePermissions(delegationsData) {
     try {
@@ -935,20 +976,13 @@ class AmexingUser extends BaseModel {
       for (const delegationData of delegationsData) {
         // Check if role can delegate this specific permission
         if (!role.canDelegatePermission(delegationData.permission)) {
-          throw new Error(
-            `Role cannot delegate permission: ${delegationData.permission}`
-          );
+          throw new Error(`Role cannot delegate permission: ${delegationData.permission}`);
         }
 
         // Verify permission can be delegated
-        const hasPermission = await this.hasPermission(
-          delegationData.permission,
-          delegationData.context || {}
-        );
+        const hasPermission = await this.hasPermission(delegationData.permission, delegationData.context || {});
         if (!hasPermission) {
-          throw new Error(
-            `Cannot delegate permission ${delegationData.permission} - user doesn't have it`
-          );
+          throw new Error(`Cannot delegate permission ${delegationData.permission} - user doesn't have it`);
         }
 
         // Validate delegation context constraints (if specified)
@@ -957,12 +991,9 @@ class AmexingUser extends BaseModel {
           const userContextualData = this.get('contextualData') || {};
           if (
             userContextualData.maxApprovalAmount
-            && delegationData.context.maxAmount
-              > userContextualData.maxApprovalAmount
+            && delegationData.context.maxAmount > userContextualData.maxApprovalAmount
           ) {
-            throw new Error(
-              'Cannot delegate with higher limits than own permissions'
-            );
+            throw new Error('Cannot delegate with higher limits than own permissions');
           }
         }
 
@@ -998,6 +1029,7 @@ class AmexingUser extends BaseModel {
    * Get user's organization object.
    * @returns {Promise<object|null>} - Organization object or null.
    * @example
+   * // Usage example documented above
    */
   async getOrganization() {
     try {
@@ -1010,10 +1042,7 @@ class AmexingUser extends BaseModel {
       // For now, return a basic structure
       return {
         id: organizationId,
-        name:
-          organizationId === 'amexing'
-            ? 'Amexing'
-            : organizationId.toUpperCase(),
+        name: organizationId === 'amexing' ? 'Amexing' : organizationId.toUpperCase(),
         type: organizationId === 'amexing' ? 'internal' : 'client',
       };
     } catch (error) {
@@ -1031,6 +1060,7 @@ class AmexingUser extends BaseModel {
    * @param {string} organizationId - Organization ID to check access for.
    * @returns {boolean} - True if user can access the organization.
    * @example
+   * // Usage example documented above
    */
   canAccessOrganization(organizationId) {
     const userOrgId = this.get('organizationId');
@@ -1049,6 +1079,7 @@ class AmexingUser extends BaseModel {
    * @param {object} otherUser - User to check management permissions for.
    * @returns {Promise<boolean>} - True if user can manage the other user.
    * @example
+   * // Usage example documented above
    */
   async canManage(otherUser) {
     try {
@@ -1091,6 +1122,7 @@ class AmexingUser extends BaseModel {
    * @param {object} otherUser - User to compare against.
    * @returns {Promise<boolean>} - True if current user has higher role level.
    * @example
+   * // Usage example documented above
    */
   async isHigherThan(otherUser) {
     try {
@@ -1118,6 +1150,7 @@ class AmexingUser extends BaseModel {
    * @param {string} scope - Access scope ('own', 'department', 'organization', 'system').
    * @returns {Promise<boolean>} - True if access is allowed.
    * @example
+   * // Usage example documented above
    */
   async canAccessUserData(targetUser, scope = 'own') {
     try {
@@ -1135,9 +1168,7 @@ class AmexingUser extends BaseModel {
           return this.get('departmentId') === targetUser.get('departmentId');
 
         case 'organization':
-          return (
-            this.get('organizationId') === targetUser.get('organizationId')
-          );
+          return this.get('organizationId') === targetUser.get('organizationId');
 
         case 'system': {
           const role = await this.getRole();
@@ -1162,6 +1193,7 @@ class AmexingUser extends BaseModel {
    * Converts user to safe JSON (excludes sensitive data).
    * @returns {Promise<object>} - Safe user data.
    * @example
+   * // Usage example documented above
    */
   async toSafeJSON() {
     try {
@@ -1226,7 +1258,9 @@ class AmexingUser extends BaseModel {
   }
 }
 
-// Register the subclass
-Parse.Object.registerSubclass('AmexingUser', AmexingUser);
+// COMMENTED OUT: registerSubclass causes issues with set() + save() for boolean fields
+// The BaseModel inheritance interferes with Parse.Object field updates
+// Using Parse.Object.extend('AmexingUser') directly works correctly
+// Parse.Object.registerSubclass('AmexingUser', AmexingUser);
 
 module.exports = AmexingUser;

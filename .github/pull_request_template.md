@@ -7,19 +7,40 @@ Brief description of changes (1-2 sentences)
 - [ ] Security middleware not bypassed or disabled
 - [ ] All user inputs validated and sanitized
 
-## ✅ Quality Checklist  
+## 🧪 TDD Compliance
+- [ ] Tests written **before** implementation (Red-Green-Refactor)
+- [ ] Integration tests use MongoDB Memory Server (not external DB)
+- [ ] Integration tests use AuthTestHelper for authentication
+- [ ] No deprecated patterns (`clearDatabase()`, manual user creation)
+- [ ] Test coverage for new features ≥ 80%
+
+## ✅ Quality Checklist
 - [ ] Tests pass (`yarn test`)
 - [ ] Linting passes (`yarn lint`)
 - [ ] No `console.log()` statements in production code
 - [ ] Documentation updated (if applicable)
 
 ## 🧪 How was this tested?
-- [ ] Unit tests
-- [ ] Integration tests  
-- [ ] Manual testing
-- [ ] Security testing (if security-related)
 
-**Test details**: [Describe how you tested this change]
+**TDD Approach**:
+- [ ] ✅ Tests written first (Red phase)
+- [ ] ✅ Implementation passed tests (Green phase)
+- [ ] ✅ Code refactored maintaining tests (Refactor phase)
+
+**Test Types**:
+- [ ] Integration tests (`yarn test:integration`)
+- [ ] Unit tests (`yarn test:unit`)
+- [ ] Manual testing
+- [ ] Security testing (`yarn test:security`)
+
+**Test Commands Run**:
+```bash
+yarn test:integration  # MongoDB Memory Server tests
+yarn test:unit         # Fast unit tests
+yarn test:security     # PCI DSS compliance
+```
+
+**Test Coverage**: [X]% (minimum 80% for new code)
 
 ## 🔄 Type of Change
 - [ ] Bug fix (non-breaking change that fixes an issue)

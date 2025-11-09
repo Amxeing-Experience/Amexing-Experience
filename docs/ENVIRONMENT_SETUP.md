@@ -192,6 +192,95 @@ BCRYPT_ROUNDS=12
 ENABLE_AUDIT_LOGGING=true
 ```
 
+## 🏠 Production-Local Environment
+
+### Localhost Testing with Production Database
+
+**Purpose**: Run production database locally for testing and debugging without HTTPS requirements.
+
+The `production-local` environment provides a hybrid configuration:
+- Uses **production database** (MongoDB Atlas)
+- Uses **production security settings** (encryption, PCI DSS compliance)
+- BUT: **HTTP-compatible cookies** for localhost testing (no HTTPS required)
+
+**⚠️ IMPORTANT**: This environment is ONLY for local development/testing. DO NOT deploy to actual production servers.
+
+### Quick Start
+
+```bash
+# Start server with production-local environment
+yarn dev:prod-local
+
+# Server will run on http://localhost:1338 with production database
+```
+
+### Key Differences from Production
+
+| Setting | Production | Production-Local |
+|---------|-----------|------------------|
+| Database | MongoDB Atlas | Same (MongoDB Atlas) |
+| Cookie Secure | `true` (requires HTTPS) | `false` (HTTP compatible) |
+| Cookie SameSite | `strict` | `lax` |
+| Cookie Domain | Configured | `undefined` (localhost) |
+| OAUTH_REQUIRE_HTTPS | `true` | `false` |
+| Server URL | `https://amexing.com` | `http://localhost:1338` |
+
+### Configuration File
+
+File: `environments/.env.production-local`
+
+```bash
+# Environment identifier
+NODE_ENV=production-local
+
+# Production database
+DATABASE_URI=mongodb+srv://...your-production-atlas-connection...
+DATABASE_NAME=AmexingPROD
+
+# HTTP-compatible cookie settings
+COOKIE_SECURE=false
+COOKIE_SAMESITE=lax
+# No COOKIE_DOMAIN for localhost
+
+# Server configuration
+PARSE_SERVER_URL=http://localhost:1338/parse
+PORT=1338
+
+# Same security as production
+SESSION_SECRET=...same-as-production...
+JWT_SECRET=...same-as-production...
+ENCRYPTION_KEY=...same-as-production...
+```
+
+### Use Cases
+
+1. **Login Testing**: Test authentication flows with production data on localhost
+2. **CSRF Debugging**: Debug session and CSRF issues without HTTPS complexity
+3. **Data Verification**: Verify production data integrity locally
+4. **Development**: Develop features against production database schema
+5. **Troubleshooting**: Debug production issues in local environment
+
+### Security Notes
+
+- Uses MongoStore (MongoDB session storage) like production
+- Full PCI DSS compliance enabled
+- Audit logging active
+- Same password requirements as production
+- Only cookie settings are relaxed for HTTP compatibility
+
+### Switching Between Environments
+
+```bash
+# Development (local database, relaxed security)
+yarn dev
+
+# Production-Local (production database, HTTP-compatible)
+yarn dev:prod-local
+
+# Production (production server, full HTTPS security)
+yarn dev:prod
+```
+
 ## 🏭 Production Environment
 
 ### Enterprise Security Requirements
@@ -348,8 +437,6 @@ project-root/
 PARSE_APP_ID=application-identifier
 PARSE_MASTER_KEY=server-master-key
 PARSE_SERVER_URL=server-endpoint
-PARSE_DASHBOARD_USER=dashboard-username
-PARSE_DASHBOARD_PASS=dashboard-password
 ```
 
 #### 2. Security Variables
@@ -566,11 +653,10 @@ Pre-configured debug setups available via `F5` or Debug panel:
 #### Testing & Development
 - **Debug Current Test File** - Debug active test file
 - **Debug All Tests** - Debug complete test suite
-- **Debug Parse Dashboard** - Debug dashboard separately
 - **Debug Cloud Functions** - Debug Parse cloud code
 
 #### Full Application
-- **Launch Full Application** - Debug server + dashboard together
+- **Launch Full Application** - Debug server
 
 ### Development Tasks
 
@@ -579,7 +665,6 @@ Quick access to common tasks via `Ctrl+Shift+P` → "Tasks: Run Task":
 #### Build & Run
 - **Start Development Server** - `yarn dev`
 - **Start Production Server** - `yarn start`
-- **Start Parse Dashboard** - `yarn dashboard`
 
 #### Testing
 - **Run Tests** - `yarn test`

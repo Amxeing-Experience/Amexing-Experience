@@ -48,7 +48,9 @@ logs/
 *.log
 
 # Environment files (already in .gitignore)
+# Note: .env.test.example is safe (contains fake credentials for documentation)
 .env*
+!environments/.env.test.example     # Allow example file with fake credentials
 
 # IDE files
 .vscode/

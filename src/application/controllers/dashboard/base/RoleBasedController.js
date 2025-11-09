@@ -50,20 +50,8 @@ class RoleBasedController extends DashboardController {
         'allocate_budget',
         'view_department_reports',
       ],
-      employee: [
-        'view_own_profile',
-        'create_booking',
-        'view_own_bookings',
-        'view_own_budget',
-        'submit_feedback',
-      ],
-      driver: [
-        'view_own_profile',
-        'view_assigned_trips',
-        'update_trip_status',
-        'view_earnings',
-        'manage_vehicle',
-      ],
+      employee: ['view_own_profile', 'create_booking', 'view_own_bookings', 'view_own_budget', 'submit_feedback'],
+      driver: ['view_own_profile', 'view_assigned_trips', 'update_trip_status', 'view_earnings', 'manage_vehicle'],
       guest: ['view_event_info', 'view_transport_details'],
     };
 
@@ -83,13 +71,9 @@ class RoleBasedController extends DashboardController {
    */
   requireRole(requiredRole) {
     return (req, res, next) => {
+      // Redirect to login if user not authenticated
       if (!req.user) {
-        return this.redirectWithMessage(
-          res,
-          '/login',
-          'Please login to continue',
-          'error'
-        );
+        return this.redirectWithMessage(res, '/login', 'Please login to continue', 'error');
       }
 
       const roleHierarchy = {
@@ -106,12 +90,9 @@ class RoleBasedController extends DashboardController {
       const userLevel = roleHierarchy[req.user.role] || 0;
       const requiredLevel = roleHierarchy[requiredRole] || 0;
 
+      // Check if user has sufficient permissions
       if (userLevel < requiredLevel) {
-        return this.handleError(
-          res,
-          new Error('Insufficient permissions'),
-          403
-        );
+        return this.handleError(res, new Error('Insufficient permissions'), 403);
       }
 
       next();
@@ -175,9 +156,7 @@ class RoleBasedController extends DashboardController {
 
   /**
    * Get role-specific dashboard widgets.
-   * @param {string} userId - User unique identifier.
-   * @param {*} userId - _userId parameter.
-   * @param _userId
+   * @param {string} _userId - User unique identifier (unused parameter).
    * @example
    * // GET endpoint example
    * const result = await RoleBasedController.getNotifications(req, res);
@@ -194,9 +173,7 @@ class RoleBasedController extends DashboardController {
   /**
    * Apply role-specific data filters.
    * @param {object} query - Query parameters object.
-   * @param {*} user - User parameter.
-   * @param {*} user - _user parameter.
-   * @param _user
+   * @param {*} _user - _user parameter.
    * @example
    * // Usage example
    * const result = await applyRoleFilters({ query: 'example', _user: 'example' });
@@ -212,9 +189,7 @@ class RoleBasedController extends DashboardController {
 
   /**
    * Get role-specific notifications.
-   * @param {string} userId - User unique identifier.
-   * @param {*} userId - _userId parameter.
-   * @param _userId
+   * @param {string} _userId - User unique identifier (unused parameter).
    * @example
    * // GET endpoint example
    * const result = await RoleBasedController.getNotifications(req, res);
@@ -231,9 +206,7 @@ class RoleBasedController extends DashboardController {
   /**
    * Validate role-specific actions.
    * @param {string} action - Action identifier.
-   * @param {*} user - User parameter.
-   * @param {*} user - _user parameter.
-   * @param _user
+   * @param {string} _user - User unique identifier (unused parameter).
    * @example
    * // Validation utility usage
    * const isValid = validateFunction(input);

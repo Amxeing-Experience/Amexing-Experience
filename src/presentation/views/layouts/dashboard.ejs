@@ -11,6 +11,22 @@
     <!-- Core CSS -->
     <link rel="stylesheet" href="/dashboard/css/styles.min.css" />
 
+    <!-- Choices CSS -->
+    <link rel="stylesheet" href="/dashboard/css/choices.min.css" />
+    <style type="text/css">
+      .choices__inner {
+        border-radius: 10px;
+        border: 1px solid #ccc;
+      }
+
+      .choices__list--dropdown {
+        border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+      }
+    </style>
+    <!-- Dashboard Custom Styles -->
+    <link rel="stylesheet" href="/dashboard/css/dashboard-custom.css?v=1.0.0" />
+
     <!-- Tabler Icons -->
     <link rel="stylesheet" href="/dashboard/css/icons/tabler-icons/tabler-icons.css">
 
@@ -48,15 +64,11 @@
         .main-content {
             margin-left: 270px;
             min-height: 100vh;
-            width: calc(100% - 270px);
+            max-width: calc(100vw - 270px);
+            flex: 1;
             display: flex;
             flex-direction: column;
             transition: all 0.3s ease;
-        }
-
-        .main-content.sidebar-collapsed {
-            margin-left: 0;
-            width: 100%;
         }
 
         /* Header Styles */
@@ -169,11 +181,19 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* Desktop sidebar collapsed state */
+        @media (min-width: 992px) {
+            .main-content.sidebar-collapsed {
+                margin-left: 80px !important;
+                max-width: calc(100vw - 80px) !important;
+            }
+        }
+
         /* Responsive Design */
-        @media (max-width: 1199.98px) {
+        @media (max-width: 991.98px) {
             .main-content {
-                margin-left: 0;
-                width: 100%;
+                margin-left: 0 !important;
+                max-width: 100vw !important;
             }
         }
 
@@ -282,7 +302,8 @@
                 <div class="container-fluid">
                     <!-- Breadcrumb -->
                     <% if (typeof breadcrumb !== 'undefined' && breadcrumb) { %>
-                    <div class="card breadcrumb-card">
+                    <% const breadcrumbId = breadcrumb.title ? breadcrumb.title.replace(/\s+/g, '-').toLowerCase() : 'principal-title' %>
+                    <div class="card breadcrumb-card" id="breadcrumb-<%=breadcrumbId%>">
                         <div class="card-body p-4">
                             <div class="row align-items-center">
                                 <div class="col-md-8">
@@ -362,6 +383,7 @@
     <script src="/dashboard/libs/simplebar/dist/simplebar.js"></script>
     <script src="/dashboard/libs/apexcharts/dist/apexcharts.min.js"></script>
     <script src="/dashboard/js/sidebarmenu.js"></script>
+    <script src="/dashboard/js/choices.min.js"></script>
     <script src="/dashboard/js/app.min.js"></script>
 
     <!-- Dashboard Scripts Atom -->
@@ -441,6 +463,14 @@
     <% if (typeof footerScripts !== 'undefined' && footerScripts) { %>
         <%- footerScripts %>
     <% } %>
+
+    <!--Delete principal breadcrumb-->
+    <script>
+      <%
+        const breadcrumbDeleteId = breadcrumb ? breadcrumb.title ? breadcrumb.title.replace(/\s+/g, '-').toLowerCase() : 'principal-title' : 'principal-title';
+      %>
+      document.getElementById('breadcrumb-<%= breadcrumbDeleteId %>').remove();
+    </script>
 
 </body>
 </html>

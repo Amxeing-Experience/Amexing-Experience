@@ -1,0 +1,632 @@
+<%
+  /**
+   * Add User Modal
+   *
+   * @param {Object} data - Modal data
+   * @param {string} data.modalId - Modal ID
+   * @param {string} data.title - Modal title
+   * @param {string} [data.icon] - Modal icon name (without ti- prefix)
+   * @param {string} [data.description] - Introductory text
+   * @param {Array} [data.inputs] - List of form inputs
+   * @param {string} data.dataAction - Data-action button
+   * @param {string} [data.primaryLabel] - Main button text
+   * @param {string} [data.secondaryLabel] - Secondary button text
+   * @param {string} [data.headerColor] - Header color
+   * @param {string} [data.headerStyle] - Header style
+   * @param {boolean} [data.addScripts] - Indicate that the default script is used or, if not, use your own script
+   * @param {string} [data.actionURL] - Action URL
+   * @param {string} [data.rechargeData] - JavaScript code to reload data
+   * @returns {string} EJS template
+   * @example
+   * const data = {
+   *   modalId: 'createUserModal',
+   *   title: 'Agregar Usuario',
+   *   icon: 'user-plus',
+   *   description: 'Completa los campos requeridos.',
+   *   inputs: [],
+   *   dataAction: 'ADD_USER',
+   *   primaryLabel: 'Agregar Usuario',
+   *   secondaryLabel: 'Cancelar',
+   *   headerColor: 'primary',
+   *   headerStyle: '',
+   *   addScripts: true
+   *   actionURL: '/api/users/',
+   *   rechargeData: true
+   * };
+   * const html = ejs.render(template, data);
+   */
+  const safeData = (typeof data !== "undefined" && data) ? data : {};
+
+  const {
+    modalId,
+    title,
+    icon = "user-plus",
+    description = "Completa los campos requeridos.",
+    inputs = [],
+    dataAction,
+    primaryLabel = "Agregar Usuario",
+    secondaryLabel = "Cancelar",
+    headerColor = "primary",
+    headerStyle = "",
+    actionURL = "",
+    rechargeData = "",
+    addScripts = false,
+  } = safeData;
+%>
+
+<style>
+  /* Cuando es inválido */
+  .choices.is-invalid .choices__inner {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+  }
+
+  /* Cuando es válido */
+  .choices.is-valid .choices__inner {
+    border-color: #198754 !important;
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+  }
+</style>
+
+<div class="modal fade" id="<%= modalId %>" tabindex="-1" aria-labelledby="<%= modalId %>Label" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+
+      <!-- Header -->
+      <div class="modal-header bg-<%= headerColor %> text-white" style="<%= headerStyle %>">
+        <h5 class="modal-title d-flex align-items-center gap-2 text-white" id="<%= modalId %>Label">
+          <i class="ti ti-<%= icon %>"></i>
+          <span><%= title %></span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <!-- Body -->
+      <div class="modal-body">
+        <p class="text-muted mb-4"><%= description %></p>
+
+        <% if (inputs.length > 0) { %>
+
+          <% inputs.forEach((input) => { %>
+
+            <div class="mb-3" <%=input.hidden ? 'hidden' : ''%>>
+
+              <label for="<%= input.id %>" class="form-label fw-bold">
+                <%= input.label %>
+                <% if (input.required) { %>
+                  <span class="text-danger">*</span>
+                <% } %>
+              </label>
+
+              <% if (input.type === "textarea") { %>
+
+                <textarea 
+                  class="form-control"
+                  id="<%= input.id %>"
+                  name="<%= input.name %>"
+                  rows="<%= input.rows || 4 %>"
+                  maxlength="<%= input.maxLength || 500 %>"
+                  placeholder="<%= input.placeholder || '' %>"
+                  aria-label="<%= input.label %>"
+                  <%= input.required ? 'required' : '' %>>
+                    <%= input.value || '' %>
+                </textarea>
+
+              <% } else if (input.type === "select") { %>
+
+                <select 
+                  class="form-control form-select select-modals-add"
+                  id="<%= input.id %>"
+                  name="<%= input.name %>"
+                  aria-label="<%= input.label %>"
+                  <%= input.required ? 'required' : '' %>
+                  <%= input.multiple %>>
+                    <% input.options.forEach((option) => { %>
+                      <option 
+                          value="<%= option.value %>" 
+                          data-custom-properties='<%= JSON.stringify({ name: option.dataName }).replace(/'/g, "&#39;") %>'
+                        >
+                        <%= option.label %>
+                      </option>
+                    <% }) %>
+                </select>
+
+              <% } else { %>
+
+                
+                <% if (input.type === 'password') { %>
+
+                  <div class="input-group">
+                    <input 
+                      type="password"
+                      class="form-control"
+                      id="<%= input.id %>"
+                      name="<%= input.name %>"
+                      value="<%= input.value || '' %>"
+                      maxlength="<%= input.maxLength || 100 %>"
+                      placeholder="<%= input.placeholder || '' %>"
+                      aria-label="<%= input.label %>"
+                      <%= input.required ? 'required' : '' %>>
+                    <button 
+                      class="btn btn-outline-secondary toggle-password" 
+                      type="button"
+                      data-target="<%= input.id %>">
+                      <i class="ti ti-eye"></i>
+                    </button>
+                  </div>
+
+                <% } else { %>
+
+                  <input 
+                    type="<%= input.type || 'text' %>"
+                    class="form-control"
+                    id="<%= input.id %>"
+                    name="<%= input.name %>"
+                    value="<%= input.value || '' %>"
+                    maxlength="<%= input.maxLength || 100 %>"
+                    placeholder="<%= input.placeholder || '' %>"
+                    aria-label="<%= input.label %>"
+                    <%= input.required ? 'required' : '' %>>
+
+                <% } %>
+
+              <% } %>
+
+              <% if (input.helper) { %>
+
+                <div class="form-text">
+                  <i class="ti ti-info-circle me-1"></i>
+                  <%= input.helper %>
+                </div>
+
+              <% } %>
+
+              <div 
+                id="<%= input.id %>ValidationError" 
+                class="invalid-feedback" 
+                style="display: none;">
+              </div>
+
+            </div>
+
+          <% }) %>
+
+        <% } %>
+
+      </div>
+
+      <!-- Footer -->
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="ti ti-x me-1"></i> <%= secondaryLabel %>
+        </button>
+        <button type="button" class="btn btn-primary" data-action="<%= dataAction %>">
+          <i class="ti ti-check me-1"></i> <%= primaryLabel %>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.toggle-password');
+    if (!btn) return; // si no es el botón de mostrar contraseña, salimos
+
+    const inputId = btn.getAttribute('data-target');
+    const input = document.getElementById(inputId);
+    if (!input) return;
+
+    const icon = btn.querySelector('i');
+
+    if (input.type === 'password') {
+      input.type = 'text';
+      icon.classList.replace('ti-eye', 'ti-eye-off');
+    } else {
+      input.type = 'password';
+      icon.classList.replace('ti-eye-off', 'ti-eye');
+    }
+  });
+</script>
+
+<% if(addScripts) { %>
+  <script>
+    
+    // ============================================================================
+    // 1. Data Loading & Initialization
+    // ============================================================================
+
+    /**
+     * Load roles from API and initialize DataTable
+     * Implements exponential backoff retry for library loading
+     * @param {number} retryCount - Current retry attempt
+     */
+    async function loadRolesSelect(select) {
+      const apiEndpoint = '/api/roles';
+      try {
+          const params = new URLSearchParams({
+              viewUsers: 'true'
+          });
+          // Load roles data from API
+          const response = await fetch(`${apiEndpoint}?${params.toString()}`, {
+              method: 'GET',
+              credentials: 'include', // Send cookies
+              headers: {
+                  'X-Requested-With': 'XMLHttpRequest',
+                  'Content-Type': 'application/json'
+              },
+          });
+
+          if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          const roles = data.data?.roles || [];
+
+          select.innerHTML = '';
+          for (let i = 0; i < roles.length; i++) {
+            const option = document.createElement('option');
+            option.value = roles[i].id;
+            option.textContent = roles[i].displayName;
+            option.dataset.customProperties = JSON.stringify({ name: roles[i].name });
+            select.appendChild(option);
+          }
+          
+          const choicesInstance = new Choices(select, {
+            searchEnabled: false,
+            itemSelectText: '',
+            shouldSort: false
+          });
+
+      } catch (error) {
+          console.error('Error loading roles:', error.message);
+      }
+    }
+
+    // ============================================================================
+    // 1. Selects
+    // Documentación: https://choices.js.org
+    // ============================================================================
+
+    /**
+     * Initializer to the select elements with the class "select-modals-add"
+     * @param {Event} e
+     * @returns {void}
+     */
+    document.addEventListener('DOMContentLoaded', () => {
+      const selectsModalsAdd = document.getElementsByClassName('select-modals-add');
+      Array.from(selectsModalsAdd).forEach((el) => {
+        if(el.getAttribute('name') == "roleId") {
+          loadRolesSelect(el);
+        }else {
+          new Choices(el, {
+            searchEnabled: false,  // desactiva el buscador
+            itemSelectText: '',    // oculta texto del ícono de selección
+            shouldSort: false      // mantiene el orden original de las opciones
+          });
+        }
+      });
+    });
+
+    // ============================================================================
+    // 2. Initialize events of the modal
+    // Documentación: https://getbootstrap.com/docs/5.3/components/modal/
+    // ============================================================================
+    //Obtains the IDs of the inputs for field validation
+    const idsInputsModalAdd = [
+      <% inputs.forEach((input, i) => { %>
+        '<%= input.required ? input.id : '' %>'<%= i < inputs.length - 1 ? ',' : '' %>
+      <% }) %>
+    ];
+    const btnAddUserModalAdd = document.querySelector('[data-action="<%= dataAction %>"]');
+
+    /**
+     * Show error message modal
+     * @param {Element} el - The input element
+     * @param {string} id - The input ID
+     * @param {string} message - The error message
+     * @returns {void}
+     */
+    const showErrorMessageModalAdd = (el, id, message = "") => {
+      let errorDiv = document.getElementById(id + 'ValidationError');
+      if (!errorDiv) {
+        // Create the actual div
+        errorDiv = document.createElement('div');
+        errorDiv.id = id + 'ValidationError';
+        errorDiv.className = 'invalid-feedback';
+
+        // Assign the complete content you want to display
+        errorDiv.innerHTML = message;
+        errorDiv.style.display = 'block';
+
+        // Add to the DOM, below the input
+        el.parentElement.appendChild(errorDiv);
+      } else {
+        // If it already exists, just display it
+        errorDiv.style.display = 'block';
+        errorDiv.innerHTML = message;
+      }
+      return;
+    }
+
+    /**
+     * Validate inputs of the modal
+     * @param {Event} e - The event
+     * @returns {void}
+     */
+    const validateInputsModalAdd = () => {
+      let valid = true;
+
+      idsInputsModalAdd.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        const value = el.value.trim();
+        const type = el.getAttribute('type')
+
+        // Visual wrapper for Choices.js select
+        const wrapper = el.closest('.choices');
+
+        if (type === 'email' && value) {
+          const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailPattern.test(value)) {
+            valid = false;
+            showErrorMessageModalAdd(el, id, 'Por favor ingresa un email válido');
+            el.classList.add('is-invalid');
+            el.classList.remove('is-valid');
+
+            const wrapper = el.closest('.choices');
+            if (wrapper) {
+              wrapper.classList.add('is-invalid');
+              wrapper.classList.remove('is-valid');
+            }
+            return;
+          }
+        }
+
+        if (!value) {
+          valid = false;
+
+          // Add error message
+          showErrorMessageModalAdd(el, id, "El campo es obligatorio");
+
+          // Error mark in the actual input
+          el.classList.add('is-invalid');
+          el.classList.remove('is-valid');
+
+          // Visible mark in the Choices container
+          if (wrapper) {
+            wrapper.classList.add('is-invalid');
+            wrapper.classList.remove('is-valid');
+          }
+
+          // Display the Bootstrap error message
+          const feedback = el.parentElement.querySelector('.invalid-feedback');
+          if (feedback) feedback.style.display = 'block';
+
+          let feedbackParent = el.parentElement.parentElement.querySelector('.invalid-feedback');
+          if (feedbackParent) feedbackParent.style.display = 'block';
+        }
+        else {
+          el.classList.remove('is-invalid');
+          el.classList.add('is-valid');
+
+          if (wrapper) {
+            wrapper.classList.remove('is-invalid');
+            wrapper.classList.add('is-valid');
+            const feedback = wrapper.parentElement.querySelector('.invalid-feedback');
+            if (feedback) feedback.style.display = 'none';
+          }
+
+          let feedback = el.parentElement.querySelector('.invalid-feedback');
+          if (feedback) feedback.style.display = 'none';
+
+          let feedbackParent = el.parentElement.parentElement.querySelector('.invalid-feedback');
+          if (feedbackParent) feedbackParent.style.display = 'none';
+
+        }
+      });
+
+      if (!valid) {
+        return false;
+      }
+
+      return true;
+    }
+
+    /**
+     * Add user
+     * @returns {Promise<void>}
+     */
+    btnAddUserModalAdd.addEventListener('click', async () => {
+
+      if(!validateInputsModalAdd()) return;
+      await AddUserModalAdd();
+      return;
+
+    });
+
+    // ============================================================================
+    // 3. Initialize events of the modal close
+    // Documentación: https://getbootstrap.com/docs/5.3/components/modal/
+    // ============================================================================
+    /*
+    * Add event listener for the modal event
+    * @param {Event} e - The event
+    * @returns {void}
+    */
+    const modalAddUserModalAdd = document.getElementById('<%= modalId %>');
+    modalAddUserModalAdd.addEventListener('hidden.bs.modal', () => {
+      idsInputsModalAdd.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+
+        const wrapper = el.closest('.choices');
+
+        // Remove validation classes
+        el.classList.remove('is-valid', 'is-invalid');
+        if (wrapper) wrapper.classList.remove('is-valid', 'is-invalid');
+
+        // Hide feedback
+        const feedback = el.parentElement.querySelector('.invalid-feedback');
+        const feedback2 = el.parentElement.parentElement.querySelector('.invalid-feedback');
+        const feedback3 = el.parentElement.parentElement.parentElement.querySelector('.invalid-feedback');
+        if (feedback) feedback.style.display = 'none';
+        if (feedback2) feedback2.style.display = 'none';
+        if (feedback3) feedback3.style.display = 'none';
+
+        // You can also clear values if you want:
+        if (!el.parentElement.hidden) {
+          el.value = '';
+        }
+      });
+    });
+
+    // ============================================================================
+    // 4. Initialize Add User method in the modal
+    // ============================================================================
+    /*
+    * Function to add user in the modal
+    * @param {Event} e - The event
+    * @returns {Promise<void>}
+    */
+    async function AddUserModalAdd() {
+      const updateBtn = document.querySelector('#<%= modalId %> [data-action="<%= dataAction %>"]');
+      const idsInputs = [
+        <% inputs.forEach((input, i) => { %>
+          '<%= input.required ? input.id : '' %>'<%= i < inputs.length - 1 ? ',' : '' %>
+        <% }) %>
+      ];
+
+      // Disable button and show loading state
+      updateBtn.disabled = true;
+      const originalBtnContent = updateBtn.innerHTML;
+      updateBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Actualizando...';
+
+      try {
+          // Build request body with both fields
+          const requestBody = {};
+          idsInputs.forEach(id => {
+            if(document.getElementById(id).getAttribute('name') == "roleId") {
+              requestBody[document.getElementById(id).getAttribute('name')] = document.getElementById(id).value;
+              const selectedOption = document.getElementById(id).selectedOptions[0];
+              const customProps = JSON.parse(selectedOption.dataset.customProperties);
+              requestBody['role'] = customProps.name
+            }
+            else {
+              requestBody[document.getElementById(id).getAttribute('name')] = document.getElementById(id).value;
+            }
+          })
+
+          const response = await fetch(`<%=actionURL%>`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'X-Requested-With': 'XMLHttpRequest'
+              },
+              body: JSON.stringify(requestBody)
+          });
+
+          const result = await response.json();
+
+          if (!response.ok) {
+              throw new Error(result.error || 'Error al actualizar el usuario');
+          }
+
+          // Success
+          const modalEl = document.getElementById('<%= modalId %>');
+          const modalInstance = bootstrap.Modal.getInstance(modalEl);
+          if (modalInstance) {
+            modalInstance.hide();
+          }
+          showSuccessAlert(` Usuario agregado exitosamente`);
+
+          // Reload Users table data
+          const rechargeData = <%= rechargeData %>;
+          if (rechargeData && window.usersTable) {
+            loadUsersAndInitializeTable();
+          }
+
+          updateBtn.disabled = false;
+          updateBtn.innerHTML = originalBtnContent;
+
+      } catch (error) {
+        console.log(error)
+          console.error('Error updating role:', error);
+          showErrorAlert(error.message || 'Error al actualizar el usuario. Por favor, intenta nuevamente.');
+
+          // Restore button state
+          updateBtn.disabled = false;
+          updateBtn.innerHTML = originalBtnContent;
+      }
+    }
+
+    // ============================================================================
+    // 5. Alert/Notification System
+    // Documentación: https://getbootstrap.com/docs/5.3/components/alerts/
+    // ============================================================================
+
+    /**
+     * Display alert notification to user
+     * @param {string} message - Alert message to display
+     * @param {string} type - Alert type (success, danger, warning, info)
+     * @param {number} duration - Auto-dismiss duration in ms (0 = no auto-dismiss)
+     */
+    function showAlert(message, type = 'info', duration = 5000) {
+        // Remove any existing alerts
+        const existingAlert = document.querySelector('.role-management-alert');
+        if (existingAlert) {
+            existingAlert.remove();
+        }
+
+        // Create alert element
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show role-management-alert`;
+        alertDiv.setAttribute('role', 'alert');
+        alertDiv.style.cssText = 'position: fixed; top: 80px; right: 20px; z-index: 9999; min-width: 300px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);';
+
+        // Icon mapping
+        const icons = {
+            success: 'ti-check-circle',
+            danger: 'ti-alert-circle',
+            warning: 'ti-alert-triangle',
+            info: 'ti-info-circle'
+        };
+
+        alertDiv.innerHTML = `
+            <i class="ti ${icons[type] || icons.info} me-2"></i>
+            <strong>${message}</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+
+        document.body.appendChild(alertDiv);
+
+        // Auto-dismiss after duration
+        if (duration > 0) {
+            setTimeout(() => {
+                alertDiv.classList.remove('show');
+                setTimeout(() => alertDiv.remove(), 150);
+            }, duration);
+        }
+    }
+
+    function showSuccessAlert(message) {
+        showAlert(message, 'success', 5000);
+    }
+
+    function showErrorAlert(message) {
+        showAlert(message, 'danger', 0); // Don't auto-dismiss errors
+    }
+
+    function showInfoAlert(message) {
+        showAlert(message, 'info', 5000);
+    }
+
+    function showValidationError(message) {
+        showAlert(message, 'warning', 5000);
+    }
+
+  </script>
+<% } %>

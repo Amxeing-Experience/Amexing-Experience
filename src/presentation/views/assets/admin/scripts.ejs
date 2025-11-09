@@ -1,4 +1,22 @@
+<!-- Amexing Session Manager -->
+<script src="/dashboard/js/session-manager.js"></script>
+
 <script>
+// Initialize Session Manager with custom callbacks for admin
+if (typeof SessionManager !== 'undefined') {
+    window.sessionManager = new SessionManager({
+        debug: <%= process.env.NODE_ENV === 'development' ? 'true' : 'false' %>,
+        onSessionExpiring: function(expiresAt) {
+            console.log('Session expiring at:', expiresAt);
+            // Custom admin warning - could integrate with admin notification system
+        },
+        onSessionExpired: function() {
+            alert('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+            window.location.href = '/login';
+        }
+    });
+}
+
 /**
  * Amexing Admin Dashboard JavaScript
  * Enhanced with DataTables integration and modern UI interactions

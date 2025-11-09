@@ -9,12 +9,8 @@
  */
 
 const Parse = require('parse/node');
-const {
-  DepartmentOAuthFlowService,
-} = require('../../application/services/DepartmentOAuthFlowService');
-const {
-  PermissionAuditService,
-} = require('../../application/services/PermissionAuditService');
+const { DepartmentOAuthFlowService } = require('../../application/services/DepartmentOAuthFlowService');
+const { PermissionAuditService } = require('../../application/services/PermissionAuditService');
 const logger = require('../../infrastructure/logger');
 
 // Initialize services
@@ -24,7 +20,6 @@ const auditService = new PermissionAuditService();
 /**
  * Get available departments for OAuth.
  * @param {object} request - Parse Cloud Code request object.
- * @param {object} request.user - Current authenticated user.
  * @returns {Promise<object>} - Available departments for user.
  * @example
  * // Cloud function usage
@@ -67,10 +62,7 @@ const getAvailableDepartments = async (request) => {
     };
   } catch (error) {
     logger.error('Get available departments failed:', error);
-    throw new Parse.Error(
-      Parse.Error.INTERNAL_SERVER_ERROR,
-      'Failed to get departments'
-    );
+    throw new Parse.Error(Parse.Error.INTERNAL_SERVER_ERROR, 'Failed to get departments');
   }
 };
 
@@ -92,10 +84,7 @@ const initiateDepartmentOAuth = async (request) => {
   try {
     // Validate required parameters
     if (!department || !_provider) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'Department and provider are required'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Department and provider are required');
     }
 
     // Generate state for OAuth flow
@@ -106,9 +95,7 @@ const initiateDepartmentOAuth = async (request) => {
       department,
       _provider,
       corporateConfigId,
-      redirectUri:
-        redirectUri
-        || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/callback`,
+      redirectUri: redirectUri || `${process.env.PARSE_PUBLIC_SERVER_URL}/auth/oauth/callback`,
       state,
       headers: request.headers,
       ip,
@@ -126,9 +113,7 @@ const initiateDepartmentOAuth = async (request) => {
     stateRecord.set('userAgent', request.headers['user-agent']);
     await stateRecord.save(null, { useMasterKey: true });
 
-    logger.info(
-      `Department OAuth initiated: ${department}/${_provider} from IP: ${ip}`
-    );
+    logger.info(`Department OAuth initiated: ${department}/${_provider} from IP: ${ip}`);
 
     return {
       success: true,
@@ -175,10 +160,7 @@ const handleDepartmentOAuthCallback = async (request) => {
 
     const stateRecord = await stateQuery.first({ useMasterKey: true });
     if (!stateRecord) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'Invalid or expired OAuth state'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Invalid or expired OAuth state');
     }
 
     // Use provider from state record if not in parsed data
@@ -225,29 +207,20 @@ const getDepartmentOAuthConfig = async (request) => {
 
   try {
     if (!department) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'Department is required'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Department is required');
     }
 
     // Get department configuration
     const deptConfig = departmentOAuthService.getDepartmentConfig(department);
     if (!deptConfig) {
-      throw new Parse.Error(
-        Parse.Error.OBJECT_NOT_FOUND,
-        `Department not found: ${department}`
-      );
+      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Department not found: ${department}`);
     }
 
     // Check if user has access to this department info
     if (user) {
       const userDepartments = user.get('departments') || [user.get('department')].filter(Boolean);
       if (userDepartments.length > 0 && !userDepartments.includes(department)) {
-        throw new Parse.Error(
-          Parse.Error.OPERATION_FORBIDDEN,
-          'Access denied to department configuration'
-        );
+        throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Access denied to department configuration');
       }
     }
 
@@ -296,41 +269,26 @@ const switchToDepartmentContext = async (request) => {
   const { department, sessionId } = params;
 
   if (!user) {
-    throw new Parse.Error(
-      Parse.Error.INVALID_SESSION_TOKEN,
-      'Authentication required'
-    );
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'Authentication required');
   }
 
   try {
     if (!department) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'Department is required'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Department is required');
     }
 
     // Verify user has access to this department
     const userDepartments = user.get('departments') || [user.get('department')].filter(Boolean);
     if (!userDepartments.includes(department)) {
-      throw new Parse.Error(
-        Parse.Error.OPERATION_FORBIDDEN,
-        'Access denied to department'
-      );
+      throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Access denied to department');
     }
 
     // Switch to department context using Sprint 03 system
-    const {
-      PermissionContextService,
-    } = require('../../application/services/PermissionContextService');
+    const { PermissionContextService } = require('../../application/services/PermissionContextService');
     const contextService = new PermissionContextService();
 
     const contextId = `dept-${department}`;
-    const result = await contextService.switchToContext(
-      user.id,
-      contextId,
-      sessionId
-    );
+    const result = await contextService.switchToContext(user.id, contextId, sessionId);
 
     // Log context switch
     await auditService.recordPermissionAudit({
@@ -374,28 +332,19 @@ const getDepartmentOAuthProviders = async (request) => {
 
   try {
     if (!department) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'Department is required'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Department is required');
     }
 
     // Get department configuration
     const deptConfig = departmentOAuthService.getDepartmentConfig(department);
     if (!deptConfig) {
-      throw new Parse.Error(
-        Parse.Error.OBJECT_NOT_FOUND,
-        `Department not found: ${department}`
-      );
+      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Department not found: ${department}`);
     }
 
     // Get provider configurations
     const providers = await Promise.all(
       deptConfig.allowedProviders.map(async (providerName) => {
-        const scopes = departmentOAuthService.getDepartmentScopes(
-          department,
-          providerName
-        );
+        const scopes = departmentOAuthService.getDepartmentScopes(department, providerName);
 
         return {
           name: providerName,
@@ -436,19 +385,13 @@ const validateDepartmentOAuthAccess = async (request) => {
 
   try {
     if (!department || !_provider) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'Department and provider are required'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Department and provider are required');
     }
 
     // Get department configuration
     const deptConfig = departmentOAuthService.getDepartmentConfig(department);
     if (!deptConfig) {
-      throw new Parse.Error(
-        Parse.Error.OBJECT_NOT_FOUND,
-        `Department not found: ${department}`
-      );
+      throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, `Department not found: ${department}`);
     }
 
     // Validate provider is allowed for department
@@ -529,30 +472,21 @@ const getDepartmentOAuthAnalytics = async (request) => {
   const { department, timeRange = '30d' } = params;
 
   if (!user) {
-    throw new Parse.Error(
-      Parse.Error.INVALID_SESSION_TOKEN,
-      'Authentication required'
-    );
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'Authentication required');
   }
 
   try {
     // Check if user has analytics access
     const userRole = user.get('role');
     if (!['admin', 'superadmin', 'manager'].includes(userRole)) {
-      throw new Parse.Error(
-        Parse.Error.OPERATION_FORBIDDEN,
-        'Analytics access denied'
-      );
+      throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Analytics access denied');
     }
 
     // If department specified, check access
     if (department) {
       const userDepartments = user.get('departments') || [user.get('department')].filter(Boolean);
       if (userRole !== 'superadmin' && !userDepartments.includes(department)) {
-        throw new Parse.Error(
-          Parse.Error.OPERATION_FORBIDDEN,
-          'Department access denied'
-        );
+        throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Department access denied');
       }
     }
 

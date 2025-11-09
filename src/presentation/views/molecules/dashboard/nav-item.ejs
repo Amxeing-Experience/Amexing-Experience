@@ -22,31 +22,38 @@ const navBadge = typeof badge !== 'undefined' ? badge : null;
 const navSubmenu = typeof submenu !== 'undefined' ? submenu : [];
 const navId = typeof id !== 'undefined' ? id : '';
 const navExternal = typeof external !== 'undefined' ? external : false;
+const hasDropdown = dropdown !== 'undefined' ? dropdown.length > 0 ? true : false : false;
+const listDropdown = dropdown !== 'undefined' ? dropdown : [];
 
 // Classes
 const itemClasses = ['sidebar-item', navActive ? 'selected' : ''].filter(cls => cls.length > 0).join(' ');
-const linkClasses = ['sidebar-link', navActive ? 'active' : ''].filter(cls => cls.length > 0).join(' ');
+let linkClasses = ['sidebar-link', navActive ? 'active' : ''].filter(cls => cls.length > 0).join(' ');
 const hasSubmenu = navSubmenu && navSubmenu.length > 0;
+linkClasses = hasDropdown ? linkClasses + ' dropdown-toggle' : linkClasses
 %>
 
-<li class="<%= itemClasses %>">
+<li class="<%= itemClasses %>"
+  <% if (hasDropdown) { %>id="dropdownMenuButton-<%= navId %>" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false"<% } %>>
     <a class="<%= linkClasses %>"
-       href="<%= navHref %>"
-       <% if (hasSubmenu) { %>
-       data-bs-toggle="collapse"
-       data-bs-target="#submenu-<%= navId %>"
-       aria-expanded="<%= navActive %>"
-       aria-controls="submenu-<%= navId %>"
-       <% } else { %>
-       aria-expanded="false"
-       <% } %>
-       <% if (navId) { %>data-nav-id="<%= navId %>"<% } %>
-       <% if (navExternal) { %>target="_blank" rel="noopener noreferrer"<% } %>>
+      href="<%= navHref %>"
+      <% if (hasSubmenu) { %>
+      data-bs-toggle="collapse"
+      data-bs-target="#submenu-<%= navId %>"
+      aria-expanded="<%= navActive %>"
+      aria-controls="submenu-<%= navId %>"
+      <% } else { %>
+      aria-expanded="false"
+      <% } %>
+      <% if (navId) { %>data-nav-id="<%= navId %>"<% } %>
+      <% if (navExternal) { %>target="_blank" rel="noopener noreferrer"<% } %>
+      >
 
         <!-- Icon -->
-        <span class="nav-icon">
-            <i class="ti ti-<%= navIcon %>"></i>
-        </span>
+        <% if(navIcon) {%>
+          <span class="nav-icon">
+              <i class="ti ti-<%= navIcon %>"></i>
+          </span>
+        <% } %>
 
         <!-- Text -->
         <span class="hide-menu nav-text"><%= navText %></span>
@@ -77,9 +84,9 @@ const hasSubmenu = navSubmenu && navSubmenu.length > 0;
             <% navSubmenu.forEach(function(subitem, index) { %>
                 <li class="sidebar-item <%= subitem.active ? 'selected' : '' %>">
                     <a href="<%= subitem.href || '#' %>"
-                       class="sidebar-link <%= subitem.active ? 'active' : '' %>"
-                       <% if (subitem.id) { %>data-nav-id="<%= subitem.id %>"<% } %>
-                       <% if (subitem.external) { %>target="_blank" rel="noopener noreferrer"<% } %>>
+                      class="sidebar-link <%= subitem.active ? 'active' : '' %>"
+                      <% if (subitem.id) { %>data-nav-id="<%= subitem.id %>"<% } %>
+                      <% if (subitem.external) { %>target="_blank" rel="noopener noreferrer"<% } %>>
 
                         <div class="round-16 d-flex align-items-center justify-content-center">
                             <% if (subitem.icon) { %>
@@ -106,6 +113,23 @@ const hasSubmenu = navSubmenu && navSubmenu.length > 0;
         </ul>
     <% } %>
 </li>
+
+<% if (hasDropdown) { %>
+  <ul class="dropdown-menu dropdown-menu-sidebar animated flipInX" aria-labelledby="dropdownMenuButton-<%= navId %>">
+    <% listDropdown.forEach(function(item, index) { %>
+      <li class="<%= itemClasses %>">
+          <a class="dropdown-item <%= linkClasses.replace('dropdown-toggle', '') %>" href="<%= item.path || '#' %>">
+            <% if (item.icon) { %>
+              <span class="nav-icon">
+                <i class="ti ti-<%=item.icon%>"></i>
+              </span>
+            <% } %>
+            <span class="hide-menu nav-text"><%= item.name ? item.name : ' ' %></span>
+          </a>
+      </li>
+    <% }) %>
+  </ul>
+<% } %>
 
 <style>
     /* Navigation Item Styles */
@@ -269,5 +293,14 @@ const hasSubmenu = navSubmenu && navSubmenu.length > 0;
     @keyframes nav-spin {
         0% { transform: translateY(-50%) rotate(0deg); }
         100% { transform: translateY(-50%) rotate(360deg); }
+    }
+
+    .dropdown-menu-sidebar {
+      position: fixed !important;
+      inset: 0px auto auto 1% !important;
+    }
+
+    .left-sidebar.collapsed .sidebar-link.dropdown-toggle .nav-icon{
+      margin-right: -20px;
     }
 </style>

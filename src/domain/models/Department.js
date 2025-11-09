@@ -58,9 +58,27 @@ class Department extends BaseModel {
     // Lifecycle fields are set by BaseModel constructor
     // active: true, exists: true are defaults
 
-    // Audit fields
-    department.set('createdBy', departmentData.createdBy || null);
-    department.set('modifiedBy', departmentData.modifiedBy || null);
+    // Audit fields - Handle both User objects and string IDs as Pointers
+    if (departmentData.createdBy) {
+      if (typeof departmentData.createdBy === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const createdByPointer = new AmexingUser();
+        createdByPointer.id = departmentData.createdBy;
+        department.set('createdBy', createdByPointer);
+      } else {
+        department.set('createdBy', departmentData.createdBy);
+      }
+    }
+    if (departmentData.modifiedBy) {
+      if (typeof departmentData.modifiedBy === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const modifiedByPointer = new AmexingUser();
+        modifiedByPointer.id = departmentData.modifiedBy;
+        department.set('modifiedBy', modifiedByPointer);
+      } else {
+        department.set('modifiedBy', departmentData.modifiedBy);
+      }
+    }
 
     return department;
   }
@@ -131,9 +149,7 @@ class Department extends BaseModel {
         query.equalTo('role', role);
       } else {
         // Include both employees and department managers
-        const allowedRoles = includeManager
-          ? ['employee', 'department_manager']
-          : ['employee'];
+        const allowedRoles = includeManager ? ['employee', 'department_manager'] : ['employee'];
         query.containedIn('role', allowedRoles);
       }
 
@@ -303,10 +319,7 @@ class Department extends BaseModel {
       query.select('cost');
 
       const orders = await query.find({ useMasterKey: true });
-      return orders.reduce(
-        (total, order) => total + (order.get('cost') || 0),
-        0
-      );
+      return orders.reduce((total, order) => total + (order.get('cost') || 0), 0);
     } catch (error) {
       logger.error('Error calculating budget used', {
         departmentId: this.id,
@@ -636,10 +649,7 @@ class Department extends BaseModel {
 
     // Budget validation
     if (departmentData.budget !== undefined && departmentData.budget !== null) {
-      if (
-        typeof departmentData.budget !== 'number'
-        || departmentData.budget < 0
-      ) {
+      if (typeof departmentData.budget !== 'number' || departmentData.budget < 0) {
         errors.push('Budget must be a non-negative number');
       }
     }

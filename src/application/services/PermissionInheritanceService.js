@@ -93,12 +93,7 @@ class PermissionInheritanceService {
    * const service = new PermissionInheritanceService();
    * const result = await service.processCompleteInheritance(user, oauthProfile, 'microsoft', corporateConfig);
    */
-  async processCompleteInheritance(
-    user,
-    oauthProfile,
-    _provider,
-    corporateConfig
-  ) {
+  async processCompleteInheritance(user, oauthProfile, _provider, corporateConfig) {
     try {
       const userId = user.id;
 
@@ -109,18 +104,10 @@ class PermissionInheritanceService {
       });
 
       // Step 1: Inherit permissions from OAuth groups
-      const oauthInheritance = await OAuthPermissionService.inheritPermissionsFromOAuth(
-        user,
-        oauthProfile,
-        _provider
-      );
+      const oauthInheritance = await OAuthPermissionService.inheritPermissionsFromOAuth(user, oauthProfile, _provider);
 
       // Step 2: Add department-specific permissions
-      const departmentPermissions = await this.addDepartmentPermissions(
-        user,
-        oauthProfile,
-        corporateConfig
-      );
+      const departmentPermissions = await this.addDepartmentPermissions(user, oauthProfile, corporateConfig);
 
       // Step 3: Apply any individual overrides
       const overrides = await this.applyIndividualOverrides(user);
@@ -196,28 +183,19 @@ class PermissionInheritanceService {
 
       const employee = await employeeQuery.first({ useMasterKey: true });
 
+      // Check if employee exists and has a department assigned
       if (employee && employee.get('departmentId')) {
         const departmentId = employee.get('departmentId');
 
         // Get department-specific permissions
-        departmentPermissions = await OAuthPermissionService.getDepartmentPermissions(
-          userId,
-          departmentId
-        );
+        departmentPermissions = await OAuthPermissionService.getDepartmentPermissions(userId, departmentId);
 
         // Also check for OAuth profile department information
-        const oauthDepartment = await this.extractDepartmentFromOAuth(
-          oauthProfile,
-          corporateConfig
-        );
+        const oauthDepartment = await this.extractDepartmentFromOAuth(oauthProfile, corporateConfig);
+        // Check if OAuth department exists and differs from employee department
         if (oauthDepartment && oauthDepartment !== departmentId) {
-          const additionalPerms = await OAuthPermissionService.getDepartmentPermissions(
-            userId,
-            oauthDepartment
-          );
-          departmentPermissions = [
-            ...new Set([...departmentPermissions, ...additionalPerms]),
-          ];
+          const additionalPerms = await OAuthPermissionService.getDepartmentPermissions(userId, oauthDepartment);
+          departmentPermissions = [...new Set([...departmentPermissions, ...additionalPerms])];
         }
 
         // Create department permission record
@@ -259,15 +237,13 @@ class PermissionInheritanceService {
    * const deptId = await service.extractDepartmentFromOAuth(oauthProfile, corporateConfig);
    */
   async extractDepartmentFromOAuth(oauthProfile, corporateConfig) {
+    // Check if corporate configuration and department mapping are available
     if (!corporateConfig || !corporateConfig.departmentMapping) {
       return null;
     }
 
     // Use the existing department mapping from CorporateOAuthService
-    return CorporateOAuthService.mapDepartmentFromOAuth(
-      oauthProfile,
-      corporateConfig
-    );
+    return CorporateOAuthService.mapDepartmentFromOAuth(oauthProfile, corporateConfig);
   }
 
   /**
@@ -298,6 +274,7 @@ class PermissionInheritanceService {
 
       const appliedOverrides = [];
 
+      // Iterate through all permission overrides to validate and apply them
       for (const override of overrides) {
         const overrideData = {
           id: override.id,
@@ -310,7 +287,7 @@ class PermissionInheritanceService {
           priority: override.get('priority'),
         };
 
-        // Check if override is still valid
+        // Check if override has expired based on expiration date
         if (overrideData.expiresAt && overrideData.expiresAt < new Date()) {
           // Override expired, deactivate it
           override.set('active', false);
@@ -326,10 +303,12 @@ class PermissionInheritanceService {
           // Skip expired override
           // continue; // Replaced with conditional logic
         } else {
+          // Override is still valid, add to applied overrides
           appliedOverrides.push(overrideData);
         }
       }
 
+      // Log applied overrides if any exist
       if (appliedOverrides.length > 0) {
         logger.logSecurityEvent('PERMISSION_OVERRIDES_APPLIED', userId, {
           overrideCount: appliedOverrides.length,
@@ -364,12 +343,7 @@ class PermissionInheritanceService {
    * const service = new PermissionInheritanceService();
    * const finalPerms = await service.validateAndResolvePermissions(user, oauthPerms, deptPerms, overrides);
    */
-  async validateAndResolvePermissions(
-    user,
-    oauthPermissions,
-    departmentPermissions,
-    overrides
-  ) {
+  async validateAndResolvePermissions(user, oauthPermissions, departmentPermissions, overrides) {
     try {
       const userId = user.id;
 
@@ -382,7 +356,9 @@ class PermissionInheritanceService {
       // Apply overrides with priority
       const sortedOverrides = overrides.sort((a, b) => b.priority - a.priority);
 
+      // Process each override based on its type and priority
       for (const override of sortedOverrides) {
+        // Determine the action based on override type
         switch (override.type) {
           case 'grant':
             finalPermissions.add(override.permission);
@@ -406,16 +382,10 @@ class PermissionInheritanceService {
       }
 
       // Validate permission hierarchy consistency
-      const validatedPermissions = this.validatePermissionHierarchy(
-        Array.from(finalPermissions)
-      );
+      const validatedPermissions = this.validatePermissionHierarchy(Array.from(finalPermissions));
 
       // Update user's permissions
-      await OAuthPermissionService.applyPermissionsToUser(
-        user,
-        validatedPermissions,
-        'oauth_inherited_with_overrides'
-      );
+      await OAuthPermissionService.applyPermissionsToUser(user, validatedPermissions, 'oauth_inherited_with_overrides');
 
       logger.logSecurityEvent('PERMISSIONS_VALIDATED_AND_RESOLVED', userId, {
         basePermissions: oauthPermissions.length,
@@ -450,18 +420,18 @@ class PermissionInheritanceService {
     const validatedPermissions = new Set(permissions);
 
     // Remove redundant lower-level permissions if higher-level exists
+    // Check each permission against all others for hierarchy conflicts
     for (const permission of permissions) {
       const permissionLevel = hierarchy[permission] || 0;
 
+      // Compare current permission with every other permission
       for (const otherPermission of permissions) {
+        // Skip comparing permission with itself
         if (permission !== otherPermission) {
           const otherLevel = hierarchy[otherPermission] || 0;
 
-          // If we have a higher-level permission, we can remove lower ones that it encompasses
-          if (
-            otherLevel > permissionLevel
-            && this.permissionIncludes(otherPermission, permission)
-          ) {
+          // Check if another permission supersedes this one
+          if (otherLevel > permissionLevel && this.permissionIncludes(otherPermission, permission)) {
             validatedPermissions.delete(permission);
             break;
           }
@@ -489,12 +459,7 @@ class PermissionInheritanceService {
   permissionIncludes(higherPermission, lowerPermission) {
     // Define permission inclusion rules
     const inclusionRules = {
-      admin_full: [
-        'user_management',
-        'system_config',
-        'department_admin',
-        'team_management',
-      ],
+      admin_full: ['user_management', 'system_config', 'department_admin', 'team_management'],
       system_admin: ['technical_access', 'user_support'],
       department_admin: ['team_management', 'employee_access'],
       user_management: ['employee_management', 'basic_admin'],
@@ -520,18 +485,13 @@ class PermissionInheritanceService {
    */
   async createMasterInheritanceRecord(data) {
     try {
-      const MasterInheritanceClass = Parse.Object.extend(
-        'PermissionInheritanceMaster'
-      );
+      const MasterInheritanceClass = Parse.Object.extend('PermissionInheritanceMaster');
       const record = new MasterInheritanceClass();
 
       record.set('userId', data.userId);
       record.set('provider', data.provider);
       record.set('corporateClient', data.corporateConfig?.clientName);
-      record.set(
-        'oauthPermissions',
-        data.oauthInheritance.inheritedPermissions
-      );
+      record.set('oauthPermissions', data.oauthInheritance.inheritedPermissions);
       record.set('departmentPermissions', data.departmentPermissions);
       record.set('overrides', data.overrides);
       record.set('finalPermissions', data.finalPermissions);
@@ -562,9 +522,7 @@ class PermissionInheritanceService {
    */
   async createDepartmentPermissionRecord(data) {
     try {
-      const DepartmentPermissionClass = Parse.Object.extend(
-        'DepartmentPermission'
-      );
+      const DepartmentPermissionClass = Parse.Object.extend('DepartmentPermission');
       const record = new DepartmentPermissionClass();
 
       record.set('userId', data.userId);
@@ -612,11 +570,9 @@ class PermissionInheritanceService {
       override.set('reason', overrideData.reason);
       override.set('grantedBy', overrideData.grantedBy);
       override.set('context', overrideData.context);
-      override.set(
-        'priority',
-        overrideData.priority || this.overrideTypes[overrideData.type]
-      );
+      override.set('priority', overrideData.priority || this.overrideTypes[overrideData.type]);
 
+      // Set expiration date if provided
       if (overrideData.expiresAt) {
         override.set('expiresAt', overrideData.expiresAt);
       }
@@ -626,17 +582,13 @@ class PermissionInheritanceService {
 
       await override.save(null, { useMasterKey: true });
 
-      logger.logSecurityEvent(
-        'PERMISSION_OVERRIDE_CREATED',
-        overrideData.userId,
-        {
-          overrideId: override.id,
-          type: overrideData.type,
-          permission: overrideData.permission,
-          grantedBy: overrideData.grantedBy,
-          reason: overrideData.reason,
-        }
-      );
+      logger.logSecurityEvent('PERMISSION_OVERRIDE_CREATED', overrideData.userId, {
+        overrideId: override.id,
+        type: overrideData.type,
+        permission: overrideData.permission,
+        grantedBy: overrideData.grantedBy,
+        reason: overrideData.reason,
+      });
 
       return override;
     } catch (error) {
@@ -667,6 +619,7 @@ class PermissionInheritanceService {
 
       const masterRecord = await masterQuery.first({ useMasterKey: true });
 
+      // Return message if no inheritance record exists for user
       if (!masterRecord) {
         return {
           hasInheritance: false,

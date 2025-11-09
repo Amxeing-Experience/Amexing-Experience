@@ -21,7 +21,7 @@ const logger = require('../../infrastructure/logger');
  * - Integration with authentication and authorization flows.
  * @class ValidationMiddleware
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -243,12 +243,9 @@ class ValidationMiddleware {
             'Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character',
           'string.min': `Password must be at least ${process.env.PASSWORD_MIN_LENGTH || 12} characters long`,
         }),
-      confirmPassword: Joi.string()
-        .valid(Joi.ref('password'))
-        .required()
-        .messages({
-          'any.only': 'Passwords must match',
-        }),
+      confirmPassword: Joi.string().valid(Joi.ref('password')).required().messages({
+        'any.only': 'Passwords must match',
+      }),
     });
 
     const validationMiddleware = new ValidationMiddleware();
@@ -342,12 +339,9 @@ class ValidationMiddleware {
             'Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character',
           'string.min': `Password must be at least ${process.env.PASSWORD_MIN_LENGTH || 12} characters long`,
         }),
-      confirmPassword: Joi.string()
-        .valid(Joi.ref('password'))
-        .required()
-        .messages({
-          'any.only': 'Passwords must match',
-        }),
+      confirmPassword: Joi.string().valid(Joi.ref('password')).required().messages({
+        'any.only': 'Passwords must match',
+      }),
       token: Joi.string().required(),
     });
 

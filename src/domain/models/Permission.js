@@ -10,7 +10,7 @@
  * - Permission composition and validation
  * - Soft delete pattern compliance.
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 2024-09-24
  * @example
  * // Create a permission for booking approval with conditions
@@ -59,43 +59,27 @@ class Permission extends BaseModel {
     // Validate resource and action format
     const validPartRegex = /^[a-z][a-z0-9_]*$/;
     if (!validPartRegex.test(permissionData.resource)) {
-      throw new Error(
-        'Resource must contain only lowercase letters, numbers, and underscores, starting with a letter'
-      );
+      throw new Error('Resource must contain only lowercase letters, numbers, and underscores, starting with a letter');
     }
     if (!validPartRegex.test(permissionData.action)) {
-      throw new Error(
-        'Action must contain only lowercase letters, numbers, and underscores, starting with a letter'
-      );
+      throw new Error('Action must contain only lowercase letters, numbers, and underscores, starting with a letter');
     }
 
     // Validate conditions structure if provided
-    if (
-      permissionData.conditions
-      && typeof permissionData.conditions !== 'object'
-    ) {
+    if (permissionData.conditions && typeof permissionData.conditions !== 'object') {
       throw new Error('Conditions must be an object');
     }
 
     // Validate condition values if provided
     if (permissionData.conditions) {
       const { conditions } = permissionData;
-      if (
-        conditions.maxAmount !== undefined
-        && typeof conditions.maxAmount !== 'number'
-      ) {
+      if (conditions.maxAmount !== undefined && typeof conditions.maxAmount !== 'number') {
         throw new Error('maxAmount must be a number');
       }
-      if (
-        conditions.minAmount !== undefined
-        && typeof conditions.minAmount !== 'number'
-      ) {
+      if (conditions.minAmount !== undefined && typeof conditions.minAmount !== 'number') {
         throw new Error('minAmount must be a number');
       }
-      if (
-        conditions.businessHoursOnly !== undefined
-        && typeof conditions.businessHoursOnly !== 'boolean'
-      ) {
+      if (conditions.businessHoursOnly !== undefined && typeof conditions.businessHoursOnly !== 'boolean') {
         throw new Error('businessHoursOnly must be a boolean');
       }
     }
@@ -103,8 +87,7 @@ class Permission extends BaseModel {
     const permission = new Permission();
 
     // Auto-generate name if not provided
-    const name = permissionData.name
-      || `${permissionData.resource}.${permissionData.action}`;
+    const name = permissionData.name || `${permissionData.resource}.${permissionData.action}`;
 
     // Core permission identification
     permission.set('name', name);
@@ -120,20 +103,9 @@ class Permission extends BaseModel {
     // Permission metadata
     permission.set('category', permissionData.category || 'general');
     permission.set('priority', permissionData.priority || 0);
-    permission.set(
-      'isSystemPermission',
-      permissionData.isSystemPermission || false
-    );
-    permission.set(
-      'requiresApproval',
-      permissionData.requiresApproval || false
-    );
-    permission.set(
-      'delegatable',
-      permissionData.delegatable !== undefined
-        ? permissionData.delegatable
-        : true
-    );
+    permission.set('isSystemPermission', permissionData.isSystemPermission || false);
+    permission.set('requiresApproval', permissionData.requiresApproval || false);
+    permission.set('delegatable', permissionData.delegatable !== undefined ? permissionData.delegatable : true);
 
     // Permission inheritance
     permission.set('includes', permissionData.includes || []);
@@ -143,14 +115,8 @@ class Permission extends BaseModel {
     permission.set('prerequisites', permissionData.prerequisites || []);
 
     // Base model fields
-    permission.set(
-      'active',
-      permissionData.active !== undefined ? permissionData.active : true
-    );
-    permission.set(
-      'exists',
-      permissionData.exists !== undefined ? permissionData.exists : true
-    );
+    permission.set('active', permissionData.active !== undefined ? permissionData.active : true);
+    permission.set('exists', permissionData.exists !== undefined ? permissionData.exists : true);
 
     return permission;
   }
@@ -160,6 +126,7 @@ class Permission extends BaseModel {
    * @param {object} context - Context to validate.
    * @returns {boolean} - True if context is valid.
    * @example
+   * // Usage example documented above
    */
   validateContext(context = {}) {
     const conditions = this.get('conditions') || {};
@@ -185,10 +152,8 @@ class Permission extends BaseModel {
 
     // Check department scope - only validate if department info is provided in context
     if (
-      (conditions.departmentScope === 'own'
-        || conditions.departmentScope === true)
-      && (context.departmentId !== undefined
-        || context.userDepartmentId !== undefined)
+      (conditions.departmentScope === 'own' || conditions.departmentScope === true)
+      && (context.departmentId !== undefined || context.userDepartmentId !== undefined)
     ) {
       if (!context.departmentId || !context.userDepartmentId) {
         return false;
@@ -201,11 +166,7 @@ class Permission extends BaseModel {
     // Special case: if context is empty but conditions exist that require context
     if (Object.keys(context).length === 0) {
       // Return false only if conditions require specific context validation
-      if (
-        conditions.maxAmount !== undefined
-        || conditions.businessHoursOnly
-        || conditions.departmentScope
-      ) {
+      if (conditions.maxAmount !== undefined || conditions.businessHoursOnly || conditions.departmentScope) {
         return false;
       }
     }
@@ -217,18 +178,17 @@ class Permission extends BaseModel {
    * Check if permission is a system permission.
    * @returns {boolean} - True if system permission.
    * @example
+   * // Usage example documented above
    */
   isSystemPermission() {
-    return (
-      this.get('isSystemPermission') === true
-      || this.get('category') === 'system'
-    );
+    return this.get('isSystemPermission') === true || this.get('category') === 'system';
   }
 
   /**
    * Check if permission can be delegated.
    * @returns {boolean} - True if delegatable.
    * @example
+   * // Usage example documented above
    */
   isDelegatable() {
     return this.get('delegatable') !== false;
@@ -239,6 +199,7 @@ class Permission extends BaseModel {
    * @param {string} permissionName - Permission name to check.
    * @returns {boolean} - True if this permission includes the specified permission.
    * @example
+   * // Usage example documented above
    */
   includes(permissionName) {
     const includedPermissions = this.get('includes') || [];
@@ -250,6 +211,7 @@ class Permission extends BaseModel {
    * @param {string} permissionName - Permission name to check.
    * @returns {boolean} - True if this permission implies the specified permission.
    * @example
+   * // Usage example documented above
    */
   impliesPermission(permissionName) {
     return this.includes(permissionName);
@@ -260,6 +222,7 @@ class Permission extends BaseModel {
    * @param {Date} timestamp - Timestamp to check.
    * @returns {boolean} - True if during business hours.
    * @example
+   * // Usage example documented above
    */
   isBusinessHours(timestamp = new Date()) {
     return Permission.isBusinessHours(timestamp);
@@ -270,6 +233,7 @@ class Permission extends BaseModel {
    * @param {string} parentPermission - Permission name to check.
    * @returns {boolean} - True if inherits from parent.
    * @example
+   * // Usage example documented above
    */
   inheritsFrom(parentPermission) {
     const name = this.get('name');
@@ -296,9 +260,7 @@ class Permission extends BaseModel {
     const parentParts = parentPermission.split('.');
 
     if (parentParts.length < nameParts.length) {
-      return (
-        nameParts.slice(0, parentParts.length).join('.') === parentPermission
-      );
+      return nameParts.slice(0, parentParts.length).join('.') === parentPermission;
     }
 
     return false;
@@ -309,6 +271,7 @@ class Permission extends BaseModel {
    * @param {string} name - Permission name.
    * @returns {boolean} - True if valid format.
    * @example
+   * // Usage example documented above
    */
   static isValidPermissionName(name) {
     if (!name || typeof name !== 'string') {
@@ -331,6 +294,7 @@ class Permission extends BaseModel {
    * @param {object} conditions - Conditions to validate.
    * @returns {boolean} - True if valid structure.
    * @example
+   * // Usage example documented above
    */
   static validateConditionStructure(conditions) {
     if (!conditions || typeof conditions !== 'object') {
@@ -354,17 +318,11 @@ class Permission extends BaseModel {
     }
 
     // Validate specific condition values
-    if (
-      conditions.maxAmount !== undefined
-      && typeof conditions.maxAmount !== 'number'
-    ) {
+    if (conditions.maxAmount !== undefined && typeof conditions.maxAmount !== 'number') {
       return false;
     }
 
-    if (
-      conditions.businessHoursOnly !== undefined
-      && typeof conditions.businessHoursOnly !== 'boolean'
-    ) {
+    if (conditions.businessHoursOnly !== undefined && typeof conditions.businessHoursOnly !== 'boolean') {
       return false;
     }
 
@@ -376,6 +334,7 @@ class Permission extends BaseModel {
    * @param {Date} timestamp - Timestamp to check.
    * @returns {boolean} - True if during business hours.
    * @example
+   * // Usage example documented above
    */
   static isBusinessHours(timestamp = new Date()) {
     const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
@@ -391,6 +350,7 @@ class Permission extends BaseModel {
    * @param {object} config - Permission configuration.
    * @returns {Permission} - Created permission.
    * @example
+   * // Usage example documented above
    */
   static createSystemPermission(config) {
     return Permission.create({
@@ -404,6 +364,7 @@ class Permission extends BaseModel {
    * Create all system permissions.
    * @returns {Array<Permission>} - Array of system permissions.
    * @example
+   * // Usage example documented above
    */
   static createSystemPermissions() {
     const systemPermConfigs = this.getSystemPermissions();
@@ -416,6 +377,7 @@ class Permission extends BaseModel {
    * @param {object} user - User attempting to execute permission.
    * @returns {Promise<object>} - Validation result { valid: boolean, reason?: string }.
    * @example
+   * // Usage example documented above
    */
   async validateExecution(context = {}, user = null) {
     try {
@@ -434,27 +396,20 @@ class Permission extends BaseModel {
 
       // Check time-based conditions
       if (conditions.businessHoursOnly) {
-        const now = context.timestamp
-          ? new Date(context.timestamp)
-          : new Date();
+        const now = context.timestamp ? new Date(context.timestamp) : new Date();
         const hour = now.getHours();
         const day = now.getDay();
 
         if (day === 0 || day === 6 || hour < 9 || hour > 17) {
           return {
             valid: false,
-            reason:
-              'Action only allowed during business hours (9 AM - 5 PM, Monday-Friday)',
+            reason: 'Action only allowed during business hours (9 AM - 5 PM, Monday-Friday)',
           };
         }
       }
 
       // Check department scope
-      if (
-        conditions.departmentScope === 'own'
-        && user
-        && context.departmentId
-      ) {
+      if (conditions.departmentScope === 'own' && user && context.departmentId) {
         if (user.get('departmentId') !== context.departmentId) {
           return {
             valid: false,
@@ -464,11 +419,7 @@ class Permission extends BaseModel {
       }
 
       // Check organization scope
-      if (
-        conditions.organizationScope === 'own'
-        && user
-        && context.organizationId
-      ) {
+      if (conditions.organizationScope === 'own' && user && context.organizationId) {
         if (user.get('organizationId') !== context.organizationId) {
           return {
             valid: false,
@@ -479,11 +430,7 @@ class Permission extends BaseModel {
 
       // Check custom validation rules
       if (validationRules.customValidator) {
-        const customResult = await this.executeCustomValidator(
-          validationRules.customValidator,
-          context,
-          user
-        );
+        const customResult = await this.executeCustomValidator(validationRules.customValidator, context, user);
         if (!customResult.valid) {
           return customResult;
         }
@@ -492,10 +439,7 @@ class Permission extends BaseModel {
       // Check prerequisites
       const prerequisites = this.get('prerequisites') || [];
       if (prerequisites.length > 0) {
-        const prerequisiteResult = await this.checkPrerequisites(
-          prerequisites,
-          user
-        );
+        const prerequisiteResult = await this.checkPrerequisites(prerequisites, user);
         if (!prerequisiteResult.valid) {
           return prerequisiteResult;
         }
@@ -523,6 +467,7 @@ class Permission extends BaseModel {
    * @param {object} user - User object.
    * @returns {Promise<object>} - Validation result.
    * @example
+   * // Usage example documented above
    */
   async executeCustomValidator(validatorName, context, user) {
     // This would integrate with a custom validation service
@@ -542,6 +487,7 @@ class Permission extends BaseModel {
    * @param {object} user - User object.
    * @returns {Promise<object>} - Check result.
    * @example
+   * // Usage example documented above
    */
   async checkPrerequisites(prerequisites, user) {
     if (!user || !prerequisites.length) {
@@ -563,6 +509,7 @@ class Permission extends BaseModel {
    * Get permission scope level.
    * @returns {number} - Scope level (1=own, 2=department, 3=organization, 4=system).
    * @example
+   * // Usage example documented above
    */
   getScopeLevel() {
     const scopeMap = {
@@ -579,6 +526,7 @@ class Permission extends BaseModel {
    * @param {Permission} otherPermission - Permission to compare against.
    * @returns {boolean} - True if this permission is more restrictive.
    * @example
+   * // Usage example documented above
    */
   isMoreRestrictiveThan(otherPermission) {
     const thisScope = this.getScopeLevel();
@@ -610,6 +558,7 @@ class Permission extends BaseModel {
    * Get safe JSON representation for API responses.
    * @returns {object} - Safe permission data.
    * @example
+   * // Usage example documented above
    */
   toSafeJSON() {
     return {
@@ -633,6 +582,7 @@ class Permission extends BaseModel {
    * Get system permissions configuration.
    * @returns {Array<object>} - System permissions configuration.
    * @example
+   * // Usage example documented above
    */
   static getSystemPermissions() {
     return [

@@ -1,0 +1,698 @@
+<%
+/**
+ * Quote DataTable Organism
+ * DataTable component for quotes management
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'quotes-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/quotes';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-file-invoice me-2"></i>Cotizaciones
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Gestión de cotizaciones del sistema</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <a href="/dashboard/admin/quotes/new" class="btn btn-light btn-sm">
+                        <i class="ti ti-plus me-1"></i>Nueva Cotización
+                    </a>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="quotes-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Tarifa</th>
+                        <th>Tipo de Evento</th>
+                        <th class="text-center">No. Personas</th>
+                        <th>Creado Por</th>
+                        <th class="text-center">Estatus</th>
+                        <th class="text-center">Fecha Creación</th>
+                        <th class="text-center">Última Modificación</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Copy Quote Modal -->
+<div class="modal fade" id="copyQuoteModal" tabindex="-1" aria-labelledby="copyQuoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title text-white" id="copyQuoteModalLabel">
+                    <i class="ti ti-copy me-2"></i>Duplicar Cotización
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Desea duplicar la cotización <strong id="copyQuoteFolio"></strong>?</p>
+                <div class="alert alert-info d-flex align-items-start" role="alert">
+                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Información:</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>Se creará una nueva cotización con un folio diferente</li>
+                            <li>El tipo de evento se incrementará automáticamente (ejemplo: "Evento - Opción 2")</li>
+                            <li>Se copiará todo el itinerario y servicios</li>
+                            <li>El estatus será "Borrador"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-info" id="confirmCopyQuoteBtn">
+                    <i class="ti ti-copy me-1"></i>Duplicar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Quote Modal -->
+<div class="modal fade" id="deleteQuoteModal" tabindex="-1" aria-labelledby="deleteQuoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title text-white" id="deleteQuoteModalLabel">
+                    <i class="ti ti-alert-triangle me-2"></i>Eliminar Cotización
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas eliminar la cotización <strong id="deleteQuoteFolio"></strong>?</p>
+                <div class="alert alert-warning d-flex align-items-start" role="alert">
+                    <i class="ti ti-alert-triangle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Advertencia:</strong>
+                        <p class="mb-0 mt-1">Esta acción no se puede deshacer.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteQuoteBtn">
+                    <i class="ti ti-trash me-1"></i>Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Wait for DOM and all dependencies to be ready
+    function initWhenReady() {
+        // Check if jQuery and DataTables are loaded
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        if (!jQuery.fn.dataTable) {
+            console.warn('DataTables not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        initQuotesTable();
+    }
+
+    function initQuotesTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        // Variables to store quote IDs for modal actions
+        let copyQuoteId = null;
+        let deleteQuoteId = null;
+
+        /**
+         * Calculate relative luminance of a color for contrast determination.
+         * @param {string} hex - Hex color code (#RRGGBB)
+         * @returns {number} Luminance value between 0 and 1
+         */
+        function calculateLuminance(hex) {
+            const cleanHex = hex.replace('#', '');
+            const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
+            const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
+            const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
+
+            const rLinear = r <= 0.03928 ? r / 12.92 : Math.pow((r + 0.055) / 1.055, 2.4);
+            const gLinear = g <= 0.03928 ? g / 12.92 : Math.pow((g + 0.055) / 1.055, 2.4);
+            const bLinear = b <= 0.03928 ? b / 12.92 : Math.pow((b + 0.055) / 1.055, 2.4);
+
+            return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+        }
+
+        /**
+         * Determine optimal text color based on background luminance.
+         * @param {string} backgroundColor - Hex color code
+         * @returns {string} '#1F2937' for dark or '#FFFFFF' for light text
+         */
+        function getContrastTextColor(backgroundColor) {
+            const luminance = calculateLuminance(backgroundColor);
+            return luminance > 0.5 ? '#1F2937' : '#FFFFFF';
+        }
+
+        // Get JWT token from cookies
+        function getAccessToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Setup global AJAX configuration to include JWT token
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
+        });
+
+        // DataTable Configuration
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint,
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading Quotes:', error);
+                    showErrorAlert('Error al cargar las cotizaciones');
+                }
+            },
+            columns: [
+                {
+                    data: 'client',
+                    render: function(data) {
+                        if (!data) return '<em class="text-muted">Sin cliente</em>';
+                        const fullName = data.fullName || '-';
+                        const company = data.companyName;
+                        return company
+                            ? `${fullName} <small class="text-muted">(${company})</small>`
+                            : fullName;
+                    }
+                },
+                {
+                    data: 'rate',
+                    render: function(data) {
+                        if (!data) return '<span class="text-muted">N/A</span>';
+                        const color = data.color || '#6366F1';
+                        const textColor = getContrastTextColor(color);
+                        return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${data.name || 'N/A'}</span>`;
+                    }
+                },
+                {
+                    data: 'eventType',
+                    render: function(data) {
+                        if (!data || data.trim() === '') {
+                            return '<em class="text-muted">Sin especificar</em>';
+                        }
+                        return `<span class="text-truncate" style="max-width: 200px; display: inline-block;" title="${data}">${data}</span>`;
+                    }
+                },
+                {
+                    data: 'numberOfPeople',
+                    className: 'text-center',
+                    render: function(data) {
+                        return `<span class="fw-semibold">${data || 1}</span>`;
+                    }
+                },
+                {
+                    data: 'createdBy',
+                    render: function(data) {
+                        if (!data) return '<em class="text-muted">Sin información</em>';
+                        return `<span>${data.fullName || data.email || 'N/A'}</span>`;
+                    }
+                },
+                {
+                    data: 'status',
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        const statuses = [
+                            { value: 'draft', text: 'BORRADOR', class: 'bg-secondary' },
+                            { value: 'sent', text: 'ENVIADO', class: 'bg-info' },
+                            { value: 'accepted', text: 'ACEPTADO', class: 'bg-success' },
+                            { value: 'rejected', text: 'RECHAZADO', class: 'bg-danger' }
+                        ];
+
+                        let select = `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" style="font-size: 0.75rem; cursor: pointer;">`;
+                        statuses.forEach(status => {
+                            const selected = status.value === data ? 'selected' : '';
+                            select += `<option value="${status.value}" ${selected}>${status.text}</option>`;
+                        });
+                        select += '</select>';
+                        return select;
+                    }
+                },
+                {
+                    data: 'createdAt',
+                    className: 'text-center',
+                    render: function(data) {
+                        if (!data) return '<em class="text-muted">N/A</em>';
+                        const date = new Date(data);
+                        const dateStr = date.toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                        const timeStr = date.toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        return `<div style="white-space: nowrap;">
+                                    <div class="fw-semibold">${dateStr}</div>
+                                    <small class="text-muted">${timeStr}</small>
+                                </div>`;
+                    }
+                },
+                {
+                    data: 'updatedAt',
+                    className: 'text-center',
+                    render: function(data) {
+                        if (!data) return '<em class="text-muted">N/A</em>';
+                        const date = new Date(data);
+                        const dateStr = date.toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                        });
+                        const timeStr = date.toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        return `<div style="white-space: nowrap;">
+                                    <div class="fw-semibold">${dateStr}</div>
+                                    <small class="text-muted">${timeStr}</small>
+                                </div>`;
+                    }
+                },
+                ...(showActions ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+                        if (canEdit) {
+                            // Copy button (at the beginning)
+                            actions += `<button type="button"
+                                            class="btn btn-info copy-quote-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-folio="${data.folio}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Duplicar Cotización">
+                                            <i class="ti ti-copy"></i>
+                                        </button>`;
+
+                            // Edit button (goes to detail page)
+                            actions += `<a href="/dashboard/admin/quotes/${data.objectId || data.id}"
+                                            class="btn btn-primary"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Cotización">
+                                            <i class="ti ti-edit"></i>
+                                        </a>`;
+                        }
+
+                        if (canDelete) {
+                            // Delete button (opens modal)
+                            actions += `<button type="button"
+                                            class="btn btn-danger delete-quote-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-folio="${data.folio}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Eliminar Cotización">
+                                            <i class="ti ti-trash"></i>
+                                        </button>`;
+                        }
+
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando Cotizaciones...'
+            },
+            order: [[7, 'desc']], // Sort by updatedAt column by default (most recent first)
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                // Reinitialize tooltips after table redraw
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
+        });
+
+        // Event Handlers
+
+        // Status dropdown change
+        $(`#${tableId}`).on('change', '.status-selector', function() {
+            const quoteId = $(this).data('id');
+            const quoteFolio = $(this).data('folio');
+            const newStatus = $(this).val();
+            const oldStatus = $(this).find('option:not(:selected)').first().val();
+
+            updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus);
+        });
+
+        // Copy Quote button click
+        $(`#${tableId}`).on('click', '.copy-quote-btn', function() {
+            const quoteId = $(this).data('id');
+            const quoteFolio = $(this).data('folio');
+            openCopyModal(quoteId, quoteFolio);
+        });
+
+        // Confirm copy button in modal
+        $('#confirmCopyQuoteBtn').on('click', function() {
+            if (copyQuoteId) {
+                executeCopy(copyQuoteId);
+            }
+        });
+
+        // Delete Quote button click
+        $(`#${tableId}`).on('click', '.delete-quote-btn', function() {
+            const quoteId = $(this).data('id');
+            const quoteFolio = $(this).data('folio');
+            openDeleteModal(quoteId, quoteFolio);
+        });
+
+        // Confirm delete button in modal
+        $('#confirmDeleteQuoteBtn').on('click', function() {
+            if (deleteQuoteId) {
+                executeDelete(deleteQuoteId);
+            }
+        });
+
+        // Functions
+
+        function updateQuoteStatus(quoteId, quoteFolio, newStatus, oldStatus) {
+            $.ajax({
+                url: `${apiEndpoint}/${quoteId}`,
+                type: 'PUT',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    status: newStatus,
+                    reason: `Status changed from ${oldStatus} to ${newStatus}`
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        showSuccessAlert(`Estatus de cotización ${quoteFolio} actualizado exitosamente`);
+                        dataTable.ajax.reload(null, false); // Reload without resetting page
+                    } else {
+                        showErrorAlert(response.error || 'Error al actualizar el estatus');
+                        dataTable.ajax.reload(null, false);
+                    }
+                },
+                error: function(xhr) {
+                    const errorMsg = xhr.responseJSON?.error || 'Error al actualizar el estatus';
+                    showErrorAlert(errorMsg);
+                    dataTable.ajax.reload(null, false);
+                }
+            });
+        }
+
+        /**
+         * Open copy confirmation modal
+         * @param {string} quoteId - Quote ID to duplicate
+         * @param {string} quoteFolio - Quote folio for display
+         */
+        function openCopyModal(quoteId, quoteFolio) {
+            copyQuoteId = quoteId;
+            $('#copyQuoteFolio').text(quoteFolio);
+            const copyModal = new bootstrap.Modal(document.getElementById('copyQuoteModal'));
+            copyModal.show();
+        }
+
+        /**
+         * Close copy modal properly
+         */
+        function closeCopyModal() {
+            const modalElement = document.getElementById('copyQuoteModal');
+            if (modalElement) {
+                const copyModal = bootstrap.Modal.getInstance(modalElement);
+                if (copyModal) {
+                    copyModal.hide();
+                }
+                // Remove modal backdrop manually if it exists
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) {
+                    backdrop.remove();
+                }
+                // Remove modal-open class from body
+                document.body.classList.remove('modal-open');
+                // Reset body style
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+        }
+
+        /**
+         * Execute quote duplication
+         * @param {string} quoteId - Quote ID to duplicate
+         */
+        function executeCopy(quoteId) {
+            $.ajax({
+                url: `${apiEndpoint}/${quoteId}/duplicate`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({}),
+                success: function(response) {
+                    if (response.success && response.data && response.data.quote) {
+                        // Close modal properly
+                        closeCopyModal();
+
+                        const newFolio = response.data.quote.folio;
+                        const newEventType = response.data.quote.eventType;
+
+                        // Show success message with details
+                        showSuccessAlert(
+                            `Cotización duplicada exitosamente.<br>` +
+                            `<strong>Nueva cotización:</strong> ${newFolio}<br>` +
+                            `<strong>Tipo de evento:</strong> ${newEventType}`
+                        );
+
+                        // Reload table to show new quote
+                        dataTable.ajax.reload(null, false);
+
+                        // Reset stored ID
+                        copyQuoteId = null;
+                    } else {
+                        closeCopyModal();
+                        showErrorAlert(response.error || 'Error al duplicar la cotización');
+                    }
+                },
+                error: function(xhr) {
+                    // Close modal on error
+                    closeCopyModal();
+
+                    let errorMsg = 'Error al duplicar la cotización';
+
+                    if (xhr.status === 404) {
+                        errorMsg = 'Cotización no encontrada';
+                    } else if (xhr.status === 403) {
+                        errorMsg = 'No tiene permisos para duplicar cotizaciones';
+                    } else if (xhr.status === 401) {
+                        errorMsg = 'Sesión expirada. Por favor inicie sesión nuevamente';
+                    } else if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMsg = xhr.responseJSON.error;
+                    }
+
+                    showErrorAlert(errorMsg);
+                }
+            });
+        }
+
+        function openDeleteModal(quoteId, quoteFolio) {
+            deleteQuoteId = quoteId;
+            $('#deleteQuoteFolio').text(quoteFolio);
+            const deleteModal = new bootstrap.Modal(document.getElementById('deleteQuoteModal'));
+            deleteModal.show();
+        }
+
+        function closeDeleteModal() {
+            const modalElement = document.getElementById('deleteQuoteModal');
+            if (modalElement) {
+                const deleteModal = bootstrap.Modal.getInstance(modalElement);
+                if (deleteModal) {
+                    deleteModal.hide();
+                }
+                // Remove modal backdrop manually if it exists
+                const backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) {
+                    backdrop.remove();
+                }
+                // Remove modal-open class from body
+                document.body.classList.remove('modal-open');
+                // Reset body style
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }
+        }
+
+        function executeDelete(quoteId) {
+            $.ajax({
+                url: `${apiEndpoint}/${quoteId}`,
+                type: 'DELETE',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    reason: 'Quote deleted by user'
+                }),
+                success: function(response) {
+                    if (response.success) {
+                        // Close modal properly
+                        closeDeleteModal();
+
+                        // Show success message
+                        showSuccessAlert('Cotización eliminada exitosamente');
+
+                        // Reload table
+                        dataTable.ajax.reload(null, false);
+
+                        // Reset stored ID
+                        deleteQuoteId = null;
+                    } else {
+                        closeDeleteModal();
+                        showErrorAlert(response.error || 'Error al eliminar la cotización');
+                    }
+                },
+                error: function(xhr) {
+                    // Close modal on error
+                    closeDeleteModal();
+
+                    const errorMsg = xhr.responseJSON?.error || 'Error al eliminar la cotización';
+                    showErrorAlert(errorMsg);
+                }
+            });
+        }
+
+        /**
+         * Show success alert message
+         * @param {string} message - Success message to display
+         */
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('quotes-content');
+            if (container) {
+                // Remove existing alerts
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+
+                // Insert new alert at the beginning
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        /**
+         * Show error alert message
+         * @param {string} message - Error message to display
+         */
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('quotes-content');
+            if (container) {
+                // Remove existing alerts
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+
+                // Insert new alert at the beginning
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                // Auto-dismiss after 8 seconds
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+    }
+
+    // Start initialization when ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>

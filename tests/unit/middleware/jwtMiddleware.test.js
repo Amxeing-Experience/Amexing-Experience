@@ -43,7 +43,15 @@ describe('JWT Middleware', () => {
         id: 'test-user-id',
         username: 'testuser',
         email: 'test@example.com',
-        role: 'user'
+        role: 'user',
+        get: jest.fn((field) => {
+          const data = {
+            active: true,
+            exists: true,
+            email: 'test@example.com'
+          };
+          return data[field];
+        })
       }
     };
 
@@ -107,6 +115,74 @@ describe('JWT Middleware', () => {
       expect(mockRes.json).toHaveBeenCalledWith({
         success: false,
         error: 'Invalid or malformed token'
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when user account is deactivated', async () => {
+      const deactivatedUserResult = {
+        success: true,
+        userId: 'test-user-id',
+        role: 'user',
+        user: {
+          id: 'test-user-id',
+          username: 'testuser',
+          email: 'test@example.com',
+          get: jest.fn((field) => {
+            const data = {
+              active: false,
+              exists: true,
+              email: 'test@example.com'
+            };
+            return data[field];
+          })
+        }
+      };
+
+      mockReq.cookies = { accessToken: 'valid.token' };
+      AuthenticationService.validateToken.mockResolvedValue(deactivatedUserResult);
+
+      await jwtMiddleware.authenticateToken(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Your account has been deactivated',
+        code: 'ACCOUNT_DEACTIVATED'
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when user account is deleted', async () => {
+      const deletedUserResult = {
+        success: true,
+        userId: 'test-user-id',
+        role: 'user',
+        user: {
+          id: 'test-user-id',
+          username: 'testuser',
+          email: 'test@example.com',
+          get: jest.fn((field) => {
+            const data = {
+              active: true,
+              exists: false,
+              email: 'test@example.com'
+            };
+            return data[field];
+          })
+        }
+      };
+
+      mockReq.cookies = { accessToken: 'valid.token' };
+      AuthenticationService.validateToken.mockResolvedValue(deletedUserResult);
+
+      await jwtMiddleware.authenticateToken(mockReq, mockRes, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(401);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: false,
+        error: 'Account not found',
+        code: 'ACCOUNT_DELETED'
       });
       expect(mockNext).not.toHaveBeenCalled();
     });

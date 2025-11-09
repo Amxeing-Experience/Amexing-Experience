@@ -1,0 +1,838 @@
+﻿Tarifa,Tipo Traslado,Origen,Destino,Tipo Vehículo,Precio,Notas
+Económico,Aeropuerto,(AGU) Aeropuerto Internacional de Aguascalientes,San Miguel de Allende,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(AGU) Aeropuerto Internacional de Aguascalientes,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(AGU) Aeropuerto Internacional de Aguascalientes,San Miguel de Allende,VAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(AGU) Aeropuerto Internacional de Aguascalientes,VAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(AIFA) Aeropuerto Internacional Felipe Angeles,San Miguel de Allende,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(AIFA) Aeropuerto Internacional Felipe Angeles,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(AIFA) Aeropuerto Internacional Felipe Angeles,San Miguel de Allende,VAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(AIFA) Aeropuerto Internacional Felipe Angeles,VAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(BJX) Aeropuerto Internacional de Leon,San Miguel de Allende,SEDAN,1926,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(BJX) Aeropuerto Internacional de Leon,SEDAN,1926,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(BJX) Aeropuerto Internacional de Leon,San Miguel de Allende,VAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(BJX) Aeropuerto Internacional de Leon,VAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(GDL) Aeropuerto Internacional de Guadalajara,San Miguel de Allende,SEDAN,6420,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(GDL) Aeropuerto Internacional de Guadalajara,SEDAN,6420,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(GDL) Aeropuerto Internacional de Guadalajara,San Miguel de Allende,VAN,13642.5,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(GDL) Aeropuerto Internacional de Guadalajara,VAN,13642.5,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(MEX) Aeropuerto Internacional Benito Juarez,San Miguel de Allende,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(MEX) Aeropuerto Internacional Benito Juarez,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(MEX) Aeropuerto Internacional Benito Juarez,San Miguel de Allende,VAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(MEX) Aeropuerto Internacional Benito Juarez,VAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(MLM) Aeropuerto Internacional de Morelia,San Miguel de Allende,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(MLM) Aeropuerto Internacional de Morelia,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(MLM) Aeropuerto Internacional de Morelia,San Miguel de Allende,VAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(MLM) Aeropuerto Internacional de Morelia,VAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(QRO) Aeropuerto Internacional de Queretaro,San Miguel de Allende,SEDAN,1926,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(QRO) Aeropuerto Internacional de Queretaro,SEDAN,1926,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(QRO) Aeropuerto Internacional de Queretaro,San Miguel de Allende,VAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(QRO) Aeropuerto Internacional de Queretaro,VAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(SLP) Aeropuerto Internacional de San Luis Potosi,San Miguel de Allende,SEDAN,2675,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(SLP) Aeropuerto Internacional de San Luis Potosi,SEDAN,2675,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(SLP) Aeropuerto Internacional de San Luis Potosi,San Miguel de Allende,VAN,6821.25,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(SLP) Aeropuerto Internacional de San Luis Potosi,VAN,6821.25,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(TLC) Aeropuerto Internacional de Toluca,San Miguel de Allende,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(TLC) Aeropuerto Internacional de Toluca,SEDAN,5350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,(TLC) Aeropuerto Internacional de Toluca,San Miguel de Allende,VAN,9630,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Aeropuerto,San Miguel de Allende,(TLC) Aeropuerto Internacional de Toluca,VAN,9630,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Económico,Punto a Punto,Aguascalientes,San Miguel de Allende,SEDAN,5350,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Económico,Punto a Punto,San Miguel de Allende,Aguascalientes,SEDAN,5350,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Económico,Punto a Punto,Aguascalientes,San Miguel de Allende,VAN,9095,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Económico,Punto a Punto,San Miguel de Allende,Aguascalientes,VAN,9095,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Económico,Punto a Punto,León,San Miguel de Allende,SEDAN,2675,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Económico,Punto a Punto,San Miguel de Allende,León,SEDAN,2675,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Económico,Punto a Punto,León,San Miguel de Allende,VAN,6420,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Económico,Punto a Punto,San Miguel de Allende,León,VAN,6420,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Económico,Punto a Punto,Ciudad de México 1 (Norte & Zona Centro),San Miguel de Allende,SEDAN,5350,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Económico,Punto a Punto,San Miguel de Allende,Ciudad de México 1 (Norte & Zona Centro),SEDAN,5350,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Económico,Punto a Punto,Ciudad de México 1 (Norte & Zona Centro),San Miguel de Allende,VAN,9095,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Económico,Punto a Punto,San Miguel de Allende,Ciudad de México 1 (Norte & Zona Centro),VAN,9095,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Económico,Punto a Punto,Ciudad de México 2 (Sur & Zona de Santa Fé),San Miguel de Allende,SEDAN,6420,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Económico,Punto a Punto,San Miguel de Allende,Ciudad de México 2 (Sur & Zona de Santa Fé),SEDAN,6420,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Económico,Punto a Punto,Ciudad de México 2 (Sur & Zona de Santa Fé),San Miguel de Allende,VAN,10165,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Económico,Punto a Punto,San Miguel de Allende,Ciudad de México 2 (Sur & Zona de Santa Fé),VAN,10165,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Económico,Punto a Punto,Cuernavaca,San Miguel de Allende,SEDAN,8560,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Económico,Punto a Punto,San Miguel de Allende,Cuernavaca,SEDAN,8560,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Económico,Punto a Punto,Cuernavaca,San Miguel de Allende,VAN,14177.5,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Económico,Punto a Punto,San Miguel de Allende,Cuernavaca,VAN,14177.5,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Económico,Punto a Punto,Dolores Hidalgo,San Miguel de Allende,SEDAN,1070,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Económico,Punto a Punto,San Miguel de Allende,Dolores Hidalgo,SEDAN,1070,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Económico,Punto a Punto,Dolores Hidalgo,San Miguel de Allende,VAN,4815,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Económico,Punto a Punto,San Miguel de Allende,Dolores Hidalgo,VAN,4815,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Económico,Punto a Punto,Estado de México,San Miguel de Allende,SEDAN,5350,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Económico,Punto a Punto,San Miguel de Allende,Estado de México,SEDAN,5350,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Económico,Punto a Punto,Estado de México,San Miguel de Allende,VAN,9095,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Económico,Punto a Punto,San Miguel de Allende,Estado de México,VAN,9095,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Económico,Punto a Punto,Guadalajara,San Miguel de Allende,SEDAN,6955,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Económico,Punto a Punto,San Miguel de Allende,Guadalajara,SEDAN,6955,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Económico,Punto a Punto,Guadalajara,San Miguel de Allende,VAN,13642.5,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Económico,Punto a Punto,San Miguel de Allende,Guadalajara,VAN,13642.5,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Económico,Punto a Punto,Guanajuato,San Miguel de Allende,SEDAN,2140,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Económico,Punto a Punto,San Miguel de Allende,Guanajuato,SEDAN,2140,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Económico,Punto a Punto,Guanajuato,San Miguel de Allende,VAN,5350,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Económico,Punto a Punto,San Miguel de Allende,Guanajuato,VAN,5350,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Económico,Punto a Punto,Morelia,San Miguel de Allende,SEDAN,5350,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Económico,Punto a Punto,San Miguel de Allende,Morelia,SEDAN,5350,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Económico,Punto a Punto,Morelia,San Miguel de Allende,VAN,9095,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Económico,Punto a Punto,San Miguel de Allende,Morelia,VAN,9095,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Económico,Punto a Punto,Puebla,San Miguel de Allende,SEDAN,8667,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Económico,Punto a Punto,San Miguel de Allende,Puebla,SEDAN,8667,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Económico,Punto a Punto,Puebla,San Miguel de Allende,VAN,15006.75,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Económico,Punto a Punto,San Miguel de Allende,Puebla,VAN,15006.75,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Económico,Punto a Punto,Querétaro,San Miguel de Allende,SEDAN,2140,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Económico,Punto a Punto,San Miguel de Allende,Querétaro,SEDAN,2140,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Económico,Punto a Punto,Querétaro,San Miguel de Allende,VAN,5350,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Económico,Punto a Punto,San Miguel de Allende,Querétaro,VAN,5350,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Económico,Punto a Punto,San Juan del Rio,San Miguel de Allende,SEDAN,2675,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Económico,Punto a Punto,San Miguel de Allende,San Juan del Rio,SEDAN,2675,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Económico,Punto a Punto,San Juan del Rio,San Miguel de Allende,VAN,6687.5,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Económico,Punto a Punto,San Miguel de Allende,San Juan del Rio,VAN,6687.5,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Económico,Punto a Punto,San Luis Potosí,San Miguel de Allende,SEDAN,3210,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Económico,Punto a Punto,San Miguel de Allende,San Luis Potosí,SEDAN,3210,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Económico,Punto a Punto,San Luis Potosí,San Miguel de Allende,VAN,6821.25,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Económico,Punto a Punto,San Miguel de Allende,San Luis Potosí,VAN,6821.25,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Económico,Punto a Punto,Zacatecas,San Miguel de Allende,SEDAN,8560,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Económico,Punto a Punto,San Miguel de Allende,Zacatecas,SEDAN,8560,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Económico,Punto a Punto,Zacatecas,San Miguel de Allende,VAN,14177.5,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Económico,Punto a Punto,San Miguel de Allende,Zacatecas,VAN,14177.5,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Económico,Local,,Capilla de Jimmy Ray,SEDAN,428,
+Económico,Local,,Capilla de Jimmy Ray,VAN,1765.5,
+Económico,Local,,Casa Adela,SEDAN,428,
+Económico,Local,,Casa Adela,VAN,1765.5,
+Económico,Local,,Casa de Aves,SEDAN,535,
+Económico,Local,,Casa de Aves,VAN,1872.5,
+Económico,Local,,Central de Autobuses,SEDAN,160.5,
+Económico,Local,,Central de Autobuses,VAN,1284,
+Económico,Local,,Club de Golf Malanquín,SEDAN,160.5,
+Económico,Local,,Club de Golf Malanquín,VAN,1284,
+Económico,Local,,Club de Golf Ventanas,SEDAN,160.5,
+Económico,Local,,Club de Golf Ventanas,VAN,1284,
+Económico,Local,,Escondido Place,SEDAN,374.5,
+Económico,Local,,Escondido Place,VAN,1605,
+Económico,Local,,Fábrica La Aurora,SEDAN,160.5,
+Económico,Local,,Fábrica La Aurora,VAN,1284,
+Económico,Local,,Finca Luna Serena,SEDAN,535,
+Económico,Local,,Finca Luna Serena,VAN,1872.5,
+Económico,Local,,Hacienda Calderon,SEDAN,535,
+Económico,Local,,Hacienda Calderon,VAN,1872.5,
+Económico,Local,,Hacienda Herencia de Allende,SEDAN,428,
+Económico,Local,,Hacienda Herencia de Allende,VAN,1765.5,
+Económico,Local,,Hacienda Los Picachos,SEDAN,214,
+Económico,Local,,Hacienda Los Picachos,VAN,1391,
+Económico,Local,,Hacienda Los Arcángeles,SEDAN,214,
+Económico,Local,,Hacienda Los Arcángeles,VAN,1391,
+Económico,Local,,Hacienda San José La Vista,SEDAN,428,
+Económico,Local,,Hacienda San José La Vista,VAN,1765.5,
+Económico,Local,,Hacienda Puerto de Sosa,SEDAN,642,
+Económico,Local,,Hacienda Puerto de Sosa,VAN,1979.5,
+Económico,Local,,Helipuerto Los Gerez,SEDAN,214,
+Económico,Local,,Helipuerto Los Gerez,VAN,1391,
+Económico,Local,,La Casona,SEDAN,160.5,
+Económico,Local,,La Casona,VAN,1284,
+Económico,Local,,La Candelaria,SEDAN,321,
+Económico,Local,,La Candelaria,VAN,1605,
+Económico,Local,,Finca La Devocion,SEDAN,428,
+Económico,Local,,Finca La Devocion,VAN,1765.5,
+Económico,Local,,La Gruta,SEDAN,428,
+Económico,Local,,La Gruta,VAN,1765.5,
+Económico,Local,,La Noria,SEDAN,535,
+Económico,Local,,La Noria,VAN,1872.5,
+Económico,Local,,La Zandunga,SEDAN,642,
+Económico,Local,,La Zandunga,VAN,2140,
+Económico,Local,,Los Senderos,SEDAN,321,
+Económico,Local,,Los Senderos,VAN,1605,
+Económico,Local,,Mayan Baths,SEDAN,321,
+Económico,Local,,Mayan Baths,VAN,1605,
+Económico,Local,,Opuntia,SEDAN,1070,
+Económico,Local,,Opuntia,VAN,2675,
+Económico,Local,,Otomí,SEDAN,428,
+Económico,Local,,Otomí,VAN,1765.5,
+Económico,Local,,Rancho La Trinidad,SEDAN,428,
+Económico,Local,,Rancho La Trinidad,VAN,1765.5,
+Económico,Local,,Rancho Labradores,SEDAN,428,
+Económico,Local,,Rancho Labradores,VAN,1765.5,
+Económico,Local,,Rancho Las Puertas,SEDAN,428,
+Económico,Local,,Rancho Las Puertas,VAN,1765.5,
+Económico,Local,,Rancho Las Sabinas,SEDAN,428,
+Económico,Local,,Rancho Las Sabinas,VAN,1765.5,
+Económico,Local,,Rancho Luna Escondida,SEDAN,428,
+Económico,Local,,Rancho Luna Escondida,VAN,1765.5,
+Económico,Local,,Rancho San Luis Gonzaga,SEDAN,428,
+Económico,Local,,Rancho San Luis Gonzaga,VAN,1765.5,
+Económico,Local,,Rancho Vía Orgánica,SEDAN,642,
+Económico,Local,,Rancho Vía Orgánica,VAN,2140,
+Económico,Local,,Santuario de Atotonilco,SEDAN,428,
+Económico,Local,,Santuario de Atotonilco,VAN,1765.5,
+Económico,Local,,Viñedo Cuna de Tierra,SEDAN,1070,
+Económico,Local,,Viñedo Cuna de Tierra,VAN,2675,
+Económico,Local,,Viñedo Dos Búhos,SEDAN,428,
+Económico,Local,,Viñedo Dos Búhos,VAN,1765.5,
+Económico,Local,,Viñedo La Santísima Trinidad,SEDAN,856,
+Económico,Local,,Viñedo La Santísima Trinidad,VAN,2354,
+Económico,Local,,Viñedo Los Remedios,SEDAN,642,
+Económico,Local,,Viñedo Los Remedios,VAN,2140,
+Económico,Local,,Viñedo San Lucas,SEDAN,428,
+Económico,Local,,Viñedo San Lucas,VAN,1765.5,
+Económico,Local,,Viñedo Toyan,SEDAN,428,
+Económico,Local,,Viñedo Toyan,VAN,1765.5,
+Económico,Local,,Viñedo Tres Raíces,SEDAN,856,
+Económico,Local,,Viñedo Tres Raíces,VAN,2354,
+Económico,Local,,Viñedos Patria,SEDAN,321,
+Económico,Local,,Viñedos Patria,VAN,1605,
+Económico,Local,,Viñedos San Miguel,SEDAN,642,
+Económico,Local,,Viñedos San Miguel,VAN,2140,
+Económico,Local,,Zirándaro,SEDAN,374.5,
+Económico,Local,,Zirándaro,VAN,1658.5,
+Económico,Local,,Zona Centro,SEDAN,160.5,
+Económico,Local,,Zona Centro,VAN,1284,
+Premium,Aeropuerto,(AGU) Aeropuerto Internacional de Aguascalientes,San Miguel de Allende,SEDAN,6955,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(AGU) Aeropuerto Internacional de Aguascalientes,SEDAN,6955,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(AGU) Aeropuerto Internacional de Aguascalientes,San Miguel de Allende,SUBURBAN,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(AGU) Aeropuerto Internacional de Aguascalientes,SUBURBAN,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(AGU) Aeropuerto Internacional de Aguascalientes,San Miguel de Allende,SPRINTER,15515,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(AGU) Aeropuerto Internacional de Aguascalientes,SPRINTER,15515,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(AIFA) Aeropuerto Internacional Felipe Angeles,San Miguel de Allende,SEDAN,6955,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(AIFA) Aeropuerto Internacional Felipe Angeles,SEDAN,6955,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(AIFA) Aeropuerto Internacional Felipe Angeles,San Miguel de Allende,SUBURBAN,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(AIFA) Aeropuerto Internacional Felipe Angeles,SUBURBAN,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(AIFA) Aeropuerto Internacional Felipe Angeles,San Miguel de Allende,SPRINTER,15515,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(AIFA) Aeropuerto Internacional Felipe Angeles,SPRINTER,15515,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(BJX) Aeropuerto Internacional de Leon,San Miguel de Allende,SEDAN,2461,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(BJX) Aeropuerto Internacional de Leon,SEDAN,2461,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(BJX) Aeropuerto Internacional de Leon,San Miguel de Allende,SUBURBAN,3424,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(BJX) Aeropuerto Internacional de Leon,SUBURBAN,3424,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(BJX) Aeropuerto Internacional de Leon,San Miguel de Allende,SPRINTER,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(BJX) Aeropuerto Internacional de Leon,SPRINTER,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(GDL) Aeropuerto Internacional de Guadalajara,San Miguel de Allende,SEDAN,9630,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(GDL) Aeropuerto Internacional de Guadalajara,SEDAN,9630,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(GDL) Aeropuerto Internacional de Guadalajara,San Miguel de Allende,SUBURBAN,12037.5,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(GDL) Aeropuerto Internacional de Guadalajara,SUBURBAN,12037.5,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(GDL) Aeropuerto Internacional de Guadalajara,San Miguel de Allende,SPRINTER,21750,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(GDL) Aeropuerto Internacional de Guadalajara,SPRINTER,21750,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(MEX) Aeropuerto Internacional Benito Juarez,San Miguel de Allende,SEDAN,6420,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(MEX) Aeropuerto Internacional Benito Juarez,SEDAN,6420,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(MEX) Aeropuerto Internacional Benito Juarez,San Miguel de Allende,SUBURBAN,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(MEX) Aeropuerto Internacional Benito Juarez,SUBURBAN,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(MEX) Aeropuerto Internacional Benito Juarez,San Miguel de Allende,SPRINTER,15515,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(MEX) Aeropuerto Internacional Benito Juarez,SPRINTER,15515,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(MLM) Aeropuerto Internacional de Morelia,San Miguel de Allende,SEDAN,6420,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(MLM) Aeropuerto Internacional de Morelia,SEDAN,6420,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(MLM) Aeropuerto Internacional de Morelia,San Miguel de Allende,SUBURBAN,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(MLM) Aeropuerto Internacional de Morelia,SUBURBAN,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(MLM) Aeropuerto Internacional de Morelia,San Miguel de Allende,SPRINTER,15515,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(MLM) Aeropuerto Internacional de Morelia,SPRINTER,15515,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(QRO) Aeropuerto Internacional de Queretaro,San Miguel de Allende,SEDAN,2461,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(QRO) Aeropuerto Internacional de Queretaro,SEDAN,2461,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(QRO) Aeropuerto Internacional de Queretaro,San Miguel de Allende,SUBURBAN,3424,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(QRO) Aeropuerto Internacional de Queretaro,SUBURBAN,3424,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(QRO) Aeropuerto Internacional de Queretaro,San Miguel de Allende,SPRINTER,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(QRO) Aeropuerto Internacional de Queretaro,SPRINTER,8025,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(SLP) Aeropuerto Internacional de San Luis Potosi,San Miguel de Allende,SEDAN,4815,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(SLP) Aeropuerto Internacional de San Luis Potosi,SEDAN,4815,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(SLP) Aeropuerto Internacional de San Luis Potosi,San Miguel de Allende,SUBURBAN,6018.75,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(SLP) Aeropuerto Internacional de San Luis Potosi,SUBURBAN,6018.75,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(SLP) Aeropuerto Internacional de San Luis Potosi,San Miguel de Allende,SPRINTER,11636.25,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(SLP) Aeropuerto Internacional de San Luis Potosi,SPRINTER,11636.25,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(TLC) Aeropuerto Internacional de Toluca,San Miguel de Allende,SEDAN,6955,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(TLC) Aeropuerto Internacional de Toluca,SEDAN,6955,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(TLC) Aeropuerto Internacional de Toluca,San Miguel de Allende,SUBURBAN,8560,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(TLC) Aeropuerto Internacional de Toluca,SUBURBAN,8560,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,(TLC) Aeropuerto Internacional de Toluca,San Miguel de Allende,SPRINTER,16050,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Aeropuerto,San Miguel de Allende,(TLC) Aeropuerto Internacional de Toluca,SPRINTER,16050,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Premium,Punto a Punto,Aguascalientes,San Miguel de Allende,SEDAN,6955,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Premium,Punto a Punto,San Miguel de Allende,Aguascalientes,SEDAN,6955,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Premium,Punto a Punto,Aguascalientes,San Miguel de Allende,SUBURBAN,8025,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Premium,Punto a Punto,San Miguel de Allende,Aguascalientes,SUBURBAN,8025,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Premium,Punto a Punto,Aguascalientes,San Miguel de Allende,SPRINTER,15515,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Premium,Punto a Punto,San Miguel de Allende,Aguascalientes,SPRINTER,15515,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Premium,Punto a Punto,León,San Miguel de Allende,SEDAN,3531,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Premium,Punto a Punto,San Miguel de Allende,León,SEDAN,3531,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Premium,Punto a Punto,León,San Miguel de Allende,SUBURBAN,4494,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Premium,Punto a Punto,San Miguel de Allende,León,SUBURBAN,4494,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Premium,Punto a Punto,León,San Miguel de Allende,SPRINTER,9630,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Premium,Punto a Punto,San Miguel de Allende,León,SPRINTER,9630,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Premium,Punto a Punto,Ciudad de México 1 (Norte & Zona Centro),San Miguel de Allende,SEDAN,6420,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Premium,Punto a Punto,San Miguel de Allende,Ciudad de México 1 (Norte & Zona Centro),SEDAN,6420,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Premium,Punto a Punto,Ciudad de México 1 (Norte & Zona Centro),San Miguel de Allende,SUBURBAN,8025,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Premium,Punto a Punto,San Miguel de Allende,Ciudad de México 1 (Norte & Zona Centro),SUBURBAN,8025,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Premium,Punto a Punto,Ciudad de México 1 (Norte & Zona Centro),San Miguel de Allende,SPRINTER,15515,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Premium,Punto a Punto,San Miguel de Allende,Ciudad de México 1 (Norte & Zona Centro),SPRINTER,15515,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Premium,Punto a Punto,Ciudad de México 2 (Sur & Zona de Santa Fé),San Miguel de Allende,SEDAN,7940,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Premium,Punto a Punto,San Miguel de Allende,Ciudad de México 2 (Sur & Zona de Santa Fé),SEDAN,7940,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Premium,Punto a Punto,Ciudad de México 2 (Sur & Zona de Santa Fé),San Miguel de Allende,SUBURBAN,9095,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Premium,Punto a Punto,San Miguel de Allende,Ciudad de México 2 (Sur & Zona de Santa Fé),SUBURBAN,9095,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Premium,Punto a Punto,Ciudad de México 2 (Sur & Zona de Santa Fé),San Miguel de Allende,SPRINTER,17120,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Premium,Punto a Punto,San Miguel de Allende,Ciudad de México 2 (Sur & Zona de Santa Fé),SPRINTER,17120,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Premium,Punto a Punto,Cuernavaca,San Miguel de Allende,SEDAN,9630,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Premium,Punto a Punto,San Miguel de Allende,Cuernavaca,SEDAN,9630,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Premium,Punto a Punto,Cuernavaca,San Miguel de Allende,SUBURBAN,12037.5,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Premium,Punto a Punto,San Miguel de Allende,Cuernavaca,SUBURBAN,12037.5,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Premium,Punto a Punto,Cuernavaca,San Miguel de Allende,SPRINTER,23272.5,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Premium,Punto a Punto,San Miguel de Allende,Cuernavaca,SPRINTER,23272.5,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Premium,Punto a Punto,Dolores Hidalgo,San Miguel de Allende,SEDAN,2354,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Premium,Punto a Punto,San Miguel de Allende,Dolores Hidalgo,SEDAN,2354,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Premium,Punto a Punto,Dolores Hidalgo,San Miguel de Allende,SUBURBAN,2889,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Premium,Punto a Punto,San Miguel de Allende,Dolores Hidalgo,SUBURBAN,2889,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Premium,Punto a Punto,Dolores Hidalgo,San Miguel de Allende,SPRINTER,6848,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Premium,Punto a Punto,San Miguel de Allende,Dolores Hidalgo,SPRINTER,6848,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Premium,Punto a Punto,Estado de México,San Miguel de Allende,SEDAN,6420,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Premium,Punto a Punto,San Miguel de Allende,Estado de México,SEDAN,6420,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Premium,Punto a Punto,Estado de México,San Miguel de Allende,SUBURBAN,8025,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Premium,Punto a Punto,San Miguel de Allende,Estado de México,SUBURBAN,8025,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Premium,Punto a Punto,Estado de México,San Miguel de Allende,SPRINTER,15515,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Premium,Punto a Punto,San Miguel de Allende,Estado de México,SPRINTER,15515,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Premium,Punto a Punto,Guadalajara,San Miguel de Allende,SEDAN,9630,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Premium,Punto a Punto,San Miguel de Allende,Guadalajara,SEDAN,9630,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Premium,Punto a Punto,Guadalajara,San Miguel de Allende,SUBURBAN,12037.5,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Premium,Punto a Punto,San Miguel de Allende,Guadalajara,SUBURBAN,12037.5,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Premium,Punto a Punto,Guadalajara,San Miguel de Allende,SPRINTER,23272.5,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Premium,Punto a Punto,San Miguel de Allende,Guadalajara,SPRINTER,23272.5,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Premium,Punto a Punto,Guanajuato,San Miguel de Allende,SEDAN,2461,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Premium,Punto a Punto,San Miguel de Allende,Guanajuato,SEDAN,2461,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Premium,Punto a Punto,Guanajuato,San Miguel de Allende,SUBURBAN,3424,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Premium,Punto a Punto,San Miguel de Allende,Guanajuato,SUBURBAN,3424,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Premium,Punto a Punto,Guanajuato,San Miguel de Allende,SPRINTER,8025,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Premium,Punto a Punto,San Miguel de Allende,Guanajuato,SPRINTER,8025,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Premium,Punto a Punto,Morelia,San Miguel de Allende,SEDAN,6420,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Premium,Punto a Punto,San Miguel de Allende,Morelia,SEDAN,6420,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Premium,Punto a Punto,Morelia,San Miguel de Allende,SUBURBAN,8025,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Premium,Punto a Punto,San Miguel de Allende,Morelia,SUBURBAN,8025,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Premium,Punto a Punto,Morelia,San Miguel de Allende,SPRINTER,15515,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Premium,Punto a Punto,San Miguel de Allende,Morelia,SPRINTER,15515,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Premium,Punto a Punto,Puebla,San Miguel de Allende,SEDAN,11074.5,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Premium,Punto a Punto,San Miguel de Allende,Puebla,SEDAN,11074.5,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Premium,Punto a Punto,Puebla,San Miguel de Allende,SUBURBAN,13843.13,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Premium,Punto a Punto,San Miguel de Allende,Puebla,SUBURBAN,13843.13,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Premium,Punto a Punto,Puebla,San Miguel de Allende,SPRINTER,26763.38,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Premium,Punto a Punto,San Miguel de Allende,Puebla,SPRINTER,26763.38,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Premium,Punto a Punto,Querétaro,San Miguel de Allende,SEDAN,2461,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Premium,Punto a Punto,San Miguel de Allende,Querétaro,SEDAN,2461,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Premium,Punto a Punto,Querétaro,San Miguel de Allende,SUBURBAN,3424,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Premium,Punto a Punto,San Miguel de Allende,Querétaro,SUBURBAN,3424,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Premium,Punto a Punto,Querétaro,San Miguel de Allende,SPRINTER,8025,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Premium,Punto a Punto,San Miguel de Allende,Querétaro,SPRINTER,8025,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Premium,Punto a Punto,San Juan del Rio,San Miguel de Allende,SEDAN,2996,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Premium,Punto a Punto,San Miguel de Allende,San Juan del Rio,SEDAN,2996,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Premium,Punto a Punto,San Juan del Rio,San Miguel de Allende,SUBURBAN,4280,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Premium,Punto a Punto,San Miguel de Allende,San Juan del Rio,SUBURBAN,4280,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Premium,Punto a Punto,San Juan del Rio,San Miguel de Allende,SPRINTER,9951,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Premium,Punto a Punto,San Miguel de Allende,San Juan del Rio,SPRINTER,9951,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Premium,Punto a Punto,San Luis Potosí,San Miguel de Allende,SEDAN,4815,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Premium,Punto a Punto,San Miguel de Allende,San Luis Potosí,SEDAN,4815,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Premium,Punto a Punto,San Luis Potosí,San Miguel de Allende,SUBURBAN,6018.75,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Premium,Punto a Punto,San Miguel de Allende,San Luis Potosí,SUBURBAN,6018.75,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Premium,Punto a Punto,San Luis Potosí,San Miguel de Allende,SPRINTER,11636.25,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Premium,Punto a Punto,San Miguel de Allende,San Luis Potosí,SPRINTER,11636.25,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Premium,Punto a Punto,Zacatecas,San Miguel de Allende,SEDAN,9630,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Premium,Punto a Punto,San Miguel de Allende,Zacatecas,SEDAN,9630,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Premium,Punto a Punto,Zacatecas,San Miguel de Allende,SUBURBAN,12037.5,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Premium,Punto a Punto,San Miguel de Allende,Zacatecas,SUBURBAN,12037.5,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Premium,Punto a Punto,Zacatecas,San Miguel de Allende,SPRINTER,23272.5,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Premium,Punto a Punto,San Miguel de Allende,Zacatecas,SPRINTER,23272.5,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Premium,Local,,Capilla de Jimmy Ray,SEDAN,1386.66,
+Premium,Local,,Capilla de Jimmy Ray,SUBURBAN,1559.21,
+Premium,Local,,Capilla de Jimmy Ray,SPRINTER,2002.94,
+Premium,Local,,Casa Adela,SEDAN,1794.95,
+Premium,Local,,Casa Adela,SUBURBAN,2039.97,
+Premium,Local,,Casa Adela,SPRINTER,3755.52,
+Premium,Local,,Casa de Aves,SEDAN,1694.01,
+Premium,Local,,Casa de Aves,SUBURBAN,1842.71,
+Premium,Local,,Casa de Aves,SPRINTER,2311.09,
+Premium,Local,,Central de Autobuses,SEDAN,1078.51,
+Premium,Local,,Central de Autobuses,SUBURBAN,1275.72,
+Premium,Local,,Central de Autobuses,SPRINTER,1694.8,
+Premium,Local,,Club de Golf Malanquín,SEDAN,1232.58,
+Premium,Local,,Club de Golf Malanquín,SUBURBAN,1559.21,
+Premium,Local,,Club de Golf Malanquín,SPRINTER,2002.94,
+Premium,Local,,Club de Golf Ventanas,SEDAN,1232.58,
+Premium,Local,,Club de Golf Ventanas,SUBURBAN,1559.21,
+Premium,Local,,Club de Golf Ventanas,SPRINTER,2002.94,
+Premium,Local,,Escondido Place,SEDAN,1386.65,
+Premium,Local,,Escondido Place,SUBURBAN,1559.21,
+Premium,Local,,Escondido Place,SPRINTER,2002.94,
+Premium,Local,,Fábrica La Aurora,SEDAN,1078.51,
+Premium,Local,,Fábrica La Aurora,SUBURBAN,1275.72,
+Premium,Local,,Fábrica La Aurora,SPRINTER,1694.8,
+Premium,Local,,Finca La Devocion,SEDAN,1794.95,
+Premium,Local,,Finca La Devocion,SUBURBAN,2039.97,
+Premium,Local,,Finca La Devocion,SPRINTER,3755.52,
+Premium,Local,,Finca Luna Serena,SEDAN,1694.01,
+Premium,Local,,Finca Luna Serena,SUBURBAN,1842.71,
+Premium,Local,,Finca Luna Serena,SPRINTER,2311.09,
+Premium,Local,,Hacienda Calderon,SEDAN,2203.24,
+Premium,Local,,Hacienda Calderon,SUBURBAN,2520.73,
+Premium,Local,,Hacienda Calderon,SPRINTER,5508.1,
+Premium,Local,,Hacienda Herencia de Allende,SEDAN,1386.65,
+Premium,Local,,Hacienda Herencia de Allende,SUBURBAN,1559.21,
+Premium,Local,,Hacienda Herencia de Allende,SPRINTER,2002.94,
+Premium,Local,,Hacienda Los Picachos,SEDAN,1386.65,
+Premium,Local,,Hacienda Los Picachos,SUBURBAN,1559.21,
+Premium,Local,,Hacienda Los Picachos,SPRINTER,2002.94,
+Premium,Local,,Hacienda Los Arcángeles,SEDAN,1232.58,
+Premium,Local,,Hacienda Los Arcángeles,SUBURBAN,1559.21,
+Premium,Local,,Hacienda Los Arcángeles,SPRINTER,2002.94,
+Premium,Local,,Hacienda San José La Vista,SEDAN,1694.01,
+Premium,Local,,Hacienda San José La Vista,SUBURBAN,1842.71,
+Premium,Local,,Hacienda San José La Vista,SPRINTER,5508.1,
+Premium,Local,,Hacienda Puerto de Sosa,SEDAN,2203.24,
+Premium,Local,,Hacienda Puerto de Sosa,SUBURBAN,2520.73,
+Premium,Local,,Hacienda Puerto de Sosa,SPRINTER,2311.09,
+Premium,Local,,Helipuerto Los Gerez,SEDAN,1540.33,
+Premium,Local,,Helipuerto Los Gerez,SUBURBAN,1700.96,
+Premium,Local,,Helipuerto Los Gerez,SPRINTER,2157.02,
+Premium,Local,,La Casona,SEDAN,1078.51,
+Premium,Local,,La Casona,SUBURBAN,1275.72,
+Premium,Local,,La Casona,SPRINTER,1694.8,
+Premium,Local,,La Candelaria,SEDAN,1540.33,
+Premium,Local,,La Candelaria,SUBURBAN,1700.96,
+Premium,Local,,La Candelaria,SPRINTER,2157.02,
+Premium,Local,,La Gruta,SEDAN,1386.65,
+Premium,Local,,La Gruta,SUBURBAN,1559.21,
+Premium,Local,,La Gruta,SPRINTER,2002.94,
+Premium,Local,,La Noria,SEDAN,1540.33,
+Premium,Local,,La Noria,SUBURBAN,1700.96,
+Premium,Local,,La Noria,SPRINTER,2157.02,
+Premium,Local,,La Zandunga,SEDAN,2203.24,
+Premium,Local,,La Zandunga,SUBURBAN,2520.73,
+Premium,Local,,La Zandunga,SPRINTER,5508.1,
+Premium,Local,,Los Senderos,SEDAN,1232.58,
+Premium,Local,,Los Senderos,SUBURBAN,1559.21,
+Premium,Local,,Los Senderos,SPRINTER,2002.94,
+Premium,Local,,Mayan Baths,SEDAN,1386.65,
+Premium,Local,,Mayan Baths,SUBURBAN,1559.21,
+Premium,Local,,Mayan Baths,SPRINTER,2002.94,
+Premium,Local,,Opuntia,SEDAN,2203.24,
+Premium,Local,,Opuntia,SUBURBAN,2520.73,
+Premium,Local,,Opuntia,SPRINTER,5508.1,
+Premium,Local,,Otomí,SEDAN,1386.65,
+Premium,Local,,Otomí,SUBURBAN,1559.21,
+Premium,Local,,Otomí,SPRINTER,2002.94,
+Premium,Local,,Rancho La Trinidad,SEDAN,1386.65,
+Premium,Local,,Rancho La Trinidad,SUBURBAN,1559.21,
+Premium,Local,,Rancho La Trinidad,SPRINTER,2002.94,
+Premium,Local,,Rancho Labradores,SEDAN,1540.33,
+Premium,Local,,Rancho Labradores,SUBURBAN,1700.96,
+Premium,Local,,Rancho Labradores,SPRINTER,2157.02,
+Premium,Local,,Rancho Las Puertas,SEDAN,1386.65,
+Premium,Local,,Rancho Las Puertas,SUBURBAN,1559.21,
+Premium,Local,,Rancho Las Puertas,SPRINTER,2002.94,
+Premium,Local,,Rancho Las Sabinas,SEDAN,1540.33,
+Premium,Local,,Rancho Las Sabinas,SUBURBAN,1700.96,
+Premium,Local,,Rancho Las Sabinas,SPRINTER,2157.02,
+Premium,Local,,Rancho Luna Escondida,SEDAN,1540.33,
+Premium,Local,,Rancho Luna Escondida,SUBURBAN,1700.96,
+Premium,Local,,Rancho Luna Escondida,SPRINTER,2157.02,
+Premium,Local,,Rancho San Luis Gonzaga,SEDAN,1386.65,
+Premium,Local,,Rancho San Luis Gonzaga,SUBURBAN,1559.21,
+Premium,Local,,Rancho San Luis Gonzaga,SPRINTER,2002.94,
+Premium,Local,,Rancho Vía Orgánica,SEDAN,2203.24,
+Premium,Local,,Rancho Vía Orgánica,SUBURBAN,2520.73,
+Premium,Local,,Rancho Vía Orgánica,SPRINTER,5508.1,
+Premium,Local,,Santuario de Atotonilco,SEDAN,1794.95,
+Premium,Local,,Santuario de Atotonilco,SUBURBAN,2039.97,
+Premium,Local,,Santuario de Atotonilco,SPRINTER,3755.52,
+Premium,Local,,Viñedo Cuna de Tierra,SEDAN,2403.53,
+Premium,Local,,Viñedo Cuna de Tierra,SUBURBAN,2749.89,
+Premium,Local,,Viñedo Cuna de Tierra,SPRINTER,6008.83,
+Premium,Local,,Viñedo Dos Búhos,SEDAN,1386.65,
+Premium,Local,,Viñedo Dos Búhos,SUBURBAN,1559.21,
+Premium,Local,,Viñedo Dos Búhos,SPRINTER,2002.94,
+Premium,Local,,Viñedo La Santísima Trinidad,SEDAN,2203.24,
+Premium,Local,,Viñedo La Santísima Trinidad,SUBURBAN,2520.73,
+Premium,Local,,Viñedo La Santísima Trinidad,SPRINTER,5508.1,
+Premium,Local,,Viñedo Los Remedios,SEDAN,2203.24,
+Premium,Local,,Viñedo Los Remedios,SUBURBAN,2520.74,
+Premium,Local,,Viñedo Los Remedios,SPRINTER,5508.1,
+Premium,Local,,Viñedo San Lucas,SEDAN,1386.65,
+Premium,Local,,Viñedo San Lucas,SUBURBAN,1559.21,
+Premium,Local,,Viñedo San Lucas,SPRINTER,2002.94,
+Premium,Local,,Viñedo Toyan,SEDAN,1386.65,
+Premium,Local,,Viñedo Toyan,SUBURBAN,1559.21,
+Premium,Local,,Viñedo Toyan,SPRINTER,2002.94,
+Premium,Local,,Viñedo Tres Raíces,SEDAN,2203.24,
+Premium,Local,,Viñedo Tres Raíces,SUBURBAN,2520.73,
+Premium,Local,,Viñedo Tres Raíces,SPRINTER,5508.1,
+Premium,Local,,Viñedos Patria,SEDAN,1540.33,
+Premium,Local,,Viñedos Patria,SUBURBAN,1700.96,
+Premium,Local,,Viñedos Patria,SPRINTER,2157.02,
+Premium,Local,,Viñedos San Miguel,SEDAN,2203.24,
+Premium,Local,,Viñedos San Miguel,SUBURBAN,2520.73,
+Premium,Local,,Viñedos San Miguel,SPRINTER,5508.1,
+Premium,Local,,Zirándaro,SEDAN,1386.65,
+Premium,Local,,Zirándaro,SUBURBAN,1559.21,
+Premium,Local,,Zirándaro,SPRINTER,2002.94,
+Premium,Local,,Zona Centro,SEDAN,1078.51,
+Premium,Local,,Zona Centro,SUBURBAN,1275.72,
+Premium,Local,,Zona Centro,SPRINTER,1694.8,
+Green Class,Aeropuerto,(AGU) Aeropuerto Internacional de Aguascalientes,San Miguel de Allende,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(AGU) Aeropuerto Internacional de Aguascalientes,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(AGU) Aeropuerto Internacional de Aguascalientes,San Miguel de Allende,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(AGU) Aeropuerto Internacional de Aguascalientes,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(AIFA) Aeropuerto Internacional Felipe Angeles,San Miguel de Allende,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(AIFA) Aeropuerto Internacional Felipe Angeles,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(AIFA) Aeropuerto Internacional Felipe Angeles,San Miguel de Allende,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(AIFA) Aeropuerto Internacional Felipe Angeles,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(BJX) Aeropuerto Internacional de Leon,San Miguel de Allende,MODEL 3,2990,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(BJX) Aeropuerto Internacional de Leon,MODEL 3,2990,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(BJX) Aeropuerto Internacional de Leon,San Miguel de Allende,MODEL Y,3565,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(BJX) Aeropuerto Internacional de Leon,MODEL Y,3565,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(GDL) Aeropuerto Internacional de Guadalajara,San Miguel de Allende,MODEL 3,10350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(GDL) Aeropuerto Internacional de Guadalajara,MODEL 3,10350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(GDL) Aeropuerto Internacional de Guadalajara,San Miguel de Allende,MODEL Y,11400,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(GDL) Aeropuerto Internacional de Guadalajara,MODEL Y,11400,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(MEX) Aeropuerto Internacional Benito Juarez,San Miguel de Allende,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(MEX) Aeropuerto Internacional Benito Juarez,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(MEX) Aeropuerto Internacional Benito Juarez,San Miguel de Allende,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(MEX) Aeropuerto Internacional Benito Juarez,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(MLM) Aeropuerto Internacional de Morelia,San Miguel de Allende,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(MLM) Aeropuerto Internacional de Morelia,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(MLM) Aeropuerto Internacional de Morelia,San Miguel de Allende,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(MLM) Aeropuerto Internacional de Morelia,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(QRO) Aeropuerto Internacional de Queretaro,San Miguel de Allende,MODEL 3,2990,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(QRO) Aeropuerto Internacional de Queretaro,MODEL 3,2990,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(QRO) Aeropuerto Internacional de Queretaro,San Miguel de Allende,MODEL Y,3565,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(QRO) Aeropuerto Internacional de Queretaro,MODEL Y,3565,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(SLP) Aeropuerto Internacional de San Luis Potosi,San Miguel de Allende,MODEL 3,5520,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(SLP) Aeropuerto Internacional de San Luis Potosi,MODEL 3,5520,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(SLP) Aeropuerto Internacional de San Luis Potosi,San Miguel de Allende,MODEL Y,6080,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(SLP) Aeropuerto Internacional de San Luis Potosi,MODEL Y,6080,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(TLC) Aeropuerto Internacional de Toluca,San Miguel de Allende,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(TLC) Aeropuerto Internacional de Toluca,MODEL 3,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,(TLC) Aeropuerto Internacional de Toluca,San Miguel de Allende,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Aeropuerto,San Miguel de Allende,(TLC) Aeropuerto Internacional de Toluca,MODEL Y,7600,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+Green Class,Punto a Punto,Aguascalientes,San Miguel de Allende,MODEL 3,6900,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Green Class,Punto a Punto,San Miguel de Allende,Aguascalientes,MODEL 3,6900,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Green Class,Punto a Punto,Aguascalientes,San Miguel de Allende,MODEL Y,7600,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Green Class,Punto a Punto,San Miguel de Allende,Aguascalientes,MODEL Y,7600,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+Green Class,Punto a Punto,León,San Miguel de Allende,MODEL 3,3887,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Green Class,Punto a Punto,San Miguel de Allende,León,MODEL 3,3887,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Green Class,Punto a Punto,León,San Miguel de Allende,MODEL Y,4634.5,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Green Class,Punto a Punto,San Miguel de Allende,León,MODEL Y,4634.5,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+Green Class,Punto a Punto,Ciudad de México 1 (Norte & Zona Centro),San Miguel de Allende,MODEL 3,6900,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Green Class,Punto a Punto,San Miguel de Allende,Ciudad de México 1 (Norte & Zona Centro),MODEL 3,6900,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Green Class,Punto a Punto,Ciudad de México 1 (Norte & Zona Centro),San Miguel de Allende,MODEL Y,7600,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Green Class,Punto a Punto,San Miguel de Allende,Ciudad de México 1 (Norte & Zona Centro),MODEL Y,7600,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+Green Class,Punto a Punto,Ciudad de México 2 (Sur & Zona de Santa Fé),San Miguel de Allende,MODEL 3,7935,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Green Class,Punto a Punto,San Miguel de Allende,Ciudad de México 2 (Sur & Zona de Santa Fé),MODEL 3,7935,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Green Class,Punto a Punto,Ciudad de México 2 (Sur & Zona de Santa Fé),San Miguel de Allende,MODEL Y,8740,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Green Class,Punto a Punto,San Miguel de Allende,Ciudad de México 2 (Sur & Zona de Santa Fé),MODEL Y,8740,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+Green Class,Punto a Punto,Cuernavaca,San Miguel de Allende,MODEL 3,10350,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Green Class,Punto a Punto,San Miguel de Allende,Cuernavaca,MODEL 3,10350,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Green Class,Punto a Punto,Cuernavaca,San Miguel de Allende,MODEL Y,11400,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Green Class,Punto a Punto,San Miguel de Allende,Cuernavaca,MODEL Y,11400,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+Green Class,Punto a Punto,Dolores Hidalgo,San Miguel de Allende,MODEL 3,2392,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Green Class,Punto a Punto,San Miguel de Allende,Dolores Hidalgo,MODEL 3,2392,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Green Class,Punto a Punto,Dolores Hidalgo,San Miguel de Allende,MODEL Y,2852,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Green Class,Punto a Punto,San Miguel de Allende,Dolores Hidalgo,MODEL Y,2852,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+Green Class,Punto a Punto,Estado de México,San Miguel de Allende,MODEL 3,6900,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Green Class,Punto a Punto,San Miguel de Allende,Estado de México,MODEL 3,6900,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Green Class,Punto a Punto,Estado de México,San Miguel de Allende,MODEL Y,7600,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Green Class,Punto a Punto,San Miguel de Allende,Estado de México,MODEL Y,7600,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+Green Class,Punto a Punto,Guadalajara,San Miguel de Allende,MODEL 3,10350,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Green Class,Punto a Punto,San Miguel de Allende,Guadalajara,MODEL 3,10350,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Green Class,Punto a Punto,Guadalajara,San Miguel de Allende,MODEL Y,11400,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Green Class,Punto a Punto,San Miguel de Allende,Guadalajara,MODEL Y,11400,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+Green Class,Punto a Punto,Guanajuato,San Miguel de Allende,MODEL 3,2990,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Green Class,Punto a Punto,San Miguel de Allende,Guanajuato,MODEL 3,2990,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Green Class,Punto a Punto,Guanajuato,San Miguel de Allende,MODEL Y,3565,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Green Class,Punto a Punto,San Miguel de Allende,Guanajuato,MODEL Y,3565,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+Green Class,Punto a Punto,Morelia,San Miguel de Allende,MODEL 3,6900,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Green Class,Punto a Punto,San Miguel de Allende,Morelia,MODEL 3,6900,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Green Class,Punto a Punto,Morelia,San Miguel de Allende,MODEL Y,7600,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Green Class,Punto a Punto,San Miguel de Allende,Morelia,MODEL Y,7600,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+Green Class,Punto a Punto,Puebla,San Miguel de Allende,MODEL 3,11902.5,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Green Class,Punto a Punto,San Miguel de Allende,Puebla,MODEL 3,11902.5,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Green Class,Punto a Punto,Puebla,San Miguel de Allende,MODEL Y,13110,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Green Class,Punto a Punto,San Miguel de Allende,Puebla,MODEL Y,13110,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+Green Class,Punto a Punto,Querétaro,San Miguel de Allende,MODEL 3,2990,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Green Class,Punto a Punto,San Miguel de Allende,Querétaro,MODEL 3,2990,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Green Class,Punto a Punto,Querétaro,San Miguel de Allende,MODEL Y,3565,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Green Class,Punto a Punto,San Miguel de Allende,Querétaro,MODEL Y,3565,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+Green Class,Punto a Punto,San Juan del Rio,San Miguel de Allende,MODEL 3,3737.5,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Green Class,Punto a Punto,San Miguel de Allende,San Juan del Rio,MODEL 3,3737.5,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Green Class,Punto a Punto,San Juan del Rio,San Miguel de Allende,MODEL Y,4456.25,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Green Class,Punto a Punto,San Miguel de Allende,San Juan del Rio,MODEL Y,4456.25,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+Green Class,Punto a Punto,San Luis Potosí,San Miguel de Allende,MODEL 3,5520,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Green Class,Punto a Punto,San Miguel de Allende,San Luis Potosí,MODEL 3,5520,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Green Class,Punto a Punto,San Luis Potosí,San Miguel de Allende,MODEL Y,6080,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Green Class,Punto a Punto,San Miguel de Allende,San Luis Potosí,MODEL Y,6080,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+Green Class,Punto a Punto,Zacatecas,San Miguel de Allende,MODEL 3,10350,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Green Class,Punto a Punto,San Miguel de Allende,Zacatecas,MODEL 3,10350,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Green Class,Punto a Punto,Zacatecas,San Miguel de Allende,MODEL Y,11400,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Green Class,Punto a Punto,San Miguel de Allende,Zacatecas,MODEL Y,11400,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+Green Class,Local,,Capilla de Jimmy Ray,MODEL 3,1386.66,
+Green Class,Local,,Capilla de Jimmy Ray,MODEL Y,1694.79,
+Green Class,Local,,Casa Adela,MODEL 3,1794.95,
+Green Class,Local,,Casa Adela,MODEL Y,2217.36,
+Green Class,Local,,Casa de Aves,MODEL 3,1694.01,
+Green Class,Local,,Casa de Aves,MODEL Y,2002.94,
+Green Class,Local,,Central de Autobuses,MODEL 3,1078.51,
+Green Class,Local,,Central de Autobuses,MODEL Y,1386.66,
+Green Class,Local,,Club de Golf Malanquín,MODEL 3,1232.58,
+Green Class,Local,,Club de Golf Malanquín,MODEL Y,1694.8,
+Green Class,Local,,Club de Golf Ventanas,MODEL 3,1232.58,
+Green Class,Local,,Club de Golf Ventanas,MODEL Y,1694.8,
+Green Class,Local,,Escondido Place,MODEL 3,1386.65,
+Green Class,Local,,Escondido Place,MODEL Y,1694.8,
+Green Class,Local,,Fábrica La Aurora,MODEL 3,1078.51,
+Green Class,Local,,Fábrica La Aurora,MODEL Y,1386.65,
+Green Class,Local,,Finca Luna Serena,MODEL 3,1694.01,
+Green Class,Local,,Finca Luna Serena,MODEL Y,2002.94,
+Green Class,Local,,Hacienda Calderon,MODEL 3,2203.24,
+Green Class,Local,,Hacienda Calderon,MODEL Y,2739.92,
+Green Class,Local,,Hacienda Herencia de Allende,MODEL 3,1386.65,
+Green Class,Local,,Hacienda Herencia de Allende,MODEL Y,1694.8,
+Green Class,Local,,Hacienda Los Picachos,MODEL 3,1386.65,
+Green Class,Local,,Hacienda Los Picachos,MODEL Y,1694.8,
+Green Class,Local,,Hacienda Los Arcángeles,MODEL 3,1232.58,
+Green Class,Local,,Hacienda Los Arcángeles,MODEL Y,1694.8,
+Green Class,Local,,Hacienda San José La Vista,MODEL 3,1694.01,
+Green Class,Local,,Hacienda San José La Vista,MODEL Y,2002.94,
+Green Class,Local,,Hacienda Puerto de Sosa,MODEL 3,2203.24,
+Green Class,Local,,Hacienda Puerto de Sosa,MODEL Y,2739.92,
+Green Class,Local,,Helipuerto Los Gerez,MODEL 3,1540.33,
+Green Class,Local,,Helipuerto Los Gerez,MODEL Y,1848.87,
+Green Class,Local,,La Casona,MODEL 3,1078.51,
+Green Class,Local,,La Casona,MODEL Y,1386.65,
+Green Class,Local,,La Candelaria,MODEL 3,1540.33,
+Green Class,Local,,La Candelaria,MODEL Y,1848.87,
+Green Class,Local,,Finca La Devocion,MODEL 3,1794.95,
+Green Class,Local,,Finca La Devocion,MODEL Y,2217.36,
+Green Class,Local,,La Gruta,MODEL 3,1386.65,
+Green Class,Local,,La Gruta,MODEL Y,1694.8,
+Green Class,Local,,La Noria,MODEL 3,1540.33,
+Green Class,Local,,La Noria,MODEL Y,1848.87,
+Green Class,Local,,La Zandunga,MODEL 3,2203.24,
+Green Class,Local,,La Zandunga,MODEL Y,2739.92,
+Green Class,Local,,Los Senderos,MODEL 3,1232.58,
+Green Class,Local,,Los Senderos,MODEL Y,1694.8,
+Green Class,Local,,Mayan Baths,MODEL 3,1386.65,
+Green Class,Local,,Mayan Baths,MODEL Y,1694.8,
+Green Class,Local,,Opuntia,MODEL 3,2203.24,
+Green Class,Local,,Opuntia,MODEL Y,2739.92,
+Green Class,Local,,Otomí,MODEL 3,1386.65,
+Green Class,Local,,Otomí,MODEL Y,1694.8,
+Green Class,Local,,Rancho La Trinidad,MODEL 3,1386.65,
+Green Class,Local,,Rancho La Trinidad,MODEL Y,1694.8,
+Green Class,Local,,Rancho Labradores,MODEL 3,1540.33,
+Green Class,Local,,Rancho Labradores,MODEL Y,1848.87,
+Green Class,Local,,Rancho Las Puertas,MODEL 3,1386.65,
+Green Class,Local,,Rancho Las Puertas,MODEL Y,1694.8,
+Green Class,Local,,Rancho Las Sabinas,MODEL 3,1540.33,
+Green Class,Local,,Rancho Las Sabinas,MODEL Y,1848.87,
+Green Class,Local,,Rancho Luna Escondida,MODEL 3,1540.33,
+Green Class,Local,,Rancho Luna Escondida,MODEL Y,1848.87,
+Green Class,Local,,Rancho San Luis Gonzaga,MODEL 3,1386.65,
+Green Class,Local,,Rancho San Luis Gonzaga,MODEL Y,1694.8,
+Green Class,Local,,Rancho Vía Orgánica,MODEL 3,2203.24,
+Green Class,Local,,Rancho Vía Orgánica,MODEL Y,2739.92,
+Green Class,Local,,Santuario de Atotonilco,MODEL 3,1794.95,
+Green Class,Local,,Santuario de Atotonilco,MODEL Y,2217.36,
+Green Class,Local,,Viñedo Cuna de Tierra,MODEL 3,2403.53,
+Green Class,Local,,Viñedo Cuna de Tierra,MODEL Y,2989.01,
+Green Class,Local,,Viñedo Dos Búhos,MODEL 3,1386.65,
+Green Class,Local,,Viñedo Dos Búhos,MODEL Y,1694.8,
+Green Class,Local,,Viñedo La Santísima Trinidad,MODEL 3,2203.24,
+Green Class,Local,,Viñedo La Santísima Trinidad,MODEL Y,2739.92,
+Green Class,Local,,Viñedo Los Remedios,MODEL 3,2203.24,
+Green Class,Local,,Viñedo Los Remedios,MODEL Y,2739.92,
+Green Class,Local,,Viñedo San Lucas,MODEL 3,1386.65,
+Green Class,Local,,Viñedo San Lucas,MODEL Y,1694.8,
+Green Class,Local,,Viñedo Toyan,MODEL 3,1386.65,
+Green Class,Local,,Viñedo Toyan,MODEL Y,1694.8,
+Green Class,Local,,Viñedo Tres Raíces,MODEL 3,2203.24,
+Green Class,Local,,Viñedo Tres Raíces,MODEL Y,2739.92,
+Green Class,Local,,Viñedos Patria,MODEL 3,1540.33,
+Green Class,Local,,Viñedos Patria,MODEL Y,1848.87,
+Green Class,Local,,Viñedos San Miguel,MODEL 3,2203.24,
+Green Class,Local,,Viñedos San Miguel,MODEL Y,2739.92,
+Green Class,Local,,Zirándaro,MODEL 3,1386.65,
+Green Class,Local,,Zirándaro,MODEL Y,1694.8,
+Green Class,Local,,Zona Centro,MODEL 3,1078.51,
+Green Class,Local,,Zona Centro,MODEL Y,1386.65,
+First Class,Aeropuerto,(AGU) Aeropuerto Internacional de Aguascalientes,San Miguel de Allende,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(AGU) Aeropuerto Internacional de Aguascalientes,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(AGU) Aeropuerto Internacional de Aguascalientes,San Miguel de Allende,SUBURBAN,8560,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(AGU) Aeropuerto Internacional de Aguascalientes,SUBURBAN,8560,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(AIFA) Aeropuerto Internacional Felipe Angeles,San Miguel de Allende,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(AIFA) Aeropuerto Internacional Felipe Angeles,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(AIFA) Aeropuerto Internacional Felipe Angeles,San Miguel de Allende,SUBURBAN,8560,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(AIFA) Aeropuerto Internacional Felipe Angeles,SUBURBAN,8560,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(BJX) Aeropuerto Internacional de Leon,San Miguel de Allende,SEDAN,2990,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(BJX) Aeropuerto Internacional de Leon,SEDAN,2990,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(BJX) Aeropuerto Internacional de Leon,San Miguel de Allende,SUBURBAN,3852,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(BJX) Aeropuerto Internacional de Leon,SUBURBAN,3852,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(GDL) Aeropuerto Internacional de Guadalajara,San Miguel de Allende,SEDAN,10350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(GDL) Aeropuerto Internacional de Guadalajara,SEDAN,10350,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(GDL) Aeropuerto Internacional de Guadalajara,San Miguel de Allende,SUBURBAN,12840,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(GDL) Aeropuerto Internacional de Guadalajara,SUBURBAN,12840,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(MEX) Aeropuerto Internacional Benito Juarez,San Miguel de Allende,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(MEX) Aeropuerto Internacional Benito Juarez,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(MEX) Aeropuerto Internacional Benito Juarez,San Miguel de Allende,SUBURBAN,8560,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(MEX) Aeropuerto Internacional Benito Juarez,SUBURBAN,8560,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(MLM) Aeropuerto Internacional de Morelia,San Miguel de Allende,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(MLM) Aeropuerto Internacional de Morelia,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(MLM) Aeropuerto Internacional de Morelia,San Miguel de Allende,SUBURBAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(MLM) Aeropuerto Internacional de Morelia,SUBURBAN,9095,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(QRO) Aeropuerto Internacional de Queretaro,San Miguel de Allende,SEDAN,2990,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(QRO) Aeropuerto Internacional de Queretaro,SEDAN,2990,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(QRO) Aeropuerto Internacional de Queretaro,San Miguel de Allende,SUBURBAN,3852,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(QRO) Aeropuerto Internacional de Queretaro,SUBURBAN,3852,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(SLP) Aeropuerto Internacional de San Luis Potosi,San Miguel de Allende,SEDAN,5520,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(SLP) Aeropuerto Internacional de San Luis Potosi,SEDAN,5520,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(SLP) Aeropuerto Internacional de San Luis Potosi,San Miguel de Allende,SUBURBAN,6821.25,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(SLP) Aeropuerto Internacional de San Luis Potosi,SUBURBAN,6821.25,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(TLC) Aeropuerto Internacional de Toluca,San Miguel de Allende,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(TLC) Aeropuerto Internacional de Toluca,SEDAN,6900,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,(TLC) Aeropuerto Internacional de Toluca,San Miguel de Allende,SUBURBAN,9630,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Aeropuerto,San Miguel de Allende,(TLC) Aeropuerto Internacional de Toluca,SUBURBAN,9630,LAS TARIFAS INCLUYEN PAGO DE DERECHO DE PISO
+First Class,Punto a Punto,Aguascalientes,San Miguel de Allende,SEDAN,6900,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+First Class,Punto a Punto,San Miguel de Allende,Aguascalientes,SEDAN,6900,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+First Class,Punto a Punto,Aguascalientes,San Miguel de Allende,SUBURBAN,8560,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+First Class,Punto a Punto,San Miguel de Allende,Aguascalientes,SUBURBAN,8560,CUALQUIER DESTINO EN LA CIUDAD DE AGUASCALIENTES
+First Class,Punto a Punto,León,San Miguel de Allende,SEDAN,3887,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+First Class,Punto a Punto,San Miguel de Allende,León,SEDAN,3887,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+First Class,Punto a Punto,León,San Miguel de Allende,SUBURBAN,4922,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+First Class,Punto a Punto,San Miguel de Allende,León,SUBURBAN,4922,CUALQUIER DESTINO EN LA CIUDAD DE LEÓN
+First Class,Punto a Punto,Ciudad de México 1 (Norte & Zona Centro),San Miguel de Allende,SEDAN,6900,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+First Class,Punto a Punto,San Miguel de Allende,Ciudad de México 1 (Norte & Zona Centro),SEDAN,6900,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+First Class,Punto a Punto,Ciudad de México 1 (Norte & Zona Centro),San Miguel de Allende,SUBURBAN,8560,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+First Class,Punto a Punto,San Miguel de Allende,Ciudad de México 1 (Norte & Zona Centro),SUBURBAN,8560,"(ZÓCALO, POLANCO, LA CONDESA, REFORMA, ZONA ROSA, LA ALAMEDA CENTRAL, CHAPULTEPEC)"
+First Class,Punto a Punto,Ciudad de México 2 (Sur & Zona de Santa Fé),San Miguel de Allende,SEDAN,7935,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+First Class,Punto a Punto,San Miguel de Allende,Ciudad de México 2 (Sur & Zona de Santa Fé),SEDAN,7935,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+First Class,Punto a Punto,Ciudad de México 2 (Sur & Zona de Santa Fé),San Miguel de Allende,SUBURBAN,10165,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+First Class,Punto a Punto,San Miguel de Allende,Ciudad de México 2 (Sur & Zona de Santa Fé),SUBURBAN,10165,CUALQUIER DESTINO AL SUR DE MÉXICO Y LA ZONA DE SANTA FÉ
+First Class,Punto a Punto,Cuernavaca,San Miguel de Allende,SEDAN,10350,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+First Class,Punto a Punto,San Miguel de Allende,Cuernavaca,SEDAN,10350,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+First Class,Punto a Punto,Cuernavaca,San Miguel de Allende,SUBURBAN,14177.5,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+First Class,Punto a Punto,San Miguel de Allende,Cuernavaca,SUBURBAN,14177.5,CUALQUIER DESTINO EN LA CIUDAD DE CUERNAVACA
+First Class,Punto a Punto,Dolores Hidalgo,San Miguel de Allende,SEDAN,2392,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+First Class,Punto a Punto,San Miguel de Allende,Dolores Hidalgo,SEDAN,2392,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+First Class,Punto a Punto,Dolores Hidalgo,San Miguel de Allende,SUBURBAN,3466.8,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+First Class,Punto a Punto,San Miguel de Allende,Dolores Hidalgo,SUBURBAN,3466.8,CUALQUIER DESTINO EN LA CIUDAD DE DOLORES HIDALGO
+First Class,Punto a Punto,Estado de México,San Miguel de Allende,SEDAN,6900,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+First Class,Punto a Punto,San Miguel de Allende,Estado de México,SEDAN,6900,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+First Class,Punto a Punto,Estado de México,San Miguel de Allende,SUBURBAN,8560,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+First Class,Punto a Punto,San Miguel de Allende,Estado de México,SUBURBAN,8560,CUALQUIER DESTINO EN EL ESTADO DE MÉXICO
+First Class,Punto a Punto,Guadalajara,San Miguel de Allende,SEDAN,10350,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+First Class,Punto a Punto,San Miguel de Allende,Guadalajara,SEDAN,10350,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+First Class,Punto a Punto,Guadalajara,San Miguel de Allende,SUBURBAN,12840,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+First Class,Punto a Punto,San Miguel de Allende,Guadalajara,SUBURBAN,12840,CUALQUIER DESTINO EN LA CIUDAD DE GUADALAJARA
+First Class,Punto a Punto,Guanajuato,San Miguel de Allende,SEDAN,2990,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+First Class,Punto a Punto,San Miguel de Allende,Guanajuato,SEDAN,2990,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+First Class,Punto a Punto,Guanajuato,San Miguel de Allende,SUBURBAN,3852,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+First Class,Punto a Punto,San Miguel de Allende,Guanajuato,SUBURBAN,3852,CUALQUIER DESTINO EN LA CIUDAD DE GUANAJUATO
+First Class,Punto a Punto,Morelia,San Miguel de Allende,SEDAN,6900,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+First Class,Punto a Punto,San Miguel de Allende,Morelia,SEDAN,6900,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+First Class,Punto a Punto,Morelia,San Miguel de Allende,SUBURBAN,8560,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+First Class,Punto a Punto,San Miguel de Allende,Morelia,SUBURBAN,8560,CUALQUIER DESTINO EN LA CIUDAD DE MORELIA
+First Class,Punto a Punto,Puebla,San Miguel de Allende,SEDAN,11902.5,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+First Class,Punto a Punto,San Miguel de Allende,Puebla,SEDAN,11902.5,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+First Class,Punto a Punto,Puebla,San Miguel de Allende,SUBURBAN,14124,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+First Class,Punto a Punto,San Miguel de Allende,Puebla,SUBURBAN,14124,CUALQUIER DESTINO EN LA CIUDAD DE PUEBLA
+First Class,Punto a Punto,Querétaro,San Miguel de Allende,SEDAN,2990,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+First Class,Punto a Punto,San Miguel de Allende,Querétaro,SEDAN,2990,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+First Class,Punto a Punto,Querétaro,San Miguel de Allende,SUBURBAN,3852,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+First Class,Punto a Punto,San Miguel de Allende,Querétaro,SUBURBAN,3852,CUALQUIER DESTINO EN LA CIUDAD DE QUERÉTARO
+First Class,Punto a Punto,San Juan del Rio,San Miguel de Allende,SEDAN,3737.5,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+First Class,Punto a Punto,San Miguel de Allende,San Juan del Rio,SEDAN,3737.5,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+First Class,Punto a Punto,San Juan del Rio,San Miguel de Allende,SUBURBAN,4815,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+First Class,Punto a Punto,San Miguel de Allende,San Juan del Rio,SUBURBAN,4815,CUALQUIER DESTINO EN LA CIUDAD DE SAN JUAN DEL RÍO
+First Class,Punto a Punto,San Luis Potosí,San Miguel de Allende,SEDAN,5520,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+First Class,Punto a Punto,San Miguel de Allende,San Luis Potosí,SEDAN,5520,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+First Class,Punto a Punto,San Luis Potosí,San Miguel de Allende,SUBURBAN,6821.25,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+First Class,Punto a Punto,San Miguel de Allende,San Luis Potosí,SUBURBAN,6821.25,CUALQUIER DESTINO EN LA CIUDAD DE SAN LUIS POTOSÍ
+First Class,Punto a Punto,Zacatecas,San Miguel de Allende,SEDAN,10350,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+First Class,Punto a Punto,San Miguel de Allende,Zacatecas,SEDAN,10350,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+First Class,Punto a Punto,Zacatecas,San Miguel de Allende,SUBURBAN,14177.5,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+First Class,Punto a Punto,San Miguel de Allende,Zacatecas,SUBURBAN,14177.5,CUALQUIER DESTINO EN LA CIUDAD DE ZACATECAS
+First Class,Local,,Capilla de Jimmy Ray,SEDAN,1386.66,
+First Class,Local,,Capilla de Jimmy Ray,SUBURBAN,1694.79,
+First Class,Local,,Casa Adela,SEDAN,1794.95,
+First Class,Local,,Casa Adela,SUBURBAN,2217.36,
+First Class,Local,,Casa de Aves,SEDAN,1694.01,
+First Class,Local,,Casa de Aves,SUBURBAN,2002.94,
+First Class,Local,,Central de Autobuses,SEDAN,1078.51,
+First Class,Local,,Central de Autobuses,SUBURBAN,1386.66,
+First Class,Local,,Club de Golf Malanquín,SEDAN,1232.58,
+First Class,Local,,Club de Golf Malanquín,SUBURBAN,1694.8,
+First Class,Local,,Club de Golf Ventanas,SEDAN,1232.58,
+First Class,Local,,Club de Golf Ventanas,SUBURBAN,1694.8,
+First Class,Local,,Escondido Place,SEDAN,1386.65,
+First Class,Local,,Escondido Place,SUBURBAN,1694.8,
+First Class,Local,,Fábrica La Aurora,SEDAN,1078.51,
+First Class,Local,,Fábrica La Aurora,SUBURBAN,1386.65,
+First Class,Local,,Finca Luna Serena,SEDAN,2203.24,
+First Class,Local,,Finca Luna Serena,SUBURBAN,2002.94,
+First Class,Local,,Hacienda Calderon,SEDAN,1386.65,
+First Class,Local,,Hacienda Calderon,SUBURBAN,2739.92,
+First Class,Local,,Hacienda Herencia de Allende,SEDAN,1386.65,
+First Class,Local,,Hacienda Herencia de Allende,SUBURBAN,1694.8,
+First Class,Local,,Hacienda Los Picachos,SEDAN,1232.58,
+First Class,Local,,Hacienda Los Picachos,SUBURBAN,1694.8,
+First Class,Local,,Hacienda Los Arcángeles,SEDAN,1694.01,
+First Class,Local,,Hacienda Los Arcángeles,SUBURBAN,1694.8,
+First Class,Local,,Hacienda San José La Vista,SEDAN,2203.24,
+First Class,Local,,Hacienda San José La Vista,SUBURBAN,2002.94,
+First Class,Local,,Hacienda Puerto de Sosa,SEDAN,1540.33,
+First Class,Local,,Hacienda Puerto de Sosa,SUBURBAN,2739.92,
+First Class,Local,,Helipuerto Los Gerez,SEDAN,1078.51,
+First Class,Local,,Helipuerto Los Gerez,SUBURBAN,1848.87,
+First Class,Local,,La Casona,SEDAN,1540.33,
+First Class,Local,,La Casona,SUBURBAN,1386.65,
+First Class,Local,,La Candelaria,SEDAN,1794.95,
+First Class,Local,,La Candelaria,SUBURBAN,1848.87,
+First Class,Local,,Finca La Devocion,SEDAN,1694.01,
+First Class,Local,,Finca La Devocion,SUBURBAN,2217.36,
+First Class,Local,,La Gruta,SEDAN,1386.65,
+First Class,Local,,La Gruta,SUBURBAN,1694.8,
+First Class,Local,,La Noria,SEDAN,1540.33,
+First Class,Local,,La Noria,SUBURBAN,1848.87,
+First Class,Local,,La Zandunga,SEDAN,2203.24,
+First Class,Local,,La Zandunga,SUBURBAN,2739.92,
+First Class,Local,,Los Senderos,SEDAN,1232.58,
+First Class,Local,,Los Senderos,SUBURBAN,1694.8,
+First Class,Local,,Mayan Baths,SEDAN,1386.65,
+First Class,Local,,Mayan Baths,SUBURBAN,1694.8,
+First Class,Local,,Opuntia,SEDAN,2203.24,
+First Class,Local,,Opuntia,SUBURBAN,2739.92,
+First Class,Local,,Otomí,SEDAN,1386.65,
+First Class,Local,,Otomí,SUBURBAN,1694.8,
+First Class,Local,,Rancho La Trinidad,SEDAN,1386.65,
+First Class,Local,,Rancho La Trinidad,SUBURBAN,1694.8,
+First Class,Local,,Rancho Labradores,SEDAN,1540.33,
+First Class,Local,,Rancho Labradores,SUBURBAN,1848.87,
+First Class,Local,,Rancho Las Puertas,SEDAN,1386.65,
+First Class,Local,,Rancho Las Puertas,SUBURBAN,1694.8,
+First Class,Local,,Rancho Las Sabinas,SEDAN,1540.33,
+First Class,Local,,Rancho Las Sabinas,SUBURBAN,1848.87,
+First Class,Local,,Rancho Luna Escondida,SEDAN,1540.33,
+First Class,Local,,Rancho Luna Escondida,SUBURBAN,1848.87,
+First Class,Local,,Rancho San Luis Gonzaga,SEDAN,1386.65,
+First Class,Local,,Rancho San Luis Gonzaga,SUBURBAN,1694.8,
+First Class,Local,,Rancho Vía Orgánica,SEDAN,2203.24,
+First Class,Local,,Rancho Vía Orgánica,SUBURBAN,2739.92,
+First Class,Local,,Santuario de Atotonilco,SEDAN,1794.95,
+First Class,Local,,Santuario de Atotonilco,SUBURBAN,2217.36,
+First Class,Local,,Viñedo Cuna de Tierra,SEDAN,2403.53,
+First Class,Local,,Viñedo Cuna de Tierra,SUBURBAN,2989.01,
+First Class,Local,,Viñedo Dos Búhos,SEDAN,1386.65,
+First Class,Local,,Viñedo Dos Búhos,SUBURBAN,1694.8,
+First Class,Local,,Viñedo La Santísima Trinidad,SEDAN,2203.24,
+First Class,Local,,Viñedo La Santísima Trinidad,SUBURBAN,2739.92,
+First Class,Local,,Viñedo Los Remedios,SEDAN,2203.24,
+First Class,Local,,Viñedo Los Remedios,SUBURBAN,2739.92,
+First Class,Local,,Viñedo San Lucas,SEDAN,1386.65,
+First Class,Local,,Viñedo San Lucas,SUBURBAN,1694.8,
+First Class,Local,,Viñedo Toyan,SEDAN,1386.65,
+First Class,Local,,Viñedo Toyan,SUBURBAN,1694.8,
+First Class,Local,,Viñedo Tres Raíces,SEDAN,2203.24,
+First Class,Local,,Viñedo Tres Raíces,SUBURBAN,2739.92,
+First Class,Local,,Viñedos Patria,SEDAN,1540.33,
+First Class,Local,,Viñedos Patria,SUBURBAN,1848.87,
+First Class,Local,,Viñedos San Miguel,SEDAN,2203.24,
+First Class,Local,,Viñedos San Miguel,SUBURBAN,2739.92,
+First Class,Local,,Zirándaro,SEDAN,1386.65,
+First Class,Local,,Zirándaro,SUBURBAN,1694.8,
+First Class,Local,,Zona Centro,SEDAN,1078.51,
+First Class,Local,,Zona Centro,SUBURBAN,1386.65,

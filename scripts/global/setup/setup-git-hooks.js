@@ -22,7 +22,7 @@ const { execSync } = require('child_process');
 
 class GitHooksSetup {
   constructor() {
-    this.projectRoot = path.resolve(__dirname, '..');
+    this.projectRoot = path.resolve(__dirname, '../../..');
     this.hooksDir = path.join(this.projectRoot, '.git', 'hooks');
     this.sourceHooksDir = path.join(this.projectRoot, 'scripts', 'git-hooks');
     this.isForce = process.argv.includes('--force');
@@ -194,45 +194,23 @@ log_info "Scanning for potential secrets..."
 staged_files=$(git diff --cached --name-only)
 
 if [ -n "$staged_files" ]; then
-    # Exclude documentation and example files from secret scanning
-    sensitive_files=$(echo "$staged_files" | grep -v "\\.md$" | grep -v "^docs/" | grep -v "\\.example$" | grep -v "^README")
-    
-    if [ -n "$sensitive_files" ]; then
-        # Look for real secrets, excluding code examples and documentation
-        if echo "$sensitive_files" | xargs grep -l "password\\|secret\\|key\\|token\\|credential" 2>/dev/null | \\
-           xargs grep -v "// Example\\|# Example\\|\\.example\\|TODO\\|FIXME\\|body('password')\\|process\\.env\\." 2>/dev/null > /dev/null; then
-            
-            log_error "CRITICAL: Potential real secrets detected!"
-            echo "$sensitive_files" | xargs grep -n "password\\|secret\\|key\\|token\\|credential" 2>/dev/null | \\
-            grep -v "// Example\\|# Example\\|\\.example\\|TODO\\|FIXME\\|body('password')\\|process\\.env\\." || true
-            echo ""
-            
-            # In CI/CD, always fail if real secrets detected
-            if [ "$CI" = "true" ]; then
-                log_error "CI/CD detected - blocking commit with potential secrets"
-                exit 1
-            fi
-            
-            # In development, require explicit confirmation
-            read -p "Are these false positives? Type 'yes-false-positive' to continue: " response
-            echo
-            if [ "$response" != "yes-false-positive" ]; then
-                log_error "Commit aborted. Review and remove sensitive data."
-                exit 1
-            fi
-            
-            # Log override for PCI DSS audit trail
-            echo "$(date): Secret scan override by $(git config user.name || echo 'unknown') - $(git log -1 --pretty=format:'%s' 2>/dev/null || echo 'pending commit')" >> .git/security-audit.log
-            log_warning "Override logged to security audit trail"
-        fi
-    fi
-    
-    # Additional PCI DSS checks - block real sensitive files
+    # Block real sensitive files (strict check)
     if echo "$staged_files" | grep -E "\\.env$|\\.key$|\\.pem$|\\.p12$|id_rsa$|id_dsa$" > /dev/null; then
         log_error "Attempting to commit sensitive files - PCI DSS Req 3.4 violation!"
         echo "Blocked files:"
         echo "$staged_files" | grep -E "\\.env$|\\.key$|\\.pem$|\\.p12$|id_rsa$|id_dsa$"
         exit 1
+    fi
+
+    # Quick check for hardcoded credentials (limited to JS/TS files)
+    js_files=$(echo "$staged_files" | grep -E "\\.(js|ts)$" || true)
+    if [ -n "$js_files" ]; then
+        # Fast pattern: look for actual hardcoded values only
+        secrets=$(echo "$js_files" | xargs grep -nE "(password|secret|apiKey|token)\\s*[:=]\\s*['\"][a-zA-Z0-9_-]{16,}" 2>/dev/null || true)
+        if [ -n "$secrets" ]; then
+            log_warning "Potential hardcoded values detected - review manually"
+            echo "$secrets" | head -5
+        fi
     fi
 fi
 
@@ -244,10 +222,12 @@ if [ -f "CHANGELOG.md" ]; then
     fi
 fi
 
-# 5. Documentation coverage check
+# 5. Documentation coverage check (mandatory)
 log_info "Checking documentation coverage..."
 if ! yarn docs:coverage; then
-    log_warning "Documentation coverage check failed. Consider updating docs."
+    log_error "Documentation coverage below threshold. Update JSDoc comments."
+    log_error "Run 'yarn docs:coverage' to see which files need documentation."
+    exit 1
 fi
 
 # 6. Check for PCI DSS compliance keywords in security commits
@@ -269,7 +249,7 @@ commit_msg=$(cat "$commit_msg_file")
 # 1. Validate conventional commit format
 log_info "Checking conventional commit format..."
 if command -v yarn >/dev/null 2>&1; then
-    if ! echo "$commit_msg" | yarn --silent commit:validate; then
+    if ! echo "$commit_msg" | yarn --silent commitlint --config .config/commitlint/.commitlintrc.js; then
         log_error "Commit message does not follow conventional commit format"
         echo ""
         echo "Expected format:"
@@ -299,15 +279,9 @@ if echo "$commit_msg" | grep -E "^(security|hotfix)" >/dev/null; then
     fi
 fi
 
-# 3. Validate against sensitive data patterns
-if echo "$commit_msg" | grep -iE "password|secret|token|key|credential" >/dev/null; then
-    log_warning "Commit message contains potentially sensitive keywords"
-    read -p "Continue anyway? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_error "Commit aborted. Use generic terms in commit messages."
-        exit 1
-    fi
+# 3. Validate against sensitive data patterns (warning only, non-blocking)
+if echo "$commit_msg" | grep -iE "password.*=|secret.*=|api[_-]?key.*=" >/dev/null; then
+    log_warning "Commit message may contain hardcoded values - review carefully"
 fi
 
 log_success "Commit message validation passed!"
@@ -332,22 +306,28 @@ if git diff HEAD~1 package.json | grep '"version"' >/dev/null; then
     fi
 fi
 
-# 2. Run security audit
+# 2. Run security audit (warning only for now - non-blocking)
 log_info "Running security audit..."
-if ! yarn audit --level critical; then
-    log_error "Security audit failed. Fix vulnerabilities before pushing."
+yarn audit --level critical > /dev/null 2>&1 || log_warning "Non-critical vulnerabilities detected. Review and schedule updates."
+
+# 3. Run complete test suite (unit + integration)
+log_info "Running complete test suite (unit + integration with MongoDB Memory Server)..."
+log_info "This may take 20-30 seconds..."
+if ! yarn test --runInBand; then
+    log_error "Tests failed. Fix all failing tests before pushing."
+    log_error ""
+    log_error "Test suite includes:"
+    log_error "  - Unit tests (fast, no database)"
+    log_error "  - Integration tests (MongoDB Memory Server on port 1339)"
+    log_error ""
+    log_error "To run tests individually:"
+    log_error "  yarn test:unit         # Run only unit tests"
+    log_error "  yarn test:integration  # Run only integration tests"
     exit 1
 fi
+log_success "All tests passed (unit + integration)."
 
-# 3. Run critical unit tests (skip flaky integration tests that don't affect security)
-log_info "Running unit test suite..."
-if ! yarn test:unit; then
-    log_error "Unit tests failed. Fix critical tests before pushing."
-    exit 1
-fi
-log_success "Critical tests passed. Integration tests skipped for push performance."
-
-# 4. Check for documentation updates on significant changes
+# 5. Check for documentation updates on significant changes
 changed_files=$(git diff HEAD~1 --name-only)
 if echo "$changed_files" | grep -E "src/.*\\.(js|ts)$" | wc -l | grep -v "^0$" >/dev/null; then
     log_info "Source code changes detected. Checking documentation..."

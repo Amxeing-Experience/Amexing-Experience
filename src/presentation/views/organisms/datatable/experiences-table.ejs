@@ -1,0 +1,897 @@
+<%
+/**
+ * Experiences DataTable Organism
+ * DataTable component for experiences management
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'experiences-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/experiences';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-star me-2"></i>Experiencias
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Gestión completa del catálogo de experiencias</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createExperienceBtn">
+                        <i class="ti ti-plus me-1"></i>Nueva Experiencia
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="experiences-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Descripción</th>
+                        <th>Experiencias</th>
+                        <th>Costo</th>
+                        <th>Última Act.</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<%- include('../modal/experience-images-modal.ejs') %>
+
+<!-- Experience Modal -->
+<div class="modal fade" id="experienceModal" tabindex="-1" aria-labelledby="experienceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="experienceModalLabel">
+                    <i class="ti ti-star-plus me-2"></i><span id="modalTitle">Crear Nueva Experiencia</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="experienceModalAlerts"></div>
+
+                <form id="experienceForm">
+                    <input type="hidden" id="experienceId">
+                    <input type="hidden" id="type" value="Experience">
+
+                    <!-- Sección: Información Básica -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Información Básica
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Nombre de la Experiencia <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" required maxlength="200" placeholder="Ej: Tour Gastronómico en el Centro Histórico">
+                            <div class="form-text">Nombre descriptivo de la experiencia</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Descripción <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="description" name="description" required rows="4" maxlength="1000" placeholder="Describe la experiencia en detalle..."></textarea>
+                            <div class="form-text">Descripción completa de la experiencia</div>
+                        </div>
+                    </div>
+
+                    <!-- Sección: Detalles de la Experiencia -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-settings me-1"></i>
+                            Detalles de la Experiencia
+                        </h6>
+
+                        <%- include('../../atoms/common/tom-select', {
+                            id: 'experiences',
+                            name: 'experiences',
+                            multiple: true,
+                            placeholder: 'Buscar y seleccionar experiencias o proveedores...',
+                            maxItems: 20,
+                            label: 'Experiencias y Proveedores Incluidos (Opcional)',
+                            helpText: 'Selecciona las experiencias y proveedores que forman parte de este paquete (máximo 20).',
+                            options: [],
+                            selected: []
+                        }) %>
+
+                        <!-- Tabla de Costo Sugerido (inicialmente oculta) -->
+                        <div id="suggestedCostContainer" style="display: none;" class="mb-3">
+                            <div class="card border-info">
+                                <div class="card-header bg-info bg-opacity-10 py-2">
+                                    <h6 class="mb-0 text-info">
+                                        <i class="ti ti-calculator me-2"></i>Costo Sugerido (Informativo)
+                                    </h6>
+                                </div>
+                                <div class="card-body p-0">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm mb-0" id="suggestedCostTable">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th>Experiencia/Proveedor</th>
+                                                    <th class="text-end" style="width: 150px;">Costo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="suggestedCostBody">
+                                                <!-- Filas dinámicas generadas por JavaScript -->
+                                            </tbody>
+                                            <tfoot class="table-light">
+                                                <tr>
+                                                    <th>Total Sugerido</th>
+                                                    <th class="text-end">
+                                                        <span id="suggestedTotal" class="fw-bold text-primary">$0.00 MXN</span>
+                                                    </th>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="card-footer bg-light py-2">
+                                    <small class="text-muted">
+                                        <i class="ti ti-info-circle me-1"></i>
+                                        Este es un cálculo sugerido basado en los costos individuales.
+                                        Puedes establecer el precio final en el campo "Costo" abajo.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="cost" class="form-label">Costo <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="cost" name="cost" required min="0" step="0.01" placeholder="0.00">
+                                <span class="input-group-text">MXN</span>
+                            </div>
+                            <div class="form-text">Costo de la experiencia en pesos mexicanos</div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveExperienceBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Experiencia</span>
+                </button>
+            </div>
+
+            <%- include('../../atoms/common/modal-loader', { text: 'Cargando datos de la experiencia...' }) %>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function initWhenReady() {
+        if (typeof jQuery === 'undefined') {
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+        if (!jQuery.fn.dataTable) {
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+        initExperiencesTable();
+    }
+
+    function initExperiencesTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        // Variable global para almacenar datos de experiencias con costos
+        let experiencesDataMap = {};
+
+        /**
+         * Format money amount with thousands separator and 2 decimals
+         * @param {number} amount - Amount to format
+         * @returns {string} Formatted money string
+         */
+        function formatMoney(amount) {
+            return parseFloat(amount || 0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        }
+
+        /**
+         * Update suggested cost table based on selected experiences
+         */
+        function updateSuggestedCostTable() {
+            const selectElement = document.getElementById('experiences');
+            const tomSelectInstance = selectElement?.tomselect;
+            const selectedIds = tomSelectInstance?.getValue() || [];
+
+            const container = $('#suggestedCostContainer');
+            const tbody = $('#suggestedCostBody');
+
+            if (selectedIds.length === 0) {
+                // No selections, hide table
+                container.hide();
+                return;
+            }
+
+            // Clear tbody
+            tbody.empty();
+
+            let total = 0;
+
+            // Generate rows for each selected item
+            selectedIds.forEach(function(id) {
+                const item = experiencesDataMap[id];
+                if (item) {
+                    const cost = parseFloat(item.cost || 0);
+                    total += cost;
+
+                    const row = `
+                        <tr>
+                            <td>${item.name}</td>
+                            <td class="text-end">$${formatMoney(cost)} MXN</td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                }
+            });
+
+            // Update total
+            $('#suggestedTotal').text(`$${formatMoney(total)} MXN`);
+
+            // Show table
+            container.show();
+        }
+
+        /**
+         * Initialize suggested cost calculator by binding to Tom Select change event
+         */
+        let calculatorInitialized = false;
+        function initializeSuggestedCostCalculator() {
+            // Prevent multiple initializations
+            if (calculatorInitialized) {
+                return;
+            }
+
+            const selectElement = document.getElementById('experiences');
+            const tomSelectInstance = selectElement?.tomselect;
+
+            if (tomSelectInstance) {
+                tomSelectInstance.on('change', function() {
+                    updateSuggestedCostTable();
+                });
+                calculatorInitialized = true;
+            }
+        }
+
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint + '?type=Experience',
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading experiences:', error);
+                    showErrorAlert('Error al cargar las experiencias. Por favor, intente nuevamente.');
+                }
+            },
+            columns: [
+                {
+                    data: 'name',
+                    render: function(data) {
+                        return `<div class="fw-semibold">${data}</div>`;
+                    }
+                },
+                {
+                    data: 'description',
+                    render: function(data) {
+                        const truncated = data.length > 100 ? data.substring(0, 100) + '...' : data;
+                        return `<small class="text-muted">${truncated}</small>`;
+                    }
+                },
+                {
+                    data: 'experienceCount',
+                    className: 'text-center',
+                    render: function(data) {
+                        const count = data || 0;
+                        if (count > 0) {
+                            return `<span class="badge bg-info">${count}</span>`;
+                        }
+                        return '<span class="text-muted">-</span>';
+                    }
+                },
+                {
+                    data: 'cost',
+                    render: function(data) {
+                        const formatted = new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(data || 0);
+                        return `<div class="fw-bold text-success">${formatted}</div>`;
+                    }
+                },
+                {
+                    data: 'updatedAt',
+                    render: function(data) {
+                        const date = new Date(data);
+                        return `<small>${date.toLocaleDateString('es-MX')}</small>`;
+                    }
+                },
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data
+                            ? '<span class="badge bg-success">Activa</span>'
+                            : '<span class="badge bg-secondary">Inactiva</span>';
+                    }
+                },
+                ...(showActions ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+                        if (canEdit) {
+                            // Edit button
+                            actions += `<button type="button"
+                                            class="btn btn-primary edit-experience-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Experiencia">
+                                            <i class="ti ti-edit"></i>
+                                        </button>`;
+
+                            // Manage images button (preparado, no funcional)
+                            actions += `<button type="button"
+                                            class="btn btn-info manage-images-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Gestionar Imágenes">
+                                            <i class="ti ti-photo"></i>
+                                        </button>`;
+
+                            // Toggle status button
+                            const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                            const statusTitle = data.active ? 'Desactivar Experiencia' : 'Activar Experiencia';
+                            const statusClass = data.active ? 'btn-warning' : 'btn-success';
+
+                            actions += `<button type="button"
+                                            class="btn ${statusClass} toggle-experience-status-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-current-status="${data.active}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="${statusTitle}">
+                                            <i class="ti ${statusIcon}"></i>
+                                        </button>`;
+                        }
+                        if (canDelete) {
+                            // Delete button
+                            actions += `<button type="button"
+                                            class="btn btn-danger delete-experience-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Eliminar Experiencia">
+                                            <i class="ti ti-trash"></i>
+                                        </button>`;
+                        }
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando experiencias...'
+            },
+            order: [[4, 'desc']], // Sort by updatedAt
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
+        });
+
+        $('#createExperienceBtn').on('click', function() { openExperienceModal(); });
+        $(`#${tableId}`).on('click', '.edit-experience-btn', function() { loadExperienceData($(this).data('id')); });
+        $(`#${tableId}`).on('click', '.manage-images-btn', function() {
+            const experienceId = $(this).data('id');
+            const name = $(this).data('name');
+            window.openExperienceImagesModal(experienceId, name);
+        });
+        $(`#${tableId}`).on('click', '.toggle-experience-status-btn', function() {
+            toggleExperienceStatus($(this).data('id'), $(this).data('current-status'), $(this).data('name'));
+        });
+        $(`#${tableId}`).on('click', '.delete-experience-btn', function() { deleteExperience($(this).data('id'), $(this).data('name')); });
+        $('#saveExperienceBtn').on('click', function() { saveExperience(); });
+
+        function loadAvailableItems(currentId = null) {
+            // Build query parameters
+            const queryParams = { length: 1000 }; // Get all for selection
+
+            // Add exclusion parameter if editing existing experience (eliminates flickering)
+            if (currentId) {
+                queryParams.excludeId = currentId;
+            }
+
+            return $.ajax({
+                url: '/api/experiences',
+                type: 'GET',
+                data: queryParams,
+                success: function(response) {
+                    if (response.data) {
+                        // Reset data map
+                        experiencesDataMap = {};
+
+                        // Get Tom Select instance
+                        const selectElement = document.getElementById('experiences');
+                        const tomSelectInstance = selectElement ? selectElement.tomselect : null;
+
+                        if (tomSelectInstance) {
+                            // Clear existing options
+                            tomSelectInstance.clearOptions();
+
+                            // Add new options with cost information
+                            // Note: Backend already excludes currentId, no need for client-side filter
+                            response.data.forEach(function(item) {
+                                if (item.active) {
+                                    // Store complete data for cost calculation
+                                    experiencesDataMap[item.id] = {
+                                        id: item.id,
+                                        name: item.name,
+                                        cost: item.cost || 0
+                                    };
+
+                                    // Add option to Tom Select with cost in display text
+                                    const costFormatted = formatMoney(item.cost || 0);
+                                    tomSelectInstance.addOption({
+                                        value: item.id,
+                                        text: `${item.name} - $${costFormatted} MXN`
+                                    });
+                                }
+                            });
+
+                            // Refresh the dropdown
+                            tomSelectInstance.refreshOptions(false);
+
+                            // Initialize cost calculator after loading items
+                            initializeSuggestedCostCalculator();
+                        }
+                    }
+                },
+                error: function(xhr) {
+                    console.warn('No se pudieron cargar los items disponibles');
+                }
+            });
+        }
+
+        function openExperienceModal(isEdit = false) {
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('experienceModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+
+            $('#experienceModal').modal('show');
+            $('#experienceForm')[0].reset();
+            $('#experienceId').val('');
+            $('#type').val('Experience');
+            $('#modalTitle').text(isEdit ? 'Editar Experiencia' : 'Crear Nueva Experiencia');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Experiencia');
+
+            // Clear Tom Select values
+            const selectElement = document.getElementById('experiences');
+            const tomSelectInstance = selectElement ? selectElement.tomselect : null;
+            if (tomSelectInstance) {
+                tomSelectInstance.clear();
+            }
+
+            // Hide suggested cost table
+            $('#suggestedCostContainer').hide();
+
+            loadAvailableItems();
+        }
+
+        function loadExperienceData(experienceId) {
+            openExperienceModal(true);
+
+            // Show loader to prevent user interaction during data loading
+            showModalLoader('experienceModal');
+
+            $.ajax({
+                url: `${apiEndpoint}/${experienceId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const experience = response.data;
+                        $('#experienceId').val(experience.id);
+                        $('#name').val(experience.name);
+                        $('#description').val(experience.description);
+                        $('#cost').val(experience.cost);
+
+                        // Load all items and set selected values
+                        loadAvailableItems(experience.id).done(function() {
+                            if (experience.experiences && experience.experiences.length > 0) {
+                                const selectElement = document.getElementById('experiences');
+                                const tomSelectInstance = selectElement ? selectElement.tomselect : null;
+                                if (tomSelectInstance) {
+                                    tomSelectInstance.setValue(experience.experiences);
+                                    // Update suggested cost table after setting values
+                                    updateSuggestedCostTable();
+                                }
+                            }
+
+                            // Hide loader after all data is loaded and populated
+                            hideModalLoader('experienceModal');
+                        }).fail(function() {
+                            // Hide loader even if loading items fails
+                            hideModalLoader('experienceModal');
+                        });
+                    } else {
+                        hideModalLoader('experienceModal');
+                        showErrorAlert('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr) {
+                    hideModalLoader('experienceModal');
+                    showModalError(xhr.responseJSON?.error || 'Error al cargar la experiencia');
+                }
+            });
+        }
+
+        function saveExperience() {
+            const form = $('#experienceForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+            const experienceId = $('#experienceId').val();
+            const isEdit = !!experienceId;
+
+            // Get values from Tom Select
+            const selectElement = document.getElementById('experiences');
+            const tomSelectInstance = selectElement ? selectElement.tomselect : null;
+            const selectedItems = tomSelectInstance ? tomSelectInstance.getValue() : [];
+
+            // Validation
+            if (selectedItems.length > 20) {
+                showErrorAlert('Máximo 20 elementos permitidos (experiencias y proveedores combinados)');
+                return;
+            }
+
+            const experienceData = {
+                name: $('#name').val(),
+                description: $('#description').val(),
+                type: $('#type').val(),
+                cost: parseFloat($('#cost').val()),
+                experiences: selectedItems
+            };
+
+            const url = isEdit ? `${apiEndpoint}/${experienceId}` : apiEndpoint;
+            const method = isEdit ? 'PUT' : 'POST';
+            $('#saveExperienceBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
+
+            $.ajax({
+                url, type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(experienceData),
+                success: function(response) {
+                    if (response.success) {
+                        $('#experienceModal').modal('hide');
+                        dataTable.ajax.reload();
+                        showSuccessAlert(isEdit ? 'Experiencia actualizada exitosamente' : 'Experiencia creada exitosamente');
+                    }
+                },
+                error: function(xhr) {
+                    const errorMessage = xhr.responseJSON?.error || 'Error al guardar la experiencia';
+                    showModalError(errorMessage);
+                },
+                complete: function() {
+                    $('#saveExperienceBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>' + (isEdit ? 'Guardar Cambios' : 'Crear Experiencia'));
+                }
+            });
+        }
+
+        function toggleExperienceStatus(experienceId, currentStatus, experienceName) {
+            const newStatus = !currentStatus;
+            const action = newStatus ? 'activar' : 'desactivar';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+            // If deactivating, check for dependencies first
+            if (!newStatus) {
+                $.ajax({
+                    url: `${apiEndpoint}/${experienceId}/dependencies`,
+                    type: 'GET',
+                    success: function(depResponse) {
+                        if (depResponse.success && !depResponse.canModify) {
+                            // Has dependencies, show error modal
+                            showDependenciesModal(experienceName, depResponse.dependencies, 'desactivar');
+                        } else {
+                            // No dependencies, show confirmation modal
+                            showToggleConfirmationModal(experienceId, newStatus, action, actionTitle, btnClass, experienceName);
+                        }
+                    },
+                    error: function(xhr) {
+                        showErrorAlert('Error al verificar dependencias');
+                    }
+                });
+            } else {
+                // Activating, no validation needed
+                showToggleConfirmationModal(experienceId, newStatus, action, actionTitle, btnClass, experienceName);
+            }
+        }
+
+        function showToggleConfirmationModal(experienceId, newStatus, action, actionTitle, btnClass, experienceName) {
+            const modalHtml = `
+                <div class="modal fade" id="confirmToggleExperienceModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${actionTitle} Experiencia</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas ${action} la experiencia <strong>"${experienceName}"</strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn ${btnClass}" id="confirmToggleExperienceBtn">${actionTitle}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#confirmToggleExperienceModal').remove();
+            $('body').append(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('confirmToggleExperienceModal'));
+            modal.show();
+
+            $('#confirmToggleExperienceBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${experienceId}`,
+                    type: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showSuccessAlert(`Experiencia ${newStatus ? 'activada' : 'desactivada'} exitosamente`);
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado de la experiencia';
+                        showErrorAlert(error);
+                    }
+                });
+            });
+        }
+
+        function deleteExperience(experienceId, experienceName) {
+            // Check for dependencies first
+            $.ajax({
+                url: `${apiEndpoint}/${experienceId}/dependencies`,
+                type: 'GET',
+                success: function(depResponse) {
+                    if (depResponse.success && !depResponse.canModify) {
+                        // Has dependencies, show error modal
+                        showDependenciesModal(experienceName, depResponse.dependencies, 'eliminar');
+                    } else {
+                        // No dependencies, show confirmation modal
+                        showDeleteConfirmationModal(experienceId, experienceName);
+                    }
+                },
+                error: function(xhr) {
+                    showErrorAlert('Error al verificar dependencias');
+                }
+            });
+        }
+
+        function showDeleteConfirmationModal(experienceId, experienceName) {
+            const modalHtml = `
+                <div class="modal fade" id="confirmDeleteExperienceModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white">Eliminar Experiencia</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas eliminar la experiencia <strong>"${experienceName}"</strong>?</p>
+                                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeleteExperienceBtn">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#confirmDeleteExperienceModal').remove();
+            $('body').append(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteExperienceModal'));
+            modal.show();
+
+            $('#confirmDeleteExperienceBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${experienceId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showSuccessAlert('Experiencia eliminada exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al eliminar la experiencia';
+                        showErrorAlert(error);
+                    }
+                });
+            });
+        }
+
+        function showDependenciesModal(itemName, dependencies, actionText) {
+            const dependenciesList = dependencies.map(dep =>
+                `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    ${dep.name}
+                    <span class="badge bg-primary">${dep.type === 'Experience' ? 'Experiencia' : 'Proveedor'}</span>
+                </li>`
+            ).join('');
+
+            const modalHtml = `
+                <div class="modal fade" id="dependenciesModal" tabindex="-1">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-warning">
+                                <h5 class="modal-title">
+                                    <i class="ti ti-alert-triangle me-2"></i>No se puede ${actionText}
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="alert alert-warning" role="alert">
+                                    <i class="ti ti-alert-triangle me-2"></i>
+                                    No se puede ${actionText} <strong>"${itemName}"</strong>
+                                </div>
+                                <p>Esta experiencia/proveedor está incluida en <strong>${dependencies.length}</strong> experiencia(s):</p>
+                                <ul class="list-group mb-3">
+                                    ${dependenciesList}
+                                </ul>
+                                <p class="text-muted mb-0">
+                                    <i class="ti ti-info-circle me-1"></i>
+                                    Para continuar, primero actualiza estas experiencias y remueve la dependencia.
+                                </p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="ti ti-x me-1"></i>Entendido
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            $('#dependenciesModal').remove();
+            $('body').append(modalHtml);
+            const modal = new bootstrap.Modal(document.getElementById('dependenciesModal'));
+            modal.show();
+        }
+
+        function showModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('experienceModalAlerts');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('experiences-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('experiences-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>

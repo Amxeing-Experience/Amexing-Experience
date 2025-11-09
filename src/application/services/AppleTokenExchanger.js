@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
  * - Private key based authentication.
  * @class AppleTokenExchanger
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -151,11 +151,7 @@ class AppleTokenExchanger {
              * // Returns: { success: true, data: {...} }
              */
             if (response.statusCode !== 200) {
-              reject(
-                new Error(
-                  `Token exchange failed: ${result.error_description || result.error}`
-                )
-              );
+              reject(new Error(`Token exchange failed: ${result.error_description || result.error}`));
             } else {
               resolve(result);
             }

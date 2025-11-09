@@ -38,7 +38,6 @@ Scripts for starting the application, development server, and runtime management
 |--------|-------------|-------|-------------|
 | **`start`** | Start production server | `yarn start` | Production |
 | **`dev`** | Start development server with hot reload | `yarn dev` | Development |
-| **`dashboard`** | Open Parse Dashboard on port 4040 | `yarn dashboard` | Development |
 | **`prod`** | Start with PM2 in production mode | `yarn prod` | Production |
 | **`pm2:dev`** | Start with PM2 in development mode | `yarn pm2:dev` | Development |
 | **`pm2:stop`** | Stop all PM2 processes | `yarn pm2:stop` | Any |
@@ -55,7 +54,7 @@ yarn install && yarn dev
 yarn install --production && yarn prod
 
 # Development with dashboard
-yarn dev & yarn dashboard
+yarn dev & 
 
 # PM2 management
 yarn pm2:dev        # Start

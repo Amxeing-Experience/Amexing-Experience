@@ -167,7 +167,9 @@ describe('AmexingUser RBAC Integration', () => {
 
       const newUser = AmexingUser.create(userData);
 
-      expect(newUser.get('roleId')).toBe('employee-role-id');
+      // roleId is now stored as a Pointer object, so check the id property
+      const roleId = newUser.get('roleId');
+      expect(roleId.id).toBe('employee-role-id');
       expect(newUser.get('organizationId')).toBe('client-org');
       expect(newUser.get('role')).toBeUndefined(); // Old role field should not be set
     });
@@ -398,7 +400,8 @@ describe('AmexingUser RBAC Integration', () => {
       });
 
       expect(legacyUser.get('role')).toBe('admin');
-      expect(legacyUser.get('roleId')).toBe('admin-role-id');
+      // roleId is now stored as a Pointer object
+      expect(legacyUser.get('roleId').id).toBe('admin-role-id');
     });
 
     it('should handle mixed role/roleId scenarios', () => {
@@ -408,8 +411,8 @@ describe('AmexingUser RBAC Integration', () => {
         roleId: 'department_manager-role-id' // New system
       });
 
-      // New system should take precedence
-      expect(mixedUser.get('roleId')).toBe('department_manager-role-id');
+      // New system should take precedence - roleId is now a Pointer object
+      expect(mixedUser.get('roleId').id).toBe('department_manager-role-id');
     });
   });
 

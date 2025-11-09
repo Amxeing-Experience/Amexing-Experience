@@ -1,0 +1,823 @@
+<%
+/**
+ * Tours DataTable Organism
+ * DataTable component for tours management
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/tours';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header text-white" style="background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%); border: none;">
+    <div class="row align-items-center">
+      <div class="col">
+        <h5 class="card-title mb-0 text-white">
+          <i class="ti ti-map me-2"></i>Gestión de Tours
+        </h5>
+        <small class="text-white" style="opacity: 0.9;">Administra tours</small>
+      </div>
+      <div class="col-auto">
+        <% if (canCreate) { %>
+        <button type="button" class="btn btn-light btn-sm" id="createTourBtn">
+          <i class="ti ti-plus me-1"></i>Nuevo Tour
+        </button>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="card-body">
+    <div class="table-responsive">
+      <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+        <thead class="table-light">
+          <tr>
+            <th>Destino</th>
+            <th>Tiempo (Hrs min)</th>
+            <th>Tipo de Vehículo</th>
+            <th>Pasajeros</th>
+            <th>Costo</th>
+            <th>Tarifa</th>
+            <th>Estado</th>
+            <% if (dtShowActions) { %>
+            <th class="text-center">Acciones</th>
+            <% } %>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Tour Modal -->
+<div class="modal fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title text-white" id="tourModalLabel">
+          <i class="ti ti-map-plus me-2"></i><span id="modalTitle">Crear Nuevo Tour</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Alert container for modal-specific errors -->
+        <div id="tourModalAlerts"></div>
+
+        <form id="tourForm">
+          <input type="hidden" id="tourId">
+
+          <!-- Sección: Información del Tour -->
+          <div class="mb-4">
+            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+              <i class="ti ti-info-circle me-1"></i>
+              Información del Tour
+            </h6>
+
+            <div class="mb-3">
+              <label for="destinationPOI" class="form-label">Destino <span class="text-danger">*</span></label>
+              <select class="form-select" id="destinationPOI" name="destinationPOI" required>
+                <option value="">Seleccionar destino...</option>
+                <!-- Las opciones se cargarán dinámicamente -->
+              </select>
+              <div class="form-text">Punto de interés de destino</div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="timeHours" class="form-label">Duración <span class="text-danger">*</span></label>
+                <div class="row">
+                  <div class="col-6">
+                    <div class="input-group">
+                      <input type="number" class="form-control" id="timeHours" name="timeHours" min="0" max="23" placeholder="0">
+                      <span class="input-group-text">hrs</span>
+                    </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="input-group">
+                      <input type="number" class="form-control" id="timeMinutes" name="timeMinutes" min="0" max="59" placeholder="0">
+                      <span class="input-group-text">min</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="vehicleType" class="form-label">Tipo de Vehículo <span class="text-danger">*</span></label>
+                <select class="form-select" id="vehicleType" name="vehicleType" required>
+                  <option value="">Seleccionar tipo de vehículo...</option>
+                  <!-- Las opciones se cargarán dinámicamente -->
+                </select>
+              </div>
+            </div>
+
+            <!-- Sección: Rango de Pasajeros (Opcional) -->
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="minPassengers" class="form-label">Mínimo de Pasajeros <span class="text-muted">(Opcional)</span></label>
+                <input type="number" class="form-control" id="minPassengers" name="minPassengers" min="1" placeholder="Ej: 2">
+                <div class="form-text">Número mínimo de pasajeros requerido</div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="maxPassengers" class="form-label">Máximo de Pasajeros <span class="text-muted">(Opcional)</span></label>
+                <input type="number" class="form-control" id="maxPassengers" name="maxPassengers" min="1" placeholder="Ej: 8">
+                <div class="form-text">Número máximo de pasajeros permitido</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="price" class="form-label">Precio <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <span class="input-group-text">$</span>
+                  <input type="number" class="form-control" id="price" name="price" required min="0" step="0.01" placeholder="0.00">
+                </div>
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="rate" class="form-label">Tarifa <span class="text-danger">*</span></label>
+                <select class="form-select" id="rate" name="rate" required>
+                  <option value="">Seleccionar tarifa...</option>
+                  <!-- Las opciones se cargarán dinámicamente -->
+                </select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-12 mb-3">
+                <label for="notes" class="form-label">Notas <span class="text-muted">(Opcional)</span></label>
+                <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Información adicional sobre el tour, instrucciones especiales, etc."></textarea>
+                <div class="form-text">Información adicional o notas sobre el tour</div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          <i class="ti ti-x me-1"></i>Cancelar
+        </button>
+        <button type="button" class="btn btn-primary" id="saveTourBtn">
+          <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Tour</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    // Wait for DOM and all dependencies to be ready
+    function initWhenReady() {
+      // Check if jQuery and DataTables are loaded
+      if (typeof jQuery === 'undefined') {
+        console.warn('jQuery not loaded yet, waiting...');
+        setTimeout(initWhenReady, 100);
+        return;
+      }
+
+      if (!jQuery.fn.dataTable) {
+        console.warn('DataTables not loaded yet, waiting...');
+        setTimeout(initWhenReady, 100);
+        return;
+      }
+
+      // All dependencies loaded, initialize
+      initToursTable();
+    }
+
+    function initToursTable() {
+      const API = '<%= dtApiEndpoint %>';
+      let table;
+
+      table = $('#<%= dtTableId %>').DataTable({
+        processing: true,
+        serverSide: true,
+        deferRender: true,
+        ajax: function(data, callback, settings) {
+          const params = {
+            page: Math.floor(data.start / data.length) + 1,
+            limit: data.length
+          };
+
+          if (data.search.value) {
+            params.search = data.search.value;
+          }
+
+          $.ajax({
+            url: API,
+            type: 'GET',
+            data: params,
+            success: function(json) {
+              if (!json.success) {
+                showErrorAlert('Error al cargar los datos de tours: ' + (json.error || 'Error desconocido'));
+                callback({
+                  draw: data.draw,
+                  recordsTotal: 0,
+                  recordsFiltered: 0,
+                  data: []
+                });
+                return;
+              }
+
+              const totalCount = json.data?.pagination?.totalCount || json.data?.pagination?.total || 0;
+              $('#total-tours-count').text(totalCount);
+
+              const tours = json.data?.tours || [];
+
+              callback({
+                draw: data.draw,
+                recordsTotal: totalCount,
+                recordsFiltered: totalCount,
+                data: tours
+              });
+            },
+            error: function(xhr, status, error) {
+              showErrorAlert('Error al cargar los datos de tours: ' + error);
+              callback({
+                draw: data.draw,
+                recordsTotal: 0,
+                recordsFiltered: 0,
+                data: []
+              });
+            }
+          });
+        },
+        columns: [{
+            data: 'destinationPOI',
+            render: function(data, type, row) {
+              if (!data) return '-';
+              return `<div><strong>${data.name || 'Sin destino'}</strong></div>`;
+            }
+          },
+          {
+            data: 'time',
+            render: function(data, type, row) {
+              if (!data) return '-';
+              const hours = Math.floor(data / 60);
+              const minutes = data % 60;
+              if (hours > 0 && minutes > 0) {
+                return `${hours}h ${minutes}min`;
+              } else if (hours > 0) {
+                return `${hours}h`;
+              } else {
+                return `${minutes}min`;
+              }
+            }
+          },
+          {
+            data: 'vehicleType',
+            render: function(data, type, row) {
+              if (!data) return '-';
+              return data.name || 'Sin tipo';
+            }
+          },
+          {
+            data: null,
+            render: function(data, type, row) {
+              const minPassengers = row.minPassengers;
+              const maxPassengers = row.maxPassengers;
+              
+              if (!minPassengers && !maxPassengers) {
+                return '<span class="text-muted">Sin límite</span>';
+              }
+              
+              if (minPassengers && maxPassengers) {
+                return `${minPassengers} - ${maxPassengers} pax`;
+              }
+              
+              if (minPassengers) {
+                return `Mín: ${minPassengers} pax`;
+              }
+              
+              if (maxPassengers) {
+                return `Máx: ${maxPassengers} pax`;
+              }
+              
+              return '-';
+            }
+          },
+          {
+            data: 'price',
+            render: function(data, type, row) {
+              if (!data) return '-';
+              return '$' + parseFloat(data).toLocaleString('es-MX', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+              });
+            }
+          },
+          {
+            data: 'rate',
+            render: function(data, type, row) {
+              if (!data) return '-';
+              return data.name || 'Sin tarifa';
+            }
+          },
+          {
+            data: 'active',
+            defaultContent: false,
+            render: function(data, type, row) {
+              if (data) {
+                return '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activo</span>';
+              } else {
+                return '<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Inactivo</span>';
+              }
+            }
+          },
+          <% if (dtShowActions) { %> {
+            data: null,
+            orderable: false,
+            render: function(data, type, row) {
+              let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+              <% if (canEdit) { %>
+              /* Edit button */
+              actions += `<button type="button"
+                                class="btn btn-primary edit-btn"
+                                data-id="${row.id || row.objectId}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="Editar">
+                                <i class="ti ti-edit"></i>
+                            </button>`;
+              <% } %>
+
+              <% if (canEdit) { %>
+              /* Toggle status button */
+              const statusIcon = row.active ? 'ti-eye-off' : 'ti-eye-check';
+              const statusTitle = row.active ? 'Desactivar' : 'Activar';
+              const statusClass = row.active ? 'btn-warning' : 'btn-success';
+
+              actions += `<button type="button"
+                                class="btn ${statusClass} toggle-btn"
+                                data-id="${row.id || row.objectId}"
+                                data-active="${row.active}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="${statusTitle}">
+                                <i class="ti ${statusIcon}"></i>
+                            </button>`;
+              <% } %>
+
+              <% if (canDelete) { %>
+              /* Delete button */
+              actions += `<button type="button"
+                                class="btn btn-danger delete-btn"
+                                data-id="${row.id || row.objectId}"
+                                data-tour-name="${row.destinationPOI?.name || 'Tour'}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="Eliminar">
+                                <i class="ti ti-trash"></i>
+                            </button>`;
+              <% } %>
+
+              actions += '</div>';
+              return actions;
+            }
+          }
+          <% } %>
+        ],
+        pageLength: 25,
+        lengthMenu: [
+          [10, 25, 50, 100],
+          [10, 25, 50, 100]
+        ],
+        order: [
+          [0, 'asc']
+        ],
+        pagingType: 'full_numbers',
+        language: {
+          processing: "Procesando...",
+          search: "Buscar:",
+          lengthMenu: "Mostrar _MENU_ registros",
+          info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+          infoEmpty: "Mostrando 0 a 0 de 0 registros",
+          infoFiltered: "(filtrado de _MAX_ registros totales)",
+          loadingRecords: "Cargando...",
+          zeroRecords: "No se encontraron registros coincidentes",
+          emptyTable: "No hay datos disponibles en la tabla",
+          paginate: {
+            first: "Primero",
+            previous: "Anterior",
+            next: "Siguiente",
+            last: "Último"
+          }
+        },
+        drawCallback: function(settings) {
+          // Reinitialize tooltips after table redraw
+          const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+          tooltipTriggerList.map(function(tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+          });
+        }
+      });
+
+      // Load dropdown options when modal opens
+      function loadDropdownOptions() {
+        // Load Active POIs
+        $.ajax({
+          url: '/api/pois/active',
+          type: 'GET',
+          success: function(data) {
+            if (data.success && data.data) {
+              const select = $('#destinationPOI');
+              select.empty().append('<option value="">Seleccionar destino...</option>');
+              data.data.forEach(poi => {
+                select.append(`<option value="${poi.value}">${poi.label}</option>`);
+              });
+            }
+          },
+          error: function(xhr, status, error) {
+            console.error('Error loading POIs:', error);
+          }
+        });
+
+        // Load Active Vehicle Types
+        $.ajax({
+          url: '/api/vehicle-types/active',
+          type: 'GET',
+          success: function(data) {
+            if (data.success && data.data) {
+              const select = $('#vehicleType');
+              select.empty().append('<option value="">Seleccionar tipo de vehículo...</option>');
+              data.data.forEach(vt => {
+                select.append(`<option value="${vt.value}">${vt.label}</option>`);
+              });
+            }
+          },
+          error: function(xhr, status, error) {
+            console.error('Error loading vehicle types:', error);
+          }
+        });
+
+        // Load Active Rates
+        $.ajax({
+          url: '/api/rates/active',
+          type: 'GET',
+          success: function(data) {
+            if (data.success && data.data) {
+              const select = $('#rate');
+              select.empty().append('<option value="">Seleccionar tarifa...</option>');
+              data.data.forEach(rate => {
+                select.append(`<option value="${rate.value}">${rate.label}</option>`);
+              });
+            }
+          },
+          error: function(xhr, status, error) {
+            console.error('Error loading rates:', error);
+          }
+        });
+      }
+
+      $('#<%= dtTableId %>').on('click', '.edit-btn', function() {
+        const id = $(this).data('id');
+        loadDropdownOptions(); // Load dropdown options first
+
+        $.ajax({
+          url: `${API}/${id}`,
+          type: 'GET',
+          success: function(data) {
+            if (data.success) {
+              const t = data.data.tour;
+              $('#tourId').val(t.id || t.objectId);
+
+              // Set POI destination
+              setTimeout(() => {
+                $('#destinationPOI').val(t.destinationPOI?.objectId || t.destinationPOI?.id || '');
+              }, 500);
+
+              // Set time (convert from minutes to hours and minutes)
+              const totalMinutes = t.time || 0;
+              const hours = Math.floor(totalMinutes / 60);
+              const minutes = totalMinutes % 60;
+              $('#timeHours').val(hours);
+              $('#timeMinutes').val(minutes);
+
+              // Set vehicle type
+              setTimeout(() => {
+                $('#vehicleType').val(t.vehicleType?.objectId || t.vehicleType?.id || '');
+              }, 500);
+
+              $('#price').val(t.price || '');
+
+              // Set passenger range
+              $('#minPassengers').val(t.minPassengers || '');
+              $('#maxPassengers').val(t.maxPassengers || '');
+
+              // Set notes
+              $('#notes').val(t.notes || '');
+
+              // Set rate
+              setTimeout(() => {
+                $('#rate').val(t.rate?.objectId || t.rate?.id || '');
+              }, 500);
+
+              $('#modalTitle').text('Editar Tour');
+              $('#saveButtonText').text('Actualizar Tour');
+
+              // Clear any previous modal alerts
+              const alertsContainer = document.getElementById('tourModalAlerts');
+              if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+              }
+
+              $('#tourModal').modal('show');
+            }
+          },
+          error: function(xhr) {
+            showModalError(xhr.responseJSON?.error || 'Error al cargar el tour');
+          }
+        });
+      });
+
+      $('#createTourBtn').click(() => {
+        // Clear any previous modal alerts
+        const alertsContainer = document.getElementById('tourModalAlerts');
+        if (alertsContainer) {
+          alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+        }
+
+        loadDropdownOptions(); // Load dropdown options
+        $('#tourForm')[0].reset();
+        $('#tourId').val('');
+        $('#modalTitle').text('Crear Nuevo Tour');
+        $('#saveButtonText').text('Crear Tour');
+        $('#tourModal').modal('show');
+      });
+
+      $('#saveTourBtn').click(function() {
+        const id = $('#tourId').val();
+
+        // Calculate total time in minutes
+        const hours = parseInt($('#timeHours').val()) || 0;
+        const minutes = parseInt($('#timeMinutes').val()) || 0;
+        const totalMinutes = (hours * 60) + minutes;
+
+        const data = {
+          destinationPOI: $('#destinationPOI').val(),
+          time: totalMinutes,
+          vehicleType: $('#vehicleType').val(),
+          price: parseFloat($('#price').val()) || 0,
+          rate: $('#rate').val()
+        };
+
+        // Add optional passenger range fields
+        const minPassengers = $('#minPassengers').val();
+        const maxPassengers = $('#maxPassengers').val();
+        
+        if (minPassengers && minPassengers.trim() !== '') {
+          data.minPassengers = parseInt(minPassengers);
+        }
+        
+        if (maxPassengers && maxPassengers.trim() !== '') {
+          data.maxPassengers = parseInt(maxPassengers);
+        }
+
+        // Add optional notes field
+        const notes = $('#notes').val();
+        if (notes && notes.trim() !== '') {
+          data.notes = notes.trim();
+        }
+
+        // Validate required fields
+        if (!data.destinationPOI || !data.time || !data.vehicleType || !data.price || !data.rate) {
+          showModalError('Por favor completa todos los campos requeridos');
+          return;
+        }
+
+        if (data.time <= 0) {
+          showModalError('La duración debe ser mayor a 0 minutos');
+          return;
+        }
+
+        $.ajax({
+          url: id ? `${API}/${id}` : API,
+          type: id ? 'PUT' : 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify(data),
+          success: function(result) {
+            if (result.success) {
+              showSuccessAlert(`Tour ${id?'actualizado':'creado'} exitosamente`);
+              $('#tourModal').modal('hide');
+              table.ajax.reload(null, false);
+            } else {
+              showModalError(result.error || 'Error al guardar el tour');
+            }
+          },
+          error: function(xhr) {
+            showModalError(xhr.responseJSON?.error || 'Error al guardar el tour');
+          }
+        });
+      });
+
+      $('#<%= dtTableId %>').on('click', '.toggle-btn', function() {
+        const id = $(this).data('id');
+        const active = $(this).data('active');
+        toggleTourStatus(id, active);
+      });
+
+      $('#<%= dtTableId %>').on('click', '.delete-btn', function() {
+        const id = $(this).data('id');
+        const name = $(this).data('tour-name');
+        deleteTour(id, name);
+      });
+
+      function toggleTourStatus(tourId, currentStatus) {
+        const newStatus = !currentStatus;
+        const action = newStatus ? 'activar' : 'desactivar';
+        const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+        const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+        const modalHtml = `
+            <div class="modal fade" id="confirmToggleTourModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">${actionTitle} Tour</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>¿Estás seguro de que deseas ${action} este tour?</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn ${btnClass}" id="confirmToggleTourBtn">${actionTitle}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        $('#confirmToggleTourModal').remove();
+        $('body').append(modalHtml);
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('confirmToggleTourModal'));
+        modal.show();
+
+        // Handle confirmation
+        $('#confirmToggleTourBtn').on('click', function() {
+          $.ajax({
+            url: `${API}/${tourId}/toggle-status`,
+            type: 'PATCH',
+            contentType: 'application/json',
+            data: JSON.stringify({
+              active: newStatus
+            }),
+            success: function(result) {
+              if (result.success) {
+                modal.hide();
+                table.ajax.reload(null, false);
+                showSuccessAlert(`Tour ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+              } else {
+                modal.hide();
+                showErrorAlert(result.error || 'Error al cambiar el estado del tour');
+              }
+            },
+            error: function(xhr) {
+              modal.hide();
+              const errorMsg = xhr.responseJSON?.error || 'Error al cambiar el estado del tour';
+              showErrorAlert(errorMsg);
+            }
+          });
+        });
+      }
+
+      function deleteTour(tourId, tourName) {
+        const modalHtml = `
+            <div class="modal fade" id="confirmDeleteTourModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title">Eliminar Tour</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>¿Estás seguro de que deseas eliminar el tour <strong>"${tourName}"</strong>?</p>
+                            <p class="text-muted mb-0">Esta acción se puede revertir.</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-danger" id="confirmDeleteTourBtn">Eliminar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        $('#confirmDeleteTourModal').remove();
+
+        // Add modal to body
+        $('body').append(modalHtml);
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('confirmDeleteTourModal'));
+        modal.show();
+
+        // Handle confirmation
+        $('#confirmDeleteTourBtn').on('click', function() {
+          $.ajax({
+            url: `${API}/${tourId}`,
+            type: 'DELETE',
+            success: function(result) {
+              if (result.success) {
+                modal.hide();
+                table.ajax.reload(null, false);
+                showSuccessAlert(`Tour "${tourName}" eliminado exitosamente`);
+              } else {
+                modal.hide();
+                showErrorAlert(result.error || 'Error al eliminar el tour');
+              }
+            },
+            error: function(xhr) {
+              modal.hide();
+              const error = xhr.responseJSON?.error || 'Error al eliminar el tour';
+              showErrorAlert(error);
+            }
+          });
+        });
+      }
+
+      function showModalError(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+
+        const container = document.getElementById('tourModalAlerts');
+        if (container) {
+          container.querySelectorAll('.alert').forEach(el => el.remove());
+          container.insertAdjacentHTML('afterbegin', alertHtml);
+
+          setTimeout(() => {
+            container.querySelectorAll('.alert').forEach(el => {
+              el.classList.remove('show');
+              setTimeout(() => el.remove(), 150);
+            });
+          }, 8000);
+        }
+      }
+
+      function showSuccessAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="ti ti-check-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        document.querySelectorAll('.alert').forEach(el => el.remove());
+        const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
+        cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+        setTimeout(() => {
+          document.querySelectorAll('.alert').forEach(el => {
+            el.classList.remove('show');
+            setTimeout(() => el.remove(), 150);
+          });
+        }, 5000);
+      }
+
+      function showErrorAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        document.querySelectorAll('.alert').forEach(el => el.remove());
+        const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
+        cardBody.insertAdjacentHTML('afterbegin', alertHtml);
+      }
+    }
+
+    // Start initialization when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+      // DOM already loaded
+      initWhenReady();
+    }
+  })();
+</script>

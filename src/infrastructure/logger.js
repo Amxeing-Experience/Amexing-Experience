@@ -17,17 +17,48 @@
  * - HTTP request logging integration with Morgan
  * - Uncaught exception and rejection handling
  * - Configurable log levels and retention periods
- * - JSON audit logs for compliance reporting.
+ * - JSON audit logs for compliance reporting
+ * - Environment-specific transport configuration
+ * - Test environment optimization (silent mode)
+ * - Fallback transport validation to prevent memory issues.
+ *
+ * Environment Configuration:
+ * - **Development**: Console output with colors + file rotation
+ * - **Production**: Structured console output + file rotation + audit logs
+ * - **Test**: Silent console transport (no file creation).
+ *
+ * Transport Behavior by Environment:.
+ * ```
+ * Development (NODE_ENV=development):
+ * ✓ Console: Active with colors
+ * ✓ Application logs: Daily rotation
+ * ✓ Error logs: Daily rotation
+ * ✓ Audit logs: If ENABLE_AUDIT_LOGGING=true
+ *
+ * Production (NODE_ENV=production):
+ * ✓ Console: Active with structured format
+ * ✓ Application logs: Daily rotation
+ * ✓ Error logs: Daily rotation
+ * ✓ Audit logs: If ENABLE_AUDIT_LOGGING=true
+ *
+ * Test (NODE_ENV=test):
+ * ✓ Console: Silent (no output)
+ * ✗ File transports: Disabled
+ * ✗ Audit logs: Disabled
+ * ```
+ *
+ * Configuration Variables:
+ * - LOG_LEVEL: Logging level (debug, info, warn, error) - default: 'info'
+ * - LOG_DIR: Directory for log files - default: 'logs'
+ * - ENABLE_AUDIT_LOGGING: Enable audit log transport - default: false
+ * - AUDIT_LOG_RETENTION_DAYS: Audit log retention period - default: '365d'
+ * - LOG_RETENTION_DAYS: Standard log retention period - default: '30d'
+ * - SILENT_LOGGER: Force complete silence in test - default: false.
  * @file Infrastructure logging system for Amexing platform.
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 2.1.0
  * @since 1.0.0
  * @example
- * // Usage example
- * const result = await require({ 'winston': 'example' });
- * // Returns: operation result
- * // const result = await authService.login(credentials);
- * // Returns: { success: true, user: {...}, tokens: {...} }
  * // Basic logging
  * const logger = require('./infrastructure/logger');
  * logger.info('Application started', { port: 3000, env: 'production' });
@@ -74,10 +105,12 @@ const customFormat = winston.format.combine(
   }) => {
     let msg = `${timestamp} [${level.toUpperCase()}]: ${message}`;
 
+    // Append metadata if present
     if (Object.keys(metadata).length > 0) {
       msg += ` ${JSON.stringify(metadata)}`;
     }
 
+    // Append stack trace if error
     if (stack) {
       msg += `\n${stack}`;
     }
@@ -90,27 +123,30 @@ const customFormat = winston.format.combine(
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),
   winston.format.simple(),
-  winston.format.printf(
-    ({ level, message, timestamp }) => `${timestamp} ${level}: ${message}`
-  )
+  winston.format.printf(({ level, message, timestamp }) => `${timestamp} ${level}: ${message}`)
 );
 
-// Create Winston logger
-const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: customFormat,
-  defaultMeta: { service: 'amexing-api' },
-  exitOnError: false,
-  transports: [
-    // Console transport
-    new winston.transports.Console({
-      format:
-        process.env.NODE_ENV === 'development' ? consoleFormat : customFormat,
-      handleExceptions: true,
-      handleRejections: true,
-    }),
+// Determine if we're in test environment
+const isTestEnvironment = process.env.NODE_ENV === 'test';
+const isDevelopmentEnvironment = process.env.NODE_ENV === 'development';
 
-    // Daily rotate file for all logs
+// Build transports array based on environment
+const transports = [];
+
+// Console transport - always add, but silence in test environment
+transports.push(
+  new winston.transports.Console({
+    format: isDevelopmentEnvironment ? consoleFormat : customFormat,
+    handleExceptions: true,
+    handleRejections: true,
+    silent: isTestEnvironment, // Silence console output in test environment
+  })
+);
+
+// File transports - skip in test environment to avoid file creation during tests
+if (!isTestEnvironment) {
+  // Daily rotate file for all logs
+  transports.push(
     new DailyRotateFile({
       filename: path.join(logDir, 'application-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
@@ -118,9 +154,11 @@ const logger = winston.createLogger({
       maxSize: '20m',
       maxFiles: process.env.LOG_RETENTION_DAYS || '30d',
       format: customFormat,
-    }),
+    })
+  );
 
-    // Daily rotate file for error logs
+  // Daily rotate file for error logs
+  transports.push(
     new DailyRotateFile({
       filename: path.join(logDir, 'error-%DATE%.log'),
       datePattern: 'YYYY-MM-DD',
@@ -129,12 +167,36 @@ const logger = winston.createLogger({
       maxFiles: process.env.LOG_RETENTION_DAYS || '30d',
       level: 'error',
       format: customFormat,
-    }),
-  ],
+    })
+  );
+}
+
+// Create Winston logger with environment-specific configuration
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: customFormat,
+  defaultMeta: { service: 'amexing-api' },
+  exitOnError: false,
+  transports,
+  // Silence all logging in test environment if needed
+  silent: isTestEnvironment && process.env.SILENT_LOGGER === 'true',
 });
 
-// Add audit log transport if enabled
-if (process.env.ENABLE_AUDIT_LOGGING === 'true') {
+// Validate transports configuration
+if (transports.length === 0) {
+  console.warn(
+    '[Logger] Warning: No transports configured. Adding fallback console transport to prevent memory issues.'
+  );
+  transports.push(
+    new winston.transports.Console({
+      format: customFormat,
+      silent: true, // Silent fallback to avoid unwanted output
+    })
+  );
+}
+
+// Enable audit logging if configured (skip in test environment)
+if (process.env.ENABLE_AUDIT_LOGGING === 'true' && !isTestEnvironment) {
   logger.add(
     new DailyRotateFile({
       filename: path.join(logDir, 'audit-%DATE%.log'),
@@ -142,10 +204,7 @@ if (process.env.ENABLE_AUDIT_LOGGING === 'true') {
       zippedArchive: true,
       maxSize: '50m',
       maxFiles: process.env.AUDIT_LOG_RETENTION_DAYS || '365d',
-      format: winston.format.combine(
-        winston.format.timestamp(),
-        winston.format.json()
-      ),
+      format: winston.format.combine(winston.format.timestamp(), winston.format.json()),
       auditMode: true,
     })
   );
@@ -159,7 +218,7 @@ if (process.env.ENABLE_AUDIT_LOGGING === 'true') {
  * @param {string} event - Security event type (e.g., 'FAILED_LOGIN', 'ACCOUNT_LOCKED', 'PERMISSION_DENIED').
  * @param {object} details - Additional event details and context.
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -206,7 +265,7 @@ logger.logSecurityEvent = (event, details) => {
  * @param {string} ip - IP address of the access attempt.
  * @param {string|null} [reason] - Reason for failure (if applicable).
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -230,10 +289,12 @@ logger.logAccessAttempt = (success, username, ip, reason = null) => {
     timestamp: new Date().toISOString(),
   };
 
+  // Include failure reason if provided
   if (reason) {
     logData.reason = reason;
   }
 
+  // Log success or failure with appropriate level
   if (success) {
     logger.info('Successful login', logData);
   } else {
@@ -251,7 +312,7 @@ logger.logAccessAttempt = (success, username, ip, reason = null) => {
  * @param {string} action - Action performed (READ, WRITE, UPDATE, DELETE).
  * @param {boolean} success - Whether the data access was successful.
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -286,7 +347,7 @@ logger.logDataAccess = (userId, resource, action, success) => {
  * @param {string|null} oldValue - Previous value (will be masked with *** for privacy).
  * @param {string|null} newValue - New value (will be masked with *** for privacy).
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -318,14 +379,8 @@ logger.stream = {
   },
 };
 
-// Handle uncaught exceptions and unhandled rejections
-process.on('uncaughtException', (error) => {
-  logger.error('Uncaught Exception:', error);
-  process.exit(1);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-});
+// NOTE: Global error handlers are registered in src/index.js
+// to avoid duplicate event listeners and ensure proper graceful shutdown.
+// This keeps the logger module focused on logging functionality only.
 
 module.exports = logger;

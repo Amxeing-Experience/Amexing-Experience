@@ -1,228 +1,867 @@
-<!-- Admin Dashboard - Client Management -->
-<div class="row">
-    <!-- Page Header -->
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <div class="d-sm-flex d-block align-items-center justify-content-between mb-3">
-                    <div class="mb-3 mb-sm-0">
-                        <h5 class="card-title fw-semibold">Client Management</h5>
-                        <p class="card-subtitle mb-0">Manage your client companies and their configurations</p>
-                    </div>
-                    <div>
-                        <span class="badge bg-light-info text-info fs-2">
-                            Admin View
-                        </span>
-                    </div>
-                </div>
+<%
+/**
+ * Admin Clients Management Page
+ * Follows main dashboard layout structure with atomic design components
+ *
+ * Layout Structure (matching main dashboard):
+ * - Direct row/column structure (no body-wrapper)
+ * - Container-fluid from Flexy Bootstrap
+ * - Consistent spacing and alignment
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller (pageStyles & footerScripts)
+ */
 
-                <!-- Quick Stats -->
-                <div class="row">
-                    <div class="col-md-3">
-                        <%- include('../../atoms/dashboard/stats-card', {
-                            icon: 'ti ti-building',
-                            title: 'Total Clients',
-                            value: typeof stats !== 'undefined' ? stats.totalClients : '42',
-                            color: 'primary',
-                            trend: '+2 this month',
-                            trendColor: 'success'
-                        }) %>
-                    </div>
-                    <div class="col-md-3">
-                        <%- include('../../atoms/dashboard/stats-card', {
-                            icon: 'ti ti-users',
-                            title: 'Client Employees',
-                            value: typeof stats !== 'undefined' ? stats.clientEmployees : '287',
-                            color: 'info',
-                            trend: '+15 this month',
-                            trendColor: 'success'
-                        }) %>
-                    </div>
-                    <div class="col-md-3">
-                        <%- include('../../atoms/dashboard/stats-card', {
-                            icon: 'ti ti-calendar-check',
-                            title: 'Active Bookings',
-                            value: typeof stats !== 'undefined' ? stats.activeBookings : '156',
-                            color: 'success',
-                            trend: '92% completion',
-                            trendColor: 'success'
-                        }) %>
-                    </div>
-                    <div class="col-md-3">
-                        <%- include('../../atoms/dashboard/stats-card', {
-                            icon: 'ti ti-brand-oauth',
-                            title: 'OAuth Enabled',
-                            value: typeof stats !== 'undefined' ? stats.oauthClients : '28',
-                            color: 'warning',
-                            trend: '67% adoption',
-                            trendColor: 'info'
-                        }) %>
-                    </div>
-                </div>
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const currentPath = '/dashboard/admin/clients';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold">Gestión de Clientes</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/admin" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-building me-1"></i>Clientes
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="text-muted">
+                <small class="d-block">Total clientes registrados</small>
+                <strong id="total-clients-count">-</strong>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Client Table -->
+<!-- Clients DataTable -->
 <div class="row">
     <div class="col-12">
-        <div class="card">
-            <div class="card-body">
-                <!-- Navigation Tabs -->
-                <ul class="nav nav-pills mb-3" id="clientTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="active-clients-tab" data-bs-toggle="pill" data-bs-target="#active-clients" type="button" role="tab">
-                            <i class="ti ti-building me-2"></i>Active Clients
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="pending-clients-tab" data-bs-toggle="pill" data-bs-target="#pending-clients" type="button" role="tab">
-                            <i class="ti ti-clock me-2"></i>Pending Approval
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="oauth-setup-tab" data-bs-toggle="pill" data-bs-target="#oauth-setup" type="button" role="tab">
-                            <i class="ti ti-brand-oauth me-2"></i>OAuth Configuration
-                        </button>
-                    </li>
-                </ul>
+        <%- include('../../organisms/datatable/clients-table', {
+            tableId: 'clients-table',
+            apiEndpoint: '/api/clients',
+            userRole: currentUserRole,
+            showActions: true
+        }) %>
+    </div>
+</div>
 
-                <!-- Tab Content -->
-                <div class="tab-content" id="clientTabsContent">
-                    <!-- Active Clients Tab -->
-                    <div class="tab-pane fade show active" id="active-clients" role="tabpanel">
-                        <div id="clientTableContainer"></div>
+<!-- Client Management Modals -->
+<!-- Create Client Modal -->
+<div class="modal fade" id="createClientModal" tabindex="-1" aria-labelledby="createClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="createClientModalLabel">
+                    <i class="ti ti-building-plus me-2"></i>Crear Nuevo Cliente
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <form id="createClientForm">
+                    <!-- Sección: Información del Representante -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-user me-1"></i>
+                            Información del Representante
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'firstName',
+                                    id: 'clientFirstName',
+                                    label: 'Nombre del Representante',
+                                    required: true,
+                                    placeholder: 'Ej: Juan',
+                                    helpText: 'Nombre del contacto principal',
+                                    inputAttributes: { maxlength: '100' }
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'lastName',
+                                    id: 'clientLastName',
+                                    label: 'Apellido del Representante',
+                                    required: true,
+                                    placeholder: 'Ej: Pérez García',
+                                    inputAttributes: { maxlength: '100' }
+                                }) %>
+                            </div>
+                        </div>
+
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'email',
+                            name: 'email',
+                            id: 'clientEmail',
+                            label: 'Email Corporativo',
+                            required: true,
+                            placeholder: 'contacto@empresa.com',
+                            helpText: 'Email del representante para acceso al sistema',
+                            inputAttributes: { maxlength: '255' }
+                        }) %>
                     </div>
 
-                    <!-- Pending Clients Tab -->
-                    <div class="tab-pane fade" id="pending-clients" role="tabpanel">
-                        <div id="pendingClientTableContainer"></div>
+                    <!-- Sección: Información de la Empresa -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-building me-1"></i>
+                            Información de la Empresa
+                        </h6>
+
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'text',
+                            name: 'companyName',
+                            id: 'companyName',
+                            label: 'Nombre de la Empresa',
+                            required: true,
+                            placeholder: 'Ej: Tecnología y Servicios S.A. de C.V.',
+                            helpText: 'Razón social o nombre comercial',
+                            inputAttributes: { maxlength: '200' }
+                        }) %>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'tel',
+                                    name: 'phone',
+                                    id: 'clientPhone',
+                                    label: 'Teléfono de Contacto',
+                                    required: false,
+                                    placeholder: '+52 (999) 123-4567',
+                                    inputAttributes: { maxlength: '20' }
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'taxId',
+                                    id: 'clientTaxId',
+                                    label: 'RFC / Tax ID',
+                                    required: false,
+                                    placeholder: 'ABC123456XXX',
+                                    helpText: 'Registro Federal de Contribuyentes',
+                                    inputAttributes: { maxlength: '13' }
+                                }) %>
+                            </div>
+                        </div>
+
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'url',
+                            name: 'website',
+                            id: 'clientWebsite',
+                            label: 'Sitio Web',
+                            required: false,
+                            placeholder: 'https://www.empresa.com'
+                        }) %>
                     </div>
 
-                    <!-- OAuth Setup Tab -->
-                    <div class="tab-pane fade" id="oauth-setup" role="tabpanel">
-                        <div id="oauthClientTableContainer"></div>
+                    <!-- Sección: Dirección Fiscal -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-map-pin me-1"></i>
+                            Dirección Fiscal
+                        </h6>
+
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'text',
+                            name: 'addressStreet',
+                            id: 'addressStreet',
+                            label: 'Calle y Número',
+                            required: false,
+                            placeholder: 'Av. Principal #123, Col. Centro',
+                            inputAttributes: { maxlength: '200' }
+                        }) %>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'addressCity',
+                                    id: 'addressCity',
+                                    label: 'Ciudad',
+                                    required: false,
+                                    placeholder: 'Mérida',
+                                    inputAttributes: { maxlength: '100' }
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'addressState',
+                                    id: 'addressState',
+                                    label: 'Estado',
+                                    required: false,
+                                    placeholder: 'Yucatán',
+                                    inputAttributes: { maxlength: '100' }
+                                }) %>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'addressZipCode',
+                                    id: 'addressZipCode',
+                                    label: 'Código Postal',
+                                    required: false,
+                                    placeholder: '97000',
+                                    inputAttributes: { maxlength: '10' }
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'addressCountry',
+                                    id: 'addressCountry',
+                                    label: 'País',
+                                    required: false,
+                                    value: 'México',
+                                    inputAttributes: { maxlength: '100' }
+                                }) %>
+                            </div>
+                        </div>
                     </div>
-                </div>
+
+                    <!-- Sección: Notas Adicionales -->
+                    <div class="mb-3">
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'textarea',
+                            name: 'notes',
+                            id: 'clientNotes',
+                            label: 'Notas Adicionales',
+                            required: false,
+                            placeholder: 'Información relevante sobre el cliente...',
+                            inputAttributes: { maxlength: '500', rows: '3' }
+                        }) %>
+                        <!-- Contenedor flex para helpText y contador en la misma línea -->
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <small class="text-muted">Máximo 500 caracteres</small>
+                            <small id="notesCharCount" class="text-muted">0/500</small>
+                        </div>
+                    </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Acceso al sistema:</strong>
+                            <p class="mb-0 mt-1">Se generará una contraseña temporal automáticamente. El cliente recibirá instrucciones para configurar una nueva contraseña en su primer acceso.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <%- include('../../atoms/common/button', {
+                    type: 'button',
+                    variant: 'secondary',
+                    text: 'Cancelar',
+                    icon: 'x',
+                    attributes: { 'data-bs-dismiss': 'modal' }
+                }) %>
+
+                <%- include('../../atoms/common/button', {
+                    type: 'button',
+                    variant: 'primary',
+                    text: 'Crear Cliente',
+                    icon: 'check',
+                    attributes: {
+                        'id': 'submitCreateClient',
+                        'disabled': 'true'
+                    }
+                }) %>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Include CSS -->
-<link rel="stylesheet" href="/css/components/user-management.css">
+<!-- Edit Client Modal -->
+<div class="modal fade" id="editClientModal" tabindex="-1" aria-labelledby="editClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editClientModalLabel">
+                    <i class="ti ti-edit me-2"></i>Editar Cliente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Edit client form will go here -->
+                <p class="text-muted">Formulario de edición de cliente pendiente de implementar</p>
+            </div>
+        </div>
+    </div>
+</div>
 
-<!-- JavaScript -->
-<script src="/js/components/UserTableManager.js"></script>
+<!-- View Client Modal -->
+<div class="modal fade" id="viewClientModal" tabindex="-1" aria-labelledby="viewClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewClientModalLabel">
+                    <i class="ti ti-eye me-2"></i>Detalles de Cliente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Client details will go here -->
+                <p class="text-muted">Vista de detalles de cliente pendiente de implementar</p>
+            </div>
+        </div>
+    </div>
+</div>
 
+<!-- Page-specific JavaScript -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Get current user context
-    const currentUser = {
-        id: '<%= user.id %>',
-        role: '<%= user.role %>',
-        email: '<%= user.email %>'
-    };
+    // ========================================================================
+    // CREATE CLIENT MODAL FUNCTIONS
+    // ========================================================================
 
-    // Initialize Active Clients Table
-    window.activeClientsTable = new UserTableManager('clientTableContainer', {
-        userRole: 'client',
-        userId: currentUser.id,
-        currentUserRole: currentUser.role,
-        pageSize: 25,
-        apiBaseUrl: '/api',
-        permissions: {
-            canCreateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canDeactivateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
-        },
-        filters: {
-            role: 'client',
-            active: true
-        },
-        customizations: {
-            title: 'Active Client Companies',
-            showBulkActions: true,
-            showExport: true,
-            showFilters: true
+    /**
+     * Initialize create client modal with validation
+     */
+    function initializeCreateClientModal() {
+        const modal = document.getElementById('createClientModal');
+        const form = document.getElementById('createClientForm');
+        const submitBtn = document.getElementById('submitCreateClient');
+
+        if (!modal || !form || !submitBtn) return;
+
+        // Character counter for notes
+        const notesTextarea = document.getElementById('clientNotes');
+        const charCounter = document.getElementById('notesCharCount');
+
+        if (notesTextarea && charCounter) {
+            notesTextarea.addEventListener('input', function() {
+                const length = this.value.length;
+                charCounter.textContent = `${length}/500`;
+
+                if (length > 450) {
+                    charCounter.classList.add('text-warning');
+                    charCounter.classList.remove('text-muted');
+                } else if (length === 500) {
+                    charCounter.classList.add('text-danger');
+                    charCounter.classList.remove('text-warning', 'text-muted');
+                } else {
+                    charCounter.classList.remove('text-warning', 'text-danger');
+                    charCounter.classList.add('text-muted');
+                }
+            });
         }
-    });
 
-    // Initialize Pending Clients Table
-    window.pendingClientsTable = new UserTableManager('pendingClientTableContainer', {
-        userRole: 'client',
-        userId: currentUser.id,
-        currentUserRole: currentUser.role,
-        pageSize: 25,
-        apiBaseUrl: '/api',
-        permissions: {
-            canCreateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canDeactivateUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
-        },
-        filters: {
-            role: 'client',
-            active: false
-        },
-        customizations: {
-            title: 'Pending Client Approvals',
-            showBulkActions: true,
-            showExport: false,
-            showFilters: false
+        // Real-time validation
+        const requiredFields = form.querySelectorAll('[required]');
+
+        function validateForm() {
+            let isValid = true;
+
+            requiredFields.forEach(field => {
+                const value = field.value.trim();
+
+                // Required field validation
+                if (!value) {
+                    isValid = false;
+                    return;
+                }
+
+                // Email validation
+                if (field.type === 'email' && value) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(value)) {
+                        isValid = false;
+                    }
+                }
+            });
+
+            submitBtn.disabled = !isValid;
+            return isValid;
         }
-    });
 
-    // Initialize OAuth Clients Table
-    window.oauthClientsTable = new UserTableManager('oauthClientTableContainer', {
-        userRole: 'client',
-        userId: currentUser.id,
-        currentUserRole: currentUser.role,
-        pageSize: 25,
-        apiBaseUrl: '/api',
-        permissions: {
-            canCreateUsers: false,
-            canModifyUsers: <%= ['superadmin', 'admin'].includes(user.role) %>,
-            canDeactivateUsers: false,
-            canViewAll: <%= ['superadmin', 'admin'].includes(user.role) %>
-        },
-        filters: {
-            role: 'client',
-            active: true,
-            hasOAuth: true
-        },
-        customizations: {
-            title: 'OAuth-Enabled Client Companies',
-            showBulkActions: false,
-            showExport: true,
-            showFilters: true
+        // Validate on input for all form fields
+        form.addEventListener('input', validateForm);
+
+        // Handle form submission
+        submitBtn.addEventListener('click', async function() {
+            if (!validateForm()) return;
+
+            // Collect form data
+            const formData = {
+                firstName: document.getElementById('clientFirstName').value.trim(),
+                lastName: document.getElementById('clientLastName').value.trim(),
+                email: document.getElementById('clientEmail').value.trim(),
+                companyName: document.getElementById('companyName').value.trim(),
+                phone: document.getElementById('clientPhone').value.trim() || undefined,
+                taxId: document.getElementById('clientTaxId').value.trim() || undefined,
+                website: document.getElementById('clientWebsite').value.trim() || undefined,
+                address: {
+                    street: document.getElementById('addressStreet').value.trim() || '',
+                    city: document.getElementById('addressCity').value.trim() || '',
+                    state: document.getElementById('addressState').value.trim() || '',
+                    zipCode: document.getElementById('addressZipCode').value.trim() || '',
+                    country: document.getElementById('addressCountry').value.trim() || 'México'
+                },
+                notes: document.getElementById('clientNotes').value.trim() || ''
+            };
+
+            // Remove undefined values
+            Object.keys(formData).forEach(key => {
+                if (formData[key] === undefined) {
+                    delete formData[key];
+                }
+            });
+
+            await executeCreateClient(formData);
+        });
+
+        // Reset form on modal hide
+        modal.addEventListener('hidden.bs.modal', function() {
+            form.reset();
+            submitBtn.disabled = true;
+
+            if (charCounter) {
+                charCounter.textContent = '0/500';
+                charCounter.classList.remove('text-warning', 'text-danger');
+                charCounter.classList.add('text-muted');
+            }
+
+            // Clear validation states
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            form.querySelectorAll('.invalid-feedback').forEach(el => el.style.display = 'none');
+        });
+    }
+
+    /**
+     * Execute create client API call
+     * @param {object} formData - Client data from form
+     */
+    async function executeCreateClient(formData) {
+        const submitBtn = document.getElementById('submitCreateClient');
+        const modal = bootstrap.Modal.getInstance(document.getElementById('createClientModal'));
+
+        // Disable button and show loading
+        submitBtn.disabled = true;
+        const originalContent = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Creando...';
+
+        try {
+            const response = await fetch('/api/clients', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Error al crear el cliente');
+            }
+
+            // Success - restore button before hiding modal
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+
+            modal.hide();
+            showSuccessAlert(`Cliente "${formData.companyName}" creado exitosamente`);
+
+            // Reload table
+            if (window.clientsTable) {
+                window.clientsTable.ajax.reload(null, false);
+            }
+
+        } catch (error) {
+            console.error('Error creating client:', error);
+            showErrorAlert(error.message || 'Error al crear el cliente. Por favor, intenta nuevamente.');
+
+            // Restore button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
         }
-    });
+    }
 
-    // Tab switching logic
-    const tabs = document.querySelectorAll('[data-bs-toggle="pill"]');
-    tabs.forEach(tab => {
-        tab.addEventListener('shown.bs.tab', function(event) {
-            const targetTab = event.target.getAttribute('data-bs-target');
+    // ========================================================================
+    // PAGE INITIALIZATION
+    // ========================================================================
 
-            // Refresh the appropriate table when tab is shown
-            switch(targetTab) {
-                case '#active-clients':
-                    window.activeClientsTable.refresh();
-                    break;
-                case '#pending-clients':
-                    window.pendingClientsTable.refresh();
-                    break;
-                case '#oauth-setup':
-                    window.oauthClientsTable.refresh();
-                    break;
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update total count when table loads (listen to custom event)
+        document.addEventListener('clientsTableLoaded', function(e) {
+            const count = e.detail?.count || 0;
+            const countEl = document.getElementById('total-clients-count');
+            if (countEl) {
+                countEl.textContent = count;
             }
         });
-    });
 
-    // Load initial data
-    window.activeClientsTable.loadUsers();
-});
+        // Initialize create client modal
+        initializeCreateClientModal();
+    });
 </script>
+
+<!-- Bulk Import Modal -->
+<div class="modal fade" id="bulkImportModal" tabindex="-1" aria-labelledby="bulkImportModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="bulkImportModalLabel">
+                    <i class="ti ti-file-upload me-2"></i>Importación Masiva de Clientes
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Step Indicator -->
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="step-item" data-step="1">
+                            <div class="step-circle active">1</div>
+                            <small class="step-label">Descargar Plantilla</small>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step-item" data-step="2">
+                            <div class="step-circle">2</div>
+                            <small class="step-label">Cargar Archivo</small>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step-item" data-step="3">
+                            <div class="step-circle">3</div>
+                            <small class="step-label">Revisar Datos</small>
+                        </div>
+                        <div class="step-line"></div>
+                        <div class="step-item" data-step="4">
+                            <div class="step-circle">4</div>
+                            <small class="step-label">Procesar</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 1: Download Template -->
+                <div class="import-step" id="step-1">
+                    <div class="text-center mb-4">
+                        <i class="ti ti-file-download" style="font-size: 4rem; color: #5a6a85;"></i>
+                        <h4 class="mt-3 mb-2">Descarga la Plantilla de Excel</h4>
+                        <p class="text-muted">
+                            Descarga la plantilla para conocer el formato correcto de los datos.
+                        </p>
+                    </div>
+
+                    <div class="card border-primary mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="ti ti-info-circle me-2"></i>Instrucciones Importantes</h6>
+                            <ul class="mb-0">
+                                <li><strong>Campos obligatorios:</strong> firstName, lastName, email, companyName</li>
+                                <li><strong>Máximo de registros:</strong> 1,000 por importación</li>
+                                <li><strong>Tamaño máximo:</strong> 10MB</li>
+                                <li><strong>Formato:</strong> Solo archivos .xlsx o .xls</li>
+                                <li><strong>Los emails deben ser únicos</strong> (no duplicados en archivo ni base de datos)</li>
+                                <li>La plantilla incluye ejemplos y validaciones automáticas</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <button type="button" class="btn btn-primary btn-lg" id="downloadTemplateBtn">
+                            <i class="ti ti-download me-2"></i>Descargar Plantilla
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Upload File -->
+                <div class="import-step d-none" id="step-2">
+                    <div class="text-center mb-4">
+                        <i class="ti ti-cloud-upload" style="font-size: 4rem; color: #5a6a85;"></i>
+                        <h4 class="mt-3 mb-2">Sube tu Archivo Excel</h4>
+                        <p class="text-muted">
+                            Arrastra tu archivo o haz clic para seleccionarlo desde tu computadora.
+                        </p>
+                    </div>
+
+                    <!-- Include Dropzone Component -->
+                    <%- include('../../atoms/common/file-dropzone', {
+                        id: 'bulk-import-dropzone',
+                        acceptedFiles: '.xlsx,.xls',
+                        maxFiles: 1,
+                        maxFileSize: 250,
+                        uploadUrl: '/api/clients/bulk/upload',
+                        helpText: 'Arrastra tu archivo Excel aquí o haz clic para seleccionar',
+                        autoProcessQueue: true
+                    }) %>
+
+                    <div id="uploadValidationResult" class="mt-3"></div>
+                </div>
+
+                <!-- Step 3: Review Data -->
+                <div class="import-step d-none" id="step-3">
+                    <div class="text-center mb-4">
+                        <i class="ti ti-file-search" style="font-size: 4rem; color: #5a6a85;"></i>
+                        <h4 class="mt-3 mb-2">Revisa los Datos</h4>
+                        <p class="text-muted">
+                            Verifica que la información sea correcta antes de continuar.
+                        </p>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0" id="validRecordsCount">0</h3>
+                                    <small class="text-success"><i class="ti ti-check-circle"></i> Registros Válidos</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0" id="invalidRecordsCount">0</h3>
+                                    <small class="text-danger"><i class="ti ti-alert-circle"></i> Registros Inválidos</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body text-center">
+                                    <h3 class="mb-0" id="totalRecordsCount">0</h3>
+                                    <small class="text-muted"><i class="ti ti-list"></i> Total de Registros</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="invalidRecordsSection" class="d-none">
+                        <div class="alert alert-warning" role="alert">
+                            <h6 class="alert-heading"><i class="ti ti-alert-triangle me-2"></i>Se encontraron registros inválidos</h6>
+                            <p class="mb-0">Algunos registros tienen errores de validación. Puedes continuar con los registros válidos o cancelar para corregir los errores.</p>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Registros con Errores (Primeros 10)</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                                    <table class="table table-sm" id="invalidRecordsTable">
+                                        <thead class="table-light sticky-top">
+                                            <tr>
+                                                <th>Fila</th>
+                                                <th>Email</th>
+                                                <th>Empresa</th>
+                                                <th>Error</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 4: Process Import -->
+                <div class="import-step d-none" id="step-4">
+                    <div class="text-center mb-4">
+                        <i class="ti ti-loader" style="font-size: 4rem; color: #5a6a85;" id="processingIcon"></i>
+                        <i class="ti ti-circle-check d-none" style="font-size: 4rem; color: #10b981;" id="completedIcon"></i>
+                        <i class="ti ti-alert-circle d-none" style="font-size: 4rem; color: #ef4444;" id="errorIcon"></i>
+
+                        <h4 class="mt-3 mb-2" id="processingTitle">Procesando Importación</h4>
+                        <p class="text-muted" id="processingSubtitle">
+                            Por favor espera mientras se crean los clientes...
+                        </p>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span id="progressLabel">Procesando...</span>
+                            <span id="progressPercentage">0%</span>
+                        </div>
+                        <div class="progress" style="height: 30px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated"
+                                 role="progressbar"
+                                 id="importProgressBar"
+                                 style="width: 0%"
+                                 aria-valuenow="0"
+                                 aria-valuemin="0"
+                                 aria-valuemax="100">
+                                <span id="progressText">0 / 0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Results Summary (hidden until completion) -->
+                    <div id="resultsSection" class="d-none">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <div class="card border-success">
+                                    <div class="card-body text-center">
+                                        <h3 class="mb-0 text-success" id="successfulCount">0</h3>
+                                        <small><i class="ti ti-circle-check"></i> Clientes Creados</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-danger">
+                                    <div class="card-body text-center">
+                                        <h3 class="mb-0 text-danger" id="failedCount">0</h3>
+                                        <small><i class="ti ti-alert-circle"></i> Errores</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="errorReportSection" class="d-none">
+                            <div class="alert alert-info">
+                                <h6 class="alert-heading"><i class="ti ti-info-circle me-2"></i>Descarga el Reporte de Errores</h6>
+                                <p>Algunos registros no pudieron ser importados. Descarga el reporte de errores para ver los detalles y corregirlos.</p>
+                                <button type="button" class="btn btn-sm btn-info" id="downloadErrorReportBtn">
+                                    <i class="ti ti-download me-1"></i>Descargar Reporte de Errores
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="bulkImportCancelBtn" data-bs-dismiss="modal">
+                    Cancelar
+                </button>
+                <button type="button" class="btn btn-primary d-none" id="bulkImportPrevBtn">
+                    <i class="ti ti-arrow-left me-1"></i>Anterior
+                </button>
+                <button type="button" class="btn btn-primary" id="bulkImportNextBtn">
+                    Siguiente<i class="ti ti-arrow-right ms-1"></i>
+                </button>
+                <button type="button" class="btn btn-success d-none" id="bulkImportProcessBtn">
+                    <i class="ti ti-check me-1"></i>Procesar Importación
+                </button>
+                <button type="button" class="btn btn-primary d-none" id="bulkImportFinishBtn">
+                    <i class="ti ti-check me-1"></i>Finalizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Import Styles -->
+<style>
+/* Step Indicator Styles */
+.step-item {
+    text-align: center;
+    position: relative;
+    flex: 1;
+}
+
+.step-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #e2e8f0;
+    color: #64748b;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin: 0 auto 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.step-circle.active {
+    background-color: #f76b1c;
+    color: white;
+}
+
+.step-circle.completed {
+    background-color: #10b981;
+    color: white;
+}
+
+.step-label {
+    display: block;
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+.step-item.active .step-label {
+    color: #f76b1c;
+    font-weight: 600;
+}
+
+.step-line {
+    height: 2px;
+    background-color: #e2e8f0;
+    flex: 1;
+    margin: 0 1rem;
+    margin-top: -20px;
+}
+
+/* Import Step Visibility */
+.import-step {
+    min-height: 400px;
+}
+
+/* Progress Bar Custom */
+#importProgressBar {
+    background: linear-gradient(90deg, #f76b1c 0%, #fa984f 100%);
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+/* Sticky table header */
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Processing icon animation */
+#processingIcon {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .step-item {
+        font-size: 0.75rem;
+    }
+
+    .step-circle {
+        width: 30px;
+        height: 30px;
+        font-size: 0.875rem;
+    }
+
+    .step-line {
+        margin: 0 0.5rem;
+        margin-top: -15px;
+    }
+}
+</style>
+
+<!-- Load Dropzone.js from CDN -->
+<script src="https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone-min.js"></script>
+<link href="https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone.css" rel="stylesheet" type="text/css" />
+
+<!-- Load Bulk Import Module -->
+<script src="/js/bulk-import-client.js"></script>

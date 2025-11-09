@@ -1,0 +1,973 @@
+<%
+/**
+ * Airport Service DataTable Organism
+ * DataTable component for airport transportation service management
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading (should include serviceType=Aeropuerto filter)
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'airport-services-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/services?serviceType=Aeropuerto';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    Traslados de Aeropuerto
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Gestión de traslados desde/hacia aeropuerto</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createServiceBtn">
+                        <i class="ti ti-plus me-1"></i>Nuevo Traslado
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="services-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tarifa</th>
+                        <th>Ruta</th>
+                        <th>Tipo de Vehículo</th>
+                        <th>Costo</th>
+                        <th>Notas</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Service Modal -->
+<div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="serviceModalLabel">
+                    <i class="ti ti-briefcase me-2"></i><span id="modalTitle">Crear Nuevo Traslado</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="serviceModalAlerts"></div>
+
+                <form id="serviceForm">
+                    <input type="hidden" id="serviceId">
+
+                    <!-- Sección: Información de Ruta -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-route me-1"></i>
+                            Información de Ruta
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <%- include('../../atoms/common/tom-select', {
+                                    id: 'originPOI',
+                                    name: 'originPOI',
+                                    multiple: false,
+                                    placeholder: 'Seleccionar origen',
+                                    label: 'Origen',
+                                    required: true,
+                                    helpText: 'Aeropuerto de origen (requerido)',
+                                    options: [],
+                                    selected: []
+                                }) %>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <%- include('../../atoms/common/tom-select', {
+                                    id: 'destinationPOI',
+                                    name: 'destinationPOI',
+                                    multiple: false,
+                                    placeholder: 'Seleccionar destino',
+                                    label: 'Destino',
+                                    required: true,
+                                    helpText: 'Punto final del traslado',
+                                    options: [],
+                                    selected: []
+                                }) %>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sección: Información del Vehículo y Tarifa -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-car me-1"></i>
+                            Información del Vehículo y Tarifa
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="vehicleType" class="form-label">Tipo de Vehículo <span class="text-danger">*</span></label>
+                                <select class="form-select" id="vehicleType" name="vehicleType" required>
+                                    <option value="">Seleccionar tipo de vehículo</option>
+                                </select>
+                                <div class="form-text">Tipo de vehículo asignado para esta ruta</div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label for="rate" class="form-label">Tarifa <span class="text-danger">*</span></label>
+                                <select class="form-select" id="rate" name="rate" required>
+                                    <option value="">Seleccionar tarifa</option>
+                                </select>
+                                <div class="form-text">Tarifa aplicable a este traslado</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sección: Información de Precio -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-currency-dollar me-1"></i>
+                            Información de Precio
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="price" class="form-label">Precio <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="price" name="price" required min="0" step="0.01" placeholder="0.00">
+                                <span class="input-group-text">MXN</span>
+                            </div>
+                            <div class="form-text">Precio del traslado en pesos mexicanos</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="isRoundTrip" name="isRoundTrip">
+                                <label class="form-check-label" for="isRoundTrip">
+                                    Viaje Redondo
+                                </label>
+                            </div>
+                            <div class="form-text">El precio aplica en ambas direcciones (Aeropuerto ↔ Ciudad)</div>
+                        </div>
+                    </div>
+
+                    <!-- Sección: Notas Adicionales -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-notes me-1"></i>
+                            Notas Adicionales
+                        </h6>
+
+                        <div class="mb-3">
+                            <label for="note" class="form-label">Nota</label>
+                            <textarea class="form-control" id="note" name="note" rows="3" maxlength="500" placeholder="Notas adicionales sobre el traslado..."></textarea>
+                            <div class="form-text">Máximo 500 caracteres (opcional)</div>
+                        </div>
+                    </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Traslado:</strong>
+                            <p class="mb-0 mt-1">Define una ruta específica con origen, destino, tipo de vehículo y precio. Este traslado estará disponible para reservaciones una vez activado.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveServiceBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Traslado</span>
+                </button>
+            </div>
+
+            <%- include('../../atoms/common/modal-loader', { text: 'Cargando datos del traslado...' }) %>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Wait for DOM and all dependencies to be ready
+    function initWhenReady() {
+        // Check if jQuery and DataTables are loaded
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        if (!jQuery.fn.dataTable) {
+            console.warn('DataTables not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        initServicesTable();
+    }
+
+    function initServicesTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        // Extract serviceType from apiEndpoint
+        const serviceTypeMatch = apiEndpoint.match(/serviceType=([^&]+)/);
+        const serviceType = serviceTypeMatch ? decodeURIComponent(serviceTypeMatch[1]) : null;
+
+        // Get JWT token from cookies
+        function getAccessToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Setup global AJAX configuration to include JWT token
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
+        });
+
+        // Load dropdown data
+        let poisData = [];
+        let vehicleTypesData = [];
+        let ratesData = [];
+
+        // Color contrast functions for rate badges (from rates-table.ejs)
+        function getLuminance(hex) {
+            // WCAG 2.0 luminance calculation
+            const rgb = parseInt(hex.slice(1), 16);
+            const r = (rgb >> 16) & 0xff;
+            const g = (rgb >> 8) & 0xff;
+            const b = (rgb >> 0) & 0xff;
+
+            const [rsRGB, gsRGB, bsRGB] = [r/255, g/255, b/255].map(val => {
+                return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+            });
+
+            return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
+        }
+
+        function getContrastTextColor(backgroundColor) {
+            const luminance = getLuminance(backgroundColor);
+            return luminance > 0.5 ? '#1F2937' : '#FFFFFF';
+        }
+
+        // DataTable Configuration
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint,
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading services:', error);
+                    showErrorAlert('Error al cargar los traslados');
+                }
+            },
+            columns: [
+                // 1. Tarifa
+                {
+                    data: 'rate.name',
+                    render: function(data, type, row) {
+                        const color = row.rate?.color || '#6366F1';
+                        const textColor = getContrastTextColor(color);
+                        return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${data || '-'}</span>`;
+                    }
+                },
+                // 2. Ruta (Origen → Destino con indicador de viaje redondo)
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        const origin = row.originPOI?.name || '-';
+                        const destination = row.destinationPOI?.name || '-';
+                        const isRoundTrip = row.isRoundTrip || false;
+
+                        // Para búsqueda y ordenamiento, retornar texto plano
+                        if (type === 'filter' || type === 'sort') {
+                            return `${origin} ${destination}`;
+                        }
+
+                        // Para display, retornar HTML visual
+                        const arrowIcon = isRoundTrip
+                            ? '<i class="ti ti-arrows-down-up text-info" style="font-size: 1.25rem;" data-bs-toggle="tooltip" title="Viaje Redondo"></i>'
+                            : '<i class="ti ti-arrow-down text-success" style="font-size: 1.25rem;"></i>';
+
+                        return `
+                            <div class="d-flex flex-column align-items-start gap-1" style="min-width: 180px;">
+                                <span class="fw-medium" style="font-size: 0.875rem;">${origin}</span>
+                                <div class="text-center w-100">
+                                    ${arrowIcon}
+                                </div>
+                                <span class="fw-medium" style="font-size: 0.875rem;">${destination}</span>
+                            </div>
+                        `;
+                    }
+                },
+                // 3. Tipo de Vehículo
+                {
+                    data: 'vehicleType.name',
+                    render: function(data) {
+                        return `<span class="badge bg-dark">${data || '-'}</span>`;
+                    }
+                },
+                // 4. Costo
+                {
+                    data: 'price',
+                    render: function(data) {
+                        const formatted = new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(data || 0);
+                        return `<div class="fw-bold text-success">${formatted}</div>`;
+                    }
+                },
+                // 5. Notas
+                {
+                    data: 'note',
+                    render: function(data) {
+                        if (!data) return '<span class="text-muted">-</span>';
+                        // Truncar si es muy largo
+                        const truncated = data.length > 50 ? data.substring(0, 50) + '...' : data;
+                        return `<div class="small" title="${data}">${truncated}</div>`;
+                    }
+                },
+                // 6. Estado
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data
+                            ? '<span class="badge bg-success">Activo</span>'
+                            : '<span class="badge bg-secondary">Inactivo</span>';
+                    }
+                },
+                ...(showActions ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+                        if (canEdit) {
+                            // Edit button
+                            actions += `<button type="button"
+                                            class="btn btn-primary edit-service-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Traslado">
+                                            <i class="ti ti-edit"></i>
+                                        </button>`;
+
+                            // Toggle status button - usar iconos más descriptivos
+                            const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                            const statusTitle = data.active ? 'Desactivar Traslado' : 'Activar Traslado';
+                            const statusClass = data.active ? 'btn-warning' : 'btn-success';
+
+                            actions += `<button type="button"
+                                            class="btn ${statusClass} toggle-status-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-current-status="${data.active}"
+                                            data-origin="${data.originPOI?.name}"
+                                            data-destination="${data.destinationPOI?.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="${statusTitle}">
+                                            <i class="ti ${statusIcon}"></i>
+                                        </button>`;
+                        }
+
+                        if (canDelete) {
+                            // Delete button
+                            actions += `<button type="button"
+                                            class="btn btn-danger delete-service-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-origin="${data.originPOI?.name}"
+                                            data-destination="${data.destinationPOI?.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Eliminar Traslado">
+                                            <i class="ti ti-trash"></i>
+                                        </button>`;
+                        }
+
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando traslados...'
+            },
+            order: [
+                [0, 'asc'],  // 1. Tarifa
+                [1, 'asc'],  // 2. Ruta
+                [3, 'asc']   // 3. Costo
+            ],
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                // Reinitialize tooltips after table redraw
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+            }
+        });
+
+        // Load POIs and VehicleTypes for dropdowns
+        loadDropdownData();
+
+        // Event Handlers
+        $('#createServiceBtn').on('click', function() {
+            openServiceModal();
+        });
+
+        // Edit service
+        $(`#${tableId}`).on('click', '.edit-service-btn', function() {
+            const serviceId = $(this).data('id');
+            loadServiceData(serviceId);
+        });
+
+        // Toggle status
+        $(`#${tableId}`).on('click', '.toggle-status-btn', function() {
+            const serviceId = $(this).data('id');
+            const currentStatus = $(this).data('current-status');
+            const origin = $(this).data('origin');
+            const destination = $(this).data('destination');
+            toggleServiceStatus(serviceId, currentStatus, origin, destination);
+        });
+
+        // Delete service
+        $(`#${tableId}`).on('click', '.delete-service-btn', function() {
+            const serviceId = $(this).data('id');
+            const origin = $(this).data('origin');
+            const destination = $(this).data('destination');
+            deleteService(serviceId, origin, destination);
+        });
+
+        // Save service
+        $('#saveServiceBtn').on('click', function() {
+            saveService();
+        });
+
+        // Functions
+
+        // Helper function to wait for Tom Select to be initialized
+        function waitForTomSelect(elementId, maxAttempts = 50) {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const checkInterval = setInterval(() => {
+                    const element = document.getElementById(elementId);
+                    if (element && element.tomselect) {
+                        clearInterval(checkInterval);
+                        resolve(element.tomselect);
+                    } else {
+                        attempts++;
+                        if (attempts >= maxAttempts) {
+                            clearInterval(checkInterval);
+                            reject(new Error(`Tom Select not initialized on #${elementId}`));
+                        }
+                    }
+                }, 100);
+            });
+        }
+
+        function loadDropdownData() {
+            // Load POIs filtered by serviceType
+            const poisUrl = serviceType ? `/api/pois/active?serviceType=${encodeURIComponent(serviceType)}` : '/api/pois/active';
+            $.ajax({
+                url: poisUrl,
+                type: 'GET',
+                success: async function(response) {
+                    if (response.success && response.data) {
+                        poisData = response.data;
+
+                        try {
+                            // Wait for Tom Select instances to be initialized
+                            const originTS = await waitForTomSelect('originPOI');
+                            const destTS = await waitForTomSelect('destinationPOI');
+
+                            // Clear existing options
+                            originTS.clearOptions();
+                            destTS.clearOptions();
+
+                            // Add options to both Tom Select instances
+                            response.data.forEach(poi => {
+                                const option = { value: poi.value, text: poi.label };
+                                originTS.addOption(option);
+                                destTS.addOption(option);
+                            });
+
+                            // Refresh to apply changes
+                            originTS.refreshOptions(false);
+                            destTS.refreshOptions(false);
+                        } catch (error) {
+                            console.error('Error initializing Tom Select:', error);
+                        }
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error loading POIs:', xhr);
+                }
+            });
+
+            // Load VehicleTypes
+            $.ajax({
+                url: '/api/vehicle-types/active',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        vehicleTypesData = response.data;
+                        const options = response.data.map(vt =>
+                            `<option value="${vt.value}">${vt.label}</option>`
+                        ).join('');
+                        $('#vehicleType').append(options);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error loading vehicle types:', xhr);
+                }
+            });
+
+            // Load Rates
+            $.ajax({
+                url: '/api/rates/active',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        ratesData = response.data;
+                        const options = response.data.map(rate =>
+                            `<option value="${rate.value}">${rate.label}</option>`
+                        ).join('');
+                        $('#rate').append(options);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error loading rates:', xhr);
+                }
+            });
+        }
+
+        async function openServiceModal(isEdit = false) {
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('serviceModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+
+            $('#serviceModal').modal('show');
+            $('#serviceForm')[0].reset();
+            $('#serviceId').val('');
+            $('#modalTitle').text(isEdit ? 'Editar Traslado' : 'Crear Nuevo Traslado');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Traslado');
+
+            try {
+                // Wait for and clear Tom Select instances
+                const originTS = await waitForTomSelect('originPOI');
+                const destTS = await waitForTomSelect('destinationPOI');
+
+                originTS.clear();
+                destTS.clear();
+            } catch (error) {
+                console.error('Error clearing Tom Select:', error);
+            }
+        }
+
+        async function loadServiceData(serviceId) {
+            // Open modal first in edit mode (this will reset the form)
+            await openServiceModal(true);
+
+            // Show loader to prevent user interaction during data loading
+            showModalLoader('serviceModal');
+
+            // Extract base URL without query parameters
+            const baseUrl = apiEndpoint.split('?')[0];
+
+            $.ajax({
+                url: `${baseUrl}/${serviceId}`,
+                type: 'GET',
+                success: async function(response) {
+                    if (response.success && response.data) {
+                        const service = response.data;
+
+                        try {
+                            // Wait for Tom Select instances
+                            const originTS = await waitForTomSelect('originPOI');
+                            const destTS = await waitForTomSelect('destinationPOI');
+
+                            // Populate the form with the data
+                            $('#serviceId').val(service.id);
+
+                            // Set Tom Select values
+                            if (service.originPOI?.id) {
+                                originTS.setValue(service.originPOI.id);
+                            }
+                            if (service.destinationPOI?.id) {
+                                destTS.setValue(service.destinationPOI.id);
+                            }
+
+                            $('#vehicleType').val(service.vehicleType?.id);
+                            $('#rate').val(service.rate?.id);
+                            $('#note').val(service.note || '');
+                            $('#price').val(service.price);
+                            $('#isRoundTrip').prop('checked', service.isRoundTrip || false);
+
+                            // Hide loader after all data is loaded and populated
+                            hideModalLoader('serviceModal');
+                        } catch (error) {
+                            console.error('Error setting Tom Select values:', error);
+                            hideModalLoader('serviceModal');
+                        }
+                    } else {
+                        hideModalLoader('serviceModal');
+                        showErrorAlert('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', { xhr, status, error });
+                    hideModalLoader('serviceModal');
+                    const errorMessage = xhr.responseJSON?.error || 'Error al cargar el traslado';
+                    showModalError(errorMessage);
+                }
+            });
+        }
+
+        async function saveService() {
+            const form = $('#serviceForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+
+            const serviceId = $('#serviceId').val();
+            const isEdit = !!serviceId;
+
+            try {
+                // Wait for Tom Select instances
+                const originTS = await waitForTomSelect('originPOI');
+                const destTS = await waitForTomSelect('destinationPOI');
+
+                // Get values from Tom Select
+                const originPOI = originTS.getValue();
+                const destinationPOI = destTS.getValue();
+
+                // Validate origin !== destination (only if both exist)
+                if (originPOI && destinationPOI && originPOI === destinationPOI) {
+                    showErrorAlert('El origen y el destino deben ser diferentes');
+                    return;
+                }
+
+                const serviceData = {
+                    originPOI: originPOI || null,
+                    destinationPOI: destinationPOI,
+                    vehicleType: $('#vehicleType').val(),
+                    rate: $('#rate').val(),
+                    note: $('#note').val().trim(),
+                    price: parseFloat($('#price').val()),
+                    isRoundTrip: $('#isRoundTrip').is(':checked')
+                };
+
+                // Extract base URL without query parameters
+                const baseUrl = apiEndpoint.split('?')[0];
+                const url = isEdit ? `${baseUrl}/${serviceId}` : apiEndpoint;
+                const method = isEdit ? 'PUT' : 'POST';
+
+                $.ajax({
+                    url,
+                    type: method,
+                    contentType: 'application/json',
+                    data: JSON.stringify(serviceData),
+                    success: function(response) {
+                        if (response.success) {
+                            $('#serviceModal').modal('hide');
+                            dataTable.ajax.reload();
+                            showSuccessAlert(isEdit ? 'Traslado actualizado exitosamente' : 'Traslado creado exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        let errorMessage = 'Error al guardar el traslado';
+
+                        if (xhr.responseJSON?.error) {
+                            const error = xhr.responseJSON.error;
+                            if (error.includes('already exists') || error.includes('ya existe')) {
+                                errorMessage = 'Ya existe un traslado con esta ruta, tipo de vehículo y tarifa.';
+                            } else if (error.includes('required')) {
+                                errorMessage = 'Todos los campos requeridos deben ser completados.';
+                            } else if (error.includes('different') || error.includes('diferentes')) {
+                                errorMessage = 'El origen y destino deben ser diferentes.';
+                            } else {
+                                errorMessage = error;
+                            }
+                        }
+
+                        showModalError(errorMessage);
+                    }
+                });
+            } catch (error) {
+                console.error('Error getting Tom Select values:', error);
+                showModalError('Error al obtener los valores del formulario');
+            }
+        }
+
+        function toggleServiceStatus(serviceId, currentStatus, origin, destination) {
+            const newStatus = !currentStatus;
+            const action = newStatus ? 'activar' : 'desactivar';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmToggleServiceModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${actionTitle} Traslado</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas ${action} el traslado <strong>"${origin} → ${destination}"</strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn ${btnClass}" id="confirmToggleServiceBtn">${actionTitle}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmToggleServiceModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmToggleServiceModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmToggleServiceBtn').on('click', function() {
+                // Extract base URL without query parameters
+                const baseUrl = apiEndpoint.split('?')[0];
+
+                $.ajax({
+                    url: `${baseUrl}/${serviceId}/toggle-status`,
+                    type: 'PATCH',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(function() {}, false);
+                            showAlert('success', `Traslado ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+                        } else {
+                            modal.hide();
+                            showAlert('danger', response.error || 'Error desconocido');
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error('Toggle error:', xhr);
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado del traslado';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        function deleteService(serviceId, origin, destination) {
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmDeleteServiceModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white">Eliminar Traslado</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas eliminar el traslado <strong>"${origin} → ${destination}"</strong>?</p>
+                                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeleteServiceBtn">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmDeleteServiceModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteServiceModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmDeleteServiceBtn').on('click', function() {
+                // Extract base URL without query parameters
+                const baseUrl = apiEndpoint.split('?')[0];
+
+                $.ajax({
+                    url: `${baseUrl}/${serviceId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showAlert('success', 'Traslado eliminado exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al eliminar el traslado';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        /**
+         * Show error alert message inside the modal
+         * @param {string} message - Error message to display
+         */
+        function showModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('serviceModalAlerts');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+
+        /**
+         * Show success alert message
+         * @param {string} message - Success message to display
+         */
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('services-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        /**
+         * Show error alert message
+         * @param {string} message - Error message to display
+         */
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('services-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        }
+
+        // Legacy function for backward compatibility
+        function showAlert(type, message) {
+            if (type === 'success') {
+                showSuccessAlert(message);
+            } else {
+                showErrorAlert(message);
+            }
+        }
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>

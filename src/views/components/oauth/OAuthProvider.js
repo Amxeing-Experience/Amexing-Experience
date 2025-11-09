@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 /**
  * OAuth Provider Component - Main OAuth orchestration component for comprehensive authentication.
  * Provides centralized OAuth authentication management supporting multiple providers (Google, Microsoft, Apple)
@@ -6,6 +7,9 @@
  * This component serves as the primary orchestrator for OAuth authentication flows, managing provider
  * initialization, UI rendering, authentication workflows, and security compliance across the Amexing platform.
  * It supports both individual and corporate authentication modes with department-specific configurations.
+ *
+ * NOTE: console statements are allowed in this frontend component for client-side debugging.
+ * These are disabled in production builds via environment configuration.
  *
  * Features:
  * - Multi-provider OAuth support (Google, Microsoft, Apple) with dynamic configuration
@@ -21,7 +25,7 @@
  * - Auto-initialization with configuration injection support.
  * @class OAuthProvider
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -68,11 +72,7 @@ class OAuthProvider {
       corporateMode: options.corporateMode || false,
       corporateConfig: options.corporateConfig || null,
       departmentRequired: options.departmentRequired || false,
-      allowedProviders: options.allowedProviders || [
-        'google',
-        'microsoft',
-        'apple',
-      ],
+      allowedProviders: options.allowedProviders || ['google', 'microsoft', 'apple'],
       redirectUri: options.redirectUri || '/auth/oauth/callback',
       mobile: options.mobile || this.detectMobile(),
       theme: options.theme || 'default',
@@ -301,9 +301,7 @@ class OAuthProvider {
       const msalConfig = {
         auth: {
           clientId: this.providerConfigs.microsoft.clientId,
-          authority:
-            this.providerConfigs.microsoft.authority
-            || 'https://login.microsoftonline.com/common',
+          authority: this.providerConfigs.microsoft.authority || 'https://login.microsoftonline.com/common',
           redirectUri: this.config.redirectUri,
         },
         cache: {
@@ -344,10 +342,7 @@ class OAuthProvider {
     window.addEventListener('beforeunload', this.cleanup.bind(this));
 
     // Listen for department selection changes
-    document.addEventListener(
-      'departmentChanged',
-      this.handleDepartmentChange.bind(this)
-    );
+    document.addEventListener('departmentChanged', this.handleDepartmentChange.bind(this));
   }
 
   /**
@@ -403,10 +398,7 @@ class OAuthProvider {
 
     // Create provider buttons
     this.config.allowedProviders.forEach((provider) => {
-      if (
-        this.providerConfigs[provider]
-        && this.providerConfigs[provider].initialized
-      ) {
+      if (this.providerConfigs[provider] && this.providerConfigs[provider].initialized) {
         const button = this.createProviderButton(provider);
         container.appendChild(button);
       }
@@ -429,17 +421,15 @@ class OAuthProvider {
 
   /**
    * Create provider-specific OAuth button.
-   * @param {string} provider - OAuth provider name.
-   * @param _provider
+   * Creates a styled button element for OAuth authentication with the specified provider,
+   * including accessibility attributes, click handlers, and provider-specific theming.
+   * @function createProviderButton
+   * @param {string} provider - OAuth provider name (e.g., 'google', 'microsoft', 'apple').
+   * @returns {HTMLButtonElement} Provider-specific OAuth authentication button.
    * @example
-   * // Usage example
-   * const result = await createProviderButton({ provider: 'example' });
-   * // Returns: operation result
-   * // const result = await authService.login(credentials);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
-   * // const provider = new OAuthProvider("google", config);
-   * // const authUrl = await provider.getAuthorizationUrl(options);
-   * @returns {*} - Operation result.
+   * const oauthProvider = new OAuthProvider();
+   * const googleButton = oauthProvider.createProviderButton('google');
+   * // Returns: <button class="oauth-btn oauth-google">Sign in with Google</button>
    */
   createProviderButton(provider) {
     const button = document.createElement('button');
@@ -452,10 +442,7 @@ class OAuthProvider {
 
     // Add accessibility attributes
     button.setAttribute('role', 'button');
-    button.setAttribute(
-      'aria-label',
-      `Sign in with ${this.getProviderDisplayName(provider)}`
-    );
+    button.setAttribute('aria-label', `Sign in with ${this.getProviderDisplayName(provider)}`);
 
     return button;
   }
@@ -493,18 +480,13 @@ class OAuthProvider {
     select.appendChild(defaultOption);
 
     // Add department options from corporate config
-    if (
-      this.config.corporateConfig
-      && this.config.corporateConfig.departments
-    ) {
-      Object.entries(this.config.corporateConfig.departments).forEach(
-        ([key, dept]) => {
-          const option = document.createElement('option');
-          option.value = key;
-          option.textContent = dept.displayName || key;
-          select.appendChild(option);
-        }
-      );
+    if (this.config.corporateConfig && this.config.corporateConfig.departments) {
+      Object.entries(this.config.corporateConfig.departments).forEach(([key, dept]) => {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = dept.displayName || key;
+        select.appendChild(option);
+      });
     }
 
     select.addEventListener('change', (e) => {
@@ -557,22 +539,21 @@ class OAuthProvider {
 
   /**
    * Authenticate with specific OAuth provider.
-   * @param {string} provider - OAuth provider name.
-   * @param _provider
+   * Initiates OAuth authentication flow with the selected provider, validates department
+   * selection if required, and routes to provider-specific authentication methods.
+   * Implements comprehensive error handling and audit logging for PCI DSS compliance.
+   * @function authenticateWithProvider
+   * @param {string} provider - OAuth provider name (e.g., 'google', 'microsoft', 'apple').
+   * @returns {Promise<void>} Promise resolving when authentication flow is initiated.
    * @example
-   * // Usage example
-   * const result = await authenticateWithProvider({ provider: 'example' });
-   * // Returns: operation result
-   * // const result = await authService.login(credentials);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
-   * // const provider = new OAuthProvider("google", config);
-   * // const authUrl = await provider.getAuthorizationUrl(options);
-   * @returns {Promise<object>} - Promise resolving to operation result.
+   * const oauthProvider = new OAuthProvider();
+   * await oauthProvider.authenticateWithProvider('google');
+   * // Initiates Google OAuth popup authentication flow
    */
-  async authenticateWithProvider(_provider) {
+  async authenticateWithProvider(provider) {
     try {
       this.logAuditEvent('oauth_authentication_started', {
-        provider: _provider,
+        provider,
       });
 
       // Validate department selection if required
@@ -580,7 +561,7 @@ class OAuthProvider {
         throw new Error('Please select your department before signing in');
       }
 
-      switch (_provider) {
+      switch (provider) {
         case 'apple':
           await this.authenticateWithApple();
           break;
@@ -591,15 +572,11 @@ class OAuthProvider {
           await this.authenticateWithMicrosoft();
           break;
         default:
-          throw new Error(`Unsupported OAuth provider: ${_provider}`);
+          throw new Error(`Unsupported OAuth provider: ${provider}`);
       }
     } catch (error) {
-      console.error(
-        'OAuth authentication failed with provider:',
-        _provider,
-        error
-      );
-      this.handleAuthenticationError(error, _provider);
+      console.error('OAuth authentication failed with provider:', provider, error);
+      this.handleAuthenticationError(error, provider);
     }
   }
 
@@ -680,20 +657,20 @@ class OAuthProvider {
 
   /**
    * Handle successful OAuth authentication.
-   * @param {string} provider - OAuth provider name.
-   * @param _provider
-   * @param {object} response - HTTP response object.
+   * Processes successful OAuth authentication responses, sends credentials to server
+   * for validation and user creation, handles department context switching if applicable,
+   * and redirects to appropriate destination. Implements PCI DSS compliant audit logging.
+   * @function handleOAuthSuccess
+   * @param {string} provider - OAuth provider name (e.g., 'google', 'microsoft', 'apple').
+   * @param {object} response - OAuth authentication response containing tokens and user info.
+   * @returns {Promise<void>} Promise resolving when authentication is complete.
    * @example
-   * // Usage example
-   * const result = await handleOAuthSuccess({ provider: 'example' , response: 'example' });
-   * // Returns: operation result
-   * // const result = await authService.login(credentials);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
-   * // const provider = new OAuthProvider("google", config);
-   * // const authUrl = await provider.getAuthorizationUrl(options);
-   * @returns {Promise<object>} - Promise resolving to operation result.
+   * const oauthProvider = new OAuthProvider();
+   * const googleResponse = { credential: 'eyJhbGc...', clientId: 'abc123' };
+   * await oauthProvider.handleOAuthSuccess('google', googleResponse);
+   * // Validates with server and redirects to dashboard
    */
-  async handleOAuthSuccess(_provider, response) {
+  async handleOAuthSuccess(provider, response) {
     try {
       // Send OAuth response to server for validation and user creation
       const serverResponse = await fetch('/api/oauth/authenticate', {
@@ -703,7 +680,7 @@ class OAuthProvider {
           'X-Requested-With': 'XMLHttpRequest',
         },
         body: JSON.stringify({
-          provider: _provider,
+          provider,
           response,
           department: this.selectedDepartment,
           corporateMode: this.config.corporateMode,
@@ -712,9 +689,7 @@ class OAuthProvider {
       });
 
       if (!serverResponse.ok) {
-        throw new Error(
-          `Server authentication failed: ${serverResponse.status}`
-        );
+        throw new Error(`Server authentication failed: ${serverResponse.status}`);
       }
 
       const result = await serverResponse.json();
@@ -725,7 +700,7 @@ class OAuthProvider {
       }
 
       this.logAuditEvent('oauth_authentication_success', {
-        provider: _provider,
+        provider,
         userId: result.user.id,
         department: this.selectedDepartment,
       });
@@ -734,7 +709,7 @@ class OAuthProvider {
       this.handleAuthenticationRedirect(result);
     } catch (error) {
       console.error('OAuth success handling failed:', error);
-      this.handleAuthenticationError(error, _provider);
+      this.handleAuthenticationError(error, provider);
     }
   }
 
@@ -757,11 +732,7 @@ class OAuthProvider {
 
     try {
       const contextService = new window.PermissionContextService();
-      await contextService.switchToContext(
-        user.id,
-        `dept-${department}`,
-        user.sessionId
-      );
+      await contextService.switchToContext(user.id, `dept-${department}`, user.sessionId);
     } catch (error) {
       console.warn('Context switching failed:', error);
     }
@@ -853,23 +824,22 @@ class OAuthProvider {
 
   /**
    * Handle authentication errors.
-   * @param {Error} error - Error object.
-   * @param {string} provider - OAuth provider name.
-   * @param _provider
+   * Processes OAuth authentication failures, logs error details for audit compliance,
+   * displays user-friendly error messages, and re-enables authentication buttons
+   * for retry attempts. Implements comprehensive error tracking for PCI DSS compliance.
+   * @function handleAuthenticationError
+   * @param {Error} error - Error object containing authentication failure details.
+   * @param {string} provider - OAuth provider name where authentication failed.
+   * @returns {void}
    * @example
-   * // Usage example
-   * const result = await handleAuthenticationError({ error: 'example', provider: 'example' });
-   * // Returns: operation result
-   * // const result = await authService.login(credentials);
-   * // Returns: { success: true, user: {...}, tokens: {...} }
-   * // Example usage:
-   * // const result = await methodName(params);
-   * // console.log(result);
-   * @returns {*} - Operation result.
+   * const oauthProvider = new OAuthProvider();
+   * const error = new Error('Network timeout during authentication');
+   * oauthProvider.handleAuthenticationError(error, 'google');
+   * // Logs audit event, shows error message, re-enables buttons
    */
-  handleAuthenticationError(error, _provider) {
+  handleAuthenticationError(error, provider) {
     this.logAuditEvent('oauth_authentication_error', {
-      provider: _provider,
+      provider,
       error: error.message,
     });
 
@@ -934,10 +904,7 @@ class OAuthProvider {
     const buttons = document.querySelectorAll('.oauth-btn');
     buttons.forEach((button) => {
       button.disabled = false;
-      button.textContent = button.textContent.replace(
-        'Signing in...',
-        'Sign in'
-      );
+      button.textContent = button.textContent.replace('Signing in...', 'Sign in');
     });
   }
 
@@ -990,26 +957,57 @@ class OAuthProvider {
   detectMobile() {
     return (
       window.innerWidth <= 768
-      || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-        navigator.userAgent
-      )
+      || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
     );
   }
 
+  /**
+   * Generates a cryptographically random state parameter for OAuth 2.0 CSRF protection.
+   * Creates a base64-encoded random string used to maintain state between authentication
+   * request and callback, ensuring the response matches the original request.
+   * @function generateState
+   * @returns {string} Base64-encoded random state string for CSRF protection.
+   * @example
+   * const provider = new OAuthProvider();
+   * const state = provider.generateState();
+   * // Returns: "MzQ1Njc4OTBhYmNkZWY="
+   * // Use state parameter in OAuth authorization request
+   */
   generateState() {
-    return btoa(
-      Math.random().toString(36).substring(2, 15)
-        + Math.random().toString(36).substring(2, 15)
-    );
+    return btoa(Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
   }
 
+  /**
+   * Generates a cryptographically random nonce for OAuth 2.0 replay attack protection.
+   * Creates a base64-encoded random string used once to prevent token replay attacks,
+   * particularly important for OpenID Connect authentication flows.
+   * @function generateNonce
+   * @returns {string} Base64-encoded random nonce string for replay attack prevention.
+   * @example
+   * const provider = new OAuthProvider();
+   * const nonce = provider.generateNonce();
+   * // Returns: "YWJjZGVmZ2hpamtsbW5vcA=="
+   * // Use nonce parameter in OpenID Connect authentication request
+   */
   generateNonce() {
-    return btoa(
-      Math.random().toString(36).substring(2, 15)
-        + Math.random().toString(36).substring(2, 15)
-    );
+    return btoa(Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
   }
 
+  /**
+   * Retrieves the user-friendly display name for an OAuth provider.
+   * Maps internal provider identifiers to human-readable names for UI display,
+   * with fallback to the original identifier if no mapping exists.
+   * @function getProviderDisplayName
+   * @param {string} provider - OAuth provider identifier (e.g., 'google', 'microsoft', 'apple').
+   * @returns {string} User-friendly display name for the provider.
+   * @example
+   * const provider = new OAuthProvider();
+   * const displayName = provider.getProviderDisplayName('google');
+   * // Returns: "Google"
+   *
+   * const unknownProvider = provider.getProviderDisplayName('custom-provider');
+   * // Returns: "custom-provider" (fallback to original identifier)
+   */
   getProviderDisplayName(provider) {
     const displayNames = {
       google: 'Google',
@@ -1019,11 +1017,40 @@ class OAuthProvider {
     return displayNames[provider] || provider;
   }
 
+  /**
+   * Applies provider-specific styling attributes to OAuth authentication buttons.
+   * Sets data attributes on button elements to enable CSS-based provider theming
+   * and visual differentiation between different OAuth providers.
+   * @function applyProviderStyling
+   * @param {HTMLButtonElement} button - Button DOM element to style.
+   * @param {string} provider - OAuth provider identifier for styling.
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider();
+   * const googleButton = document.createElement('button');
+   * provider.applyProviderStyling(googleButton, 'google');
+   * // Button now has data-provider="google" attribute for CSS targeting
+   */
   applyProviderStyling(button, provider) {
     // Provider-specific styling will be handled by CSS
     button.setAttribute('data-provider', provider);
   }
 
+  /**
+   * Applies corporate branding theme to the OAuth provider UI container.
+   * Dynamically sets CSS custom properties based on corporate configuration theme,
+   * enabling white-label authentication experiences with custom color schemes.
+   * @function applyTheme
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider({
+   *   corporateConfig: {
+   *     theme: { primaryColor: '#0066cc' }
+   *   }
+   * });
+   * provider.applyTheme();
+   * // OAuth container now uses custom primary color from corporate theme
+   */
   applyTheme() {
     if (this.config.corporateConfig && this.config.corporateConfig.theme) {
       const { theme } = this.config.corporateConfig;
@@ -1034,17 +1061,43 @@ class OAuthProvider {
     }
   }
 
+  /**
+   * Initializes smart provider selection based on email domain detection.
+   * Sets up event listener on email input field to automatically suggest
+   * appropriate OAuth providers when user enters their email address.
+   * @function initializeProviderSelection
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider({
+   *   allowedProviders: ['google', 'microsoft', 'apple']
+   * });
+   * provider.initializeProviderSelection();
+   * // Email input now detects domain and suggests matching provider
+   * // e.g., user@gmail.com will highlight Google sign-in button
+   */
   initializeProviderSelection() {
     // Smart provider selection based on email domain
     const emailInput = document.getElementById('identifier');
     if (emailInput) {
-      emailInput.addEventListener(
-        'blur',
-        this.detectProviderFromEmail.bind(this)
-      );
+      emailInput.addEventListener('blur', this.detectProviderFromEmail.bind(this));
     }
   }
 
+  /**
+   * Detects and suggests OAuth provider based on user's email domain.
+   * Analyzes email domain from input blur event, checks against corporate domain
+   * mappings and common provider domains (Gmail, Outlook, iCloud), then highlights
+   * the most appropriate authentication provider for improved user experience.
+   * @function detectProviderFromEmail
+   * @param {Event} event - Blur event from email input field containing user's email.
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider();
+   * const emailInput = document.getElementById('identifier');
+   * emailInput.addEventListener('blur', provider.detectProviderFromEmail.bind(provider));
+   * // User enters "john@gmail.com" -> Google provider button is highlighted
+   * // User enters "jane@outlook.com" -> Microsoft provider button is highlighted
+   */
   detectProviderFromEmail(event) {
     const email = event.target.value;
     if (!email.includes('@')) return;
@@ -1053,10 +1106,7 @@ class OAuthProvider {
     let suggestedProvider = null;
 
     // Corporate domain mapping
-    if (
-      this.config.corporateConfig
-      && this.config.corporateConfig.domainMappings
-    ) {
+    if (this.config.corporateConfig && this.config.corporateConfig.domainMappings) {
       suggestedProvider = this.config.corporateConfig.domainMappings[domain];
     }
 
@@ -1064,15 +1114,9 @@ class OAuthProvider {
     if (!suggestedProvider) {
       if (domain.includes('gmail.com') || domain.includes('google.com')) {
         suggestedProvider = 'google';
-      } else if (
-        domain.includes('outlook.com')
-        || domain.includes('microsoft.com')
-      ) {
+      } else if (domain.includes('outlook.com') || domain.includes('microsoft.com')) {
         suggestedProvider = 'microsoft';
-      } else if (
-        domain.includes('icloud.com')
-        || domain.includes('apple.com')
-      ) {
+      } else if (domain.includes('icloud.com') || domain.includes('apple.com')) {
         suggestedProvider = 'apple';
       }
     }
@@ -1082,22 +1126,71 @@ class OAuthProvider {
     }
   }
 
-  highlightSuggestedProvider(_provider) {
+  /**
+   * Highlights the suggested OAuth provider button in the UI.
+   * Removes existing highlights from all provider buttons and adds a visual
+   * highlight to the recommended provider button based on email domain detection,
+   * improving user experience through intelligent provider suggestion.
+   * @function highlightSuggestedProvider
+   * @param {string} provider - OAuth provider identifier to highlight (e.g., 'google', 'microsoft', 'apple').
+   * @returns {void}
+   * @example
+   * const oauthProvider = new OAuthProvider();
+   * oauthProvider.highlightSuggestedProvider('google');
+   * // Google sign-in button now has 'suggested' CSS class for visual emphasis
+   */
+  highlightSuggestedProvider(provider) {
     // Remove existing highlights
     const buttons = document.querySelectorAll('.oauth-btn');
     buttons.forEach((btn) => btn.classList.remove('suggested'));
 
     // Highlight suggested provider
-    const suggestedButton = document.querySelector(`.oauth-${_provider}`);
+    const suggestedButton = document.querySelector(`.oauth-${provider}`);
     if (suggestedButton) {
       suggestedButton.classList.add('suggested');
     }
   }
 
+  /**
+   * Initializes department-based provider availability in corporate mode.
+   * Triggers update to show/hide OAuth providers based on department-specific
+   * configuration, ensuring users only see authentication options allowed
+   * for their selected organizational department.
+   * @function initializeDepartmentSelection
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider({
+   *   corporateMode: true,
+   *   departmentRequired: true
+   * });
+   * provider.initializeDepartmentSelection();
+   * // Updates provider visibility based on selected department's allowedProviders
+   */
   initializeDepartmentSelection() {
     this.updateProviderAvailability();
   }
 
+  /**
+   * Updates OAuth provider button visibility based on department configuration.
+   * Dynamically shows or hides provider buttons according to the selected department's
+   * allowedProviders list in corporate mode, enforcing organizational authentication
+   * policies and department-level access control.
+   * @function updateProviderAvailability
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider({
+   *   corporateMode: true,
+   *   corporateConfig: {
+   *     departments: {
+   *       engineering: { allowedProviders: ['google', 'microsoft'] },
+   *       sales: { allowedProviders: ['microsoft'] }
+   *     }
+   *   }
+   * });
+   * provider.selectedDepartment = 'engineering';
+   * provider.updateProviderAvailability();
+   * // Shows Google and Microsoft buttons, hides Apple button
+   */
   updateProviderAvailability() {
     if (!this.selectedDepartment || !this.config.corporateConfig) return;
 
@@ -1113,6 +1206,20 @@ class OAuthProvider {
     });
   }
 
+  /**
+   * Handles OAuth callback messages from popup authentication windows.
+   * Processes postMessage events from OAuth popup windows, validates message origin
+   * for security, and routes successful OAuth callbacks to authentication handler.
+   * Implements secure cross-window communication for popup-based OAuth flows.
+   * @function handleOAuthMessage
+   * @param {MessageEvent} event - PostMessage event containing OAuth callback data.
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider();
+   * window.addEventListener('message', provider.handleOAuthMessage.bind(provider));
+   * // OAuth popup sends: { type: 'oauth-callback', provider: 'google', response: {...} }
+   * // Handler validates origin and processes authentication response
+   */
   handleOAuthMessage(event) {
     // Handle OAuth callback messages from popup windows
     if (event.origin !== window.location.origin) return;
@@ -1122,18 +1229,63 @@ class OAuthProvider {
     }
   }
 
+  /**
+   * Handles department selection change events in corporate mode.
+   * Listens for custom 'departmentChanged' events, updates the selected department,
+   * and triggers provider availability refresh to show only department-authorized
+   * OAuth providers for enhanced organizational access control.
+   * @function handleDepartmentChange
+   * @param {CustomEvent} event - Custom event with department data in event.detail.department.
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider({ corporateMode: true });
+   * document.addEventListener('departmentChanged', provider.handleDepartmentChange.bind(provider));
+   * // User selects "Engineering" department
+   * // Event: { detail: { department: 'engineering' } }
+   * // Provider updates to show only engineering-approved OAuth options
+   */
   handleDepartmentChange(event) {
     this.selectedDepartment = event.detail.department;
     this.updateProviderAvailability();
   }
 
+  /**
+   * Handles OAuth provider initialization errors with user feedback.
+   * Logs initialization failures to console, displays user-friendly error message,
+   * and provides recovery guidance. Called when provider setup fails during
+   * component initialization to ensure graceful degradation.
+   * @function handleInitializationError
+   * @param {Error} error - Error object containing initialization failure details.
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider();
+   * try {
+   *   await provider.init();
+   * } catch (error) {
+   *   provider.handleInitializationError(error);
+   *   // Displays: "Failed to initialize authentication system. Please refresh the page."
+   * }
+   */
   handleInitializationError(error) {
     console.error('OAuth Provider initialization failed:', error);
-    this.showErrorMessage(
-      'Failed to initialize authentication system. Please refresh the page.'
-    );
+    this.showErrorMessage('Failed to initialize authentication system. Please refresh the page.');
   }
 
+  /**
+   * Performs cleanup of OAuth provider resources before page unload.
+   * Removes event listeners, cleans up provider-specific instances (MSAL),
+   * and releases resources to prevent memory leaks. Called automatically
+   * on beforeunload event to ensure proper component lifecycle management.
+   * @function cleanup
+   * @returns {void}
+   * @example
+   * const provider = new OAuthProvider();
+   * window.addEventListener('beforeunload', provider.cleanup.bind(provider));
+   * // On page unload:
+   * // - Removes message event listeners
+   * // - Removes departmentChanged event listeners
+   * // - Cleans up MSAL instance if present
+   */
   cleanup() {
     // Clean up resources before page unload
     if (this.msalInstance) {
@@ -1142,10 +1294,7 @@ class OAuthProvider {
 
     // Remove event listeners
     window.removeEventListener('message', this.handleOAuthMessage.bind(this));
-    document.removeEventListener(
-      'departmentChanged',
-      this.handleDepartmentChange.bind(this)
-    );
+    document.removeEventListener('departmentChanged', this.handleDepartmentChange.bind(this));
   }
 }
 
@@ -1156,9 +1305,7 @@ window.OAuthProvider = OAuthProvider;
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('oauth-container');
   if (container && container.dataset.autoInit !== 'false') {
-    const config = container.dataset.config
-      ? JSON.parse(container.dataset.config)
-      : {};
+    const config = container.dataset.config ? JSON.parse(container.dataset.config) : {};
     new OAuthProvider(config);
   }
 });

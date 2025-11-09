@@ -64,10 +64,19 @@ server {
 server {
     listen 443 ssl;
     server_name yourdomain.com;
-    
+
     ssl_certificate /path/to/certificate.crt;
     ssl_certificate_key /path/to/private.key;
-    
+
+    # Allow upload of large files (up to 250MB)
+    client_max_body_size 250m;
+
+    # Increase timeouts for large file uploads
+    client_body_timeout 300s;
+    proxy_read_timeout 300s;
+    proxy_connect_timeout 300s;
+    proxy_send_timeout 300s;
+
     location / {
         proxy_pass http://localhost:1337;
         proxy_set_header Host $host;

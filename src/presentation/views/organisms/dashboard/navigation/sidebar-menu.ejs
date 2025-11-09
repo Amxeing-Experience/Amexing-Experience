@@ -9,36 +9,87 @@
  * @param {function} isActiveMenuItem - Helper function to check active state
  */
 
+const rolesHierarchy = {
+  superadmin: 7,
+  admin: 6,
+  client: 5,
+  department_manager: 4,
+  employee: 3,
+  driver: 2,
+  guest: 1
+};
+
+const allDashboards = [
+  { name: "Dashboard Super Admin", icon: "settings", path: "/dashboard/superadmin", level: 7 },
+  { name: "Dashboard Admin", icon: "shield-check", path: "/dashboard/admin", level: 6 },
+  { name: "Dashboard Department Manager", icon: "screen-share", path: "/dashboard/department-manager", level: 5 },
+  { name: "Dashboard Employee", icon: "building", path: "/dashboard/employee", level: 4 },
+  { name: "Dashboard Driver", icon: "steering-wheel", path: "/dashboard/driver", level: 3 },
+  { name: "Dashboard Client", icon: "user", path: "/dashboard/client", level: 2 },
+  { name: "Dashboard Guest", icon: "world", path: "/dashboard/guest", level: 1 }
+];
+const dashboards =allDashboards.filter( dashboard => dashboard.level <= rolesHierarchy[user.role] );
+
 // Navigation items based on role
 const navigationItems = {
     superadmin: [
         // System Management Section - Only Dashboard
         { section: 'System Management', icon: 'ti-settings', items: [
-            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/superadmin', id: 'dashboard' }
+            { name: 'Dashboard Super Admin', icon: 'settings', path: '/dashboard/superadmin', id: 'dashboard',
+              dropdown: dashboards
+            }
         ]},
-        // Users System Section - Only User Management
+        // Users System Section - User Management and Role Management
         { section: 'Users System', icon: 'ti-users', items: [
-            { name: 'User Management', icon: 'users', path: '/dashboard/superadmin/users', id: 'users' }
+            { name: 'User Management', icon: 'users', path: '/dashboard/superadmin/users', id: 'users' },
+            { name: 'Role Management', icon: 'shield', path: '/dashboard/superadmin/roles', id: 'roles' },
+            { name: 'Reportes', icon: 'report', path: '/dashboard/superadmin/reports', id: 'reports' }
+        ]},
+        // Equipo y Recursos Section
+        { section: 'Equipo y Recursos', icon: 'ti-users', items: [
+            { name: 'Gestión de Empleados', icon: 'user-check', path: '/dashboard/superadmin/employees', id: 'employees' },
+            { name: 'Gestión de Vehículos', icon: 'car', path: '/dashboard/superadmin/vehicles', id: 'vehicles' },
+            { name: 'Gestión de Destinos', icon: 'map-pin', path: '/dashboard/superadmin/pois', id: 'pois' },
+            { name: 'Gestión de Traslados', icon: 'briefcase', path: '/dashboard/superadmin/services', id: 'services' },
+            { name: 'Gestión de Experiencias', icon: 'star', path: '/dashboard/superadmin/experiences', id: 'experiences' },
+            { name: 'Gestión de Tarifas', icon: 'currency-dollar', path: '/dashboard/superadmin/pricing', id: 'pricing' },
+            { name: 'Gestión de Tours', icon: 'map', path: '/dashboard/superadmin/tours', id: 'tours' }
         ]}
     ],
     admin: [
-        { section: 'Operations', icon: 'ti-dashboard', items: [
-            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/admin', id: 'dashboard' },
-            { name: 'Events Management', icon: 'calendar-event', path: '/dashboard/admin/events', id: 'events' },
-            { name: 'Bookings', icon: 'car', path: '/dashboard/admin/bookings', id: 'bookings' }
+        // System Management Section - Only Dashboard
+        { section: 'System Management', icon: 'ti-settings', items: [
+            { name: 'Dashboard Admin', icon: 'shield-check', path: '/dashboard/admin', id: 'dashboard',
+              dropdown: dashboards
+            }
         ]},
-        { section: 'Users Management', icon: 'ti-users', items: [
-            { name: 'Client Management', icon: 'users', path: '/dashboard/admin/clients', id: 'clients' },
-            { name: 'Employee Management', icon: 'ti-briefcase', path: '/dashboard/admin/employees', id: 'employees' }
+        { section: 'Operaciones Principales', icon: 'ti-dashboard', items: [
+            { name: 'Tablero', icon: 'dashboard', path: '/dashboard/admin', id: 'dashboard' },
+            { name: 'Clientes', icon: 'users', path: '/dashboard/admin/clients', id: 'clients' },
+            { name: 'Reservaciones', icon: 'clipboard-list', path: '/dashboard/admin/bookings', id: 'bookings' },
+            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/admin/quotes', id: 'quotes' }
         ]},
-        { section: 'Resources', icon: 'ti-car', items: [
-            { name: 'Vehicle Management', icon: 'car-garage', path: '/dashboard/admin/vehicles', id: 'vehicles' },
-            { name: 'Driver Management', icon: 'user-check', path: '/dashboard/admin/drivers', id: 'drivers' },
-            { name: 'Schedule Calendar', icon: 'calendar', path: '/dashboard/admin/schedule', id: 'schedule' },
-            { name: 'Reports', icon: 'report', path: '/dashboard/admin/reports', id: 'reports' }
+        { section: 'Gestión de Eventos', icon: 'ti-calendar', items: [
+            { name: 'Eventos', icon: 'calendar-event', path: '/dashboard/admin/events', id: 'events' },
+            { name: 'Calendario', icon: 'calendar', path: '/dashboard/admin/schedule', id: 'schedule' }
+        ]},
+        { section: 'Gestión', icon: 'ti-users', items: [
+            { name: 'Empleados', icon: 'user-check', path: '/dashboard/admin/employees', id: 'employees' },
+            { name: 'Vehículos', icon: 'car', path: '/dashboard/admin/vehicles', id: 'vehicles' },
+            { name: 'Destinos', icon: 'map-pin', path: '/dashboard/admin/pois', id: 'pois' },
+            { name: 'Traslados', icon: 'briefcase', path: '/dashboard/admin/services', id: 'services' },
+            { name: 'Experiencias', icon: 'star', path: '/dashboard/admin/experiences', id: 'experiences' },
+            { name: 'Tarifas', icon: 'currency-dollar', path: '/dashboard/admin/pricing', id: 'pricing' },
+            { name: 'Tours', icon: 'map', path: '/dashboard/admin/tours', id: 'tours' }
         ]}
     ],
     client: [
+        // System Management Section - Only Dashboard
+        { section: 'System Management', icon: 'ti-settings', items: [
+            { name: 'Dashboard Client', icon: 'user', path: '/dashboard/client', id: 'dashboard',
+              dropdown: dashboards
+            }
+        ]},
         { section: 'My Business', icon: 'ti-building', items: [
             { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/client', id: 'dashboard' },
             { name: 'My Events', icon: 'calendar-event', path: '/dashboard/client/events', id: 'events' },
@@ -51,6 +102,12 @@ const navigationItems = {
         ]}
     ],
     department_manager: [
+        // System Management Section - Only Dashboard
+        { section: 'System Management', icon: 'ti-settings', items: [
+            { name: 'Dashboard Department Manager', icon: 'screen-share', path: '/dashboard/department-manager', id: 'dashboard',
+              dropdown: dashboards
+            }
+        ]},
         { section: 'Team Management', icon: 'ti-users', items: [
             { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/department-manager', id: 'dashboard' },
             { name: 'My Team', icon: 'users', path: '/dashboard/department-manager/team', id: 'team' },
@@ -63,6 +120,12 @@ const navigationItems = {
         ]}
     ],
     employee: [
+        // System Management Section - Only Dashboard
+        { section: 'System Management', icon: 'ti-settings', items: [
+            { name: 'Dashboard Employee', icon: 'building', path: '/dashboard/employee', id: 'dashboard',
+              dropdown: dashboards
+            }
+        ]},
         { section: 'My Services', icon: 'ti-user', items: [
             { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/employee', id: 'dashboard' },
             { name: 'My Bookings', icon: 'car', path: '/dashboard/employee/bookings', id: 'bookings' },
@@ -71,6 +134,12 @@ const navigationItems = {
         ]}
     ],
     driver: [
+        // System Management Section - Only Dashboard
+        { section: 'System Management', icon: 'ti-settings', items: [
+            { name: 'Dashboard Driver', icon: 'steering-wheel', path: '/dashboard/driver', id: 'dashboard',
+              dropdown: dashboards
+            }
+        ]},
         { section: 'My Trips', icon: 'ti-car', items: [
             { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/driver', id: 'dashboard' },
             { name: 'Active Trips', icon: 'route', path: '/dashboard/driver/trips', id: 'trips' },
@@ -80,6 +149,12 @@ const navigationItems = {
         ]}
     ],
     guest: [
+        // System Management Section - Only Dashboard
+        { section: 'System Management', icon: 'ti-settings', items: [
+            { name: 'Dashboard Guest', icon: 'world', path: '/dashboard/guest', id: 'dashboard',
+              dropdown: dashboards
+            }
+        ]},
         { section: 'Welcome', icon: 'ti-home', items: [
             { name: 'Home', icon: 'home', path: '/', id: 'home' }
         ]}
@@ -90,18 +165,18 @@ const menuSections = navigationItems[userRole] || navigationItems.guest;
 %>
 
 <ul id="sidebarnav" class="list-unstyled">
-    <% menuSections.forEach(function(section, sectionIndex) { %>
-        <!-- Section Header -->
-        <li class="nav-small-cap">
-            <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
-            <span class="hide-menu"><%= section.section %></span>
-        </li>
+  <% menuSections.forEach(function(section, sectionIndex) { %>
+  <!-- Section Header -->
+  <li class="nav-small-cap">
+    <i class="ti ti-dots nav-small-cap-icon fs-4"></i>
+    <span class="hide-menu"><%= section.section %></span>
+  </li>
 
-        <!-- Section Items -->
-        <% section.items.forEach(function(item, itemIndex) { %>
-            <% const isActive = isActiveMenuItem(item.path, currentPath); %>
+  <!-- Section Items -->
+  <% section.items.forEach(function(item, itemIndex) { %>
+  <% const isActive = isActiveMenuItem(item.path, currentPath); %>
 
-            <%- include('../../../molecules/dashboard/nav-item', {
+  <%- include('../../../molecules/dashboard/nav-item', {
                 href: item.path,
                 icon: item.icon,
                 text: item.name,
@@ -109,148 +184,167 @@ const menuSections = navigationItems[userRole] || navigationItems.guest;
                 badge: item.badge,
                 submenu: item.submenu,
                 id: item.id,
-                external: item.external
+                external: item.external,
+                dropdown: item.dropdown ? item.dropdown : [],
             }) %>
-        <% }); %>
-    <% }); %>
+  <% }); %>
+  <% }); %>
 
-    <!-- User Section -->
-    <%- include('./sidebar-footer', {
+  <!-- User Section -->
+  <%- include('./sidebar-footer', {
         userRole: userRole,
         currentPath: currentPath
     }) %>
 </ul>
 
 <style>
-    /* Section Headers */
+  /* Section Headers */
+  .nav-small-cap {
+    color: #6c757d;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    letter-spacing: 1px;
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    padding: 0 20px;
+    position: relative;
+  }
+
+  .nav-small-cap:first-child {
+    margin-top: 1rem;
+  }
+
+  .nav-small-cap .nav-small-cap-icon {
+    color: <%=colors.primary %>;
+    margin-right: 8px;
+    font-size: 0.75rem;
+  }
+
+  .nav-small-cap .hide-menu {
+    position: relative;
+  }
+
+  /* Sidebar Menu Animations */
+  #sidebarnav .sidebar-item {
+    opacity: 0;
+    transform: translateX(-10px);
+    animation: slideInNav 0.3s ease forwards;
+  }
+
+  <% menuSections.forEach(function(section, sectionIndex) {
+      %> <% section.items.forEach(function(item, itemIndex) {
+          %> #sidebarnav .sidebar-item:nth-child(<%=sectionIndex * (section.items.length + 1) + itemIndex + 2 %>) {
+            animation-delay: <%=(sectionIndex * section.items.length + itemIndex) * 0.05 %>s;
+          }
+
+          <%
+        }
+
+      ); %> <%
+    }
+
+  );
+
+  %>@keyframes slideInNav {
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  /* Role-specific accent colors */
+  #sidebarnav .nav-small-cap-icon,
+  #sidebarnav .sidebar-link:hover .nav-icon,
+  #sidebarnav .sidebar-link.active .nav-icon {
+    color: <%=colors.primary %>;
+  }
+
+  #sidebarnav .sidebar-link:hover,
+  #sidebarnav .sidebar-link.active {
+    background: linear-gradient(135deg, <%=colors.primary %>10, <%=colors.secondary %>10);
+    color: <%=colors.primary %>;
+  }
+
+  /* Badge animations */
+  .nav-badge {
+    animation: badgePulse 2s infinite;
+  }
+
+  @keyframes badgePulse {
+
+    0%,
+    100% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(1.1);
+    }
+  }
+
+  /* Loading state for menu items */
+  .sidebar-item.loading {
+    pointer-events: none;
+    opacity: 0.6;
+  }
+
+  .sidebar-item.loading::after {
+    content: '';
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    width: 12px;
+    height: 12px;
+    border: 1px solid transparent;
+    border-top: 1px solid <%=colors.primary %>;
+    border-radius: 50%;
+    animation: nav-item-loading 1s linear infinite;
+    transform: translateY(-50%);
+  }
+
+  @keyframes nav-item-loading {
+    0% {
+      transform: translateY(-50%) rotate(0deg);
+    }
+
+    100% {
+      transform: translateY(-50%) rotate(360deg);
+    }
+  }
+
+  /* Hover effects for better UX */
+  .sidebar-link {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .sidebar-link::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 3px;
+    height: 100%;
+    background: <%=colors.primary %>;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar-link.active::before,
+  .sidebar-link:hover::before {
+    transform: translateX(0);
+  }
+
+  /* Responsive adjustments */
+  @media (max-width: 991.98px) {
     .nav-small-cap {
-        color: #6c757d;
-        font-weight: 700;
-        text-transform: uppercase;
-        font-size: 0.6875rem;
-        letter-spacing: 1px;
-        margin-top: 2rem;
-        margin-bottom: 0.75rem;
-        padding: 0 20px;
-        position: relative;
+      padding: 0 15px;
+      font-size: 0.625rem;
     }
 
-    .nav-small-cap:first-child {
-        margin-top: 1rem;
+    #sidebarnav .sidebar-link {
+      padding: 14px 15px;
     }
-
-    .nav-small-cap .nav-small-cap-icon {
-        color: <%= colors.primary %>;
-        margin-right: 8px;
-        font-size: 0.75rem;
-    }
-
-    .nav-small-cap .hide-menu {
-        position: relative;
-    }
-
-    /* Sidebar Menu Animations */
-    #sidebarnav .sidebar-item {
-        opacity: 0;
-        transform: translateX(-10px);
-        animation: slideInNav 0.3s ease forwards;
-    }
-
-    <% menuSections.forEach(function(section, sectionIndex) { %>
-        <% section.items.forEach(function(item, itemIndex) { %>
-            #sidebarnav .sidebar-item:nth-child(<%= sectionIndex * (section.items.length + 1) + itemIndex + 2 %>) {
-                animation-delay: <%= (sectionIndex * section.items.length + itemIndex) * 0.05 %>s;
-            }
-        <% }); %>
-    <% }); %>
-
-    @keyframes slideInNav {
-        to {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-
-    /* Role-specific accent colors */
-    #sidebarnav .nav-small-cap-icon,
-    #sidebarnav .sidebar-link:hover .nav-icon,
-    #sidebarnav .sidebar-link.active .nav-icon {
-        color: <%= colors.primary %>;
-    }
-
-    #sidebarnav .sidebar-link:hover,
-    #sidebarnav .sidebar-link.active {
-        background: linear-gradient(135deg, <%= colors.primary %>10, <%= colors.secondary %>10);
-        color: <%= colors.primary %>;
-    }
-
-    /* Badge animations */
-    .nav-badge {
-        animation: badgePulse 2s infinite;
-    }
-
-    @keyframes badgePulse {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.1); }
-    }
-
-    /* Loading state for menu items */
-    .sidebar-item.loading {
-        pointer-events: none;
-        opacity: 0.6;
-    }
-
-    .sidebar-item.loading::after {
-        content: '';
-        position: absolute;
-        right: 20px;
-        top: 50%;
-        width: 12px;
-        height: 12px;
-        border: 1px solid transparent;
-        border-top: 1px solid <%= colors.primary %>;
-        border-radius: 50%;
-        animation: nav-item-loading 1s linear infinite;
-        transform: translateY(-50%);
-    }
-
-    @keyframes nav-item-loading {
-        0% { transform: translateY(-50%) rotate(0deg); }
-        100% { transform: translateY(-50%) rotate(360deg); }
-    }
-
-    /* Hover effects for better UX */
-    .sidebar-link {
-        position: relative;
-        overflow: hidden;
-    }
-
-    .sidebar-link::before {
-        content: '';
-        position: absolute;
-        left: 0;
-        top: 0;
-        width: 3px;
-        height: 100%;
-        background: <%= colors.primary %>;
-        transform: translateX(-100%);
-        transition: transform 0.3s ease;
-    }
-
-    .sidebar-link.active::before,
-    .sidebar-link:hover::before {
-        transform: translateX(0);
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 991.98px) {
-        .nav-small-cap {
-            padding: 0 15px;
-            font-size: 0.625rem;
-        }
-
-        #sidebarnav .sidebar-link {
-            padding: 14px 15px;
-        }
-    }
+  }
 </style>

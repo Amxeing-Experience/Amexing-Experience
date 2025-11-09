@@ -21,6 +21,7 @@
 
 const UserManagementService = require('../../services/UserManagementService');
 const logger = require('../../../infrastructure/logger');
+const { logReadAccess, logBulkReadAccess } = require('../../utils/auditHelper');
 
 /**
  * UserManagementController class implementing RESTful API for user management.
@@ -76,6 +77,11 @@ class UserManagementController {
       // Get users from service
       const result = await this.userService.getUsers(currentUser, options);
 
+      // PCI DSS Audit: Log bulk READ access to user data
+      if (result.users && result.users.length > 0) {
+        await logBulkReadAccess(req, result.users, 'AmexingUser', options);
+      }
+
       // Add metadata for frontend consumption
       const response = {
         ...result,
@@ -117,12 +123,17 @@ class UserManagementController {
    * // Get specific user by ID
    * GET /api/users/12345
    */
+  /* eslint-disable max-lines-per-function */
   async getUserById(req, res) {
     try {
       const currentUser = req.user;
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
+
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
 
       const userId = req.params.id;
       if (!userId) {
@@ -135,6 +146,9 @@ class UserManagementController {
       if (!user) {
         return this.sendError(res, 'User not found or access denied', 404);
       }
+
+      // PCI DSS Audit: Log individual READ access to user data
+      await logReadAccess(req, user, 'AmexingUser');
 
       this.sendSuccess(res, { user }, 'User retrieved successfully');
     } catch (error) {
@@ -188,14 +202,14 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
+
       // Validate request body
       const validationErrors = this.validateCreateUserRequest(req.body);
       if (validationErrors.length > 0) {
-        return this.sendError(
-          res,
-          `Validation failed: ${validationErrors.join(', ')}`,
-          400
-        );
+        return this.sendError(res, `Validation failed: ${validationErrors.join(', ')}`, 400);
       }
 
       const userData = this.sanitizeUserData(req.body);
@@ -270,12 +284,17 @@ class UserManagementController {
    * // Update user
    * PUT /api/users/12345 with body: { firstName: 'Jane', role: 'manager' }
    */
+  /* eslint-disable max-lines-per-function */
   async updateUser(req, res) {
     try {
       const currentUser = req.user;
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
+
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
 
       const userId = req.params.id;
       if (!userId) {
@@ -285,21 +304,13 @@ class UserManagementController {
       // Validate request body
       const validationErrors = this.validateUpdateUserRequest(req.body);
       if (validationErrors.length > 0) {
-        return this.sendError(
-          res,
-          `Validation failed: ${validationErrors.join(', ')}`,
-          400
-        );
+        return this.sendError(res, `Validation failed: ${validationErrors.join(', ')}`, 400);
       }
 
       const updates = this.sanitizeUserData(req.body);
 
       // Update user through service
-      const updatedUser = await this.userService.updateUser(
-        userId,
-        updates,
-        currentUser
-      );
+      const updatedUser = await this.userService.updateUser(userId, updates, currentUser);
 
       logger.info('User updated via API', {
         updatedUserId: userId,
@@ -359,19 +370,18 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Add role property to currentUser for service validation
+      currentUser.role = req.userRole;
+
       const userId = req.params.id;
       if (!userId) {
         return this.sendError(res, 'User ID is required', 400);
       }
 
-      const reason = req.body.reason || 'Deactivated via API';
+      const reason = req.body?.reason || 'Deactivated via API';
 
       // Deactivate user through service
-      const success = await this.userService.deactivateUser(
-        userId,
-        currentUser,
-        reason
-      );
+      const success = await this.userService.deactivateUser(userId, currentUser, reason);
 
       if (success) {
         logger.info('User deactivated via API', {
@@ -395,7 +405,7 @@ class UserManagementController {
       logger.error('Error in UserManagementController.deactivateUser', {
         error: error.message,
         userId: req.params.id,
-        reason: req.body.reason,
+        reason: req.body?.reason,
         deactivatedBy: req.user?.id,
       });
 
@@ -441,6 +451,10 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
+
       const userId = req.params.id;
       if (!userId) {
         return this.sendError(res, 'User ID is required', 400);
@@ -449,11 +463,7 @@ class UserManagementController {
       const reason = req.body.reason || 'Reactivated via API';
 
       // Reactivate user through service
-      const success = await this.userService.reactivateUser(
-        userId,
-        currentUser,
-        reason
-      );
+      const success = await this.userService.reactivateUser(userId, currentUser, reason);
 
       if (success) {
         logger.info('User reactivated via API', {
@@ -477,7 +487,7 @@ class UserManagementController {
       logger.error('Error in UserManagementController.reactivateUser', {
         error: error.message,
         userId: req.params.id,
-        reason: req.body.reason,
+        reason: req.body?.reason,
         reactivatedBy: req.user?.id,
       });
 
@@ -509,12 +519,17 @@ class UserManagementController {
    * // console.log(result);
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
+  /* eslint-disable max-lines */
   async toggleUserStatus(req, res) {
     try {
       const currentUser = req.user;
       if (!currentUser) {
         return this.sendError(res, 'Authentication required', 401);
       }
+
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
 
       const userId = req.params.id;
       if (!userId) {
@@ -529,12 +544,7 @@ class UserManagementController {
       const actionReason = reason || `User ${active ? 'activated' : 'deactivated'} via API`;
 
       // Toggle user status through service
-      const result = await this.userService.toggleUserStatus(
-        currentUser,
-        userId,
-        active,
-        actionReason
-      );
+      const result = await this.userService.toggleUserStatus(currentUser, userId, active, actionReason);
 
       if (result.success) {
         logger.info('User status toggled via API', {
@@ -555,11 +565,7 @@ class UserManagementController {
           `User ${active ? 'activated' : 'deactivated'} successfully`
         );
       } else {
-        this.sendError(
-          res,
-          result.message || 'Failed to toggle user status',
-          400
-        );
+        this.sendError(res, result.message || 'Failed to toggle user status', 400);
       }
     } catch (error) {
       logger.error('Error in UserManagementController.toggleUserStatus', {
@@ -598,6 +604,10 @@ class UserManagementController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Add role property to currentUser for service validation
+      // req.userRole comes from JWT middleware
+      currentUser.role = req.userRole;
+
       const userId = req.params.id;
       if (!userId) {
         return this.sendError(res, 'User ID is required', 400);
@@ -606,11 +616,7 @@ class UserManagementController {
       const reason = req.body.reason || 'User archived via API';
 
       // Archive user through service
-      const result = await this.userService.archiveUser(
-        currentUser,
-        userId,
-        reason
-      );
+      const result = await this.userService.archiveUser(currentUser, userId, reason);
 
       if (result.success) {
         logger.info('User archived via API', {
@@ -635,7 +641,7 @@ class UserManagementController {
       logger.error('Error in UserManagementController.archiveUser', {
         error: error.message,
         userId: req.params.id,
-        reason: req.body.reason,
+        reason: req.body?.reason,
         archivedBy: req.user?.id,
       });
 
@@ -719,10 +725,7 @@ class UserManagementController {
       const searchParams = this.parseSearchParams(req.query);
 
       // Perform search through service
-      const result = await this.userService.searchUsers(
-        currentUser,
-        searchParams
-      );
+      const result = await this.userService.searchUsers(currentUser, searchParams);
 
       this.sendSuccess(res, result, 'Search completed successfully');
     } catch (error) {
@@ -754,10 +757,7 @@ class UserManagementController {
    */
   parseUserQueryParams(query) {
     const page = Math.max(1, parseInt(query.page, 10) || 1);
-    const limit = Math.min(
-      this.maxPageSize,
-      Math.max(1, parseInt(query.limit, 10) || this.defaultPageSize)
-    );
+    const limit = Math.min(this.maxPageSize, Math.max(1, parseInt(query.limit, 10) || this.defaultPageSize));
 
     return {
       targetRole: query.role || null,
@@ -765,10 +765,7 @@ class UserManagementController {
       limit,
       filters: {
         active: query.active !== undefined ? query.active === 'true' : null,
-        emailVerified:
-          query.emailVerified !== undefined
-            ? query.emailVerified === 'true'
-            : null,
+        emailVerified: query.emailVerified !== undefined ? query.emailVerified === 'true' : null,
         clientId: query.clientId || null,
         departmentId: query.departmentId || null,
         createdAfter: query.createdAfter || null,
@@ -801,10 +798,7 @@ class UserManagementController {
       role: query.role || null,
       active: query.active !== undefined ? query.active === 'true' : null,
       page: Math.max(1, parseInt(query.page, 10) || 1),
-      limit: Math.min(
-        this.maxPageSize,
-        Math.max(1, parseInt(query.limit, 10) || this.defaultPageSize)
-      ),
+      limit: Math.min(this.maxPageSize, Math.max(1, parseInt(query.limit, 10) || this.defaultPageSize)),
       sortField: query.sortField || 'lastName',
       sortDirection: query.sortDirection || 'asc',
     };
@@ -846,27 +840,15 @@ class UserManagementController {
   validateRequiredFields(data) {
     const errors = [];
 
-    if (
-      !data.email
-      || typeof data.email !== 'string'
-      || data.email.trim() === ''
-    ) {
+    if (!data.email || typeof data.email !== 'string' || data.email.trim() === '') {
       errors.push('Email is required');
     }
 
-    if (
-      !data.firstName
-      || typeof data.firstName !== 'string'
-      || data.firstName.trim() === ''
-    ) {
+    if (!data.firstName || typeof data.firstName !== 'string' || data.firstName.trim() === '') {
       errors.push('First name is required');
     }
 
-    if (
-      !data.lastName
-      || typeof data.lastName !== 'string'
-      || data.lastName.trim() === ''
-    ) {
+    if (!data.lastName || typeof data.lastName !== 'string' || data.lastName.trim() === '') {
       errors.push('Last name is required');
     }
 
@@ -924,12 +906,8 @@ class UserManagementController {
 
     // Require either role or roleId
     if (
-      (!data.role
-        || typeof data.role !== 'string'
-        || data.role.trim() === '')
-      && (!data.roleId
-        || typeof data.roleId !== 'string'
-        || data.roleId.trim() === '')
+      (!data.role || typeof data.role !== 'string' || data.role.trim() === '')
+      && (!data.roleId || typeof data.roleId !== 'string' || data.roleId.trim() === '')
     ) {
       errors.push('Either role or roleId is required');
     }
@@ -1023,10 +1001,7 @@ class UserManagementController {
     ];
     stringFields.forEach((field) => {
       // eslint-disable-next-line security/detect-object-injection
-      if (
-        Object.prototype.hasOwnProperty.call(data, field)
-        && typeof data[field] === 'string'
-      ) {
+      if (Object.prototype.hasOwnProperty.call(data, field) && typeof data[field] === 'string') {
         // eslint-disable-next-line security/detect-object-injection
         sanitized[field] = data[field].trim();
       }

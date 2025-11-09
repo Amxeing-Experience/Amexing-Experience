@@ -26,9 +26,8 @@ const logger = require('../../infrastructure/logger');
  * Implements BaseModel for consistent lifecycle management across the platform.
  */
 class Client extends BaseModel {
-  constructor() {
-    super('Client');
-  }
+  // Constructor removed - useless constructor that only calls super with no additional logic
+  // Parse.Object.extend pattern handles this automatically
 
   /**
    * Creates a new Client instance with default lifecycle values.
@@ -65,30 +64,36 @@ class Client extends BaseModel {
     });
 
     // OAuth and employee management settings
-    client.set(
-      'isCorporate',
-      clientData.isCorporate !== undefined ? clientData.isCorporate : true
-    );
+    client.set('isCorporate', clientData.isCorporate !== undefined ? clientData.isCorporate : true);
     client.set('oauthDomain', clientData.oauthDomain || null);
-    client.set(
-      'autoProvisionEmployees',
-      clientData.autoProvisionEmployees || false
-    );
-    client.set(
-      'defaultEmployeeRole',
-      clientData.defaultEmployeeRole || 'employee'
-    );
-    client.set(
-      'employeeAccessLevel',
-      clientData.employeeAccessLevel || 'basic'
-    );
+    client.set('autoProvisionEmployees', clientData.autoProvisionEmployees || false);
+    client.set('defaultEmployeeRole', clientData.defaultEmployeeRole || 'employee');
+    client.set('employeeAccessLevel', clientData.employeeAccessLevel || 'basic');
 
     // Lifecycle fields are set by BaseModel constructor
     // active: true, exists: true are defaults
 
-    // Audit fields
-    client.set('createdBy', clientData.createdBy || null);
-    client.set('modifiedBy', clientData.modifiedBy || null);
+    // Audit fields - Handle both User objects and string IDs as Pointers
+    if (clientData.createdBy) {
+      if (typeof clientData.createdBy === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const createdByPointer = new AmexingUser();
+        createdByPointer.id = clientData.createdBy;
+        client.set('createdBy', createdByPointer);
+      } else {
+        client.set('createdBy', clientData.createdBy);
+      }
+    }
+    if (clientData.modifiedBy) {
+      if (typeof clientData.modifiedBy === 'string') {
+        const AmexingUser = require('./AmexingUser');
+        const modifiedByPointer = new AmexingUser();
+        modifiedByPointer.id = clientData.modifiedBy;
+        client.set('modifiedBy', modifiedByPointer);
+      } else {
+        client.set('modifiedBy', clientData.modifiedBy);
+      }
+    }
 
     return client;
   }
@@ -336,10 +341,7 @@ class Client extends BaseModel {
 
       // Validate OAuth domain
       const oauthDomain = this.get('oauthDomain');
-      if (
-        oauthDomain
-        && !userData.email.toLowerCase().endsWith(`@${oauthDomain.toLowerCase()}`)
-      ) {
+      if (oauthDomain && !userData.email.toLowerCase().endsWith(`@${oauthDomain.toLowerCase()}`)) {
         return null;
       }
 
@@ -361,9 +363,7 @@ class Client extends BaseModel {
 
         // Update OAuth accounts
         const oauthAccounts = existingUser.get('oauthAccounts') || [];
-        const hasProvider = oauthAccounts.some(
-          (account) => account.provider === oauthProvider
-        );
+        const hasProvider = oauthAccounts.some((account) => account.provider === oauthProvider);
 
         if (!hasProvider) {
           oauthAccounts.push({
@@ -376,7 +376,10 @@ class Client extends BaseModel {
           existingUser.set('oauthAccounts', oauthAccounts);
           existingUser.set('primaryOAuthProvider', oauthProvider);
           existingUser.set('lastAuthMethod', 'oauth');
-          existingUser.set('modifiedBy', this.id);
+          // Set modifiedBy as Pointer to this Client
+          const clientPointer = new Client();
+          clientPointer.id = this.id;
+          existingUser.set('modifiedBy', clientPointer);
 
           await existingUser.save(null, { useMasterKey: true });
         }
@@ -384,7 +387,10 @@ class Client extends BaseModel {
         return existingUser;
       }
 
-      // Create new user
+      // Create new user with Pointer to this Client for audit fields
+      const clientPointer = new Client();
+      clientPointer.id = this.id;
+
       const newUser = AmexingUser.create({
         username: userData.email,
         email: userData.email,
@@ -405,8 +411,8 @@ class Client extends BaseModel {
         ],
         primaryOAuthProvider: oauthProvider,
         lastAuthMethod: 'oauth',
-        createdBy: this.id,
-        modifiedBy: this.id,
+        createdBy: clientPointer,
+        modifiedBy: clientPointer,
       });
 
       await newUser.save(null, { useMasterKey: true });
@@ -470,8 +476,17 @@ class Client extends BaseModel {
         }
       });
 
-      // Update modification tracking
-      this.set('modifiedBy', modifiedBy);
+      // Update modification tracking - Handle both User objects and string IDs
+      if (modifiedBy) {
+        if (typeof modifiedBy === 'string') {
+          const AmexingUser = require('./AmexingUser');
+          const modifiedByPointer = new AmexingUser();
+          modifiedByPointer.id = modifiedBy;
+          this.set('modifiedBy', modifiedByPointer);
+        } else {
+          this.set('modifiedBy', modifiedBy);
+        }
+      }
       this.set('updatedAt', new Date());
 
       await this.save(null, { useMasterKey: true });
@@ -570,25 +585,14 @@ class Client extends BaseModel {
     }
 
     // Company type validation
-    const allowedCompanyTypes = [
-      'corporate',
-      'government',
-      'nonprofit',
-      'individual',
-    ];
-    if (
-      clientData.companyType
-      && !allowedCompanyTypes.includes(clientData.companyType)
-    ) {
+    const allowedCompanyTypes = ['corporate', 'government', 'nonprofit', 'individual'];
+    if (clientData.companyType && !allowedCompanyTypes.includes(clientData.companyType)) {
       errors.push('Invalid company type');
     }
 
     // Employee role validation
     const allowedEmployeeRoles = ['employee', 'department_manager'];
-    if (
-      clientData.defaultEmployeeRole
-      && !allowedEmployeeRoles.includes(clientData.defaultEmployeeRole)
-    ) {
+    if (clientData.defaultEmployeeRole && !allowedEmployeeRoles.includes(clientData.defaultEmployeeRole)) {
       errors.push('Invalid default employee role');
     }
 

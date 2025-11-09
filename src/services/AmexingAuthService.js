@@ -9,8 +9,8 @@
  * - JWT session management
  * - Corporate SSO with auto-provisioning.
  * @author Claude Code + Technical Team
- * @version 2.0
- * @since 2025-09-11
+ * @version 1.0
+ * @since 2024-09-11
  * @example
  * // Authentication service usage
  * const result = await amexingauthservice.require(userData);
@@ -46,8 +46,8 @@ const logger = require('../infrastructure/logger');
  * - Account lockout and security features.
  * @class AmexingAuthService
  * @author Claude Code + Technical Team
- * @version 2.0
- * @since 2025-09-11
+ * @version 1.0
+ * @since 2024-09-11
  * @example
  * // const result = await authService.login(credentials);
  * // Returns: { success: true, user: {...}, tokens: {...} }
@@ -213,7 +213,6 @@ class AmexingAuthService {
   /**
    * Authenticate user with email/password.
    * @param {string} email - User email.
-   * @param email
    * @param {string} password - User password.
    * @returns {object} - Operation result User and tokens.
    * @example
@@ -236,9 +235,7 @@ class AmexingAuthService {
 
       // Check password
       if (!user.passwordHash) {
-        throw new Error(
-          'Password authentication not available for this account'
-        );
+        throw new Error('Password authentication not available for this account');
       }
 
       const isValidPassword = await bcrypt.compare(password, user.passwordHash);
@@ -326,9 +323,7 @@ class AmexingAuthService {
         tokens: sessionTokens.accessToken,
       });
 
-      logger.info(
-        `OAuth user authenticated: ${oauthProfile.email} via ${_provider}`
-      );
+      logger.info(`OAuth user authenticated: ${oauthProfile.email} via ${_provider}`);
 
       return {
         user: this.sanitizeUser(user),
@@ -374,9 +369,7 @@ class AmexingAuthService {
           email: profile.email,
           profile,
           accessToken: await this.encryptToken(tokens.accessToken),
-          refreshToken: tokens.refreshToken
-            ? await this.encryptToken(tokens.refreshToken)
-            : null,
+          refreshToken: tokens.refreshToken ? await this.encryptToken(tokens.refreshToken) : null,
           tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
           scopes: tokens.scope?.split(' ') || [],
           linkedAt: new Date(),
@@ -390,10 +383,7 @@ class AmexingAuthService {
       // Profile
       firstName: profile.firstName || profile.given_name || '',
       lastName: profile.lastName || profile.family_name || '',
-      displayName:
-        profile.fullName
-        || profile.name
-        || `${profile.firstName} ${profile.lastName}`,
+      displayName: profile.fullName || profile.name || `${profile.firstName} ${profile.lastName}`,
       profilePicture: profile.picture,
       locale: profile.locale || 'en',
       timezone: 'America/Mexico_City',
@@ -461,9 +451,7 @@ class AmexingAuthService {
       email: profile.email,
       profile,
       accessToken: await this.encryptToken(tokens.accessToken),
-      refreshToken: tokens.refreshToken
-        ? await this.encryptToken(tokens.refreshToken)
-        : null,
+      refreshToken: tokens.refreshToken ? await this.encryptToken(tokens.refreshToken) : null,
       tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
       scopes: tokens.scope?.split(' ') || [],
       linkedAt: new Date(),
@@ -481,10 +469,7 @@ class AmexingAuthService {
       existingAccounts.push(oauthAccount);
 
       parseUser.set('oauthAccounts', existingAccounts);
-      parseUser.set(
-        'primaryOAuthProvider',
-        user.primaryOAuthProvider || _provider
-      );
+      parseUser.set('primaryOAuthProvider', user.primaryOAuthProvider || _provider);
       parseUser.set('lastOAuthSync', new Date());
       parseUser.set('updatedAt', new Date());
 
@@ -523,9 +508,7 @@ class AmexingAuthService {
       ...user.oauthAccounts[oauthAccountIndex],
       profile,
       accessToken: await this.encryptToken(tokens.accessToken),
-      refreshToken: tokens.refreshToken
-        ? await this.encryptToken(tokens.refreshToken)
-        : null,
+      refreshToken: tokens.refreshToken ? await this.encryptToken(tokens.refreshToken) : null,
       tokenExpiry: new Date(Date.now() + tokens.expiresIn * 1000),
       scopes: tokens.scope?.split(' ') || [],
       lastUsed: new Date(),
@@ -541,14 +524,8 @@ class AmexingAuthService {
       oauthAccounts[oauthAccountIndex] = updatedOAuthAccount;
 
       parseUser.set('oauthAccounts', oauthAccounts);
-      parseUser.set(
-        'firstName',
-        profile.firstName || profile.given_name || user.firstName
-      );
-      parseUser.set(
-        'lastName',
-        profile.lastName || profile.family_name || user.lastName
-      );
+      parseUser.set('firstName', profile.firstName || profile.given_name || user.firstName);
+      parseUser.set('lastName', profile.lastName || profile.family_name || user.lastName);
       parseUser.set('profilePicture', profile.picture || user.profilePicture);
       parseUser.set('lastOAuthSync', new Date());
       parseUser.set('lastLoginAt', new Date());
@@ -587,9 +564,7 @@ class AmexingAuthService {
       if (client && client.autoProvisionEmployees) {
         // Auto-provision employee
         await this.provisionCorporateEmployee(user, client, profile);
-        logger.info(
-          `Corporate employee provisioned: ${user.email} for client ${client.name}`
-        );
+        logger.info(`Corporate employee provisioned: ${user.email} for client ${client.name}`);
       }
     } catch (error) {
       logger.error('Corporate integration failed:', error);
@@ -800,7 +775,6 @@ class AmexingAuthService {
   /**
    * Get user's effective permissions (role + department + individual).
    * @param {string} userId - User ID.
-   * @param {*} userId - _userId parameter.
    * @param _userId
    * @returns {Array} - Array of results Array of permission codes.
    * @example
@@ -821,9 +795,6 @@ class AmexingAuthService {
    * @param {string} userId - User ID.
    * @param {string} permissionCode - Permission code to check.
    * @param {object} context - Optional context (department, client, etc.).
-   * @param {*} userId - _userId parameter.
-   * @param {*} permissionCode - _permissionCode parameter.
-   * @param {*} context - _context parameter.
    * @param _permissionCode
    * @param _context
    * @returns {boolean} - Boolean result Has permission.
@@ -847,7 +818,6 @@ class AmexingAuthService {
   /**
    * Find user by email.
    * @param {string} email - User email.
-   * @param email
    * @returns {object | null} - Operation result User object or null.
    * @example
    * // Authentication service usage
@@ -958,22 +928,16 @@ class AmexingAuthService {
 
     // Length validation
     if (password.length < minLength) {
-      throw new Error(
-        `La contraseña debe tener al menos ${minLength} caracteres`
-      );
+      throw new Error(`La contraseña debe tener al menos ${minLength} caracteres`);
     }
 
     // Character type validations
     if (requireUppercase && !/[A-Z]/.test(password)) {
-      throw new Error(
-        'La contraseña debe contener al menos una letra mayúscula'
-      );
+      throw new Error('La contraseña debe contener al menos una letra mayúscula');
     }
 
     if (requireLowercase && !/[a-z]/.test(password)) {
-      throw new Error(
-        'La contraseña debe contener al menos una letra minúscula'
-      );
+      throw new Error('La contraseña debe contener al menos una letra minúscula');
     }
 
     if (requireNumbers && !/\d/.test(password)) {
@@ -981,9 +945,7 @@ class AmexingAuthService {
     }
 
     if (requireSpecial && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
-      throw new Error(
-        'La contraseña debe contener al menos un carácter especial'
-      );
+      throw new Error('La contraseña debe contener al menos un carácter especial');
     }
 
     // Common password validation
@@ -1009,16 +971,12 @@ class AmexingAuthService {
 
     // Sequential characters validation
     if (/123456|abcdef|qwerty/i.test(password)) {
-      throw new Error(
-        'La contraseña no puede contener secuencias comunes de caracteres'
-      );
+      throw new Error('La contraseña no puede contener secuencias comunes de caracteres');
     }
 
     // Repeated characters validation
     if (/(.)\1{3,}/.test(password)) {
-      throw new Error(
-        'La contraseña no puede contener más de 3 caracteres consecutivos iguales'
-      );
+      throw new Error('La contraseña no puede contener más de 3 caracteres consecutivos iguales');
     }
 
     return true;
@@ -1059,7 +1017,6 @@ class AmexingAuthService {
   /**
    * Generate username from email (deprecated - now uses email directly).
    * @param {string} email - Email address.
-   * @param email
    * @returns {string} - Operation result Email as username.
    * @deprecated Use email directly as username for consistency.
    * @example
@@ -1077,7 +1034,6 @@ class AmexingAuthService {
   /**
    * Check if email domain is personal (non-corporate).
    * @param {string} domain - Email domain.
-   * @param domain
    * @returns {boolean} - Boolean result Is personal domain.
    * @example
    * // Authentication service usage
@@ -1153,9 +1109,7 @@ class AmexingAuthService {
         parseUser.set('locked', true);
         parseUser.set('lockedUntil', new Date(Date.now() + lockDuration));
 
-        logger.warn(
-          `Account locked due to failed login attempts: ${parseUser.get('email')}`
-        );
+        logger.warn(`Account locked due to failed login attempts: ${parseUser.get('email')}`);
       }
 
       await parseUser.save(null, { useMasterKey: true });
@@ -1216,7 +1170,6 @@ class AmexingAuthService {
   /**
    * Encrypt sensitive token for storage.
    * @param {string} token - Token to encrypt.
-   * @param token
    * @returns {string} - Operation result Encrypted token.
    * @example
    * // Authentication service usage
@@ -1274,10 +1227,7 @@ class AmexingAuthService {
     tokenRecord.set('token', await this.encryptToken(refreshToken));
     tokenRecord.set('active', true);
     tokenRecord.set('createdAt', new Date());
-    tokenRecord.set(
-      'expiresAt',
-      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-    ); // 30 days
+    tokenRecord.set('expiresAt', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)); // 30 days
 
     await tokenRecord.save(null, { useMasterKey: true });
   }
@@ -1308,7 +1258,6 @@ class AmexingAuthService {
   /**
    * Find corporate client by domain.
    * @param {string} domain - Email domain.
-   * @param domain
    * @returns {object | null} - Operation result Client object or null.
    * @example
    * // Authentication service usage
@@ -1333,7 +1282,6 @@ class AmexingAuthService {
    * @param {object} user - User object.
    * @param {object} client - Corporate client.
    * @param {object} profile - OAuth profile.
-   * @param {*} profile - _profile parameter.
    * @param _profile
    * @example
    * // Authentication service usage

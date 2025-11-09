@@ -1,10 +1,41 @@
 /**
- * Notifications API Controller
- * Basic implementation for notifications endpoint.
+ * Notifications API Controller - REST API endpoints for user notification management.
+ * Provides comprehensive notification handling including retrieval, read status tracking,
+ * and bulk operations for user notifications with proper error handling and logging.
+ *
+ * This controller implements the notification API endpoints following RESTful principles
+ * with standardized response formats for successful operations and error conditions.
+ * Currently implements basic notification structure with placeholder logic for
+ * future notification service integration.
+ *
+ * Features:
+ * - User notification retrieval with counts
+ * - Individual notification read status management
+ * - Bulk notification status updates
+ * - Standardized JSON response format
+ * - Comprehensive error handling and logging
+ * - Future-ready for notification service integration.
+ * @class NotificationsController
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 0.1.0
+ * @example
+ * // Register notification routes
+ * router.get('/api/notifications', NotificationsController.getNotifications);
+ * router.patch('/api/notifications/:notificationId/read', NotificationsController.markAsRead);
+ * router.patch('/api/notifications/read-all', NotificationsController.markAllAsRead);
+ *
+ * // Usage in API client
+ * // GET /api/notifications
+ * // Response: { success: true, data: { notifications: [], unreadCount: 0, totalCount: 0 } }
  */
 
 const logger = require('../../../infrastructure/logger');
 
+/**
+ * NotificationsController class for handling notification API endpoints.
+ * @class NotificationsController
+ */
 class NotificationsController {
   /**
    * Get user notifications.

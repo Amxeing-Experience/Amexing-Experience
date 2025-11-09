@@ -30,18 +30,12 @@ const getAvailableCorporateDomains = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_SESSION_TOKEN,
-        'User not authenticated'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
     const userRole = request.user.get('role');
     if (!['admin', 'superadmin'].includes(userRole)) {
-      throw new Parse.Error(
-        Parse.Error.OPERATION_FORBIDDEN,
-        'Admin access required for corporate domain management'
-      );
+      throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for corporate domain management');
     }
 
     const corporateDomains = OAuthService.getAvailableCorporateDomains();
@@ -77,27 +71,16 @@ const addCorporateDomain = async (request) => {
   try {
     // Check superadmin permissions
     if (!request.user) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_SESSION_TOKEN,
-        'User not authenticated'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
     const userRole = request.user.get('role');
     if (userRole !== 'superadmin') {
-      throw new Parse.Error(
-        Parse.Error.OPERATION_FORBIDDEN,
-        'Superadmin access required for domain configuration'
-      );
+      throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Superadmin access required for domain configuration');
     }
 
     const {
-      _domain,
-      clientName,
-      type,
-      primaryProvider,
-      autoProvisionEmployees,
-      departmentMapping,
+      _domain, clientName, type, primaryProvider, autoProvisionEmployees, departmentMapping,
     } = request.params;
 
     // Validate required parameters
@@ -125,14 +108,9 @@ const addCorporateDomain = async (request) => {
     }
 
     // Check if domain already exists
-    const existingConfig = OAuthService.getCorporateDomainConfig(
-      `test@${_domain}`
-    );
+    const existingConfig = OAuthService.getCorporateDomainConfig(`test@${_domain}`);
     if (existingConfig) {
-      throw new Parse.Error(
-        Parse.Error.DUPLICATE_VALUE,
-        `Domain ${_domain} is already configured`
-      );
+      throw new Parse.Error(Parse.Error.DUPLICATE_VALUE, `Domain ${_domain} is already configured`);
     }
 
     const config = {
@@ -187,18 +165,12 @@ const getOAuthProviderStatus = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_SESSION_TOKEN,
-        'User not authenticated'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
     const userRole = request.user.get('role');
     if (!['admin', 'superadmin'].includes(userRole)) {
-      throw new Parse.Error(
-        Parse.Error.OPERATION_FORBIDDEN,
-        'Admin access required for OAuth provider status'
-      );
+      throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for OAuth provider status');
     }
 
     const availableProviders = OAuthService.getAvailableProviders();
@@ -215,14 +187,10 @@ const getOAuthProviderStatus = async (request) => {
       };
     }
 
-    logger.logSecurityEvent(
-      'OAUTH_PROVIDER_STATUS_RETRIEVED',
-      request.user.id,
-      {
-        adminUser: request.user.get('username'),
-        providers: availableProviders,
-      }
-    );
+    logger.logSecurityEvent('OAUTH_PROVIDER_STATUS_RETRIEVED', request.user.id, {
+      adminUser: request.user.get('username'),
+      providers: availableProviders,
+    });
 
     return {
       success: true,
@@ -251,27 +219,18 @@ const testCorporateDomain = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_SESSION_TOKEN,
-        'User not authenticated'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
     const userRole = request.user.get('role');
     if (!['admin', 'superadmin'].includes(userRole)) {
-      throw new Parse.Error(
-        Parse.Error.OPERATION_FORBIDDEN,
-        'Admin access required for domain testing'
-      );
+      throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for domain testing');
     }
 
     const { testEmail } = request.params;
 
     if (!testEmail) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'testEmail parameter required'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'testEmail parameter required');
     }
 
     // Extract domain and check configuration
@@ -288,9 +247,7 @@ const testCorporateDomain = async (request) => {
     }
 
     // Test the provider availability
-    const providerConfig = OAuthService.getProviderConfig(
-      domainConfig.primaryProvider
-    );
+    const providerConfig = OAuthService.getProviderConfig(domainConfig.primaryProvider);
 
     logger.logSecurityEvent('CORPORATE_DOMAIN_TESTED', request.user.id, {
       adminUser: request.user.get('username'),
@@ -334,18 +291,12 @@ const getOAuthAuditLogs = async (request) => {
   try {
     // Check admin permissions
     if (!request.user) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_SESSION_TOKEN,
-        'User not authenticated'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User not authenticated');
     }
 
     const userRole = request.user.get('role');
     if (!['admin', 'superadmin'].includes(userRole)) {
-      throw new Parse.Error(
-        Parse.Error.OPERATION_FORBIDDEN,
-        'Admin access required for audit logs'
-      );
+      throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin access required for audit logs');
     }
 
     const { _limit = 50, skip = 0, entityType = 'OAuthEvent' } = request.params;

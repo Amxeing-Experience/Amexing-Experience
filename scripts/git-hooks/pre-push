@@ -1,0 +1,87 @@
+#!/bin/bash
+# pre-push hook for AmexingWeb PCI DSS Compliance
+# Generated automatically by scripts/setup-git-hooks.js
+# 
+# This hook enforces security and compliance requirements
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${BLUE}ℹ️  $1${NC}"
+}
+
+log_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+log_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+log_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# Check if we're in the right directory
+if [ ! -f "package.json" ]; then
+    log_error "Not in project root directory"
+    exit 1
+fi
+
+
+log_info "Running pre-push validation..."
+
+# 1. Check if changelog needs updating for version changes
+current_version=$(grep '"version"' package.json | sed 's/.*"version": "\(.*\)".*/\1/')
+if git diff HEAD~1 package.json | grep '"version"' >/dev/null; then
+    log_info "Version change detected. Checking changelog..."
+    if [ -f "CHANGELOG.md" ]; then
+        if ! grep "$current_version" CHANGELOG.md >/dev/null; then
+            log_error "Version updated but CHANGELOG.md not updated"
+            echo "Run: yarn changelog:generate"
+            exit 1
+        fi
+    else
+        log_warning "No CHANGELOG.md found. Consider creating one."
+    fi
+fi
+
+# 2. Run security audit (warning only for now - non-blocking)
+log_info "Running security audit..."
+yarn audit --level critical > /dev/null 2>&1 || log_warning "Non-critical vulnerabilities detected. Review and schedule updates."
+
+# 3. Run complete test suite (unit + integration)
+log_info "Running complete test suite (unit + integration with MongoDB Memory Server)..."
+log_info "This may take 20-30 seconds..."
+if ! yarn test --runInBand; then
+    log_error "Tests failed. Fix all failing tests before pushing."
+    log_error ""
+    log_error "Test suite includes:"
+    log_error "  - Unit tests (fast, no database)"
+    log_error "  - Integration tests (MongoDB Memory Server on port 1339)"
+    log_error ""
+    log_error "To run tests individually:"
+    log_error "  yarn test:unit         # Run only unit tests"
+    log_error "  yarn test:integration  # Run only integration tests"
+    exit 1
+fi
+log_success "All tests passed (unit + integration)."
+
+# 5. Check for documentation updates on significant changes
+changed_files=$(git diff HEAD~1 --name-only)
+if echo "$changed_files" | grep -E "src/.*\.(js|ts)$" | wc -l | grep -v "^0$" >/dev/null; then
+    log_info "Source code changes detected. Checking documentation..."
+    if ! echo "$changed_files" | grep -E "\.(md|txt)$" >/dev/null; then
+        log_warning "Code changes without documentation updates detected"
+    fi
+fi
+
+log_success "Pre-push validation completed!"

@@ -27,7 +27,7 @@ const logger = require('../../infrastructure/logger');
  * @class AppleOAuthService
  * @augments AppleOAuthServiceCore
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -82,20 +82,14 @@ class AppleOAuthService extends AppleOAuthServiceCore {
       const idTokenPayload = await this.verifyIdToken(idToken, expectedNonce);
       const userData = this.parseUserData(userJsonString);
       const tokenData = await this.exchangeCodeForTokens(code);
-      const userProfile = this.buildUserProfile(
-        idTokenPayload,
-        userData,
-        tokenData
-      );
+      const userProfile = this.buildUserProfile(idTokenPayload, userData, tokenData);
 
       const authResult = await this.processAuthentication(userProfile, {
         department,
         corporateConfigId,
       });
 
-      logger.info(
-        `Apple OAuth callback successful for user: ${authResult.user.id}`
-      );
+      logger.info(`Apple OAuth callback successful for user: ${authResult.user.id}`);
 
       return {
         success: true,
@@ -115,10 +109,10 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Validates callback data from Apple.
    * @param {object} data - Callback data to validate.
-   * @param {string} data.code - Authorization code.
-   * @param {string} data.idToken - ID token.
-   * @param {string} data.error - Error code if present.
-   * @param {string} data.errorDescription - Error description if present.
+   * @param data.code
+   * @param data.idToken
+   * @param data.error
+   * @param data.errorDescription
    * @example Validate callback data
    * service.validateCallbackData({ code: 'abc', idToken: 'token' });
    * @returns {*} - Operation result.
@@ -154,10 +148,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
      * // Returns: { success: true, user: {...}, tokens: {...} }
      */
     if (!code || !idToken) {
-      throw new Parse.Error(
-        Parse.Error.INVALID_QUERY,
-        'Missing authorization code or ID token from Apple'
-      );
+      throw new Parse.Error(Parse.Error.INVALID_QUERY, 'Missing authorization code or ID token from Apple');
     }
   }
 
@@ -199,6 +190,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
         // inheritanceService not available yet
       };
 
+      // Apply department permissions if department specified
       if (department) {
         await this.applyDepartmentPermissions(user, department, userProfile);
       }
@@ -228,21 +220,26 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     const { email, id } = userProfile;
 
     // First, try to find by Apple ID
-    let userQuery = new Parse.Query(Parse.User);
+    let userQuery = new Parse.Query('AmexingUser');
     userQuery.equalTo('appleId', id);
+    userQuery.equalTo('exists', true);
     let user = await userQuery.first({ useMasterKey: true });
 
+    // Try finding by email if not found by Apple ID
     if (!user && email) {
-      userQuery = new Parse.Query(Parse.User);
+      userQuery = new Parse.Query('AmexingUser');
       userQuery.equalTo('email', email);
+      userQuery.equalTo('exists', true);
       user = await userQuery.first({ useMasterKey: true });
 
+      // Link Apple ID to existing email account
       if (user) {
         user.set('appleId', id);
         await user.save(null, { useMasterKey: true });
       }
     }
 
+    // Create new user or update existing
     if (!user) {
       user = await this.createNewUser(userProfile);
     } else {
@@ -329,17 +326,10 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async applyDepartmentPermissions(user, department, userProfile) {
-    const {
-      DepartmentOAuthFlowService,
-    } = require('./DepartmentOAuthFlowService');
+    const { DepartmentOAuthFlowService } = require('./DepartmentOAuthFlowService');
     const departmentService = new DepartmentOAuthFlowService();
 
-    await departmentService.applyDepartmentPermissionInheritance(
-      user,
-      userProfile,
-      { code: department },
-      'apple'
-    );
+    await departmentService.applyDepartmentPermissionInheritance(user, userProfile, { code: department }, 'apple');
   }
 
   /**
@@ -396,8 +386,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
   /**
    * Validates Apple webhook.
    * @param {object} requestBody - Webhook request body.
-   * @param {*} signature - Webhook signature (unused for now).
-   * @param _signature
+   * @param {string} _signature - Webhook signature (unused for now).
    * @returns {Promise<object>} - Validation result.
    * @example Validate Apple webhook
    * const result = await service.validateAppleWebhook(requestBody, signature);
@@ -406,6 +395,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     try {
       logger.info('Apple webhook received:', requestBody.type);
 
+      // Handle consent revocation event
       if (requestBody.type === 'consent-revoked') {
         await this.handleConsentRevoked(requestBody.sub);
       }
@@ -425,28 +415,27 @@ class AppleOAuthService extends AppleOAuthServiceCore {
    * @returns {Promise<object>} - Promise resolving to operation result.
    */
   async handleConsentRevoked(appleId) {
-    const userQuery = new Parse.Query(Parse.User);
+    const userQuery = new Parse.Query('AmexingUser');
     userQuery.equalTo('appleId', appleId);
+    userQuery.equalTo('exists', true);
 
     const user = await userQuery.first({ useMasterKey: true });
+    // Return early if user not found
     if (!user) return;
 
     const providers = user.get('oauthProviders') || [];
     const remainingProviders = providers.filter((p) => p !== 'apple');
 
+    // Delete account if Apple is only provider
     if (remainingProviders.length === 0) {
       await user.destroy({ useMasterKey: true });
-      logger.info(
-        `User account deleted due to Apple consent revocation: ${user.id}`
-      );
+      logger.info(`User account deleted due to Apple consent revocation: ${user.id}`);
     } else {
       user.unset('appleId');
       user.unset('isPrivateEmail');
       user.set('oauthProviders', remainingProviders);
       await user.save(null, { useMasterKey: true });
-      logger.info(
-        `Apple association removed due to consent revocation: ${user.id}`
-      );
+      logger.info(`Apple association removed due to consent revocation: ${user.id}`);
     }
   }
 
@@ -468,14 +457,7 @@ class AppleOAuthService extends AppleOAuthServiceCore {
     };
 
     // Remove null/undefined values with allowlist security
-    const allowedKeys = [
-      'id',
-      'email',
-      'firstName',
-      'lastName',
-      'isPrivateEmail',
-      'emailVerified',
-    ];
+    const allowedKeys = ['id', 'email', 'firstName', 'lastName', 'isPrivateEmail', 'emailVerified'];
     Object.keys(userData).forEach((key) => {
       // eslint-disable-next-line security/detect-object-injection
       if (!allowedKeys.includes(key) || userData[key] == null) {

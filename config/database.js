@@ -17,6 +17,35 @@ class DatabaseConfig {
   }
 
   getConnectionString() {
+    // If DATABASE_NAME is specified, inject it into the URI
+    if (this.name && this.name !== 'amexingdb') {
+      // Parse the URI to inject database name before query parameters
+      const uriParts = this.uri.split('?');
+      const baseUri = uriParts[0];
+      const queryParams = uriParts[1] || '';
+
+      // Remove trailing slash if present
+      const cleanBaseUri = baseUri.endsWith('/') ? baseUri.slice(0, -1) : baseUri;
+
+      // Check if database name is already in URI (after last /)
+      const lastSlashIndex = cleanBaseUri.lastIndexOf('/');
+      const pathAfterSlash = cleanBaseUri.substring(lastSlashIndex + 1);
+
+      // If there's already a database name in the URI, replace it
+      // Otherwise, append the database name
+      let finalUri;
+      if (pathAfterSlash && !pathAfterSlash.includes('@')) {
+        // Database name already exists, replace it
+        finalUri = cleanBaseUri.substring(0, lastSlashIndex + 1) + this.name;
+      } else {
+        // No database name, append it
+        finalUri = cleanBaseUri + '/' + this.name;
+      }
+
+      // Re-append query parameters if they exist
+      return queryParams ? `${finalUri}?${queryParams}` : finalUri;
+    }
+
     return this.uri;
   }
 

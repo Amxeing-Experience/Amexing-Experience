@@ -30,7 +30,7 @@ const logger = require('../../infrastructure/logger');
  * - PCI DSS compliant token processing.
  * @class AppleIdTokenValidator
  * @author Amexing Development Team
- * @version 2.0.0
+ * @version 1.0.0
  * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
@@ -72,10 +72,7 @@ class AppleIdTokenValidator {
       return payload;
     } catch (error) {
       logger.error('Apple ID token verification failed:', error);
-      throw new Parse.Error(
-        Parse.Error.OTHER_CAUSE,
-        'Failed to verify Apple ID token'
-      );
+      throw new Parse.Error(Parse.Error.OTHER_CAUSE, 'Failed to verify Apple ID token');
     }
   }
 
@@ -90,26 +87,12 @@ class AppleIdTokenValidator {
     const appleKeys = await this.getApplePublicKeys();
     const decoded = jwt.decode(idToken, { complete: true });
 
-    /**
-     * Validates JWT token structure and extracts key identifier.
-     * Ensures token has proper format and contains required header information
-     * for public key lookup and signature verification.
-     * @param {*} !decoded || !decoded.header.kid - !decoded || !decoded.header.kid parameter.
-     * @returns {*} - Operation result.
-     * @example
-     * // Service method usage
-     * const result = await appleidtokenvalidator.if({ !decoded: 'example' });
-     * // Returns: { success: true, data: {...} }
-     */
+    // Validate JWT token structure and extract key identifier
     if (!decoded || !decoded.header.kid) {
       throw new Error('Invalid ID token format');
     }
 
-    /**
-     * Locates matching Apple public key for token verification.
-     * Uses key identifier from token header to find corresponding
-     * public key from Apple's key set for signature validation.
-     */
+    // Locate matching Apple public key for token verification
     const publicKey = appleKeys[decoded.header.kid];
     if (!publicKey) {
       throw new Error('Unable to find matching public key');

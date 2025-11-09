@@ -149,12 +149,7 @@ class PermissionDelegationService {
       } = delegationData;
 
       // Validate delegation request
-      await this.validateDelegationRequest(
-        managerId,
-        employeeId,
-        permissions,
-        delegationType
-      );
+      await this.validateDelegationRequest(managerId, employeeId, permissions, delegationType);
 
       // Calculate expiration time
       const expiresAt = this.calculateExpirationTime(delegationType, duration);
@@ -172,12 +167,7 @@ class PermissionDelegationService {
       });
 
       // Apply delegated permissions to employee
-      await this.applyDelegatedPermissions(
-        employeeId,
-        permissions,
-        delegation.id,
-        expiresAt
-      );
+      await this.applyDelegatedPermissions(employeeId, permissions, delegation.id, expiresAt);
 
       // Schedule expiration if auto-expire is enabled
       if (autoExpire) {
@@ -226,12 +216,7 @@ class PermissionDelegationService {
    * const service = new PermissionDelegationService();
    * await service.validateDelegationRequest('mgr123', 'emp456', ['team_management'], 'temporary');
    */
-  async validateDelegationRequest(
-    managerId,
-    employeeId,
-    permissions,
-    delegationType
-  ) {
+  async validateDelegationRequest(managerId, employeeId, permissions, delegationType) {
     try {
       // Validate delegation type
       if (!this.delegationTypes[delegationType]) {
@@ -248,20 +233,13 @@ class PermissionDelegationService {
         }
 
         if (!this.delegatablePermissions.includes(permission)) {
-          throw new Error(
-            `Permission '${permission}' is not in delegatable permissions list`
-          );
+          throw new Error(`Permission '${permission}' is not in delegatable permissions list`);
         }
 
         // Check if manager has the permission
-        const hasPermission = await OAuthPermissionService.hasPermission(
-          managerId,
-          permission
-        );
+        const hasPermission = await OAuthPermissionService.hasPermission(managerId, permission);
         if (!hasPermission) {
-          throw new Error(
-            `Manager does not have permission '${permission}' to delegate`
-          );
+          throw new Error(`Manager does not have permission '${permission}' to delegate`);
         }
       }
 
@@ -295,11 +273,7 @@ class PermissionDelegationService {
       // Check if manager has management authority over employee
       const managerEmployeeQuery = new Parse.Query('ClientEmployee');
       managerEmployeeQuery.equalTo('userId', managerId);
-      managerEmployeeQuery.containedIn('accessLevel', [
-        'manager',
-        'supervisor',
-        'admin',
-      ]);
+      managerEmployeeQuery.containedIn('accessLevel', ['manager', 'supervisor', 'admin']);
       managerEmployeeQuery.equalTo('active', true);
 
       const managerRecord = await managerEmployeeQuery.first({
@@ -323,12 +297,8 @@ class PermissionDelegationService {
       }
 
       // Additional check: manager must have higher access level
-      const managerLevel = this.getAccessLevelValue(
-        managerRecord.get('accessLevel')
-      );
-      const employeeLevel = this.getAccessLevelValue(
-        employeeRecord.get('accessLevel')
-      );
+      const managerLevel = this.getAccessLevelValue(managerRecord.get('accessLevel'));
+      const employeeLevel = this.getAccessLevelValue(employeeRecord.get('accessLevel'));
 
       if (managerLevel <= employeeLevel) {
         throw new Error('Manager must have higher access level than employee');
@@ -401,9 +371,7 @@ class PermissionDelegationService {
       const limit = limits[delegationType] || 5;
 
       if (activeDelegations >= limit) {
-        throw new Error(
-          `Maximum active delegations (${limit}) reached for delegation type: ${delegationType}`
-        );
+        throw new Error(`Maximum active delegations (${limit}) reached for delegation type: ${delegationType}`);
       }
     } catch (error) {
       logger.error('Delegation limits validation failed:', error);
@@ -489,12 +457,7 @@ class PermissionDelegationService {
    * const service = new PermissionDelegationService();
    * await service.applyDelegatedPermissions('emp456', ['team_management'], 'del123', expirationDate);
    */
-  async applyDelegatedPermissions(
-    employeeId,
-    permissions,
-    delegationId,
-    expiresAt
-  ) {
+  async applyDelegatedPermissions(employeeId, permissions, delegationId, expiresAt) {
     try {
       // Create permission overrides for each delegated permission
       for (const permission of permissions) {
@@ -645,10 +608,7 @@ class PermissionDelegationService {
       const managerId = delegation.get('managerId');
       if (revokedBy !== managerId) {
         // Check if revoker has higher authority
-        const hasAuthority = await this.validateRevocationAuthority(
-          revokedBy,
-          managerId
-        );
+        const hasAuthority = await this.validateRevocationAuthority(revokedBy, managerId);
         if (!hasAuthority) {
           throw new Error('Insufficient authority to revoke this delegation');
         }
@@ -717,10 +677,7 @@ class PermissionDelegationService {
   async validateRevocationAuthority(revokerId, managerId) {
     try {
       // Check if revoker has admin permissions
-      const hasAdminPermission = await OAuthPermissionService.hasPermission(
-        revokerId,
-        'admin_full'
-      );
+      const hasAdminPermission = await OAuthPermissionService.hasPermission(revokerId, 'admin_full');
       if (hasAdminPermission) {
         return true;
       }
@@ -730,12 +687,8 @@ class PermissionDelegationService {
       const managerEmployee = await this.getEmployeeRecord(managerId);
 
       if (revokerEmployee && managerEmployee) {
-        const revokerLevel = this.getAccessLevelValue(
-          revokerEmployee.get('accessLevel')
-        );
-        const managerLevel = this.getAccessLevelValue(
-          managerEmployee.get('accessLevel')
-        );
+        const revokerLevel = this.getAccessLevelValue(revokerEmployee.get('accessLevel'));
+        const managerLevel = this.getAccessLevelValue(managerEmployee.get('accessLevel'));
 
         return revokerLevel > managerLevel;
       }
@@ -804,9 +757,7 @@ class PermissionDelegationService {
       // Validate emergency elevation authority
       const hasAuthority = await this.validateEmergencyAuthority(elevatedBy);
       if (!hasAuthority) {
-        throw new Error(
-          'Insufficient authority for emergency permission elevation'
-        );
+        throw new Error('Insufficient authority for emergency permission elevation');
       }
 
       // Calculate expiration time (max 24 hours for emergency)
@@ -869,17 +820,10 @@ class PermissionDelegationService {
   async validateEmergencyAuthority(elevatedBy) {
     try {
       // Check for emergency elevation permissions
-      const emergencyPermissions = [
-        'admin_full',
-        'system_admin',
-        'emergency_admin',
-      ];
+      const emergencyPermissions = ['admin_full', 'system_admin', 'emergency_admin'];
 
       for (const permission of emergencyPermissions) {
-        const hasPermission = await OAuthPermissionService.hasPermission(
-          elevatedBy,
-          permission
-        );
+        const hasPermission = await OAuthPermissionService.hasPermission(elevatedBy, permission);
         if (hasPermission) {
           return true;
         }
