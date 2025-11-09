@@ -81,7 +81,7 @@ For API support, contact the Amexing Development Team.
         description: 'Staging server',
       },
       {
-        url: 'https://api.amexing.com',
+        url: 'https://quotes.amexingexperience.com',
         description: 'Production server',
       },
     ],
