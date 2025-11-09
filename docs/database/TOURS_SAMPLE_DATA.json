@@ -1,0 +1,285 @@
+{
+  "sampleTours": [
+    {
+      "objectId": "tour001",
+      "destinationPOI": {
+        "objectId": "poi001",
+        "name": "Centro Histórico de Mérida",
+        "__type": "Pointer",
+        "className": "POI"
+      },
+      "time": 120,
+      "vehicleType": {
+        "objectId": "vt001", 
+        "name": "Van Turística",
+        "__type": "Pointer",
+        "className": "VehicleType"
+      },
+      "price": 1500.00,
+      "rate": {
+        "objectId": "rate001",
+        "name": "Tarifa Estándar",
+        "__type": "Pointer", 
+        "className": "Rate"
+      },
+      "active": true,
+      "exists": true,
+      "createdAt": "2024-10-28T10:00:00.000Z",
+      "updatedAt": "2024-10-28T10:00:00.000Z"
+    },
+    {
+      "objectId": "tour002",
+      "destinationPOI": {
+        "objectId": "poi002",
+        "name": "Chichén Itzá",
+        "__type": "Pointer",
+        "className": "POI"
+      },
+      "time": 480,
+      "vehicleType": {
+        "objectId": "vt002",
+        "name": "Autobús",
+        "__type": "Pointer",
+        "className": "VehicleType"
+      },
+      "price": 2800.00,
+      "rate": {
+        "objectId": "rate002",
+        "name": "Tarifa Premium",
+        "__type": "Pointer",
+        "className": "Rate"
+      },
+      "active": true,
+      "exists": true,
+      "createdAt": "2024-10-28T10:15:00.000Z",
+      "updatedAt": "2024-10-28T10:15:00.000Z"
+    },
+    {
+      "objectId": "tour003",
+      "destinationPOI": {
+        "objectId": "poi003",
+        "name": "Uxmal",
+        "__type": "Pointer",
+        "className": "POI"
+      },
+      "time": 360,
+      "vehicleType": {
+        "objectId": "vt001",
+        "name": "Van Turística", 
+        "__type": "Pointer",
+        "className": "VehicleType"
+      },
+      "price": 2200.00,
+      "rate": {
+        "objectId": "rate001",
+        "name": "Tarifa Estándar",
+        "__type": "Pointer",
+        "className": "Rate"
+      },
+      "active": true,
+      "exists": true,
+      "createdAt": "2024-10-28T10:30:00.000Z",
+      "updatedAt": "2024-10-28T10:30:00.000Z"
+    },
+    {
+      "objectId": "tour004",
+      "destinationPOI": {
+        "objectId": "poi004",
+        "name": "Cenotes de Dzitnup",
+        "__type": "Pointer",
+        "className": "POI"
+      },
+      "time": 240,
+      "vehicleType": {
+        "objectId": "vt003",
+        "name": "Camioneta",
+        "__type": "Pointer",
+        "className": "VehicleType"
+      },
+      "price": 1800.00,
+      "rate": {
+        "objectId": "rate003",
+        "name": "Tarifa Ecológica",
+        "__type": "Pointer",
+        "className": "Rate"
+      },
+      "active": true,
+      "exists": true,
+      "createdAt": "2024-10-28T10:45:00.000Z",
+      "updatedAt": "2024-10-28T10:45:00.000Z"
+    },
+    {
+      "objectId": "tour005",
+      "destinationPOI": {
+        "objectId": "poi005",
+        "name": "Playa de Progreso",
+        "__type": "Pointer",
+        "className": "POI"
+      },
+      "time": 300,
+      "vehicleType": {
+        "objectId": "vt001",
+        "name": "Van Turística",
+        "__type": "Pointer", 
+        "className": "VehicleType"
+      },
+      "price": 1200.00,
+      "rate": {
+        "objectId": "rate004",
+        "name": "Tarifa Costera",
+        "__type": "Pointer",
+        "className": "Rate"
+      },
+      "active": false,
+      "exists": true,
+      "createdAt": "2024-10-28T11:00:00.000Z",
+      "updatedAt": "2024-10-28T11:00:00.000Z"
+    }
+  ],
+  "relatedTables": {
+    "POI": [
+      {
+        "objectId": "poi001",
+        "name": "Centro Histórico de Mérida",
+        "description": "Centro histórico de la ciudad blanca",
+        "location": "Centro de Mérida, Yucatán",
+        "active": true,
+        "exists": true
+      },
+      {
+        "objectId": "poi002", 
+        "name": "Chichén Itzá",
+        "description": "Zona arqueológica maya patrimonio de la humanidad",
+        "location": "Chichén Itzá, Yucatán",
+        "active": true,
+        "exists": true
+      },
+      {
+        "objectId": "poi003",
+        "name": "Uxmal",
+        "description": "Zona arqueológica maya",
+        "location": "Uxmal, Yucatán", 
+        "active": true,
+        "exists": true
+      },
+      {
+        "objectId": "poi004",
+        "name": "Cenotes de Dzitnup",
+        "description": "Cenotes cristalinos para nadar",
+        "location": "Dzitnup, Yucatán",
+        "active": true,
+        "exists": true
+      },
+      {
+        "objectId": "poi005",
+        "name": "Playa de Progreso",
+        "description": "Puerto de playa en la costa yucateca",
+        "location": "Progreso, Yucatán",
+        "active": true,
+        "exists": true
+      }
+    ],
+    "VehicleType": [
+      {
+        "objectId": "vt001",
+        "name": "Van Turística",
+        "capacity": 15,
+        "description": "Van con aire acondicionado para turismo",
+        "active": true,
+        "exists": true
+      },
+      {
+        "objectId": "vt002",
+        "name": "Autobús",
+        "capacity": 40,
+        "description": "Autobús de turismo con aire acondicionado",
+        "active": true,
+        "exists": true
+      },
+      {
+        "objectId": "vt003",
+        "name": "Camioneta",
+        "capacity": 8,
+        "description": "Camioneta 4x4 para aventuras",
+        "active": true,
+        "exists": true
+      }
+    ],
+    "Rate": [
+      {
+        "objectId": "rate001", 
+        "name": "Tarifa Estándar",
+        "description": "Tarifa base para tours regulares",
+        "multiplier": 1.0,
+        "active": true,
+        "exists": true
+      },
+      {
+        "objectId": "rate002",
+        "name": "Tarifa Premium", 
+        "description": "Tarifa para tours de lujo",
+        "multiplier": 1.5,
+        "active": true,
+        "exists": true
+      },
+      {
+        "objectId": "rate003",
+        "name": "Tarifa Ecológica",
+        "description": "Tarifa especial para tours ecológicos",
+        "multiplier": 1.2,
+        "active": true,
+        "exists": true
+      },
+      {
+        "objectId": "rate004",
+        "name": "Tarifa Costera",
+        "description": "Tarifa para tours costeros",
+        "multiplier": 0.8,
+        "active": true,
+        "exists": true
+      }
+    ]
+  },
+  "expectedTableDisplay": [
+    {
+      "destino": "Centro Histórico de Mérida",
+      "tiempo": "2h",
+      "tipoVehiculo": "Van Turística", 
+      "costo": "$1,500.00",
+      "tarifa": "Tarifa Estándar",
+      "estado": "Activo"
+    },
+    {
+      "destino": "Chichén Itzá",
+      "tiempo": "8h",
+      "tipoVehiculo": "Autobús",
+      "costo": "$2,800.00", 
+      "tarifa": "Tarifa Premium",
+      "estado": "Activo"
+    },
+    {
+      "destino": "Uxmal",
+      "tiempo": "6h",
+      "tipoVehiculo": "Van Turística",
+      "costo": "$2,200.00",
+      "tarifa": "Tarifa Estándar", 
+      "estado": "Activo"
+    },
+    {
+      "destino": "Cenotes de Dzitnup",
+      "tiempo": "4h",
+      "tipoVehiculo": "Camioneta",
+      "costo": "$1,800.00",
+      "tarifa": "Tarifa Ecológica",
+      "estado": "Activo"
+    },
+    {
+      "destino": "Playa de Progreso", 
+      "tiempo": "5h",
+      "tipoVehiculo": "Van Turística",
+      "costo": "$1,200.00",
+      "tarifa": "Tarifa Costera",
+      "estado": "Inactivo"
+    }
+  ]
+}

@@ -247,7 +247,7 @@
     "mongodb": "^6.3.0",
     "multer": "^2.0.2",
     "parse": "^7.0.0",
-    "parse-server": "8.2.4",
+    "parse-server": "8.4.0-alpha.2",
     "serve-favicon": "^2.5.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
@@ -299,7 +299,8 @@
     "cookie": ">=0.7.0",
     "@babel/runtime-corejs3": ">=7.26.10",
     "prismjs": ">=1.29.0",
-    "minimist": ">=1.2.8"
+    "minimist": ">=1.2.8",
+    "validator": ">=13.15.20"
   },
   "engines": {
     "node": ">=20.0.0",

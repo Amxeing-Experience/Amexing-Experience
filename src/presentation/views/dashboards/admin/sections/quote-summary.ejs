@@ -209,81 +209,189 @@
         }
     }
 
-    /* PDF Export Optimization - Fixed Width Strategy */
+    /* PDF Export Optimization - Improved Layout Strategy */
     .pdf-export-mode {
         max-width: 100% !important;
         width: 100% !important;
-        padding: 0 !important;
-        font-size: 0.85rem !important;
+        padding: 15px !important;
+        font-size: 0.9rem !important;
         box-sizing: border-box !important;
-    }
-
-    .pdf-export-mode .summary-banner {
-        padding: 10px 0 !important;
-        margin-bottom: 10px !important;
-    }
-
-    .pdf-export-mode .summary-banner-logo img {
-        max-width: 180px !important;
-    }
-
-    .pdf-export-mode .summary-banner-address {
-        font-size: 0.75rem !important;
         line-height: 1.4 !important;
     }
 
+    .pdf-export-mode .summary-banner {
+        padding: 15px 0 !important;
+        margin-bottom: 15px !important;
+        page-break-inside: avoid;
+    }
+
+    .pdf-export-mode .summary-banner-logo img {
+        max-width: 200px !important;
+        height: auto !important;
+    }
+
+    .pdf-export-mode .summary-banner-address {
+        font-size: 0.8rem !important;
+        line-height: 1.5 !important;
+    }
+
     .pdf-export-mode .summary-section {
-        margin-bottom: 10px !important;
-        padding: 10px !important;
+        margin-bottom: 15px !important;
+        padding: 12px !important;
+        page-break-inside: avoid;
     }
 
     .pdf-export-mode .summary-section-title {
-        font-size: 1rem !important;
-        margin-bottom: 8px !important;
-        padding-bottom: 4px !important;
+        font-size: 1.1rem !important;
+        margin-bottom: 10px !important;
+        padding-bottom: 5px !important;
+        page-break-after: avoid;
     }
 
     .pdf-export-mode .summary-attention {
-        font-size: 1.2rem !important;
-        padding: 8px !important;
+        font-size: 1.3rem !important;
+        padding: 12px !important;
+        page-break-inside: avoid;
     }
 
     .pdf-export-mode .summary-table {
         width: 100% !important;
-        table-layout: fixed !important;
-        font-size: 0.75rem !important;
+        table-layout: auto !important;
+        font-size: 10px !important;
+        border-collapse: collapse !important;
+        page-break-inside: auto;
+        margin: 0 !important;
+        visibility: visible !important;
+        display: table !important;
     }
 
     .pdf-export-mode .summary-table th {
         padding: 6px 4px !important;
-        font-size: 0.7rem !important;
+        font-size: 9px !important;
         word-wrap: break-word !important;
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
-        color-adjust: exact;
+        border: 1px solid #000 !important;
+        background-color: #0d6efd !important;
+        color: white !important;
+        font-weight: bold !important;
+        text-align: center !important;
+        visibility: visible !important;
+        display: table-cell !important;
     }
 
     .pdf-export-mode .summary-table td {
         padding: 6px 4px !important;
-        font-size: 0.7rem !important;
+        font-size: 9px !important;
         word-wrap: break-word !important;
+        border: 1px solid #000 !important;
+        vertical-align: top !important;
+        visibility: visible !important;
+        display: table-cell !important;
+        background-color: white !important;
+        color: black !important;
+    }
+
+    /* Simplified column widths for better PDF rendering */
+    .pdf-export-mode .summary-table th:nth-child(1),
+    .pdf-export-mode .summary-table td:nth-child(1) {
+        width: 10% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(2),
+    .pdf-export-mode .summary-table td:nth-child(2) {
+        width: 30% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(3),
+    .pdf-export-mode .summary-table td:nth-child(3) {
+        width: 15% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(4),
+    .pdf-export-mode .summary-table td:nth-child(4) {
+        width: 10% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(5),
+    .pdf-export-mode .summary-table td:nth-child(5) {
+        width: 15% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(6),
+    .pdf-export-mode .summary-table td:nth-child(6) {
+        width: 10% !important;
+    }
+
+    .pdf-export-mode .summary-table th:nth-child(7),
+    .pdf-export-mode .summary-table td:nth-child(7) {
+        width: 10% !important;
     }
 
     .pdf-export-mode .summary-day-header {
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
         color-adjust: exact;
+        background-color: #e7f1ff !important;
+        page-break-after: avoid;
+    }
+
+    .pdf-export-mode .summary-subconcept-row {
+        page-break-inside: avoid;
     }
 
     .pdf-export-mode .summary-totals {
-        margin-top: 10px !important;
-        padding: 10px !important;
-        font-size: 0.9rem !important;
+        margin-top: 15px !important;
+        padding: 15px !important;
+        font-size: 0.95rem !important;
+        page-break-inside: avoid;
     }
 
     .pdf-export-mode .summary-footer {
-        padding: 10px !important;
-        font-size: 0.75rem !important;
+        padding: 15px !important;
+        font-size: 0.8rem !important;
+        page-break-inside: avoid;
+    }
+
+    .pdf-export-mode .summary-info-grid {
+        display: block !important;
+    }
+
+    .pdf-export-mode .summary-info-item {
+        display: inline-block !important;
+        width: 48% !important;
+        margin-bottom: 8px !important;
+        margin-right: 2% !important;
+        vertical-align: top !important;
+    }
+
+    /* Additional PDF table optimizations */
+    .pdf-export-mode .summary-table th,
+    .pdf-export-mode .summary-table td {
+        white-space: normal !important;
+        word-break: break-word !important;
+        line-height: 1.3 !important;
+        max-width: none !important;
+        overflow: visible !important;
+    }
+
+    .pdf-export-mode .summary-day-header {
+        background-color: #e7f1ff !important;
+        color: #0d6efd !important;
+        font-weight: bold !important;
+        visibility: visible !important;
+        display: table-row !important;
+    }
+
+    .pdf-export-mode .summary-subconcept-row {
+        background-color: white !important;
+        color: black !important;
+        visibility: visible !important;
+        display: table-row !important;
+    }
+
+    /* Ensure wrapper doesn't exceed page width */
+    .pdf-export-mode {
+        max-width: 720px !important;
+        overflow: hidden !important;
     }
 
     /* Ensure backgrounds are visible in PDF */
@@ -458,9 +566,10 @@
     </div>
 </div>
 
-<!-- html2pdf.js Library for Client-Side PDF Generation -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
-        crossorigin="anonymous"
+<!-- PDF Libraries - Try jsPDF first, fallback to html2pdf -->
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" 
+        crossorigin="anonymous" 
         referrerpolicy="no-referrer"></script>
 
 <script>
@@ -623,7 +732,7 @@
             dayHeaderRow.className = 'summary-day-header';
             dayHeaderRow.innerHTML = `
                 <td rowspan="${rowspan}" class="text-center align-middle"><strong>Día ${day.dayNumber}</strong></td>
-                <td colspan="4"><strong>${day.dayTitle || `Día ${day.dayNumber}`}</strong></td>
+                <td colspan="3"><strong>${day.dayTitle || `Día ${day.dayNumber}`}</strong></td>
                 <td rowspan="${rowspan}" class="text-end align-middle bg-light"><strong>${currencyFormatter.format(day.dayTotal || 0)}</strong></td>
                 <td></td>
             `;
@@ -705,7 +814,12 @@
                     // Notes - show actual notes or empty if none
                     const notes = subconcept.notes ? `<small>${subconcept.notes}</small>` : '';
 
-                    // Note: columns are: Día (skipped - rowspan), Concepto, Vehículo, Horas, Precio, Total Día (skipped - rowspan), Notas
+                    // Calculate the subconcept total to display
+                    const subTotal = subconcept.total !== null && subconcept.total !== undefined
+                        ? currencyFormatter.format(subconcept.total)
+                        : '-';
+
+                    // Note: columns are: Día (skipped - rowspan), Concepto, Vehículo, Horas, Precio Unit., Total (skipped - rowspan), Notas
                     subRow.innerHTML = `
                         <td>${conceptHTML}</td>
                         <td>${vehicleTypeHTML}</td>
@@ -757,25 +871,33 @@
         });
     }
 
-    // Export to PDF function using html2pdf.js with Wrapper Isolation Pattern
+    // Export to PDF function with fallback support
     function exportToPdf() {
-        // Check if html2pdf is loaded
-        if (typeof html2pdf === 'undefined') {
-            alert('La librería de generación de PDF no se ha cargado correctamente. Por favor recargue la página.');
-            console.error('html2pdf.js is not loaded');
+        // Try jsPDF first
+        if (tryJsPDFExport()) {
             return;
         }
+        
+        // Fallback to html2pdf if jsPDF fails
+        console.log('Falling back to html2pdf...');
+        tryHtml2PdfExport();
+    }
 
-        const element = document.getElementById('summaryContent');
-        const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
-        const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
-
-        // Hide "Información del Resumen" section before cloning
-        const infoSection = element.querySelector('.summary-section.d-print-none');
-        if (infoSection) {
-            infoSection.style.display = 'none';
+    // Try jsPDF approach
+    function tryJsPDFExport() {
+        // Check if jsPDF is loaded with multiple possible locations
+        let jsPDF;
+        if (typeof window.jsPDF !== 'undefined') {
+            jsPDF = window.jsPDF.jsPDF || window.jsPDF;
+        } else if (typeof window.jsPDF === 'undefined' && typeof jsPDF !== 'undefined') {
+            // Global jsPDF variable
+        } else {
+            console.log('jsPDF not available, will try html2pdf fallback');
+            return false;
         }
 
+        const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
+        const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
         // Apply PDF export mode to original element
         element.classList.add('pdf-export-mode');
 
@@ -835,71 +957,253 @@
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando PDF...';
         btn.disabled = true;
 
-        // Generate and download PDF
+        try {
+            console.log('Starting manual PDF generation...');
+            
+            // Create new jsPDF instance
+            const doc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'letter'
+            });
+
+            // Set font
+            doc.setFont('helvetica');
+            
+            let yPosition = 20;
+            const pageWidth = doc.internal.pageSize.width;
+            const margin = 15;
+            const contentWidth = pageWidth - (margin * 2);
+
+            // Company Header
+            doc.setFontSize(16);
+            doc.setTextColor(13, 110, 253); // Blue color
+            doc.text('AMEXING EXPERIENCE', margin, yPosition);
+            
+            yPosition += 6;
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            doc.text('Vicente Suarez 5, Colonia Independencia', margin, yPosition);
+            yPosition += 4;
+            doc.text('San Miguel de Allende, Guanajuato 37732', margin, yPosition);
+            yPosition += 4;
+            doc.text('+52 (415) 167 39 90', margin, yPosition);
+            yPosition += 4;
+            doc.text('contact@amexingexperience.com', margin, yPosition);
+            
+            // Line separator
+            yPosition += 8;
+            doc.setDrawColor(13, 110, 253);
+            doc.setLineWidth(0.5);
+            doc.line(margin, yPosition, pageWidth - margin, yPosition);
+            yPosition += 10;
+
+            // Quote Info
+            doc.setFontSize(14);
+            doc.setTextColor(13, 110, 253);
+            doc.text(`COTIZACIÓN: ${folio}`, margin, yPosition);
+            
+            yPosition += 8;
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            
+            // Get quote details
+            const contactPerson = document.getElementById('summaryContactPerson')?.textContent || 'No especificado';
+            const eventType = document.getElementById('summaryEventType')?.textContent || 'No especificado';
+            const numberOfPeople = document.getElementById('summaryNumberOfPeople')?.textContent || '0';
+            const clientName = document.getElementById('summaryClientName')?.textContent || 'No especificado';
+            
+            doc.text(`ATENCIÓN A: ${contactPerson}`, margin, yPosition);
+            yPosition += 5;
+            doc.text(`CLIENTE: ${clientName}`, margin, yPosition);
+            yPosition += 5;
+            doc.text(`EVENTO: ${eventType}`, margin, yPosition);
+            yPosition += 5;
+            doc.text(`PERSONAS: ${numberOfPeople}`, margin, yPosition);
+            yPosition += 10;
+
+            // Services Section
+            doc.setFontSize(12);
+            doc.setTextColor(13, 110, 253);
+            doc.text('SERVICIOS E ITINERARIO', margin, yPosition);
+            yPosition += 8;
+
+            // Get table data
+            const tableBody = document.querySelector('#summaryServicesTableBody');
+            if (tableBody) {
+                const rows = tableBody.querySelectorAll('tr');
+                console.log(`Processing ${rows.length} service rows for PDF`);
+                
+                doc.setFontSize(9);
+                doc.setTextColor(0, 0, 0);
+                
+                rows.forEach((row, index) => {
+                    // Check if we need a new page
+                    if (yPosition > 250) {
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+                    
+                    if (row.className.includes('summary-day-header')) {
+                        // Day header
+                        const dayTitle = row.querySelector('td')?.textContent || '';
+                        
+                        yPosition += 5;
+                        doc.setFontSize(11);
+                        doc.setTextColor(13, 110, 253);
+                        doc.setFillColor(231, 241, 255);
+                        doc.rect(margin, yPosition - 4, contentWidth, 8, 'F');
+                        doc.text(dayTitle.toUpperCase(), margin + 2, yPosition + 1);
+                        yPosition += 8;
+                        
+                    } else if (row.className.includes('summary-subconcept-row')) {
+                        // Service item
+                        const cells = row.querySelectorAll('td');
+                        const cellData = Array.from(cells).map(cell => cell.textContent?.trim() || '');
+                        
+                        doc.setFontSize(9);
+                        doc.setTextColor(0, 0, 0);
+                        
+                        if (cellData[0]) {
+                            doc.text(`• ${cellData[0]}`, margin + 5, yPosition);
+                            yPosition += 4;
+                        }
+                        if (cellData[1]) {
+                            doc.text(`  Vehículo: ${cellData[1]}`, margin + 8, yPosition);
+                            yPosition += 4;
+                        }
+                        if (cellData[2]) {
+                            doc.text(`  Horas: ${cellData[2]}`, margin + 8, yPosition);
+                            yPosition += 4;
+                        }
+                        if (cellData[3]) {
+                            doc.text(`  Precio: ${cellData[3]}`, margin + 8, yPosition);
+                            yPosition += 4;
+                        }
+                        if (cellData[4]) {
+                            const notes = doc.splitTextToSize(`  Notas: ${cellData[4]}`, contentWidth - 10);
+                            doc.text(notes, margin + 8, yPosition);
+                            yPosition += notes.length * 4;
+                        }
+                        yPosition += 3;
+                    }
+                });
+            }
+
+            // Financial Summary
+            yPosition += 10;
+            if (yPosition > 240) {
+                doc.addPage();
+                yPosition = 20;
+            }
+
+            doc.setFontSize(12);
+            doc.setTextColor(13, 110, 253);
+            doc.text('RESUMEN FINANCIERO', margin, yPosition);
+            yPosition += 8;
+
+            // Draw totals box
+            const boxHeight = 25;
+            doc.setDrawColor(13, 110, 253);
+            doc.setLineWidth(0.5);
+            doc.rect(margin, yPosition, contentWidth, boxHeight);
+
+            doc.setFontSize(10);
+            doc.setTextColor(0, 0, 0);
+            
+            const subtotal = document.getElementById('summarySubtotal')?.textContent || '$0.00';
+            const iva = document.getElementById('summaryIVA')?.textContent || '$0.00';
+            const total = document.getElementById('summaryTotal')?.textContent || '$0.00';
+
+            yPosition += 6;
+            doc.text('Subtotal:', margin + 5, yPosition);
+            doc.text(subtotal, pageWidth - margin - 5, yPosition, { align: 'right' });
+            
+            yPosition += 5;
+            doc.text('IVA (16%):', margin + 5, yPosition);
+            doc.text(iva, pageWidth - margin - 5, yPosition, { align: 'right' });
+            
+            yPosition += 5;
+            doc.setDrawColor(13, 110, 253);
+            doc.line(margin + 5, yPosition, pageWidth - margin - 5, yPosition);
+            
+            yPosition += 5;
+            doc.setFontSize(12);
+            doc.setTextColor(13, 110, 253);
+            doc.text('TOTAL:', margin + 5, yPosition);
+            doc.text(total, pageWidth - margin - 5, yPosition, { align: 'right' });
+
+            // Footer
+            yPosition += 15;
+            doc.setFontSize(9);
+            doc.setTextColor(100, 100, 100);
+            const footerText = 'Agradecemos su preferencia y quedamos a sus órdenes para cualquier duda o comentario';
+            const footerLines = doc.splitTextToSize(footerText, contentWidth);
+            doc.text(footerLines, margin, yPosition, { align: 'center' });
+
+            // Add metadata
+            doc.setProperties({
+                title: `Cotización ${folio}`,
+                subject: 'Cotización Amexing Experience',
+                author: 'Amexing Experience',
+                keywords: 'cotización, transporte, servicios',
+                creator: 'AmexingWeb Platform'
+            });
+
+            // Save the PDF
+            doc.save(filename);
+            
+            console.log('PDF generated successfully with manual jsPDF');
+            return true;
+
+        } catch (error) {
+            console.error('Error generating PDF with jsPDF:', error);
+            return false;
+        } finally {
+            // Restore button
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    // Fallback html2pdf approach (simplified)
+    function tryHtml2PdfExport() {
+        if (typeof html2pdf === 'undefined') {
+            alert('No se pudo cargar ninguna librería de PDF. Por favor recargue la página.');
+            return;
+        }
+
+        const element = document.getElementById('summaryContent');
+        const folio = document.getElementById('summaryFolio').textContent || 'cotizacion';
+        const filename = `Cotizacion_${folio.replace(/\s+/g, '_')}.pdf`;
+
+        // UI feedback
+        const btn = document.getElementById('exportPdfBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Generando PDF...';
+        btn.disabled = true;
+
+        // Simple html2pdf options
+        const opt = {
+            margin: 10,
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 1, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
         html2pdf()
             .set(opt)
-            .from(wrapper)
-            .toPdf()
-            .get('pdf')
-            .then((pdf) => {
-                // Add PDF metadata
-                pdf.setProperties({
-                    title: `Cotización ${folio}`,
-                    subject: 'Cotización Amexing Experience',
-                    author: 'Amexing Experience',
-                    keywords: 'cotización, transporte, servicios',
-                    creator: 'AmexingWeb Platform'
-                });
-            })
+            .from(element)
             .save()
             .then(() => {
-                // Restore original DOM structure
-                element.classList.remove('pdf-export-mode');
-
-                if (nextSibling) {
-                    parent.insertBefore(element, nextSibling);
-                } else {
-                    parent.appendChild(element);
-                }
-
-                // Remove temporary wrapper
-                if (document.body.contains(wrapper)) {
-                    document.body.removeChild(wrapper);
-                }
-
-                // Restore info section visibility
-                if (infoSection) {
-                    infoSection.style.display = '';
-                }
-
-                // Restore button
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-                console.log('PDF generated successfully with fixed dimensions');
+                console.log('PDF generated successfully with html2pdf fallback');
             })
             .catch((error) => {
-                console.error('Error generating PDF:', error);
-
-                // Restore original DOM structure on error
-                element.classList.remove('pdf-export-mode');
-
-                if (nextSibling) {
-                    parent.insertBefore(element, nextSibling);
-                } else {
-                    parent.appendChild(element);
-                }
-
-                // Cleanup wrapper
-                if (document.body.contains(wrapper)) {
-                    document.body.removeChild(wrapper);
-                }
-
-                // Restore info section visibility
-                if (infoSection) {
-                    infoSection.style.display = '';
-                }
-
+                console.error('Error generating PDF with html2pdf:', error);
                 alert('Error al generar el PDF. Por favor intente nuevamente.');
+            })
+            .finally(() => {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             });
