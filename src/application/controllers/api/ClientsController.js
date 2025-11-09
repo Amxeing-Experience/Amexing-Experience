@@ -663,9 +663,6 @@ class ClientsController {
       const uniqueId = email ? null : require('crypto').randomUUID().substring(0, 8);
       const userEmail = email || `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${uniqueId}@temp.amexing.com`;
 
-      // Debug logging for email generation
-      console.log('[DEBUG] createQuickClient - Generated email:', userEmail);
-
       // Prepare client data
       const clientData = {
         firstName: firstName.trim(),
@@ -731,13 +728,6 @@ class ClientsController {
         message: 'Quick client created successfully',
       });
     } catch (error) {
-      // Debug logging for error details
-      console.log('[DEBUG] createQuickClient error:', {
-        message: error.message,
-        code: error.code,
-        stack: error.stack,
-      });
-
       logger.error('Error in ClientsController.createQuickClient', {
         error: error.message,
         stack: error.stack,

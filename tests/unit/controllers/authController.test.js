@@ -181,29 +181,41 @@ describe('Authentication Controller', () => {
   describe('logout', () => {
     it('should logout user and redirect to home', async () => {
       mockReq.user = { id: 'test-user-id' };
-      mockReq.session = { 
+      mockReq.session = {
         sessionToken: 'test-session-token',
-        destroy: jest.fn((callback) => callback()) 
+        regenerate: jest.fn((callback) => callback()),
+        save: jest.fn((callback) => callback()),
+        destroy: jest.fn((callback) => callback())
       };
       mockReq.accepts = jest.fn(() => false); // Return false for 'json' to force HTML response
-      
+
       Parse.User.logOut.mockResolvedValue();
 
       await authController.logout(mockReq, mockRes);
 
+      // Wait for setTimeout(100ms) to complete
+      await new Promise(resolve => setTimeout(resolve, 150));
+
       expect(Parse.User.logOut).toHaveBeenCalledWith({ sessionToken: 'test-session-token' });
-      expect(mockReq.session.destroy).toHaveBeenCalled();
+      expect(mockReq.session.regenerate).toHaveBeenCalled();
       expect(mockRes.clearCookie).toHaveBeenCalledWith('amexing.sid');
       expect(mockRes.redirect).toHaveBeenCalledWith('/');
     });
 
     it('should return JSON response for API requests', async () => {
       mockReq.user = { id: 'test-user-id' };
-      mockReq.session = { destroy: jest.fn((callback) => callback()) };
+      mockReq.session = {
+        regenerate: jest.fn((callback) => callback()),
+        save: jest.fn((callback) => callback()),
+        destroy: jest.fn((callback) => callback())
+      };
       mockReq.path = '/api/auth/logout';
       mockReq.accepts = jest.fn(() => 'json'); // Mock JSON accept
 
       await authController.logout(mockReq, mockRes);
+
+      // Wait for setTimeout(100ms) to complete
+      await new Promise(resolve => setTimeout(resolve, 150));
 
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,

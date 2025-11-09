@@ -57,11 +57,49 @@ else
     log_warning "Semgrep not found. Install with: pip install semgrep"
 fi
 
-# 3. Check for secrets in staged files
+# 3. Check for secrets in staged files (Enhanced AWS detection)
 log_info "Scanning for potential secrets..."
 staged_files=$(git diff --cached --name-only)
 if [ -n "$staged_files" ]; then
-    # Check for common secret patterns
+    # CRITICAL: Block .env.test from being committed (contains real AWS credentials)
+    if echo "$staged_files" | grep -q "\.env\.test$"; then
+        log_error ".env.test file detected in commit!"
+        log_error "This file contains REAL AWS test credentials and must NEVER be committed."
+        log_error ""
+        log_error "To unstage: git reset HEAD environments/.env.test"
+        log_error "Verify .gitignore protection: git check-ignore environments/.env.test"
+        exit 1
+    fi
+
+    # Check for real AWS access keys in source code (not examples)
+    REAL_AWS_KEYS=$(echo "$staged_files" | \
+        grep -v "\.example$" | \
+        grep -v "\.md$" | \
+        grep -v "test\.js$" | \
+        xargs grep -l "AKIA[0-9A-Z]\{16\}" 2>/dev/null || true)
+
+    if [ -n "$REAL_AWS_KEYS" ]; then
+        log_error "Real AWS access key detected in source files:"
+        echo "$REAL_AWS_KEYS"
+        log_error ""
+        log_error "AWS credentials must NOT be hardcoded in source code."
+        log_error "Use environment variables (.env.test for tests, IAM roles for production)."
+        exit 1
+    fi
+
+    # Check for real AWS secret keys (40 characters base64)
+    REAL_AWS_SECRETS=$(echo "$staged_files" | \
+        grep -v "\.example$" | \
+        xargs grep -E "AWS_SECRET_ACCESS_KEY\s*=\s*[A-Za-z0-9/+=]{40}" 2>/dev/null | \
+        grep -v "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY" || true)
+
+    if [ -n "$REAL_AWS_SECRETS" ]; then
+        log_error "Real AWS secret access key detected!"
+        log_error "AWS secrets must be in .env.test (gitignored), not in source code."
+        exit 1
+    fi
+
+    # Check for common secret patterns (soft check with prompt)
     if echo "$staged_files" | xargs grep -l "password\|secret\|key\|token\|credential" 2>/dev/null; then
         log_warning "Potential secrets detected in staged files:"
         echo "$staged_files" | xargs grep -n "password\|secret\|key\|token\|credential" 2>/dev/null || true

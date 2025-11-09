@@ -621,26 +621,64 @@ class AuthController {
         await Parse.User.logOut({ sessionToken });
       }
 
-      // Destroy Express session
-      req.session.destroy((err) => {
+      // Regenerate session instead of destroying it
+      // This preserves CSRF protection for subsequent requests
+      req.session.regenerate((err) => {
         if (err) {
-          logger.error('Error destroying session:', err);
+          logger.error('Error regenerating session:', err);
+
+          // Fallback to destroy if regenerate fails
+          req.session.destroy((destroyErr) => {
+            if (destroyErr) {
+              logger.error('Error destroying session after regeneration failure:', destroyErr);
+            }
+          });
+
+          // Clear cookie
+          res.clearCookie('amexing.sid');
+
+          // Handle response
+          if (req.accepts('json')) {
+            return res.json({
+              success: true,
+              message: 'Logged out successfully',
+            });
+          }
+
+          return res.redirect('/');
         }
-      });
 
-      // Clear cookie
-      res.clearCookie('amexing.sid');
+        // Generate new CSRF secret for regenerated session
+        const crypto = require('crypto');
+        req.session.csrfSecret = crypto.randomBytes(32).toString('hex');
 
-      // Handle response type
-      if (req.accepts('json')) {
-        return res.json({
-          success: true,
-          message: 'Logged out successfully',
+        // CRITICAL FIX: Save regenerated session and wait for persistence before redirect
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            logger.error('Error saving regenerated session:', saveErr);
+            // Don't return here - still clear cookie and redirect
+          }
+
+          // Clear cookie (will be recreated with new session)
+          res.clearCookie('amexing.sid');
+
+          // CRITICAL FIX: Add small delay to ensure MongoDB write completes
+          // This prevents race conditions where the user immediately logs back in
+          // before the new session with CSRF secret is fully persisted
+          setTimeout(() => {
+            // Handle response type
+            if (req.accepts('json')) {
+              return res.json({
+                success: true,
+                message: 'Logged out successfully',
+              });
+            }
+
+            // Redirect to home
+            res.redirect('/');
+          }, 100); // 100ms delay for MongoDB persistence
         });
-      }
-
-      // Redirect to home
-      res.redirect('/');
+      });
     } catch (error) {
       logger.error('Error during logout:', error);
 

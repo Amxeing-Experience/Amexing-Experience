@@ -533,6 +533,20 @@ function registerCloudFunctions() {
 
         return { providers: providerConfigs };
       } catch (error) {
+        // Check if error is due to OAuthService initialization
+        if (error.message && (error.message.includes('not initialized') || error.message.includes('initialization'))) {
+          // Use debug logging for initialization-related errors (expected during startup)
+          logger.debug('getOAuthProviders called during OAuthService initialization', {
+            error: error.message,
+            timestamp: new Date().toISOString(),
+            phase: 'startup',
+          });
+
+          // Return empty providers gracefully during initialization
+          return { providers: [] };
+        }
+
+        // For other errors, use error logging (unexpected runtime errors)
         logger.error('Get OAuth providers error:', error);
         throw error;
       }

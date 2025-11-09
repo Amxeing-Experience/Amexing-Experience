@@ -68,17 +68,53 @@ class VehicleImage extends BaseModel {
   }
 
   /**
-   * Get image URL.
-   * @returns {string} Image URL path.
+   * Get Parse.File for image (S3 storage).
+   * @returns {Parse.File|null} Parse.File object or null.
+   * @since 1.1.0 (S3 migration)
    * @example
-   * const url = vehicleImage.getUrl(); // '/uploads/vehicles/123/image.jpg'
+   * const imageFile = vehicleImage.getImageFile();
+   * const s3Url = imageFile ? imageFile.url() : null;
    */
-  getUrl() {
-    return this.get('url') || '';
+  getImageFile() {
+    return this.get('imageFile') || null;
   }
 
   /**
-   * Set image URL.
+   * Set Parse.File for image (S3 storage).
+   * @param {Parse.File} file - Parse.File object.
+   * @since 1.1.0 (S3 migration)
+   * @example
+   * const parseFile = new Parse.File('vehicle.jpg', fileData);
+   * vehicleImage.setImageFile(parseFile);
+   */
+  setImageFile(file) {
+    this.set('imageFile', file);
+  }
+
+  /**
+   * Get image URL (S3 or legacy local path).
+   *
+   * Priority:
+   * 1. If imageFile exists (S3): Returns presigned URL
+   * 2. If url exists (legacy): Returns local path
+   * 3. Otherwise: Returns empty string.
+   * @returns {string} Image URL (S3 presigned URL or local path).
+   * @example
+   * const url = vehicleImage.getUrl();
+   * // S3: 'https://amexing-bucket.s3.us-east-2.amazonaws.com/...'
+   * // Legacy: '/uploads/vehicles/123/image.jpg'
+   */
+  getUrl() {
+    const imageFile = this.get('imageFile');
+    if (imageFile) {
+      return imageFile.url(); // S3 presigned URL
+    }
+    return this.get('url') || ''; // Legacy local path
+  }
+
+  /**
+   * Set image URL (legacy - for backwards compatibility).
+   * @deprecated Use setImageFile() for new uploads (S3 storage).
    * @param {string} url - Image URL path.
    * @example
    * vehicleImage.setUrl('/uploads/vehicles/123/image.jpg');

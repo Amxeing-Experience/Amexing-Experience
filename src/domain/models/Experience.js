@@ -187,6 +187,27 @@ class Experience extends BaseModel {
     this.set('cost', cost);
   }
 
+  /**
+   * Get main image URL (presigned S3 URL).
+   * @returns {string} Main image URL or empty string.
+   * @example
+   * const mainImage = experience.getMainImage();
+   * console.log(mainImage); // 'https://s3.amazonaws.com/bucket/experiences/...'
+   */
+  getMainImage() {
+    return this.get('mainImage') || '';
+  }
+
+  /**
+   * Set main image URL (presigned S3 URL).
+   * @param {string} url - Main image URL (presigned S3 URL).
+   * @example
+   * experience.setMainImage('https://s3.amazonaws.com/bucket/experiences/...');
+   */
+  setMainImage(url) {
+    this.set('mainImage', url);
+  }
+
   // =================
   // BUSINESS LOGIC
   // =================

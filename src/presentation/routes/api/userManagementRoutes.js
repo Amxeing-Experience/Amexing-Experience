@@ -525,15 +525,14 @@ router.patch('/:id/archive', writeOperationsLimiter, jwtMiddleware.requireRoleLe
 
 /**
  * Error handling middleware for this router.
- * @param {*} next - _next parameter.
- * @param {object} res - Express response object.
- * @param {object} req - Express request object.
  * @param {*} error - Error parameter.
+ * @param {object} req - Express request object.
+ * @param {object} res - Express response object.
+ * @param {*} _next - Next middleware function.
  * @returns {*} - Operation result.
  * @example
  * // Usage example
- * const result = await use({ (error: 'example', _next: 'example' });
- * // Returns: operation result
+ * router.use((error, req, res, _next) => { ... });
  */
 router.use((error, req, res, _next) => {
   logger.error('User Management API Error:', {

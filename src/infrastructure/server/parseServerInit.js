@@ -26,6 +26,22 @@ const parseServerConfig = require('../../../config/parse-server');
  * app.use('/parse', parseServer.app);
  */
 const initializeParseServer = async () => {
+  // In test environment, skip Parse Server initialization
+  // Tests use their own Parse Server instance from globalSetup
+  if (process.env.NODE_ENV === 'test') {
+    logger.info('Skipping Parse Server initialization in test mode');
+    logger.info('Using Parse Server from test globalSetup');
+
+    // Just configure Parse SDK to connect to test server
+    Parse.initialize(parseServerConfig.appId, null, parseServerConfig.masterKey);
+    Parse.serverURL = parseServerConfig.serverURL;
+
+    logger.info('Parse SDK configured for test environment:', parseServerConfig.serverURL);
+
+    // Return null to indicate no local Parse Server instance
+    return null;
+  }
+
   logger.info('Initializing Parse Server 8.2.4...');
 
   const parseServer = new ParseServer(parseServerConfig);

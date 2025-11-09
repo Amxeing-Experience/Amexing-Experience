@@ -35,10 +35,6 @@ const currentPath = '/dashboard/superadmin/users';
                     </ol>
                 </nav>
             </div>
-            <div class="text-muted">
-                <small class="d-block">Total usuarios registrados</small>
-                <strong id="total-users-count">-</strong>
-            </div>
         </div>
     </div>
 </div>
@@ -68,37 +64,28 @@ const currentPath = '/dashboard/superadmin/users';
     description: 'Completa los datos para registrar un nuevo usuario.',
     dataAction: 'ADD_USER',
     primaryLabel: 'Agregar Usuario',
-    actionURL: '/api/users/',
+    actionURL: '/api/amexingusers',
     rechargeData: true,
     inputs: [
-      { 
-        id: 'userName',
-        name: 'username',
-        label: 'Nombre',
-        type: 'text',
-        required: true,
-        maxLength: 100,
-        placeholder: 'Ej. Juan',
-      },
-      { 
+      {
         id: 'firstName',
         name: 'firstName',
-        label: 'Apellido Paterno',
+        label: 'Nombre(s)',
         type: 'text',
         required: true,
         maxLength: 100,
-        placeholder: 'Ej. Pérez',
+        placeholder: 'Ej. Juan Carlos',
       },
-      { 
+      {
         id: 'lastName',
         name: 'lastName',
-        label: 'Apellido Materno',
+        label: 'Apellido(s)',
         type: 'text',
         required: true,
         maxLength: 100,
-        placeholder: 'Ej. Pérez',
+        placeholder: 'Ej. Pérez García',
       },
-      { 
+      {
         id: 'userEmail',
         name: 'email',
         label: 'Correo electrónico',
@@ -184,16 +171,3 @@ const currentPath = '/dashboard/superadmin/users';
     </div>
 </div>
 
-<!-- Page-specific JavaScript -->
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Update total count when table loads (listen to custom event)
-        document.addEventListener('usersTableLoaded', function(e) {
-            const count = e.detail?.count || 0;
-            const countEl = document.getElementById('total-users-count');
-            if (countEl) {
-                countEl.textContent = count;
-            }
-        });
-    });
-</script>

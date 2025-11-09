@@ -1600,6 +1600,13 @@ class IntelligentProviderSelector {
     return '<div style="width: 32px; height: 32px; background: #ddd; border-radius: 4px;"></div>';
   }
 
+  /**
+   * Create provider icon element using safe DOM methods
+   * Generates styled div element with provider initial as text content.
+   * @param {string} provider - OAuth provider name (google, microsoft, apple).
+   * @returns {HTMLElement} Icon element with provider styling.
+   * @example
+   */
   createProviderIconElement(provider) {
     // Create icon element safely using DOM methods
     const iconElement = document.createElement('div');

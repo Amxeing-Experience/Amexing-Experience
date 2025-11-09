@@ -158,11 +158,11 @@ class PublicQuoteController {
 
       // Service items (itinerary) - EXCLUDING notes per business decision
       serviceItems: {
-        days: ((serviceItems.days || []).map((day) => ({
+        days: (serviceItems.days || []).map((day) => ({
           dayNumber: day.dayNumber || 0,
           date: day.date || '',
           city: day.city || '',
-          subconcepts: ((day.subconcepts || []).map((sub) => ({
+          subconcepts: (day.subconcepts || []).map((sub) => ({
             id: sub.id || '',
             type: sub.type || '',
             concept: sub.concept || '',
@@ -179,8 +179,8 @@ class PublicQuoteController {
             numberOfPeople: sub.numberOfPeople || 1,
             total: sub.total || 0,
             // EXCLUDE: notes (business decision)
-          }))),
-        }))),
+          })),
+        })),
         subtotal: serviceItems.subtotal || 0,
         iva: serviceItems.iva || 0,
         total: serviceItems.total || 0,

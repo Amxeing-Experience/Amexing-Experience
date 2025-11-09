@@ -257,7 +257,7 @@ function initializeDataTableWithData(usersData) {
         serverSide: false,
         searching: true,
         ordering: true,
-        responsive: true
+        responsive: false
     };
 
     // Add actions column if permissions allow
@@ -484,7 +484,7 @@ async function executeDeleteUser(userId) {
 
         // Make API request to DELETE endpoint (sets active: false, exists: false)
         // No CSRF token needed - JWT authentication is used for API routes
-        const response = await fetch(`/api/users/${userId}`, {
+        const response = await fetch(`<%= dtApiEndpoint %>/${userId}`, {
             method: 'DELETE',
             credentials: 'include',
             headers: {
@@ -638,7 +638,7 @@ async function executeToggleUser(userId, newStatus) {
         toggleBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${newStatus ? 'Activando' : 'Desactivando'}...`;
 
         // Make API request - No CSRF token needed for API routes
-        const response = await fetch(`/api/users/${userId}/toggle-status`, {
+        const response = await fetch(`<%= dtApiEndpoint %>/${userId}/toggle-status`, {
             method: 'PATCH',
             credentials: 'include',
             headers: {

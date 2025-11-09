@@ -10,6 +10,29 @@ if (!process.env.PARSE_APP_ID || !process.env.PARSE_MASTER_KEY || !process.env.D
   throw new Error('Missing required Parse Server environment variables');
 }
 
+// Verify S3 configuration
+const requiredS3Vars = ['S3_BUCKET', 'AWS_REGION'];
+const missingS3Vars = requiredS3Vars.filter(v => !process.env[v]);
+
+if (missingS3Vars.length > 0) {
+  console.warn('⚠️  Missing S3 environment variables:', missingS3Vars);
+  console.warn('⚠️  File uploads will use GridFS (MongoDB) fallback');
+}
+
+// Warn if credentials missing in development
+if (process.env.NODE_ENV === 'development') {
+  if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+    console.warn('⚠️  AWS credentials not found - required for S3 uploads in development');
+  }
+}
+
+// Validate production uses IAM role (no credentials in env)
+if (process.env.NODE_ENV === 'production') {
+  if (process.env.AWS_ACCESS_KEY_ID || process.env.AWS_SECRET_ACCESS_KEY) {
+    console.warn('⚠️  WARNING: AWS credentials found in production env - use IAM roles instead');
+  }
+}
+
 const parseServerConfig = {
   databaseURI: databaseConfig.getConnectionString(),
   cloud: process.env.CLOUD_CODE_MAIN || path.join(__dirname, '../src/cloud/main.js'),
@@ -17,7 +40,7 @@ const parseServerConfig = {
   masterKey: process.env.PARSE_MASTER_KEY || 'master-key-change-in-production',
   serverURL: process.env.PARSE_SERVER_URL || 'http://localhost:1337/parse',
   publicServerURL: process.env.PARSE_PUBLIC_SERVER_URL || 'http://localhost:1337/parse',
-  
+
   // Security Configuration
   allowClientClassCreation: process.env.NODE_ENV === 'development',
   enableAnonymousUsers: false,
@@ -55,6 +78,10 @@ const parseServerConfig = {
     enableForPublic: false,
     enableForAnonymousUser: false,
     enableForAuthenticatedUser: true,
+    // Allow common image and document formats
+    // Parse Server 6.2+ defaults to blocking HTML files for security
+    // Explicitly allow image formats for vehicle/experience uploads
+    fileExtensions: ['.*'], // Allow all extensions (secure because we validate MIME types in controller)
   },
   
   // Logging

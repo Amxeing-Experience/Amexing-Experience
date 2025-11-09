@@ -95,15 +95,29 @@ function autoRecoverSession() {
         // Generate new CSRF secret
         req.session.csrfSecret = await generateCSRFSecret();
 
-        // Log recovery event for security audit (PCI DSS compliant logging)
-        logger.warn('CSRF secret auto-recovered for session', {
+        // Calculate session age to determine logging level
+        const sessionAge = req.session.createdAt ? Date.now() - req.session.createdAt : 0;
+
+        // Use appropriate logging level based on session age
+        // New sessions (< 30 seconds): debug (expected during startup/logout)
+        // Old sessions (>= 30 seconds): warn (unexpected, potential issue)
+        const logContext = {
           sessionID: req.session.id,
+          sessionAge,
           path: req.path,
           method: req.method,
           userAgent: req.get('User-Agent')?.substring(0, 50), // Truncate for log size
           ip: req.ip,
           timestamp: new Date().toISOString(),
-        });
+        };
+
+        if (sessionAge < 30000) {
+          // New session - this is expected (post-logout, new session, etc.)
+          logger.debug('CSRF secret auto-recovered for new session', logContext);
+        } else {
+          // Old session - unexpected, log as warning for investigation
+          logger.warn('CSRF secret auto-recovered for session', logContext);
+        }
 
         // Record recovery in metrics
         sessionMetrics.recordSessionRecovered(req.session.id, 'csrf-secret-missing');

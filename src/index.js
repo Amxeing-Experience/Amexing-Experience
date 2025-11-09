@@ -95,6 +95,41 @@ initializeParseServer()
 
 // Mount Parse Server middleware (will be available after initialization)
 app.use('/parse', (req, res, next) => {
+  // In test mode with no local Parse Server, proxy to test server
+  if (process.env.NODE_ENV === 'test' && (!parseServer || parseServer === null)) {
+    // Proxy to test Parse Server at http://localhost:1339/parse
+    const http = require('http');
+    const url = require('url');
+
+    const targetUrl = url.parse(process.env.PARSE_SERVER_URL || 'http://localhost:1339/parse');
+    const options = {
+      hostname: targetUrl.hostname,
+      port: targetUrl.port,
+      path: targetUrl.pathname + (req.url.startsWith('/') ? req.url : `/${req.url}`),
+      method: req.method,
+      headers: req.headers,
+    };
+
+    const proxyReq = http.request(options, (proxyRes) => {
+      res.writeHead(proxyRes.statusCode, proxyRes.headers);
+      proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (error) => {
+      logger.error('Parse Server proxy error:', error);
+      res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Test Parse Server is not available',
+      });
+    });
+
+    if (req.body) {
+      proxyReq.write(JSON.stringify(req.body));
+    }
+    proxyReq.end();
+    return;
+  }
+
   if (parseServer && parseServer.app) {
     return parseServer.app(req, res, next);
   }

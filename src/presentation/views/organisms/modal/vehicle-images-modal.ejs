@@ -19,6 +19,12 @@ Features:
 <div class="modal fade" id="vehicleImagesModal" tabindex="-1" aria-labelledby="vehicleImagesModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
+            <!-- Loader overlay mientras se cargan las imágenes -->
+            <%- include('../../atoms/common/modal-loader', {
+                loaderText: 'Cargando imágenes del vehículo...',
+                loaderSpinnerColor: 'primary'
+            }) %>
+
             <!-- Modal Header -->
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title text-white" id="vehicleImagesModalLabel">
@@ -302,12 +308,12 @@ Features:
             // Load CSS first
             const link = document.createElement('link');
             link.rel = 'stylesheet';
-            link.href = 'https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone.css';
+            link.href = 'https://unpkg.com/dropzone@5.9.3/dist/min/dropzone.min.css';
             document.head.appendChild(link);
 
             // Load JS
             const script = document.createElement('script');
-            script.src = 'https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone-min.js';
+            script.src = 'https://unpkg.com/dropzone@5.9.3/dist/min/dropzone.min.js';
             script.onload = () => {
                 console.log('Dropzone library loaded successfully');
                 resolve();
@@ -461,6 +467,9 @@ Features:
 
         // Show modal
         $('#vehicleImagesModal').modal('show');
+
+        // Show loader while loading images
+        showModalLoader('vehicleImagesModal');
     };
 
     /**
@@ -489,11 +498,14 @@ Features:
             if (result.success) {
                 renderImages(result.data || []);
                 updateImagesCount(result.count || 0);
+                hideModalLoader('vehicleImagesModal');
             } else {
+                hideModalLoader('vehicleImagesModal');
                 showErrorAlert(result.error || 'Error al cargar las imágenes');
             }
         } catch (error) {
             console.error('Error loading vehicle images:', error);
+            hideModalLoader('vehicleImagesModal');
             showErrorAlert('Error al cargar las imágenes');
         }
     }
@@ -697,14 +709,70 @@ Features:
     };
 
     /**
-     * Delete image
+     * Show confirmation modal for image deletion
      */
-    window.deleteImage = async function(imageId) {
-        if (!confirm('¿Estás seguro de que deseas eliminar esta imagen?')) {
-            return;
+    window.deleteImage = function(imageId) {
+        const modalHtml = `
+            <div class="modal fade" id="deleteImageModal" tabindex="-1" aria-labelledby="deleteImageModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="deleteImageModalLabel">
+                                <i class="ti ti-alert-triangle me-2"></i>Eliminar Imagen
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-danger mb-0">
+                                <i class="ti ti-alert-octagon me-2"></i>
+                                <strong>ADVERTENCIA:</strong> Esta acción eliminará permanentemente esta imagen del vehículo.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="ti ti-x me-1"></i>Cancelar
+                            </button>
+                            <button type="button" class="btn btn-danger" data-action="delete-image" data-image-id="${imageId}">
+                                <i class="ti ti-trash me-1"></i>Eliminar Imagen
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        const existingModal = document.getElementById('deleteImageModal');
+        if (existingModal) {
+            existingModal.remove();
         }
 
+        // Add modal to body
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('deleteImageModal'));
+        modal.show();
+
+        // Add event listener for delete button
+        document.querySelector('#deleteImageModal [data-action="delete-image"]')
+            .addEventListener('click', function() {
+                executeDeleteImage(imageId);
+            });
+    };
+
+    /**
+     * Execute image deletion after confirmation
+     */
+    window.executeDeleteImage = async function(imageId) {
         try {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteImageModal'));
+            const deleteBtn = document.querySelector('#deleteImageModal [data-action="delete-image"]');
+
+            // Show loading state
+            deleteBtn.disabled = true;
+            deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Eliminando...';
+
             const response = await fetch(`/api/vehicles/${currentVehicleId}/images/${imageId}`, {
                 method: 'DELETE',
                 headers: {
@@ -715,14 +783,26 @@ Features:
             const result = await response.json();
 
             if (result.success) {
+                modal.hide();
                 showSuccessAlert('Imagen eliminada exitosamente');
-                loadVehicleImages();
+                // Small delay to ensure Parse Server has propagated primary image changes
+                setTimeout(() => {
+                    showModalLoader('vehicleImagesModal');
+                    loadVehicleImages();
+                }, 300);
             } else {
-                showErrorAlert(result.error || 'Error al eliminar la imagen');
+                throw new Error(result.error || 'Error al eliminar la imagen');
             }
         } catch (error) {
             console.error('Error deleting image:', error);
-            showErrorAlert('Error al eliminar la imagen');
+            showErrorAlert(error.message || 'Error al eliminar la imagen');
+
+            // Reset button state
+            const deleteBtn = document.querySelector('#deleteImageModal [data-action="delete-image"]');
+            if (deleteBtn) {
+                deleteBtn.disabled = false;
+                deleteBtn.innerHTML = '<i class="ti ti-trash me-1"></i>Eliminar Imagen';
+            }
         }
     };
 
@@ -813,9 +893,13 @@ Features:
         document.getElementById('vehicle-images-alerts').innerHTML = '';
         closeCarousel();
 
-        // Clear dropzone
-        if (vehicleImagesDropzone) {
-            vehicleImagesDropzone.removeAllFiles();
+        // Clear dropzone - safely handle null
+        if (vehicleImagesDropzone && typeof vehicleImagesDropzone.removeAllFiles === 'function') {
+            try {
+                vehicleImagesDropzone.removeAllFiles(true); // true = don't trigger events
+            } catch (error) {
+                console.warn('Error clearing dropzone files:', error);
+            }
         }
     }
 

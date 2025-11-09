@@ -8,6 +8,11 @@ const Quote = require('../../../domain/models/Quote');
 const QuoteService = require('../../services/QuoteService');
 const logger = require('../../../infrastructure/logger');
 
+/**
+ * Quote Controller - Manages quote/cotización CRUD operations
+ * Handles creation, retrieval, update, and deletion of quotes with rate assignments.
+ * @class QuoteController
+ */
 class QuoteController {
   constructor() {
     this.quoteService = new QuoteService();
@@ -1264,21 +1269,13 @@ class QuoteController {
       // 4. Verify quote is active
       const isActive = quote.get('active');
       if (!isActive) {
-        return this.sendError(
-          res,
-          'No se puede compartir una cotización inactiva',
-          400
-        );
+        return this.sendError(res, 'No se puede compartir una cotización inactiva', 400);
       }
 
       // 5. Get folio (required for public access)
       const folio = quote.get('folio');
       if (!folio) {
-        return this.sendError(
-          res,
-          'La cotización no tiene folio asignado',
-          500
-        );
+        return this.sendError(res, 'La cotización no tiene folio asignado', 500);
       }
 
       // 6. Generate share URL using folio

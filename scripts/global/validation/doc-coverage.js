@@ -201,7 +201,7 @@ function main() {
   fileResults.forEach((result) => {
     const status = result.coverage >= 80 ? '✅' : result.coverage >= 60 ? '⚠️' : '❌';
     console.log(`${status} ${result.file}: ${result.coverage}% (${result.documented}/${result.total})`);
-    
+
     if (result.undocumented > 0 && result.coverage < 80) {
       result.undocumentedItems.forEach((item) => {
         console.log(`   - Missing: ${item.type} ${item.name} (line ${item.line})`);
@@ -219,7 +219,7 @@ function main() {
   console.log(`Undocumented: ${totalFunctions - totalDocumented}`);
   console.log(`Overall Coverage: ${overallCoverage}%\n`);
   
-  // Set minimum coverage threshold (increased to 100% after achieving full coverage)
+  // Set minimum coverage threshold (100% - all functions documented)
   const minCoverage = 100;
   
   if (overallCoverage >= minCoverage) {

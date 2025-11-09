@@ -1,38 +1,81 @@
 /**
- * Experience Images API Routes
+ * Experience Images API Routes with S3 Storage
  * Handles image upload, listing, deletion, and ordering for experiences and providers.
+ *
+ * Migration Notes:
+ * - Uses multer memory storage (no local filesystem)
+ * - Files uploaded to S3 via direct AWS SDK
+ * - Maintains same API interface for backwards compatibility
+ * - Includes PCI DSS security logging.
  * @author Amexing Development Team
- * @version 1.0.0
+ * @version 3.0.0 (Direct S3 Upload + Security Logging)
  * @since 2024-01-15
  */
 
 const express = require('express');
+const multer = require('multer');
 const ExperienceImageController = require('../../../application/controllers/api/ExperienceImageController');
 const { authenticateToken, requireRole } = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
 const controller = new ExperienceImageController();
 
+// Configure multer for memory storage (no local files)
+// Files are buffered in memory and then uploaded to S3
+const upload = multer({
+  storage: multer.memoryStorage(), // Store in memory, not disk
+  limits: {
+    fileSize: 250 * 1024 * 1024, // 250MB max file size
+    files: 10, // Maximum 10 files at once
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Tipo de archivo no permitido. Solo se aceptan JPG, PNG y WEBP'));
+    }
+  },
+});
+
 /**
- * Upload a new image for an experience.
+ * Multer error handler middleware.
+ * Converts multer errors to proper 400 responses.
+ * @param err
+ * @param req
+ * @param res
+ * @param next
+ * @example
+ */
+const handleMulterError = (err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    // Multer-specific errors (file size, file count, etc.)
+    return res.status(400).json({
+      success: false,
+      error: err.message,
+    });
+  }
+  if (err) {
+    // Custom fileFilter errors
+    return res.status(400).json({
+      success: false,
+      error: err.message,
+    });
+  }
+  next();
+};
+
+/**
+ * Upload a new image for an experience (S3 storage).
  * POST /api/experiences/:id/images.
- * @access public
+ * @access admin, superadmin
  */
 router.post(
   '/:id/images',
   authenticateToken,
   requireRole(['admin', 'superadmin']),
-  (req, res, next) => {
-    controller.upload.single('image')(req, res, (err) => {
-      if (err) {
-        return res.status(400).json({
-          success: false,
-          error: err.message,
-        });
-      }
-      next();
-    });
-  },
+  upload.single('image'), // Use memory storage middleware
+  handleMulterError, // Handle multer errors
   controller.uploadImage.bind(controller)
 );
 
@@ -56,6 +99,19 @@ router.delete(
 );
 
 /**
+ * Reorder experience images.
+ * PATCH /api/experiences/:id/images/reorder.
+ * @access public
+ * NOTE: Must be defined BEFORE /:imageId/primary to avoid Express matching 'reorder' as :imageId
+ */
+router.patch(
+  '/:id/images/reorder',
+  authenticateToken,
+  requireRole(['admin', 'superadmin']),
+  controller.reorderImages.bind(controller)
+);
+
+/**
  * Set an image as the primary image for an experience.
  * PATCH /api/experiences/:id/images/:imageId/primary.
  * @access public
@@ -65,18 +121,6 @@ router.patch(
   authenticateToken,
   requireRole(['admin', 'superadmin']),
   controller.setPrimary.bind(controller)
-);
-
-/**
- * Reorder experience images.
- * PATCH /api/experiences/:id/images/reorder.
- * @access public
- */
-router.patch(
-  '/:id/images/reorder',
-  authenticateToken,
-  requireRole(['admin', 'superadmin']),
-  controller.reorderImages.bind(controller)
 );
 
 module.exports = router;

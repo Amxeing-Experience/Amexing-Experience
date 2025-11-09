@@ -68,17 +68,103 @@ class ExperienceImage extends BaseModel {
   }
 
   /**
-   * Get image URL.
-   * @returns {string} Image URL path.
+   * Get Parse.File (legacy support for old images).
+   * @returns {Parse.File|null} Parse.File object or null.
    * @example
-   * const url = experienceImage.getUrl(); // '/uploads/experiences/123/image.jpg'
+   * const imageFile = experienceImage.getImageFile();
    */
-  getUrl() {
-    return this.get('url') || '';
+  getImageFile() {
+    return this.get('imageFile') || null;
   }
 
   /**
-   * Set image URL.
+   * Set Parse.File (legacy support).
+   * @param {Parse.File} file - Parse.File object.
+   * @example
+   * experienceImage.setImageFile(parseFile);
+   */
+  setImageFile(file) {
+    this.set('imageFile', file);
+  }
+
+  /**
+   * Get S3 key (new S3 direct upload).
+   * @returns {string} S3 key.
+   * @example
+   * const s3Key = experienceImage.getS3Key(); // 'experiences/exp123-timestamp.jpg'
+   */
+  getS3Key() {
+    return this.get('s3Key') || '';
+  }
+
+  /**
+   * Set S3 key.
+   * @param {string} key - S3 key.
+   * @example
+   * experienceImage.setS3Key('experiences/exp123-timestamp.jpg');
+   */
+  setS3Key(key) {
+    this.set('s3Key', key);
+  }
+
+  /**
+   * Get S3 bucket name.
+   * @returns {string} S3 bucket name.
+   * @example
+   * const bucket = experienceImage.getS3Bucket(); // 'amexing-bucket'
+   */
+  getS3Bucket() {
+    return this.get('s3Bucket') || '';
+  }
+
+  /**
+   * Set S3 bucket name.
+   * @param {string} bucket - S3 bucket name.
+   * @example
+   * experienceImage.setS3Bucket('amexing-bucket');
+   */
+  setS3Bucket(bucket) {
+    this.set('s3Bucket', bucket);
+  }
+
+  /**
+   * Get S3 region.
+   * @returns {string} S3 region.
+   * @example
+   * const region = experienceImage.getS3Region(); // 'us-east-2'
+   */
+  getS3Region() {
+    return this.get('s3Region') || '';
+  }
+
+  /**
+   * Set S3 region.
+   * @param {string} region - S3 region.
+   * @example
+   * experienceImage.setS3Region('us-east-2');
+   */
+  setS3Region(region) {
+    this.set('s3Region', region);
+  }
+
+  /**
+   * Get image URL (presigned S3 URL or legacy local path).
+   * Priority: imageFile (Parse.File) > url (legacy local path).
+   * @returns {string} Image URL path or presigned URL.
+   * @example
+   * const url = experienceImage.getUrl(); // Presigned S3 URL or legacy path
+   */
+  getUrl() {
+    // Priority: imageFile (Parse.File with presigned URL) > url (legacy local)
+    const imageFile = this.get('imageFile');
+    if (imageFile) {
+      return imageFile.url(); // S3 presigned URL from Parse.File
+    }
+    return this.get('url') || ''; // Legacy local path
+  }
+
+  /**
+   * Set image URL (legacy support).
    * @param {string} url - Image URL path.
    * @example
    * experienceImage.setUrl('/uploads/experiences/123/image.jpg');

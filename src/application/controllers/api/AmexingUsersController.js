@@ -163,16 +163,28 @@ class AmexingUsersController {
         return this.sendError(res, 'Authentication required', 401);
       }
 
+      // Ensure role is set on currentUser for permission validation
+      if (!currentUser.role && req.userRole) {
+        currentUser.role = req.userRole;
+      }
+
       // Validate role is allowed for Amexing users
       if (userData.role && !this.allowedRoles.includes(userData.role)) {
         return this.sendError(res, `Invalid role for Amexing user. Allowed: ${this.allowedRoles.join(', ')}`, 400);
       }
 
       // Only SuperAdmin can create other SuperAdmins
-      const currentUserRole = currentUser.role || currentUser.get?.('role');
+      const currentUserRole = currentUser.role || req.userRole;
       if (userData.role === 'superadmin' && currentUserRole !== 'superadmin') {
         return this.sendError(res, 'Only SuperAdmin can create SuperAdmin users', 403);
       }
+
+      logger.info('Creating Amexing user', {
+        currentUserId: currentUser.id,
+        currentUserRole,
+        targetRole: userData.role,
+        targetEmail: userData.email,
+      });
 
       // Create user using service
       const result = await this.userService.createUser(userData, currentUser);
@@ -182,6 +194,7 @@ class AmexingUsersController {
       logger.error('Error in AmexingUsersController.createAmexingUser', {
         error: error.message,
         currentUser: req.user?.id,
+        currentUserRole: req.user?.role || req.userRole,
         userData: { ...req.body, password: undefined },
       });
 
@@ -253,6 +266,17 @@ class AmexingUsersController {
         return this.sendError(res, 'User ID is required', 400);
       }
 
+      // Ensure role is set on currentUser for permission validation
+      if (!currentUser.role && req.userRole) {
+        currentUser.role = req.userRole;
+      }
+
+      logger.info('Deactivating user', {
+        currentUserId: currentUser.id,
+        currentUserRole: currentUser.role || req.userRole,
+        targetUserId: userId,
+      });
+
       // Deactivate user using service
       const result = await this.userService.deactivateUser(userId, currentUser);
 
@@ -262,6 +286,7 @@ class AmexingUsersController {
         error: error.message,
         userId: req.params.id,
         currentUser: req.user?.id,
+        currentUserRole: req.user?.role || req.userRole,
       });
 
       this.sendError(res, error.message, 500);
@@ -295,8 +320,25 @@ class AmexingUsersController {
         return this.sendError(res, 'Active status must be a boolean', 400);
       }
 
+      // Ensure role is set on currentUser for permission validation
+      if (!currentUser.role && req.userRole) {
+        currentUser.role = req.userRole;
+      }
+
+      logger.info('Toggling user status', {
+        currentUserId: currentUser.id,
+        currentUserRole: currentUser.role || req.userRole,
+        targetUserId: userId,
+        newStatus: active,
+      });
+
       // Toggle status using service
-      const result = await this.userService.toggleUserStatus(userId, active, currentUser);
+      const result = await this.userService.toggleUserStatus(currentUser, userId, active);
+
+      // Check if operation was successful
+      if (!result.success) {
+        return this.sendError(res, result.message || 'Failed to toggle user status', 400);
+      }
 
       this.sendSuccess(res, result, `User ${active ? 'activated' : 'deactivated'} successfully`);
     } catch (error) {
@@ -304,6 +346,7 @@ class AmexingUsersController {
         error: error.message,
         userId: req.params.id,
         currentUser: req.user?.id,
+        currentUserRole: req.user?.role || req.userRole,
       });
 
       this.sendError(res, error.message, 500);

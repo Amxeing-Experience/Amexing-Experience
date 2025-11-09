@@ -12,6 +12,12 @@
 
 const Parse = require('parse/node');
 
+/**
+ * Permission Context Switcher UI Component
+ * Frontend component for switching between permission contexts (user/client/department).
+ * Provides visual interface for context selection with auto-refresh capability.
+ * @class PermissionContextSwitcher
+ */
 class PermissionContextSwitcher {
   /**
    * Creates a new PermissionContextSwitcher instance.

@@ -536,6 +536,7 @@ class UserManagementService {
     try {
       // Get user using existing records query (includes archived)
       const query = BaseModel.queryExisting(this.className);
+      query.include('roleId'); // Include role data for permission validation
       const user = await query.get(userId, {
         useMasterKey: true,
         context: extractUserContext(deactivatedBy),
@@ -687,6 +688,7 @@ class UserManagementService {
     try {
       // Query active users to get current user data
       const query = BaseModel.queryActive(this.className);
+      query.include('roleId'); // Include role data for permission validation
       let user;
 
       try {
@@ -697,6 +699,7 @@ class UserManagementService {
       } catch (error) {
         // If user not found in active query, try archived query
         const archivedQuery = BaseModel.queryArchived(this.className);
+        archivedQuery.include('roleId'); // Include role data for permission validation
         user = await archivedQuery.get(userId, {
           useMasterKey: true,
           context: extractUserContext(currentUser),
@@ -946,6 +949,21 @@ class UserManagementService {
     }
   }
 
+  /**
+   * Search users with role-based filtering and pagination
+   * Searches users by name or email with optional role/status filters.
+   * @param {Parse.User} currentUser - Current authenticated user.
+   * @param {object} [searchParams] - Search parameters.
+   * @param {string} [searchParams.query] - Search query for name/email.
+   * @param {string} [searchParams.role] - Filter by role.
+   * @param {boolean} [searchParams.active] - Filter by active status.
+   * @param {number} [searchParams.page] - Page number.
+   * @param {number} [searchParams.limit] - Results per page.
+   * @param {string} [searchParams.sortField] - Sort field.
+   * @param {string} [searchParams.sortDirection] - Sort direction.
+   * @returns {Promise<object>} Search results with pagination.
+   * @example
+   */
   async searchUsers(currentUser, searchParams = {}) {
     try {
       const {
@@ -1614,20 +1632,40 @@ class UserManagementService {
    * @returns {*} - Operation result.
    */
   canCreateUser(currentUser, targetRole) {
-    console.log('[DEBUG] canCreateUser - currentUser:', {
-      id: currentUser.id,
-      role: currentUser.role,
-      email: currentUser.email,
-    });
-    console.log('[DEBUG] canCreateUser - targetRole:', targetRole);
+    // Get role from currentUser - prioritize direct property 'role' (set by controller)
+    let currentRole = currentUser?.role;
+    if (!currentRole && typeof currentUser?.get === 'function') {
+      currentRole = currentUser.get('role');
+    }
 
-    const currentLevel = this.roleHierarchy[currentUser.role] || 0;
+    const currentLevel = this.roleHierarchy[currentRole] || 0;
     const targetLevel = this.roleHierarchy[targetRole] || 0;
 
-    console.log('[DEBUG] canCreateUser - currentLevel:', currentLevel, 'targetLevel:', targetLevel);
+    // Debug logging
+    logger.info('canCreateUser validation', {
+      currentUserId: currentUser?.id || currentUser?.objectId,
+      currentRole,
+      currentLevel,
+      targetRole,
+      targetLevel,
+      canCreate: currentLevel >= targetLevel,
+      hasGetMethod: typeof currentUser?.get === 'function',
+      hasRoleProperty: !!currentUser?.role,
+    });
 
     // Can only create users with lower or equal role level
-    return currentLevel >= targetLevel;
+    const canCreate = currentLevel >= targetLevel;
+
+    if (!canCreate) {
+      logger.warn('Cannot create user: insufficient role level', {
+        currentRole,
+        currentLevel,
+        targetRole,
+        targetLevel,
+      });
+    }
+
+    return canCreate;
   }
 
   /**
@@ -1643,21 +1681,60 @@ class UserManagementService {
    * @returns {boolean} - Boolean result Operation result.
    */
   canModifyUser(currentUser, targetUser) {
-    // Get role from currentUser - might be property or get() method
-    const currentRole = currentUser?.role || (typeof currentUser?.get === 'function' ? currentUser.get('role') : null);
-    // Get role from targetUser - try property first, then get() method
-    const targetRole = targetUser?.role || (typeof targetUser?.get === 'function' ? targetUser.get('role') : null);
+    // Get role from currentUser - prioritize direct property 'role' (set by controller)
+    let currentRole = currentUser?.role;
+    if (!currentRole && typeof currentUser?.get === 'function') {
+      currentRole = currentUser.get('role');
+    }
+
+    // Get role from targetUser - handle Pointer, property, or get() method
+    let targetRole = null;
+    if (targetUser?.role) {
+      targetRole = targetUser.role;
+    } else if (typeof targetUser?.get === 'function') {
+      // Try to get role from roleId Pointer first
+      const rolePointer = targetUser.get('roleId');
+      if (rolePointer && typeof rolePointer.get === 'function') {
+        targetRole = rolePointer.get('name');
+      } else {
+        // Fallback to direct role field
+        targetRole = targetUser.get('role');
+      }
+    }
 
     const currentLevel = this.roleHierarchy[currentRole] || 0;
     const targetLevel = this.roleHierarchy[targetRole] || 0;
 
+    // Debug logging
+    logger.info('canModifyUser validation', {
+      currentUserId: currentUser?.id || currentUser?.objectId,
+      currentRole,
+      currentLevel,
+      targetUserId: targetUser?.id || targetUser?.objectId,
+      targetRole,
+      targetLevel,
+      canModify: currentLevel >= targetLevel,
+      hasGetMethod: typeof currentUser?.get === 'function',
+      hasRoleProperty: !!currentUser?.role,
+    });
+
     // Cannot modify users with higher role level
     if (currentLevel < targetLevel) {
+      logger.warn('Cannot modify user: higher role level', {
+        currentRole,
+        currentLevel,
+        targetRole,
+        targetLevel,
+      });
       return false;
     }
 
     // Cannot modify other superadmins unless you are superadmin
     if (targetRole === 'superadmin' && currentRole !== 'superadmin') {
+      logger.warn('Cannot modify superadmin: insufficient role', {
+        currentRole,
+        targetRole,
+      });
       return false;
     }
 
