@@ -1,0 +1,224 @@
+<%
+/**
+ * Department Manager Vehicles Management Page
+ * View-only access to Amexing vehicle fleet and vehicle types
+ *
+ * Layout Structure:
+ * - Vertical navigation menu (collapsible)
+ * - Two sections: Vehículos (vehicles list) and Tipos (vehicle types management)
+ * - Section-based content rendering
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller
+ * Department managers have read-only access to vehicle information
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'department_manager';
+const activeSection = typeof section !== 'undefined' ? section : 'vehicles';
+
+// Menu items configuration
+const menuItems = [
+    { label: 'Vehículos', icon: 'car', section: 'vehicles', href: '/dashboard/department_manager/vehicles' },
+    { label: 'Tipos de Vehículo', icon: 'list', section: 'types', href: '/dashboard/department_manager/vehicles?section=types' }
+];
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold">Vehículos</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/department_manager" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-car me-1"></i>Vehículos
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content with spacing from header -->
+<div class="row mt-4">
+    <div class="col-lg-3 mb-3 mb-lg-0" id="menuColumn">
+        <nav class="vertical-menu card border-0 shadow-sm">
+            <div class="card-body p-3">
+                <div class="menu-header mb-3">
+                    <h6 class="text-uppercase text-muted fw-bold menu-title" style="font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 0;">MENÚ</h6>
+                    <button class="btn btn-sm btn-link text-muted p-0 menu-toggle-btn" id="menuToggle" type="button" aria-label="Colapsar menú">
+                        <i class="ti ti-menu-2 fs-5"></i>
+                    </button>
+                </div>
+                <% menuItems.forEach(function(item) { %>
+                    <a href="<%= item.href %>" class="menu-item <%= item.section === activeSection ? 'active' : '' %>" data-bs-toggle="tooltip" data-bs-placement="right" title="<%= item.label %>">
+                        <i class="ti ti-<%= item.icon %> menu-icon"></i><span class="menu-label"><%= item.label %></span>
+                    </a>
+                <% }); %>
+            </div>
+        </nav>
+    </div>
+
+    <div class="col-lg-9" id="contentColumn">
+        <% if (activeSection === 'vehicles') { %>
+            <!-- Vehicles Management Section -->
+            <%- include('../../organisms/datatable/vehicles-table', {
+                tableId: 'vehicles-table',
+                apiEndpoint: '/api/vehicles',
+                userRole: currentUserRole,
+                showActions: false
+            }) %>
+
+        <% } else if (activeSection === 'types') { %>
+            <!-- Vehicle Types Management Section -->
+            <%- include('../../organisms/datatable/vehicle-types-table', {
+                tableId: 'vehicle-types-table',
+                apiEndpoint: '/api/vehicle-types',
+                userRole: currentUserRole,
+                showActions: false
+            }) %>
+
+        <% } %>
+    </div>
+</div>
+
+<!-- Include the same styles as admin but adapted for department manager -->
+<style>
+/* Vertical Menu Styles */
+.vertical-menu {
+    position: sticky;
+    top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.vertical-menu.collapsed {
+    max-width: 80px;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 0.5rem;
+    margin-bottom: 0.125rem;
+    color: #6c757d;
+    text-decoration: none;
+    border-radius: 0.375rem;
+    transition: all 0.2s ease;
+    position: relative;
+    cursor: pointer;
+}
+
+.menu-item:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+    text-decoration: none;
+}
+
+.menu-item.active {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    font-weight: 500;
+}
+
+.menu-icon {
+    width: 1.25rem;
+    flex-shrink: 0;
+    margin-right: 0.5rem;
+    font-size: 1rem;
+}
+
+.menu-label {
+    flex: 1;
+    font-size: 0.875rem;
+    transition: opacity 0.3s ease;
+}
+
+.menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 0.75rem;
+}
+
+.menu-toggle-btn {
+    border: none !important;
+    background: none !important;
+    box-shadow: none !important;
+}
+
+.menu-toggle-btn:focus {
+    box-shadow: none !important;
+}
+
+/* Responsive behavior */
+@media (max-width: 991.98px) {
+    .vertical-menu {
+        position: static;
+        margin-bottom: 1rem;
+    }
+    
+    .menu-header .menu-toggle-btn {
+        display: inline-block;
+    }
+}
+
+@media (min-width: 992px) {
+    .menu-header .menu-toggle-btn {
+        display: none;
+    }
+}
+
+/* Collapsed state */
+.vertical-menu.collapsed .menu-label {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+}
+
+.vertical-menu.collapsed .menu-icon {
+    margin-right: 0;
+}
+
+.vertical-menu.collapsed .menu-header .menu-title {
+    opacity: 0;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Menu toggle functionality
+    const menuToggle = document.getElementById('menuToggle');
+    const verticalMenu = document.querySelector('.vertical-menu');
+    const menuColumn = document.getElementById('menuColumn');
+    const contentColumn = document.getElementById('contentColumn');
+
+    if (menuToggle && verticalMenu) {
+        menuToggle.addEventListener('click', function() {
+            verticalMenu.classList.toggle('collapsed');
+            
+            // Adjust Bootstrap grid classes
+            if (verticalMenu.classList.contains('collapsed')) {
+                menuColumn.className = 'col-lg-1 mb-3 mb-lg-0';
+                contentColumn.className = 'col-lg-11';
+            } else {
+                menuColumn.className = 'col-lg-3 mb-3 mb-lg-0';
+                contentColumn.className = 'col-lg-9';
+            }
+        });
+    }
+
+    // Initialize tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+</script>

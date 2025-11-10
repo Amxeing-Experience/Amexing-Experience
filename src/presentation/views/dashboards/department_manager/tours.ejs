@@ -1,0 +1,51 @@
+<%
+/**
+ * Department Manager Tours Management Page
+ * View-only access to tour packages and itineraries
+ *
+ * Layout Structure:
+ * - Direct row/column structure
+ * - Container-fluid from Flexy Bootstrap
+ * - DataTables for tours listing
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller
+ * Department managers can view tours but cannot modify them
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'department_manager';
+const currentPath = '/dashboard/department_manager/tours';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="mb-4">
+            <h2 class="mb-1 fw-bold">Tours</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item">
+                        <a href="/dashboard/department_manager" class="text-decoration-none">
+                            <i class="ti ti-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">
+                        <i class="ti ti-map me-1"></i>Tours
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Tours DataTable -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/datatable/tours-table', {
+            tableId: 'tours-table',
+            apiEndpoint: '/api/tours',
+            userRole: currentUserRole,
+            showActions: false
+        }) %>
+    </div>
+</div>

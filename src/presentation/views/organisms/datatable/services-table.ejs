@@ -229,8 +229,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
 
-        // Get JWT token from cookies
+        // Get JWT token from localStorage or cookies
         function getAccessToken() {
+            // First try localStorage (used by other parts of the app)
+            const tokenFromStorage = localStorage.getItem('accessToken');
+            if (tokenFromStorage) {
+                return tokenFromStorage;
+            }
+            
+            // Fallback to cookies (httpOnly cookies won't work, but try anyway)
             const cookies = document.cookie.split(';');
             for (let cookie of cookies) {
                 const [name, value] = cookie.trim().split('=');

@@ -199,6 +199,7 @@ class QuoteController {
 
   /**
    * GET /api/quotes - Get quotes with DataTables server-side processing.
+   * Now supports role-based filtering for department managers.
    *
    * Query Parameters (DataTables format):
    * - draw: Draw counter for DataTables
@@ -233,19 +234,23 @@ class QuoteController {
       const columns = ['client', 'rate', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt'];
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
-      // Get total records count (without search filter)
-      const totalRecordsQuery = new Parse.Query('Quote');
-      totalRecordsQuery.equalTo('exists', true);
-      const recordsTotal = await totalRecordsQuery.count({
-        useMasterKey: true,
-      });
-
-      // Build base query for all existing records
+      // Build base query for all existing records with role-based filtering
       const baseQuery = new Parse.Query('Quote');
       baseQuery.equalTo('exists', true);
       baseQuery.include('client');
       baseQuery.include('rate');
       baseQuery.include('createdBy');
+
+      // Apply role-based filters
+      await this.applyRoleBasedQuoteFilters(baseQuery, currentUser);
+
+      // Get total records count (without search filter but with role filters)
+      const totalRecordsQuery = new Parse.Query('Quote');
+      totalRecordsQuery.equalTo('exists', true);
+      await this.applyRoleBasedQuoteFilters(totalRecordsQuery, currentUser);
+      const recordsTotal = await totalRecordsQuery.count({
+        useMasterKey: true,
+      });
 
       // Build filtered query with search
       let filteredQuery = baseQuery;
@@ -254,10 +259,12 @@ class QuoteController {
         const folioQuery = new Parse.Query('Quote');
         folioQuery.equalTo('exists', true);
         folioQuery.matches('folio', searchValue, 'i');
+        await this.applyRoleBasedQuoteFilters(folioQuery, currentUser);
 
         const contactQuery = new Parse.Query('Quote');
         contactQuery.equalTo('exists', true);
         contactQuery.matches('contactPerson', searchValue, 'i');
+        await this.applyRoleBasedQuoteFilters(contactQuery, currentUser);
 
         filteredQuery = Parse.Query.or(folioQuery, contactQuery);
         filteredQuery.include('client');
@@ -1310,6 +1317,146 @@ class QuoteController {
       });
 
       return this.sendError(res, 'Error al generar enlace de compartir', 500);
+    }
+  }
+
+  /**
+   * Apply role-based filters to quote queries.
+   * Ensures department managers only see quotes created by users in their department.
+   * @param {Parse.Query} query - Parse query to apply filters to.
+   * @param {object} currentUser - Current authenticated user.
+   * @returns {Promise<void>}
+   * @example
+   * // Apply filters to a quote query
+   * await this.applyRoleBasedQuoteFilters(query, currentUser);
+   */
+  async applyRoleBasedQuoteFilters(query, currentUser) {
+    try {
+      const userRole = currentUser.role || currentUser.get('role');
+
+      // Super admins and admins can see all quotes
+      if (userRole === 'superadmin' || userRole === 'admin') {
+        return; // No additional filters needed
+      }
+
+      // Department managers can only see quotes created by users in their department
+      if (userRole === 'department_manager') {
+        const userDepartmentId = currentUser.departmentId || currentUser.get('departmentId');
+
+        if (!userDepartmentId) {
+          logger.warn('Department manager missing departmentId, restricting to own quotes only', {
+            userId: currentUser.id,
+            role: userRole,
+          });
+          // If no department ID, only show quotes they created themselves
+          query.equalTo('createdBy', {
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: currentUser.id,
+          });
+          return;
+        }
+
+        // Find all users in the same department
+        const departmentUsersQuery = new Parse.Query('AmexingUser');
+        departmentUsersQuery.equalTo('departmentId', userDepartmentId);
+        departmentUsersQuery.equalTo('exists', true);
+        departmentUsersQuery.equalTo('active', true);
+
+        const departmentUsers = await departmentUsersQuery.find({ useMasterKey: true });
+
+        if (departmentUsers.length === 0) {
+          // No users in department, restrict to own quotes only
+          query.equalTo('createdBy', {
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: currentUser.id,
+          });
+          return;
+        }
+
+        // Create array of user pointers for the department
+        const departmentUserPointers = departmentUsers.map((user) => ({
+          __type: 'Pointer',
+          className: 'AmexingUser',
+          objectId: user.id,
+        }));
+
+        // Filter quotes to only those created by users in this department
+        query.containedIn('createdBy', departmentUserPointers);
+
+        logger.info('Applied department filter to quotes query', {
+          userId: currentUser.id,
+          departmentId: userDepartmentId,
+          departmentUsersCount: departmentUsers.length,
+        });
+
+        return;
+      }
+
+      // Clients can only see quotes created by users in their organization
+      if (userRole === 'client') {
+        const userClientId = currentUser.clientId || currentUser.get('clientId') || currentUser.id;
+
+        // Find all users in the same client organization
+        const clientUsersQuery = new Parse.Query('AmexingUser');
+        clientUsersQuery.equalTo('clientId', userClientId);
+        clientUsersQuery.equalTo('exists', true);
+        clientUsersQuery.equalTo('active', true);
+
+        const clientUsers = await clientUsersQuery.find({ useMasterKey: true });
+
+        if (clientUsers.length === 0) {
+          // No users in organization, restrict to own quotes only
+          query.equalTo('createdBy', {
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: currentUser.id,
+          });
+          return;
+        }
+
+        const clientUserPointers = clientUsers.map((user) => ({
+          __type: 'Pointer',
+          className: 'AmexingUser',
+          objectId: user.id,
+        }));
+
+        query.containedIn('createdBy', clientUserPointers);
+
+        logger.info('Applied client filter to quotes query', {
+          userId: currentUser.id,
+          clientId: userClientId,
+          clientUsersCount: clientUsers.length,
+        });
+
+        return;
+      }
+
+      // Employees, drivers, guests can only see their own quotes
+      query.equalTo('createdBy', {
+        __type: 'Pointer',
+        className: 'AmexingUser',
+        objectId: currentUser.id,
+      });
+
+      logger.info('Applied user-only filter to quotes query', {
+        userId: currentUser.id,
+        role: userRole,
+      });
+    } catch (error) {
+      logger.error('Error applying role-based quote filters', {
+        error: error.message,
+        userId: currentUser.id,
+        role: currentUser.role || currentUser.get('role'),
+      });
+
+      // On error, restrict to user's own quotes as fallback
+      query.equalTo('createdBy', {
+        __type: 'Pointer',
+        className: 'AmexingUser',
+        objectId: currentUser.id,
+      });
     }
   }
 

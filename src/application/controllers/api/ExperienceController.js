@@ -770,6 +770,7 @@ class ExperienceController {
    * @param {object} query - Request query object.
    * @returns {object} Parsed parameters.
    * @private
+   * @example
    */
   parseDataTablesParams(query) {
     return {
@@ -793,6 +794,7 @@ class ExperienceController {
    * @param {string} excludeId - ID to exclude.
    * @returns {Parse.Query} Base query.
    * @private
+   * @example
    */
   buildBaseQuery(typeFilter, excludeId) {
     const query = new Parse.Query('Experience');
@@ -813,6 +815,7 @@ class ExperienceController {
    * @param {string} excludeId - ID to exclude.
    * @returns {Parse.Query} Filtered query.
    * @private
+   * @example
    */
   buildSearchQuery(searchValue, typeFilter, excludeId) {
     const nameQuery = new Parse.Query('Experience');
@@ -835,6 +838,7 @@ class ExperienceController {
    * @param {Parse.Object} experience - Experience object.
    * @returns {object} Formatted experience data.
    * @private
+   * @example
    */
   formatExperienceData(experience) {
     const includedExperiences = experience.get('experiences') || [];
