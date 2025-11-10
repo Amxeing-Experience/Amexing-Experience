@@ -640,7 +640,7 @@ class QuoteController {
       }
 
       // 9. Set new values for status and validUntil
-      newQuote.set('status', 'requested');
+      newQuote.set('status', 'draft');
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
       newQuote.set('validUntil', validUntil);
