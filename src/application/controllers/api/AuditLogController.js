@@ -11,7 +11,7 @@
  * - Export-ready data formatting.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024
+ * @since 1.0.0
  * @example
  * // Usage example:
  * const controller = new AuditLogController();

@@ -3,7 +3,7 @@
  * RESTful routes for tours management.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-10-28
+ * @since 1.0.0
  */
 
 const express = require('express');

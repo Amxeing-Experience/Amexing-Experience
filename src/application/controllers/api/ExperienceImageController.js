@@ -13,7 +13,7 @@
  * - Includes PCI DSS security logging for all operations.
  * @author Amexing Development Team
  * @version 3.0.0 (Direct S3 Upload + Security Logging)
- * @since 2024-01-15
+ * @since 1.0.0
  */
 
 const Parse = require('parse/node');

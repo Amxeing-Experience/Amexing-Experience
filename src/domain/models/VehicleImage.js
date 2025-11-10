@@ -11,7 +11,7 @@
  * @augments BaseModel
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  * @example
  * // Create new vehicle image
  * const vehicleImage = new VehicleImage();
@@ -70,7 +70,7 @@ class VehicleImage extends BaseModel {
   /**
    * Get Parse.File for image (S3 storage).
    * @returns {Parse.File|null} Parse.File object or null.
-   * @since 1.1.0 (S3 migration)
+   * @since 1.1.0
    * @example
    * const imageFile = vehicleImage.getImageFile();
    * const s3Url = imageFile ? imageFile.url() : null;
@@ -82,7 +82,7 @@ class VehicleImage extends BaseModel {
   /**
    * Set Parse.File for image (S3 storage).
    * @param {Parse.File} file - Parse.File object.
-   * @since 1.1.0 (S3 migration)
+   * @since 1.1.0
    * @example
    * const parseFile = new Parse.File('vehicle.jpg', fileData);
    * vehicleImage.setImageFile(parseFile);

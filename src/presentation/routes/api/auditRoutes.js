@@ -11,7 +11,7 @@
  * - Statistics and summary endpoints.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2025-10-16
+ * @since 1.0.0
  * @example
  * // Usage example
  * router.use('/audit', auditRoutes);

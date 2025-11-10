@@ -12,7 +12,7 @@
  * @augments BaseModel
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  * @example
  * // Create new experience
  * const experience = new Experience();
@@ -395,18 +395,18 @@ class Experience extends BaseModel {
     if (!this.isPackage()) {
       return this.getName();
     }
-    
+
     const experiencesCount = this.getIncludedCount();
     const toursCount = this.getIncludedToursCount();
     const items = [];
-    
+
     if (experiencesCount > 0) {
       items.push(`${experiencesCount} experiencias`);
     }
     if (toursCount > 0) {
       items.push(`${toursCount} tours`);
     }
-    
+
     const packageInfo = items.length > 0 ? ` (${items.join(', ')})` : '';
     return `${this.getName()}${packageInfo}`;
   }
@@ -472,15 +472,15 @@ class Experience extends BaseModel {
     const experiences = this.getIncludedExperiences();
     const tours = this.getIncludedTours();
     const totalItems = this.getTotalIncludedCount();
-    
+
     if (experiences.length > 20) {
       errors.push('Maximum 20 experiences per package');
     }
-    
+
     if (tours.length > 20) {
       errors.push('Maximum 20 tours per package');
     }
-    
+
     if (totalItems > 30) {
       errors.push('Maximum 30 total items (experiences + tours) per package');
     }

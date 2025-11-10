@@ -11,7 +11,7 @@
  * - Comprehensive validation and audit logging.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-10-28
+ * @since 1.0.0
  * @example
  * GET /api/tours - List all tours with pagination
  * POST /api/tours - Create new tour

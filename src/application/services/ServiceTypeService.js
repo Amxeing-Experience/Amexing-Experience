@@ -13,7 +13,7 @@
  * - Error handling with detailed logging.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-10-24
+ * @since 1.0.0
  * @example
  * const service = new ServiceTypeService();
  * const result = await service.toggleServiceTypeStatus(currentUser, typeId, false, 'Deactivating unused type');
