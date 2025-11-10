@@ -220,6 +220,133 @@ class ServiceController {
         filteredQuery = Parse.Query.or(originQuery, destQuery, vehicleQuery, rateQuery);
       }
 
+      // Apply rate filter if provided
+      const { rateId } = req.query;
+      if (rateId && rateId.trim() !== '') {
+        // Create Rate pointer
+        const Rate = Parse.Object.extend('Rate');
+        const ratePointer = Rate.createWithoutData(rateId);
+
+        // Pre-fetch serviceType object if filter is provided (for combining with rate filter)
+        let serviceTypeObj = null;
+        if (serviceTypeFilter) {
+          const serviceTypeQuery = new Parse.Query('ServiceType');
+          serviceTypeQuery.equalTo('name', serviceTypeFilter);
+          serviceTypeObj = await serviceTypeQuery.first({ useMasterKey: true });
+        }
+
+        // If we already have a filtered query from search, combine with rate filter
+        if (searchValue) {
+          // Recreate search queries but add rate filter to each
+          // Origin search + rate
+          const originPOIQuery = new Parse.Query('POI');
+          originPOIQuery.matches('name', searchValue, 'i');
+          if (serviceTypeObj) {
+            originPOIQuery.equalTo('serviceType', serviceTypeObj);
+          }
+
+          const originQueryWithRate = new Parse.Query('Service');
+          originQueryWithRate.equalTo('exists', true);
+          originQueryWithRate.matchesQuery('originPOI', originPOIQuery);
+          originQueryWithRate.equalTo('rate', ratePointer);
+          originQueryWithRate.include('originPOI');
+          originQueryWithRate.include('destinationPOI');
+          originQueryWithRate.include('destinationPOI.serviceType');
+          originQueryWithRate.include('vehicleType');
+          originQueryWithRate.include('rate');
+
+          if (serviceTypeObj) {
+            const destPoiTypeQuery = new Parse.Query('POI');
+            destPoiTypeQuery.equalTo('serviceType', serviceTypeObj);
+            originQueryWithRate.matchesQuery('destinationPOI', destPoiTypeQuery);
+          }
+
+          // Destination search + rate
+          const destPOIQuery = new Parse.Query('POI');
+          destPOIQuery.matches('name', searchValue, 'i');
+          if (serviceTypeObj) {
+            destPOIQuery.equalTo('serviceType', serviceTypeObj);
+          }
+
+          const destQueryWithRate = new Parse.Query('Service');
+          destQueryWithRate.equalTo('exists', true);
+          destQueryWithRate.matchesQuery('destinationPOI', destPOIQuery);
+          destQueryWithRate.equalTo('rate', ratePointer);
+          destQueryWithRate.include('originPOI');
+          destQueryWithRate.include('destinationPOI');
+          destQueryWithRate.include('destinationPOI.serviceType');
+          destQueryWithRate.include('vehicleType');
+          destQueryWithRate.include('rate');
+
+          // Vehicle search + rate
+          const vehicleTypeQuery = new Parse.Query('VehicleType');
+          vehicleTypeQuery.matches('name', searchValue, 'i');
+
+          const vehicleQueryWithRate = new Parse.Query('Service');
+          vehicleQueryWithRate.equalTo('exists', true);
+          vehicleQueryWithRate.matchesQuery('vehicleType', vehicleTypeQuery);
+          vehicleQueryWithRate.equalTo('rate', ratePointer);
+          vehicleQueryWithRate.include('originPOI');
+          vehicleQueryWithRate.include('destinationPOI');
+          vehicleQueryWithRate.include('destinationPOI.serviceType');
+          vehicleQueryWithRate.include('vehicleType');
+          vehicleQueryWithRate.include('rate');
+
+          if (serviceTypeObj) {
+            const poiQuery = new Parse.Query('POI');
+            poiQuery.equalTo('serviceType', serviceTypeObj);
+            vehicleQueryWithRate.matchesQuery('destinationPOI', poiQuery);
+          }
+
+          // Rate name search + rate filter (already matches the rate)
+          const rateTypeQuery = new Parse.Query('Rate');
+          rateTypeQuery.matches('name', searchValue, 'i');
+          rateTypeQuery.equalTo('objectId', rateId); // Must match the filtered rate
+
+          const rateQueryWithRate = new Parse.Query('Service');
+          rateQueryWithRate.equalTo('exists', true);
+          rateQueryWithRate.matchesQuery('rate', rateTypeQuery);
+          rateQueryWithRate.include('originPOI');
+          rateQueryWithRate.include('destinationPOI');
+          rateQueryWithRate.include('destinationPOI.serviceType');
+          rateQueryWithRate.include('vehicleType');
+          rateQueryWithRate.include('rate');
+
+          if (serviceTypeObj) {
+            const poiQuery = new Parse.Query('POI');
+            poiQuery.equalTo('serviceType', serviceTypeObj);
+            rateQueryWithRate.matchesQuery('destinationPOI', poiQuery);
+          }
+
+          filteredQuery = Parse.Query.or(
+            originQueryWithRate,
+            destQueryWithRate,
+            vehicleQueryWithRate,
+            rateQueryWithRate
+          );
+        } else {
+          // Just rate filter (no search), but may have serviceType filter
+          // Create new query with same filters as baseQuery plus rate filter
+          const rateOnlyQuery = new Parse.Query('Service');
+          rateOnlyQuery.equalTo('exists', true);
+          rateOnlyQuery.equalTo('rate', ratePointer);
+          rateOnlyQuery.include('originPOI');
+          rateOnlyQuery.include('destinationPOI');
+          rateOnlyQuery.include('destinationPOI.serviceType');
+          rateOnlyQuery.include('vehicleType');
+          rateOnlyQuery.include('rate');
+
+          // Apply serviceType filter if present
+          if (serviceTypeObj) {
+            const poiQuery = new Parse.Query('POI');
+            poiQuery.equalTo('serviceType', serviceTypeObj);
+            rateOnlyQuery.matchesQuery('destinationPOI', poiQuery);
+          }
+
+          filteredQuery = rateOnlyQuery;
+        }
+      }
+
       // Get count of filtered results
       const recordsFiltered = await filteredQuery.count({ useMasterKey: true });
 
@@ -440,6 +567,7 @@ class ServiceController {
 
       // DataTables response format
       const response = {
+        success: true,
         draw,
         recordsTotal,
         recordsFiltered,
