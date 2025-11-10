@@ -11,7 +11,7 @@
  * - Soft delete pattern compliance.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-09-24
+ * @since 1.0.0
  * @example
  * // Create a permission for booking approval with conditions
  * const permission = Permission.create({

@@ -7,7 +7,7 @@
  * @file Middleware for audit trail user context propagation.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2025-10-16
+ * @since 1.0.0
  * @example
  * // In app.js or routes:
  * app.use(auditContextMiddleware);

@@ -12,7 +12,7 @@
  * - Comprehensive validation and audit logging.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  * @example
  * GET /api/experiences - List experiences with DataTables
  * POST /api/experiences - Create experience
@@ -47,136 +47,43 @@ class ExperienceController {
    */
   async getExperiences(req, res) {
     try {
-      const currentUser = req.user;
-      if (!currentUser) {
+      if (!req.user) {
         return this.sendError(res, 'Authentication required', 401);
       }
 
-      // Parse DataTables parameters
-      const draw = parseInt(req.query.draw, 10) || 1;
-      const start = parseInt(req.query.start, 10) || 0;
-      const length = Math.min(parseInt(req.query.length, 10) || this.defaultPageSize, this.maxPageSize);
-      const searchValue = req.query.search?.value || '';
-      const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
-      const sortDirection = req.query.order?.[0]?.dir || 'asc';
-      const typeFilter = req.query.type; // "Experience" or "Provider"
-      const { excludeId } = req.query; // ID to exclude from results (for edit modal)
-
-      // Column mapping for sorting
+      const params = this.parseDataTablesParams(req.query);
       const columns = ['name', 'description', 'cost', 'updatedAt'];
-      const sortField = columns[sortColumnIndex] || 'updatedAt';
+      const sortField = columns[params.sortColumnIndex] || 'updatedAt';
 
-      // Get total records count (without search filter)
-      const totalRecordsQuery = new Parse.Query('Experience');
-      totalRecordsQuery.equalTo('exists', true);
-      if (typeFilter && ['Experience', 'Provider'].includes(typeFilter)) {
-        totalRecordsQuery.equalTo('type', typeFilter);
-      }
-      const recordsTotal = await totalRecordsQuery.count({
-        useMasterKey: true,
-      });
+      // Get total records count
+      const totalQuery = this.buildBaseQuery(params.typeFilter, null);
+      const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
-      // Build base query for all existing records
-      const baseQuery = new Parse.Query('Experience');
-      baseQuery.equalTo('exists', true);
-      if (typeFilter && ['Experience', 'Provider'].includes(typeFilter)) {
-        baseQuery.equalTo('type', typeFilter);
-      }
-      // Exclude specific experience if provided (for edit modal to prevent self-selection)
-      if (excludeId) {
-        baseQuery.notEqualTo('objectId', excludeId);
-      }
+      // Build filtered query
+      const filteredQuery = params.searchValue
+        ? this.buildSearchQuery(params.searchValue, params.typeFilter, params.excludeId)
+        : this.buildBaseQuery(params.typeFilter, params.excludeId);
 
-      // Build filtered query with search
-      let filteredQuery = baseQuery;
-      if (searchValue) {
-        const nameQuery = new Parse.Query('Experience');
-        nameQuery.equalTo('exists', true);
-        if (typeFilter) nameQuery.equalTo('type', typeFilter);
-        if (excludeId) nameQuery.notEqualTo('objectId', excludeId);
-        nameQuery.matches('name', searchValue, 'i');
+      const recordsFiltered = await filteredQuery.count({ useMasterKey: true });
 
-        const descQuery = new Parse.Query('Experience');
-        descQuery.equalTo('exists', true);
-        if (typeFilter) descQuery.equalTo('type', typeFilter);
-        if (excludeId) descQuery.notEqualTo('objectId', excludeId);
-        descQuery.matches('description', searchValue, 'i');
-
-        filteredQuery = Parse.Query.or(nameQuery, descQuery);
-      }
-
-      // Get count of filtered results
-      const recordsFiltered = await filteredQuery.count({
-        useMasterKey: true,
-      });
-
-      // Apply sorting
-      if (sortDirection === 'asc') {
-        filteredQuery.ascending(sortField);
-      } else {
-        filteredQuery.descending(sortField);
-      }
-
-      // Include experiences and tours arrays for display
+      // Apply sorting and pagination
+      filteredQuery[params.sortDirection === 'asc' ? 'ascending' : 'descending'](sortField);
       filteredQuery.include('experiences');
       filteredQuery.include('vehicleType');
       filteredQuery.include('tours');
+      filteredQuery.skip(params.start);
+      filteredQuery.limit(params.length);
 
-      // Apply pagination
-      filteredQuery.skip(start);
-      filteredQuery.limit(length);
-
-      // Execute query
+      // Execute and format
       const experiences = await filteredQuery.find({ useMasterKey: true });
+      const data = experiences.map((exp) => this.formatExperienceData(exp));
 
-      // Format data for DataTables
-      const data = experiences.map((experience) => {
-        const includedExperiences = experience.get('experiences') || [];
-        const includedTours = experience.get('tours') || [];
-        const vehicleType = experience.get('vehicleType');
-
-        return {
-          id: experience.id,
-          objectId: experience.id,
-          name: experience.get('name'),
-          description: experience.get('description'),
-          type: experience.get('type'),
-          providerType: experience.get('providerType'),
-          duration: experience.get('duration'),
-          cost: experience.get('cost'),
-          vehicleType: vehicleType ? {
-            id: vehicleType.id,
-            name: vehicleType.get('name'),
-            code: vehicleType.get('code'),
-          } : null,
-          vehicleTypeId: vehicleType ? vehicleType.id : null,
-          experiences: includedExperiences.map((exp) => ({
-            id: exp.id,
-            name: exp.get('name'),
-          })),
-          tours: includedTours.map((tour) => ({
-            id: tour.id,
-            destinationPOI: tour.get('destinationPOI'),
-            time: tour.get('time'),
-          })),
-          experienceCount: includedExperiences.length,
-          tourCount: includedTours.length,
-          totalItemCount: includedExperiences.length + includedTours.length,
-          active: experience.get('active'),
-          createdAt: experience.createdAt,
-          updatedAt: experience.updatedAt,
-        };
-      });
-
-      // DataTables response format
-      const response = {
-        draw,
+      return res.json({
+        draw: params.draw,
         recordsTotal,
         recordsFiltered,
         data,
-      };
-
-      return res.json(response);
+      });
     } catch (error) {
       logger.error('Error in ExperienceController.getExperiences', {
         error: error.message,
@@ -856,6 +763,117 @@ class ExperienceController {
         500
       );
     }
+  }
+
+  /**
+   * Parse DataTables request parameters.
+   * @param {object} query - Request query object.
+   * @returns {object} Parsed parameters.
+   * @private
+   */
+  parseDataTablesParams(query) {
+    return {
+      draw: parseInt(query.draw, 10) || 1,
+      start: parseInt(query.start, 10) || 0,
+      length: Math.min(
+        parseInt(query.length, 10) || this.defaultPageSize,
+        this.maxPageSize
+      ),
+      searchValue: query.search?.value || '',
+      sortColumnIndex: parseInt(query.order?.[0]?.column, 10) || 0,
+      sortDirection: query.order?.[0]?.dir || 'asc',
+      typeFilter: query.type,
+      excludeId: query.excludeId,
+    };
+  }
+
+  /**
+   * Build base query for experiences.
+   * @param {string} typeFilter - Type filter (Experience/Provider).
+   * @param {string} excludeId - ID to exclude.
+   * @returns {Parse.Query} Base query.
+   * @private
+   */
+  buildBaseQuery(typeFilter, excludeId) {
+    const query = new Parse.Query('Experience');
+    query.equalTo('exists', true);
+    if (typeFilter && ['Experience', 'Provider'].includes(typeFilter)) {
+      query.equalTo('type', typeFilter);
+    }
+    if (excludeId) {
+      query.notEqualTo('objectId', excludeId);
+    }
+    return query;
+  }
+
+  /**
+   * Build search query with filters.
+   * @param {string} searchValue - Search term.
+   * @param {string} typeFilter - Type filter (Experience/Provider).
+   * @param {string} excludeId - ID to exclude.
+   * @returns {Parse.Query} Filtered query.
+   * @private
+   */
+  buildSearchQuery(searchValue, typeFilter, excludeId) {
+    const nameQuery = new Parse.Query('Experience');
+    nameQuery.equalTo('exists', true);
+    if (typeFilter) nameQuery.equalTo('type', typeFilter);
+    if (excludeId) nameQuery.notEqualTo('objectId', excludeId);
+    nameQuery.matches('name', searchValue, 'i');
+
+    const descQuery = new Parse.Query('Experience');
+    descQuery.equalTo('exists', true);
+    if (typeFilter) descQuery.equalTo('type', typeFilter);
+    if (excludeId) descQuery.notEqualTo('objectId', excludeId);
+    descQuery.matches('description', searchValue, 'i');
+
+    return Parse.Query.or(nameQuery, descQuery);
+  }
+
+  /**
+   * Format experience data for DataTables.
+   * @param {Parse.Object} experience - Experience object.
+   * @returns {object} Formatted experience data.
+   * @private
+   */
+  formatExperienceData(experience) {
+    const includedExperiences = experience.get('experiences') || [];
+    const includedTours = experience.get('tours') || [];
+    const vehicleType = experience.get('vehicleType');
+
+    return {
+      id: experience.id,
+      objectId: experience.id,
+      name: experience.get('name'),
+      description: experience.get('description'),
+      type: experience.get('type'),
+      providerType: experience.get('providerType'),
+      duration: experience.get('duration'),
+      cost: experience.get('cost'),
+      vehicleType: vehicleType
+        ? {
+          id: vehicleType.id,
+          name: vehicleType.get('name'),
+          code: vehicleType.get('code'),
+        }
+        : null,
+      vehicleTypeId: vehicleType ? vehicleType.id : null,
+      experiences: includedExperiences.map((exp) => ({
+        id: exp.id,
+        name: exp.get('name'),
+      })),
+      tours: includedTours.map((tour) => ({
+        id: tour.id,
+        destinationPOI: tour.get('destinationPOI'),
+        time: tour.get('time'),
+      })),
+      experienceCount: includedExperiences.length,
+      tourCount: includedTours.length,
+      totalItemCount: includedExperiences.length + includedTours.length,
+      active: experience.get('active'),
+      createdAt: experience.createdAt,
+      updatedAt: experience.updatedAt,
+    };
   }
 
   /**

@@ -13,7 +13,7 @@
  * - Pointer handling for POIs and VehicleTypes.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  * @example
  * GET /api/services - List all services with pagination
  * POST /api/services - Create new service

@@ -11,7 +11,7 @@
  * - Hierarchical delegation validation.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-09-24
+ * @since 1.0.0
  * @example
  * // Delegate booking approval permission with amount limit
  * const delegation = DelegatedPermission.create({

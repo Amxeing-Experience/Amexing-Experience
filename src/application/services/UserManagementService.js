@@ -10,7 +10,7 @@
  * - Security validation and input sanitization.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-09-22
+ * @since 1.0.0
  * @example
  * // User management service usage
  * const result = await usermanagementservice.require(userId, data);

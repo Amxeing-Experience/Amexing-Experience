@@ -19,7 +19,7 @@
  * @file Parse Server hooks for automatic audit trail generation.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2025-10-16
+ * @since 1.0.0
  * @example
  * // Register hooks during server startup
  * const { registerAuditHooks } = require('./cloud/hooks/auditTrailHooks');

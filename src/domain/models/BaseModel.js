@@ -11,7 +11,7 @@
  * - active: false, exists: false = Soft deleted record (hidden from normal queries, audit trail only).
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-09-22
+ * @since 1.0.0
  * @example
  * // Model method usage
  * const result = await basemodel.require({ 'parse/node': 'example' });
@@ -40,7 +40,7 @@ const logger = require('../../infrastructure/logger');
  * @augments Parse.Object
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-09-22
+ * @since 1.0.0
  * @example
  * // Extend BaseModel for domain entities
  * class AmexingUser extends BaseModel {

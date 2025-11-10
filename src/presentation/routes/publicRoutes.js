@@ -9,7 +9,7 @@
  * - Input validation and sanitization.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  */
 
 const express = require('express');
