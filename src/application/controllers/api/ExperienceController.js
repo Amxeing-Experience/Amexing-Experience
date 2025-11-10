@@ -119,6 +119,7 @@ class ExperienceController {
 
       // Include experiences and tours arrays for display
       filteredQuery.include('experiences');
+      filteredQuery.include('vehicleType');
       filteredQuery.include('tours');
 
       // Apply pagination
@@ -132,6 +133,7 @@ class ExperienceController {
       const data = experiences.map((experience) => {
         const includedExperiences = experience.get('experiences') || [];
         const includedTours = experience.get('tours') || [];
+        const vehicleType = experience.get('vehicleType');
 
         return {
           id: experience.id,
@@ -142,6 +144,12 @@ class ExperienceController {
           providerType: experience.get('providerType'),
           duration: experience.get('duration'),
           cost: experience.get('cost'),
+          vehicleType: vehicleType ? {
+            id: vehicleType.id,
+            name: vehicleType.get('name'),
+            code: vehicleType.get('code'),
+          } : null,
+          vehicleTypeId: vehicleType ? vehicleType.id : null,
           experiences: includedExperiences.map((exp) => ({
             id: exp.id,
             name: exp.get('name'),
@@ -208,6 +216,7 @@ class ExperienceController {
       const query = new Parse.Query('Experience');
       query.equalTo('exists', true);
       query.include('experiences');
+      query.include('vehicleType');
 
       const experience = await query.get(experienceId, { useMasterKey: true });
 
@@ -217,6 +226,7 @@ class ExperienceController {
 
       const includedExperiences = experience.get('experiences') || [];
       const includedTours = experience.get('tours') || [];
+      const vehicleType = experience.get('vehicleType');
 
       const data = {
         id: experience.id,
@@ -226,6 +236,14 @@ class ExperienceController {
         providerType: experience.get('providerType'),
         duration: experience.get('duration'),
         cost: experience.get('cost'),
+        vehicleType: vehicleType ? {
+          id: vehicleType.id,
+          name: vehicleType.get('name'),
+          code: vehicleType.get('code'),
+          defaultCapacity: vehicleType.get('defaultCapacity'),
+          trunkCapacity: vehicleType.get('trunkCapacity'),
+        } : null,
+        vehicleTypeId: vehicleType ? vehicleType.id : null,
         experiences: includedExperiences.map((exp) => exp.id),
         experienceDetails: includedExperiences.map((exp) => ({
           id: exp.id,
@@ -286,7 +304,7 @@ class ExperienceController {
       }
 
       const {
-        name, description, type, providerType, duration, cost, experiences, tours,
+        name, description, type, providerType, duration, cost, experiences, tours, vehicleType,
       } = req.body;
 
       // Validation
@@ -399,6 +417,22 @@ class ExperienceController {
         experienceObj.set('tours', []);
       }
 
+      // Handle optional vehicleType relationship
+      if (vehicleType && vehicleType.trim() !== '') {
+        try {
+          const vehicleTypeQuery = new Parse.Query('VehicleType');
+          vehicleTypeQuery.equalTo('exists', true);
+          vehicleTypeQuery.equalTo('active', true);
+          const vehicleTypeObj = await vehicleTypeQuery.get(vehicleType, { useMasterKey: true });
+          if (!vehicleTypeObj) {
+            return this.sendError(res, `Vehicle type ${vehicleType} not found or inactive`, 404);
+          }
+          experienceObj.set('vehicleType', vehicleTypeObj);
+        } catch (error) {
+          return this.sendError(res, `Vehicle type ${vehicleType} not found or inactive`, 404);
+        }
+      }
+
       // Save experience with user context for audit trail
       await experienceObj.save(null, {
         useMasterKey: true,
@@ -466,7 +500,7 @@ class ExperienceController {
       }
 
       const {
-        name, description, providerType, duration, cost, experiences, tours, active,
+        name, description, providerType, duration, cost, experiences, tours, active, vehicleType,
       } = req.body;
 
       // Get existing experience
@@ -598,6 +632,27 @@ class ExperienceController {
           experienceObj.set('tours', tourPointers);
         } else {
           experienceObj.set('tours', []);
+        }
+      }
+
+      // Update vehicleType relationship
+      if (vehicleType !== undefined) {
+        if (vehicleType && vehicleType.trim() !== '') {
+          try {
+            const vehicleTypeQuery = new Parse.Query('VehicleType');
+            vehicleTypeQuery.equalTo('exists', true);
+            vehicleTypeQuery.equalTo('active', true);
+            const vehicleTypeObj = await vehicleTypeQuery.get(vehicleType, { useMasterKey: true });
+            if (!vehicleTypeObj) {
+              return this.sendError(res, `Vehicle type ${vehicleType} not found or inactive`, 404);
+            }
+            experienceObj.set('vehicleType', vehicleTypeObj);
+          } catch (error) {
+            return this.sendError(res, `Vehicle type ${vehicleType} not found or inactive`, 404);
+          }
+        } else {
+          // Clear the vehicleType relationship
+          experienceObj.unset('vehicleType');
         }
       }
 

@@ -10,7 +10,6 @@
  * - Audit logging for all public access.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024
  */
 
 const Quote = require('../../domain/models/Quote');

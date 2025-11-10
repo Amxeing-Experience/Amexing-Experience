@@ -196,6 +196,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             </div>
                             <div class="form-text">Costo de la experiencia en pesos mexicanos</div>
                         </div>
+
+                        <!-- Tipo de Vehículo -->
+                        <div class="mb-3">
+                            <label for="vehicleType" class="form-label">Tipo de Vehículo</label>
+                            <select class="form-select" id="vehicleType" name="vehicleType">
+                                <option value="">Sin tipo de vehículo específico</option>
+                            </select>
+                            <div class="form-text">Tipo de vehículo requerido para esta experiencia (campo opcional)</div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -633,6 +642,31 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             });
         }
 
+        function loadAvailableVehicleTypes() {
+            return $.ajax({
+                url: '/api/vehicle-types/active',
+                type: 'GET',
+                success: function(response) {
+                    const select = document.getElementById('vehicleType');
+                    if (select && response.data) {
+                        // Clear existing options except the default one
+                        select.innerHTML = '<option value="">Sin tipo de vehículo específico</option>';
+                        
+                        // Add vehicle type options
+                        response.data.forEach(function(vehicleType) {
+                            const option = document.createElement('option');
+                            option.value = vehicleType.value;
+                            option.textContent = vehicleType.label;
+                            select.appendChild(option);
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    console.warn('No se pudieron cargar los tipos de vehículos:', xhr.status, xhr.responseText);
+                }
+            });
+        }
+
         function openExperienceModal(isEdit = false) {
             // Clear any previous modal alerts
             const alertsContainer = document.getElementById('experienceModalAlerts');
@@ -665,9 +699,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Hide suggested cost table
             $('#suggestedCostContainer').hide();
 
-            // Load both experiences and tours
-            $.when(loadAvailableItems(), loadAvailableTours()).done(function() {
-                // Both loaded successfully
+            // Load experiences, tours, and vehicle types
+            $.when(loadAvailableItems(), loadAvailableTours(), loadAvailableVehicleTypes()).done(function() {
+                // All loaded successfully
             });
         }
 
@@ -692,7 +726,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         // Load all items and set selected values
                         Promise.all([
                             loadAvailableItems(experience.id),
-                            loadAvailableTours()
+                            loadAvailableTours(),
+                            loadAvailableVehicleTypes()
                         ]).then(function() {
                             // Set experiences values
                             if (experience.experiences && experience.experiences.length > 0) {
@@ -709,6 +744,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                 const toursTomSelectInstance = toursSelectElement ? toursSelectElement.tomselect : null;
                                 if (toursTomSelectInstance) {
                                     toursTomSelectInstance.setValue(experience.tours);
+                                }
+                            }
+
+                            // Set vehicleType value if it exists
+                            if (experience.vehicleTypeId) {
+                                const vehicleTypeSelect = document.getElementById('vehicleType');
+                                if (vehicleTypeSelect) {
+                                    vehicleTypeSelect.value = experience.vehicleTypeId;
                                 }
                             }
 
@@ -781,6 +824,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const durationValue = $('#duration').val();
             if (durationValue) {
                 experienceData.duration = parseFloat(durationValue);
+            }
+
+            // Only include vehicleType if it has a value
+            const vehicleTypeValue = $('#vehicleType').val();
+            if (vehicleTypeValue) {
+                experienceData.vehicleType = vehicleTypeValue;
             }
 
             const url = isEdit ? `${apiEndpoint}/${experienceId}` : apiEndpoint;

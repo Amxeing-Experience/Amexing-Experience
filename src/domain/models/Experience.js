@@ -306,6 +306,29 @@ class Experience extends BaseModel {
     }
   }
 
+  /**
+   * Get vehicle type (optional relationship to VehicleType).
+   * @returns {object|null} VehicleType Parse object or null if not set.
+   * @example
+   * const vehicleType = experience.getVehicleType();
+   * console.log(vehicleType?.get('name')); // 'Sedan' or null
+   */
+  getVehicleType() {
+    return this.get('vehicleType') || null;
+  }
+
+  /**
+   * Set vehicle type (optional relationship to VehicleType).
+   * @param {object|null} vehicleType - VehicleType Parse object, Pointer, or null.
+   * @example
+   * experience.setVehicleType(vehicleTypePointer);
+   * // or clear the relationship
+   * experience.setVehicleType(null);
+   */
+  setVehicleType(vehicleType) {
+    this.set('vehicleType', vehicleType);
+  }
+
   // =================
   // BUSINESS LOGIC
   // =================
