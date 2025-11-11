@@ -22,10 +22,10 @@ class QuoteController {
   /**
    * Create a new quote
    * POST /api/quotes
-   * Following ServiceController pattern for rate pointer assignment.
+   * Note: Rate is no longer required at quote level (v2.0.0+).
+   * Rates are now managed at subconcept/service level.
    * @param {object} req - Express request object.
    * @param {object} req.body - Request body.
-   * @param {string} req.body.rate - Rate ID (Rate objectId) - REQUIRED.
    * @param {string} [req.body.client] - Client ID (AmexingUser objectId) - OPTIONAL.
    * @param {string} [req.body.contactPerson] - Contact person name.
    * @param {string} [req.body.contactEmail] - Contact email.
@@ -38,7 +38,6 @@ class QuoteController {
   async createQuote(req, res) {
     // Declare variables at method scope for error logging
     let clientObj = null;
-    let rateObj = null;
     let createdByObj = null;
 
     try {
@@ -49,12 +48,9 @@ class QuoteController {
       }
 
       // 2. Extract fields from request body
-      // Accept both 'rate' and 'rateId' for compatibility (frontend sends rateId)
       const {
         client,
         clientId,
-        rate: rateFromBody,
-        rateId,
         contactPerson,
         contactEmail,
         contactPhone,
@@ -64,13 +60,7 @@ class QuoteController {
       } = req.body;
 
       // Normalize field names (accept both formats)
-      const rate = rateFromBody || rateId;
       const clientIdNormalized = client || clientId;
-
-      // Validate required fields
-      if (!rate) {
-        return this.sendError(res, 'La tarifa es requerida', 400);
-      }
 
       // 3. Create client pointer to AmexingUser (if provided)
       if (clientIdNormalized) {
@@ -81,14 +71,7 @@ class QuoteController {
         };
       }
 
-      // 4. Create rate pointer (required)
-      rateObj = {
-        __type: 'Pointer',
-        className: 'Rate',
-        objectId: rate,
-      };
-
-      // 4.5. Create createdBy pointer to current user (required)
+      // 4. Create createdBy pointer to current user (required)
       createdByObj = {
         __type: 'Pointer',
         className: 'AmexingUser',
@@ -105,7 +88,7 @@ class QuoteController {
       if (clientObj) {
         quote.set('client', clientObj); // Full Pointer object (optional)
       }
-      quote.set('rate', rateObj); // Full Pointer object (required)
+      // Note: Rate is no longer set at quote level (v2.0.0+)
       quote.set('createdBy', createdByObj); // Full Pointer object (required)
 
       // 8. Set basic fields
@@ -130,7 +113,6 @@ class QuoteController {
       logger.info('Attempting to save quote with data:', {
         folio,
         clientPointer: clientObj,
-        ratePointer: rateObj,
         contactPerson: contactPerson || '',
         contactEmail: contactEmail || '',
         contactPhone: contactPhone || '',
@@ -157,7 +139,6 @@ class QuoteController {
         quoteId: quote.id,
         folio,
         clientId: clientObj ? clientObj.objectId : null,
-        rateId: rateObj.objectId,
         createdBy: currentUser.id,
         createdByEmail: currentUser.get('email'),
       });
@@ -167,7 +148,6 @@ class QuoteController {
         id: quote.id,
         folio,
         clientId: clientObj ? clientObj.objectId : null,
-        rateId: rateObj.objectId,
         contactPerson: contactPerson || '',
         contactEmail: contactEmail || '',
         contactPhone: contactPhone || '',
@@ -189,7 +169,6 @@ class QuoteController {
         userId: req.user?.id,
         requestBody: req.body,
         clientPointerAttempted: clientObj,
-        ratePointerAttempted: rateObj,
       });
 
       // Return more detailed error message
@@ -1239,6 +1218,148 @@ class QuoteController {
         error: error.message,
         stack: error.stack,
         quoteId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener los servicios disponibles', 500);
+    }
+  }
+
+  /**
+   * Get available services filtered by specific rate (not quote-level).
+   * GET /api/quotes/services-by-rate/:rateId.
+   *
+   * Used when adding traslado subconcept - user selects rate first, then service.
+   * Returns services grouped by route with vehicle types and pricing.
+   * @param {object} req - Express request object.
+   * @param {string} req.params.rateId - Rate ID to filter services.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/quotes/services-by-rate/ABC123
+   * Response: { success: true, data: [{ routeKey, originName, destinationName, vehicles: [...] }] }
+   */
+  async getAvailableServicesByRate(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // 2. Get rate ID from params
+      const { rateId } = req.params;
+      if (!rateId) {
+        return this.sendError(res, 'El ID de la tarifa es requerido', 400);
+      }
+
+      // 3. Fetch rate
+      const rateQuery = new Parse.Query('Rate');
+      const rate = await rateQuery.get(rateId, { useMasterKey: true });
+
+      if (!rate) {
+        return this.sendError(res, 'Tarifa no encontrada', 404);
+      }
+
+      // 4. Get services filtered by this rate
+      const servicesQuery = new Parse.Query('Service');
+      servicesQuery.equalTo('rate', rate);
+      servicesQuery.equalTo('active', true);
+      servicesQuery.equalTo('exists', true);
+      servicesQuery.include('originPOI');
+      servicesQuery.include('destinationPOI');
+      servicesQuery.include('destinationPOI.serviceType');
+      servicesQuery.include('vehicleType');
+      servicesQuery.limit(1000); // Support large datasets
+
+      const services = await servicesQuery.find({ useMasterKey: true });
+
+      // 5. Group services by route (origin → destination)
+      const routeMap = new Map();
+
+      // Use for...of to support async price calculations
+      for (const service of services) {
+        const originPOI = service.get('originPOI');
+        const destinationPOI = service.get('destinationPOI');
+        const vehicleType = service.get('vehicleType');
+        const serviceType = destinationPOI?.get('serviceType');
+
+        const originId = originPOI ? originPOI.id : 'local';
+        const destinationId = destinationPOI ? destinationPOI.id : '';
+        const routeKey = `${originId}_${destinationId}`;
+
+        const originName = originPOI ? originPOI.get('name') : 'Local';
+        const destinationName = destinationPOI ? destinationPOI.get('name') : '';
+        const isRoundTrip = service.get('isRoundTrip') || false;
+
+        if (!routeMap.has(routeKey)) {
+          routeMap.set(routeKey, {
+            routeKey,
+            originName,
+            destinationName,
+            originId,
+            destinationId,
+            serviceType: serviceType ? serviceType.get('name') : '',
+            vehicles: [],
+            hasRoundTrip: false, // Will be set to true if any vehicle is round trip
+          });
+        }
+
+        // Update hasRoundTrip flag if this service is round trip
+        const route = routeMap.get(routeKey);
+        if (isRoundTrip) {
+          route.hasRoundTrip = true;
+        }
+
+        // Get price breakdown with surcharge
+        const basePrice = service.get('price') || 0;
+        const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+        // Add vehicle type to this route with price breakdown
+        route.vehicles.push({
+          serviceId: service.id,
+          vehicleType: vehicleType ? vehicleType.get('name') : '',
+          vehicleTypeId: vehicleType ? vehicleType.id : null,
+          capacity: vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4,
+          basePrice: priceBreakdown.basePrice, // Cash price (precio contado)
+          price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
+          surcharge: priceBreakdown.surcharge, // Surcharge amount
+          surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
+          note: service.get('note') || '',
+          isRoundTrip,
+        });
+      }
+
+      // 6. Convert map to array and add labels with appropriate arrows
+      const groupedRoutes = Array.from(routeMap.values()).map((route) => {
+        const arrow = route.hasRoundTrip ? '<->' : '->';
+        const label = route.originName === 'Local'
+          ? route.destinationName
+          : `${route.originName} ${arrow} ${route.destinationName}`;
+
+        return {
+          ...route,
+          label,
+        };
+      });
+
+      logger.info('Available services fetched and grouped by rate', {
+        rateId,
+        rateName: rate.get('name'),
+        servicesCount: services.length,
+        routesCount: groupedRoutes.length,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: groupedRoutes,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getAvailableServicesByRate', {
+        error: error.message,
+        stack: error.stack,
+        rateId: req.params.rateId,
         userId: req.user?.id,
       });
 

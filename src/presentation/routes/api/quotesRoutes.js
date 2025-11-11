@@ -227,6 +227,50 @@ router.get(
 );
 
 /**
+ * GET /api/quotes/services-by-rate/:rateId - Get available services filtered by specific rate.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * Returns list of services (transfers) available for the specified rate.
+ * Used when adding traslado subconcept - user selects rate first, then service.
+ * @param {string} rateId - Rate ID to filter services.
+ * @returns {object} Response with grouped routes array.
+ * @example
+ * // Response structure:
+ * {
+ *   success: true,
+ *   data: [{
+ *     routeKey: "originId_destinationId",
+ *     label: "Aeropuerto Internacional -> Hotel Rosewood",
+ *     originName: "Aeropuerto Internacional",
+ *     destinationName: "Hotel Rosewood",
+ *     originId: "poi123",
+ *     destinationId: "poi456",
+ *     serviceType: "Aeropuerto",
+ *     hasRoundTrip: false,
+ *     vehicles: [{
+ *       serviceId: "service789",
+ *       vehicleType: "Sprinter",
+ *       vehicleTypeId: "vt456",
+ *       capacity: 12,
+ *       basePrice: 2000.00,
+ *       price: 2500.00,
+ *       surcharge: 500.00,
+ *       surchargePercentage: 25,
+ *       note: "Recepción en sala VIP",
+ *       isRoundTrip: false
+ *     }]
+ *   }]
+ * }
+ */
+router.get(
+  '/services-by-rate/:rateId',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.getAvailableServicesByRate(req, res)
+);
+
+/**
  * POST /api/quotes/:id/duplicate - Duplicate an existing quote.
  * Private access (Department Manager, Admin and SuperAdmin).
  *

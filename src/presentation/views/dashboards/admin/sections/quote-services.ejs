@@ -545,8 +545,11 @@ tr[data-row-type="subconcept"] {
             console.log('Response data:', result);
 
             if (result.success && result.data) {
-                const quote = result.data;
+                let quote = result.data;
                 console.log('Quote serviceItems:', quote.serviceItems);
+
+                // Migrate old quote structure (quote-level rate) to new (subconcept-level rate)
+                quote = migrateQuoteRateToSubconcepts(quote);
 
                 // Store quote's number of people for validation
                 quoteNumberOfPeople = quote.numberOfPeople || 1;
@@ -810,6 +813,7 @@ tr[data-row-type="subconcept"] {
         if (subType === 'traslado') {
             conceptCellHTML = `
                 <td>
+                    <!-- Time Input -->
                     <div class="d-flex align-items-center gap-2 mb-2">
                         <i class="ti ti-clock text-primary"></i>
                         <input type="text"
@@ -822,12 +826,31 @@ tr[data-row-type="subconcept"] {
                                maxlength="5"
                                style="max-width: 80px; flex-shrink: 0;">
                     </div>
-                    <select class="form-select form-select-sm transfer-selector"
-                            data-day-index="${dayIndex}"
-                            data-subconcept-index="${subconceptIndex}"
-                            id="transferSelector_${dayIndex}_${subconceptIndex}">
-                        <option value="">Seleccionar traslado...</option>
-                    </select>
+
+                    <!-- STEP 1: Rate Selector (NEW) -->
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">1. Seleccionar Tarifa</label>
+                        <select class="form-select form-select-sm rate-selector"
+                                data-day-index="${dayIndex}"
+                                data-subconcept-index="${subconceptIndex}"
+                                id="rateSelector_${dayIndex}_${subconceptIndex}"
+                                ${subconcept.rateId ? '' : 'required'}>
+                            <option value="">Seleccionar tarifa...</option>
+                        </select>
+                    </div>
+
+                    <!-- STEP 2: Transfer Selector (depends on rate) -->
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">2. Seleccionar Traslado</label>
+                        <select class="form-select form-select-sm transfer-selector"
+                                data-day-index="${dayIndex}"
+                                data-subconcept-index="${subconceptIndex}"
+                                id="transferSelector_${dayIndex}_${subconceptIndex}"
+                                ${subconcept.rateId ? '' : 'disabled'}>
+                            <option value="">Primero seleccione tarifa...</option>
+                        </select>
+                    </div>
+
                     ${subconcept.concept ? `<small class="text-muted mt-1 d-block">${subconcept.concept}</small>` : ''}
                 </td>
             `;
@@ -895,6 +918,13 @@ tr[data-row-type="subconcept"] {
             // Show badge if vehicle has capacity (either from per-person calc or just has a vehicle selected)
             const hasVehicle = subconcept.vehicleCapacity || subconcept.vehicleTypeId;
             const multiplier = subconcept.vehicleMultiplier || 1;
+
+            // Determine the initial message for vehicle selector based on state
+            let vehicleSelectorMessage = 'Primero seleccione un traslado';
+            if (subconcept.transferId) {
+                vehicleSelectorMessage = 'Seleccionar vehículo...';
+            }
+
             vehicleCellHTML = `
                 <td>
                     <div class="d-flex align-items-center gap-2 mb-2">
@@ -909,7 +939,7 @@ tr[data-row-type="subconcept"] {
                             data-day-index="${dayIndex}"
                             data-subconcept-index="${subconceptIndex}"
                             id="vehicleTypeSelector_${dayIndex}_${subconceptIndex}">
-                        <option value="">Seleccionar vehículo...</option>
+                        <option value="">${vehicleSelectorMessage}</option>
                     </select>
                 </td>
             `;
@@ -1121,10 +1151,10 @@ tr[data-row-type="subconcept"] {
             });
         });
 
-        // Initialize transfer selector for traslado type
+        // Initialize rate selector first, then transfer selector for traslado type
         if (subType === 'traslado') {
             setTimeout(() => {
-                initTransferSelector(dayIndex, subconceptIndex, subconcept);
+                initRateSelector(dayIndex, subconceptIndex, subconcept);
             }, 100);
         }
 
@@ -1215,6 +1245,263 @@ tr[data-row-type="subconcept"] {
         }
     }
 
+    /**
+     * Initialize rate selector for traslado subconcept
+     * Step 1 of 2-step process: Rate → Transfer → Vehicle
+     */
+    function initRateSelector(dayIndex, subconceptIndex, subconcept) {
+        const selectElement = document.getElementById(`rateSelector_${dayIndex}_${subconceptIndex}`);
+        if (!selectElement) {
+            console.error('Rate selector not found');
+            return;
+        }
+
+        // Load active rates
+        loadActiveRatesForSelector().then(rates => {
+            if (rates.length === 0) {
+                selectElement.innerHTML = '<option value="">No hay tarifas disponibles</option>';
+                return;
+            }
+
+            // Clear existing options
+            selectElement.innerHTML = '<option value="">Seleccionar tarifa...</option>';
+
+            // Add rate options
+            rates.forEach(rate => {
+                const option = document.createElement('option');
+                option.value = rate.value;
+                option.textContent = rate.label;
+
+                // Pre-select if this subconcept has a rateId
+                if (subconcept.rateId === rate.value) {
+                    option.selected = true;
+                }
+
+                selectElement.appendChild(option);
+            });
+
+            // Attach change listener
+            selectElement.onchange = function(e) {
+                const rateId = e.target.value;
+                const rateName = e.target.options[e.target.selectedIndex].text;
+
+                if (rateId) {
+                    // Update subconcept with selected rate
+                    const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+                    if (subconcept) {
+                        subconcept.rateId = rateId;
+                        subconcept.rateName = rateName;
+
+                        // IMPORTANTE: Limpiar selección anterior de traslado y vehículo
+                        subconcept.transferId = null;
+                        subconcept.vehicleTypeId = null;
+                        subconcept.vehicleType = "";
+                        subconcept.concept = "";
+                        subconcept.unitPrice = 0;
+                        subconcept.total = 0;
+
+                        // Limpiar el selector de vehículos inmediatamente
+                        const vehicleSelector = document.getElementById(`vehicleTypeSelector_${dayIndex}_${subconceptIndex}`);
+                        if (vehicleSelector) {
+                            vehicleSelector.innerHTML = '<option value="">Primero seleccione un traslado</option>';
+                        }
+
+                        // Enable transfer selector
+                        const transferSelector = document.getElementById(`transferSelector_${dayIndex}_${subconceptIndex}`);
+                        if (transferSelector) {
+                            transferSelector.disabled = false;
+                            transferSelector.innerHTML = '<option value="">Cargando traslados...</option>';
+                        }
+
+                        // Initialize transfer selector with this rate
+                        initTransferSelectorByRate(dayIndex, subconceptIndex, subconcept, rateId);
+
+                        // Actualizar la fila visualmente
+                        renderDay(dayIndex);
+
+                        markDirty();
+                        triggerAutoSave();
+                    }
+                } else {
+                    // Si se deselecciona la tarifa, resetear todo
+                    const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+                    if (subconcept) {
+                        subconcept.rateId = null;
+                        subconcept.rateName = "";
+                        subconcept.transferId = null;
+                        subconcept.vehicleTypeId = null;
+                        subconcept.vehicleType = "";
+                        subconcept.concept = "";
+                        subconcept.unitPrice = 0;
+                        subconcept.total = 0;
+
+                        // Deshabilitar y limpiar transfer selector
+                        const transferSelector = document.getElementById(`transferSelector_${dayIndex}_${subconceptIndex}`);
+                        if (transferSelector) {
+                            transferSelector.disabled = true;
+                            transferSelector.innerHTML = '<option value="">Primero seleccione tarifa...</option>';
+                        }
+
+                        // Limpiar vehicle selector
+                        const vehicleSelector = document.getElementById(`vehicleTypeSelector_${dayIndex}_${subconceptIndex}`);
+                        if (vehicleSelector) {
+                            vehicleSelector.innerHTML = '<option value="">Primero seleccione un traslado</option>';
+                        }
+
+                        renderDay(dayIndex);
+                        markDirty();
+                        triggerAutoSave();
+                    }
+                }
+            };
+
+            // If rate already selected, enable transfer selector
+            if (subconcept.rateId) {
+                const transferSelector = document.getElementById(`transferSelector_${dayIndex}_${subconceptIndex}`);
+                if (transferSelector) {
+                    transferSelector.disabled = false;
+                }
+                initTransferSelectorByRate(dayIndex, subconceptIndex, subconcept, subconcept.rateId);
+            }
+        });
+    }
+
+    /**
+     * Load active rates for rate selector dropdown
+     */
+    async function loadActiveRatesForSelector() {
+        try {
+            const response = await fetch('/api/rates/active', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                return result.data; // [{value, label}]
+            } else {
+                console.error('Error loading rates:', result.error);
+                return [];
+            }
+        } catch (error) {
+            console.error('Error loading rates for selector:', error);
+            showAlert('servicesAlerts', 'Error al cargar las tarifas', 'danger');
+            return [];
+        }
+    }
+
+    /**
+     * Initialize transfer selector by rate (uses rateId instead of quoteId)
+     * Step 2 of 2-step process: Rate → Transfer → Vehicle
+     */
+    function initTransferSelectorByRate(dayIndex, subconceptIndex, subconcept, rateId) {
+        const selectElement = document.getElementById(`transferSelector_${dayIndex}_${subconceptIndex}`);
+        if (!selectElement) {
+            console.error('Transfer selector not found');
+            return;
+        }
+
+        // Load services filtered by selected rate (NEW ENDPOINT)
+        loadAvailableServicesByRate(rateId).then(routes => {
+            if (routes.length === 0) {
+                selectElement.innerHTML = '<option value="">No hay traslados para esta tarifa</option>';
+                return;
+            }
+
+            // Clear existing options
+            selectElement.innerHTML = '<option value="">Seleccionar traslado...</option>';
+
+            // Add route options
+            routes.forEach(route => {
+                const option = document.createElement('option');
+                option.value = route.routeKey;
+                option.textContent = route.label;
+
+                // Store route data
+                option.dataset.routeData = JSON.stringify(route);
+
+                // Pre-select if matches transferId
+                if (subconcept.transferId) {
+                    const hasMatchingVehicle = route.vehicles.some(v => v.serviceId === subconcept.transferId);
+                    if (hasMatchingVehicle) {
+                        option.selected = true;
+                    }
+                }
+
+                selectElement.appendChild(option);
+            });
+
+            // Initialize Tom Select
+            const tomSelectInstance = new TomSelect(selectElement, {
+                placeholder: 'Buscar traslado (origen, destino)...',
+                maxOptions: 1000,
+                searchField: ['text'],
+                sortField: 'text',
+                closeAfterSelect: true,
+                onChange: function(routeKey) {
+                    if (!routeKey) return;
+
+                    const option = selectElement.querySelector(`option[value="${routeKey}"]`);
+                    if (!option) return;
+
+                    const routeData = JSON.parse(option.dataset.routeData);
+                    updateVehicleTypeSelector(dayIndex, subconceptIndex, routeData, subconcept);
+                }
+            });
+
+            // If already has route selected, populate vehicle selector
+            if (selectElement.value) {
+                const option = selectElement.querySelector(`option[value="${selectElement.value}"]`);
+                if (option) {
+                    const routeData = JSON.parse(option.dataset.routeData);
+                    updateVehicleTypeSelector(dayIndex, subconceptIndex, routeData, subconcept);
+                }
+            }
+
+            console.log('Transfer selector initialized by rate', {
+                dayIndex,
+                subconceptIndex,
+                rateId,
+                routesCount: routes.length
+            });
+        });
+    }
+
+    /**
+     * Load available services filtered by specific rate (NEW)
+     */
+    async function loadAvailableServicesByRate(rateId) {
+        try {
+            console.log('Loading available services for rate:', rateId);
+            const response = await fetch(`/api/quotes/services-by-rate/${rateId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.data) {
+                console.log(`Loaded ${result.data.length} routes for rate ${rateId}`);
+                return result.data;
+            } else {
+                console.error('Error loading services by rate:', result.error);
+                return [];
+            }
+        } catch (error) {
+            console.error('Error loading available services by rate:', error);
+            showAlert('servicesAlerts', 'Error al cargar los traslados para esta tarifa', 'danger');
+            return [];
+        }
+    }
+
+    // OLD FUNCTION - Kept for backward compatibility with existing quotes
     function initTransferSelector(dayIndex, subconceptIndex, subconcept) {
         const selectElement = document.getElementById(`transferSelector_${dayIndex}_${subconceptIndex}`);
         if (!selectElement) {
@@ -1610,6 +1897,38 @@ tr[data-row-type="subconcept"] {
         packageTableContainer.style.display = 'block';
     }
 
+    /**
+     * Migrate old quote structure (quote-level rate) to new structure (subconcept-level rate)
+     * Called when loading service items to ensure backward compatibility
+     */
+    function migrateQuoteRateToSubconcepts(quote) {
+        // If quote has a rate and service items, migrate rate to traslado subconcepts
+        if (quote.rate && quote.serviceItems && quote.serviceItems.days) {
+            const quoteRateId = quote.rate.id;
+            const quoteRateName = quote.rate.name;
+
+            console.log('Migrating quote-level rate to subconcepts:', {
+                rateId: quoteRateId,
+                rateName: quoteRateName
+            });
+
+            quote.serviceItems.days.forEach((day, dayIndex) => {
+                if (!day.subconcepts) return;
+
+                day.subconcepts.forEach((sub, subIndex) => {
+                    if (sub.type === 'traslado' && !sub.rateId) {
+                        // Migrate: Set quote's rate to this traslado
+                        sub.rateId = quoteRateId;
+                        sub.rateName = quoteRateName;
+                        console.log(`Migrated rate to day ${dayIndex + 1}, subconcept ${subIndex + 1}`);
+                    }
+                });
+            });
+        }
+
+        return quote;
+    }
+
     function migrateSubconceptToTyped(subconcept) {
         // Always update numberOfPeople if it's 1 and should be quoteNumberOfPeople
         // This handles cases where old data has numberOfPeople: 1 by default
@@ -1711,6 +2030,8 @@ tr[data-row-type="subconcept"] {
 
         // Additional fields for traslados
         if (type === "traslado") {
+            newSubconcept.rateId = null;        // NEW - Rate must be selected first
+            newSubconcept.rateName = "";        // NEW - Rate display name
             newSubconcept.transferId = null;
             newSubconcept.vehicleTypeId = null;
         }
