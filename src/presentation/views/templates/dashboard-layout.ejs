@@ -463,7 +463,7 @@
                     localStorage.setItem('accessToken', data.token);
                     console.log('Access token initialized in localStorage');
                 } else {
-                    console.warn('Failed to get access token:', data.error || 'Unknown error');
+                    console.warn('Failed to get authentication credentials:', data.error || 'Unknown error');
                 }
             })
             .catch(error => {
