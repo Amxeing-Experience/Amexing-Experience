@@ -90,14 +90,17 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               Información del Tour
             </h6>
 
-            <div class="mb-3">
-              <label for="destinationPOI" class="form-label">Destino <span class="text-danger">*</span></label>
-              <select class="form-select" id="destinationPOI" name="destinationPOI" required>
-                <option value="">Seleccionar destino...</option>
-                <!-- Las opciones se cargarán dinámicamente -->
-              </select>
-              <div class="form-text">Punto de interés de destino</div>
-            </div>
+            <%- include('../../atoms/common/tom-select', {
+                id: 'destinationPOI',
+                name: 'destinationPOI',
+                multiple: false,
+                placeholder: 'Seleccionar destino',
+                label: 'Destino',
+                required: true,
+                helpText: 'Punto de interés de destino para el tour',
+                options: [],
+                selected: []
+            }) %>
 
             <div class="row">
               <div class="col-md-6 mb-3">
@@ -514,21 +517,54 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
       // Load dropdown options when modal opens
       function loadDropdownOptions() {
-        // Load Active POIs
+        // Load Active POIs (filtered by Tours service type)
         $.ajax({
-          url: '/api/pois/active',
+          url: '/api/pois/active?serviceType=Tours',
           type: 'GET',
           success: function(data) {
             if (data.success && data.data) {
+              const selectElement = document.getElementById('destinationPOI');
+
+              // Destroy existing Tom Select instance if it exists
+              if (selectElement && selectElement.tomselect) {
+                selectElement.tomselect.destroy();
+              }
+
+              // Clear the select element
               const select = $('#destinationPOI');
-              select.empty().append('<option value="">Seleccionar destino...</option>');
-              data.data.forEach(poi => {
-                select.append(`<option value="${poi.value}">${poi.label}</option>`);
-              });
+              select.empty();
+
+              // Initialize Tom Select first (on empty select)
+              if (typeof TomSelect !== 'undefined') {
+                const tomSelectInstance = new TomSelect('#destinationPOI', {
+                  plugins: [],
+                  maxOptions: 1000,
+                  placeholder: 'Seleccionar destino',
+                  maxItems: 1,
+                  highlight: true,
+                  searchField: ['text'],
+                  valueField: 'value',
+                  labelField: 'text',
+                  sortField: 'text',
+                  closeAfterSelect: true,
+                  persist: false
+                });
+
+                // Store instance reference
+                selectElement.tomselect = tomSelectInstance;
+
+                // Load options using Tom Select API (prevents auto-selection)
+                tomSelectInstance.clearOptions();
+                data.data.forEach(poi => {
+                  tomSelectInstance.addOption({ value: poi.value, text: poi.label });
+                });
+                tomSelectInstance.refreshOptions(false);
+                tomSelectInstance.clear(); // Clear selection to start empty
+              }
             }
           },
           error: function(xhr, status, error) {
-            console.error('Error loading POIs:', error);
+            console.error('Error loading POIs for Tours:', error);
           }
         });
 
@@ -581,9 +617,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               const t = data.data.tour;
               $('#tourId').val(t.id || t.objectId);
 
-              // Set POI destination
+              // Set POI destination (wait for Tom Select to initialize)
               setTimeout(() => {
-                $('#destinationPOI').val(t.destinationPOI?.objectId || t.destinationPOI?.id || '');
+                const destinationValue = t.destinationPOI?.objectId || t.destinationPOI?.id || '';
+                const selectElement = document.getElementById('destinationPOI');
+
+                if (selectElement && selectElement.tomselect) {
+                  // Use Tom Select API to set value
+                  selectElement.tomselect.setValue(destinationValue, true);
+                } else {
+                  // Fallback to jQuery if Tom Select not initialized
+                  $('#destinationPOI').val(destinationValue);
+                }
               }, 500);
 
               // Set time (convert from minutes to hours and minutes)

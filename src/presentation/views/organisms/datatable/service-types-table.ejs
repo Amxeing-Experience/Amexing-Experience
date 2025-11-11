@@ -146,7 +146,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const canDelete = <%= canDelete %>;
 
         // Define system-protected service types (cannot be edited/deleted)
-        const PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local'];
+        const PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local', 'Tours'];
 
         // Helper function to check if type is protected
         function isProtectedType(typeName) {

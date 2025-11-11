@@ -98,6 +98,27 @@ class SeedLogger {
 const cliLogger = new SeedLogger();
 
 /**
+ * Compare semantic versions
+ * @param {string} v1 - First version (e.g., "1.1.0")
+ * @param {string} v2 - Second version (e.g., "1.0.0")
+ * @returns {number} 1 if v1 > v2, -1 if v1 < v2, 0 if equal
+ */
+function compareVersions(v1, v2) {
+  const parts1 = v1.split('.').map(Number);
+  const parts2 = v2.split('.').map(Number);
+
+  for (let i = 0; i < 3; i++) {
+    const part1 = parts1[i] || 0;
+    const part2 = parts2[i] || 0;
+
+    if (part1 > part2) return 1;
+    if (part1 < part2) return -1;
+  }
+
+  return 0;
+}
+
+/**
  * Seed Runner class
  */
 class SeedRunner {
@@ -193,6 +214,7 @@ class SeedRunner {
   async getSeedsToExecute(manifest) {
     const executedSeeds = await this.tracker.getExecutedSeeds();
     const executedNames = new Set(executedSeeds.map(s => s.name));
+    const executedMap = new Map(executedSeeds.map(s => [s.name, s]));
 
     // Filter seeds based on environment and execution status
     let seedsToRun = manifest.seeds.filter(seed => {
@@ -203,8 +225,36 @@ class SeedRunner {
       if (!seed.environments.includes(this.environment)) return false;
 
       // Check if already executed
-      if (executedNames.has(seed.name) && seed.idempotent !== false) {
-        // Already executed and idempotent
+      if (executedNames.has(seed.name)) {
+        // Non-idempotent seeds cannot be re-run
+        if (seed.idempotent === false) {
+          return false;
+        }
+
+        // For idempotent seeds, check version
+        const executedSeed = executedMap.get(seed.name);
+        const executedVersion = executedSeed.version || '0.0.0';
+        const manifestVersion = seed.version || '1.0.0';
+
+        // Compare versions
+        const versionComparison = compareVersions(manifestVersion, executedVersion);
+
+        if (versionComparison > 0) {
+          // Manifest version is newer - re-execute
+          if (options.verbose) {
+            cliLogger.info(
+              `Seed ${seed.name} has newer version (${manifestVersion} > ${executedVersion}), will re-execute`
+            );
+          }
+          return true;
+        }
+
+        // Same or older version - skip
+        if (options.verbose) {
+          cliLogger.info(
+            `Seed ${seed.name} is up-to-date (${manifestVersion} <= ${executedVersion}), skipping`
+          );
+        }
         return false;
       }
 

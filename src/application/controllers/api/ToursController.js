@@ -215,21 +215,27 @@ class ToursController {
       const tourData = {
         id: tour.id,
         objectId: tour.id,
-        destinationPOI: destinationPOI ? {
-          objectId: destinationPOI.id,
-          name: destinationPOI.get('name'),
-        } : null,
+        destinationPOI: destinationPOI
+          ? {
+            objectId: destinationPOI.id,
+            name: destinationPOI.get('name'),
+          }
+          : null,
         time: tour.get('time'),
-        vehicleType: vehicleType ? {
-          objectId: vehicleType.id,
-          name: vehicleType.get('name'),
-        } : null,
+        vehicleType: vehicleType
+          ? {
+            objectId: vehicleType.id,
+            name: vehicleType.get('name'),
+          }
+          : null,
         price: tour.get('price'),
-        rate: rate ? {
-          id: rate.id,
-          name: rate.get('name'),
-          color: rate.get('color') || '#6366F1',
-        } : null,
+        rate: rate
+          ? {
+            id: rate.id,
+            name: rate.get('name'),
+            color: rate.get('color') || '#6366F1',
+          }
+          : null,
         minPassengers: tour.get('minPassengers'),
         maxPassengers: tour.get('maxPassengers'),
         notes: tour.get('notes'),

@@ -39,8 +39,8 @@
     {
       "name": "001-seed-service-types",
       "file": "001-seed-service-types.js",
-      "description": "Seed initial service types (Aeropuerto, Punto a Punto, Local)",
-      "version": "1.0.0",
+      "description": "Seed initial service types (Aeropuerto, Punto a Punto, Local, Tours)",
+      "version": "1.1.0",
       "enabled": true,
       "environments": ["development", "staging", "production"],
       "dependencies": [],

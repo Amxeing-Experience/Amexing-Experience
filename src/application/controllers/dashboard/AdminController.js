@@ -566,6 +566,7 @@ class AdminController extends RoleBasedController {
         pageStyles: [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+          'https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css',
         ],
         footerScripts: `
           <!-- DataTables Core -->
@@ -573,6 +574,8 @@ class AdminController extends RoleBasedController {
           <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
           <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
           <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+          <!-- Tom Select for Enhanced Select -->
+          <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
         `,
       });
     } catch (error) {
