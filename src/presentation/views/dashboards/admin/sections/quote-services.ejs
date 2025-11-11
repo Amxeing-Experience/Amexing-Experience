@@ -994,9 +994,8 @@ tr[data-row-type="subconcept"] {
                 </td>
             `;
         } else if (subType === 'traslado') {
-            // Show badge if vehicle has capacity (either from per-person calc or just has a vehicle selected)
-            const hasVehicle = subconcept.vehicleCapacity || subconcept.vehicleTypeId;
-            const multiplier = subconcept.vehicleMultiplier || 1;
+            const hasVehicle = subconcept.vehicleTypeId;
+            const hasCapacities = subconcept.vehiclePassengerCapacity !== null && subconcept.vehiclePassengerCapacity !== undefined;
 
             // Determine the initial message for vehicle selector based on state
             let vehicleSelectorMessage = 'Primero seleccione un traslado';
@@ -1006,26 +1005,44 @@ tr[data-row-type="subconcept"] {
 
             vehicleCellHTML = `
                 <td>
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <span class="badge bg-info vehicle-multiplier"
-                              data-day-index="${dayIndex}"
-                              data-subconcept-index="${subconceptIndex}"
-                              style="display: ${hasVehicle ? 'inline-block' : 'none'}; min-width: 35px; text-align: center;">
-                            ${multiplier}x
-                        </span>
-                    </div>
                     <select class="form-select form-select-sm vehicle-type-selector"
                             data-day-index="${dayIndex}"
                             data-subconcept-index="${subconceptIndex}"
                             id="vehicleTypeSelector_${dayIndex}_${subconceptIndex}">
                         <option value="">${vehicleSelectorMessage}</option>
                     </select>
+
+                    ${hasCapacities ? `
+                        <div class="mt-2 small text-muted">
+                            <div class="d-flex align-items-center gap-1">
+                                <i class="ti ti-users"></i>
+                                <span>Capacidad: ${subconcept.vehiclePassengerCapacity} personas</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <i class="ti ti-briefcase"></i>
+                                <span>Maletas: ${subconcept.vehicleTrunkCapacity}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${hasVehicle ? `
+                        <div class="form-check mt-2">
+                            <input class="form-check-input additional-vehicle-checkbox"
+                                   type="checkbox"
+                                   data-day-index="${dayIndex}"
+                                   data-subconcept-index="${subconceptIndex}"
+                                   id="additionalVehicle_${dayIndex}_${subconceptIndex}"
+                                   ${subconcept.additionalVehicleForLuggage ? 'checked' : ''}>
+                            <label class="form-check-label small" for="additionalVehicle_${dayIndex}_${subconceptIndex}">
+                                Vehículo adicional para maletas
+                            </label>
+                        </div>
+                    ` : ''}
                 </td>
             `;
         } else if (subType === 'tour') {
-            // Show badge if vehicle has capacity (either from per-person calc or just has a vehicle selected)
-            const hasVehicle = subconcept.vehicleCapacity || subconcept.vehicleTypeId;
-            const multiplier = subconcept.vehicleMultiplier || 1;
+            const hasVehicle = subconcept.vehicleTypeId;
+            const hasCapacities = subconcept.vehiclePassengerCapacity !== null && subconcept.vehiclePassengerCapacity !== undefined;
 
             // Determine the initial message for vehicle selector based on state
             let vehicleSelectorMessage = 'Primero seleccione un destino';
@@ -1035,14 +1052,6 @@ tr[data-row-type="subconcept"] {
 
             vehicleCellHTML = `
                 <td>
-                    <div class="d-flex align-items-center gap-2 mb-2">
-                        <span class="badge bg-info vehicle-multiplier"
-                              data-day-index="${dayIndex}"
-                              data-subconcept-index="${subconceptIndex}"
-                              style="display: ${hasVehicle ? 'inline-block' : 'none'}; min-width: 35px; text-align: center;">
-                            ${multiplier}x
-                        </span>
-                    </div>
                     <select class="form-select form-select-sm tour-vehicle-selector"
                             data-day-index="${dayIndex}"
                             data-subconcept-index="${subconceptIndex}"
@@ -1050,6 +1059,33 @@ tr[data-row-type="subconcept"] {
                             ${subconcept.destinationId ? '' : 'disabled'}>
                         <option value="">${vehicleSelectorMessage}</option>
                     </select>
+
+                    ${hasCapacities ? `
+                        <div class="mt-2 small text-muted">
+                            <div class="d-flex align-items-center gap-1">
+                                <i class="ti ti-users"></i>
+                                <span>Capacidad: ${subconcept.vehiclePassengerCapacity} personas</span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <i class="ti ti-briefcase"></i>
+                                <span>Maletas: ${subconcept.vehicleTrunkCapacity}</span>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${hasVehicle ? `
+                        <div class="form-check mt-2">
+                            <input class="form-check-input additional-vehicle-checkbox"
+                                   type="checkbox"
+                                   data-day-index="${dayIndex}"
+                                   data-subconcept-index="${subconceptIndex}"
+                                   id="additionalVehicle_${dayIndex}_${subconceptIndex}"
+                                   ${subconcept.additionalVehicleForLuggage ? 'checked' : ''}>
+                            <label class="form-check-label small" for="additionalVehicle_${dayIndex}_${subconceptIndex}">
+                                Vehículo adicional para maletas
+                            </label>
+                        </div>
+                    ` : ''}
                 </td>
             `;
         } else if (subType === 'experiencia') {
@@ -1110,18 +1146,18 @@ tr[data-row-type="subconcept"] {
                                placeholder="$0.00"
                                value="${subconcept.unitPrice !== null && subconcept.unitPrice !== undefined ? formatCurrency(subconcept.unitPrice) : ''}">
 
-                        <!-- Number of People Input (bottom) - always enabled for traslados/tours -->
+                        <!-- Number of People Input (bottom) - readonly for traslados/tours (uses quote's numberOfPeople) -->
                         <input type="number"
-                               class="form-control form-control-sm text-center"
+                               class="form-control form-control-sm text-center bg-light"
                                data-day-index="${dayIndex}"
                                data-subconcept-index="${subconceptIndex}"
                                data-field="numberOfPeople"
                                placeholder="${quoteNumberOfPeople} pers."
                                min="1"
-                               max="${quoteNumberOfPeople}"
                                step="1"
                                value="${subconcept.numberOfPeople !== null && subconcept.numberOfPeople !== undefined ? subconcept.numberOfPeople : quoteNumberOfPeople}"
-                               title="Máximo: ${quoteNumberOfPeople} personas">
+                               title="Cantidad de personas de la cotización"
+                               readonly>
                     </div>
                 ` : `
                     <!-- Regular/Experiencia: Price + Checkbox + Number of People -->
@@ -1274,6 +1310,30 @@ tr[data-row-type="subconcept"] {
                 openDeleteSubconceptModal(dayIndex, subconceptIndex);
             });
         });
+
+        // Attach additional vehicle checkbox listener (for traslados and tours)
+        const additionalVehicleCheckbox = tr.querySelector('.additional-vehicle-checkbox');
+        if (additionalVehicleCheckbox) {
+            additionalVehicleCheckbox.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+                if (subconcept) {
+                    subconcept.additionalVehicleForLuggage = isChecked;
+                    subconcept.total = calculateSubconceptTotal(subconcept);
+                    recalculateDayTotal(dayIndex);
+                    recalculateGeneralTotals();
+                    markDirty();
+                    triggerAutoSave();
+
+                    console.log('Additional vehicle checkbox changed:', {
+                        dayIndex,
+                        subconceptIndex,
+                        isChecked,
+                        newTotal: subconcept.total
+                    });
+                }
+            });
+        }
 
         // Initialize rate selector first, then transfer selector for traslado type
         if (subType === 'traslado') {
@@ -1616,8 +1676,8 @@ tr[data-row-type="subconcept"] {
      */
     async function loadAvailableServicesByRate(rateId) {
         try {
-            console.log('Loading available services for rate:', rateId);
-            const response = await fetch(`/api/quotes/services-by-rate/${rateId}`, {
+            console.log('Loading available services for rate:', rateId, 'with capacity filter:', quoteNumberOfPeople);
+            const response = await fetch(`/api/quotes/services-by-rate/${rateId}?numberOfPeople=${quoteNumberOfPeople}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
@@ -1629,6 +1689,15 @@ tr[data-row-type="subconcept"] {
 
             if (result.success && result.data) {
                 console.log(`Loaded ${result.data.length} routes for rate ${rateId}`);
+
+                // Check if any routes have vehicles
+                const hasVehicles = result.data.some(route => route.vehicles && route.vehicles.length > 0);
+                if (!hasVehicles && quoteNumberOfPeople > 0) {
+                    showAlert('servicesAlerts',
+                        `No hay vehículos disponibles con capacidad para ${quoteNumberOfPeople} personas. Por favor seleccione otra tarifa o reduzca el número de personas.`,
+                        'warning');
+                }
+
                 return result.data;
             } else {
                 console.error('Error loading services by rate:', result.error);
@@ -1805,6 +1874,8 @@ tr[data-row-type="subconcept"] {
         subconcept.vehicleTypeId = transferData.vehicleTypeId;
         subconcept.vehicleType = transferData.vehicleType;
         subconcept.vehicleCapacity = transferData.capacity || null; // Store capacity for per-person calculations
+        subconcept.vehiclePassengerCapacity = transferData.capacity || null; // NEW - Passenger capacity for display
+        subconcept.vehicleTrunkCapacity = transferData.trunkCapacity || null; // NEW - Trunk capacity for display
         subconcept.hours = 1; // Default for transfers
         subconcept.unitPrice = transferData.price;
         subconcept.notes = transferData.note || '';
@@ -2158,7 +2229,8 @@ tr[data-row-type="subconcept"] {
      */
     async function loadTourVehiclesByRateAndDestination(rateId, destinationId) {
         try {
-            const response = await fetch(`/api/quotes/tours/vehicles-by-rate-destination/${rateId}/${destinationId}`, {
+            console.log('Loading tour vehicles for rate:', rateId, 'destination:', destinationId, 'with capacity filter:', quoteNumberOfPeople);
+            const response = await fetch(`/api/quotes/tours/vehicles-by-rate-destination/${rateId}/${destinationId}?numberOfPeople=${quoteNumberOfPeople}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
@@ -2170,6 +2242,14 @@ tr[data-row-type="subconcept"] {
 
             if (result.success && result.data) {
                 console.log(`Loaded ${result.data.length} tour vehicles for rate ${rateId} and destination ${destinationId}`);
+
+                // Check if any vehicles available
+                if (result.data.length === 0 && quoteNumberOfPeople > 0) {
+                    showAlert('servicesAlerts',
+                        `No hay vehículos disponibles para este tour con capacidad para ${quoteNumberOfPeople} personas. Por favor seleccione otro destino o reduzca el número de personas.`,
+                        'warning');
+                }
+
                 return result.data;
             } else {
                 console.error('Error loading tour vehicles:', result.error);
@@ -2285,6 +2365,8 @@ tr[data-row-type="subconcept"] {
         subconcept.vehicleTypeId = vehicleData.vehicleTypeId;
         subconcept.vehicleType = vehicleData.vehicleType;
         subconcept.vehicleCapacity = vehicleData.capacity;
+        subconcept.vehiclePassengerCapacity = vehicleData.capacity || null; // NEW - Passenger capacity for display
+        subconcept.vehicleTrunkCapacity = vehicleData.trunkCapacity || null; // NEW - Trunk capacity for display
         subconcept.durationMinutes = vehicleData.durationMinutes;
 
         // Precio unitario: usar directamente el precio del tour (ya incluye recargo del backend)
@@ -2648,6 +2730,9 @@ tr[data-row-type="subconcept"] {
             newSubconcept.rateName = "";        // NEW - Rate display name
             newSubconcept.transferId = null;
             newSubconcept.vehicleTypeId = null;
+            newSubconcept.additionalVehicleForLuggage = false;  // NEW - Checkbox for extra vehicle
+            newSubconcept.vehiclePassengerCapacity = null;      // NEW - Vehicle passenger capacity
+            newSubconcept.vehicleTrunkCapacity = null;          // NEW - Vehicle trunk capacity
         }
 
         // Additional fields for experiencias
@@ -2668,6 +2753,9 @@ tr[data-row-type="subconcept"] {
             newSubconcept.vehicleTypeId = null;    // Step 3: Vehicle type ID
             newSubconcept.vehicleType = "";        // Step 3: Vehicle type name
             newSubconcept.durationMinutes = 0;     // Duration in minutes (from tour record)
+            newSubconcept.additionalVehicleForLuggage = false;  // NEW - Checkbox for extra vehicle
+            newSubconcept.vehiclePassengerCapacity = null;      // NEW - Vehicle passenger capacity
+            newSubconcept.vehicleTrunkCapacity = null;          // NEW - Vehicle trunk capacity
         }
 
         serviceItemsData.days[dayIndex].subconcepts.push(newSubconcept);
@@ -2694,34 +2782,32 @@ tr[data-row-type="subconcept"] {
             currentMultiplier: subconcept.vehicleMultiplier
         });
 
-        // TRASLADO: Direct unit price multiplied by vehicle multiplier (no hours)
+        // TRASLADO: Direct unit price multiplied by vehicle count (1 or 2 based on checkbox)
         if (subconcept.type === 'traslado' && subconcept.vehicleCapacity) {
-            // Calculate vehicle multiplier based on capacity
-            // unitPrice is PER VEHICLE, so multiply by number of vehicles needed
-            const vehicleMultiplier = Math.ceil(numberOfPeople / subconcept.vehicleCapacity);
-            subconcept.vehicleMultiplier = vehicleMultiplier; // Store for UI display
+            // Vehicle count: 1 by default, 2 if additional vehicle for luggage is checked
+            const vehicleCount = subconcept.additionalVehicleForLuggage ? 2 : 1;
             console.log('Traslado vehicle calculation:', {
                 numberOfPeople,
                 vehicleCapacity: subconcept.vehicleCapacity,
-                vehicleMultiplier,
-                calculation: `$${unitPrice} × ${vehicleMultiplier} vehicles = $${unitPrice * vehicleMultiplier}`
+                additionalVehicleForLuggage: subconcept.additionalVehicleForLuggage,
+                vehicleCount,
+                calculation: `$${unitPrice} × ${vehicleCount} vehicle(s) = $${unitPrice * vehicleCount}`
             });
-            return Math.round(unitPrice * vehicleMultiplier * 100) / 100;
+            return Math.round(unitPrice * vehicleCount * 100) / 100;
         }
 
-        // TOUR: Direct unit price multiplied by vehicle multiplier (no hours)
+        // TOUR: Direct unit price multiplied by vehicle count (1 or 2 based on checkbox)
         if (subconcept.type === 'tour' && subconcept.vehicleCapacity) {
-            // Calculate vehicle multiplier based on capacity
-            // unitPrice is PER VEHICLE, so multiply by number of vehicles needed
-            const vehicleMultiplier = Math.ceil(numberOfPeople / subconcept.vehicleCapacity);
-            subconcept.vehicleMultiplier = vehicleMultiplier; // Store for UI display
+            // Vehicle count: 1 by default, 2 if additional vehicle for luggage is checked
+            const vehicleCount = subconcept.additionalVehicleForLuggage ? 2 : 1;
             console.log('Tour vehicle calculation:', {
                 numberOfPeople,
                 vehicleCapacity: subconcept.vehicleCapacity,
-                vehicleMultiplier,
-                calculation: `$${unitPrice} × ${vehicleMultiplier} vehicles = $${unitPrice * vehicleMultiplier}`
+                additionalVehicleForLuggage: subconcept.additionalVehicleForLuggage,
+                vehicleCount,
+                calculation: `$${unitPrice} × ${vehicleCount} vehicle(s) = $${unitPrice * vehicleCount}`
             });
-            return Math.round(unitPrice * vehicleMultiplier * 100) / 100;
+            return Math.round(unitPrice * vehicleCount * 100) / 100;
         }
 
         // EXPERIENCIA: Direct unit price, no hours multiplication

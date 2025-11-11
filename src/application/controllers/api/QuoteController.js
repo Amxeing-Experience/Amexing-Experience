@@ -1233,17 +1233,20 @@ class QuoteController {
 
   /**
    * Get available services filtered by specific rate (not quote-level).
-   * GET /api/quotes/services-by-rate/:rateId.
+   * GET /api/quotes/services-by-rate/:rateId?numberOfPeople=X.
    *
    * Used when adding traslado subconcept - user selects rate first, then service.
    * Returns services grouped by route with vehicle types and pricing.
+   * Filters vehicles by capacity if numberOfPeople query parameter is provided.
+   * Includes trunk capacity for each vehicle type.
    * @param {object} req - Express request object.
    * @param {string} req.params.rateId - Rate ID to filter services.
+   * @param {number} [req.query.numberOfPeople] - Optional number of people for capacity filtering.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * GET /api/quotes/services-by-rate/ABC123
-   * Response: { success: true, data: [{ routeKey, originName, destinationName, vehicles: [...] }] }
+   * GET /api/quotes/services-by-rate/ABC123?numberOfPeople=10
+   * Response: { success: true, data: [{ routeKey, originName, destinationName, vehicles: [{ capacity: 14, trunkCapacity: 10, ... }] }] }
    */
   async getAvailableServicesByRate(req, res) {
     try {
@@ -1253,8 +1256,10 @@ class QuoteController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // 2. Get rate ID from params
+      // 2. Get rate ID from params and optional quoteNumberOfPeople from query
       const { rateId } = req.params;
+      const quoteNumberOfPeople = parseInt(req.query.numberOfPeople) || 0;
+
       if (!rateId) {
         return this.sendError(res, 'El ID de la tarifa es requerido', 400);
       }
@@ -1317,23 +1322,32 @@ class QuoteController {
           route.hasRoundTrip = true;
         }
 
-        // Get price breakdown with surcharge
-        const basePrice = service.get('price') || 0;
-        const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+        // Get vehicle capacity
+        const vehicleCapacity = vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4;
+        const trunkCapacity = vehicleType ? vehicleType.get('trunkCapacity') || 0 : 0;
 
-        // Add vehicle type to this route with price breakdown
-        route.vehicles.push({
-          serviceId: service.id,
-          vehicleType: vehicleType ? vehicleType.get('name') : '',
-          vehicleTypeId: vehicleType ? vehicleType.id : null,
-          capacity: vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4,
-          basePrice: priceBreakdown.basePrice, // Cash price (precio contado)
-          price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
-          surcharge: priceBreakdown.surcharge, // Surcharge amount
-          surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
-          note: service.get('note') || '',
-          isRoundTrip,
-        });
+        // Filter by capacity if quoteNumberOfPeople is provided
+        // Only add vehicle if it meets capacity requirements
+        if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
+          // Get price breakdown with surcharge
+          const basePrice = service.get('price') || 0;
+          const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+          // Add vehicle type to this route with price breakdown and capacity info
+          route.vehicles.push({
+            serviceId: service.id,
+            vehicleType: vehicleType ? vehicleType.get('name') : '',
+            vehicleTypeId: vehicleType ? vehicleType.id : null,
+            capacity: vehicleCapacity,
+            trunkCapacity,
+            basePrice: priceBreakdown.basePrice, // Cash price (precio contado)
+            price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
+            surcharge: priceBreakdown.surcharge, // Surcharge amount
+            surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
+            note: service.get('note') || '',
+            isRoundTrip,
+          });
+        }
       }
 
       // 6. Convert map to array and add labels with appropriate arrows
@@ -1592,23 +1606,27 @@ class QuoteController {
 
   /**
    * Get available vehicles for a specific rate and destination (Step 3 of 3-step tour selection).
-   * GET /api/quotes/tours/vehicles-by-rate-destination/:rateId/:destinationId.
+   * GET /api/quotes/tours/vehicles-by-rate-destination/:rateId/:destinationId?numberOfPeople=X.
    *
    * Returns list of vehicle types available for the specified rate + destination combination.
-   * Each vehicle includes tour details (tourId, price, duration, capacity).
+   * Each vehicle includes tour details (tourId, price, duration, capacity, trunk capacity).
+   * Filters vehicles by capacity if numberOfPeople query parameter is provided.
    * This is the third step in the tour selection flow: Rate → Destination → Vehicle.
    * @param {object} req - Express request object with rateId and destinationId in params.
+   * @param {number} [req.query.numberOfPeople] - Optional number of people for capacity filtering.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
+   * GET /api/quotes/tours/vehicles-by-rate-destination/ABC123/POI456?numberOfPeople=10
    * Response: {
    *   success: true,
    *   data: [
    *     {
    *       tourId: 'tour123',
-   *       vehicleType: 'Model 3',
+   *       vehicleType: 'Sprinter',
    *       vehicleTypeId: 'veh456',
-   *       capacity: 4,
+   *       capacity: 14,
+   *       trunkCapacity: 10,
    *       basePrice: 925.72,
    *       price: 1065.58,
    *       surcharge: 139.86,
@@ -1627,8 +1645,10 @@ class QuoteController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // 2. Get rate ID and destination ID from params
+      // 2. Get rate ID, destination ID from params, and optional numberOfPeople from query
       const { rateId, destinationId } = req.params;
+      const quoteNumberOfPeople = parseInt(req.query.numberOfPeople) || 0;
+
       if (!rateId || !destinationId) {
         return this.sendError(res, 'El ID de la tarifa y destino son requeridos', 400);
       }
@@ -1666,29 +1686,38 @@ class QuoteController {
       for (const tour of tours) {
         const vehicleType = tour.get('vehicleType');
 
-        // Get price breakdown with surcharge
-        const basePrice = tour.get('price') || 0;
-        const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+        // Get vehicle capacity
+        const vehicleCapacity = vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4;
+        const trunkCapacity = vehicleType ? vehicleType.get('trunkCapacity') || 0 : 0;
 
-        // Get duration in minutes and convert to hours
-        const durationMinutes = tour.get('time') || 0;
-        const durationHours = Math.round((durationMinutes / 60) * 10) / 10;
+        // Filter by capacity if quoteNumberOfPeople is provided
+        // Only add vehicle if it meets capacity requirements
+        if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
+          // Get price breakdown with surcharge
+          const basePrice = tour.get('price') || 0;
+          const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
 
-        vehicles.push({
-          tourId: tour.id,
-          vehicleType: vehicleType ? vehicleType.get('name') : '',
-          vehicleTypeId: vehicleType ? vehicleType.id : null,
-          capacity: vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4,
-          basePrice: priceBreakdown.basePrice,
-          price: priceBreakdown.totalPrice,
-          surcharge: priceBreakdown.surcharge,
-          surchargePercentage: priceBreakdown.surchargePercentage,
-          durationMinutes,
-          durationHours,
-          minPassengers: tour.get('minPassengers') || null,
-          maxPassengers: tour.get('maxPassengers') || null,
-          note: tour.get('notes') || '',
-        });
+          // Get duration in minutes and convert to hours
+          const durationMinutes = tour.get('time') || 0;
+          const durationHours = Math.round((durationMinutes / 60) * 10) / 10;
+
+          vehicles.push({
+            tourId: tour.id,
+            vehicleType: vehicleType ? vehicleType.get('name') : '',
+            vehicleTypeId: vehicleType ? vehicleType.id : null,
+            capacity: vehicleCapacity,
+            trunkCapacity,
+            basePrice: priceBreakdown.basePrice,
+            price: priceBreakdown.totalPrice,
+            surcharge: priceBreakdown.surcharge,
+            surchargePercentage: priceBreakdown.surchargePercentage,
+            durationMinutes,
+            durationHours,
+            minPassengers: tour.get('minPassengers') || null,
+            maxPassengers: tour.get('maxPassengers') || null,
+            note: tour.get('notes') || '',
+          });
+        }
       }
 
       logger.info('Tour vehicles fetched for rate and destination', {
