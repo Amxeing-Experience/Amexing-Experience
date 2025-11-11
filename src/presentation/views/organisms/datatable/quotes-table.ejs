@@ -54,7 +54,6 @@ const baseDashboardPath = dtUserRole === 'department_manager'
                 <thead class="table-light">
                     <tr>
                         <th>Cliente</th>
-                        <th>Tarifa</th>
                         <th>Tipo de Evento</th>
                         <th class="text-center">No. Personas</th>
                         <th>Creado Por</th>
@@ -247,15 +246,6 @@ const baseDashboardPath = dtUserRole === 'department_manager'
                         return company
                             ? `${fullName} <small class="text-muted">(${company})</small>`
                             : fullName;
-                    }
-                },
-                {
-                    data: 'rate',
-                    render: function(data) {
-                        if (!data) return '<span class="text-muted">N/A</span>';
-                        const color = data.color || '#6366F1';
-                        const textColor = getContrastTextColor(color);
-                        return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${data.name || 'N/A'}</span>`;
                     }
                 },
                 {
