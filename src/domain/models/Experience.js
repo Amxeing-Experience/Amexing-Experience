@@ -448,7 +448,8 @@ class Experience extends BaseModel {
     // Validate providerType for Provider type experiences (optional field)
     if (this.getType() === 'Provider') {
       const providerType = this.get('providerType'); // Get raw value to check for null/undefined
-      if (providerType) { // Only validate if providerType is provided
+      if (providerType) {
+        // Only validate if providerType is provided
         const validProviderTypes = ['Exclusivo', 'Compartido', 'Privado'];
         if (!validProviderTypes.includes(providerType)) {
           errors.push('Provider type must be Exclusivo, Compartido, or Privado');

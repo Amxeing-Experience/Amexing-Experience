@@ -202,7 +202,10 @@ class DepartmentManagerController extends RoleBasedController {
         section,
         breadcrumb: {
           title: 'Vehículos',
-          items: [{ name: 'Servicios', url: '#' }, { name: 'Vehículos', active: true }],
+          items: [
+            { name: 'Servicios', url: '#' },
+            { name: 'Vehículos', active: true },
+          ],
         },
         pageStyles: [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
@@ -243,7 +246,10 @@ class DepartmentManagerController extends RoleBasedController {
         section,
         breadcrumb: {
           title: 'Traslados',
-          items: [{ name: 'Servicios', url: '#' }, { name: 'Traslados', active: true }],
+          items: [
+            { name: 'Servicios', url: '#' },
+            { name: 'Traslados', active: true },
+          ],
         },
         pageStyles: [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
@@ -283,7 +289,10 @@ class DepartmentManagerController extends RoleBasedController {
         section,
         breadcrumb: {
           title: 'Experiencias',
-          items: [{ name: 'Servicios', url: '#' }, { name: 'Experiencias', active: true }],
+          items: [
+            { name: 'Servicios', url: '#' },
+            { name: 'Experiencias', active: true },
+          ],
         },
         pageStyles: [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
@@ -318,7 +327,10 @@ class DepartmentManagerController extends RoleBasedController {
         title: 'Tours',
         breadcrumb: {
           title: 'Tours',
-          items: [{ name: 'Servicios', url: '#' }, { name: 'Tours', active: true }],
+          items: [
+            { name: 'Servicios', url: '#' },
+            { name: 'Tours', active: true },
+          ],
         },
         pageStyles: [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',

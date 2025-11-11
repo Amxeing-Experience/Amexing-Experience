@@ -304,9 +304,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 {
                     data: 'rate.name',
                     render: function(data, type, row) {
+                        if (!data) return '-';
+
+                        // Remove "Tarifa" word from the beginning if present
+                        let displayName = data.replace(/^Tarifa\s*/i, '');
+
                         const color = row.rate?.color || '#6366F1';
                         const textColor = getContrastTextColor(color);
-                        return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${data || '-'}</span>`;
+
+                        return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${displayName}</span>`;
                     }
                 },
                 // 2. Tipo de Destino (NUEVA)

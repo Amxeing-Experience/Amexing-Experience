@@ -114,13 +114,15 @@ class ExperienceController {
    * @example
    */
   formatVehicleType(vehicleType) {
-    return vehicleType ? {
-      id: vehicleType.id,
-      name: vehicleType.get('name'),
-      code: vehicleType.get('code'),
-      defaultCapacity: vehicleType.get('defaultCapacity'),
-      trunkCapacity: vehicleType.get('trunkCapacity'),
-    } : null;
+    return vehicleType
+      ? {
+        id: vehicleType.id,
+        name: vehicleType.get('name'),
+        code: vehicleType.get('code'),
+        defaultCapacity: vehicleType.get('defaultCapacity'),
+        trunkCapacity: vehicleType.get('trunkCapacity'),
+      }
+      : null;
   }
 
   /**
@@ -310,7 +312,10 @@ class ExperienceController {
 
     const totalItems = (experiences ? experiences.length : 0) + (tours ? tours.length : 0);
     if (totalItems > this.maxTotalItemsPerPackage) {
-      return { error: `Maximum ${this.maxTotalItemsPerPackage} total items (experiences + tours) per package`, status: 400 };
+      return {
+        error: `Maximum ${this.maxTotalItemsPerPackage} total items (experiences + tours) per package`,
+        status: 400,
+      };
     }
 
     return null;
@@ -635,7 +640,7 @@ class ExperienceController {
         return { error: `Maximum ${this.maxToursPerPackage} tours per package`, status: 400 };
       }
 
-      const currentExperiences = experiences !== undefined ? experiences : (experienceObj.get('experiences') || []);
+      const currentExperiences = experiences !== undefined ? experiences : experienceObj.get('experiences') || [];
       if (currentExperiences.length + tours.length > this.maxTotalItemsPerPackage) {
         return { error: `Maximum ${this.maxTotalItemsPerPackage} total items per package`, status: 400 };
       }
@@ -929,10 +934,7 @@ class ExperienceController {
     return {
       draw: parseInt(query.draw, 10) || 1,
       start: parseInt(query.start, 10) || 0,
-      length: Math.min(
-        parseInt(query.length, 10) || this.defaultPageSize,
-        this.maxPageSize
-      ),
+      length: Math.min(parseInt(query.length, 10) || this.defaultPageSize, this.maxPageSize),
       searchValue: query.search?.value || '',
       sortColumnIndex: parseInt(query.order?.[0]?.column, 10) || 0,
       sortDirection: query.order?.[0]?.dir || 'asc',

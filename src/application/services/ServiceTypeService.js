@@ -45,7 +45,7 @@ class ServiceTypeService {
     };
 
     // System-protected service types (cannot be modified or deleted)
-    this.PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local'];
+    this.PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local', 'Tours'];
   }
 
   /**

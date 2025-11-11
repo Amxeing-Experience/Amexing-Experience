@@ -632,7 +632,13 @@ class SecurityMiddleware {
         // 4. Login CSRF attacks have minimal practical impact (forces login to attacker account)
         // 5. This is a common practice in modern authentication systems
         // All other authenticated endpoints remain CSRF-protected
-        if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS' || req.path.startsWith('/api/') || req.path === '/auth/login') {
+        if (
+          req.method === 'GET'
+          || req.method === 'HEAD'
+          || req.method === 'OPTIONS'
+          || req.path.startsWith('/api/')
+          || req.path === '/auth/login'
+        ) {
           // Generate CSRF token for forms if session exists
           if (req.session && (req.method === 'GET' || req.method === 'HEAD')) {
             // PERSISTENCE CHECK: Detect authenticated user without CSRF secret

@@ -349,7 +349,7 @@ class ServiceTypeController {
 
       // Check if trying to modify a system-protected type
       const currentName = serviceType.get('name');
-      const PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local'];
+      const PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local', 'Tours'];
 
       if (PROTECTED_TYPES.includes(currentName)) {
         logger.warn('Attempted to modify protected service type', {

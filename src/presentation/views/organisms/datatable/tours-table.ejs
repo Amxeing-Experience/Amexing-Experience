@@ -46,6 +46,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
       <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
         <thead class="table-light">
           <tr>
+            <th>Tarifa</th>
             <th>Destino</th>
             <th>Tiempo (Hrs min)</th>
             <th>Tipo de Vehículo</th>
@@ -90,14 +91,17 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               Información del Tour
             </h6>
 
-            <div class="mb-3">
-              <label for="destinationPOI" class="form-label">Destino <span class="text-danger">*</span></label>
-              <select class="form-select" id="destinationPOI" name="destinationPOI" required>
-                <option value="">Seleccionar destino...</option>
-                <!-- Las opciones se cargarán dinámicamente -->
-              </select>
-              <div class="form-text">Punto de interés de destino</div>
-            </div>
+            <%- include('../../atoms/common/tom-select', {
+                id: 'destinationPOI',
+                name: 'destinationPOI',
+                multiple: false,
+                placeholder: 'Seleccionar destino',
+                label: 'Destino',
+                required: true,
+                helpText: 'Punto de interés de destino para el tour',
+                options: [],
+                selected: []
+            }) %>
 
             <div class="row">
               <div class="col-md-6 mb-3">
@@ -235,66 +239,74 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }
       });
 
+      // Helper functions for badge color contrast
+      function getLuminance(hex) {
+        // WCAG 2.0 luminance calculation
+        const rgb = parseInt(hex.slice(1), 16);
+        const r = (rgb >> 16) & 0xff;
+        const g = (rgb >> 8) & 0xff;
+        const b = (rgb >> 0) & 0xff;
+
+        const [rsRGB, gsRGB, bsRGB] = [r/255, g/255, b/255].map(val => {
+          return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
+        });
+
+        return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
+      }
+
+      function getContrastTextColor(backgroundColor) {
+        const luminance = getLuminance(backgroundColor);
+        return luminance > 0.5 ? '#1F2937' : '#FFFFFF';
+      }
+
       table = $('#<%= dtTableId %>').DataTable({
         processing: true,
         serverSide: true,
         deferRender: true,
-        ajax: function(data, callback, settings) {
-          const params = {
-            page: Math.floor(data.start / data.length) + 1,
-            limit: data.length
-          };
-
-          if (data.search.value) {
-            params.search = data.search.value;
-          }
-
-          $.ajax({
-            url: API,
-            type: 'GET',
-            data: params,
-            success: function(json) {
-              if (!json.success) {
-                showErrorAlert('Error al cargar los datos de tours: ' + (json.error || 'Error desconocido'));
-                callback({
-                  draw: data.draw,
-                  recordsTotal: 0,
-                  recordsFiltered: 0,
-                  data: []
-                });
-                return;
-              }
-
-              const totalCount = json.data?.pagination?.totalCount || json.data?.pagination?.total || 0;
-              $('#total-tours-count').text(totalCount);
-
-              const tours = json.data?.tours || [];
-
-              callback({
-                draw: data.draw,
-                recordsTotal: totalCount,
-                recordsFiltered: totalCount,
-                data: tours
-              });
-            },
-            error: function(xhr, status, error) {
-              showErrorAlert('Error al cargar los datos de tours: ' + error);
-              callback({
-                draw: data.draw,
-                recordsTotal: 0,
-                recordsFiltered: 0,
-                data: []
-              });
+        ajax: {
+          url: API,
+          type: 'GET',
+          dataSrc: function(json) {
+            if (!json.success) {
+              showErrorAlert('Error al cargar los datos de tours: ' + (json.error || 'Error desconocido'));
+              return [];
             }
-          });
+
+            // Update total count display
+            $('#total-tours-count').text(json.recordsTotal || 0);
+
+            return json.data || [];
+          },
+          error: function(xhr, error, thrown) {
+            console.error('Error loading tours:', error);
+            showErrorAlert('Error al cargar los tours');
+          }
         },
-        columns: [{
+        columns: [
+          // 0. Tarifa (moved to first position with badge styling)
+          {
+            data: 'rate.name',
+            render: function(data, type, row) {
+              if (!data) return '-';
+
+              // Remove "Tarifa" word from the beginning if present
+              let displayName = data.replace(/^Tarifa\s*/i, '');
+
+              const color = row.rate?.color || '#6366F1';
+              const textColor = getContrastTextColor(color);
+
+              return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${displayName}</span>`;
+            }
+          },
+          // 1. Destino
+          {
             data: 'destinationPOI',
             render: function(data, type, row) {
               if (!data) return '-';
               return `<div><strong>${data.name || 'Sin destino'}</strong></div>`;
             }
           },
+          // 2. Tiempo
           {
             data: 'time',
             render: function(data, type, row) {
@@ -310,6 +322,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               }
             }
           },
+          // 3. Tipo de Vehículo
           {
             data: 'vehicleType',
             render: function(data, type, row) {
@@ -317,28 +330,29 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               return data.name || 'Sin tipo';
             }
           },
+          // 4. Pasajeros
           {
             data: null,
             render: function(data, type, row) {
               const minPassengers = row.minPassengers;
               const maxPassengers = row.maxPassengers;
-              
+
               if (!minPassengers && !maxPassengers) {
                 return '<span class="text-muted">Sin límite</span>';
               }
-              
+
               if (minPassengers && maxPassengers) {
                 return `${minPassengers} - ${maxPassengers} pax`;
               }
-              
+
               if (minPassengers) {
                 return `Mín: ${minPassengers} pax`;
               }
-              
+
               if (maxPassengers) {
                 return `Máx: ${maxPassengers} pax`;
               }
-              
+
               return '-';
             }
           },
@@ -481,7 +495,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
           [10, 25, 50, 100]
         ],
         order: [
-          [0, 'asc']
+          [0, 'asc'], // 1. Tarifa
+          [1, 'asc']  // 2. Destino
         ],
         pagingType: 'full_numbers',
         language: {
@@ -512,21 +527,54 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
       // Load dropdown options when modal opens
       function loadDropdownOptions() {
-        // Load Active POIs
+        // Load Active POIs (filtered by Tours service type)
         $.ajax({
-          url: '/api/pois/active',
+          url: '/api/pois/active?serviceType=Tours',
           type: 'GET',
           success: function(data) {
             if (data.success && data.data) {
+              const selectElement = document.getElementById('destinationPOI');
+
+              // Destroy existing Tom Select instance if it exists
+              if (selectElement && selectElement.tomselect) {
+                selectElement.tomselect.destroy();
+              }
+
+              // Clear the select element
               const select = $('#destinationPOI');
-              select.empty().append('<option value="">Seleccionar destino...</option>');
-              data.data.forEach(poi => {
-                select.append(`<option value="${poi.value}">${poi.label}</option>`);
-              });
+              select.empty();
+
+              // Initialize Tom Select first (on empty select)
+              if (typeof TomSelect !== 'undefined') {
+                const tomSelectInstance = new TomSelect('#destinationPOI', {
+                  plugins: [],
+                  maxOptions: 1000,
+                  placeholder: 'Seleccionar destino',
+                  maxItems: 1,
+                  highlight: true,
+                  searchField: ['text'],
+                  valueField: 'value',
+                  labelField: 'text',
+                  sortField: 'text',
+                  closeAfterSelect: true,
+                  persist: false
+                });
+
+                // Store instance reference
+                selectElement.tomselect = tomSelectInstance;
+
+                // Load options using Tom Select API (prevents auto-selection)
+                tomSelectInstance.clearOptions();
+                data.data.forEach(poi => {
+                  tomSelectInstance.addOption({ value: poi.value, text: poi.label });
+                });
+                tomSelectInstance.refreshOptions(false);
+                tomSelectInstance.clear(); // Clear selection to start empty
+              }
             }
           },
           error: function(xhr, status, error) {
-            console.error('Error loading POIs:', error);
+            console.error('Error loading POIs for Tours:', error);
           }
         });
 
@@ -579,9 +627,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               const t = data.data.tour;
               $('#tourId').val(t.id || t.objectId);
 
-              // Set POI destination
+              // Set POI destination (wait for Tom Select to initialize)
               setTimeout(() => {
-                $('#destinationPOI').val(t.destinationPOI?.objectId || t.destinationPOI?.id || '');
+                const destinationValue = t.destinationPOI?.objectId || t.destinationPOI?.id || '';
+                const selectElement = document.getElementById('destinationPOI');
+
+                if (selectElement && selectElement.tomselect) {
+                  // Use Tom Select API to set value
+                  selectElement.tomselect.setValue(destinationValue, true);
+                } else {
+                  // Fallback to jQuery if Tom Select not initialized
+                  $('#destinationPOI').val(destinationValue);
+                }
               }, 500);
 
               // Set time (convert from minutes to hours and minutes)

@@ -88,10 +88,7 @@ class PricingHelper {
       // Get percentage (use override or fetch from settings)
       const percentage = surchargePercentage !== null
         ? surchargePercentage
-        : await this.settingsService.getNumericValue(
-          this.surchargeSettingKey,
-          this.defaultSurchargePercentage
-        );
+        : await this.settingsService.getNumericValue(this.surchargeSettingKey, this.defaultSurchargePercentage);
 
       // Calculate surcharge
       const surcharge = (basePrice * percentage) / 100;
@@ -161,10 +158,7 @@ class PricingHelper {
       // Get percentage (use override or fetch from settings)
       const percentage = surchargePercentage !== null
         ? surchargePercentage
-        : await this.settingsService.getNumericValue(
-          this.surchargeSettingKey,
-          this.defaultSurchargePercentage
-        );
+        : await this.settingsService.getNumericValue(this.surchargeSettingKey, this.defaultSurchargePercentage);
 
       const surcharge = await this.calculateSurcharge(basePrice, percentage);
       const totalPrice = basePrice + surcharge;
@@ -200,14 +194,9 @@ class PricingHelper {
   async getBulkPriceBreakdown(items, surchargePercentage = null) {
     const percentage = surchargePercentage !== null
       ? surchargePercentage
-      : await this.settingsService.getNumericValue(
-        this.surchargeSettingKey,
-        this.defaultSurchargePercentage
-      );
+      : await this.settingsService.getNumericValue(this.surchargeSettingKey, this.defaultSurchargePercentage);
 
-    return Promise.all(
-      items.map((item) => this.getPriceBreakdown(item.price, percentage))
-    );
+    return Promise.all(items.map((item) => this.getPriceBreakdown(item.price, percentage)));
   }
 
   // ============================================================
@@ -320,12 +309,9 @@ class PricingHelper {
     try {
       const percentage = surchargePercentage !== null
         ? surchargePercentage
-        : await this.settingsService.getNumericValue(
-          this.surchargeSettingKey,
-          this.defaultSurchargePercentage
-        );
+        : await this.settingsService.getNumericValue(this.surchargeSettingKey, this.defaultSurchargePercentage);
 
-      const basePrice = totalPrice / (1 + (percentage / 100));
+      const basePrice = totalPrice / (1 + percentage / 100);
       const rounded = Math.round(basePrice * 100) / 100;
 
       logger.debug('Base price calculated from total', {
@@ -357,10 +343,7 @@ class PricingHelper {
    * // Returns: 21.09
    */
   async getCurrentSurchargePercentage() {
-    return this.settingsService.getNumericValue(
-      this.surchargeSettingKey,
-      this.defaultSurchargePercentage
-    );
+    return this.settingsService.getNumericValue(this.surchargeSettingKey, this.defaultSurchargePercentage);
   }
 
   /**

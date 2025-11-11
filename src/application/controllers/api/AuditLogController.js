@@ -182,13 +182,7 @@ class AuditLogController {
       const baseQuery = AuditLogHelper.buildAuditLogQuery({ startDate, endDate });
 
       // Get statistics in parallel
-      const [
-        totalLogs,
-        uniqueUsers,
-        actionBreakdown,
-        entityTypeBreakdown,
-        recentActivity,
-      ] = await Promise.all([
+      const [totalLogs, uniqueUsers, actionBreakdown, entityTypeBreakdown, recentActivity] = await Promise.all([
         baseQuery.count({ useMasterKey: true }),
         this.getUniqueUsersCount(baseQuery),
         this.getActionBreakdown(baseQuery),
@@ -231,10 +225,7 @@ class AuditLogController {
    * @example
    */
   async executeQuery(query) {
-    return Promise.all([
-      query.find({ useMasterKey: true }),
-      query.count({ useMasterKey: true }),
-    ]);
+    return Promise.all([query.find({ useMasterKey: true }), query.count({ useMasterKey: true })]);
   }
 
   /**

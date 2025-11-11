@@ -130,48 +130,46 @@ class ToursController {
       const tours = await filteredQuery.find({ useMasterKey: true });
 
       // Transform results for DataTables
-      const data = tours.map((tour) => ({
-        id: tour.id,
-        objectId: tour.id,
-        destinationPOI: {
-          objectId: tour.get('destinationPOI')?.id,
-          name: tour.get('destinationPOI')?.get('name') || 'Sin destino',
-        },
-        time: tour.get('time') || 0,
-        vehicleType: {
-          objectId: tour.get('vehicleType')?.id,
-          name: tour.get('vehicleType')?.get('name') || 'Sin tipo',
-        },
-        price: tour.get('price') || 0,
-        rate: {
-          objectId: tour.get('rate')?.id,
-          name: tour.get('rate')?.get('name') || 'Sin tarifa',
-        },
-        minPassengers: tour.get('minPassengers') || null,
-        maxPassengers: tour.get('maxPassengers') || null,
-        notes: tour.get('notes') || null,
-        active: tour.get('active') || false,
-        exists: tour.get('exists') || true,
-        createdAt: tour.get('createdAt'),
-        updatedAt: tour.get('updatedAt'),
-      }));
+      const data = tours.map((tour) => {
+        const destinationPOI = tour.get('destinationPOI');
+        const vehicleType = tour.get('vehicleType');
+        const rate = tour.get('rate');
 
-      // Send DataTables response
+        return {
+          id: tour.id,
+          objectId: tour.id,
+          destinationPOI: {
+            objectId: destinationPOI?.id,
+            name: destinationPOI?.get('name') || 'Sin destino',
+          },
+          time: tour.get('time') || 0,
+          vehicleType: {
+            objectId: vehicleType?.id,
+            name: vehicleType?.get('name') || 'Sin tipo',
+          },
+          price: tour.get('price') || 0,
+          rate: {
+            id: rate?.id,
+            name: rate?.get('name') || 'Sin tarifa',
+            color: rate?.get('color') || '#6366F1',
+          },
+          minPassengers: tour.get('minPassengers') || null,
+          maxPassengers: tour.get('maxPassengers') || null,
+          notes: tour.get('notes') || null,
+          active: tour.get('active') || false,
+          exists: tour.get('exists') || true,
+          createdAt: tour.get('createdAt'),
+          updatedAt: tour.get('updatedAt'),
+        };
+      });
+
+      // Send DataTables response (standardized format matching Services)
       res.json({
         success: true,
         draw,
         recordsTotal,
         recordsFiltered,
-        data: {
-          tours: data,
-          pagination: {
-            total: recordsTotal,
-            totalCount: recordsTotal,
-            filtered: recordsFiltered,
-            page: Math.floor(start / length) + 1,
-            limit: length,
-          },
-        },
+        data,
       });
     } catch (error) {
       logger.error('Error getting tours:', error);
@@ -210,23 +208,34 @@ class ToursController {
         return this.sendError(res, 'Tour no encontrado', 404);
       }
 
+      const destinationPOI = tour.get('destinationPOI');
+      const vehicleType = tour.get('vehicleType');
+      const rate = tour.get('rate');
+
       const tourData = {
         id: tour.id,
         objectId: tour.id,
-        destinationPOI: tour.get('destinationPOI') ? {
-          objectId: tour.get('destinationPOI').id,
-          name: tour.get('destinationPOI').get('name'),
-        } : null,
+        destinationPOI: destinationPOI
+          ? {
+            objectId: destinationPOI.id,
+            name: destinationPOI.get('name'),
+          }
+          : null,
         time: tour.get('time'),
-        vehicleType: tour.get('vehicleType') ? {
-          objectId: tour.get('vehicleType').id,
-          name: tour.get('vehicleType').get('name'),
-        } : null,
+        vehicleType: vehicleType
+          ? {
+            objectId: vehicleType.id,
+            name: vehicleType.get('name'),
+          }
+          : null,
         price: tour.get('price'),
-        rate: tour.get('rate') ? {
-          objectId: tour.get('rate').id,
-          name: tour.get('rate').get('name'),
-        } : null,
+        rate: rate
+          ? {
+            id: rate.id,
+            name: rate.get('name'),
+            color: rate.get('color') || '#6366F1',
+          }
+          : null,
         minPassengers: tour.get('minPassengers'),
         maxPassengers: tour.get('maxPassengers'),
         notes: tour.get('notes'),

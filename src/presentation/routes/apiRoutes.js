@@ -106,34 +106,30 @@ router.get('/version', apiController.getVersion);
  *                 error:
  *                   type: string
  */
-router.get(
-  '/auth/current-token',
-  jwtMiddleware.authenticateToken,
-  (req, res) => {
-    try {
-      // Extract token from cookies (since this endpoint is authenticated, the token exists)
-      const token = req.cookies?.accessToken;
+router.get('/auth/current-token', jwtMiddleware.authenticateToken, (req, res) => {
+  try {
+    // Extract token from cookies (since this endpoint is authenticated, the token exists)
+    const token = req.cookies?.accessToken;
 
-      if (!token) {
-        return res.status(401).json({
-          success: false,
-          error: 'No access token found',
-        });
-      }
-
-      res.json({
-        success: true,
-        token,
-      });
-    } catch (error) {
-      logger.error('Error retrieving current token:', error);
-      res.status(500).json({
+    if (!token) {
+      return res.status(401).json({
         success: false,
-        error: 'Internal server error',
+        error: 'No access token found',
       });
     }
+
+    res.json({
+      success: true,
+      token,
+    });
+  } catch (error) {
+    logger.error('Error retrieving current token:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Internal server error',
+    });
   }
-);
+});
 
 // CSP Report endpoint
 router.post(
