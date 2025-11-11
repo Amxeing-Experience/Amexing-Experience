@@ -6,6 +6,7 @@
 const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
 const QuoteService = require('../../services/QuoteService');
+const pricingHelper = require('../../utils/pricingHelper');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -1154,7 +1155,8 @@ class QuoteController {
       // Group services by route (origin → destination)
       const routeMap = new Map();
 
-      services.forEach((service) => {
+      // Use for...of to support async price calculations
+      for (const service of services) {
         const originPOI = service.get('originPOI');
         const destinationPOI = service.get('destinationPOI');
         const vehicleType = service.get('vehicleType');
@@ -1187,17 +1189,24 @@ class QuoteController {
           route.hasRoundTrip = true;
         }
 
-        // Add vehicle type to this route
+        // Get price breakdown with surcharge
+        const basePrice = service.get('price') || 0;
+        const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+        // Add vehicle type to this route with price breakdown
         route.vehicles.push({
           serviceId: service.id,
           vehicleType: vehicleType ? vehicleType.get('name') : '',
           vehicleTypeId: vehicleType ? vehicleType.id : null,
           capacity: vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4,
-          price: service.get('price') || 0,
+          basePrice: priceBreakdown.basePrice, // Cash price (precio contado)
+          price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
+          surcharge: priceBreakdown.surcharge, // Surcharge amount
+          surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
           note: service.get('note') || '',
           isRoundTrip,
         });
-      });
+      }
 
       // Convert map to array and add labels with appropriate arrows
       const groupedRoutes = Array.from(routeMap.values()).map((route) => {

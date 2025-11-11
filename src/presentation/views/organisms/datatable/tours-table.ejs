@@ -50,7 +50,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <th>Tiempo (Hrs min)</th>
             <th>Tipo de Vehículo</th>
             <th>Pasajeros</th>
-            <th>Costo</th>
+            <th>Precio</th>
+            <th>Precio Contado</th>
             <th>Tarifa</th>
             <th>Estado</th>
             <% if (dtShowActions) { %>
@@ -340,16 +341,66 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               return '-';
             }
           },
+          // 5. Precio (with surcharge - "Tarjeta/Digital")
           {
             data: 'price',
             render: function(data, type, row) {
-              if (!data) return '-';
-              return '$' + parseFloat(data).toLocaleString('es-MX', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-              });
+              const basePrice = data || 0;
+              const surchargePercentage = window.APP_SETTINGS?.paymentSurchargePercentage || 21.09;
+              const surcharge = (basePrice * surchargePercentage) / 100;
+              const totalPrice = basePrice + surcharge;
+
+              // For sorting and filtering, use total price
+              if (type === 'sort' || type === 'filter') {
+                return totalPrice;
+              }
+
+              const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                style: 'currency',
+                currency: 'MXN'
+              }).format(amount);
+
+              return `
+                <div class="text-center">
+                  <div class="fw-bold text-success" style="font-size: 1rem;">
+                    ${formatMXN(totalPrice)}
+                  </div>
+                  <div class="text-muted" style="font-size: 0.75rem;">
+                    <small>Tarjeta/Digital</small>
+                  </div>
+                </div>
+              `;
             }
           },
+          // 6. Precio Contado (base price - "Efectivo")
+          {
+            data: 'price',
+            render: function(data, type, row) {
+              const basePrice = data || 0;
+
+              // For sorting and filtering, use base price
+              if (type === 'sort' || type === 'filter') {
+                return basePrice;
+              }
+
+              const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                style: 'currency',
+                currency: 'MXN'
+              }).format(amount);
+
+              return `
+                <div class="text-center">
+                  <div class="fw-bold text-primary" style="font-size: 1rem;">
+                    ${formatMXN(basePrice)}
+                  </div>
+                  <div class="text-muted" style="font-size: 0.75rem;">
+                    <small>Efectivo</small>
+                  </div>
+                </div>
+              `;
+            }
+          },
+          // 7. Tarifa
           {
             data: 'rate',
             render: function(data, type, row) {
@@ -357,6 +408,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               return data.name || 'Sin tarifa';
             }
           },
+          // 8. Estado
           {
             data: 'active',
             defaultContent: false,
