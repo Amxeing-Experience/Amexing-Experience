@@ -222,12 +222,12 @@ class QuoteController {
       baseQuery.include('createdBy');
 
       // Apply role-based filters
-      await this.applyRoleBasedQuoteFilters(baseQuery, currentUser);
+      await this.applyRoleBasedQuoteFilters(baseQuery, currentUser, req.userRole);
 
       // Get total records count (without search filter but with role filters)
       const totalRecordsQuery = new Parse.Query('Quote');
       totalRecordsQuery.equalTo('exists', true);
-      await this.applyRoleBasedQuoteFilters(totalRecordsQuery, currentUser);
+      await this.applyRoleBasedQuoteFilters(totalRecordsQuery, currentUser, req.userRole);
       const recordsTotal = await totalRecordsQuery.count({
         useMasterKey: true,
       });
@@ -239,12 +239,12 @@ class QuoteController {
         const folioQuery = new Parse.Query('Quote');
         folioQuery.equalTo('exists', true);
         folioQuery.matches('folio', searchValue, 'i');
-        await this.applyRoleBasedQuoteFilters(folioQuery, currentUser);
+        await this.applyRoleBasedQuoteFilters(folioQuery, currentUser, req.userRole);
 
         const contactQuery = new Parse.Query('Quote');
         contactQuery.equalTo('exists', true);
         contactQuery.matches('contactPerson', searchValue, 'i');
-        await this.applyRoleBasedQuoteFilters(contactQuery, currentUser);
+        await this.applyRoleBasedQuoteFilters(contactQuery, currentUser, req.userRole);
 
         filteredQuery = Parse.Query.or(folioQuery, contactQuery);
         filteredQuery.include('client');
@@ -372,6 +372,12 @@ class QuoteController {
 
       if (!quote) {
         return this.sendError(res, 'Cotización no encontrada', 404);
+      }
+
+      // Check access permissions after getting the quote
+      const hasAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
+      if (!hasAccess) {
+        return this.sendError(res, 'No tienes permisos para acceder a esta cotización', 403);
       }
 
       const client = quote.get('client');
@@ -1795,21 +1801,85 @@ class QuoteController {
   }
 
   /**
+   * Check if a user has access to view a specific quote.
+   * Used for single quote access validation in getQuoteById.
+   * @param {object} currentUser - Current authenticated user.
+   * @param {object} quote - Parse Quote object.
+   * @param {string} userRole - User role from middleware.
+   * @returns {Promise<boolean>} True if user has access, false otherwise.
+   * @example
+   * const hasAccess = await this.checkQuoteAccess(currentUser, quote, userRole);
+   */
+  async checkQuoteAccess(currentUser, quote, userRole) {
+    try {
+      // Super admins and admins can access all quotes
+      if (userRole === 'superadmin' || userRole === 'admin') {
+        return true;
+      }
+
+      // For all other roles, check if they created the quote
+      const createdBy = quote.get('createdBy');
+      if (createdBy && createdBy.id === currentUser.id) {
+        return true;
+      }
+
+      // Department managers can access quotes created by users in their department
+      if (userRole === 'department_manager') {
+        const userDepartmentId = currentUser.departmentId || currentUser.get('departmentId');
+        if (!userDepartmentId || !createdBy) {
+          return false;
+        }
+
+        // Check if the quote creator is in the same department
+        try {
+          const creatorQuery = new Parse.Query('AmexingUser');
+          const creator = await creatorQuery.get(createdBy.id, { useMasterKey: true });
+
+          if (creator) {
+            const creatorDepartmentId = creator.departmentId || creator.get('departmentId');
+            return creatorDepartmentId === userDepartmentId;
+          }
+        } catch (error) {
+          logger.warn('Could not fetch quote creator for department check', {
+            createdById: createdBy.id,
+            error: error.message,
+          });
+        }
+      }
+
+      return false;
+    } catch (error) {
+      logger.error('Error checking quote access', {
+        error: error.message,
+        userId: currentUser.id,
+        quoteId: quote.id,
+        role: userRole,
+      });
+      return false;
+    }
+  }
+
+  /**
    * Apply role-based filters to quote queries.
    * Ensures department managers only see quotes created by users in their department.
    * @param {Parse.Query} query - Parse query to apply filters to.
    * @param {object} currentUser - Current authenticated user.
+   * @param {string} userRole - User role from middleware.
    * @returns {Promise<void>}
    * @example
    * // Apply filters to a quote query
-   * await this.applyRoleBasedQuoteFilters(query, currentUser);
+   * await this.applyRoleBasedQuoteFilters(query, currentUser, userRole);
    */
-  async applyRoleBasedQuoteFilters(query, currentUser) {
+  async applyRoleBasedQuoteFilters(query, currentUser, userRole) {
     try {
-      const userRole = currentUser.role || currentUser.get('role');
+      logger.debug('Applying role-based quote filters', {
+        userId: currentUser.id,
+        role: userRole,
+      });
 
       // Super admins and admins can see all quotes
       if (userRole === 'superadmin' || userRole === 'admin') {
+        logger.debug('Admin/superadmin user - showing all quotes', { userRole });
         return; // No additional filters needed
       }
 
@@ -1922,7 +1992,7 @@ class QuoteController {
       logger.error('Error applying role-based quote filters', {
         error: error.message,
         userId: currentUser.id,
-        role: currentUser.role || currentUser.get('role'),
+        role: userRole,
       });
 
       // On error, restrict to user's own quotes as fallback

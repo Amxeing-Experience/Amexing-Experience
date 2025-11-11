@@ -18,7 +18,7 @@ const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
 const canEdit = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
-const canDelete = ['superadmin', 'admin'].includes(dtUserRole); // Only admins can delete
+const canDelete = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
 
 // Dynamic base path based on user role

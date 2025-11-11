@@ -36,20 +36,33 @@
 
                 <div class="row">
                     <div class="col-md-12 mb-3">
-                        <%- include('../../../atoms/common/tom-select', {
-                            id: 'clientId',
-                            name: 'clientId',
-                            multiple: false,
-                            placeholder: 'Buscar cliente por nombre o empresa',
-                            label: 'Cliente',
-                            required: true,
-                            helpText: 'Selecciona un cliente existente o crea uno nuevo',
-                            options: [],
-                            selected: []
-                        }) %>
-                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
-                            <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
-                        </button>
+                        <% if (typeof userRole !== 'undefined' && userRole === 'department_manager') { %>
+                            <!-- Department Manager: Current user as client (read-only) -->
+                            <label class="form-label">Cliente <span class="text-danger">*</span></label>
+                            <div class="form-control bg-light d-flex align-items-center">
+                                <i class="ti ti-user me-2 text-muted"></i>
+                                <span id="currentUserName">Cargando...</span>
+                                <small class="text-muted ms-auto">(Usuario actual)</small>
+                            </div>
+                            <input type="hidden" id="clientId" name="clientId" value="">
+                            <div class="form-text">Tu cuenta será automáticamente asignada como cliente para esta cotización</div>
+                        <% } else { %>
+                            <!-- Admin/SuperAdmin: Client selection -->
+                            <%- include('../../../atoms/common/tom-select', {
+                                id: 'clientId',
+                                name: 'clientId',
+                                multiple: false,
+                                placeholder: 'Buscar cliente por nombre o empresa',
+                                label: 'Cliente',
+                                required: true,
+                                helpText: 'Selecciona un cliente existente o crea uno nuevo',
+                                options: [],
+                                selected: []
+                            }) %>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
+                                <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
+                            </button>
+                        <% } %>
                     </div>
                 </div>
             </div>
@@ -139,9 +152,9 @@
                 <div class="mb-3">
                     <label for="status" class="form-label">Estado</label>
                     <select class="form-select" id="status" name="status">
-                        <option value="draft">Borrador</option>
-                        <option value="sent">Enviado</option>
-                        <option value="accepted">Aceptado</option>
+                        <option value="requested">Solicitado</option>
+                        <option value="hold">Bloqueado</option>
+                        <option value="scheduled">Agendado</option>
                         <option value="rejected">Rechazado</option>
                     </select>
                     <div class="form-text">El estado actual de la cotización</div>
@@ -245,6 +258,17 @@
     'use strict';
 
     let clientTomSelect = null;
+    const userRole = '<%= typeof userRole !== "undefined" ? userRole : "admin" %>';
+    
+    // Current user data for department_manager (passed from server)
+    const currentUserData = {
+        id: '<%= typeof user !== "undefined" && user ? user.id : "" %>',
+        name: '<%= typeof user !== "undefined" && user ? (user.firstName && user.lastName ? user.firstName + " " + user.lastName : user.name || user.email || "") : "" %>',
+        email: '<%= typeof user !== "undefined" && user ? user.email || "" : "" %>',
+        firstName: '<%= typeof user !== "undefined" && user ? user.firstName || "" : "" %>',
+        lastName: '<%= typeof user !== "undefined" && user ? user.lastName || "" : "" %>',
+        phone: '<%= typeof user !== "undefined" && user ? user.phone || "" : "" %>'
+    };
 
     // Get JWT token from cookies
     function getAccessToken() {
@@ -330,7 +354,40 @@
         }
     }
 
-    // Load active clients for Tom Select
+    // Load current user info for department manager (using server-side data)
+    function loadCurrentUserAsClient() {
+        try {
+            if (currentUserData.id) {
+                // Set current user name in the display
+                const displayName = currentUserData.name || currentUserData.email || 'Usuario actual';
+                document.getElementById('currentUserName').textContent = displayName;
+                
+                // Set the hidden client ID field to the current user's ID
+                document.getElementById('clientId').value = currentUserData.id;
+                
+                // Auto-fill contact information with user data
+                if (currentUserData.firstName || currentUserData.lastName) {
+                    const fullName = `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim();
+                    if (fullName) {
+                        document.getElementById('contactPerson').value = fullName;
+                    }
+                }
+                if (currentUserData.email) {
+                    document.getElementById('contactEmail').value = currentUserData.email;
+                }
+                if (currentUserData.phone) {
+                    document.getElementById('contactPhone').value = currentUserData.phone;
+                }
+            } else {
+                document.getElementById('currentUserName').textContent = 'Usuario no disponible';
+            }
+        } catch (error) {
+            console.error('Error loading current user:', error);
+            document.getElementById('currentUserName').textContent = 'Error al cargar usuario';
+        }
+    }
+
+    // Load active clients for Tom Select (admin/superadmin only)
     async function loadActiveClients() {
         try {
             const response = await fetch('/api/clients/active', {
@@ -369,9 +426,12 @@
         }
     }
 
-    // Auto-fill contact information when client is selected
+    // Auto-fill contact information when client is selected (admin/superadmin only)
     async function handleClientSelection() {
         try {
+            // Skip if Tom Select element doesn't exist (department_manager case)
+            if (!document.querySelector('#clientId.tomselect')) return;
+            
             const clientTS = await waitForTomSelect('clientId');
 
             clientTS.on('change', function(value) {
@@ -496,12 +556,21 @@
             if (result.success && result.data) {
                 const quote = result.data;
 
-                // Wait for Tom Select to be ready
-                const clientTS = await waitForTomSelect('clientId');
-
-                // Populate client (Tom Select)
-                if (quote.client && quote.client.id) {
-                    clientTS.setValue(quote.client.id);
+                // Handle client population based on user role
+                if (userRole === 'department_manager') {
+                    // For department manager: populate client info in read-only display
+                    if (quote.client && quote.client.fullName) {
+                        document.getElementById('currentUserName').textContent = quote.client.fullName;
+                    }
+                    if (quote.client && quote.client.id) {
+                        document.getElementById('clientId').value = quote.client.id;
+                    }
+                } else {
+                    // For admin/superadmin: wait for Tom Select and populate
+                    const clientTS = await waitForTomSelect('clientId');
+                    if (quote.client && quote.client.id) {
+                        clientTS.setValue(quote.client.id);
+                    }
                 }
 
                 // Populate form fields
@@ -523,10 +592,6 @@
 
                 if (quote.contactPhone) {
                     document.getElementById('contactPhone').value = quote.contactPhone;
-                }
-
-                if (quote.rate && quote.rate.id) {
-                    document.getElementById('rateId').value = quote.rate.id;
                 }
 
                 if (quote.notes) {
@@ -565,9 +630,16 @@
 
         clearAlerts('quoteInformationAlerts');
 
-        // Get Tom Select value
-        const clientTS = await waitForTomSelect('clientId');
-        const clientId = clientTS.getValue();
+        // Get client ID based on user role
+        let clientId;
+        if (userRole === 'department_manager') {
+            // For department manager: get from hidden input
+            clientId = document.getElementById('clientId').value;
+        } else {
+            // For admin/superadmin: get from Tom Select
+            const clientTS = await waitForTomSelect('clientId');
+            clientId = clientTS.getValue();
+        }
 
         if (!clientId) {
             showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
@@ -643,9 +715,16 @@
 
         clearAlerts('quoteInformationAlerts');
 
-        // Get Tom Select value
-        const clientTS = await waitForTomSelect('clientId');
-        const clientId = clientTS.getValue();
+        // Get client ID based on user role
+        let clientId;
+        if (userRole === 'department_manager') {
+            // For department manager: get from hidden input
+            clientId = document.getElementById('clientId').value;
+        } else {
+            // For admin/superadmin: get from Tom Select
+            const clientTS = await waitForTomSelect('clientId');
+            clientId = clientTS.getValue();
+        }
 
         if (!clientId) {
             showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
@@ -684,9 +763,10 @@
             if (result.success && result.data) {
                 showAlert('quoteInformationAlerts', result.message || 'Cotización creada exitosamente', 'success');
 
-                // Redirect to quote detail page with services section
+                // Redirect to quote detail page with services section (use appropriate dashboard path)
+                const dashboardPath = userRole === 'department_manager' ? '/dashboard/department_manager' : '/dashboard/admin';
                 setTimeout(() => {
-                    window.location.href = `/dashboard/admin/quotes/${result.data.id}?section=services`;
+                    window.location.href = `${dashboardPath}/quotes/${result.data.id}?section=services`;
                 }, 1500);
             } else {
                 showAlert('quoteInformationAlerts', result.error || 'Error al crear la cotización', 'danger');
@@ -707,11 +787,17 @@
         showPageLoader('quoteInformationCard');
 
         try {
-            // Load dropdown data
-            await loadActiveClients();
+            // Load data based on user role
+            if (userRole === 'department_manager') {
+                // For department manager: load current user as client
+                loadCurrentUserAsClient();
+            } else {
+                // For admin/superadmin: load clients
+                await loadActiveClients();
 
-            // Setup client selection handler
-            await handleClientSelection();
+                // Setup client selection handler only for admin/superadmin
+                await handleClientSelection();
+            }
 
             // Check if we're in edit mode
             const quoteIdInput = document.getElementById('quoteId');
@@ -723,9 +809,11 @@
                 await loadQuoteData(quoteId);
             }
 
-            // Event listeners
-            document.getElementById('createQuickClientBtn').addEventListener('click', openQuickClientModal);
-            document.getElementById('saveQuickClientBtn').addEventListener('click', saveQuickClient);
+            // Event listeners (only for admin/superadmin)
+            if (userRole !== 'department_manager') {
+                document.getElementById('createQuickClientBtn').addEventListener('click', openQuickClientModal);
+                document.getElementById('saveQuickClientBtn').addEventListener('click', saveQuickClient);
+            }
 
             // Form submission - use appropriate function based on mode
             document.getElementById('quoteInformationForm').addEventListener('submit', function(event) {

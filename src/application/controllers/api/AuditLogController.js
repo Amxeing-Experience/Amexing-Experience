@@ -33,6 +33,8 @@ class AuditLogController {
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
+   * // GET /api/audit/logs?action=CREATE&entityType=Quote&limit=50
+   * // Returns paginated audit logs with optional filters
    */
   async getAuditLogs(req, res) {
     try {
@@ -79,6 +81,8 @@ class AuditLogController {
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
+   * // GET /api/audit/user/xyz789
+   * // Returns audit logs for user with ID xyz789
    */
   async getUserAuditLogs(req, res) {
     try {
@@ -120,6 +124,8 @@ class AuditLogController {
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
+   * // GET /api/audit/entity/Quote/abc123
+   * // Returns audit logs for Quote with ID abc123
    */
   async getEntityAuditLogs(req, res) {
     try {
@@ -163,6 +169,8 @@ class AuditLogController {
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
+   * // GET /api/audit/statistics
+   * // Returns statistics about audit log entries
    */
   async getStatistics(req, res) {
     try {
@@ -223,6 +231,7 @@ class AuditLogController {
    * @param {object} query - Parse query object.
    * @returns {Promise<Array>} Array of [logs, totalCount].
    * @example
+   * const [logs, totalCount] = await controller.executeQuery(query);
    */
   async executeQuery(query) {
     return Promise.all([query.find({ useMasterKey: true }), query.count({ useMasterKey: true })]);
@@ -233,6 +242,7 @@ class AuditLogController {
    * @param {object} baseQuery - Base Parse query.
    * @returns {Promise<number>} Number of unique users.
    * @example
+   * const userCount = await controller.getUniqueUsersCount(baseQuery);
    */
   async getUniqueUsersCount(baseQuery) {
     const logs = await baseQuery.find({ useMasterKey: true });
@@ -245,13 +255,17 @@ class AuditLogController {
    * @param {object} baseQuery - Base Parse query.
    * @returns {Promise<object>} Action breakdown data.
    * @example
+   * const breakdown = await controller.getActionBreakdown(baseQuery);
    */
   async getActionBreakdown(baseQuery) {
     const logs = await baseQuery.find({ useMasterKey: true });
-    const breakdown = {};
+    const breakdown = Object.create(null); // Use Object.create(null) to avoid prototype pollution
     logs.forEach((log) => {
       const action = log.get('action');
-      breakdown[action] = (breakdown[action] || 0) + 1;
+      // Validate that action is a safe string and not a prototype property
+      if (typeof action === 'string' && action && !['__proto__', 'constructor', 'prototype'].includes(action)) {
+        breakdown[action] = (breakdown[action] || 0) + 1;
+      }
     });
     return breakdown;
   }
@@ -261,13 +275,17 @@ class AuditLogController {
    * @param {object} baseQuery - Base Parse query.
    * @returns {Promise<object>} Entity type breakdown data.
    * @example
+   * const breakdown = await controller.getEntityTypeBreakdown(baseQuery);
    */
   async getEntityTypeBreakdown(baseQuery) {
     const logs = await baseQuery.find({ useMasterKey: true });
-    const breakdown = {};
+    const breakdown = Object.create(null); // Use Object.create(null) to avoid prototype pollution
     logs.forEach((log) => {
       const entityType = log.get('entityType');
-      breakdown[entityType] = (breakdown[entityType] || 0) + 1;
+      // Validate that entityType is a safe string and not a prototype property
+      if (typeof entityType === 'string' && entityType && !['__proto__', 'constructor', 'prototype'].includes(entityType)) {
+        breakdown[entityType] = (breakdown[entityType] || 0) + 1;
+      }
     });
     return breakdown;
   }

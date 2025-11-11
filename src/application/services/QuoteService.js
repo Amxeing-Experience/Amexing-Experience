@@ -275,8 +275,8 @@ class QuoteService {
       // Get user role
       const role = userRole || currentUser.get('role');
 
-      // Validate user permissions (only superadmin and admin)
-      if (!['superadmin', 'admin'].includes(role)) {
+      // Validate user permissions (superadmin, admin, and department_manager)
+      if (!['superadmin', 'admin', 'department_manager'].includes(role)) {
         throw new Error(`Unauthorized: Role '${role}' cannot delete Quotes`);
       }
 

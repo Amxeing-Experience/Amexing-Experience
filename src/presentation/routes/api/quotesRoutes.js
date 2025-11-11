@@ -404,7 +404,7 @@ router.post(
 
 /**
  * DELETE /api/quotes/:id - Soft delete quote.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Soft deletes the quote (sets exists=false, active=false).
  * Cannot be undone through normal UI.
@@ -420,7 +420,7 @@ router.delete(
   '/:id',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.deleteQuote(req, res)
 );
 
