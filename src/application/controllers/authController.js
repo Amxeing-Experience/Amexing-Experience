@@ -1,6 +1,7 @@
 const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
 const securityMiddlewares = require('../../infrastructure/security/securityMiddleware');
+const emailService = require('../services/EmailService');
 
 /**
  * Authentication Controller - Handles authentication operations and user flows.
@@ -388,6 +389,15 @@ class AuthController {
       this.setUserSession(req, newUser);
 
       logger.info(`User ${req.body.username} registered successfully`);
+
+      // Send welcome email asynchronously
+      this.sendWelcomeEmail(newUser, req.body).catch((error) => {
+        logger.error('Failed to send welcome email:', {
+          userId: newUser.id,
+          email: req.body.email,
+          error: error.message,
+        });
+      });
 
       return this.handleRegistrationSuccess(res, newUser);
     } catch (error) {
@@ -787,6 +797,54 @@ class AuthController {
       token,
       csrfToken: csrf,
     });
+  }
+
+  /**
+   * Send welcome email to newly registered user.
+   * @function sendWelcomeEmail
+   * @param {Parse.User} user - The newly created user.
+   * @param {object} userData - Registration data from request body.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async sendWelcomeEmail(user, userData) {
+    try {
+      if (!emailService.isAvailable()) {
+        logger.warn('Email service not available, skipping welcome email', {
+          userId: user.id,
+          email: userData.email,
+        });
+        return;
+      }
+
+      const emailData = {
+        email: userData.email,
+        name: userData.username || userData.firstName || 'User',
+        role: 'guest',
+      };
+
+      const result = await emailService.sendWelcomeEmail(emailData);
+
+      if (result.success) {
+        logger.info('Welcome email sent successfully', {
+          userId: user.id,
+          email: userData.email,
+          messageId: result.messageId,
+        });
+      } else {
+        logger.error('Failed to send welcome email', {
+          userId: user.id,
+          email: userData.email,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      logger.error('Error sending welcome email:', {
+        userId: user.id,
+        email: userData.email,
+        error: error.message,
+      });
+    }
   }
 }
 

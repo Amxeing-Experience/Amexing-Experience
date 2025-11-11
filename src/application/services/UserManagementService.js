@@ -23,6 +23,7 @@ const BaseModel = require('../../domain/models/BaseModel');
 const logger = require('../../infrastructure/logger');
 const RoleAuthorizationService = require('./RoleAuthorizationService');
 const { extractUserContext, saveWithContext } = require('../utils/parseQueryHelper');
+const emailService = require('./EmailService');
 
 /**
  * UserManagementService class implementing comprehensive user management
@@ -409,6 +410,15 @@ class UserManagementService {
         email: userData.email,
         role: userData.role,
         createdBy: createdBy.id,
+      });
+
+      // Send welcome email asynchronously
+      this.sendWelcomeEmailToNewUser(user, userData).catch((error) => {
+        logger.error('Failed to send welcome email during user creation:', {
+          userId: user.id,
+          email: userData.email,
+          error: error.message,
+        });
       });
 
       return this.transformUserToSafeFormat(user);
@@ -2081,6 +2091,55 @@ class UserManagementService {
         organizationType,
       });
       throw error;
+    }
+  }
+
+  /**
+   * Send welcome email to newly created user.
+   * @param {Parse.Object} user - The created user object.
+   * @param {object} userData - User data from creation request.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async sendWelcomeEmailToNewUser(user, userData) {
+    try {
+      if (!emailService.isAvailable()) {
+        logger.warn('Email service not available, skipping welcome email', {
+          userId: user.id,
+          email: userData.email,
+        });
+        return;
+      }
+
+      const emailData = {
+        email: userData.email,
+        name: userData.firstName
+          ? `${userData.firstName} ${userData.lastName || ''}`.trim()
+          : userData.username || userData.email.split('@')[0],
+        role: userData.role || 'user',
+      };
+
+      const result = await emailService.sendWelcomeEmail(emailData);
+
+      if (result.success) {
+        logger.info('Welcome email sent successfully to new user', {
+          userId: user.id,
+          email: userData.email,
+          messageId: result.messageId,
+        });
+      } else {
+        logger.error('Failed to send welcome email to new user', {
+          userId: user.id,
+          email: userData.email,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      logger.error('Error sending welcome email to new user:', {
+        userId: user.id,
+        email: userData.email,
+        error: error.message,
+      });
     }
   }
 }

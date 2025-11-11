@@ -243,6 +243,7 @@
     "joi": "^17.11.0",
     "js-yaml": "^4.1.0",
     "jsonwebtoken": "^9.0.2",
+    "mailersend": "^2.6.0",
     "method-override": "^3.0.0",
     "mongodb": "^6.3.0",
     "multer": "^2.0.2",
