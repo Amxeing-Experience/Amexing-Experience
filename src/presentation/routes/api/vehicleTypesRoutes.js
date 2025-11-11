@@ -67,7 +67,7 @@ router.use(vehicleTypeApiLimiter);
 router.get(
   '/',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => VehicleTypeController.getVehicleTypes(req, res)
 );
 
@@ -91,7 +91,7 @@ router.get('/active', jwtMiddleware.authenticateToken, (req, res) => VehicleType
 router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => VehicleTypeController.getVehicleTypeById(req, res)
 );
 

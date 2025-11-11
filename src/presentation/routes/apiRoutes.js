@@ -68,6 +68,73 @@ router.get('/status', apiController.getStatus);
  */
 router.get('/version', apiController.getVersion);
 
+/**
+ * @swagger
+ * /api/auth/current-token:
+ *   get:
+ *     tags:
+ *       - Authentication
+ *     summary: Get current session JWT token for client-side use
+ *     description: |
+ *       Returns the current user's JWT token for use in client-side AJAX requests.
+ *       This endpoint solves the issue where httpOnly cookies cannot be read by JavaScript.
+ *
+ *       **Authentication Required** - Must have valid session
+ *       **Rate Limited:** 200 requests per 15 minutes
+ *     responses:
+ *       200:
+ *         description: Token retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 token:
+ *                   type: string
+ *                   description: JWT access token
+ *       401:
+ *         description: Authentication required
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 error:
+ *                   type: string
+ */
+router.get(
+  '/auth/current-token',
+  jwtMiddleware.authenticateToken,
+  (req, res) => {
+    try {
+      // Extract token from cookies (since this endpoint is authenticated, the token exists)
+      const token = req.cookies?.accessToken;
+
+      if (!token) {
+        return res.status(401).json({
+          success: false,
+          error: 'No access token found',
+        });
+      }
+
+      res.json({
+        success: true,
+        token,
+      });
+    } catch (error) {
+      logger.error('Error retrieving current token:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+      });
+    }
+  }
+);
+
 // CSP Report endpoint
 router.post(
   '/csp-report',

@@ -17,9 +17,16 @@ const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/q
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
-const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
-const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
-const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+const canEdit = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole); // Only admins can delete
+const canCreate = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
+
+// Dynamic base path based on user role
+const baseDashboardPath = dtUserRole === 'department_manager' 
+    ? '/dashboard/department_manager' 
+    : dtUserRole === 'admin' 
+        ? '/dashboard/admin' 
+        : '/dashboard/superadmin';
 %>
 
 <div class="card border-0 shadow-sm">
@@ -33,7 +40,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
-                    <a href="/dashboard/admin/quotes/new" class="btn btn-light btn-sm">
+                    <a href="<%= baseDashboardPath %>/quotes/new" class="btn btn-light btn-sm">
                         <i class="ti ti-plus me-1"></i>Nueva Cotización
                     </a>
                 <% } %>
@@ -357,7 +364,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                         </button>`;
 
                             // Edit button (goes to detail page)
-                            actions += `<a href="/dashboard/admin/quotes/${data.objectId || data.id}"
+                            actions += `<a href="<%= baseDashboardPath %>/quotes/${data.objectId || data.id}"
                                             class="btn btn-primary"
                                             data-bs-toggle="tooltip"
                                             data-bs-placement="top"

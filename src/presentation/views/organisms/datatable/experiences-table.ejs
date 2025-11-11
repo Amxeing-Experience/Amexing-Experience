@@ -357,6 +357,35 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             }
         }
 
+        // Get JWT token from localStorage or cookies
+        function getAccessToken() {
+            // First try localStorage (used by other parts of the app)
+            const tokenFromStorage = localStorage.getItem('accessToken');
+            if (tokenFromStorage) {
+                return tokenFromStorage;
+            }
+            
+            // Fallback to cookies (httpOnly cookies won't work, but try anyway)
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Setup global AJAX configuration to include JWT token
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
+        });
+
         const dataTable = $(`#${tableId}`).DataTable({
             processing: true,
             serverSide: true,

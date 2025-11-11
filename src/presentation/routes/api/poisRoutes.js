@@ -67,7 +67,7 @@ router.use(poiApiLimiter);
 router.get(
   '/',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => POIController.getPOIs(req, res)
 );
 
@@ -91,7 +91,7 @@ router.get('/active', jwtMiddleware.authenticateToken, (req, res) => POIControll
 router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => POIController.getPOIById(req, res)
 );
 

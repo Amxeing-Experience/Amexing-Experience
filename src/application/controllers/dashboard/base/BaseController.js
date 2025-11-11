@@ -40,7 +40,7 @@ class BaseController {
         const sanitizedView = view.replace(/\.\./g, '').replace(/\\/g, '/');
 
         // Validate view name contains only allowed characters
-        if (!/^dashboards\/[a-z-]+\/[a-z-]+$/.test(sanitizedView)) {
+        if (!/^dashboards\/[a-z_-]+\/[a-z_-]+$/.test(sanitizedView)) {
           throw new Error('Invalid view path format');
         }
 

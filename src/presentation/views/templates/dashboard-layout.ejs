@@ -450,6 +450,41 @@
         window.addEventListener('unhandledrejection', function(e) {
             console.error('Unhandled promise rejection:', e.reason);
         });
+
+        // Initialize JWT token in localStorage for DataTables
+        // Since httpOnly cookies can't be read by JavaScript, we need to get the token from server
+        function initializeAccessToken() {
+            // Check if token already exists in localStorage
+            if (localStorage.getItem('accessToken')) {
+                console.log('Access token already available in localStorage');
+                return;
+            }
+
+            // Make a request to get current session token
+            fetch('/api/auth/current-token', {
+                method: 'GET',
+                credentials: 'include' // Include cookies in the request
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.token) {
+                    localStorage.setItem('accessToken', data.token);
+                    console.log('Access token initialized in localStorage');
+                } else {
+                    console.warn('Failed to get authentication credentials:', data.error || 'Unknown error');
+                }
+            })
+            .catch(error => {
+                console.error('Error initializing access token:', error);
+            });
+        }
+
+        // Initialize token on page load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initializeAccessToken);
+        } else {
+            initializeAccessToken();
+        }
     </script>
 
     <!-- Additional scripts -->

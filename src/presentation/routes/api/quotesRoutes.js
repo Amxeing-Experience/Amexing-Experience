@@ -42,7 +42,7 @@ const writeOperationsLimiter = rateLimit({
 
 /**
  * GET /api/quotes - Get quotes with DataTables server-side processing.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Query Parameters (DataTables format):
  * - draw: Draw counter
@@ -65,13 +65,13 @@ router.get(
   '/',
   readOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.getQuotes(req, res)
 );
 
 /**
  * POST /api/quotes - Create a new quote.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Request body:
  * - client: string (optional) - Client ID (AmexingUser objectId).
@@ -105,13 +105,13 @@ router.post(
   '/',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.createQuote(req, res)
 );
 
 /**
  * GET /api/quotes/:id - Get quote by ID.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Returns complete quote information including related entities.
  * @returns {object} Response with quote data.
@@ -130,13 +130,13 @@ router.get(
   '/:id',
   readOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.getQuoteById(req, res)
 );
 
 /**
  * PUT /api/quotes/:id - Update quote.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Request body can include:
  * - status: string (draft, sent, accepted, rejected).
@@ -158,13 +158,13 @@ router.put(
   '/:id',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.updateQuote(req, res)
 );
 
 /**
  * PUT /api/quotes/:id/service-items - Update service items (itinerary days).
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Request body:
  * - days: Array of day objects [{dayNumber, concept, vehicleType, hours, unitPrice, total, notes}].
@@ -191,13 +191,13 @@ router.put(
   '/:id/service-items',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.updateServiceItems(req, res)
 );
 
 /**
  * GET /api/quotes/:id/available-services - Get available services filtered by quote's rate.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Returns list of services (transfers) available for the quote based on its assigned rate.
  * Used by quote-services.ejs to populate transfer selector in subconcepts.
@@ -222,13 +222,13 @@ router.get(
   '/:id/available-services',
   readOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.getAvailableServicesForQuote(req, res)
 );
 
 /**
  * POST /api/quotes/:id/duplicate - Duplicate an existing quote.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Creates a copy of an existing quote with:
  * - New auto-generated folio (QTE-YYYY-####)
@@ -259,13 +259,13 @@ router.post(
   '/:id/duplicate',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.duplicateQuote(req, res)
 );
 
 /**
  * POST /api/quotes/:id/share-link - Generate shareable public link.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Generates a public URL for sharing the quote with clients.
  * Uses the quote's folio as the access key (e.g., /quotes/QTE-2025-0004).
@@ -286,7 +286,7 @@ router.post(
   '/:id/share-link',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.generateShareLink(req, res)
 );
 
