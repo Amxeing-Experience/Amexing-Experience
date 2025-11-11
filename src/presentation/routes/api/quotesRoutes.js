@@ -227,6 +227,118 @@ router.get(
 );
 
 /**
+ * GET /api/quotes/services-by-rate/:rateId - Get available services filtered by specific rate.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * Returns list of services (transfers) available for the specified rate.
+ * Used when adding traslado subconcept - user selects rate first, then service.
+ * @param {string} rateId - Rate ID to filter services.
+ * @returns {object} Response with grouped routes array.
+ * @example
+ * // Response structure:
+ * {
+ *   success: true,
+ *   data: [{
+ *     routeKey: "originId_destinationId",
+ *     label: "Aeropuerto Internacional -> Hotel Rosewood",
+ *     originName: "Aeropuerto Internacional",
+ *     destinationName: "Hotel Rosewood",
+ *     originId: "poi123",
+ *     destinationId: "poi456",
+ *     serviceType: "Aeropuerto",
+ *     hasRoundTrip: false,
+ *     vehicles: [{
+ *       serviceId: "service789",
+ *       vehicleType: "Sprinter",
+ *       vehicleTypeId: "vt456",
+ *       capacity: 12,
+ *       basePrice: 2000.00,
+ *       price: 2500.00,
+ *       surcharge: 500.00,
+ *       surchargePercentage: 25,
+ *       note: "Recepción en sala VIP",
+ *       isRoundTrip: false
+ *     }]
+ *   }]
+ * }
+ */
+router.get(
+  '/services-by-rate/:rateId',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.getAvailableServicesByRate(req, res)
+);
+
+/**
+ * GET /api/quotes/tours-by-rate/:rateId - Get available tours filtered by specific rate.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * Returns list of tours available for the specified rate.
+ * Used when adding tour subconcept - user selects rate first, then tour.
+ * @param {string} rateId - Rate ID to filter tours.
+ * @returns {object} Response with grouped destinations array.
+ * @example
+ * // Response structure:
+ * {
+ *   success: true,
+ *   data: [{
+ *     destinationKey: "poiId123",
+ *     destinationName: "San Miguel de Allende",
+ *     label: "San Miguel de Allende",
+ *     vehicles: [{
+ *       tourId: "tour456",
+ *       vehicleType: "Suburban",
+ *       vehicleTypeId: "vt789",
+ *       capacity: 6,
+ *       basePrice: 2000.00,
+ *       price: 2500.00,
+ *       surcharge: 500.00,
+ *       surchargePercentage: 25,
+ *       durationMinutes: 240,
+ *       durationHours: 4.0,
+ *       minPassengers: 1,
+ *       maxPassengers: 6,
+ *       note: "Tour incluye..."
+ *     }]
+ *   }]
+ * }
+ */
+router.get(
+  '/tours-by-rate/:rateId',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.getAvailableToursByRate(req, res)
+);
+
+/**
+ * GET /api/quotes/tours/destinations-by-rate/:rateId - Get unique tour destinations for a rate.
+ * Step 2 of 3-step tour selection: Rate → Destination → Vehicle.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ */
+router.get(
+  '/tours/destinations-by-rate/:rateId',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getTourDestinationsByRate(req, res)
+);
+
+/**
+ * GET /api/quotes/tours/vehicles-by-rate-destination/:rateId/:destinationId - Get vehicles for rate + destination.
+ * Step 3 of 3-step tour selection: Rate → Destination → Vehicle.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ */
+router.get(
+  '/tours/vehicles-by-rate-destination/:rateId/:destinationId',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getTourVehiclesByRateAndDestination(req, res)
+);
+
+/**
  * POST /api/quotes/:id/duplicate - Duplicate an existing quote.
  * Private access (Department Manager, Admin and SuperAdmin).
  *
