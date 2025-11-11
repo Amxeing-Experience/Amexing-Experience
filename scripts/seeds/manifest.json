@@ -112,6 +112,17 @@
       "dependencies": ["001-seed-service-types", "002-seed-pois-local", "003-seed-pois-aeropuerto", "004-seed-pois-ciudades", "005-seed-rates", "006-seed-vehicle-types"],
       "idempotent": true,
       "order": 7
+    },
+    {
+      "name": "008-seed-system-settings",
+      "file": "008-seed-system-settings.js",
+      "description": "Create system configuration settings (paymentSurchargePercentage: 21.09%)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": [],
+      "idempotent": true,
+      "order": 8
     }
   ],
   "notes": [

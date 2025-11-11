@@ -50,7 +50,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <th>Descripción</th>
                         <th>Contenido</th>
                         <th>Duración</th>
-                        <th>Costo</th>
+                        <th>Precio</th>
+                        <th>Precio Contado</th>
                         <th>Última Act.</th>
                         <th>Estado</th>
                         <% if (dtShowActions) { %>
@@ -414,16 +415,66 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         return `<span class="text-primary">${data} hrs</span>`;
                     }
                 },
+                // 5. Precio (with surcharge - "Tarjeta/Digital")
                 {
                     data: 'cost',
-                    render: function(data) {
-                        const formatted = new Intl.NumberFormat('es-MX', {
+                    render: function(data, type, row) {
+                        const baseCost = data || 0;
+                        const surchargePercentage = window.APP_SETTINGS?.paymentSurchargePercentage || 21.09;
+                        const surcharge = (baseCost * surchargePercentage) / 100;
+                        const totalPrice = baseCost + surcharge;
+
+                        // For sorting and filtering, use total price
+                        if (type === 'sort' || type === 'filter') {
+                            return totalPrice;
+                        }
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
                             style: 'currency',
                             currency: 'MXN'
-                        }).format(data || 0);
-                        return `<div class="fw-bold text-success">${formatted}</div>`;
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-success" style="font-size: 1rem;">
+                                    ${formatMXN(totalPrice)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Tarjeta/Digital</small>
+                                </div>
+                            </div>
+                        `;
                     }
                 },
+                // 6. Precio Contado (base cost - "Efectivo")
+                {
+                    data: 'cost',
+                    render: function(data, type, row) {
+                        const baseCost = data || 0;
+
+                        // For sorting and filtering, use base cost
+                        if (type === 'sort' || type === 'filter') {
+                            return baseCost;
+                        }
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                    ${formatMXN(baseCost)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Efectivo</small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                },
+                // 7. Última Actualización
                 {
                     data: 'updatedAt',
                     render: function(data) {
@@ -431,6 +482,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         return `<small>${date.toLocaleDateString('es-MX')}</small>`;
                     }
                 },
+                // 8. Estado
                 {
                     data: 'active',
                     render: function(data) {
@@ -505,7 +557,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando experiencias...'
             },
-            order: [[4, 'desc']], // Sort by updatedAt
+            order: [[6, 'desc']], // Sort by updatedAt (Última Act.)
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',

@@ -244,6 +244,14 @@
     <% if (typeof headContent !== 'undefined' && headContent) { %>
         <%- headContent %> <%# nosemgrep: trusted pre-rendered head content %>
     <% } %>
+
+    <!-- Global Application Settings (injected from backend) -->
+    <script>
+        // Inject system settings into global scope for client-side access
+        window.APP_SETTINGS = {
+            paymentSurchargePercentage: <%= typeof settings !== 'undefined' && settings.paymentSurchargePercentage ? settings.paymentSurchargePercentage : 21.09 %>
+        };
+    </script>
 </head>
 
 <body data-role="<%= typeof userRole !== 'undefined' ? userRole : 'guest' %>"
