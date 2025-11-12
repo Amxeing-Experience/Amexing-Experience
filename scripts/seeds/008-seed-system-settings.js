@@ -48,7 +48,7 @@ const SYSTEM_SETTINGS = [
     value: 21.09,
     valueType: 'number',
     category: 'pricing',
-    description: 'Surcharge percentage for non-cash payment methods (credit cards, debit cards, digital wallets). Applied to base price to calculate standard displayed price. Legal terminology: base price = cash discount price (precio contado), total price = base price + surcharge (precio base).',
+    description: 'Surcharge percentage for non-cash payment methods (credit cards, debit cards, digital wallets). Applied to base price to calculate standard displayed price. Legal terminology: base price = cash discount price (precio efectivo), total price = base price + surcharge (precio base).',
     displayName: 'Surcharge de Pago con Tarjeta',
     editable: true,
     validationRules: {

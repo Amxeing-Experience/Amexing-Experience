@@ -65,7 +65,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <th>Destino</th>
                         <th>Tipo de Vehículo</th>
                         <th>Precio</th>
-                        <th>Precio Contado</th>
+                        <th>Precio Efectivo</th>
                         <th>Notas</th>
                         <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
                         <% if (dtShowActions) { %>
@@ -358,7 +358,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         `;
                     }
                 },
-                // 5. Precio Contado (base price - "Efectivo discount")
+                // 5. Precio Efectivo (base price - "Efectivo discount")
                 {
                     data: 'price',
                     render: function(data, type, row) {
@@ -466,7 +466,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             order: [
                 [0, 'asc'],  // 1. Tarifa
                 [1, 'asc'],  // 2. Destino
-                [4, 'asc']   // 5. Precio Contado (base price)
+                [4, 'asc']   // 5. Precio Efectivo (base price)
             ],
             pageLength: 10,
             searchDelay: 300,

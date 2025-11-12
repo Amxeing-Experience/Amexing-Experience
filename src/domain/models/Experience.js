@@ -307,6 +307,62 @@ class Experience extends BaseModel {
   }
 
   /**
+   * Get minimum people required.
+   * @returns {number|null} Minimum people or null if not set.
+   * @example
+   * const minPeople = experience.getMinPeople();
+   * console.log(minPeople); // 4 or null
+   */
+  getMinPeople() {
+    return this.get('min_people') || null;
+  }
+
+  /**
+   * Set minimum people required.
+   * @param {number} minPeople - Minimum people (must be positive).
+   * @example
+   * experience.setMinPeople(4);
+   */
+  setMinPeople(minPeople) {
+    if (minPeople !== null && minPeople !== undefined) {
+      if (minPeople < 1) {
+        throw new Error('Minimum people must be greater than 0');
+      }
+      this.set('min_people', parseInt(minPeople, 10));
+    } else {
+      this.set('min_people', null);
+    }
+  }
+
+  /**
+   * Get journey time in hours.
+   * @returns {number|null} Journey time or null if not set.
+   * @example
+   * const journeyTime = experience.getTimeJourney();
+   * console.log(journeyTime); // 1.5 or null
+   */
+  getTimeJourney() {
+    return this.get('time_journey') || null;
+  }
+
+  /**
+   * Set journey time in hours.
+   * @param {number} timeJourney - Journey time in hours (must be positive).
+   * @example
+   * experience.setTimeJourney(1.5);
+   */
+  setTimeJourney(timeJourney) {
+    if (timeJourney !== null && timeJourney !== undefined) {
+      if (timeJourney < 0) {
+        throw new Error('Journey time must be greater than or equal to 0');
+      }
+      this.set('time_journey', parseFloat(timeJourney));
+    } else {
+      this.set('time_journey', null);
+    }
+  }
+
+  /**
    * Get vehicle type (optional relationship to VehicleType).
    * @returns {object|null} VehicleType Parse object or null if not set.
    * @example
@@ -467,6 +523,14 @@ class Experience extends BaseModel {
     if (duration !== null && duration !== undefined) {
       if (duration < 0) {
         errors.push('Duration must be greater than or equal to 0');
+      }
+    }
+
+    // Validate min_people (optional field)
+    const minPeople = this.get('min_people');
+    if (minPeople !== null && minPeople !== undefined) {
+      if (minPeople < 1) {
+        errors.push('Minimum people must be greater than 0');
       }
     }
 

@@ -50,8 +50,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <th>Descripción</th>
                         <th>Tipo</th>
                         <th>Duración</th>
+                        <th>Mín. Personas</th>
                         <th>Precio</th>
-                        <th>Precio Contado</th>
+                        <th>Precio Efectivo</th>
                         <th>Última Actualización</th>
                         <th>Estado</th>
                         <% if (dtShowActions) { %>
@@ -128,6 +129,16 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             <span class="input-group-text">horas</span>
                         </div>
                         <div class="form-text">Duración estimada en horas (campo opcional)</div>
+                    </div>
+
+                    <!-- Mínimo personas -->
+                    <div class="mb-3">
+                        <label for="min_people" class="form-label">Mínimo personas</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="min_people" name="min_people" min="1" step="1" placeholder="4">
+                            <span class="input-group-text">personas</span>
+                        </div>
+                        <div class="form-text">Número mínimo de personas requerido (campo opcional)</div>
                     </div>
 
                     <!-- Costo -->
@@ -306,7 +317,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         return `<span class="text-primary">${data} hrs</span>`;
                     }
                 },
-                // 5. Precio (with surcharge - "Tarjeta/Digital")
+                {
+                    data: 'min_people',
+                    render: function(data) {
+                        if (!data) return '<span class="text-muted">No especificado</span>';
+                        return `<span class="text-info">${data} personas</span>`;
+                    }
+                },
+                // 6. Precio (with surcharge - "Tarjeta/Digital")
                 {
                     data: 'cost',
                     render: function(data, type, row) {
@@ -337,7 +355,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         `;
                     }
                 },
-                // 6. Precio Contado (base cost - "Efectivo")
+                // 6. Precio Efectivo (base cost - "Efectivo")
                 {
                     data: 'cost',
                     render: function(data, type, row) {
@@ -585,6 +603,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#type').val('Provider');
             $('#providerType').val(''); // No default value - optional field
             $('#duration').val(''); // No default value - optional field
+            $('#min_people').val(''); // No default value - optional field
             $('#modalTitle').text(isEdit ? 'Editar Proveedor' : 'Crear Nuevo Proveedor');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Proveedor');
             initializeDaySelection();
@@ -604,6 +623,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#description').val(provider.description || '');
                         $('#providerType').val(provider.providerType || '');
                         $('#duration').val(provider.duration || '');
+                        $('#min_people').val(provider.min_people || '');
                         $('#cost').val(provider.cost || 0);
 
                         // Set availability
@@ -654,6 +674,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const durationValue = $('#duration').val();
             if (durationValue) {
                 providerData.duration = parseFloat(durationValue);
+            }
+
+            // Only include min_people if it has a value
+            const minPeopleValue = $('#min_people').val();
+            if (minPeopleValue) {
+                providerData.min_people = parseInt(minPeopleValue, 10);
             }
 
             // Add optional availability fields

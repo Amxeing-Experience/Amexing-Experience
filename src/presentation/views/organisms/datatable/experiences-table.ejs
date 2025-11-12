@@ -51,8 +51,9 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         <th>Descripción</th>
                         <th>Contenido</th>
                         <th>Duración</th>
+                        <th>Mín. Personas</th>
                         <th>Precio</th>
-                        <th>Precio Contado</th>
+                        <th>Precio Efectivo</th>
                         <% if (dtUserRole !== 'department_manager') { %><th>Última Act.</th><% } %>
                         <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
                         <% if (dtShowActions || canViewImages) { %>
@@ -187,6 +188,25 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                                 <span class="input-group-text">horas</span>
                             </div>
                             <div class="form-text">Duración estimada en horas (campo opcional)</div>
+                        </div>
+
+                        <!-- Mínimo personas -->
+                        <div class="mb-3">
+                            <label for="min_people" class="form-label">Mínimo personas</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="min_people" name="min_people" min="1" step="1" placeholder="4">
+                                <span class="input-group-text">personas</span>
+                            </div>
+                            <div class="form-text">Número mínimo de personas requerido (campo opcional)</div>
+                        </div>
+                        <!-- Tiempo traslado -->
+                        <div class="mb-3">
+                            <label for="time_journey" class="form-label">Tiempo traslado</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="time_journey" name="time_journey" min="0" step="0.1" placeholder="2.5">
+                                <span class="input-group-text">horas</span>
+                            </div>
+                            <div class="form-text">Tiempo estimado de traslado en horas (campo opcional)</div>
                         </div>
 
                         <div class="mb-3">
@@ -526,7 +546,14 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         return `<span class="text-primary">${data} hrs</span>`;
                     }
                 },
-                // 5. Precio (with surcharge - "Tarjeta/Digital")
+                {
+                    data: 'min_people',
+                    render: function(data) {
+                        if (!data) return '<span class="text-muted">No especificado</span>';
+                        return `<span class="text-info">${data} personas</span>`;
+                    }
+                },
+                // 6. Precio (with surcharge - "Tarjeta/Digital")
                 {
                     data: 'cost',
                     render: function(data, type, row) {
@@ -557,7 +584,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         `;
                     }
                 },
-                // 6. Precio Contado (base cost - "Efectivo")
+                // 6. Precio Efectivo (base cost - "Efectivo")
                 {
                     data: 'cost',
                     render: function(data, type, row) {
@@ -1014,6 +1041,8 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             $('#experienceId').val('');
             $('#type').val('Experience');
             $('#duration').val(''); // Clear duration field
+            $('#min_people').val(''); // Clear min_people field
+            $('#time_journey').val(''); // Clear time_journey field
             $('#modalTitle').text(isEdit ? 'Editar Experiencia' : 'Crear Nueva Experiencia');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Experiencia');
 
@@ -1059,6 +1088,8 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         $('#name').val(experience.name);
                         $('#description').val(experience.description);
                         $('#duration').val(experience.duration || '');
+                        $('#min_people').val(experience.min_people || '');
+                        $('#time_journey').val(experience.time_journey || '');
                         $('#cost').val(experience.cost);
 
                         // Load all items and set selected values
@@ -1180,6 +1211,18 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             const durationValue = $('#duration').val();
             if (durationValue) {
                 experienceData.duration = parseFloat(durationValue);
+            }
+
+            // Only include min_people if it has a value
+            const minPeopleValue = $('#min_people').val();
+            if (minPeopleValue) {
+                experienceData.min_people = parseInt(minPeopleValue, 10);
+            }
+
+            // Only include time_journey if it has a value
+            const timeJourneyValue = $('#time_journey').val();
+            if (timeJourneyValue) {
+                experienceData.time_journey = parseFloat(timeJourneyValue);
             }
 
             // Only include vehicleType if it has a value
