@@ -75,6 +75,7 @@ class ExperienceController {
       filteredQuery.include('experiences');
       filteredQuery.include('vehicleType');
       filteredQuery.include('tours');
+      filteredQuery.include('tours.destinationPOI');
       filteredQuery.skip(params.start);
       filteredQuery.limit(params.length);
 
@@ -1109,11 +1110,17 @@ class ExperienceController {
         id: exp.id,
         name: exp.get('name'),
       })),
-      tours: includedTours.map((tour) => ({
-        id: tour.id,
-        destinationPOI: tour.get('destinationPOI'),
-        time: tour.get('time'),
-      })),
+      tours: includedTours.map((tour) => {
+        const poi = tour.get('destinationPOI');
+        return {
+          id: tour.id,
+          destinationPOI: poi ? {
+            objectId: poi.id,
+            name: poi.get('name'),
+          } : null,
+          time: tour.get('time'),
+        };
+      }),
       experienceCount: includedExperiences.length,
       tourCount: includedTours.length,
       totalItemCount: includedExperiences.length + includedTours.length,

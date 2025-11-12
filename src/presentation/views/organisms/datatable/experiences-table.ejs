@@ -49,7 +49,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                     <tr>
                         <th>Nombre</th>
                         <th>Descripción</th>
-                        <th>Contenido</th>
+                        <% if (dtUserRole !== 'department_manager') { %><th>Contenido</th><% } %>
                         <th>Duración</th>
                         <th>Mín. Personas</th>
                         <th>Precio</th>
@@ -227,6 +227,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             </select>
                             <div class="form-text">Tipo de vehículo requerido para esta experiencia (campo opcional)</div>
                         </div>
+
 
                         <!-- Sección: Disponibilidad (Opcional) -->
                         <div class="mb-4">
@@ -511,12 +512,65 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                 },
                 {
                     data: 'description',
-                    render: function(data) {
-                        const truncated = data.length > 100 ? data.substring(0, 100) + '...' : data;
-                        return `<small class="text-muted">${truncated}</small>`;
+                    render: function(data, type, row) {
+                        // For department_manager, show included experiences and tours instead of description
+                        if (userRole === 'department_manager') {
+                            let content = '';
+                            
+                            // Check various possible field names for included experiences
+                            const experienceDetails = row.experienceDetails || row.experiences || row.includedExperiences || [];
+                            const tourDetails = row.tourDetails || row.tours || row.includedTours || [];
+                            
+                            // Show included experiences
+                            if (experienceDetails && experienceDetails.length > 0) {
+                                content += `<div class="mb-2"><small class="text-primary fw-semibold">Experiencias:</small></div>`;
+                                const experienceItems = experienceDetails.map(exp => {
+                                    // Handle different object structures
+                                    if (typeof exp === 'string') return exp;
+                                    const name = exp.name || exp.title || exp.destinationPOI?.name || 'Experiencia sin nombre';
+                                    return `<li style="color: var(--bs-primary);"><small class="text-primary">${name}</small></li>`;
+                                }).join('');
+                                content += `<ul class="mb-2" style="margin: 0; padding-left: 16px; list-style-type: disc;">${experienceItems}</ul>`;
+                            }
+                            
+                            // Show included tours
+                            if (tourDetails && tourDetails.length > 0) {
+                                content += `<div class="mb-2"><small class="text-success fw-semibold">Tours:</small></div>`;
+                                const tourItems = tourDetails.map(tour => {
+                                    // Handle different object structures
+                                    if (typeof tour === 'string') return tour;
+                                    
+                                    // Extract POI destination name from the updated API response structure
+                                    const poiName = tour.destinationPOI?.name;
+                                    const name = tour.name || tour.title || poiName || 'Tour sin nombre';
+                                    return `<li style="color: var(--bs-success);"><small class="text-success">${name}</small></li>`;
+                                }).join('');
+                                content += `<ul style="margin: 0; padding-left: 16px; list-style-type: disc;">${tourItems}</ul>`;
+                            }
+                            
+                            // Check for experienceCount and tourCount as indicators
+                            const experienceCount = row.experienceCount || 0;
+                            const tourCount = row.tourCount || 0;
+                            
+                            if (!content && (experienceCount > 0 || tourCount > 0)) {
+                                content = `<small class="text-info">Contiene: ${experienceCount > 0 ? experienceCount + ' experiencias' : ''} ${tourCount > 0 ? tourCount + ' tours' : ''}</small>`;
+                            }
+                            
+                            // If no included content, show a placeholder
+                            if (!content) {
+                                content = '<small class="text-muted">Sin contenido incluido</small>';
+                            }
+                            
+                            return content;
+                        } else {
+                            // For other roles, show truncated description as before
+                            const truncated = data.length > 100 ? data.substring(0, 100) + '...' : data;
+                            return `<small class="text-muted">${truncated}</small>`;
+                        }
                     }
                 },
-                {
+                // 3. Contenido (only for non-department_manager roles)
+                ...(userRole !== 'department_manager' ? [{
                     data: null,
                     className: 'text-center',
                     render: function(data, type, row) {
@@ -538,7 +592,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         
                         return html;
                     }
-                },
+                }] : []),
                 {
                     data: 'duration',
                     render: function(data) {
@@ -892,6 +946,133 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
 
         // ========== END AVAILABILITY CALENDAR MANAGEMENT ==========
 
+        function openExperienceModal() {
+            // Reset form
+            $('#experienceForm')[0].reset();
+            $('#experienceId').val('');
+            $('#modalTitle').text('Crear Nueva Experiencia');
+            $('#saveButtonText').text('Crear Experiencia');
+            
+            // Clear any previous alerts
+            $('#experienceModalAlerts').empty();
+            
+            // Reset availability calendar
+            initializeDaySelection();
+            
+            // Load dropdown data
+            Promise.all([
+                loadAvailableItems(),
+                loadAvailableTours(),
+                loadAvailableVehicleTypes()
+            ]).then(() => {
+                // Initialize Tom Select for multiselect dropdowns
+                initializeTomSelectDropdowns();
+                
+                // Show modal
+                $('#experienceModal').modal('show');
+            });
+        }
+
+        function loadExperienceData(experienceId) {
+            // Show loading state
+            $('#modalTitle').text('Cargando...');
+            $('#experienceModal').modal('show');
+            
+            // Fetch experience data
+            $.ajax({
+                url: `${apiEndpoint}/${experienceId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        populateExperienceForm(response.data);
+                    }
+                },
+                error: function(xhr) {
+                    $('#experienceModal').modal('hide');
+                    showErrorAlert('Error al cargar los datos de la experiencia');
+                }
+            });
+        }
+
+        function populateExperienceForm(experience) {
+            $('#experienceId').val(experience.id);
+            $('#modalTitle').text('Editar Experiencia');
+            $('#saveButtonText').text('Actualizar Experiencia');
+            
+            // Populate basic fields
+            $('#name').val(experience.name);
+            $('#description').val(experience.description);
+            $('#duration').val(experience.duration || '');
+            $('#min_people').val(experience.min_people || '');
+            $('#time_journey').val(experience.time_journey || '');
+            $('#cost').val(experience.cost);
+            
+            // Load dropdown data first, then populate selections
+            Promise.all([
+                loadAvailableItems(experience.id),
+                loadAvailableTours(),
+                loadAvailableVehicleTypes()
+            ]).then(() => {
+                initializeTomSelectDropdowns();
+                
+                // Populate vehicle type
+                if (experience.vehicleTypeId) {
+                    $('#vehicleType').val(experience.vehicleTypeId);
+                }
+                
+                // Populate selected experiences and tours
+                if (experience.experienceDetails && experience.experienceDetails.length > 0) {
+                    const experienceIds = experience.experienceDetails.map(exp => exp.id);
+                    const experiencesSelect = document.getElementById('experiences');
+                    if (experiencesSelect?.tomselect) {
+                        experiencesSelect.tomselect.setValue(experienceIds);
+                    }
+                }
+                
+                if (experience.tourDetails && experience.tourDetails.length > 0) {
+                    const tourIds = experience.tourDetails.map(tour => tour.id);
+                    const toursSelect = document.getElementById('tours');
+                    if (toursSelect?.tomselect) {
+                        toursSelect.tomselect.setValue(tourIds);
+                    }
+                }
+            });
+        }
+
+        function initializeTomSelectDropdowns() {
+            // Check if TomSelect is available
+            if (typeof TomSelect === 'undefined') {
+                console.warn('TomSelect library not available, using standard select');
+                return;
+            }
+
+            // Initialize tours dropdown with Tom Select
+            const toursSelect = document.getElementById('tours');
+            if (toursSelect && !toursSelect.tomselect) {
+                new TomSelect(toursSelect, {
+                    plugins: ['remove_button'],
+                    placeholder: 'Selecciona tours...',
+                    allowEmptyOption: false,
+                    onChange: function(values) {
+                        updateSuggestedCostTable();
+                    }
+                });
+            }
+
+            // Initialize experiences dropdown if it exists
+            const experiencesSelect = document.getElementById('experiences');
+            if (experiencesSelect && !experiencesSelect.tomselect) {
+                new TomSelect(experiencesSelect, {
+                    plugins: ['remove_button'],
+                    placeholder: 'Selecciona experiencias...',
+                    allowEmptyOption: false,
+                    onChange: function(values) {
+                        updateSuggestedCostTable();
+                    }
+                });
+            }
+        }
+
         function loadAvailableItems(currentId = null) {
             // Build query parameters
             const queryParams = { length: 1000 }; // Get all for selection
@@ -953,12 +1134,15 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
         }
 
         function loadAvailableTours() {
+            console.log('loadAvailableTours: Starting to load tours...');
             return $.ajax({
                 url: '/api/tours',
                 type: 'GET',
                 data: { length: 1000 }, // Get all for selection
                 success: function(response) {
-                    if (response.data && response.data.tours) {
+                    console.log('loadAvailableTours: API response:', response);
+                    // Fix: The API returns tours directly in response.data, not response.data.tours
+                    if (response.data && Array.isArray(response.data)) {
                         // Reset tours data map
                         toursDataMap = {};
 
@@ -971,7 +1155,8 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             tomSelectInstance.clearOptions();
 
                             // Add new options with price information
-                            response.data.tours.forEach(function(item) {
+                            console.log('loadAvailableTours: Found', response.data.length, 'tours');
+                            response.data.forEach(function(item) {
                                 if (item.active) {
                                     // Store complete data for cost calculation
                                     toursDataMap[item.id] = {
@@ -991,11 +1176,16 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
 
                             // Refresh the dropdown
                             tomSelectInstance.refreshOptions(false);
+                        } else {
+                            console.error('loadAvailableTours: Tom Select instance not found for #tours element');
                         }
+                    } else {
+                        console.error('loadAvailableTours: Invalid response data structure:', response);
                     }
                 },
                 error: function(xhr) {
-                    console.warn('No se pudieron cargar los tours disponibles:', xhr.status, xhr.responseText);
+                    console.error('loadAvailableTours: API error:', xhr.status, xhr.responseText);
+                    console.error('loadAvailableTours: Full xhr object:', xhr);
                     // Don't fail the whole operation if tours can't be loaded
                 }
             }).always(function() {
