@@ -13,9 +13,9 @@ const { execSync } = require('child_process');
 
 class ReleaseNotesGenerator {
   constructor() {
-    this.projectRoot = path.resolve(__dirname, '..');
+    this.projectRoot = path.resolve(__dirname, '../../..');
     this.changelogPath = path.join(this.projectRoot, 'CHANGELOG.md');
-    this.releasesPath = path.join(this.projectRoot, 'RELEASES.md');
+    this.releasesPath = path.join(this.projectRoot, 'docs/project/RELEASES.md');
     this.packagePath = path.join(this.projectRoot, 'package.json');
     this.version = this.getCurrentVersion();
     this.releaseDate = new Date().toISOString().split('T')[0];

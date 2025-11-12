@@ -11,7 +11,7 @@
  * - Comprehensive audit trails.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-09-22
+ * @since 1.0.0
  * @example
  * // Model method usage
  * const result = await department.require({ './BaseModel': 'example' });

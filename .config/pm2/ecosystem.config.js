@@ -3,8 +3,8 @@ module.exports = {
     {
       name: 'amexing-api',
       script: './src/index.js',
-      instances: process.env.NODE_ENV === 'production' ? 'max' : 1,
-      exec_mode: process.env.NODE_ENV === 'production' ? 'cluster' : 'fork',
+      instances: (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') ? 'max' : 1,
+      exec_mode: (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') ? 'cluster' : 'fork',
       watch: process.env.NODE_ENV === 'development',
       ignore_watch: [
         'node_modules',
@@ -18,6 +18,10 @@ module.exports = {
       ],
       env: {
         NODE_ENV: 'development',
+        PORT: 1337,
+      },
+      env_staging: {
+        NODE_ENV: 'staging',
         PORT: 1337,
       },
       env_production: {
@@ -48,6 +52,10 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: 'development',
+        PORT: 4040,
+      },
+      env_staging: {
+        NODE_ENV: 'staging',
         PORT: 4040,
       },
       env_production: {

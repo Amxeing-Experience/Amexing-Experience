@@ -290,6 +290,7 @@ Features:
     let currentExperienceInfo = null;
     let experienceImagesDropzone = null;
     let imagesCarousel = null;
+    let isViewOnlyMode = false;
     let sortableInstance = null;
 
     /**
@@ -457,15 +458,25 @@ Features:
     /**
      * Open experience images modal
      */
-    window.openExperienceImagesModal = function(experienceId, brand, model) {
+    window.openExperienceImagesModal = function(experienceId, experienceName, viewOnlyMode = false) {
         currentExperienceId = experienceId;
-        currentExperienceInfo = { brand, model };
+        currentExperienceInfo = { name: experienceName };
+        isViewOnlyMode = viewOnlyMode;
 
-        // Update modal title
-        document.getElementById('experience-info-text').textContent = `${brand} ${model}`;
+        // Update modal title based on mode
+        const titleText = viewOnlyMode ? `Ver Galería - ${experienceName}` : `Gestionar Imágenes - ${experienceName}`;
+        document.getElementById('experience-info-text').textContent = titleText;
 
-        // Update dropzone URL
-        updateDropzoneUrl();
+        // Show/hide upload section based on mode
+        const uploadSection = document.querySelector('.upload-section');
+        if (uploadSection) {
+            uploadSection.style.display = viewOnlyMode ? 'none' : 'block';
+        }
+
+        // Update dropzone URL if not in view-only mode
+        if (!viewOnlyMode) {
+            updateDropzoneUrl();
+        }
 
         // Show modal
         $('#experienceImagesModal').modal('show');
@@ -545,18 +556,26 @@ Features:
                                 ${image.fileName}
                             </small>
                             <div class="btn-group btn-group-sm">
-                                ${!image.isPrimary ? `
-                                    <button class="btn btn-sm btn-outline-primary set-primary-btn"
+                                ${!isViewOnlyMode ? `
+                                    ${!image.isPrimary ? `
+                                        <button class="btn btn-sm btn-outline-primary set-primary-btn"
+                                                data-image-id="${image.id}"
+                                                title="Establecer como principal">
+                                            <i class="ti ti-star"></i>
+                                        </button>
+                                    ` : ''}
+                                    <button class="btn btn-sm btn-outline-danger delete-image-btn"
                                             data-image-id="${image.id}"
-                                            title="Establecer como principal">
-                                        <i class="ti ti-star"></i>
+                                            title="Eliminar">
+                                        <i class="ti ti-trash"></i>
                                     </button>
-                                ` : ''}
-                                <button class="btn btn-sm btn-outline-danger delete-image-btn"
-                                        data-image-id="${image.id}"
-                                        title="Eliminar">
-                                    <i class="ti ti-trash"></i>
-                                </button>
+                                ` : `
+                                    ${image.isPrimary ? `
+                                        <span class="badge bg-primary">
+                                            <i class="ti ti-star"></i> Principal
+                                        </span>
+                                    ` : ''}
+                                `}
                             </div>
                         </div>
                     </div>
@@ -566,8 +585,10 @@ Features:
             grid.appendChild(col);
         });
 
-        // Initialize Sortable for drag & drop reordering
-        initSortable();
+        // Initialize Sortable for drag & drop reordering (only if not in view-only mode)
+        if (!isViewOnlyMode) {
+            initSortable();
+        }
 
         // Initialize Owl Carousel
         initOwlCarousel(images);

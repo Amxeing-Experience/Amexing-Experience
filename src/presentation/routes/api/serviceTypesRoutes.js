@@ -12,7 +12,7 @@
  * - Comprehensive error handling.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-10-24
+ * @since 1.0.0
  * @example
  * // Usage
  * router.use('/service-types', serviceTypesRoutes);
@@ -67,7 +67,7 @@ router.use(serviceTypeApiLimiter);
 router.get(
   '/',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => ServiceTypeController.getServiceTypes(req, res)
 );
 
@@ -91,7 +91,7 @@ router.get('/active', jwtMiddleware.authenticateToken, (req, res) => ServiceType
 router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => ServiceTypeController.getServiceTypeById(req, res)
 );
 

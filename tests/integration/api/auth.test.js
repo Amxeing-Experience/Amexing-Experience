@@ -73,8 +73,8 @@ describe('Authentication API', () => {
           // missing password
         });
 
-      // Should be bad request (400), unauthorized (401), or forbidden (403)
-      expect([400, 401, 403]).toContain(response.status);
+      // Should be bad request (400), unauthorized (401), forbidden (403), or redirect (302)
+      expect([302, 400, 401, 403]).toContain(response.status);
     });
 
     it('should handle malformed JSON', async () => {
@@ -252,8 +252,8 @@ describe('Authentication API', () => {
       // Verify we got responses (not all should be successful)
       expect(statuses.length).toBe(10);
 
-      // All should either fail auth or be rate limited
-      const allFailedOrLimited = statuses.every(s => [400, 401, 403, 429].includes(s));
+      // All should either fail auth, be rate limited, or redirect (302)
+      const allFailedOrLimited = statuses.every(s => [302, 400, 401, 403, 429].includes(s));
       expect(allFailedOrLimited).toBe(true);
     }, 10000);
   });

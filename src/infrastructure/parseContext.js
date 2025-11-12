@@ -10,7 +10,7 @@
  * @file Parse Server context propagation for audit trails.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2025-10-16
+ * @since 1.0.0
  * @example
  * // In Express middleware:
  * app.use(parseContextMiddleware);

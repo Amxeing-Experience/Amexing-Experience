@@ -11,7 +11,7 @@
  * @augments BaseModel
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-10-24
+ * @since 1.0.0
  * @example
  * // Create new service type
  * const airport = new ServiceType();

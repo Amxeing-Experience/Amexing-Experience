@@ -19,7 +19,7 @@
  * @file Domain model for audit trail logging and compliance tracking.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2025-10-16
+ * @since 1.0.0
  * @example
  * // Create audit log entry
  * const auditLog = new AuditLog();
@@ -52,7 +52,7 @@ const BaseModel = require('./BaseModel');
  * @augments BaseModel
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2025-10-16
+ * @since 1.0.0
  * @example
  * // Create audit entry
  * const log = new AuditLog();

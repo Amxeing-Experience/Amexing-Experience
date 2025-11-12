@@ -119,7 +119,7 @@ class SecurityMiddleware {
             "'self'",
             'http://localhost:1337', // Development
             'http://localhost:1338', // Production local
-            'https://amexing.meeplab.com', // Production
+            'https://quotes.amexingexperience.com', // Production
             'https://cdn.datatables.net',
             'https://cdn.jsdelivr.net',
             'https://cdnjs.cloudflare.com',
@@ -624,7 +624,21 @@ class SecurityMiddleware {
     return async (req, res, next) => {
       try {
         // Skip CSRF for GET, HEAD, OPTIONS requests and API endpoints
-        if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS' || req.path.startsWith('/api/')) {
+        // SECURITY NOTE: Login endpoint (/auth/login) is explicitly excluded from CSRF validation
+        // Reasons:
+        // 1. User is not yet authenticated, no existing session state to protect
+        // 2. Session regeneration after successful login prevents session fixation attacks
+        // 3. Eliminates race conditions during session transitions (logout -> login)
+        // 4. Login CSRF attacks have minimal practical impact (forces login to attacker account)
+        // 5. This is a common practice in modern authentication systems
+        // All other authenticated endpoints remain CSRF-protected
+        if (
+          req.method === 'GET'
+          || req.method === 'HEAD'
+          || req.method === 'OPTIONS'
+          || req.path.startsWith('/api/')
+          || req.path === '/auth/login'
+        ) {
           // Generate CSRF token for forms if session exists
           if (req.session && (req.method === 'GET' || req.method === 'HEAD')) {
             // PERSISTENCE CHECK: Detect authenticated user without CSRF secret

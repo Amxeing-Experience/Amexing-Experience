@@ -17,9 +17,17 @@ const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/q
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
-const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
-const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
-const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+const canEdit = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
+const canViewSummary = dtUserRole === 'department_manager';
+
+// Dynamic base path based on user role
+const baseDashboardPath = dtUserRole === 'department_manager' 
+    ? '/dashboard/department_manager' 
+    : dtUserRole === 'admin' 
+        ? '/dashboard/admin' 
+        : '/dashboard/superadmin';
 %>
 
 <div class="card border-0 shadow-sm">
@@ -33,7 +41,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
-                    <a href="/dashboard/admin/quotes/new" class="btn btn-light btn-sm">
+                    <a href="<%= baseDashboardPath %>/quotes/new" class="btn btn-light btn-sm">
                         <i class="ti ti-plus me-1"></i>Nueva Cotización
                     </a>
                 <% } %>
@@ -47,7 +55,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <thead class="table-light">
                     <tr>
                         <th>Cliente</th>
-                        <th>Tarifa</th>
                         <th>Tipo de Evento</th>
                         <th class="text-center">No. Personas</th>
                         <th>Creado Por</th>
@@ -85,7 +92,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             <li>Se creará una nueva cotización con un folio diferente</li>
                             <li>El tipo de evento se incrementará automáticamente (ejemplo: "Evento - Opción 2")</li>
                             <li>Se copiará todo el itinerario y servicios</li>
-                            <li>El estatus será "Borrador"</li>
+                            <li>El estatus será "Solicitado"</li>
                         </ul>
                     </div>
                 </div>
@@ -134,6 +141,133 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     </div>
 </div>
 
+<!-- Generate Receipt Modal -->
+<div class="modal fade" id="generateReceiptModal" tabindex="-1" aria-labelledby="generateReceiptModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title text-white" id="generateReceiptModalLabel">
+                    <i class="ti ti-receipt me-2"></i>Generar Recibo
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Desea generar el recibo para la cotización <strong id="receiptQuoteFolio"></strong>?</p>
+                
+                <% if (dtUserRole === 'admin') { %>
+                <!-- Payment Info Selection for Admin Only -->
+                <div class="mb-3">
+                    <label for="paymentInfoSelect" class="form-label">
+                        <strong>Método de Pago a Incluir</strong>
+                    </label>
+                    <select class="form-select" id="paymentInfoSelect">
+                        <option value="">Sin información de pago</option>
+                        <option value="loading" disabled>Cargando métodos de pago...</option>
+                    </select>
+                    <div class="form-text">Selecciona qué información de pago incluir en el recibo</div>
+                </div>
+                <% } %>
+                
+                <div class="alert alert-info d-flex align-items-start" role="alert">
+                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Información:</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>Se generará un recibo oficial</li>
+                            <li>La cotización debe estar en estado "<%= dtUserRole === 'admin' ? 'APROBADO' : 'AGENDADO' %>"</li>
+                            <li>El recibo se enviará por correo electrónico</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-success" id="confirmGenerateReceiptBtn">
+                    <i class="ti ti-receipt me-1"></i>Generar Recibo
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Request Invoice Modal -->
+<div class="modal fade" id="requestInvoiceModal" tabindex="-1" aria-labelledby="requestInvoiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-white">
+                <h5 class="modal-title text-white" id="requestInvoiceModalLabel">
+                    <i class="ti ti-file-invoice me-2"></i>Solicitar Factura
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Desea solicitar la factura para la cotización <strong id="invoiceQuoteFolio"></strong>?</p>
+                <div class="alert alert-info d-flex align-items-start" role="alert">
+                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Información:</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>Se enviará una solicitud al departamento de facturación</li>
+                            <li>La cotización debe estar en estado "<%= dtUserRole === 'admin' ? 'APROBADO' : 'AGENDADO' %>"</li>
+                            <li>Recibirá confirmación por correo electrónico</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-warning" id="confirmRequestInvoiceBtn">
+                    <i class="ti ti-file-invoice me-1"></i>Solicitar Factura
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Reservation Modal -->
+<div class="modal fade" id="cancelReservationModal" tabindex="-1" aria-labelledby="cancelReservationModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title text-white" id="cancelReservationModalLabel">
+                    <i class="ti ti-x me-2"></i>Cancelar Reserva
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro de que desea cancelar la reserva de la cotización <strong id="cancelReservationQuoteFolio"></strong>?</p>
+                <div class="form-group mb-3">
+                    <label for="cancellationReason" class="form-label">Motivo de cancelación:</label>
+                    <textarea class="form-control" id="cancellationReason" rows="3" placeholder="Escriba el motivo de la cancelación (opcional)"></textarea>
+                </div>
+                <div class="alert alert-warning d-flex align-items-start" role="alert">
+                    <i class="ti ti-alert-triangle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Advertencia:</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>La reserva será cancelada</li>
+                            <li>El estado cambiará a "RECHAZADO"</li>
+                            <li>Se registrará en el historial de cambios</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmCancelReservationBtn">
+                    <i class="ti ti-x me-1"></i>Cancelar Reserva
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function() {
     // Wait for DOM and all dependencies to be ready
@@ -160,10 +294,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+        const basePath = '<%= baseDashboardPath %>';
 
         // Variables to store quote IDs for modal actions
         let copyQuoteId = null;
         let deleteQuoteId = null;
+        let generateReceiptQuoteId = null;
+        let requestInvoiceQuoteId = null;
+        let cancelReservationQuoteId = null;
 
         /**
          * Calculate relative luminance of a color for contrast determination.
@@ -243,15 +381,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 },
                 {
-                    data: 'rate',
-                    render: function(data) {
-                        if (!data) return '<span class="text-muted">N/A</span>';
-                        const color = data.color || '#6366F1';
-                        const textColor = getContrastTextColor(color);
-                        return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${data.name || 'N/A'}</span>`;
-                    }
-                },
-                {
                     data: 'eventType',
                     render: function(data) {
                         if (!data || data.trim() === '') {
@@ -278,12 +407,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     data: 'status',
                     className: 'text-center',
                     render: function(data, type, row) {
+                        const userRole = '<%= dtUserRole %>';
+                        
+                        // Define statuses based on user role
+                        const scheduledText = userRole === 'admin' ? 'APROBADO' : 'AGENDADO';
                         const statuses = [
-                            { value: 'draft', text: 'BORRADOR', class: 'bg-secondary' },
-                            { value: 'sent', text: 'ENVIADO', class: 'bg-info' },
-                            { value: 'accepted', text: 'ACEPTADO', class: 'bg-success' },
+                            { value: 'requested', text: 'SOLICITADO', class: 'bg-primary' },
+                            { value: 'hold', text: 'BLOQUEADO', class: 'bg-warning' },
+                            { value: 'scheduled', text: scheduledText, class: 'bg-success' },
                             { value: 'rejected', text: 'RECHAZADO', class: 'bg-danger' }
                         ];
+
+                        // If status is 'scheduled', show a non-editable badge instead of dropdown
+                        if (data === 'scheduled') {
+                            return `<span class="badge bg-success px-3 py-2" style="font-size: 0.75rem;">${scheduledText}</span>`;
+                        }
 
                         let select = `<select class="form-select form-select-sm status-selector" data-id="${row.id}" data-folio="${row.folio}" style="font-size: 0.75rem; cursor: pointer;">`;
                         statuses.forEach(status => {
@@ -342,6 +480,73 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     searchable: false,
                     className: 'text-center',
                     render: function(data) {
+                        // If the quote is in 'scheduled' status, show special scheduled actions
+                        if (data.status === 'scheduled') {
+                            let actions = '<div class="btn-group btn-group-sm" role="group">';
+                            
+                            // Ver Resumen button for both admin and department_manager roles
+                            <% if (dtUserRole === 'admin' || canViewSummary) { %>
+                            actions += `<button type="button"
+                                            class="btn btn-outline-primary view-summary-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-folio="${data.folio}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Ver Resumen">
+                                            <i class="ti ti-file-text"></i>
+                                        </button>`;
+                            <% } %>
+                            
+                            // Generate Receipt button
+                            actions += `<button type="button"
+                                            class="btn btn-success generate-receipt-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-folio="${data.folio}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Generar Recibo">
+                                            <i class="ti ti-receipt"></i>
+                                        </button>`;
+
+                            // Request Invoice button (only show if no pending request)
+                            if (!data.hasPendingInvoiceRequest) {
+                                actions += `<button type="button"
+                                                class="btn btn-warning request-invoice-btn"
+                                                data-id="${data.objectId || data.id}"
+                                                data-folio="${data.folio}"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Solicitar Factura">
+                                                <i class="ti ti-file-invoice"></i>
+                                            </button>`;
+                            } else {
+                                // Show disabled button with different text when invoice already requested
+                                actions += `<button type="button"
+                                                class="btn btn-secondary"
+                                                disabled
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                title="Factura ya solicitada">
+                                                <i class="ti ti-file-invoice"></i>
+                                            </button>`;
+                            }
+
+                            // Cancel Reservation button
+                            actions += `<button type="button"
+                                            class="btn btn-danger cancel-reservation-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-folio="${data.folio}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Cancelar Reserva">
+                                            <i class="ti ti-x"></i>
+                                        </button>`;
+
+                            actions += '</div>';
+                            return actions;
+                        }
+
+                        // Normal actions for non-scheduled quotes
                         let actions = '<div class="btn-group btn-group-sm" role="group">';
 
                         if (canEdit) {
@@ -357,7 +562,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                         </button>`;
 
                             // Edit button (goes to detail page)
-                            actions += `<a href="/dashboard/admin/quotes/${data.objectId || data.id}"
+                            actions += `<a href="<%= baseDashboardPath %>/quotes/${data.objectId || data.id}"
                                             class="btn btn-primary"
                                             data-bs-toggle="tooltip"
                                             data-bs-placement="top"
@@ -422,6 +627,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             openCopyModal(quoteId, quoteFolio);
         });
 
+        // Ver Resumen button click (for both admin and department_manager)
+        $(`#${tableId}`).on('click', '.view-summary-btn', function() {
+            const quoteId = $(this).data('id');
+            const quoteFolio = $(this).data('folio');
+            
+            // Navigate to quote detail page with summary section
+            window.location.href = `${basePath}/quotes/${quoteId}?section=summary`;
+        });
+
         // Confirm copy button in modal
         $('#confirmCopyQuoteBtn').on('click', function() {
             if (copyQuoteId) {
@@ -440,6 +654,51 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $('#confirmDeleteQuoteBtn').on('click', function() {
             if (deleteQuoteId) {
                 executeDelete(deleteQuoteId);
+            }
+        });
+
+        // Reserved Quote Action Event Handlers
+
+        // Generate Receipt button click
+        $(`#${tableId}`).on('click', '.generate-receipt-btn', function() {
+            const quoteId = $(this).data('id');
+            const quoteFolio = $(this).data('folio');
+            openGenerateReceiptModal(quoteId, quoteFolio);
+        });
+
+        // Request Invoice button click
+        $(`#${tableId}`).on('click', '.request-invoice-btn', function() {
+            const quoteId = $(this).data('id');
+            const quoteFolio = $(this).data('folio');
+            openRequestInvoiceModal(quoteId, quoteFolio);
+        });
+
+        // Cancel Reservation button click
+        $(`#${tableId}`).on('click', '.cancel-reservation-btn', function() {
+            const quoteId = $(this).data('id');
+            const quoteFolio = $(this).data('folio');
+            openCancelReservationModal(quoteId, quoteFolio);
+        });
+
+        // Confirm Generate Receipt button in modal
+        $('#confirmGenerateReceiptBtn').on('click', function() {
+            if (generateReceiptQuoteId) {
+                executeGenerateReceipt(generateReceiptQuoteId);
+            }
+        });
+
+        // Confirm Request Invoice button in modal
+        $('#confirmRequestInvoiceBtn').on('click', function() {
+            if (requestInvoiceQuoteId) {
+                executeRequestInvoice(requestInvoiceQuoteId);
+            }
+        });
+
+        // Confirm Cancel Reservation button in modal
+        $('#confirmCancelReservationBtn').on('click', function() {
+            if (cancelReservationQuoteId) {
+                const reason = $('#cancellationReason').val();
+                executeCancelReservation(cancelReservationQuoteId, reason);
             }
         });
 
@@ -685,6 +944,342 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     });
                 }, 8000);
             }
+        }
+
+        // Reserved Quote Action Functions
+
+        /**
+         * Load payment info options for admin
+         */
+        async function loadPaymentInfoOptions() {
+            const userRole = '<%= dtUserRole %>';
+            if (userRole !== 'admin') return;
+
+            const select = document.getElementById('paymentInfoSelect');
+            if (!select) return;
+
+            try {
+                const response = await fetch('/api/payment-info', {
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                
+                // Clear loading option
+                select.innerHTML = '<option value="">Sin información de pago</option>';
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    result.data.forEach(paymentInfo => {
+                        const option = document.createElement('option');
+                        option.value = paymentInfo.id;
+                        option.textContent = paymentInfo.name;
+                        
+                        // Set default option as selected
+                        if (paymentInfo.isDefault) {
+                            option.selected = true;
+                        }
+                        
+                        select.appendChild(option);
+                    });
+                } else {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No hay métodos de pago configurados';
+                    option.disabled = true;
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Error loading payment info options:', error);
+                select.innerHTML = '<option value="">Error al cargar métodos de pago</option>';
+            }
+        }
+
+        /**
+         * Open generate receipt confirmation modal
+         * @param {string} quoteId - Quote ID to generate receipt for
+         * @param {string} quoteFolio - Quote folio for display
+         */
+        function openGenerateReceiptModal(quoteId, quoteFolio) {
+            generateReceiptQuoteId = quoteId;
+            $('#receiptQuoteFolio').text(quoteFolio);
+            
+            // Load payment info options for admin
+            loadPaymentInfoOptions();
+            
+            const receiptModal = new bootstrap.Modal(document.getElementById('generateReceiptModal'));
+            receiptModal.show();
+        }
+
+        /**
+         * Open request invoice confirmation modal
+         * @param {string} quoteId - Quote ID to request invoice for
+         * @param {string} quoteFolio - Quote folio for display
+         */
+        function openRequestInvoiceModal(quoteId, quoteFolio) {
+            requestInvoiceQuoteId = quoteId;
+            $('#invoiceQuoteFolio').text(quoteFolio);
+            const invoiceModal = new bootstrap.Modal(document.getElementById('requestInvoiceModal'));
+            invoiceModal.show();
+        }
+
+        /**
+         * Open cancel reservation confirmation modal
+         * @param {string} quoteId - Quote ID to cancel reservation for
+         * @param {string} quoteFolio - Quote folio for display
+         */
+        function openCancelReservationModal(quoteId, quoteFolio) {
+            cancelReservationQuoteId = quoteId;
+            $('#cancelReservationQuoteFolio').text(quoteFolio);
+            $('#cancellationReason').val(''); // Clear previous reason
+            const cancelModal = new bootstrap.Modal(document.getElementById('cancelReservationModal'));
+            cancelModal.show();
+        }
+
+        /**
+         * Execute receipt generation
+         * @param {string} quoteId - Quote ID to generate receipt for
+         */
+        function executeGenerateReceipt(quoteId) {
+            // Show loading state
+            const confirmButton = $('#confirmGenerateReceiptBtn');
+            const originalText = confirmButton.html();
+            confirmButton.prop('disabled', true).html('<i class="ti ti-loader ti-spin me-1"></i>Generando...');
+
+            // Get selected payment info (admin only)
+            const userRole = '<%= dtUserRole %>';
+            let includePaymentInfo = true; // Default for non-admin roles
+            let selectedPaymentInfoId = null;
+            
+            if (userRole === 'admin') {
+                const select = document.getElementById('paymentInfoSelect');
+                if (select && select.value) {
+                    selectedPaymentInfoId = select.value;
+                    includePaymentInfo = true; // Include payment info if a method is selected
+                } else {
+                    includePaymentInfo = false; // No payment info if nothing selected
+                }
+            }
+
+            // Create a form and submit it to trigger download
+            const token = getAccessToken();
+            const form = $('<form>', {
+                'method': 'POST',
+                'action': `${apiEndpoint}/${quoteId}/generate-receipt`,
+                'target': '_blank'
+            });
+
+            // Add authorization header through a hidden input (for download)
+            // Note: For file downloads, we'll use a different approach
+            
+            // Alternative approach: Use fetch API for better control
+            fetch(`${apiEndpoint}/${quoteId}/generate-receipt`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    includePaymentInfo,
+                    paymentInfoId: selectedPaymentInfoId 
+                })
+            })
+            .then(response => {
+                console.log('PDF generation response status:', response.status);
+                console.log('PDF generation response headers:', response.headers);
+                
+                if (!response.ok) {
+                    // Try to get the error message from the response
+                    return response.json().then(errorData => {
+                        console.error('Server error details:', errorData);
+                        throw new Error(`${response.status}: ${errorData.error || errorData.message || 'Unknown server error'}`);
+                    }).catch(jsonError => {
+                        // If response isn't JSON, throw a generic error
+                        console.error('Failed to parse error response:', jsonError);
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    });
+                }
+                
+                // Check if the response is a PDF
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/pdf')) {
+                    // Handle PDF download
+                    return response.blob().then(blob => {
+                        // Create download link
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `Receipt-${quoteId}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        // Show success message
+                        closeGenerateReceiptModal();
+                        showSuccessAlert('Recibo generado y descargado exitosamente');
+                        dataTable.ajax.reload(null, false);
+                        generateReceiptQuoteId = null;
+                    });
+                } else {
+                    // Handle JSON response
+                    return response.json().then(data => {
+                        if (data.success) {
+                            closeGenerateReceiptModal();
+                            showSuccessAlert(data.message || 'Recibo generado exitosamente');
+                            dataTable.ajax.reload(null, false);
+                            generateReceiptQuoteId = null;
+                        } else {
+                            throw new Error(data.error || 'Error al generar el recibo');
+                        }
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('PDF generation error:', error);
+                closeGenerateReceiptModal();
+                
+                // Provide more detailed error information
+                let errorMessage = 'Error al generar el recibo';
+                if (error.message) {
+                    if (error.message.includes('401')) {
+                        errorMessage = 'Error de autenticación. Por favor, inicia sesión de nuevo.';
+                    } else if (error.message.includes('403')) {
+                        errorMessage = 'No tienes permisos para generar recibos.';
+                    } else if (error.message.includes('404')) {
+                        errorMessage = 'La cotización no fue encontrada.';
+                    } else if (error.message.includes('500')) {
+                        errorMessage = 'Error del servidor. Intenta de nuevo más tarde.';
+                    } else {
+                        errorMessage = `Error: ${error.message}`;
+                    }
+                }
+                
+                showErrorAlert(errorMessage);
+            })
+            .finally(() => {
+                // Reset button state
+                confirmButton.prop('disabled', false).html(originalText);
+            });
+        }
+
+        /**
+         * Execute invoice request
+         * @param {string} quoteId - Quote ID to request invoice for
+         */
+        function executeRequestInvoice(quoteId) {
+            $.ajax({
+                url: `${apiEndpoint}/${quoteId}/request-invoice`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({}),
+                success: function(response) {
+                    if (response.success) {
+                        closeRequestInvoiceModal();
+                        showSuccessAlert(response.message || 'Solicitud de factura enviada exitosamente');
+                        dataTable.ajax.reload(null, false);
+                        requestInvoiceQuoteId = null;
+                    } else {
+                        closeRequestInvoiceModal();
+                        showErrorAlert(response.error || 'Error al solicitar la factura');
+                    }
+                },
+                error: function(xhr) {
+                    closeRequestInvoiceModal();
+                    const errorMsg = xhr.responseJSON?.error || 'Error al solicitar la factura';
+                    showErrorAlert(errorMsg);
+                }
+            });
+        }
+
+        /**
+         * Execute reservation cancellation
+         * @param {string} quoteId - Quote ID to cancel reservation for
+         * @param {string} reason - Reason for cancellation
+         */
+        function executeCancelReservation(quoteId, reason) {
+            $.ajax({
+                url: `${apiEndpoint}/${quoteId}/cancel-reservation`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ reason: reason }),
+                success: function(response) {
+                    if (response.success) {
+                        closeCancelReservationModal();
+                        showSuccessAlert(response.message || 'Reserva cancelada exitosamente');
+                        dataTable.ajax.reload(null, false);
+                        cancelReservationQuoteId = null;
+                    } else {
+                        closeCancelReservationModal();
+                        showErrorAlert(response.error || 'Error al cancelar la reserva');
+                    }
+                },
+                error: function(xhr) {
+                    closeCancelReservationModal();
+                    const errorMsg = xhr.responseJSON?.error || 'Error al cancelar la reserva';
+                    showErrorAlert(errorMsg);
+                }
+            });
+        }
+
+        /**
+         * Close generate receipt modal properly
+         */
+        function closeGenerateReceiptModal() {
+            const modalElement = document.getElementById('generateReceiptModal');
+            if (modalElement) {
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+                cleanupModal();
+            }
+        }
+
+        /**
+         * Close request invoice modal properly
+         */
+        function closeRequestInvoiceModal() {
+            const modalElement = document.getElementById('requestInvoiceModal');
+            if (modalElement) {
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+                cleanupModal();
+            }
+        }
+
+        /**
+         * Close cancel reservation modal properly
+         */
+        function closeCancelReservationModal() {
+            const modalElement = document.getElementById('cancelReservationModal');
+            if (modalElement) {
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+                cleanupModal();
+            }
+        }
+
+        /**
+         * Clean up modal remnants
+         */
+        function cleanupModal() {
+            // Remove modal backdrop manually if it exists
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) {
+                backdrop.remove();
+            }
+            // Remove modal-open class from body
+            document.body.classList.remove('modal-open');
+            // Reset body style
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
         }
     }
 

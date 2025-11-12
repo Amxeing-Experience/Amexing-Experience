@@ -14,7 +14,7 @@
  * Service Layer pattern for infrastructure abstraction.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2025-01-15
+ * @since 1.0.0
  */
 
 /* eslint-disable no-underscore-dangle */

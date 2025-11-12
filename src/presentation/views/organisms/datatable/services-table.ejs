@@ -53,7 +53,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <th>Tipo de Vehículo</th>
                         <th>Costo</th>
                         <th>Notas</th>
-                        <th>Estado</th>
+                        <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
                         <% } %>
@@ -228,9 +228,17 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+        const userRole = '<%= dtUserRole %>';
 
-        // Get JWT token from cookies
+        // Get JWT token from localStorage or cookies
         function getAccessToken() {
+            // First try localStorage (used by other parts of the app)
+            const tokenFromStorage = localStorage.getItem('accessToken');
+            if (tokenFromStorage) {
+                return tokenFromStorage;
+            }
+            
+            // Fallback to cookies (httpOnly cookies won't work, but try anyway)
             const cookies = document.cookie.split(';');
             for (let cookie of cookies) {
                 const [name, value] = cookie.trim().split('=');
@@ -296,9 +304,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 {
                     data: 'rate.name',
                     render: function(data, type, row) {
+                        if (!data) return '-';
+
+                        // Remove "Tarifa" word from the beginning if present
+                        let displayName = data.replace(/^Tarifa\s*/i, '');
+
                         const color = row.rate?.color || '#6366F1';
                         const textColor = getContrastTextColor(color);
-                        return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${data || '-'}</span>`;
+
+                        return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${displayName}</span>`;
                     }
                 },
                 // 2. Tipo de Destino (NUEVA)
@@ -358,14 +372,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 },
                 // 8. Estado
-                {
+                ...(userRole !== 'department_manager' ? [{
                     data: 'active',
                     render: function(data) {
                         return data
                             ? '<span class="badge bg-success">Activo</span>'
                             : '<span class="badge bg-secondary">Inactivo</span>';
                     }
-                },
+                }] : []),
                 ...(showActions ? [{
                     data: null,
                     orderable: false,

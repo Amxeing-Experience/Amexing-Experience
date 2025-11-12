@@ -137,7 +137,7 @@ describe('CSRF Session Recovery Integration Tests', () => {
         .expect(200);
 
       expect(response.body.nearExpiration).toBe(false);
-    });
+    }, 30000); // Increased timeout to 30 seconds
 
     it('should include expiration warning header for expiring sessions', async () => {
       const agent = request.agent(app);

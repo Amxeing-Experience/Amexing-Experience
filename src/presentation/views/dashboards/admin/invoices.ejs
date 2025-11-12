@@ -1,0 +1,647 @@
+<%
+/**
+ * Admin Invoice Management Page
+ * Manages pending invoice requests from department managers
+ *
+ * Layout Structure:
+ * - Direct row/column structure (no body-wrapper)
+ * - Container-fluid from Flexy Bootstrap
+ * - Consistent spacing and alignment
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller
+ */
+
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold">Gestión de Facturas</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/admin" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-file-invoice me-1"></i>Facturas
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-secondary" id="refreshBtn">
+                    <i class="ti ti-refresh me-1"></i>Actualizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="avatar avatar-sm bg-warning rounded">
+                            <i class="ti ti-clock text-white"></i>
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="mb-0">Pendientes</h6>
+                        <p class="text-muted mb-0" id="pendingCount">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="avatar avatar-sm bg-success rounded">
+                            <i class="ti ti-check text-white"></i>
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="mb-0">Completadas</h6>
+                        <p class="text-muted mb-0" id="completedCount">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="avatar avatar-sm bg-info rounded">
+                            <i class="ti ti-calendar text-white"></i>
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="mb-0">Este Mes</h6>
+                        <p class="text-muted mb-0" id="monthlyCount">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-shrink-0">
+                        <div class="avatar avatar-sm bg-primary rounded">
+                            <i class="ti ti-currency-dollar text-white"></i>
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <h6 class="mb-0">Total Mes</h6>
+                        <p class="text-muted mb-0" id="monthlyTotal">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Card -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header text-white" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h5 class="card-title mb-0 text-white">
+                            <i class="ti ti-file-invoice me-2"></i>Solicitudes de Facturas
+                        </h5>
+                        <small class="text-white" style="opacity: 0.9;">Gestión de solicitudes de facturas de cotizaciones</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-body" id="invoices-content">
+                <div class="table-responsive">
+                    <table id="invoices-table" class="table table-hover" style="width:100%">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Cotización</th>
+                                <th>Cliente</th>
+                                <th>Solicitado Por</th>
+                                <th class="text-center">Total</th>
+                                <th class="text-center">Estado</th>
+                                <th class="text-center">Fecha Solicitud</th>
+                                <th class="text-center">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Complete Invoice Modal -->
+<div class="modal fade" id="completeInvoiceModal" tabindex="-1" aria-labelledby="completeInvoiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title text-white" id="completeInvoiceModalLabel">
+                    <i class="ti ti-check me-2"></i>Completar Factura
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="invoiceDetails" class="mb-4">
+                    <!-- Invoice details will be loaded here -->
+                </div>
+                
+                <form id="completeInvoiceForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label for="invoiceNumber" class="form-label">
+                                    <i class="ti ti-hash me-1"></i>Número de Factura *
+                                </label>
+                                <input type="text" 
+                                       class="form-control" 
+                                       id="invoiceNumber" 
+                                       name="invoiceNumber"
+                                       placeholder="Ej: FAC-2025-0001"
+                                       required>
+                                <div class="form-text">Número único de la factura generada</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <label for="processDate" class="form-label">
+                                    <i class="ti ti-calendar me-1"></i>Fecha de Procesamiento
+                                </label>
+                                <input type="date" 
+                                       class="form-control" 
+                                       id="processDate" 
+                                       name="processDate"
+                                       readonly>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group mb-3">
+                        <label for="processingNotes" class="form-label">
+                            <i class="ti ti-note me-1"></i>Notas de Procesamiento
+                        </label>
+                        <textarea class="form-control" 
+                                  id="processingNotes" 
+                                  name="notes"
+                                  rows="3" 
+                                  placeholder="Notas adicionales sobre el procesamiento de la factura (opcional)"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-success" id="confirmCompleteBtn">
+                    <i class="ti ti-check me-1"></i>Completar Factura
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Invoice Modal -->
+<div class="modal fade" id="cancelInvoiceModal" tabindex="-1" aria-labelledby="cancelInvoiceModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title text-white" id="cancelInvoiceModalLabel">
+                    <i class="ti ti-x me-2"></i>Cancelar Solicitud de Factura
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro de que desea cancelar esta solicitud de factura?</p>
+                <p><strong id="cancelInvoiceInfo"></strong></p>
+                
+                <div class="form-group mb-3">
+                    <label for="cancellationReason" class="form-label">Motivo de cancelación:</label>
+                    <textarea class="form-control" 
+                              id="cancellationReason" 
+                              rows="3" 
+                              placeholder="Escriba el motivo de la cancelación (opcional)"></textarea>
+                </div>
+                
+                <div class="alert alert-warning d-flex align-items-start" role="alert">
+                    <i class="ti ti-alert-triangle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Advertencia:</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>La solicitud será cancelada permanentemente</li>
+                            <li>Se habilitará nuevamente el botón de solicitud en la cotización</li>
+                            <li>Esta acción quedará registrada en el historial</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-arrow-left me-1"></i>Volver
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmCancelBtn">
+                    <i class="ti ti-x me-1"></i>Cancelar Solicitud
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize invoice management
+    initInvoiceManagement();
+});
+
+function initInvoiceManagement() {
+    let selectedInvoiceId = null;
+    
+    // Get JWT token from cookies
+    function getAccessToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'accessToken') {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    // Setup global AJAX configuration
+    $.ajaxSetup({
+        beforeSend: function(xhr) {
+            const token = getAccessToken();
+            if (token) {
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+            }
+        }
+    });
+
+    // Set today's date as default process date
+    document.getElementById('processDate').value = new Date().toISOString().split('T')[0];
+
+    // Initialize DataTable
+    const dataTable = $('#invoices-table').DataTable({
+        processing: true,
+        serverSide: true,
+        ajax: {
+            url: '/api/invoices',
+            type: 'GET',
+            dataSrc: function(json) {
+                updateStats(json.data || []);
+                return json.data || [];
+            },
+            error: function(xhr, error, thrown) {
+                console.error('Error loading invoices:', error);
+                showErrorAlert('Error al cargar las solicitudes de facturas');
+            }
+        },
+        columns: [
+            {
+                data: 'quote',
+                render: function(data) {
+                    if (!data) return '<em class="text-muted">Sin cotización</em>';
+                    return `
+                        <div>
+                            <strong>${data.folio || 'N/A'}</strong>
+                            <br><small class="text-muted">${data.eventType || 'Sin tipo'}</small>
+                        </div>
+                    `;
+                }
+            },
+            {
+                data: 'quote.client',
+                render: function(data) {
+                    if (!data) return '<em class="text-muted">Sin cliente</em>';
+                    return `
+                        <div>
+                            <strong>${data.fullName || 'N/A'}</strong>
+                            <br><small class="text-muted">${data.email || ''}</small>
+                        </div>
+                    `;
+                }
+            },
+            {
+                data: 'requestedBy',
+                render: function(data) {
+                    if (!data) return '<em class="text-muted">Sin información</em>';
+                    return `
+                        <div>
+                            <strong>${data.fullName || 'N/A'}</strong>
+                            <br><small class="text-muted">${data.role || ''}</small>
+                        </div>
+                    `;
+                }
+            },
+            {
+                data: 'quote.total',
+                className: 'text-center',
+                render: function(data) {
+                    const amount = data || 0;
+                    return `<span class="fw-bold text-success">$${amount.toLocaleString()}</span>`;
+                }
+            },
+            {
+                data: 'status',
+                className: 'text-center',
+                render: function(data) {
+                    const statusMap = {
+                        'pending': { text: 'PENDIENTE', class: 'bg-warning' },
+                        'completed': { text: 'COMPLETADA', class: 'bg-success' },
+                        'cancelled': { text: 'CANCELADA', class: 'bg-danger' }
+                    };
+                    const status = statusMap[data] || { text: data || 'N/A', class: 'bg-secondary' };
+                    return `<span class="badge ${status.class} px-3 py-2">${status.text}</span>`;
+                }
+            },
+            {
+                data: 'requestDate',
+                className: 'text-center',
+                render: function(data) {
+                    if (!data) return '<em class="text-muted">N/A</em>';
+                    const date = new Date(data);
+                    const dateStr = date.toLocaleDateString('es-MX');
+                    const timeStr = date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+                    return `
+                        <div style="white-space: nowrap;">
+                            <div class="fw-semibold">${dateStr}</div>
+                            <small class="text-muted">${timeStr}</small>
+                        </div>
+                    `;
+                }
+            },
+            {
+                data: null,
+                orderable: false,
+                searchable: false,
+                className: 'text-center',
+                render: function(data) {
+                    if (data.status !== 'pending') {
+                        return '<span class="text-muted">Sin acciones</span>';
+                    }
+                    
+                    return `
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" 
+                                    class="btn btn-success complete-invoice-btn" 
+                                    data-id="${data.id}"
+                                    data-bs-toggle="tooltip" 
+                                    title="Completar Factura">
+                                <i class="ti ti-check"></i>
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-danger cancel-invoice-btn" 
+                                    data-id="${data.id}"
+                                    data-bs-toggle="tooltip" 
+                                    title="Cancelar Solicitud">
+                                <i class="ti ti-x"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+        ],
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+            processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando solicitudes...'
+        },
+        order: [[5, 'desc']], // Sort by request date
+        pageLength: 10,
+        responsive: true,
+        drawCallback: function() {
+            // Reinitialize tooltips
+            const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        }
+    });
+
+    // Event handlers
+    $('#invoices-table').on('click', '.complete-invoice-btn', function() {
+        const invoiceId = $(this).data('id');
+        selectedInvoiceId = invoiceId;
+        loadInvoiceDetails(invoiceId);
+    });
+
+    $('#invoices-table').on('click', '.cancel-invoice-btn', function() {
+        const invoiceId = $(this).data('id');
+        selectedInvoiceId = invoiceId;
+        
+        // Find the invoice data in the table
+        const rowData = dataTable.row($(this).closest('tr')).data();
+        $('#cancelInvoiceInfo').text(`Cotización: ${rowData.quote?.folio || 'N/A'}`);
+        
+        const cancelModal = new bootstrap.Modal(document.getElementById('cancelInvoiceModal'));
+        cancelModal.show();
+    });
+
+    $('#confirmCompleteBtn').on('click', function() {
+        completeInvoice();
+    });
+
+    $('#confirmCancelBtn').on('click', function() {
+        cancelInvoice();
+    });
+
+    $('#refreshBtn').on('click', function() {
+        dataTable.ajax.reload();
+    });
+
+    // Functions
+    async function loadInvoiceDetails(invoiceId) {
+        try {
+            const response = await fetch(`/api/invoices/${invoiceId}`, {
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`
+                }
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                displayInvoiceDetails(result.data);
+                const completeModal = new bootstrap.Modal(document.getElementById('completeInvoiceModal'));
+                completeModal.show();
+            } else {
+                showErrorAlert(result.error || 'Error al cargar detalles de la factura');
+            }
+        } catch (error) {
+            console.error('Error loading invoice details:', error);
+            showErrorAlert('Error al cargar detalles de la factura');
+        }
+    }
+
+    function displayInvoiceDetails(invoice) {
+        const html = `
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="ti ti-file-invoice me-2"></i>Detalles de la Solicitud
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Cotización:</strong> ${invoice.quote?.folio || 'N/A'}</p>
+                            <p><strong>Cliente:</strong> ${invoice.quote?.client?.fullName || 'N/A'}</p>
+                            <p><strong>Solicitado por:</strong> ${invoice.requestedBy?.fullName || 'N/A'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Total:</strong> $${(invoice.quote?.serviceItems?.total || 0).toLocaleString()}</p>
+                            <p><strong>Fecha solicitud:</strong> ${new Date(invoice.requestDate).toLocaleDateString('es-MX')}</p>
+                            <p><strong>Tipo de evento:</strong> ${invoice.quote?.eventType || 'N/A'}</p>
+                        </div>
+                    </div>
+                    ${invoice.notes ? `<p><strong>Notas:</strong> ${invoice.notes}</p>` : ''}
+                </div>
+            </div>
+        `;
+        document.getElementById('invoiceDetails').innerHTML = html;
+    }
+
+    async function completeInvoice() {
+        const invoiceNumber = document.getElementById('invoiceNumber').value.trim();
+        const notes = document.getElementById('processingNotes').value.trim();
+        
+        if (!invoiceNumber) {
+            showErrorAlert('El número de factura es requerido');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/api/invoices/${selectedInvoiceId}/complete`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getAccessToken()}`
+                },
+                body: JSON.stringify({
+                    invoiceNumber,
+                    notes
+                })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showSuccessAlert('Factura completada exitosamente');
+                bootstrap.Modal.getInstance(document.getElementById('completeInvoiceModal')).hide();
+                dataTable.ajax.reload();
+                
+                // Clear form
+                document.getElementById('completeInvoiceForm').reset();
+                document.getElementById('processDate').value = new Date().toISOString().split('T')[0];
+            } else {
+                showErrorAlert(result.error || 'Error al completar la factura');
+            }
+        } catch (error) {
+            console.error('Error completing invoice:', error);
+            showErrorAlert('Error al completar la factura');
+        }
+    }
+
+    async function cancelInvoice() {
+        const reason = document.getElementById('cancellationReason').value.trim();
+        
+        try {
+            const response = await fetch(`/api/invoices/${selectedInvoiceId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getAccessToken()}`
+                },
+                body: JSON.stringify({ reason })
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                showSuccessAlert('Solicitud de factura cancelada exitosamente');
+                bootstrap.Modal.getInstance(document.getElementById('cancelInvoiceModal')).hide();
+                dataTable.ajax.reload();
+                
+                // Clear form
+                document.getElementById('cancellationReason').value = '';
+            } else {
+                showErrorAlert(result.error || 'Error al cancelar la solicitud');
+            }
+        } catch (error) {
+            console.error('Error cancelling invoice:', error);
+            showErrorAlert('Error al cancelar la solicitud');
+        }
+    }
+
+    function updateStats(invoices) {
+        const pending = invoices.filter(i => i.status === 'pending').length;
+        const completed = invoices.filter(i => i.status === 'completed').length;
+        
+        const thisMonth = new Date();
+        thisMonth.setDate(1);
+        thisMonth.setHours(0, 0, 0, 0);
+        
+        const monthlyInvoices = invoices.filter(i => new Date(i.requestDate) >= thisMonth);
+        const monthlyTotal = monthlyInvoices.reduce((sum, i) => sum + (i.quote?.total || 0), 0);
+        
+        document.getElementById('pendingCount').textContent = pending;
+        document.getElementById('completedCount').textContent = completed;
+        document.getElementById('monthlyCount').textContent = monthlyInvoices.length;
+        document.getElementById('monthlyTotal').textContent = `$${monthlyTotal.toLocaleString()}`;
+    }
+
+    function showSuccessAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="ti ti-check-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        const container = document.getElementById('invoices-content');
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+        
+        setTimeout(() => {
+            container.querySelectorAll('.alert').forEach(el => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 150);
+            });
+        }, 5000);
+    }
+
+    function showErrorAlert(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        
+        const container = document.getElementById('invoices-content');
+        container.insertAdjacentHTML('afterbegin', alertHtml);
+        
+        setTimeout(() => {
+            container.querySelectorAll('.alert').forEach(el => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 150);
+            });
+        }, 8000);
+    }
+}
+</script>

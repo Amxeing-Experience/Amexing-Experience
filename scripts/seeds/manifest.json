@@ -39,8 +39,8 @@
     {
       "name": "001-seed-service-types",
       "file": "001-seed-service-types.js",
-      "description": "Seed initial service types (Aeropuerto, Punto a Punto, Local)",
-      "version": "1.0.0",
+      "description": "Seed initial service types (Aeropuerto, Punto a Punto, Local, Tours)",
+      "version": "1.1.0",
       "enabled": true,
       "environments": ["development", "staging", "production"],
       "dependencies": [],
@@ -112,6 +112,39 @@
       "dependencies": ["001-seed-service-types", "002-seed-pois-local", "003-seed-pois-aeropuerto", "004-seed-pois-ciudades", "005-seed-rates", "006-seed-vehicle-types"],
       "idempotent": true,
       "order": 7
+    },
+    {
+      "name": "008-seed-system-settings",
+      "file": "008-seed-system-settings.js",
+      "description": "Create system configuration settings (paymentSurchargePercentage: 21.09%)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": [],
+      "idempotent": true,
+      "order": 8
+    },
+    {
+      "name": "009-seed-pois-tours",
+      "file": "009-seed-pois-tours.js",
+      "description": "Seed POIs for Tours destinations from Estructura_Tarifario_Tours.csv",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["001-seed-service-types"],
+      "idempotent": true,
+      "order": 9
+    },
+    {
+      "name": "010-seed-tours-from-csv",
+      "file": "010-seed-tours-from-csv.js",
+      "description": "Import tours from Estructura_Tarifario_Tours.csv with duration and passenger range",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["001-seed-service-types", "005-seed-rates", "006-seed-vehicle-types", "009-seed-pois-tours"],
+      "idempotent": true,
+      "order": 10
     }
   ],
   "notes": [

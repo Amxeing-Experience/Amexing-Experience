@@ -11,7 +11,7 @@
  * - Comprehensive validation and audit logging.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-10-28
+ * @since 1.0.0
  * @example
  * GET /api/tours - List all tours with pagination
  * POST /api/tours - Create new tour
@@ -22,6 +22,12 @@
 
 const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
+const {
+  validateAvailability,
+  sortDayCodesChronological,
+  validateDaySchedules,
+  sortDaySchedulesChronological,
+} = require('../../../infrastructure/utils/availabilityUtils');
 
 /**
  * ToursController class implementing RESTful API.
@@ -65,6 +71,9 @@ class ToursController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'asc';
 
+      // Extract additional filters (if provided)
+      const { rateId } = req.query;
+
       // Column mapping for sorting (matches frontend columns order)
       const columns = ['destinationPOI', 'time', 'vehicleType', 'price', 'rate', 'active'];
       const sortField = columns[sortColumnIndex] || 'createdAt';
@@ -80,6 +89,18 @@ class ToursController {
       const baseQuery = new Parse.Query('Tours');
       baseQuery.equalTo('exists', true);
       baseQuery.include(['destinationPOI', 'vehicleType', 'rate']);
+
+      // Apply rate filter if provided
+      if (rateId) {
+        const rateFilterQuery = new Parse.Query('Rate');
+        try {
+          const ratePointer = await rateFilterQuery.get(rateId, { useMasterKey: true });
+          baseQuery.equalTo('rate', ratePointer);
+        } catch (error) {
+          logger.warn('Invalid rate ID provided for filtering', { rateId, error: error.message });
+          // Continue without filter if rate not found
+        }
+      }
 
       // Build filtered query with search
       let filteredQuery = baseQuery;
@@ -103,6 +124,17 @@ class ToursController {
 
         filteredQuery = Parse.Query.or(...searchQueries);
         filteredQuery.include(['destinationPOI', 'vehicleType', 'rate']);
+
+        // Apply rate filter to filtered query as well
+        if (rateId) {
+          const rateFilterQuery = new Parse.Query('Rate');
+          try {
+            const ratePointer = await rateFilterQuery.get(rateId, { useMasterKey: true });
+            filteredQuery.equalTo('rate', ratePointer);
+          } catch (error) {
+            // Already logged above, continue without filter
+          }
+        }
       }
 
       // Get count of filtered results
@@ -130,48 +162,51 @@ class ToursController {
       const tours = await filteredQuery.find({ useMasterKey: true });
 
       // Transform results for DataTables
-      const data = tours.map((tour) => ({
-        id: tour.id,
-        objectId: tour.id,
-        destinationPOI: {
-          objectId: tour.get('destinationPOI')?.id,
-          name: tour.get('destinationPOI')?.get('name') || 'Sin destino',
-        },
-        time: tour.get('time') || 0,
-        vehicleType: {
-          objectId: tour.get('vehicleType')?.id,
-          name: tour.get('vehicleType')?.get('name') || 'Sin tipo',
-        },
-        price: tour.get('price') || 0,
-        rate: {
-          objectId: tour.get('rate')?.id,
-          name: tour.get('rate')?.get('name') || 'Sin tarifa',
-        },
-        minPassengers: tour.get('minPassengers') || null,
-        maxPassengers: tour.get('maxPassengers') || null,
-        notes: tour.get('notes') || null,
-        active: tour.get('active') || false,
-        exists: tour.get('exists') || true,
-        createdAt: tour.get('createdAt'),
-        updatedAt: tour.get('updatedAt'),
-      }));
+      const data = tours.map((tour) => {
+        const destinationPOI = tour.get('destinationPOI');
+        const vehicleType = tour.get('vehicleType');
+        const rate = tour.get('rate');
 
-      // Send DataTables response
+        return {
+          id: tour.id,
+          objectId: tour.id,
+          destinationPOI: {
+            objectId: destinationPOI?.id,
+            name: destinationPOI?.get('name') || 'Sin destino',
+          },
+          time: tour.get('time') || 0,
+          vehicleType: {
+            objectId: vehicleType?.id,
+            name: vehicleType?.get('name') || 'Sin tipo',
+          },
+          price: tour.get('price') || 0,
+          rate: {
+            id: rate?.id,
+            name: rate?.get('name') || 'Sin tarifa',
+            color: rate?.get('color') || '#6366F1',
+          },
+          minPassengers: tour.get('minPassengers') || null,
+          maxPassengers: tour.get('maxPassengers') || null,
+          notes: tour.get('notes') || null,
+          availability: tour.get('availability') || null,
+          // Legacy fields for backward compatibility
+          availableDays: tour.get('availableDays') || null,
+          startTime: tour.get('startTime') || null,
+          endTime: tour.get('endTime') || null,
+          active: tour.get('active') || false,
+          exists: tour.get('exists') || true,
+          createdAt: tour.get('createdAt'),
+          updatedAt: tour.get('updatedAt'),
+        };
+      });
+
+      // Send DataTables response (standardized format matching Services)
       res.json({
         success: true,
         draw,
         recordsTotal,
         recordsFiltered,
-        data: {
-          tours: data,
-          pagination: {
-            total: recordsTotal,
-            totalCount: recordsTotal,
-            filtered: recordsFiltered,
-            page: Math.floor(start / length) + 1,
-            limit: length,
-          },
-        },
+        data,
       });
     } catch (error) {
       logger.error('Error getting tours:', error);
@@ -210,26 +245,42 @@ class ToursController {
         return this.sendError(res, 'Tour no encontrado', 404);
       }
 
+      const destinationPOI = tour.get('destinationPOI');
+      const vehicleType = tour.get('vehicleType');
+      const rate = tour.get('rate');
+
       const tourData = {
         id: tour.id,
         objectId: tour.id,
-        destinationPOI: tour.get('destinationPOI') ? {
-          objectId: tour.get('destinationPOI').id,
-          name: tour.get('destinationPOI').get('name'),
-        } : null,
+        destinationPOI: destinationPOI
+          ? {
+            objectId: destinationPOI.id,
+            name: destinationPOI.get('name'),
+          }
+          : null,
         time: tour.get('time'),
-        vehicleType: tour.get('vehicleType') ? {
-          objectId: tour.get('vehicleType').id,
-          name: tour.get('vehicleType').get('name'),
-        } : null,
+        vehicleType: vehicleType
+          ? {
+            objectId: vehicleType.id,
+            name: vehicleType.get('name'),
+          }
+          : null,
         price: tour.get('price'),
-        rate: tour.get('rate') ? {
-          objectId: tour.get('rate').id,
-          name: tour.get('rate').get('name'),
-        } : null,
+        rate: rate
+          ? {
+            id: rate.id,
+            name: rate.get('name'),
+            color: rate.get('color') || '#6366F1',
+          }
+          : null,
         minPassengers: tour.get('minPassengers'),
         maxPassengers: tour.get('maxPassengers'),
         notes: tour.get('notes'),
+        availability: tour.get('availability'),
+        // Legacy fields for backward compatibility
+        availableDays: tour.get('availableDays'),
+        startTime: tour.get('startTime'),
+        endTime: tour.get('endTime'),
         active: tour.get('active'),
         exists: tour.get('exists'),
         createdAt: tour.get('createdAt'),
@@ -268,12 +319,68 @@ class ToursController {
       // Role checking is handled by jwtMiddleware.requireRoleLevel(6) in routes
 
       const {
-        destinationPOI, time, vehicleType, price, rate, minPassengers, maxPassengers, notes,
+        destinationPOI,
+        time,
+        vehicleType,
+        price,
+        rate,
+        minPassengers,
+        maxPassengers,
+        notes,
+        availability,
+        // Legacy fields for backward compatibility
+        availableDays,
+        startTime,
+        endTime,
       } = req.body;
 
       // Validate required fields
       if (!destinationPOI || !time || !vehicleType || !price || !rate) {
         return this.sendError(res, 'Todos los campos son requeridos', 400);
+      }
+
+      // Validate new availability format (array of day schedules)
+      if (availability && Array.isArray(availability)) {
+        if (availability.length === 0) {
+          return this.sendError(
+            res,
+            'Datos de disponibilidad inválidos: At least one day schedule must be provided',
+            400
+          );
+        }
+
+        const availabilityValidation = validateDaySchedules(availability);
+
+        if (!availabilityValidation.valid) {
+          return this.sendError(
+            res,
+            `Datos de disponibilidad inválidos: ${availabilityValidation.errors.join(', ')}`,
+            400
+          );
+        }
+      } else if (availableDays || startTime || endTime) {
+        // Legacy format validation (backward compatibility)
+        if (!availableDays || !startTime || !endTime) {
+          return this.sendError(
+            res,
+            'Para configurar disponibilidad, debe proporcionar días disponibles, hora de inicio y hora de fin',
+            400
+          );
+        }
+
+        const availabilityValidation = validateAvailability({
+          availableDays,
+          startTime,
+          endTime,
+        });
+
+        if (!availabilityValidation.valid) {
+          return this.sendError(
+            res,
+            `Datos de disponibilidad inválidos: ${availabilityValidation.errors.join(', ')}`,
+            400
+          );
+        }
       }
 
       if (time <= 0) {
@@ -335,6 +442,19 @@ class ToursController {
         tour.set('notes', notes.trim());
       }
 
+      // Set new availability format (array of day schedules)
+      if (availability && Array.isArray(availability) && availability.length > 0) {
+        const sortedSchedules = sortDaySchedulesChronological(availability);
+        tour.set('availability', sortedSchedules);
+      } else if (availableDays && startTime && endTime) {
+        // Legacy format support (backward compatibility)
+        // Sort day codes chronologically for consistency
+        const sortedDays = sortDayCodesChronological(availableDays);
+        tour.set('availableDays', sortedDays);
+        tour.set('startTime', startTime);
+        tour.set('endTime', endTime);
+      }
+
       tour.set('active', true);
       tour.set('exists', true);
 
@@ -383,7 +503,19 @@ class ToursController {
 
       const tourId = req.params.id;
       const {
-        destinationPOI, time, vehicleType, price, rate, minPassengers, maxPassengers, notes,
+        destinationPOI,
+        time,
+        vehicleType,
+        price,
+        rate,
+        minPassengers,
+        maxPassengers,
+        notes,
+        availability,
+        // Legacy fields for backward compatibility
+        availableDays,
+        startTime,
+        endTime,
       } = req.body;
 
       if (!tourId) {
@@ -393,6 +525,50 @@ class ToursController {
       // Validate required fields
       if (!destinationPOI || !time || !vehicleType || !price || !rate) {
         return this.sendError(res, 'Todos los campos son requeridos', 400);
+      }
+
+      // Validate new availability format (array of day schedules)
+      if (availability && Array.isArray(availability)) {
+        if (availability.length === 0) {
+          return this.sendError(
+            res,
+            'Datos de disponibilidad inválidos: At least one day schedule must be provided',
+            400
+          );
+        }
+
+        const availabilityValidation = validateDaySchedules(availability);
+
+        if (!availabilityValidation.valid) {
+          return this.sendError(
+            res,
+            `Datos de disponibilidad inválidos: ${availabilityValidation.errors.join(', ')}`,
+            400
+          );
+        }
+      } else if (availableDays || startTime || endTime) {
+        // Legacy format validation (backward compatibility)
+        if (!availableDays || !startTime || !endTime) {
+          return this.sendError(
+            res,
+            'Para configurar disponibilidad, debe proporcionar días disponibles, hora de inicio y hora de fin',
+            400
+          );
+        }
+
+        const availabilityValidation = validateAvailability({
+          availableDays,
+          startTime,
+          endTime,
+        });
+
+        if (!availabilityValidation.valid) {
+          return this.sendError(
+            res,
+            `Datos de disponibilidad inválidos: ${availabilityValidation.errors.join(', ')}`,
+            400
+          );
+        }
       }
 
       if (time <= 0) {
@@ -464,6 +640,33 @@ class ToursController {
         tour.set('notes', notes.trim());
       } else {
         tour.unset('notes');
+      }
+
+      // Update new availability format (array of day schedules)
+      if (availability && Array.isArray(availability) && availability.length > 0) {
+        const sortedSchedules = sortDaySchedulesChronological(availability);
+        tour.set('availability', sortedSchedules);
+        // Clear legacy fields when using new format
+        tour.unset('availableDays');
+        tour.unset('startTime');
+        tour.unset('endTime');
+      } else if (availability === null) {
+        // If explicitly set to null, remove all availability fields
+        tour.unset('availability');
+        tour.unset('availableDays');
+        tour.unset('startTime');
+        tour.unset('endTime');
+      } else if (availableDays && startTime && endTime) {
+        // Legacy format support (backward compatibility)
+        const sortedDays = sortDayCodesChronological(availableDays);
+        tour.set('availableDays', sortedDays);
+        tour.set('startTime', startTime);
+        tour.set('endTime', endTime);
+      } else if (availableDays === null || startTime === null || endTime === null) {
+        // If legacy fields explicitly set to null, remove them
+        tour.unset('availableDays');
+        tour.unset('startTime');
+        tour.unset('endTime');
       }
 
       await tour.save(null, { useMasterKey: true });

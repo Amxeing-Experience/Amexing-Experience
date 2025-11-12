@@ -44,7 +44,7 @@ const PermissionService = require('../services/PermissionService');
  * @class AmexingAuthMiddleware
  * @author Claude Code + Technical Team
  * @version 1.0
- * @since 2024-09-11
+ * @since 1.0.0
  * @example
  * // const result = await authService.login(credentials);
  * // Returns: { success: true, user: {...}, tokens: {...} }

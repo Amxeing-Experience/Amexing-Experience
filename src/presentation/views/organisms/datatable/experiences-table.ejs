@@ -20,6 +20,7 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
 %>
 
 <div class="card border-0 shadow-sm">
@@ -48,11 +49,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <tr>
                         <th>Nombre</th>
                         <th>Descripción</th>
-                        <th>Experiencias</th>
-                        <th>Costo</th>
-                        <th>Última Act.</th>
-                        <th>Estado</th>
-                        <% if (dtShowActions) { %>
+                        <% if (dtUserRole !== 'department_manager') { %><th>Contenido</th><% } %>
+                        <th>Duración</th>
+                        <th>Mín. Personas</th>
+                        <th>Precio</th>
+                        <th>Precio Efectivo</th>
+                        <% if (dtUserRole !== 'department_manager') { %><th>Última Act.</th><% } %>
+                        <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
+                        <% if (dtShowActions || canViewImages) { %>
                             <th class="text-center">Acciones</th>
                         <% } %>
                     </tr>
@@ -123,6 +127,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             selected: []
                         }) %>
 
+                        <%- include('../../atoms/common/tom-select', {
+                            id: 'tours',
+                            name: 'tours',
+                            multiple: true,
+                            placeholder: 'Buscar y seleccionar tours...',
+                            maxItems: 20,
+                            label: 'Tours Incluidos (Opcional)',
+                            helpText: 'Selecciona los tours que forman parte de este paquete (máximo 20).',
+                            options: [],
+                            selected: []
+                        }) %>
+
                         <!-- Tabla de Costo Sugerido (inicialmente oculta) -->
                         <div id="suggestedCostContainer" style="display: none;" class="mb-3">
                             <div class="card border-info">
@@ -164,6 +180,35 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             </div>
                         </div>
 
+                        <!-- Duración -->
+                        <div class="mb-3">
+                            <label for="duration" class="form-label">Duración</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="duration" name="duration" min="0" step="0.5" placeholder="2.5">
+                                <span class="input-group-text">horas</span>
+                            </div>
+                            <div class="form-text">Duración estimada en horas (campo opcional)</div>
+                        </div>
+
+                        <!-- Mínimo personas -->
+                        <div class="mb-3">
+                            <label for="min_people" class="form-label">Mínimo personas</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="min_people" name="min_people" min="1" step="1" placeholder="4">
+                                <span class="input-group-text">personas</span>
+                            </div>
+                            <div class="form-text">Número mínimo de personas requerido (campo opcional)</div>
+                        </div>
+                        <!-- Tiempo traslado -->
+                        <div class="mb-3">
+                            <label for="time_journey" class="form-label">Tiempo traslado</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="time_journey" name="time_journey" min="0" step="0.1" placeholder="2.5">
+                                <span class="input-group-text">horas</span>
+                            </div>
+                            <div class="form-text">Tiempo estimado de traslado en horas (campo opcional)</div>
+                        </div>
+
                         <div class="mb-3">
                             <label for="cost" class="form-label">Costo <span class="text-danger">*</span></label>
                             <div class="input-group">
@@ -172,6 +217,66 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                 <span class="input-group-text">MXN</span>
                             </div>
                             <div class="form-text">Costo de la experiencia en pesos mexicanos</div>
+                        </div>
+
+                        <!-- Tipo de Vehículo -->
+                        <div class="mb-3">
+                            <label for="vehicleType" class="form-label">Tipo de Vehículo</label>
+                            <select class="form-select" id="vehicleType" name="vehicleType">
+                                <option value="">Sin tipo de vehículo específico</option>
+                            </select>
+                            <div class="form-text">Tipo de vehículo requerido para esta experiencia (campo opcional)</div>
+                        </div>
+
+
+                        <!-- Sección: Disponibilidad (Opcional) -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                                <i class="ti ti-calendar-time me-1"></i>
+                                Disponibilidad <span class="text-muted fw-normal">(Opcional)</span>
+                            </h6>
+
+                            <div class="mb-3">
+                                <label class="form-label">Selecciona Días y Configura Horarios</label>
+                                <div class="d-flex gap-2 flex-wrap mb-3" id="experienceAvailableDaysContainer">
+                                    <button type="button" class="btn btn-outline-primary day-btn" data-day="1" data-day-name="Lunes">
+                                        <i class="ti ti-calendar"></i> Lu
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary day-btn" data-day="2" data-day-name="Martes">
+                                        <i class="ti ti-calendar"></i> Ma
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary day-btn" data-day="3" data-day-name="Miércoles">
+                                        <i class="ti ti-calendar"></i> Mi
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary day-btn" data-day="4" data-day-name="Jueves">
+                                        <i class="ti ti-calendar"></i> Ju
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary day-btn" data-day="5" data-day-name="Viernes">
+                                        <i class="ti ti-calendar"></i> Vi
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary day-btn" data-day="6" data-day-name="Sábado">
+                                        <i class="ti ti-calendar"></i> Sa
+                                    </button>
+                                    <button type="button" class="btn btn-outline-primary day-btn" data-day="0" data-day-name="Domingo">
+                                        <i class="ti ti-calendar"></i> Do
+                                    </button>
+                                </div>
+                                <div class="form-text">Selecciona días para configurar horarios individuales</div>
+                            </div>
+
+                            <!-- Contenedor de horarios por día -->
+                            <div id="experienceDaySchedulesContainer" class="mb-3">
+                                <div id="experienceNoDaysSelected" class="text-center text-muted py-4 border rounded bg-light">
+                                    <i class="ti ti-calendar-off fs-3 d-block mb-2"></i>
+                                    <p class="mb-0">Selecciona días para configurar sus horarios</p>
+                                    <small class="text-muted">Cada día puede tener horarios diferentes</small>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info" role="alert">
+                                <i class="ti ti-info-circle me-2"></i>
+                                <small>Si no se especifica disponibilidad, la experiencia estará disponible todos los días sin restricción de horario</small>
+                            </div>
                         </div>
                     </div>
                 </form>
@@ -190,6 +295,35 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         </div>
     </div>
 </div>
+
+<!-- Template para fila de horario por día -->
+<template id="experienceDayScheduleRowTemplate">
+    <div class="day-schedule-row mb-3 p-3 border rounded bg-light" data-day="">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <strong class="day-name text-primary">
+                    <i class="ti ti-calendar me-1"></i>
+                    <span></span>
+                </strong>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Hora de Inicio</label>
+                <input type="text" class="form-control form-control-sm day-start-time time-input" placeholder="HH:MM" maxlength="5">
+                <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Hora de Fin</label>
+                <input type="text" class="form-control form-control-sm day-end-time time-input" placeholder="HH:MM" maxlength="5">
+                <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-day-btn" title="Eliminar día">
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
 
 <script>
 (function() {
@@ -211,9 +345,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+        const canViewImages = <%= canViewImages %>;
+        const userRole = '<%= dtUserRole %>';
 
-        // Variable global para almacenar datos de experiencias con costos
+        // Variables globales para almacenar datos con costos
         let experiencesDataMap = {};
+        let toursDataMap = {};
 
         /**
          * Format money amount with thousands separator and 2 decimals
@@ -225,17 +362,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }
 
         /**
-         * Update suggested cost table based on selected experiences
+         * Update suggested cost table based on selected experiences and tours
          */
         function updateSuggestedCostTable() {
-            const selectElement = document.getElementById('experiences');
-            const tomSelectInstance = selectElement?.tomselect;
-            const selectedIds = tomSelectInstance?.getValue() || [];
+            const experiencesSelectElement = document.getElementById('experiences');
+            const toursSelectElement = document.getElementById('tours');
+            const experiencesTomSelect = experiencesSelectElement?.tomselect;
+            const toursTomSelect = toursSelectElement?.tomselect;
+            const selectedExperienceIds = experiencesTomSelect?.getValue() || [];
+            const selectedTourIds = toursTomSelect?.getValue() || [];
 
             const container = $('#suggestedCostContainer');
             const tbody = $('#suggestedCostBody');
 
-            if (selectedIds.length === 0) {
+            if (selectedExperienceIds.length === 0 && selectedTourIds.length === 0) {
                 // No selections, hide table
                 container.hide();
                 return;
@@ -246,8 +386,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
             let total = 0;
 
-            // Generate rows for each selected item
-            selectedIds.forEach(function(id) {
+            // Generate rows for each selected experience
+            selectedExperienceIds.forEach(function(id) {
                 const item = experiencesDataMap[id];
                 if (item) {
                     const cost = parseFloat(item.cost || 0);
@@ -255,7 +395,24 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                     const row = `
                         <tr>
-                            <td>${item.name}</td>
+                            <td>${item.name} <span class="badge bg-primary badge-sm">Experiencia</span></td>
+                            <td class="text-end">$${formatMoney(cost)} MXN</td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                }
+            });
+
+            // Generate rows for each selected tour
+            selectedTourIds.forEach(function(id) {
+                const item = toursDataMap[id];
+                if (item) {
+                    const cost = parseFloat(item.price || 0);
+                    total += cost;
+
+                    const row = `
+                        <tr>
+                            <td>${item.name} <span class="badge bg-success badge-sm">Tour</span></td>
                             <td class="text-end">$${formatMoney(cost)} MXN</td>
                         </tr>
                     `;
@@ -280,16 +437,57 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 return;
             }
 
-            const selectElement = document.getElementById('experiences');
-            const tomSelectInstance = selectElement?.tomselect;
+            const experiencesSelectElement = document.getElementById('experiences');
+            const experiencesTomSelectInstance = experiencesSelectElement?.tomselect;
+            
+            const toursSelectElement = document.getElementById('tours');
+            const toursTomSelectInstance = toursSelectElement?.tomselect;
 
-            if (tomSelectInstance) {
-                tomSelectInstance.on('change', function() {
+            if (experiencesTomSelectInstance) {
+                experiencesTomSelectInstance.on('change', function() {
                     updateSuggestedCostTable();
                 });
+            }
+
+            if (toursTomSelectInstance) {
+                toursTomSelectInstance.on('change', function() {
+                    updateSuggestedCostTable();
+                });
+            }
+
+            if (experiencesTomSelectInstance || toursTomSelectInstance) {
                 calculatorInitialized = true;
             }
         }
+
+        // Get JWT token from localStorage or cookies
+        function getAccessToken() {
+            // First try localStorage (used by other parts of the app)
+            const tokenFromStorage = localStorage.getItem('accessToken');
+            if (tokenFromStorage) {
+                return tokenFromStorage;
+            }
+            
+            // Fallback to cookies (httpOnly cookies won't work, but try anyway)
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Setup global AJAX configuration to include JWT token
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
+        });
 
         const dataTable = $(`#${tableId}`).DataTable({
             processing: true,
@@ -314,56 +512,187 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 },
                 {
                     data: 'description',
+                    render: function(data, type, row) {
+                        // For department_manager, show included experiences and tours instead of description
+                        if (userRole === 'department_manager') {
+                            let content = '';
+                            
+                            // Check various possible field names for included experiences
+                            const experienceDetails = row.experienceDetails || row.experiences || row.includedExperiences || [];
+                            const tourDetails = row.tourDetails || row.tours || row.includedTours || [];
+                            
+                            // Show included experiences
+                            if (experienceDetails && experienceDetails.length > 0) {
+                                content += `<div class="mb-2"><small class="text-primary fw-semibold">Experiencias:</small></div>`;
+                                const experienceItems = experienceDetails.map(exp => {
+                                    // Handle different object structures
+                                    if (typeof exp === 'string') return exp;
+                                    const name = exp.name || exp.title || exp.destinationPOI?.name || 'Experiencia sin nombre';
+                                    return `<li style="color: var(--bs-primary);"><small class="text-primary">${name}</small></li>`;
+                                }).join('');
+                                content += `<ul class="mb-2" style="margin: 0; padding-left: 16px; list-style-type: disc;">${experienceItems}</ul>`;
+                            }
+                            
+                            // Show included tours
+                            if (tourDetails && tourDetails.length > 0) {
+                                content += `<div class="mb-2"><small class="text-success fw-semibold">Tours:</small></div>`;
+                                const tourItems = tourDetails.map(tour => {
+                                    // Handle different object structures
+                                    if (typeof tour === 'string') return tour;
+                                    
+                                    // Extract POI destination name from the updated API response structure
+                                    const poiName = tour.destinationPOI?.name;
+                                    const name = tour.name || tour.title || poiName || 'Tour sin nombre';
+                                    return `<li style="color: var(--bs-success);"><small class="text-success">${name}</small></li>`;
+                                }).join('');
+                                content += `<ul style="margin: 0; padding-left: 16px; list-style-type: disc;">${tourItems}</ul>`;
+                            }
+                            
+                            // Check for experienceCount and tourCount as indicators
+                            const experienceCount = row.experienceCount || 0;
+                            const tourCount = row.tourCount || 0;
+                            
+                            if (!content && (experienceCount > 0 || tourCount > 0)) {
+                                content = `<small class="text-info">Contiene: ${experienceCount > 0 ? experienceCount + ' experiencias' : ''} ${tourCount > 0 ? tourCount + ' tours' : ''}</small>`;
+                            }
+                            
+                            // If no included content, show a placeholder
+                            if (!content) {
+                                content = '<small class="text-muted">Sin contenido incluido</small>';
+                            }
+                            
+                            return content;
+                        } else {
+                            // For other roles, show truncated description as before
+                            const truncated = data.length > 100 ? data.substring(0, 100) + '...' : data;
+                            return `<small class="text-muted">${truncated}</small>`;
+                        }
+                    }
+                },
+                // 3. Contenido (only for non-department_manager roles)
+                ...(userRole !== 'department_manager' ? [{
+                    data: null,
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        const experienceCount = row.experienceCount || 0;
+                        const tourCount = row.tourCount || 0;
+                        const totalCount = experienceCount + tourCount;
+                        
+                        if (totalCount === 0) {
+                            return '<span class="text-muted">-</span>';
+                        }
+                        
+                        let html = '';
+                        if (experienceCount > 0) {
+                            html += `<span class="badge bg-primary me-1" title="Experiencias">${experienceCount} Exp</span>`;
+                        }
+                        if (tourCount > 0) {
+                            html += `<span class="badge bg-success" title="Tours">${tourCount} Tours</span>`;
+                        }
+                        
+                        return html;
+                    }
+                }] : []),
+                {
+                    data: 'duration',
                     render: function(data) {
-                        const truncated = data.length > 100 ? data.substring(0, 100) + '...' : data;
-                        return `<small class="text-muted">${truncated}</small>`;
+                        if (!data) return '<span class="text-muted">No especificado</span>';
+                        return `<span class="text-primary">${data} hrs</span>`;
                     }
                 },
                 {
-                    data: 'experienceCount',
-                    className: 'text-center',
+                    data: 'min_people',
                     render: function(data) {
-                        const count = data || 0;
-                        if (count > 0) {
-                            return `<span class="badge bg-info">${count}</span>`;
-                        }
-                        return '<span class="text-muted">-</span>';
+                        if (!data) return '<span class="text-muted">No especificado</span>';
+                        return `<span class="text-info">${data} personas</span>`;
                     }
                 },
+                // 6. Precio (with surcharge - "Tarjeta/Digital")
                 {
                     data: 'cost',
-                    render: function(data) {
-                        const formatted = new Intl.NumberFormat('es-MX', {
+                    render: function(data, type, row) {
+                        const baseCost = data || 0;
+                        const surchargePercentage = window.APP_SETTINGS?.paymentSurchargePercentage || 21.09;
+                        const surcharge = (baseCost * surchargePercentage) / 100;
+                        const totalPrice = baseCost + surcharge;
+
+                        // For sorting and filtering, use total price
+                        if (type === 'sort' || type === 'filter') {
+                            return totalPrice;
+                        }
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
                             style: 'currency',
                             currency: 'MXN'
-                        }).format(data || 0);
-                        return `<div class="fw-bold text-success">${formatted}</div>`;
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-success" style="font-size: 1rem;">
+                                    ${formatMXN(totalPrice)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Tarjeta/Digital</small>
+                                </div>
+                            </div>
+                        `;
                     }
                 },
+                // 6. Precio Efectivo (base cost - "Efectivo")
                 {
+                    data: 'cost',
+                    render: function(data, type, row) {
+                        const baseCost = data || 0;
+
+                        // For sorting and filtering, use base cost
+                        if (type === 'sort' || type === 'filter') {
+                            return baseCost;
+                        }
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                    ${formatMXN(baseCost)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Efectivo</small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                },
+                // 7. Última Actualización
+                ...(userRole !== 'department_manager' ? [{
                     data: 'updatedAt',
                     render: function(data) {
                         const date = new Date(data);
                         return `<small>${date.toLocaleDateString('es-MX')}</small>`;
                     }
-                },
-                {
+                }] : []),
+                // 8. Estado
+                ...(userRole !== 'department_manager' ? [{
                     data: 'active',
                     render: function(data) {
                         return data
                             ? '<span class="badge bg-success">Activa</span>'
                             : '<span class="badge bg-secondary">Inactiva</span>';
                     }
-                },
-                ...(showActions ? [{
+                }] : []),
+                ...((showActions || canViewImages) ? [{
                     data: null,
                     orderable: false,
                     searchable: false,
                     className: 'text-center',
                     render: function(data) {
                         let actions = '<div class="btn-group btn-group-sm" role="group">';
+                        
                         if (canEdit) {
-                            // Edit button
+                            // Edit button (only for admin/superadmin)
                             actions += `<button type="button"
                                             class="btn btn-primary edit-experience-btn"
                                             data-id="${data.objectId || data.id}"
@@ -373,7 +702,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                             <i class="ti ti-edit"></i>
                                         </button>`;
 
-                            // Manage images button (preparado, no funcional)
+                            // Manage images button (admin/superadmin can manage)
                             actions += `<button type="button"
                                             class="btn btn-info manage-images-btn"
                                             data-id="${data.objectId || data.id}"
@@ -383,7 +712,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                             title="Gestionar Imágenes">
                                             <i class="ti ti-photo"></i>
                                         </button>`;
+                        } else if (canViewImages && !canEdit) {
+                            // View gallery button (department_manager can only view)
+                            actions += `<button type="button"
+                                            class="btn btn-info view-gallery-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Ver Galería de Imágenes">
+                                            <i class="ti ti-photo"></i>
+                                        </button>`;
+                        }
 
+                        if (canEdit) {
                             // Toggle status button
                             const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
                             const statusTitle = data.active ? 'Desactivar Experiencia' : 'Activar Experiencia';
@@ -421,7 +763,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando experiencias...'
             },
-            order: [[4, 'desc']], // Sort by updatedAt
+            order: userRole !== 'department_manager' ? [[6, 'desc']] : [[0, 'asc']], // Sort by updatedAt (Última Act.) or Name
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
@@ -438,13 +780,298 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $(`#${tableId}`).on('click', '.manage-images-btn', function() {
             const experienceId = $(this).data('id');
             const name = $(this).data('name');
-            window.openExperienceImagesModal(experienceId, name);
+            window.openExperienceImagesModal(experienceId, name, false); // false for manage mode (admin)
+        });
+        $(`#${tableId}`).on('click', '.view-gallery-btn', function() {
+            const experienceId = $(this).data('id');
+            const name = $(this).data('name');
+            window.openExperienceImagesModal(experienceId, name, true); // true for view-only mode
         });
         $(`#${tableId}`).on('click', '.toggle-experience-status-btn', function() {
             toggleExperienceStatus($(this).data('id'), $(this).data('current-status'), $(this).data('name'));
         });
         $(`#${tableId}`).on('click', '.delete-experience-btn', function() { deleteExperience($(this).data('id'), $(this).data('name')); });
         $('#saveExperienceBtn').on('click', function() { saveExperience(); });
+
+        // ========== AVAILABILITY CALENDAR MANAGEMENT ==========
+
+        // Object to store day schedules
+        let daySchedules = {};
+
+        // Day selection handling
+        function initializeDaySelection() {
+            $('#experienceAvailableDaysContainer .day-btn').removeClass('active btn-primary').addClass('btn-outline-primary');
+
+            // Clear day schedules
+            $('#experienceDaySchedulesContainer .day-schedule-row').remove();
+            daySchedules = {};
+            updateNoDaysMessage();
+        }
+
+        // Handle day button clicks
+        $(document).on('click', '#experienceAvailableDaysContainer .day-btn', function() {
+            const dayCode = parseInt($(this).data('day'));
+            const dayName = $(this).data('day-name');
+            const isSelected = $(this).hasClass('active');
+
+            if (isSelected) {
+                // Deselect: Remove day schedule
+                removeDaySchedule(dayCode);
+                $(this).removeClass('active btn-primary').addClass('btn-outline-primary');
+            } else {
+                // Select: Add day schedule
+                addDaySchedule(dayCode, dayName);
+                $(this).removeClass('btn-outline-primary').addClass('active btn-primary');
+            }
+
+            updateNoDaysMessage();
+        });
+
+        // Add day schedule row
+        function addDaySchedule(dayCode, dayName, startTime = '', endTime = '') {
+            // Check if already exists
+            if (daySchedules[dayCode]) return;
+
+            // Clone template
+            const template = document.getElementById('experienceDayScheduleRowTemplate');
+            const clone = template.content.cloneNode(true);
+            const row = clone.querySelector('.day-schedule-row');
+
+            // Set day code and name
+            row.setAttribute('data-day', dayCode);
+            row.querySelector('.day-name span').textContent = dayName;
+
+            // Set initial values if provided
+            if (startTime) row.querySelector('.day-start-time').value = startTime;
+            if (endTime) row.querySelector('.day-end-time').value = endTime;
+
+            // Add to container (sorted by day code)
+            insertDayScheduleSorted(row, dayCode);
+
+            // Store in daySchedules object
+            daySchedules[dayCode] = {
+                dayName: dayName,
+                element: row
+            };
+
+            // Attach time validation to inputs
+            attachTimeInputValidation(row.querySelector('.day-start-time'));
+            attachTimeInputValidation(row.querySelector('.day-end-time'));
+        }
+
+        // Insert day schedule row in chronological order (Mon-Sun)
+        function insertDayScheduleSorted(row, dayCode) {
+            const container = $('#experienceDaySchedulesContainer');
+            const existingRows = container.find('.day-schedule-row');
+
+            // Convert day code for sorting (Sunday = 7 for sorting purposes)
+            const sortValue = dayCode === 0 ? 7 : dayCode;
+
+            let inserted = false;
+            existingRows.each(function() {
+                const existingDayCode = parseInt($(this).attr('data-day'));
+                const existingSortValue = existingDayCode === 0 ? 7 : existingDayCode;
+
+                if (sortValue < existingSortValue) {
+                    $(this).before(row);
+                    inserted = true;
+                    return false; // Break loop
+                }
+            });
+
+            if (!inserted) {
+                container.append(row);
+            }
+        }
+
+        // Remove day schedule row
+        function removeDaySchedule(dayCode) {
+            if (!daySchedules[dayCode]) return;
+
+            // Remove from DOM
+            $(daySchedules[dayCode].element).remove();
+
+            // Remove from daySchedules object
+            delete daySchedules[dayCode];
+        }
+
+        // Handle remove day button clicks
+        $(document).on('click', '.remove-day-btn', function() {
+            const row = $(this).closest('.day-schedule-row');
+            const dayCode = parseInt(row.attr('data-day'));
+
+            // Deselect day button
+            $(`#experienceAvailableDaysContainer .day-btn[data-day="${dayCode}"]`).removeClass('active btn-primary').addClass('btn-outline-primary');
+
+            // Remove schedule
+            removeDaySchedule(dayCode);
+            updateNoDaysMessage();
+        });
+
+        // Update "no days selected" message visibility
+        function updateNoDaysMessage() {
+            const hasDays = Object.keys(daySchedules).length > 0;
+            $('#experienceNoDaysSelected').toggle(!hasDays);
+        }
+
+        // Time input validation and formatting
+        function attachTimeInputValidation(input) {
+            const $input = $(input);
+
+            $input.on('input', function() {
+                let value = $(this).val().replace(/[^0-9]/g, ''); // Remove non-digits
+
+                // Auto-format: add ":" after 2 digits
+                if (value.length >= 2) {
+                    value = value.substring(0, 2) + ':' + value.substring(2, 4);
+                }
+
+                $(this).val(value);
+            });
+
+            $input.on('blur', function() {
+                const value = $(this).val();
+                if (!value) return;
+
+                // Validate format HH:MM (00:00 to 23:59)
+                const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+                if (!timeRegex.test(value)) {
+                    $(this).addClass('is-invalid');
+                    showModalError('Formato de hora inválido. Use HH:MM (00:00 a 23:59)');
+                } else {
+                    $(this).removeClass('is-invalid');
+                }
+            });
+        }
+
+        // ========== END AVAILABILITY CALENDAR MANAGEMENT ==========
+
+        function openExperienceModal() {
+            // Reset form
+            $('#experienceForm')[0].reset();
+            $('#experienceId').val('');
+            $('#modalTitle').text('Crear Nueva Experiencia');
+            $('#saveButtonText').text('Crear Experiencia');
+            
+            // Clear any previous alerts
+            $('#experienceModalAlerts').empty();
+            
+            // Reset availability calendar
+            initializeDaySelection();
+            
+            // Load dropdown data
+            Promise.all([
+                loadAvailableItems(),
+                loadAvailableTours(),
+                loadAvailableVehicleTypes()
+            ]).then(() => {
+                // Initialize Tom Select for multiselect dropdowns
+                initializeTomSelectDropdowns();
+                
+                // Show modal
+                $('#experienceModal').modal('show');
+            });
+        }
+
+        function loadExperienceData(experienceId) {
+            // Show loading state
+            $('#modalTitle').text('Cargando...');
+            $('#experienceModal').modal('show');
+            
+            // Fetch experience data
+            $.ajax({
+                url: `${apiEndpoint}/${experienceId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        populateExperienceForm(response.data);
+                    }
+                },
+                error: function(xhr) {
+                    $('#experienceModal').modal('hide');
+                    showErrorAlert('Error al cargar los datos de la experiencia');
+                }
+            });
+        }
+
+        function populateExperienceForm(experience) {
+            $('#experienceId').val(experience.id);
+            $('#modalTitle').text('Editar Experiencia');
+            $('#saveButtonText').text('Actualizar Experiencia');
+            
+            // Populate basic fields
+            $('#name').val(experience.name);
+            $('#description').val(experience.description);
+            $('#duration').val(experience.duration || '');
+            $('#min_people').val(experience.min_people || '');
+            $('#time_journey').val(experience.time_journey || '');
+            $('#cost').val(experience.cost);
+            
+            // Load dropdown data first, then populate selections
+            Promise.all([
+                loadAvailableItems(experience.id),
+                loadAvailableTours(),
+                loadAvailableVehicleTypes()
+            ]).then(() => {
+                initializeTomSelectDropdowns();
+                
+                // Populate vehicle type
+                if (experience.vehicleTypeId) {
+                    $('#vehicleType').val(experience.vehicleTypeId);
+                }
+                
+                // Populate selected experiences and tours
+                if (experience.experienceDetails && experience.experienceDetails.length > 0) {
+                    const experienceIds = experience.experienceDetails.map(exp => exp.id);
+                    const experiencesSelect = document.getElementById('experiences');
+                    if (experiencesSelect?.tomselect) {
+                        experiencesSelect.tomselect.setValue(experienceIds);
+                    }
+                }
+                
+                if (experience.tourDetails && experience.tourDetails.length > 0) {
+                    const tourIds = experience.tourDetails.map(tour => tour.id);
+                    const toursSelect = document.getElementById('tours');
+                    if (toursSelect?.tomselect) {
+                        toursSelect.tomselect.setValue(tourIds);
+                    }
+                }
+            });
+        }
+
+        function initializeTomSelectDropdowns() {
+            // Check if TomSelect is available
+            if (typeof TomSelect === 'undefined') {
+                console.warn('TomSelect library not available, using standard select');
+                return;
+            }
+
+            // Initialize tours dropdown with Tom Select
+            const toursSelect = document.getElementById('tours');
+            if (toursSelect && !toursSelect.tomselect) {
+                new TomSelect(toursSelect, {
+                    plugins: ['remove_button'],
+                    placeholder: 'Selecciona tours...',
+                    allowEmptyOption: false,
+                    onChange: function(values) {
+                        updateSuggestedCostTable();
+                    }
+                });
+            }
+
+            // Initialize experiences dropdown if it exists
+            const experiencesSelect = document.getElementById('experiences');
+            if (experiencesSelect && !experiencesSelect.tomselect) {
+                new TomSelect(experiencesSelect, {
+                    plugins: ['remove_button'],
+                    placeholder: 'Selecciona experiencias...',
+                    allowEmptyOption: false,
+                    onChange: function(values) {
+                        updateSuggestedCostTable();
+                    }
+                });
+            }
+        }
 
         function loadAvailableItems(currentId = null) {
             // Build query parameters
@@ -506,6 +1133,92 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             });
         }
 
+        function loadAvailableTours() {
+            console.log('loadAvailableTours: Starting to load tours...');
+            return $.ajax({
+                url: '/api/tours',
+                type: 'GET',
+                data: { length: 1000 }, // Get all for selection
+                success: function(response) {
+                    console.log('loadAvailableTours: API response:', response);
+                    // Fix: The API returns tours directly in response.data, not response.data.tours
+                    if (response.data && Array.isArray(response.data)) {
+                        // Reset tours data map
+                        toursDataMap = {};
+
+                        // Get Tom Select instance
+                        const selectElement = document.getElementById('tours');
+                        const tomSelectInstance = selectElement ? selectElement.tomselect : null;
+
+                        if (tomSelectInstance) {
+                            // Clear existing options
+                            tomSelectInstance.clearOptions();
+
+                            // Add new options with price information
+                            console.log('loadAvailableTours: Found', response.data.length, 'tours');
+                            response.data.forEach(function(item) {
+                                if (item.active) {
+                                    // Store complete data for cost calculation
+                                    toursDataMap[item.id] = {
+                                        id: item.id,
+                                        name: `${item.destinationPOI?.name || 'Tour'} (${item.time || 0}min)`,
+                                        price: item.price || 0
+                                    };
+
+                                    // Add option to Tom Select with price in display text
+                                    const priceFormatted = formatMoney(item.price || 0);
+                                    tomSelectInstance.addOption({
+                                        value: item.id,
+                                        text: `${item.destinationPOI?.name || 'Tour'} (${item.time || 0}min) - $${priceFormatted} MXN`
+                                    });
+                                }
+                            });
+
+                            // Refresh the dropdown
+                            tomSelectInstance.refreshOptions(false);
+                        } else {
+                            console.error('loadAvailableTours: Tom Select instance not found for #tours element');
+                        }
+                    } else {
+                        console.error('loadAvailableTours: Invalid response data structure:', response);
+                    }
+                },
+                error: function(xhr) {
+                    console.error('loadAvailableTours: API error:', xhr.status, xhr.responseText);
+                    console.error('loadAvailableTours: Full xhr object:', xhr);
+                    // Don't fail the whole operation if tours can't be loaded
+                }
+            }).always(function() {
+                // Always resolve successfully to not break the promise chain
+                return $.Deferred().resolve();
+            });
+        }
+
+        function loadAvailableVehicleTypes() {
+            return $.ajax({
+                url: '/api/vehicle-types/active',
+                type: 'GET',
+                success: function(response) {
+                    const select = document.getElementById('vehicleType');
+                    if (select && response.data) {
+                        // Clear existing options except the default one
+                        select.innerHTML = '<option value="">Sin tipo de vehículo específico</option>';
+                        
+                        // Add vehicle type options
+                        response.data.forEach(function(vehicleType) {
+                            const option = document.createElement('option');
+                            option.value = vehicleType.value;
+                            option.textContent = vehicleType.label;
+                            select.appendChild(option);
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    console.warn('No se pudieron cargar los tipos de vehículos:', xhr.status, xhr.responseText);
+                }
+            });
+        }
+
         function openExperienceModal(isEdit = false) {
             // Clear any previous modal alerts
             const alertsContainer = document.getElementById('experienceModalAlerts');
@@ -517,20 +1230,36 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#experienceForm')[0].reset();
             $('#experienceId').val('');
             $('#type').val('Experience');
+            $('#duration').val(''); // Clear duration field
+            $('#min_people').val(''); // Clear min_people field
+            $('#time_journey').val(''); // Clear time_journey field
             $('#modalTitle').text(isEdit ? 'Editar Experiencia' : 'Crear Nueva Experiencia');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Experiencia');
 
-            // Clear Tom Select values
-            const selectElement = document.getElementById('experiences');
-            const tomSelectInstance = selectElement ? selectElement.tomselect : null;
-            if (tomSelectInstance) {
-                tomSelectInstance.clear();
+            // Clear Tom Select values for experiences
+            const experiencesSelectElement = document.getElementById('experiences');
+            const experiencesTomSelectInstance = experiencesSelectElement ? experiencesSelectElement.tomselect : null;
+            if (experiencesTomSelectInstance) {
+                experiencesTomSelectInstance.clear();
+            }
+
+            // Clear Tom Select values for tours
+            const toursSelectElement = document.getElementById('tours');
+            const toursTomSelectInstance = toursSelectElement ? toursSelectElement.tomselect : null;
+            if (toursTomSelectInstance) {
+                toursTomSelectInstance.clear();
             }
 
             // Hide suggested cost table
             $('#suggestedCostContainer').hide();
 
-            loadAvailableItems();
+            // Initialize availability calendar (clear all days)
+            initializeDaySelection();
+
+            // Load experiences, tours, and vehicle types
+            $.when(loadAvailableItems(), loadAvailableTours(), loadAvailableVehicleTypes()).done(function() {
+                // All loaded successfully
+            });
         }
 
         function loadExperienceData(experienceId) {
@@ -548,23 +1277,68 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#experienceId').val(experience.id);
                         $('#name').val(experience.name);
                         $('#description').val(experience.description);
+                        $('#duration').val(experience.duration || '');
+                        $('#min_people').val(experience.min_people || '');
+                        $('#time_journey').val(experience.time_journey || '');
                         $('#cost').val(experience.cost);
 
                         // Load all items and set selected values
-                        loadAvailableItems(experience.id).done(function() {
+                        Promise.all([
+                            loadAvailableItems(experience.id),
+                            loadAvailableTours(),
+                            loadAvailableVehicleTypes()
+                        ]).then(function() {
+                            // Set experiences values
                             if (experience.experiences && experience.experiences.length > 0) {
-                                const selectElement = document.getElementById('experiences');
-                                const tomSelectInstance = selectElement ? selectElement.tomselect : null;
-                                if (tomSelectInstance) {
-                                    tomSelectInstance.setValue(experience.experiences);
-                                    // Update suggested cost table after setting values
-                                    updateSuggestedCostTable();
+                                const experiencesSelectElement = document.getElementById('experiences');
+                                const experiencesTomSelectInstance = experiencesSelectElement ? experiencesSelectElement.tomselect : null;
+                                if (experiencesTomSelectInstance) {
+                                    experiencesTomSelectInstance.setValue(experience.experiences);
                                 }
                             }
 
+                            // Set tours values
+                            if (experience.tours && experience.tours.length > 0) {
+                                const toursSelectElement = document.getElementById('tours');
+                                const toursTomSelectInstance = toursSelectElement ? toursSelectElement.tomselect : null;
+                                if (toursTomSelectInstance) {
+                                    toursTomSelectInstance.setValue(experience.tours);
+                                }
+                            }
+
+                            // Set vehicleType value if it exists
+                            if (experience.vehicleTypeId) {
+                                const vehicleTypeSelect = document.getElementById('vehicleType');
+                                if (vehicleTypeSelect) {
+                                    vehicleTypeSelect.value = experience.vehicleTypeId;
+                                }
+                            }
+
+                            // Set availability (array of day schedules)
+                            initializeDaySelection();
+                            if (experience.availability && Array.isArray(experience.availability) && experience.availability.length > 0) {
+                                // Load day schedules
+                                experience.availability.forEach(schedule => {
+                                    const dayBtn = $(`#experienceAvailableDaysContainer .day-btn[data-day="${schedule.day}"]`);
+                                    const dayName = dayBtn.data('day-name');
+
+                                    // Add day schedule with times
+                                    addDaySchedule(schedule.day, dayName, schedule.startTime, schedule.endTime);
+
+                                    // Activate day button
+                                    dayBtn.removeClass('btn-outline-primary').addClass('active btn-primary');
+                                });
+
+                                updateNoDaysMessage();
+                            }
+
+                            // Update suggested cost table after setting values
+                            updateSuggestedCostTable();
+
                             // Hide loader after all data is loaded and populated
                             hideModalLoader('experienceModal');
-                        }).fail(function() {
+                        }).catch(function(error) {
+                            console.warn('Error loading data for modal:', error);
                             // Hide loader even if loading items fails
                             hideModalLoader('experienceModal');
                         });
@@ -589,14 +1363,28 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const experienceId = $('#experienceId').val();
             const isEdit = !!experienceId;
 
-            // Get values from Tom Select
-            const selectElement = document.getElementById('experiences');
-            const tomSelectInstance = selectElement ? selectElement.tomselect : null;
-            const selectedItems = tomSelectInstance ? tomSelectInstance.getValue() : [];
+            // Get values from Tom Select for experiences
+            const experiencesSelectElement = document.getElementById('experiences');
+            const experiencesTomSelectInstance = experiencesSelectElement ? experiencesSelectElement.tomselect : null;
+            const selectedExperiences = experiencesTomSelectInstance ? experiencesTomSelectInstance.getValue() : [];
+
+            // Get values from Tom Select for tours
+            const toursSelectElement = document.getElementById('tours');
+            const toursTomSelectInstance = toursSelectElement ? toursSelectElement.tomselect : null;
+            const selectedTours = toursTomSelectInstance ? toursTomSelectInstance.getValue() : [];
 
             // Validation
-            if (selectedItems.length > 20) {
-                showErrorAlert('Máximo 20 elementos permitidos (experiencias y proveedores combinados)');
+            const totalItems = selectedExperiences.length + selectedTours.length;
+            if (selectedExperiences.length > 20) {
+                showErrorAlert('Máximo 20 experiencias permitidas');
+                return;
+            }
+            if (selectedTours.length > 20) {
+                showErrorAlert('Máximo 20 tours permitidos');
+                return;
+            }
+            if (totalItems > 30) {
+                showErrorAlert('Máximo 30 elementos totales permitidos (experiencias + tours combinados)');
                 return;
             }
 
@@ -605,8 +1393,79 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 description: $('#description').val(),
                 type: $('#type').val(),
                 cost: parseFloat($('#cost').val()),
-                experiences: selectedItems
+                experiences: selectedExperiences,
+                tours: selectedTours
             };
+
+            // Only include duration if it has a value
+            const durationValue = $('#duration').val();
+            if (durationValue) {
+                experienceData.duration = parseFloat(durationValue);
+            }
+
+            // Only include min_people if it has a value
+            const minPeopleValue = $('#min_people').val();
+            if (minPeopleValue) {
+                experienceData.min_people = parseInt(minPeopleValue, 10);
+            }
+
+            // Only include time_journey if it has a value
+            const timeJourneyValue = $('#time_journey').val();
+            if (timeJourneyValue) {
+                experienceData.time_journey = parseFloat(timeJourneyValue);
+            }
+
+            // Only include vehicleType if it has a value
+            const vehicleTypeValue = $('#vehicleType').val();
+            if (vehicleTypeValue) {
+                experienceData.vehicleType = vehicleTypeValue;
+            }
+
+            // Add optional availability fields (NEW FORMAT: array of day schedules)
+            if (Object.keys(daySchedules).length > 0) {
+                const availability = [];
+                const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+
+                // Collect and validate each day schedule
+                for (const dayCode in daySchedules) {
+                    const scheduleRow = $(daySchedules[dayCode].element);
+                    const startTime = scheduleRow.find('.day-start-time').val();
+                    const endTime = scheduleRow.find('.day-end-time').val();
+                    const dayName = daySchedules[dayCode].dayName;
+
+                    // Validate both times are provided
+                    if (!startTime || !endTime) {
+                        showModalError(`Debe especificar hora de inicio y fin para ${dayName}`);
+                        return;
+                    }
+
+                    // Validate time format
+                    if (!timeRegex.test(startTime)) {
+                        showModalError(`Formato de hora de inicio inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
+                        return;
+                    }
+                    if (!timeRegex.test(endTime)) {
+                        showModalError(`Formato de hora de fin inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
+                        return;
+                    }
+
+                    // Validate endTime > startTime
+                    if (startTime >= endTime) {
+                        showModalError(`La hora de fin debe ser posterior a la hora de inicio para ${dayName}`);
+                        return;
+                    }
+
+                    // Add to availability array
+                    availability.push({
+                        day: parseInt(dayCode),
+                        startTime: startTime,
+                        endTime: endTime
+                    });
+                }
+
+                // Add availability array to data (sorted by day code happens on backend)
+                experienceData.availability = availability;
+            }
 
             const url = isEdit ? `${apiEndpoint}/${experienceId}` : apiEndpoint;
             const method = isEdit ? 'PUT' : 'POST';

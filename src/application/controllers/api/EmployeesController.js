@@ -109,127 +109,21 @@ class EmployeesController {
    */
   async getEmployeeById(req, res) {
     try {
-      const currentUser = req.user;
-      const employeeId = req.params.id;
+      const { currentUser, employeeId } = this.validateGetEmployeeRequest(req, res);
+      if (!currentUser || !employeeId) return;
 
-      if (!currentUser) {
-        return this.sendError(res, 'Authentication required', 401);
-      }
-
-      if (!employeeId) {
-        return this.sendError(res, 'Employee ID is required', 400);
-      }
-
-      // Get user directly from Parse (same pattern as POIController)
-      const Parse = require('parse/node');
-      const query = new Parse.Query('AmexingUser');
-      query.equalTo('exists', true);
-      query.include('roleId');
-
-      let user;
-      try {
-        logger.info('Attempting to fetch employee', { employeeId });
-        user = await query.get(employeeId, { useMasterKey: true });
-        logger.info('Employee fetched successfully', { employeeId, userId: user.id });
-      } catch (parseError) {
-        logger.error('Parse error getting employee', {
-          employeeId,
-          error: parseError.message,
-          code: parseError.code,
-          stack: parseError.stack,
-        });
-        return this.sendError(res, `Employee not found: ${parseError.message}`, 404);
-      }
-
+      const user = await this.fetchEmployee(employeeId);
       if (!user) {
         return this.sendError(res, 'Employee not found', 404);
       }
 
-      // Get role information with better null handling
-      let rolePointer = null;
-      let roleString = null;
-      let roleName = null;
+      const roleInfo = this.extractRoleInfo(user, employeeId);
+      const employeeData = this.formatEmployeeData(user, roleInfo);
 
-      try {
-        rolePointer = user.get('roleId');
-        roleString = user.get('role');
-
-        // Try to get role name from multiple sources
-        if (roleString) {
-          roleName = roleString;
-        } else if (rolePointer && typeof rolePointer.get === 'function') {
-          try {
-            roleName = rolePointer.get('name');
-          } catch (roleError) {
-            logger.warn('Error getting role name from pointer', {
-              employeeId,
-              rolePointerId: rolePointer.id,
-              error: roleError.message,
-            });
-          }
-        }
-      } catch (roleAccessError) {
-        logger.error('Error accessing role information', {
-          employeeId,
-          error: roleAccessError.message,
-        });
-      }
-
-      // Log detailed role information for debugging
-      logger.info('Getting employee by ID - Role details', {
-        employeeId,
-        roleString,
-        rolePointer: rolePointer ? { id: rolePointer.id, className: rolePointer.className } : null,
-        roleName,
-        currentUserId: currentUser.id,
-      });
-
-      // Format employee data
-      let employeeData;
-      try {
-        employeeData = {
-          id: user.id,
-          objectId: user.id,
-          firstName: user.get('firstName') || '',
-          lastName: user.get('lastName') || '',
-          email: user.get('email') || '',
-          phone: user.get('phone') || '',
-          role: roleName,
-          roleId: rolePointer
-            ? {
-              id: rolePointer.id,
-              name: roleName,
-            }
-            : null,
-          contextualData: {
-            department: user.get('department') || '',
-            position: user.get('position') || '',
-            notes: user.get('notes') || '',
-          },
-          active: user.get('active') !== false,
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-        };
-      } catch (dataError) {
-        logger.error('Error formatting employee data', {
-          employeeId,
-          error: dataError.message,
-          stack: dataError.stack,
-        });
-        return this.sendError(res, 'Error formatting employee data', 500);
-      }
-
-      // Verify user is an employee (employee_amexing or driver role)
-      // Note: SuperAdmin and Admin can edit any employee, permission validation is done in middleware
-      if (!roleName || !this.allowedEmployeeRoles.includes(roleName)) {
-        logger.warn('User role not allowed', {
-          employeeId,
-          roleName,
-          allowedRoles: this.allowedEmployeeRoles,
-        });
+      if (!this.isValidEmployee(roleInfo.roleName, employeeId)) {
         return this.sendError(
           res,
-          `User is not an employee (allowed roles: ${this.allowedEmployeeRoles.join(', ')}, found: ${roleName || 'none'})`,
+          `User is not an employee (allowed roles: ${this.allowedEmployeeRoles.join(', ')}, found: ${roleInfo.roleName || 'none'})`,
           403
         );
       }
@@ -558,6 +452,125 @@ class EmployeesController {
   }
 
   // ===== HELPER METHODS =====
+
+  /**
+   * Validate request for getEmployeeById method.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {object} - Object with currentUser and employeeId.
+   * @example
+   * const { currentUser, employeeId } = this.validateGetEmployeeRequest(req, res);
+   */
+  validateGetEmployeeRequest(req, res) {
+    const currentUser = req.user;
+    const employeeId = req.params.id;
+
+    if (!currentUser) {
+      this.sendError(res, 'Authentication required', 401);
+      return { currentUser: null, employeeId: null };
+    }
+
+    if (!employeeId) {
+      this.sendError(res, 'Employee ID is required', 400);
+      return { currentUser: null, employeeId: null };
+    }
+
+    return { currentUser, employeeId };
+  }
+
+  /**
+   * Fetch employee data from database.
+   * @param {string} employeeId - Employee ID to fetch.
+   * @returns {Promise<object>} - User object or null if not found.
+   * @example
+   * const user = await this.fetchEmployee('abc123');
+   */
+  async fetchEmployee(employeeId) {
+    const Parse = require('parse/node');
+    const query = new Parse.Query(Parse.User);
+    query.equalTo('exists', true);
+    query.include('roleId');
+    query.include('departmentId');
+    return query.get(employeeId, { useMasterKey: true });
+  }
+
+  /**
+   * Extract role information from user object.
+   * @param {object} user - User object.
+   * @param {string} employeeId - Employee ID for logging.
+   * @returns {object} - Role information object.
+   * @example
+   * const roleInfo = this.extractRoleInfo(user, 'abc123');
+   */
+  extractRoleInfo(user, employeeId) {
+    let roleId = null;
+    let roleName = null;
+
+    const rolePointer = user.get('roleId');
+    if (rolePointer && rolePointer.get) {
+      roleId = rolePointer.id;
+      roleName = rolePointer.get('name');
+    } else if (rolePointer && rolePointer.id) {
+      roleId = rolePointer.id;
+      roleName = rolePointer.name || null;
+    } else {
+      logger.warn('No roleId found for user', {
+        userId: employeeId,
+        rolePointer: rolePointer?.id,
+      });
+    }
+
+    return { roleId, roleName };
+  }
+
+  /**
+   * Format employee data for response.
+   * @param {object} user - User object.
+   * @param {object} roleInfo - Role information object.
+   * @returns {object} - Formatted employee data.
+   * @example
+   * const employeeData = this.formatEmployeeData(user, roleInfo);
+   */
+  formatEmployeeData(user, roleInfo) {
+    return {
+      id: user.id,
+      createdAt: user.get('createdAt'),
+      updatedAt: user.get('updatedAt'),
+      active: user.get('active'),
+      exists: user.get('exists'),
+      firstName: user.get('firstName'),
+      lastName: user.get('lastName'),
+      email: user.get('email'),
+      phone: user.get('phone') || null,
+      organizationId: user.get('organizationId'),
+      role: roleInfo.roleName,
+      roleId: roleInfo.roleId,
+      departmentId: user.get('departmentId')?.id || null,
+      contextualData: user.get('contextualData'),
+    };
+  }
+
+  /**
+   * Validate if user is a valid employee.
+   * @param {string} roleName - Role name to validate.
+   * @param {string} employeeId - Employee ID for logging.
+   * @returns {boolean} - True if valid employee, false otherwise.
+   * @example
+   * const isValid = this.isValidEmployee('employee_amexing', 'abc123');
+   */
+  isValidEmployee(roleName, employeeId) {
+    const isValid = this.allowedEmployeeRoles.includes(roleName);
+
+    if (!isValid) {
+      logger.warn('User is not a valid employee', {
+        userId: employeeId,
+        foundRole: roleName,
+        allowedRoles: this.allowedEmployeeRoles,
+      });
+    }
+
+    return isValid;
+  }
 
   /**
    * Parse and validate query parameters.

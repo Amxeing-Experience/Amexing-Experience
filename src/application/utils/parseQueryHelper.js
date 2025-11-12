@@ -7,7 +7,7 @@
  * @file Helper utilities for Parse queries with audit context.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2025-10-16
+ * @since 1.0.0
  * @example
  * const { queryWithContext } = require('./utils/parseQueryHelper');
  *

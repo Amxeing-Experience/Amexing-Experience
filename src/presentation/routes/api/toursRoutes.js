@@ -3,7 +3,7 @@
  * RESTful routes for tours management.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-10-28
+ * @since 1.0.0
  */
 
 const express = require('express');
@@ -12,9 +12,9 @@ const router = express.Router();
 const ToursController = require('../../../application/controllers/api/ToursController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 
-// All tours routes require admin/superadmin roles
-// Note: jwtMiddleware.authenticateToken is already applied globally in apiRoutes.js
-router.use(jwtMiddleware.requireRoleLevel(6)); // Admin or SuperAdmin only
+// =================
+// READ ROUTES (require department manager authentication)
+// =================
 
 /**
  * @swagger
@@ -26,7 +26,7 @@ router.use(jwtMiddleware.requireRoleLevel(6)); // Admin or SuperAdmin only
  *     description: |
  *       Get paginated list of tours with DataTables server-side processing support.
  *
- *       **Access:** Admin and SuperAdmin only
+ *       **Access:** Department Manager and above
  *       **Rate Limited:** 100 requests per 15 minutes
  *     security:
  *       - bearerAuth: []
@@ -79,6 +79,16 @@ router.use(jwtMiddleware.requireRoleLevel(6)); // Admin or SuperAdmin only
  *         $ref: '#/components/responses/UnauthorizedError'
  *       403:
  *         $ref: '#/components/responses/ForbiddenError'
+ */
+router.get('/', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getTours(req, res));
+
+// =================
+// WRITE ROUTES (require admin/superadmin)
+// =================
+
+/**
+ * @swagger
+ * /api/tours:
  *   post:
  *     tags:
  *       - Tours
@@ -130,8 +140,7 @@ router.use(jwtMiddleware.requireRoleLevel(6)); // Admin or SuperAdmin only
  *       403:
  *         $ref: '#/components/responses/ForbiddenError'
  */
-router.get('/', (req, res) => ToursController.getTours(req, res));
-router.post('/', (req, res) => ToursController.createTour(req, res));
+router.post('/', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.createTour(req, res));
 
 /**
  * @swagger
@@ -143,7 +152,7 @@ router.post('/', (req, res) => ToursController.createTour(req, res));
  *     description: |
  *       Retrieve detailed information for a specific tour including related objects.
  *
- *       **Access:** Admin and SuperAdmin only
+ *       **Access:** Department Manager and above
  *     security:
  *       - bearerAuth: []
  *       - cookieAuth: []
@@ -175,6 +184,12 @@ router.post('/', (req, res) => ToursController.createTour(req, res));
  *         $ref: '#/components/responses/ForbiddenError'
  *       404:
  *         description: Tour not found
+ */
+router.get('/:id', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getTourById(req, res));
+
+/**
+ * @swagger
+ * /api/tours/{id}:
  *   put:
  *     tags:
  *       - Tours
@@ -262,9 +277,8 @@ router.post('/', (req, res) => ToursController.createTour(req, res));
  *       404:
  *         description: Tour not found
  */
-router.get('/:id', (req, res) => ToursController.getTourById(req, res));
-router.put('/:id', (req, res) => ToursController.updateTour(req, res));
-router.delete('/:id', (req, res) => ToursController.deleteTour(req, res));
+router.put('/:id', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.updateTour(req, res));
+router.delete('/:id', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.deleteTour(req, res));
 
 /**
  * @swagger
@@ -311,6 +325,6 @@ router.delete('/:id', (req, res) => ToursController.deleteTour(req, res));
  *       404:
  *         description: Tour not found
  */
-router.patch('/:id/toggle-status', (req, res) => ToursController.toggleTourStatus(req, res));
+router.patch('/:id/toggle-status', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.toggleTourStatus(req, res));
 
 module.exports = router;

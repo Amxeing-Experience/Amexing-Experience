@@ -6,6 +6,7 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?logo=node.js&style=flat-square)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
+
 <!-- Compliance & Quality Badges -->
 [![PCI DSS](https://img.shields.io/badge/PCI%20DSS-4.0%20Compliant-gold?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K)](https://www.pcisecuritystandards.org/)
 [![Code Quality](https://img.shields.io/badge/code%20quality-ESLint%20%2B%20Prettier-blue?style=flat-square&logo=eslint)](https://github.com/black4ninja/amexing-web/actions)
@@ -59,7 +60,7 @@ open http://localhost:1337
 - [🌍 Environment Variables](docs/readme/ENVIRONMENT.md) - Configuration options
 - [🔒 Security Guide](SECURITY.md) - Security best practices and PCI DSS compliance
 
-### 🔄 Development Workflows  
+### 🔄 Development Workflows
 - [🧪 Testing Guide](docs/readme/TESTING.md) - Testing strategies and best practices
 - [✨ Code Quality](docs/project/CODE_QUALITY.md) - Quality standards and tools
 - [🎯 Release Process](docs/readme/RELEASE.md) - Release management workflow
@@ -153,7 +154,7 @@ Once running, access these endpoints:
 # Fresh project setup
 git clone <repo> && cd amexing-web && yarn install && yarn dev
 
-# Pre-deployment checklist  
+# Pre-deployment checklist
 yarn quality:all && yarn security:all && yarn test:full-validation
 
 # Troubleshooting
@@ -173,7 +174,7 @@ yarn scripts:help --search <term>  # Find specific scripts
 amexing-web/
 ├── docs/                    # 📚 Organized documentation
 │   ├── guides/             # Getting started guides
-│   ├── reference/          # Technical reference docs  
+│   ├── reference/          # Technical reference docs
 │   └── workflows/          # Development processes
 ├── src/                    # 🔧 Application source code
 │   ├── application/        # Controllers, middleware, validators

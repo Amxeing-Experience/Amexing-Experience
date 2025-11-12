@@ -6,6 +6,7 @@
 const Parse = require('parse/node');
 const Quote = require('../../../domain/models/Quote');
 const QuoteService = require('../../services/QuoteService');
+const pricingHelper = require('../../utils/pricingHelper');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -21,10 +22,10 @@ class QuoteController {
   /**
    * Create a new quote
    * POST /api/quotes
-   * Following ServiceController pattern for rate pointer assignment.
+   * Note: Rate is no longer required at quote level (v2.0.0+).
+   * Rates are now managed at subconcept/service level.
    * @param {object} req - Express request object.
    * @param {object} req.body - Request body.
-   * @param {string} req.body.rate - Rate ID (Rate objectId) - REQUIRED.
    * @param {string} [req.body.client] - Client ID (AmexingUser objectId) - OPTIONAL.
    * @param {string} [req.body.contactPerson] - Contact person name.
    * @param {string} [req.body.contactEmail] - Contact email.
@@ -37,7 +38,6 @@ class QuoteController {
   async createQuote(req, res) {
     // Declare variables at method scope for error logging
     let clientObj = null;
-    let rateObj = null;
     let createdByObj = null;
 
     try {
@@ -48,12 +48,9 @@ class QuoteController {
       }
 
       // 2. Extract fields from request body
-      // Accept both 'rate' and 'rateId' for compatibility (frontend sends rateId)
       const {
         client,
         clientId,
-        rate: rateFromBody,
-        rateId,
         contactPerson,
         contactEmail,
         contactPhone,
@@ -63,13 +60,7 @@ class QuoteController {
       } = req.body;
 
       // Normalize field names (accept both formats)
-      const rate = rateFromBody || rateId;
       const clientIdNormalized = client || clientId;
-
-      // Validate required fields
-      if (!rate) {
-        return this.sendError(res, 'La tarifa es requerida', 400);
-      }
 
       // 3. Create client pointer to AmexingUser (if provided)
       if (clientIdNormalized) {
@@ -80,14 +71,7 @@ class QuoteController {
         };
       }
 
-      // 4. Create rate pointer (required)
-      rateObj = {
-        __type: 'Pointer',
-        className: 'Rate',
-        objectId: rate,
-      };
-
-      // 4.5. Create createdBy pointer to current user (required)
+      // 4. Create createdBy pointer to current user (required)
       createdByObj = {
         __type: 'Pointer',
         className: 'AmexingUser',
@@ -104,7 +88,7 @@ class QuoteController {
       if (clientObj) {
         quote.set('client', clientObj); // Full Pointer object (optional)
       }
-      quote.set('rate', rateObj); // Full Pointer object (required)
+      // Note: Rate is no longer set at quote level (v2.0.0+)
       quote.set('createdBy', createdByObj); // Full Pointer object (required)
 
       // 8. Set basic fields
@@ -117,7 +101,7 @@ class QuoteController {
       quote.set('numberOfPeople', numberOfPeople ? parseInt(numberOfPeople, 10) : 1);
 
       // 9. Set automatic fields
-      quote.set('status', 'draft');
+      quote.set('status', 'requested');
       // validUntil: 30 days from now
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
@@ -129,12 +113,11 @@ class QuoteController {
       logger.info('Attempting to save quote with data:', {
         folio,
         clientPointer: clientObj,
-        ratePointer: rateObj,
         contactPerson: contactPerson || '',
         contactEmail: contactEmail || '',
         contactPhone: contactPhone || '',
         notes: notes || '',
-        status: 'draft',
+        status: 'requested',
         userId: currentUser.id,
       });
 
@@ -156,7 +139,6 @@ class QuoteController {
         quoteId: quote.id,
         folio,
         clientId: clientObj ? clientObj.objectId : null,
-        rateId: rateObj.objectId,
         createdBy: currentUser.id,
         createdByEmail: currentUser.get('email'),
       });
@@ -166,12 +148,11 @@ class QuoteController {
         id: quote.id,
         folio,
         clientId: clientObj ? clientObj.objectId : null,
-        rateId: rateObj.objectId,
         contactPerson: contactPerson || '',
         contactEmail: contactEmail || '',
         contactPhone: contactPhone || '',
         notes: notes || '',
-        status: 'draft',
+        status: 'requested',
         validUntil: validUntil.toISOString(),
         active: true,
       };
@@ -188,7 +169,6 @@ class QuoteController {
         userId: req.user?.id,
         requestBody: req.body,
         clientPointerAttempted: clientObj,
-        ratePointerAttempted: rateObj,
       });
 
       // Return more detailed error message
@@ -199,6 +179,7 @@ class QuoteController {
 
   /**
    * GET /api/quotes - Get quotes with DataTables server-side processing.
+   * Now supports role-based filtering for department managers.
    *
    * Query Parameters (DataTables format):
    * - draw: Draw counter for DataTables
@@ -233,19 +214,23 @@ class QuoteController {
       const columns = ['client', 'rate', 'eventType', 'numberOfPeople', 'createdBy', 'status', 'createdAt'];
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
-      // Get total records count (without search filter)
-      const totalRecordsQuery = new Parse.Query('Quote');
-      totalRecordsQuery.equalTo('exists', true);
-      const recordsTotal = await totalRecordsQuery.count({
-        useMasterKey: true,
-      });
-
-      // Build base query for all existing records
+      // Build base query for all existing records with role-based filtering
       const baseQuery = new Parse.Query('Quote');
       baseQuery.equalTo('exists', true);
       baseQuery.include('client');
       baseQuery.include('rate');
       baseQuery.include('createdBy');
+
+      // Apply role-based filters
+      await this.applyRoleBasedQuoteFilters(baseQuery, currentUser, req.userRole);
+
+      // Get total records count (without search filter but with role filters)
+      const totalRecordsQuery = new Parse.Query('Quote');
+      totalRecordsQuery.equalTo('exists', true);
+      await this.applyRoleBasedQuoteFilters(totalRecordsQuery, currentUser, req.userRole);
+      const recordsTotal = await totalRecordsQuery.count({
+        useMasterKey: true,
+      });
 
       // Build filtered query with search
       let filteredQuery = baseQuery;
@@ -254,10 +239,12 @@ class QuoteController {
         const folioQuery = new Parse.Query('Quote');
         folioQuery.equalTo('exists', true);
         folioQuery.matches('folio', searchValue, 'i');
+        await this.applyRoleBasedQuoteFilters(folioQuery, currentUser, req.userRole);
 
         const contactQuery = new Parse.Query('Quote');
         contactQuery.equalTo('exists', true);
         contactQuery.matches('contactPerson', searchValue, 'i');
+        await this.applyRoleBasedQuoteFilters(contactQuery, currentUser, req.userRole);
 
         filteredQuery = Parse.Query.or(folioQuery, contactQuery);
         filteredQuery.include('client');
@@ -282,11 +269,19 @@ class QuoteController {
       // Execute query
       const quotes = await filteredQuery.find({ useMasterKey: true });
 
-      // Format data for DataTables
-      const data = quotes.map((quote) => {
+      // Format data for DataTables and check for pending invoice requests
+      const data = await Promise.all(quotes.map(async (quote) => {
         const client = quote.get('client');
         const rate = quote.get('rate');
         const createdBy = quote.get('createdBy');
+
+        // Check if quote has pending invoice request
+        let hasPendingInvoiceRequest = false;
+        try {
+          hasPendingInvoiceRequest = await this.quoteService.hasPendingInvoiceRequest(quote.id);
+        } catch (error) {
+          logger.warn('Error checking pending invoice request', { quoteId: quote.id, error: error.message });
+        }
 
         return {
           id: quote.id,
@@ -319,20 +314,22 @@ class QuoteController {
               fullName: `${createdBy.get('firstName') || ''} ${createdBy.get('lastName') || ''}`.trim(),
             }
             : null,
-          status: quote.get('status') || 'draft',
+          status: quote.get('status') || 'requested',
           contactPerson: quote.get('contactPerson') || '',
           contactEmail: quote.get('contactEmail') || '',
           contactPhone: quote.get('contactPhone') || '',
           notes: quote.get('notes') || '',
           validUntil: quote.get('validUntil'),
           active: quote.get('active'),
+          hasPendingInvoiceRequest, // Add invoice status
           createdAt: quote.createdAt,
           updatedAt: quote.updatedAt,
         };
-      });
+      }));
 
       // DataTables response format
       const response = {
+        success: true,
         draw,
         recordsTotal,
         recordsFiltered,
@@ -387,6 +384,12 @@ class QuoteController {
         return this.sendError(res, 'Cotización no encontrada', 404);
       }
 
+      // Check access permissions after getting the quote
+      const hasAccess = await this.checkQuoteAccess(currentUser, quote, req.userRole);
+      if (!hasAccess) {
+        return this.sendError(res, 'No tienes permisos para acceder a esta cotización', 403);
+      }
+
       const client = quote.get('client');
       const rate = quote.get('rate');
       const createdBy = quote.get('createdBy');
@@ -418,7 +421,7 @@ class QuoteController {
         contactEmail: quote.get('contactEmail') || '',
         contactPhone: quote.get('contactPhone') || '',
         notes: quote.get('notes') || '',
-        status: quote.get('status') || 'draft',
+        status: quote.get('status') || 'requested',
         validUntil: quote.get('validUntil'),
         serviceItems: quote.get('serviceItems') || {
           days: [],
@@ -640,7 +643,7 @@ class QuoteController {
       }
 
       // 9. Set new values for status and validUntil
-      newQuote.set('status', 'draft');
+      newQuote.set('status', 'requested');
       const validUntil = new Date();
       validUntil.setDate(validUntil.getDate() + 30);
       newQuote.set('validUntil', validUntil);
@@ -1147,7 +1150,8 @@ class QuoteController {
       // Group services by route (origin → destination)
       const routeMap = new Map();
 
-      services.forEach((service) => {
+      // Use for...of to support async price calculations
+      for (const service of services) {
         const originPOI = service.get('originPOI');
         const destinationPOI = service.get('destinationPOI');
         const vehicleType = service.get('vehicleType');
@@ -1180,17 +1184,24 @@ class QuoteController {
           route.hasRoundTrip = true;
         }
 
-        // Add vehicle type to this route
+        // Get price breakdown with surcharge
+        const basePrice = service.get('price') || 0;
+        const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+        // Add vehicle type to this route with price breakdown
         route.vehicles.push({
           serviceId: service.id,
           vehicleType: vehicleType ? vehicleType.get('name') : '',
           vehicleTypeId: vehicleType ? vehicleType.id : null,
           capacity: vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4,
-          price: service.get('price') || 0,
+          basePrice: priceBreakdown.basePrice, // Cash price (precio efectivo)
+          price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
+          surcharge: priceBreakdown.surcharge, // Surcharge amount
+          surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
           note: service.get('note') || '',
           isRoundTrip,
         });
-      });
+      }
 
       // Convert map to array and add labels with appropriate arrows
       const groupedRoutes = Array.from(routeMap.values()).map((route) => {
@@ -1227,6 +1238,521 @@ class QuoteController {
       });
 
       return this.sendError(res, 'Error al obtener los servicios disponibles', 500);
+    }
+  }
+
+  /**
+   * Get available services filtered by specific rate (not quote-level).
+   * GET /api/quotes/services-by-rate/:rateId?numberOfPeople=X.
+   *
+   * Used when adding traslado subconcept - user selects rate first, then service.
+   * Returns services grouped by route with vehicle types and pricing.
+   * Filters vehicles by capacity if numberOfPeople query parameter is provided.
+   * Includes trunk capacity for each vehicle type.
+   * @param {object} req - Express request object.
+   * @param {string} req.params.rateId - Rate ID to filter services.
+   * @param {number} [req.query.numberOfPeople] - Optional number of people for capacity filtering.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/quotes/services-by-rate/ABC123?numberOfPeople=10
+   * Response: { success: true, data: [{ routeKey, originName, destinationName, vehicles: [{ capacity: 14, trunkCapacity: 10, ... }] }] }
+   */
+  async getAvailableServicesByRate(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // 2. Get rate ID from params and optional quoteNumberOfPeople from query
+      const { rateId } = req.params;
+      const quoteNumberOfPeople = parseInt(req.query.numberOfPeople) || 0;
+
+      if (!rateId) {
+        return this.sendError(res, 'El ID de la tarifa es requerido', 400);
+      }
+
+      // 3. Fetch rate
+      const rateQuery = new Parse.Query('Rate');
+      const rate = await rateQuery.get(rateId, { useMasterKey: true });
+
+      if (!rate) {
+        return this.sendError(res, 'Tarifa no encontrada', 404);
+      }
+
+      // 4. Get services filtered by this rate
+      const servicesQuery = new Parse.Query('Service');
+      servicesQuery.equalTo('rate', rate);
+      servicesQuery.equalTo('active', true);
+      servicesQuery.equalTo('exists', true);
+      servicesQuery.include('originPOI');
+      servicesQuery.include('destinationPOI');
+      servicesQuery.include('destinationPOI.serviceType');
+      servicesQuery.include('vehicleType');
+      servicesQuery.limit(1000); // Support large datasets
+
+      const services = await servicesQuery.find({ useMasterKey: true });
+
+      // 5. Group services by route (origin → destination)
+      const routeMap = new Map();
+
+      // Use for...of to support async price calculations
+      for (const service of services) {
+        const originPOI = service.get('originPOI');
+        const destinationPOI = service.get('destinationPOI');
+        const vehicleType = service.get('vehicleType');
+        const serviceType = destinationPOI?.get('serviceType');
+
+        const originId = originPOI ? originPOI.id : 'local';
+        const destinationId = destinationPOI ? destinationPOI.id : '';
+        const routeKey = `${originId}_${destinationId}`;
+
+        const originName = originPOI ? originPOI.get('name') : 'Local';
+        const destinationName = destinationPOI ? destinationPOI.get('name') : '';
+        const isRoundTrip = service.get('isRoundTrip') || false;
+
+        if (!routeMap.has(routeKey)) {
+          routeMap.set(routeKey, {
+            routeKey,
+            originName,
+            destinationName,
+            originId,
+            destinationId,
+            serviceType: serviceType ? serviceType.get('name') : '',
+            vehicles: [],
+            hasRoundTrip: false, // Will be set to true if any vehicle is round trip
+          });
+        }
+
+        // Update hasRoundTrip flag if this service is round trip
+        const route = routeMap.get(routeKey);
+        if (isRoundTrip) {
+          route.hasRoundTrip = true;
+        }
+
+        // Get vehicle capacity
+        const vehicleCapacity = vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4;
+        const trunkCapacity = vehicleType ? vehicleType.get('trunkCapacity') || 0 : 0;
+
+        // Filter by capacity if quoteNumberOfPeople is provided
+        // Only add vehicle if it meets capacity requirements
+        if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
+          // Get price breakdown with surcharge
+          const basePrice = service.get('price') || 0;
+          const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+          // Add vehicle type to this route with price breakdown and capacity info
+          route.vehicles.push({
+            serviceId: service.id,
+            vehicleType: vehicleType ? vehicleType.get('name') : '',
+            vehicleTypeId: vehicleType ? vehicleType.id : null,
+            capacity: vehicleCapacity,
+            trunkCapacity,
+            basePrice: priceBreakdown.basePrice, // Cash price (precio efectivo)
+            price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
+            surcharge: priceBreakdown.surcharge, // Surcharge amount
+            surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
+            note: service.get('note') || '',
+            isRoundTrip,
+          });
+        }
+      }
+
+      // 6. Convert map to array and add labels with appropriate arrows
+      const groupedRoutes = Array.from(routeMap.values()).map((route) => {
+        const arrow = route.hasRoundTrip ? '<->' : '->';
+        const label = route.originName === 'Local'
+          ? route.destinationName
+          : `${route.originName} ${arrow} ${route.destinationName}`;
+
+        return {
+          ...route,
+          label,
+        };
+      });
+
+      logger.info('Available services fetched and grouped by rate', {
+        rateId,
+        rateName: rate.get('name'),
+        servicesCount: services.length,
+        routesCount: groupedRoutes.length,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: groupedRoutes,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getAvailableServicesByRate', {
+        error: error.message,
+        stack: error.stack,
+        rateId: req.params.rateId,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener los servicios disponibles', 500);
+    }
+  }
+
+  /**
+   * Get available tours filtered by specific rate (not quote-level).
+   * GET /api/quotes/tours-by-rate/:rateId.
+   *
+   * Used when adding tour subconcept - user selects rate first, then tour.
+   * Returns tours grouped by destination with vehicle types and pricing.
+   * @param {object} req - Express request object.
+   * @param {string} req.params.rateId - Rate ID to filter tours.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/quotes/tours-by-rate/ABC123
+   * Response: { success: true, data: [{ destinationKey, destinationName, vehicles: [...] }] }
+   */
+  async getAvailableToursByRate(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // 2. Get rate ID from params
+      const { rateId } = req.params;
+      if (!rateId) {
+        return this.sendError(res, 'El ID de la tarifa es requerido', 400);
+      }
+
+      // 3. Fetch rate
+      const rateQuery = new Parse.Query('Rate');
+      const rate = await rateQuery.get(rateId, { useMasterKey: true });
+
+      if (!rate) {
+        return this.sendError(res, 'Tarifa no encontrada', 404);
+      }
+
+      // 4. Get tours filtered by this rate
+      const toursQuery = new Parse.Query('Tours');
+      toursQuery.equalTo('rate', rate);
+      toursQuery.equalTo('active', true);
+      toursQuery.equalTo('exists', true);
+      toursQuery.include('destinationPOI');
+      toursQuery.include('vehicleType');
+      toursQuery.limit(1000); // Support large datasets
+
+      const tours = await toursQuery.find({ useMasterKey: true });
+
+      // 5. Group tours by destination POI
+      const destinationMap = new Map();
+
+      // Use for...of to support async price calculations
+      for (const tour of tours) {
+        const destinationPOI = tour.get('destinationPOI');
+        const vehicleType = tour.get('vehicleType');
+
+        const destinationId = destinationPOI ? destinationPOI.id : 'unknown';
+        const destinationName = destinationPOI ? destinationPOI.get('name') : 'Sin destino';
+
+        if (!destinationMap.has(destinationId)) {
+          destinationMap.set(destinationId, {
+            destinationKey: destinationId,
+            destinationName,
+            vehicles: [],
+          });
+        }
+
+        // Get price breakdown with surcharge
+        const basePrice = tour.get('price') || 0;
+        const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+        // Get duration in minutes and convert to hours
+        const durationMinutes = tour.get('time') || 0;
+        const durationHours = Math.round((durationMinutes / 60) * 10) / 10; // Round to 1 decimal
+
+        // Add vehicle type to this destination with price breakdown
+        const destination = destinationMap.get(destinationId);
+        destination.vehicles.push({
+          tourId: tour.id,
+          vehicleType: vehicleType ? vehicleType.get('name') : '',
+          vehicleTypeId: vehicleType ? vehicleType.id : null,
+          capacity: vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4,
+          basePrice: priceBreakdown.basePrice, // Cash price (precio efectivo)
+          price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
+          surcharge: priceBreakdown.surcharge, // Surcharge amount
+          surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
+          durationMinutes, // Original duration in minutes
+          durationHours, // Converted to hours for display
+          minPassengers: tour.get('minPassengers') || null,
+          maxPassengers: tour.get('maxPassengers') || null,
+          note: tour.get('notes') || '',
+        });
+      }
+
+      // 6. Convert map to array and add labels
+      const groupedDestinations = Array.from(destinationMap.values()).map((destination) => ({
+        ...destination,
+        label: destination.destinationName, // For dropdown display
+      }));
+
+      logger.info('Available tours fetched and grouped by destination', {
+        rateId,
+        rateName: rate.get('name'),
+        toursCount: tours.length,
+        destinationsCount: groupedDestinations.length,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: groupedDestinations,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getAvailableToursByRate', {
+        error: error.message,
+        stack: error.stack,
+        rateId: req.params.rateId,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener los tours disponibles', 500);
+    }
+  }
+
+  /**
+   * Get unique tour destinations for a specific rate (Step 2 of 3-step tour selection).
+   * GET /api/quotes/tours/destinations-by-rate/:rateId.
+   *
+   * Returns list of unique destinations that have tours available for the specified rate.
+   * This is the second step in the tour selection flow: Rate → Destination → Vehicle.
+   * @param {object} req - Express request object with rateId in params.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * Response: {
+   *   success: true,
+   *   data: [
+   *     { destinationId: 'abc123', destinationName: 'San Miguel de Allende' },
+   *     { destinationId: 'def456', destinationName: 'Dolores Hidalgo' }
+   *   ]
+   * }
+   */
+  async getTourDestinationsByRate(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // 2. Get rate ID from params
+      const { rateId } = req.params;
+      if (!rateId) {
+        return this.sendError(res, 'El ID de la tarifa es requerido', 400);
+      }
+
+      // 3. Fetch rate
+      const rateQuery = new Parse.Query('Rate');
+      const rate = await rateQuery.get(rateId, { useMasterKey: true });
+
+      if (!rate) {
+        return this.sendError(res, 'Tarifa no encontrada', 404);
+      }
+
+      // 4. Get all tours for this rate
+      const toursQuery = new Parse.Query('Tours');
+      toursQuery.equalTo('rate', rate);
+      toursQuery.equalTo('active', true);
+      toursQuery.equalTo('exists', true);
+      toursQuery.include('destinationPOI');
+      toursQuery.limit(1000);
+
+      const tours = await toursQuery.find({ useMasterKey: true });
+
+      // 5. Extract unique destinations
+      const destinationMap = new Map();
+
+      tours.forEach((tour) => {
+        const destinationPOI = tour.get('destinationPOI');
+        if (destinationPOI) {
+          const destinationId = destinationPOI.id;
+          const destinationName = destinationPOI.get('name');
+
+          if (!destinationMap.has(destinationId)) {
+            destinationMap.set(destinationId, {
+              destinationId,
+              destinationName,
+            });
+          }
+        }
+      });
+
+      // 6. Convert map to array
+      const uniqueDestinations = Array.from(destinationMap.values());
+
+      logger.info('Tour destinations fetched for rate', {
+        rateId,
+        rateName: rate.get('name'),
+        destinationsCount: uniqueDestinations.length,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: uniqueDestinations,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getTourDestinationsByRate', {
+        error: error.message,
+        stack: error.stack,
+        rateId: req.params.rateId,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener destinos de tours', 500);
+    }
+  }
+
+  /**
+   * Get available vehicles for a specific rate and destination (Step 3 of 3-step tour selection).
+   * GET /api/quotes/tours/vehicles-by-rate-destination/:rateId/:destinationId?numberOfPeople=X.
+   *
+   * Returns list of vehicle types available for the specified rate + destination combination.
+   * Each vehicle includes tour details (tourId, price, duration, capacity, trunk capacity).
+   * Filters vehicles by capacity if numberOfPeople query parameter is provided.
+   * This is the third step in the tour selection flow: Rate → Destination → Vehicle.
+   * @param {object} req - Express request object with rateId and destinationId in params.
+   * @param {number} [req.query.numberOfPeople] - Optional number of people for capacity filtering.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/quotes/tours/vehicles-by-rate-destination/ABC123/POI456?numberOfPeople=10
+   * Response: {
+   *   success: true,
+   *   data: [
+   *     {
+   *       tourId: 'tour123',
+   *       vehicleType: 'Sprinter',
+   *       vehicleTypeId: 'veh456',
+   *       capacity: 14,
+   *       trunkCapacity: 10,
+   *       basePrice: 925.72,
+   *       price: 1065.58,
+   *       surcharge: 139.86,
+   *       surchargePercentage: 15.1,
+   *       durationMinutes: 120,
+   *       durationHours: 2.0
+   *     }
+   *   ]
+   * }
+   */
+  async getTourVehiclesByRateAndDestination(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // 2. Get rate ID, destination ID from params, and optional numberOfPeople from query
+      const { rateId, destinationId } = req.params;
+      const quoteNumberOfPeople = parseInt(req.query.numberOfPeople) || 0;
+
+      if (!rateId || !destinationId) {
+        return this.sendError(res, 'El ID de la tarifa y destino son requeridos', 400);
+      }
+
+      // 3. Fetch rate
+      const rateQuery = new Parse.Query('Rate');
+      const rate = await rateQuery.get(rateId, { useMasterKey: true });
+
+      if (!rate) {
+        return this.sendError(res, 'Tarifa no encontrada', 404);
+      }
+
+      // 4. Fetch destination POI
+      const poiQuery = new Parse.Query('POI');
+      const destinationPOI = await poiQuery.get(destinationId, { useMasterKey: true });
+
+      if (!destinationPOI) {
+        return this.sendError(res, 'Destino no encontrado', 404);
+      }
+
+      // 5. Get tours filtered by rate AND destination
+      const toursQuery = new Parse.Query('Tours');
+      toursQuery.equalTo('rate', rate);
+      toursQuery.equalTo('destinationPOI', destinationPOI);
+      toursQuery.equalTo('active', true);
+      toursQuery.equalTo('exists', true);
+      toursQuery.include('vehicleType');
+      toursQuery.limit(1000);
+
+      const tours = await toursQuery.find({ useMasterKey: true });
+
+      // 6. Build vehicle list with pricing
+      const vehicles = [];
+
+      for (const tour of tours) {
+        const vehicleType = tour.get('vehicleType');
+
+        // Get vehicle capacity
+        const vehicleCapacity = vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4;
+        const trunkCapacity = vehicleType ? vehicleType.get('trunkCapacity') || 0 : 0;
+
+        // Filter by capacity if quoteNumberOfPeople is provided
+        // Only add vehicle if it meets capacity requirements
+        if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
+          // Get price breakdown with surcharge
+          const basePrice = tour.get('price') || 0;
+          const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+          // Get duration in minutes and convert to hours
+          const durationMinutes = tour.get('time') || 0;
+          const durationHours = Math.round((durationMinutes / 60) * 10) / 10;
+
+          vehicles.push({
+            tourId: tour.id,
+            vehicleType: vehicleType ? vehicleType.get('name') : '',
+            vehicleTypeId: vehicleType ? vehicleType.id : null,
+            capacity: vehicleCapacity,
+            trunkCapacity,
+            basePrice: priceBreakdown.basePrice,
+            price: priceBreakdown.totalPrice,
+            surcharge: priceBreakdown.surcharge,
+            surchargePercentage: priceBreakdown.surchargePercentage,
+            durationMinutes,
+            durationHours,
+            minPassengers: tour.get('minPassengers') || null,
+            maxPassengers: tour.get('maxPassengers') || null,
+            note: tour.get('notes') || '',
+          });
+        }
+      }
+
+      logger.info('Tour vehicles fetched for rate and destination', {
+        rateId,
+        rateName: rate.get('name'),
+        destinationId,
+        destinationName: destinationPOI.get('name'),
+        vehiclesCount: vehicles.length,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: vehicles,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getTourVehiclesByRateAndDestination', {
+        error: error.message,
+        stack: error.stack,
+        rateId: req.params.rateId,
+        destinationId: req.params.destinationId,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener vehículos de tours', 500);
     }
   }
 
@@ -1310,6 +1836,365 @@ class QuoteController {
       });
 
       return this.sendError(res, 'Error al generar enlace de compartir', 500);
+    }
+  }
+
+  /**
+   * Check if a user has access to view a specific quote.
+   * Used for single quote access validation in getQuoteById.
+   * @param {object} currentUser - Current authenticated user.
+   * @param {object} quote - Parse Quote object.
+   * @param {string} userRole - User role from middleware.
+   * @returns {Promise<boolean>} True if user has access, false otherwise.
+   * @example
+   * const hasAccess = await this.checkQuoteAccess(currentUser, quote, userRole);
+   */
+  async checkQuoteAccess(currentUser, quote, userRole) {
+    try {
+      // Super admins and admins can access all quotes
+      if (userRole === 'superadmin' || userRole === 'admin') {
+        return true;
+      }
+
+      // For all other roles, check if they created the quote
+      const createdBy = quote.get('createdBy');
+      if (createdBy && createdBy.id === currentUser.id) {
+        return true;
+      }
+
+      // Department managers can access quotes created by users in their department
+      if (userRole === 'department_manager') {
+        const userDepartmentId = currentUser.departmentId || currentUser.get('departmentId');
+        if (!userDepartmentId || !createdBy) {
+          return false;
+        }
+
+        // Check if the quote creator is in the same department
+        try {
+          const creatorQuery = new Parse.Query('AmexingUser');
+          const creator = await creatorQuery.get(createdBy.id, { useMasterKey: true });
+
+          if (creator) {
+            const creatorDepartmentId = creator.departmentId || creator.get('departmentId');
+            return creatorDepartmentId === userDepartmentId;
+          }
+        } catch (error) {
+          logger.warn('Could not fetch quote creator for department check', {
+            createdById: createdBy.id,
+            error: error.message,
+          });
+        }
+      }
+
+      return false;
+    } catch (error) {
+      logger.error('Error checking quote access', {
+        error: error.message,
+        userId: currentUser.id,
+        quoteId: quote.id,
+        role: userRole,
+      });
+      return false;
+    }
+  }
+
+  /**
+   * Apply role-based filters to quote queries.
+   * Ensures department managers only see quotes created by users in their department.
+   * @param {Parse.Query} query - Parse query to apply filters to.
+   * @param {object} currentUser - Current authenticated user.
+   * @param {string} userRole - User role from middleware.
+   * @returns {Promise<void>}
+   * @example
+   * // Apply filters to a quote query
+   * await this.applyRoleBasedQuoteFilters(query, currentUser, userRole);
+   */
+  async applyRoleBasedQuoteFilters(query, currentUser, userRole) {
+    try {
+      logger.debug('Applying role-based quote filters', {
+        userId: currentUser.id,
+        role: userRole,
+      });
+
+      // Super admins and admins can see all quotes
+      if (userRole === 'superadmin' || userRole === 'admin') {
+        logger.debug('Admin/superadmin user - showing all quotes', { userRole });
+        return; // No additional filters needed
+      }
+
+      // Department managers can only see quotes created by users in their department
+      if (userRole === 'department_manager') {
+        const userDepartmentId = currentUser.departmentId || currentUser.get('departmentId');
+
+        if (!userDepartmentId) {
+          logger.warn('Department manager missing departmentId, restricting to own quotes only', {
+            userId: currentUser.id,
+            role: userRole,
+          });
+          // If no department ID, only show quotes they created themselves
+          query.equalTo('createdBy', {
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: currentUser.id,
+          });
+          return;
+        }
+
+        // Find all users in the same department
+        const departmentUsersQuery = new Parse.Query('AmexingUser');
+        departmentUsersQuery.equalTo('departmentId', userDepartmentId);
+        departmentUsersQuery.equalTo('exists', true);
+        departmentUsersQuery.equalTo('active', true);
+
+        const departmentUsers = await departmentUsersQuery.find({ useMasterKey: true });
+
+        if (departmentUsers.length === 0) {
+          // No users in department, restrict to own quotes only
+          query.equalTo('createdBy', {
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: currentUser.id,
+          });
+          return;
+        }
+
+        // Create array of user pointers for the department
+        const departmentUserPointers = departmentUsers.map((user) => ({
+          __type: 'Pointer',
+          className: 'AmexingUser',
+          objectId: user.id,
+        }));
+
+        // Filter quotes to only those created by users in this department
+        query.containedIn('createdBy', departmentUserPointers);
+
+        logger.info('Applied department filter to quotes query', {
+          userId: currentUser.id,
+          departmentId: userDepartmentId,
+          departmentUsersCount: departmentUsers.length,
+        });
+
+        return;
+      }
+
+      // Clients can only see quotes created by users in their organization
+      if (userRole === 'client') {
+        const userClientId = currentUser.clientId || currentUser.get('clientId') || currentUser.id;
+
+        // Find all users in the same client organization
+        const clientUsersQuery = new Parse.Query('AmexingUser');
+        clientUsersQuery.equalTo('clientId', userClientId);
+        clientUsersQuery.equalTo('exists', true);
+        clientUsersQuery.equalTo('active', true);
+
+        const clientUsers = await clientUsersQuery.find({ useMasterKey: true });
+
+        if (clientUsers.length === 0) {
+          // No users in organization, restrict to own quotes only
+          query.equalTo('createdBy', {
+            __type: 'Pointer',
+            className: 'AmexingUser',
+            objectId: currentUser.id,
+          });
+          return;
+        }
+
+        const clientUserPointers = clientUsers.map((user) => ({
+          __type: 'Pointer',
+          className: 'AmexingUser',
+          objectId: user.id,
+        }));
+
+        query.containedIn('createdBy', clientUserPointers);
+
+        logger.info('Applied client filter to quotes query', {
+          userId: currentUser.id,
+          clientId: userClientId,
+          clientUsersCount: clientUsers.length,
+        });
+
+        return;
+      }
+
+      // Employees, drivers, guests can only see their own quotes
+      query.equalTo('createdBy', {
+        __type: 'Pointer',
+        className: 'AmexingUser',
+        objectId: currentUser.id,
+      });
+
+      logger.info('Applied user-only filter to quotes query', {
+        userId: currentUser.id,
+        role: userRole,
+      });
+    } catch (error) {
+      logger.error('Error applying role-based quote filters', {
+        error: error.message,
+        userId: currentUser.id,
+        role: userRole,
+      });
+
+      // On error, restrict to user's own quotes as fallback
+      query.equalTo('createdBy', {
+        __type: 'Pointer',
+        className: 'AmexingUser',
+        objectId: currentUser.id,
+      });
+    }
+  }
+
+  /**
+   * Generate receipt for reserved quote.
+   * POST /api/quotes/:id/generate-receipt.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async generateReceipt(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const quoteId = req.params.id;
+
+      // Get payment info parameters from request body (for admin role)
+      const { includePaymentInfo, paymentInfoId } = req.body;
+
+      const result = await this.quoteService.generateReceipt(
+        currentUser,
+        quoteId,
+        req.userRole, // Pass userRole from JWT middleware
+        includePaymentInfo, // Pass the flag from request
+        paymentInfoId // Pass the specific payment info ID
+      );
+
+      // If PDF buffer is returned, send it as a downloadable file
+      if (result.success && result.data.pdfBuffer) {
+        const { pdfBuffer, filename } = result.data;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        return res.send(pdfBuffer);
+      }
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Error in QuoteController.generateReceipt', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al generar el recibo',
+        500
+      );
+    }
+  }
+
+  /**
+   * Request invoice for reserved quote.
+   * POST /api/quotes/:id/request-invoice.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async requestInvoice(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const quoteId = req.params.id;
+
+      const result = await this.quoteService.requestInvoice(
+        currentUser,
+        quoteId,
+        req.userRole // Pass userRole from JWT middleware
+      );
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Error in QuoteController.requestInvoice', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      // Check for specific business rule errors that should return 400
+      const businessRuleErrors = [
+        'There is already a pending invoice request for this quote',
+        'Quote must be in scheduled status to request invoice',
+        'Quote not found',
+        'Unauthorized: Role',
+      ];
+
+      const isBusinessRuleError = businessRuleErrors.some((errorText) => error.message.includes(errorText));
+
+      const statusCode = isBusinessRuleError ? 400 : 500;
+      let errorMessage;
+      if (isBusinessRuleError) {
+        errorMessage = error.message;
+      } else if (process.env.NODE_ENV === 'development') {
+        errorMessage = `Error: ${error.message}`;
+      } else {
+        errorMessage = 'Error al solicitar la factura';
+      }
+
+      return this.sendError(res, errorMessage, statusCode);
+    }
+  }
+
+  /**
+   * Cancel reservation for reserved quote.
+   * POST /api/quotes/:id/cancel-reservation.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async cancelReservation(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const quoteId = req.params.id;
+      const { reason } = req.body;
+
+      const result = await this.quoteService.cancelReservation(
+        currentUser,
+        quoteId,
+        reason || '',
+        req.userRole // Pass userRole from JWT middleware
+      );
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Error in QuoteController.cancelReservation', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+        userId: req.user?.id,
+        reason: req.body?.reason,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al cancelar la reserva',
+        500
+      );
     }
   }
 

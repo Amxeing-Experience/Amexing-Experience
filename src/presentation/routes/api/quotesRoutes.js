@@ -42,7 +42,7 @@ const writeOperationsLimiter = rateLimit({
 
 /**
  * GET /api/quotes - Get quotes with DataTables server-side processing.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Query Parameters (DataTables format):
  * - draw: Draw counter
@@ -65,13 +65,13 @@ router.get(
   '/',
   readOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.getQuotes(req, res)
 );
 
 /**
  * POST /api/quotes - Create a new quote.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Request body:
  * - client: string (optional) - Client ID (AmexingUser objectId).
@@ -105,13 +105,13 @@ router.post(
   '/',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.createQuote(req, res)
 );
 
 /**
  * GET /api/quotes/:id - Get quote by ID.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Returns complete quote information including related entities.
  * @returns {object} Response with quote data.
@@ -130,13 +130,13 @@ router.get(
   '/:id',
   readOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.getQuoteById(req, res)
 );
 
 /**
  * PUT /api/quotes/:id - Update quote.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Request body can include:
  * - status: string (draft, sent, accepted, rejected).
@@ -158,13 +158,13 @@ router.put(
   '/:id',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.updateQuote(req, res)
 );
 
 /**
  * PUT /api/quotes/:id/service-items - Update service items (itinerary days).
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Request body:
  * - days: Array of day objects [{dayNumber, concept, vehicleType, hours, unitPrice, total, notes}].
@@ -191,13 +191,13 @@ router.put(
   '/:id/service-items',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.updateServiceItems(req, res)
 );
 
 /**
  * GET /api/quotes/:id/available-services - Get available services filtered by quote's rate.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Returns list of services (transfers) available for the quote based on its assigned rate.
  * Used by quote-services.ejs to populate transfer selector in subconcepts.
@@ -222,13 +222,125 @@ router.get(
   '/:id/available-services',
   readOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.getAvailableServicesForQuote(req, res)
 );
 
 /**
+ * GET /api/quotes/services-by-rate/:rateId - Get available services filtered by specific rate.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * Returns list of services (transfers) available for the specified rate.
+ * Used when adding traslado subconcept - user selects rate first, then service.
+ * @param {string} rateId - Rate ID to filter services.
+ * @returns {object} Response with grouped routes array.
+ * @example
+ * // Response structure:
+ * {
+ *   success: true,
+ *   data: [{
+ *     routeKey: "originId_destinationId",
+ *     label: "Aeropuerto Internacional -> Hotel Rosewood",
+ *     originName: "Aeropuerto Internacional",
+ *     destinationName: "Hotel Rosewood",
+ *     originId: "poi123",
+ *     destinationId: "poi456",
+ *     serviceType: "Aeropuerto",
+ *     hasRoundTrip: false,
+ *     vehicles: [{
+ *       serviceId: "service789",
+ *       vehicleType: "Sprinter",
+ *       vehicleTypeId: "vt456",
+ *       capacity: 12,
+ *       basePrice: 2000.00,
+ *       price: 2500.00,
+ *       surcharge: 500.00,
+ *       surchargePercentage: 25,
+ *       note: "Recepción en sala VIP",
+ *       isRoundTrip: false
+ *     }]
+ *   }]
+ * }
+ */
+router.get(
+  '/services-by-rate/:rateId',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.getAvailableServicesByRate(req, res)
+);
+
+/**
+ * GET /api/quotes/tours-by-rate/:rateId - Get available tours filtered by specific rate.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * Returns list of tours available for the specified rate.
+ * Used when adding tour subconcept - user selects rate first, then tour.
+ * @param {string} rateId - Rate ID to filter tours.
+ * @returns {object} Response with grouped destinations array.
+ * @example
+ * // Response structure:
+ * {
+ *   success: true,
+ *   data: [{
+ *     destinationKey: "poiId123",
+ *     destinationName: "San Miguel de Allende",
+ *     label: "San Miguel de Allende",
+ *     vehicles: [{
+ *       tourId: "tour456",
+ *       vehicleType: "Suburban",
+ *       vehicleTypeId: "vt789",
+ *       capacity: 6,
+ *       basePrice: 2000.00,
+ *       price: 2500.00,
+ *       surcharge: 500.00,
+ *       surchargePercentage: 25,
+ *       durationMinutes: 240,
+ *       durationHours: 4.0,
+ *       minPassengers: 1,
+ *       maxPassengers: 6,
+ *       note: "Tour incluye..."
+ *     }]
+ *   }]
+ * }
+ */
+router.get(
+  '/tours-by-rate/:rateId',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.getAvailableToursByRate(req, res)
+);
+
+/**
+ * GET /api/quotes/tours/destinations-by-rate/:rateId - Get unique tour destinations for a rate.
+ * Step 2 of 3-step tour selection: Rate → Destination → Vehicle.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ */
+router.get(
+  '/tours/destinations-by-rate/:rateId',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getTourDestinationsByRate(req, res)
+);
+
+/**
+ * GET /api/quotes/tours/vehicles-by-rate-destination/:rateId/:destinationId - Get vehicles for rate + destination.
+ * Step 3 of 3-step tour selection: Rate → Destination → Vehicle.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ */
+router.get(
+  '/tours/vehicles-by-rate-destination/:rateId/:destinationId',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4),
+  (req, res) => QuoteController.getTourVehiclesByRateAndDestination(req, res)
+);
+
+/**
  * POST /api/quotes/:id/duplicate - Duplicate an existing quote.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Creates a copy of an existing quote with:
  * - New auto-generated folio (QTE-YYYY-####)
@@ -259,13 +371,13 @@ router.post(
   '/:id/duplicate',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.duplicateQuote(req, res)
 );
 
 /**
  * POST /api/quotes/:id/share-link - Generate shareable public link.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Generates a public URL for sharing the quote with clients.
  * Uses the quote's folio as the access key (e.g., /quotes/QTE-2025-0004).
@@ -286,13 +398,103 @@ router.post(
   '/:id/share-link',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.generateShareLink(req, res)
 );
 
 /**
+ * POST /api/quotes/:id/generate-receipt - Generate receipt for scheduled quote.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * Generates a receipt for a quote in 'scheduled' status.
+ * Only available for quotes with status 'scheduled'.
+ * @returns {object} Response with receipt generation status.
+ * @example
+ * // Response structure:
+ * {
+ *   success: true,
+ *   message: 'Recibo generado exitosamente',
+ *   data: {
+ *     quoteId: 'abc123',
+ *     folio: 'QTE-2025-0001',
+ *     receiptId: 'REC-1234567890',
+ *     timestamp: '2025-01-01T12:00:00.000Z'
+ *   }
+ * }
+ */
+router.post(
+  '/:id/generate-receipt',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.generateReceipt(req, res)
+);
+
+/**
+ * POST /api/quotes/:id/request-invoice - Request invoice for scheduled quote.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * Requests an invoice for a quote in 'scheduled' status.
+ * Only available for quotes with status 'scheduled'.
+ * @returns {object} Response with invoice request status.
+ * @example
+ * // Response structure:
+ * {
+ *   success: true,
+ *   message: 'Solicitud de factura enviada exitosamente',
+ *   data: {
+ *     quoteId: 'abc123',
+ *     folio: 'QTE-2025-0001',
+ *     invoiceRequestId: 'INV-REQ-1234567890',
+ *     timestamp: '2025-01-01T12:00:00.000Z'
+ *   }
+ * }
+ */
+router.post(
+  '/:id/request-invoice',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.requestInvoice(req, res)
+);
+
+/**
+ * POST /api/quotes/:id/cancel-reservation - Cancel reservation for scheduled quote.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * Cancels the reservation for a quote in 'scheduled' status.
+ * Changes the quote status to 'rejected'.
+ * Request body:
+ * - reason: string (optional) - Reason for cancellation.
+ * @returns {object} Response with cancellation status.
+ * @example
+ * // Request body:
+ * {
+ *   reason: 'Cliente solicitó cancelación'
+ * }
+ * // Response structure:
+ * {
+ *   success: true,
+ *   message: 'Reserva cancelada exitosamente',
+ *   data: {
+ *     id: 'abc123',
+ *     folio: 'QTE-2025-0001',
+ *     status: 'rejected',
+ *     updatedAt: '2025-01-01T12:00:00.000Z'
+ *   }
+ * }
+ */
+router.post(
+  '/:id/cancel-reservation',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.cancelReservation(req, res)
+);
+
+/**
  * DELETE /api/quotes/:id - Soft delete quote.
- * Private access (Admin and SuperAdmin only).
+ * Private access (Department Manager, Admin and SuperAdmin).
  *
  * Soft deletes the quote (sets exists=false, active=false).
  * Cannot be undone through normal UI.
@@ -308,7 +510,7 @@ router.delete(
   '/:id',
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.deleteQuote(req, res)
 );
 

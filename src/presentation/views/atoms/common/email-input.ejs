@@ -1,0 +1,162 @@
+<%
+// Email Input Atom - RFC 5322 compliant email validation component
+// Parameters: name, id, label, required, value, placeholder, helpText, maxlength, autocomplete, containerClass
+
+// Default parameters
+const inputName = typeof name !== 'undefined' ? name : '';
+const inputId = typeof id !== 'undefined' ? id : inputName || 'email_' + Math.random().toString(36).substr(2, 9);
+const inputLabel = typeof label !== 'undefined' ? label : 'Email';
+const inputRequired = typeof required !== 'undefined' ? required : true;
+const inputValue = typeof value !== 'undefined' ? value : '';
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Ingresa tu email';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const inputMaxlength = typeof maxlength !== 'undefined' ? maxlength : 255;
+const inputAutocomplete = typeof autocomplete !== 'undefined' ? autocomplete : 'email';
+const inputContainerClass = typeof containerClass !== 'undefined' ? containerClass : '';
+
+// Simplified email pattern for HTML5 validation (compatible with pattern attribute)
+const emailPattern = '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}';
+%>
+
+<div class="email-input-wrapper mb-3 <%= inputContainerClass %>">
+    <!-- Label -->
+    <label for="<%= inputId %>" class="form-label">
+        <%= inputLabel %>
+        <% if (inputRequired) { %>
+            <span class="text-danger ms-1">*</span>
+        <% } %>
+    </label>
+
+    <!-- Email Input -->
+    <input
+        type="email"
+        class="form-control"
+        id="<%= inputId %>"
+        name="<%= inputName %>"
+        placeholder="<%= inputPlaceholder %>"
+        value="<%= inputValue %>"
+        <% if (inputRequired) { %>required<% } %>
+        maxlength="<%= inputMaxlength %>"
+        pattern="<%= emailPattern %>"
+        autocomplete="<%= inputAutocomplete %>"
+        data-email-input="<%= inputName %>"
+    >
+
+    <!-- Validation Feedback -->
+    <div class="invalid-feedback">
+        Por favor proporciona un email válido (ejemplo: usuario@dominio.com)
+    </div>
+
+    <div class="valid-feedback">
+        Email válido
+    </div>
+
+    <!-- Help Text -->
+    <% if (inputHelpText) { %>
+        <div class="form-text text-muted mt-1">
+            <%= inputHelpText %>
+        </div>
+    <% } %>
+</div>
+
+<style>
+    .email-input-wrapper .form-control {
+        transition: all 0.3s ease;
+    }
+
+    .email-input-wrapper .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+
+    .email-input-wrapper .form-control.is-invalid {
+        border-color: #dc3545;
+    }
+
+    .email-input-wrapper .form-control.is-valid {
+        border-color: #198754;
+    }
+</style>
+
+<script>
+(function() {
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initEmailValidation);
+    } else {
+        initEmailValidation();
+    }
+
+    function initEmailValidation() {
+        const emailInput = document.getElementById('<%= inputId %>');
+        if (!emailInput) return;
+
+        // RFC 5322 simplified regex for JavaScript validation
+        const EMAIL_PATTERN = /^[a-zA-Z0-9.!#$%&'*+\/=?^_`{\|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+        // Email normalization on blur
+        emailInput.addEventListener('blur', function() {
+            if (this.value) {
+                // Normalize: lowercase and trim whitespace
+                this.value = this.value.toLowerCase().trim();
+            }
+        });
+
+        // Real-time validation on input
+        emailInput.addEventListener('input', function() {
+            const value = this.value.trim();
+
+            if (!value && !<%= inputRequired %>) {
+                // Optional field, empty is valid
+                this.classList.remove('is-invalid', 'is-valid');
+                return;
+            }
+
+            if (!value && <%= inputRequired %>) {
+                // Required field, empty is invalid
+                this.classList.add('is-invalid');
+                this.classList.remove('is-valid');
+                return;
+            }
+
+            // Validate email format
+            if (EMAIL_PATTERN.test(value)) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            } else {
+                this.classList.add('is-invalid');
+                this.classList.remove('is-valid');
+            }
+        });
+
+        // Form submission validation
+        const form = emailInput.closest('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const value = emailInput.value.trim();
+
+                // Check if required field is empty
+                if (!value && <%= inputRequired %>) {
+                    e.preventDefault();
+                    emailInput.classList.add('is-invalid');
+                    emailInput.focus();
+                    return false;
+                }
+
+                // Check if value exists and is invalid
+                if (value && !EMAIL_PATTERN.test(value)) {
+                    e.preventDefault();
+                    emailInput.classList.add('is-invalid');
+                    emailInput.focus();
+                    return false;
+                }
+
+                // Valid - normalize before submission
+                if (value) {
+                    emailInput.value = value.toLowerCase();
+                }
+            });
+        }
+    }
+})();
+</script>

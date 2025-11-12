@@ -48,7 +48,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <tr>
                         <th>Nombre</th>
                         <th>Capacidad</th>
-                        <th>Estado</th>
+                        <th>Maletas</th>
+                        <% if (dtUserRole !== 'department_manager') { %>
+                            <th>Estado</th>
+                        <% } %>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
                         <% } %>
@@ -110,10 +113,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         </h6>
 
                         <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <label for="defaultCapacity" class="form-label">Capacidad Predeterminada</label>
+                            <div class="col-md-6 mb-3">
+                                <label for="defaultCapacity" class="form-label">Capacidad de Pasajeros</label>
                                 <input type="number" class="form-control" id="defaultCapacity" name="defaultCapacity" min="1" max="100" placeholder="Ej: 4" value="4">
                                 <div class="form-text">Número de pasajeros típico</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="trunkCapacity" class="form-label">Capacidad del Maletero</label>
+                                <input type="number" class="form-control" id="trunkCapacity" name="trunkCapacity" min="0" max="50" placeholder="Ej: 3" value="2">
+                                <div class="form-text">Número de maletas que caben</div>
                             </div>
                         </div>
 
@@ -171,6 +179,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+        const userRole = '<%= dtUserRole %>';
 
         // DataTable Configuration
         const dataTable = $(`#${tableId}`).DataTable({
@@ -207,13 +216,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 },
                 {
+                    data: 'trunkCapacity',
+                    defaultContent: '-',
+                    className: 'text-center',
+                    render: function(data) {
+                        return `<span class="badge bg-warning text-dark">${data}</span>`;
+                    }
+                },
+                ...(userRole !== 'department_manager' ? [{
                     data: 'active',
                     render: function(data) {
                         return data
                             ? '<span class="badge bg-success">Activo</span>'
                             : '<span class="badge bg-secondary">Inactivo</span>';
                     }
-                },
+                }] : []),
                 ...(showActions ? [{
                     data: null,
                     orderable: false,
@@ -336,6 +353,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             if (!isEdit) {
                 $('#icon').val('car');
                 $('#defaultCapacity').val('4');
+                $('#trunkCapacity').val('2');
                 $('#sortOrder').val('0');
             }
         }
@@ -359,6 +377,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#description').val(type.description || '');
                         $('#icon').val(type.icon || 'car');
                         $('#defaultCapacity').val(type.defaultCapacity || 4);
+                        $('#trunkCapacity').val(type.trunkCapacity || 2);
                         $('#sortOrder').val(type.sortOrder || 0);
                     } else {
                         showErrorAlert('Formato de respuesta inválido');
@@ -387,6 +406,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 description: $('#description').val(),
                 icon: $('#icon').val() || 'car',
                 defaultCapacity: parseInt($('#defaultCapacity').val()) || 4,
+                trunkCapacity: parseInt($('#trunkCapacity').val()) || 2,
                 sortOrder: parseInt($('#sortOrder').val()) || 0
             };
 

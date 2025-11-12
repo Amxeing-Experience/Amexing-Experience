@@ -21,29 +21,23 @@ updates:
     # Automatic security updates with priority
     allow:
       - dependency-type: "all"
-        update-type: "security"
       - dependency-type: "production"
-        update-type: "version-update:semver-patch"
-    
+
     # Labels for tracking
     labels:
       - "dependencies"
       - "security-update"
       - "auto-merge-candidate"
-    
+
     # Commit message configuration
     commit-message:
       prefix: "security"
       prefix-development: "security"
       include: "scope"
-    
+
     # Version strategy
     versioning-strategy: "increase"
-    
-    # Security vulnerability alerts
-    vulnerability-alerts:
-      enabled: true
-    
+
     # Target branch
     target-branch: "main"
 

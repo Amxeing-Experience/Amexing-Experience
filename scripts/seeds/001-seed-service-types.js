@@ -1,16 +1,17 @@
 /**
  * Seed 001 - Service Types
  *
- * Seeds the initial 3 service types for the Amexing system:
+ * Seeds the initial service types for the Amexing system:
  * - Aeropuerto (Airport transfers)
  * - Punto a Punto (Point to point transfers)
  * - Local (Local destinations)
+ * - Tours (Tourist tours and experiences)
  *
  * This seed is idempotent and can be run multiple times safely.
  * Existing records will be skipped.
  *
  * @author Amexing Development Team
- * @version 1.0.0
+ * @version 1.1.0
  * @since 2024-10-25
  */
 
@@ -19,7 +20,7 @@ const logger = require('../../src/infrastructure/logger');
 
 // Seed configuration
 const SEED_NAME = '001-seed-service-types';
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 
 /**
  * Default service types to seed
@@ -36,6 +37,10 @@ const DEFAULT_SERVICE_TYPES = [
   {
     name: 'Local',
     description: 'Traslados a destinos locales y puntos de interés',
+  },
+  {
+    name: 'Tours',
+    description: 'Recorridos turísticos, experiencias guiadas y paquetes especiales',
   },
 ];
 
@@ -166,6 +171,6 @@ async function run() {
 // Export seed module
 module.exports = {
   version: VERSION,
-  description: 'Seed initial service types (Aeropuerto, Punto a Punto, Local)',
+  description: 'Seed initial service types (Aeropuerto, Punto a Punto, Local, Tours)',
   run,
 };
