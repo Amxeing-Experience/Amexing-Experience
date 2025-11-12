@@ -71,6 +71,9 @@ class ToursController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'asc';
 
+      // Extract additional filters (if provided)
+      const rateId = req.query.rateId;
+
       // Column mapping for sorting (matches frontend columns order)
       const columns = ['destinationPOI', 'time', 'vehicleType', 'price', 'rate', 'active'];
       const sortField = columns[sortColumnIndex] || 'createdAt';
@@ -86,6 +89,18 @@ class ToursController {
       const baseQuery = new Parse.Query('Tours');
       baseQuery.equalTo('exists', true);
       baseQuery.include(['destinationPOI', 'vehicleType', 'rate']);
+
+      // Apply rate filter if provided
+      if (rateId) {
+        const rateFilterQuery = new Parse.Query('Rate');
+        try {
+          const ratePointer = await rateFilterQuery.get(rateId, { useMasterKey: true });
+          baseQuery.equalTo('rate', ratePointer);
+        } catch (error) {
+          logger.warn('Invalid rate ID provided for filtering', { rateId, error: error.message });
+          // Continue without filter if rate not found
+        }
+      }
 
       // Build filtered query with search
       let filteredQuery = baseQuery;
@@ -109,6 +124,17 @@ class ToursController {
 
         filteredQuery = Parse.Query.or(...searchQueries);
         filteredQuery.include(['destinationPOI', 'vehicleType', 'rate']);
+
+        // Apply rate filter to filtered query as well
+        if (rateId) {
+          const rateFilterQuery = new Parse.Query('Rate');
+          try {
+            const ratePointer = await rateFilterQuery.get(rateId, { useMasterKey: true });
+            filteredQuery.equalTo('rate', ratePointer);
+          } catch (error) {
+            // Already logged above, continue without filter
+          }
+        }
       }
 
       // Get count of filtered results
