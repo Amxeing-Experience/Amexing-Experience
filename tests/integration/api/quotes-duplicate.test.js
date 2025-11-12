@@ -164,8 +164,8 @@ describe('Quote Duplication API Integration Tests', () => {
       expect(duplicatedQuote.folio).toMatch(/^QTE-\d{4}-\d{4}$/);
       expect(duplicatedQuote.folio).not.toBe(response.body.data.originalFolio);
 
-      // Verify status is draft
-      expect(duplicatedQuote.status).toBe('draft');
+      // Verify status is requested
+      expect(duplicatedQuote.status).toBe('requested');
 
       // Verify other fields were copied
       expect(duplicatedQuote.numberOfPeople).toBe(10);
@@ -342,7 +342,7 @@ describe('Quote Duplication API Integration Tests', () => {
       await duplicate.destroy({ useMasterKey: true });
     });
 
-    it('should set status to "draft" regardless of original status', async () => {
+    it('should set status to "requested" regardless of original status', async () => {
       // Update test quote to have status "accepted"
       const query = new Parse.Query('Quote');
       const quote = await query.get(testQuoteId, { useMasterKey: true });
@@ -356,7 +356,7 @@ describe('Quote Duplication API Integration Tests', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(response.status).toBe(201);
-      expect(response.body.data.quote.status).toBe('draft');
+      expect(response.body.data.quote.status).toBe('requested');
 
       // Clean up
       const duplicateQuery = new Parse.Query('Quote');

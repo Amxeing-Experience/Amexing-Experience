@@ -12,7 +12,7 @@
  * - Comprehensive validation and audit logging.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-10-24
+ * @since 1.0.0
  * @example
  * GET /api/service-types - List all service types with pagination
  * POST /api/service-types - Create new service type
@@ -349,7 +349,7 @@ class ServiceTypeController {
 
       // Check if trying to modify a system-protected type
       const currentName = serviceType.get('name');
-      const PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local'];
+      const PROTECTED_TYPES = ['Aeropuerto', 'Punto a Punto', 'Local', 'Tours'];
 
       if (PROTECTED_TYPES.includes(currentName)) {
         logger.warn('Attempted to modify protected service type', {

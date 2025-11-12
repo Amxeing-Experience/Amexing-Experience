@@ -13,7 +13,7 @@
  * - Comprehensive error handling.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  * @example
  * // Usage
  * router.use('/experiences', experiencesRoutes);
@@ -69,7 +69,7 @@ router.use(experienceApiLimiter);
 router.get(
   '/',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => ExperienceController.getExperiences(req, res)
 );
 
@@ -84,7 +84,7 @@ router.get(
 router.get(
   '/:id/dependencies',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => ExperienceController.checkDependencies(req, res)
 );
 
@@ -97,7 +97,7 @@ router.get(
 router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => ExperienceController.getExperienceById(req, res)
 );
 

@@ -36,20 +36,33 @@
 
                 <div class="row">
                     <div class="col-md-12 mb-3">
-                        <%- include('../../../atoms/common/tom-select', {
-                            id: 'clientId',
-                            name: 'clientId',
-                            multiple: false,
-                            placeholder: 'Buscar cliente por nombre o empresa',
-                            label: 'Cliente',
-                            required: true,
-                            helpText: 'Selecciona un cliente existente o crea uno nuevo',
-                            options: [],
-                            selected: []
-                        }) %>
-                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
-                            <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
-                        </button>
+                        <% if (typeof userRole !== 'undefined' && userRole === 'department_manager') { %>
+                            <!-- Department Manager: Current user as client (read-only) -->
+                            <label class="form-label">Cliente <span class="text-danger">*</span></label>
+                            <div class="form-control bg-light d-flex align-items-center">
+                                <i class="ti ti-user me-2 text-muted"></i>
+                                <span id="currentUserName">Cargando...</span>
+                                <small class="text-muted ms-auto">(Usuario actual)</small>
+                            </div>
+                            <input type="hidden" id="clientId" name="clientId" value="">
+                            <div class="form-text">Tu cuenta será automáticamente asignada como cliente para esta cotización</div>
+                        <% } else { %>
+                            <!-- Admin/SuperAdmin: Client selection -->
+                            <%- include('../../../atoms/common/tom-select', {
+                                id: 'clientId',
+                                name: 'clientId',
+                                multiple: false,
+                                placeholder: 'Buscar cliente por nombre o empresa',
+                                label: 'Cliente',
+                                required: true,
+                                helpText: 'Selecciona un cliente existente o crea uno nuevo',
+                                options: [],
+                                selected: []
+                            }) %>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" id="createQuickClientBtn">
+                                <i class="ti ti-plus me-1"></i>Crear Cliente Rápido
+                            </button>
+                        <% } %>
                     </div>
                 </div>
             </div>
@@ -100,35 +113,28 @@
                         <div class="form-text">Nombre de la persona que recibirá la cotización</div>
                     </div>
 
-                    <div class="col-md-6 mb-3">
-                        <label for="contactEmail" class="form-label">Email de Contacto</label>
-                        <input type="email" class="form-control" id="contactEmail" name="contactEmail" placeholder="email@ejemplo.com">
-                        <div class="form-text">Email para enviar la cotización</div>
+                    <div class="col-md-6">
+                        <%- include('../../../atoms/common/email-input', {
+                            name: 'contactEmail',
+                            id: 'contactEmail',
+                            label: 'Email de Contacto',
+                            required: false,
+                            placeholder: 'email@ejemplo.com',
+                            helpText: 'Email para enviar la cotización',
+                            containerClass: 'mb-3'
+                        }) %>
                     </div>
 
-                    <div class="col-md-6 mb-3">
-                        <label for="contactPhone" class="form-label">Teléfono de Contacto</label>
-                        <input type="tel" class="form-control" id="contactPhone" name="contactPhone" placeholder="+52 123 456 7890">
-                        <div class="form-text">Teléfono de contacto directo</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sección: Información de Tarifa -->
-            <div class="mb-4">
-                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                    <i class="ti ti-percentage me-1"></i>
-                    Tarifa Aplicable
-                </h6>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="rateId" class="form-label">Tarifa <span class="text-danger">*</span></label>
-                        <select class="form-select" id="rateId" name="rateId" required>
-                            <option value="">Seleccionar tarifa</option>
-                        </select>
-                        <div class="form-text">Tarifa que se aplicará a todos los servicios de esta cotización</div>
-                        <div class="invalid-feedback">Por favor selecciona una tarifa</div>
+                    <div class="col-md-6">
+                        <%- include('../../../atoms/common/phone-input', {
+                            name: 'contactPhone',
+                            id: 'contactPhone',
+                            label: 'Teléfono de Contacto',
+                            required: false,
+                            helpText: 'Teléfono de contacto directo',
+                            countryCode: 'MX',
+                            containerClass: 'mb-3'
+                        }) %>
                     </div>
                 </div>
             </div>
@@ -158,9 +164,13 @@
                 <div class="mb-3">
                     <label for="status" class="form-label">Estado</label>
                     <select class="form-select" id="status" name="status">
-                        <option value="draft">Borrador</option>
-                        <option value="sent">Enviado</option>
-                        <option value="accepted">Aceptado</option>
+                        <option value="requested">Solicitado</option>
+                        <option value="hold">Bloqueado</option>
+                        <% 
+                        // Show different text based on user role
+                        const scheduledText = (typeof userRole !== 'undefined' && userRole === 'admin') ? 'Aprobado' : 'Agendado';
+                        %>
+                        <option value="scheduled"><%= scheduledText %></option>
                         <option value="rejected">Rechazado</option>
                     </select>
                     <div class="form-text">El estado actual de la cotización</div>
@@ -173,7 +183,7 @@
                 <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                 <div>
                     <strong>Cotización:</strong>
-                    <p class="mb-0 mt-1">Define la información básica del cliente y la tarifa aplicable. Una vez creada, podrás agregar servicios en la siguiente sección.</p>
+                    <p class="mb-0 mt-1">Define la información básica del cliente. Una vez creada, podrás agregar servicios y seleccionar tarifas específicas para cada traslado en la siguiente sección.</p>
                 </div>
             </div>
 
@@ -218,12 +228,15 @@
                         <div class="invalid-feedback">Por favor ingresa el apellido</div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="qc_email" class="form-label">Email <span class="text-muted">(opcional)</span></label>
-                        <input type="email" class="form-control" id="qc_email" name="email" placeholder="email@ejemplo.com">
-                        <div class="form-text">Si no lo proporcionas, se generará un email temporal</div>
-                        <div class="invalid-feedback">Por favor ingresa un email válido</div>
-                    </div>
+                    <%- include('../../../atoms/common/email-input', {
+                        name: 'email',
+                        id: 'qc_email',
+                        label: 'Email',
+                        required: false,
+                        placeholder: 'email@ejemplo.com',
+                        helpText: 'Si no lo proporcionas, se generará un email temporal',
+                        containerClass: 'mb-3'
+                    }) %>
 
                     <div class="mb-3">
                         <label for="qc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
@@ -231,10 +244,15 @@
                         <div class="form-text">Nombre de la empresa del cliente</div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="qc_phone" class="form-label">Teléfono <span class="text-muted">(opcional)</span></label>
-                        <input type="tel" class="form-control" id="qc_phone" name="phone" placeholder="+52 123 456 7890">
-                    </div>
+                    <%- include('../../../atoms/common/phone-input', {
+                        name: 'phone',
+                        id: 'qc_phone',
+                        label: 'Teléfono',
+                        required: false,
+                        helpText: 'Número de contacto del cliente',
+                        countryCode: 'MX',
+                        containerClass: 'mb-3'
+                    }) %>
 
                     <div class="alert alert-info d-flex align-items-start" role="alert">
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
@@ -264,6 +282,17 @@
     'use strict';
 
     let clientTomSelect = null;
+    const userRole = '<%= typeof userRole !== "undefined" ? userRole : "admin" %>';
+    
+    // Current user data for department_manager (passed from server)
+    const currentUserData = {
+        id: '<%= typeof user !== "undefined" && user ? user.id : "" %>',
+        name: '<%= typeof user !== "undefined" && user ? (user.firstName && user.lastName ? user.firstName + " " + user.lastName : user.name || user.email || "") : "" %>',
+        email: '<%= typeof user !== "undefined" && user ? user.email || "" : "" %>',
+        firstName: '<%= typeof user !== "undefined" && user ? user.firstName || "" : "" %>',
+        lastName: '<%= typeof user !== "undefined" && user ? user.lastName || "" : "" %>',
+        phone: '<%= typeof user !== "undefined" && user ? user.phone || "" : "" %>'
+    };
 
     // Get JWT token from cookies
     function getAccessToken() {
@@ -349,7 +378,40 @@
         }
     }
 
-    // Load active clients for Tom Select
+    // Load current user info for department manager (using server-side data)
+    function loadCurrentUserAsClient() {
+        try {
+            if (currentUserData.id) {
+                // Set current user name in the display
+                const displayName = currentUserData.name || currentUserData.email || 'Usuario actual';
+                document.getElementById('currentUserName').textContent = displayName;
+                
+                // Set the hidden client ID field to the current user's ID
+                document.getElementById('clientId').value = currentUserData.id;
+                
+                // Auto-fill contact information with user data
+                if (currentUserData.firstName || currentUserData.lastName) {
+                    const fullName = `${currentUserData.firstName || ''} ${currentUserData.lastName || ''}`.trim();
+                    if (fullName) {
+                        document.getElementById('contactPerson').value = fullName;
+                    }
+                }
+                if (currentUserData.email) {
+                    document.getElementById('contactEmail').value = currentUserData.email;
+                }
+                if (currentUserData.phone) {
+                    document.getElementById('contactPhone').value = currentUserData.phone;
+                }
+            } else {
+                document.getElementById('currentUserName').textContent = 'Usuario no disponible';
+            }
+        } catch (error) {
+            console.error('Error loading current user:', error);
+            document.getElementById('currentUserName').textContent = 'Error al cargar usuario';
+        }
+    }
+
+    // Load active clients for Tom Select (admin/superadmin only)
     async function loadActiveClients() {
         try {
             const response = await fetch('/api/clients/active', {
@@ -388,37 +450,12 @@
         }
     }
 
-    // Load active rates
-    async function loadActiveRates() {
-        try {
-            const response = await fetch('/api/rates/active', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${getAccessToken()}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const result = await response.json();
-
-            if (result.success && result.data) {
-                const rateSelect = document.getElementById('rateId');
-                result.data.forEach(rate => {
-                    const option = document.createElement('option');
-                    option.value = rate.value;
-                    option.textContent = rate.label;
-                    rateSelect.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Error loading rates:', error);
-            showAlert('quoteInformationAlerts', 'Error al cargar las tarifas', 'danger');
-        }
-    }
-
-    // Auto-fill contact information when client is selected
+    // Auto-fill contact information when client is selected (admin/superadmin only)
     async function handleClientSelection() {
         try {
+            // Skip if Tom Select element doesn't exist (department_manager case)
+            if (!document.querySelector('#clientId.tomselect')) return;
+            
             const clientTS = await waitForTomSelect('clientId');
 
             clientTS.on('change', function(value) {
@@ -543,12 +580,21 @@
             if (result.success && result.data) {
                 const quote = result.data;
 
-                // Wait for Tom Select to be ready
-                const clientTS = await waitForTomSelect('clientId');
-
-                // Populate client (Tom Select)
-                if (quote.client && quote.client.id) {
-                    clientTS.setValue(quote.client.id);
+                // Handle client population based on user role
+                if (userRole === 'department_manager') {
+                    // For department manager: populate client info in read-only display
+                    if (quote.client && quote.client.fullName) {
+                        document.getElementById('currentUserName').textContent = quote.client.fullName;
+                    }
+                    if (quote.client && quote.client.id) {
+                        document.getElementById('clientId').value = quote.client.id;
+                    }
+                } else {
+                    // For admin/superadmin: wait for Tom Select and populate
+                    const clientTS = await waitForTomSelect('clientId');
+                    if (quote.client && quote.client.id) {
+                        clientTS.setValue(quote.client.id);
+                    }
                 }
 
                 // Populate form fields
@@ -570,10 +616,6 @@
 
                 if (quote.contactPhone) {
                     document.getElementById('contactPhone').value = quote.contactPhone;
-                }
-
-                if (quote.rate && quote.rate.id) {
-                    document.getElementById('rateId').value = quote.rate.id;
                 }
 
                 if (quote.notes) {
@@ -612,9 +654,16 @@
 
         clearAlerts('quoteInformationAlerts');
 
-        // Get Tom Select value
-        const clientTS = await waitForTomSelect('clientId');
-        const clientId = clientTS.getValue();
+        // Get client ID based on user role
+        let clientId;
+        if (userRole === 'department_manager') {
+            // For department manager: get from hidden input
+            clientId = document.getElementById('clientId').value;
+        } else {
+            // For admin/superadmin: get from Tom Select
+            const clientTS = await waitForTomSelect('clientId');
+            clientId = clientTS.getValue();
+        }
 
         if (!clientId) {
             showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
@@ -690,9 +739,16 @@
 
         clearAlerts('quoteInformationAlerts');
 
-        // Get Tom Select value
-        const clientTS = await waitForTomSelect('clientId');
-        const clientId = clientTS.getValue();
+        // Get client ID based on user role
+        let clientId;
+        if (userRole === 'department_manager') {
+            // For department manager: get from hidden input
+            clientId = document.getElementById('clientId').value;
+        } else {
+            // For admin/superadmin: get from Tom Select
+            const clientTS = await waitForTomSelect('clientId');
+            clientId = clientTS.getValue();
+        }
 
         if (!clientId) {
             showAlert('quoteInformationAlerts', 'Por favor selecciona un cliente', 'danger');
@@ -707,7 +763,6 @@
             contactPerson: document.getElementById('contactPerson').value.trim() || undefined,
             contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
             contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
-            rateId: document.getElementById('rateId').value,
             notes: document.getElementById('notes').value.trim() || undefined
         };
 
@@ -732,9 +787,10 @@
             if (result.success && result.data) {
                 showAlert('quoteInformationAlerts', result.message || 'Cotización creada exitosamente', 'success');
 
-                // Redirect to quote detail page with services section
+                // Redirect to quote detail page with services section (use appropriate dashboard path)
+                const dashboardPath = userRole === 'department_manager' ? '/dashboard/department_manager' : '/dashboard/admin';
                 setTimeout(() => {
-                    window.location.href = `/dashboard/admin/quotes/${result.data.id}?section=services`;
+                    window.location.href = `${dashboardPath}/quotes/${result.data.id}?section=services`;
                 }, 1500);
             } else {
                 showAlert('quoteInformationAlerts', result.error || 'Error al crear la cotización', 'danger');
@@ -755,14 +811,17 @@
         showPageLoader('quoteInformationCard');
 
         try {
-            // Load dropdown data in parallel
-            await Promise.all([
-                loadActiveClients(),
-                loadActiveRates()
-            ]);
+            // Load data based on user role
+            if (userRole === 'department_manager') {
+                // For department manager: load current user as client
+                loadCurrentUserAsClient();
+            } else {
+                // For admin/superadmin: load clients
+                await loadActiveClients();
 
-            // Setup client selection handler
-            await handleClientSelection();
+                // Setup client selection handler only for admin/superadmin
+                await handleClientSelection();
+            }
 
             // Check if we're in edit mode
             const quoteIdInput = document.getElementById('quoteId');
@@ -774,9 +833,11 @@
                 await loadQuoteData(quoteId);
             }
 
-            // Event listeners
-            document.getElementById('createQuickClientBtn').addEventListener('click', openQuickClientModal);
-            document.getElementById('saveQuickClientBtn').addEventListener('click', saveQuickClient);
+            // Event listeners (only for admin/superadmin)
+            if (userRole !== 'department_manager') {
+                document.getElementById('createQuickClientBtn').addEventListener('click', openQuickClientModal);
+                document.getElementById('saveQuickClientBtn').addEventListener('click', saveQuickClient);
+            }
 
             // Form submission - use appropriate function based on mode
             document.getElementById('quoteInformationForm').addEventListener('submit', function(event) {

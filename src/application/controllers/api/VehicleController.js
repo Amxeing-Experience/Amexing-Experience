@@ -13,7 +13,7 @@
  * - Comprehensive validation and audit logging.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  * @example
  * GET /api/vehicles - List vehicles with DataTables
  * POST /api/vehicles - Create vehicle
@@ -94,6 +94,38 @@ class VehicleController {
         filteredQuery = Parse.Query.or(brandQuery, modelQuery, plateQuery);
       }
 
+      // Apply rate filter if provided
+      const { rateId } = req.query;
+      if (rateId && rateId.trim() !== '') {
+        // Create Rate pointer
+        const Rate = Parse.Object.extend('Rate');
+        const ratePointer = Rate.createWithoutData(rateId);
+
+        // If we already have a filtered query from search, need to combine with AND
+        if (searchValue) {
+          // Create new queries for each search field that also include rate filter
+          const brandQuery = new Parse.Query('Vehicle');
+          brandQuery.equalTo('exists', true);
+          brandQuery.matches('brand', searchValue, 'i');
+          brandQuery.equalTo('rateId', ratePointer);
+
+          const modelQuery = new Parse.Query('Vehicle');
+          modelQuery.equalTo('exists', true);
+          modelQuery.matches('model', searchValue, 'i');
+          modelQuery.equalTo('rateId', ratePointer);
+
+          const plateQuery = new Parse.Query('Vehicle');
+          plateQuery.equalTo('exists', true);
+          plateQuery.matches('licensePlate', searchValue, 'i');
+          plateQuery.equalTo('rateId', ratePointer);
+
+          filteredQuery = Parse.Query.or(brandQuery, modelQuery, plateQuery);
+        } else {
+          // Just apply rate filter to base query
+          filteredQuery.equalTo('rateId', ratePointer);
+        }
+      }
+
       // Get count of filtered results
       const recordsFiltered = await filteredQuery.count({ useMasterKey: true });
 
@@ -139,6 +171,7 @@ class VehicleController {
             await rate.fetch({ useMasterKey: true });
             rateData = {
               id: rate.id,
+              objectId: rate.id,
               name: rate.get('name'),
               percentage: rate.get('percentage'),
               color: rate.get('color') || '#6366F1',
@@ -167,6 +200,7 @@ class VehicleController {
 
       // DataTables response format
       const response = {
+        success: true,
         draw,
         recordsTotal,
         recordsFiltered,

@@ -566,6 +566,7 @@ class AdminController extends RoleBasedController {
         pageStyles: [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+          'https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css',
         ],
         footerScripts: `
           <!-- DataTables Core -->
@@ -573,6 +574,8 @@ class AdminController extends RoleBasedController {
           <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
           <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
           <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+          <!-- Tom Select for Enhanced Select -->
+          <script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
         `,
       });
     } catch (error) {
@@ -586,6 +589,33 @@ class AdminController extends RoleBasedController {
    * @param {object} res - Express response object.
    * @example
    */
+  /**
+   * Payment Info management page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   */
+  async paymentInfo(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'payment-info', {
+        title: 'Métodos de Pago',
+        breadcrumb: null,
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
   async quotes(req, res) {
     try {
       await this.renderRoleView(req, res, 'quotes', {
@@ -923,6 +953,37 @@ class AdminController extends RoleBasedController {
         driver: 'Pending Assignment',
       },
     ];
+  }
+
+  /**
+   * Invoices management page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await invoices(parameters);
+   * // Returns: operation result
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async invoices(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'invoices', {
+        title: 'Gestión de Facturas',
+        breadcrumb: null,
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
   }
 }
 

@@ -12,13 +12,14 @@
  * - Comprehensive validation and audit logging.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  * @example
  * GET /api/vehicle-types - List all vehicle types with pagination
+ * GET /api/vehicle-types?active=true - List only active vehicle types
+ * GET /api/vehicle-types?active=false - List only inactive vehicle types
  * POST /api/vehicle-types - Create new vehicle type
  * PUT /api/vehicle-types/:id - Update vehicle type
  * DELETE /api/vehicle-types/:id - Soft delete vehicle type
- * GET /api/vehicle-types/active - Get active types for dropdowns
  */
 
 const Parse = require('parse/node');
@@ -44,7 +45,8 @@ class VehicleTypeController {
    * - length: Number of records to return
    * - search[value]: Search term
    * - order[0][column]: Column index to sort
-   * - order[0][dir]: Sort direction (asc/desc).
+   * - order[0][dir]: Sort direction (asc/desc)
+   * - active: Filter by active status (true/false).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
@@ -67,30 +69,53 @@ class VehicleTypeController {
       const sortDirection = req.query.order?.[0]?.dir || 'asc';
 
       // Column mapping for sorting (matches frontend columns order - code column removed)
-      const columns = ['name', 'defaultCapacity', 'active'];
+      const columns = ['name', 'defaultCapacity', 'trunkCapacity', 'active'];
       const sortField = columns[sortColumnIndex] || 'name';
 
+      // Parse active filter parameter
+      const activeFilter = req.query.active;
+
       // Get total records count (without search filter) - do this first
-      // Show all records (active and inactive) but exclude deleted ones
+      // Show all records (active and inactive) but exclude deleted ones, with active filter if specified
       const totalRecordsQuery = new Parse.Query('VehicleType');
       totalRecordsQuery.equalTo('exists', true);
+      if (activeFilter === 'true') {
+        totalRecordsQuery.equalTo('active', true);
+      } else if (activeFilter === 'false') {
+        totalRecordsQuery.equalTo('active', false);
+      }
       const recordsTotal = await totalRecordsQuery.count({
         useMasterKey: true,
       });
 
-      // Build base query for all existing records (not just active)
+      // Build base query for all existing records (filter by active if requested)
       const baseQuery = new Parse.Query('VehicleType');
       baseQuery.equalTo('exists', true);
+      if (activeFilter === 'true') {
+        baseQuery.equalTo('active', true);
+      } else if (activeFilter === 'false') {
+        baseQuery.equalTo('active', false);
+      }
 
       // Build filtered query with search
       let filteredQuery = baseQuery;
       if (searchValue) {
         const searchQuery = new Parse.Query('VehicleType');
         searchQuery.equalTo('exists', true);
+        if (activeFilter === 'true') {
+          searchQuery.equalTo('active', true);
+        } else if (activeFilter === 'false') {
+          searchQuery.equalTo('active', false);
+        }
         searchQuery.matches('name', searchValue, 'i');
 
         const descQuery = new Parse.Query('VehicleType');
         descQuery.equalTo('exists', true);
+        if (activeFilter === 'true') {
+          descQuery.equalTo('active', true);
+        } else if (activeFilter === 'false') {
+          descQuery.equalTo('active', false);
+        }
         descQuery.matches('description', searchValue, 'i');
 
         filteredQuery = Parse.Query.or(searchQuery, descQuery);
@@ -123,6 +148,7 @@ class VehicleTypeController {
         description: type.get('description') || '',
         icon: type.get('icon') || 'car',
         defaultCapacity: type.get('defaultCapacity') || 4,
+        trunkCapacity: type.get('trunkCapacity') || 2,
         sortOrder: type.get('sortOrder') || 0,
         active: type.get('active'),
         createdAt: type.createdAt,
@@ -272,7 +298,7 @@ class VehicleTypeController {
       }
 
       const {
-        name, description, icon, defaultCapacity, sortOrder,
+        name, description, icon, defaultCapacity, trunkCapacity, sortOrder,
       } = req.body;
 
       // Validate required fields
@@ -309,6 +335,7 @@ class VehicleTypeController {
       vehicleType.set('description', description || '');
       vehicleType.set('icon', icon || 'car');
       vehicleType.set('defaultCapacity', parseInt(defaultCapacity, 10) || 4);
+      vehicleType.set('trunkCapacity', parseInt(trunkCapacity, 10) || 2);
       vehicleType.set('sortOrder', parseInt(sortOrder, 10) || 0);
       vehicleType.set('active', true);
       vehicleType.set('exists', true);
@@ -387,7 +414,7 @@ class VehicleTypeController {
       }
 
       const {
-        name, description, icon, defaultCapacity, sortOrder, active,
+        name, description, icon, defaultCapacity, trunkCapacity, sortOrder, active,
       } = req.body;
 
       // Check name uniqueness if name is being changed
@@ -419,6 +446,7 @@ class VehicleTypeController {
       if (description !== undefined) vehicleType.set('description', description);
       if (icon) vehicleType.set('icon', icon);
       if (defaultCapacity) vehicleType.set('defaultCapacity', parseInt(defaultCapacity, 10));
+      if (trunkCapacity !== undefined) vehicleType.set('trunkCapacity', parseInt(trunkCapacity, 10));
       if (sortOrder !== undefined) vehicleType.set('sortOrder', parseInt(sortOrder, 10));
       if (active !== undefined) vehicleType.set('active', active);
 

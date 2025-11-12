@@ -102,15 +102,14 @@ const currentPath = '/dashboard/admin/clients';
                             </div>
                         </div>
 
-                        <%- include('../../molecules/common/form-field', {
-                            type: 'email',
+                        <%- include('../../atoms/common/email-input', {
                             name: 'email',
                             id: 'clientEmail',
                             label: 'Email Corporativo',
                             required: true,
                             placeholder: 'contacto@empresa.com',
                             helpText: 'Email del representante para acceso al sistema',
-                            inputAttributes: { maxlength: '255' }
+                            maxlength: 255
                         }) %>
                     </div>
 
@@ -134,14 +133,13 @@ const currentPath = '/dashboard/admin/clients';
 
                         <div class="row">
                             <div class="col-md-6">
-                                <%- include('../../molecules/common/form-field', {
-                                    type: 'tel',
+                                <%- include('../../atoms/common/phone-input', {
                                     name: 'phone',
                                     id: 'clientPhone',
                                     label: 'Teléfono de Contacto',
                                     required: false,
-                                    placeholder: '+52 (999) 123-4567',
-                                    inputAttributes: { maxlength: '20' }
+                                    helpText: 'Número de contacto del representante',
+                                    countryCode: 'MX'
                                 }) %>
                             </div>
                             <div class="col-md-6">

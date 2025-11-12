@@ -12,7 +12,7 @@
  * - Comprehensive error handling.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  * @example
  * // Usage
  * router.use('/vehicles', vehiclesRoutes);
@@ -61,26 +61,26 @@ router.use(vehicleApiLimiter);
 /**
  * GET /api/vehicles - Get vehicles with DataTables server-side processing.
  *
- * Access: Admin (level 6+)
+ * Access: Department Manager (level 4+), Admin, SuperAdmin
  * Returns: Paginated list of vehicles with VehicleType information.
  */
 router.get(
   '/',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => VehicleController.getVehicles(req, res)
 );
 
 /**
  * GET /api/vehicles/:id - Get single vehicle by ID.
  *
- * Access: Admin (level 6+)
+ * Access: Department Manager (level 4+), Admin, SuperAdmin
  * Returns: Vehicle details with VehicleType information.
  */
 router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
   (req, res) => VehicleController.getVehicleById(req, res)
 );
 

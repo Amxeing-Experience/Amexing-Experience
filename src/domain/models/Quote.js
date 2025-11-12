@@ -1,7 +1,8 @@
 /**
  * Quote - Domain model for quote/cotización management.
  *
- * Manages quote information with rate and optional client references.
+ * Manages quote information with optional rate and client references.
+ * Note: Rates are now managed at the service/subconcept level (per-traslado).
  *
  * Lifecycle States:
  * - active: true, exists: true = Active quote
@@ -9,14 +10,14 @@
  * - active: false, exists: false = Soft deleted (audit trail only).
  * @augments BaseModel
  * @author Amexing Development Team
- * @version 1.0.0
- * @since 2024-01-15
+ * @version 2.0.0
+ * @since 1.0.0
  * @example
  * // Create new quote
  * const quote = new Quote();
- * quote.set('rate', ratePointer);
  * quote.set('client', clientPointer); // Optional
  * quote.set('folio', 'QTE-2025-0001');
+ * // Note: Rate is no longer set at quote level
  * await quote.save();
  */
 
@@ -44,20 +45,22 @@ class Quote extends BaseModel {
   // =================
 
   /**
-   * Get rate.
-   * @returns {object} Rate Parse object.
+   * Get rate (deprecated - rates are now managed at subconcept level).
+   * @deprecated Since v2.0.0 - Use subconcept.rateId instead.
+   * @returns {object} Rate Parse object (legacy quotes only).
    * @example
-   * const rate = quote.getRate();
+   * const rate = quote.getRate(); // For backward compatibility with old quotes
    */
   getRate() {
     return this.get('rate');
   }
 
   /**
-   * Set rate (required).
+   * Set rate (deprecated - rates are now managed at subconcept level).
+   * @deprecated Since v2.0.0 - Use subconcept.rateId instead.
    * @param {object} rate - Rate Parse object or Pointer.
    * @example
-   * quote.setRate(ratePointer);
+   * quote.setRate(ratePointer); // For backward compatibility only
    */
   setRate(rate) {
     this.set('rate', rate);
@@ -185,7 +188,7 @@ class Quote extends BaseModel {
 
   /**
    * Get status.
-   * @returns {string} Quote status (draft, sent, accepted, rejected).
+   * @returns {string} Quote status (requested, hold, scheduled, rejected).
    * @example
    * const status = quote.getStatus();
    */
@@ -197,7 +200,7 @@ class Quote extends BaseModel {
    * Set status.
    * @param {string} status - Quote status.
    * @example
-   * quote.setStatus('sent');
+   * quote.setStatus('scheduled');
    */
   setStatus(status) {
     this.set('status', status);
@@ -329,7 +332,7 @@ class Quote extends BaseModel {
    * @param {object} attrs - Attributes being set.
    * @returns {Parse.Error|undefined} Returns Parse.Error if validation fails, undefined if valid.
    * @example
-   * const error = quote.validate({ rate: null });
+   * const error = quote.validate({ client: null });
    * if (error) console.error('Validation failed:', error.message);
    */
   validate(attrs) {
@@ -339,15 +342,7 @@ class Quote extends BaseModel {
       return parentError;
     }
 
-    // Rate is REQUIRED
-    if ('rate' in attrs && !attrs.rate) {
-      logger.warn('Quote validation failed: rate is required', {
-        quoteId: this.id,
-        attrs,
-      });
-      return new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Rate is required');
-    }
-
+    // Rate is OPTIONAL (deprecated - now managed at subconcept level)
     // Client is OPTIONAL - no validation needed
     // Other fields are optional
 

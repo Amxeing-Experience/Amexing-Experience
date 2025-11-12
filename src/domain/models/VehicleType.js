@@ -11,7 +11,7 @@
  * @augments BaseModel
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2024-01-15
+ * @since 1.0.0
  * @example
  * // Create new vehicle type
  * const sedan = new VehicleType();
@@ -151,6 +151,27 @@ class VehicleType extends BaseModel {
   }
 
   /**
+   * Get trunk capacity (number of suitcases).
+   * @returns {number} Trunk capacity.
+   * @example
+   * const trunkCapacity = vehicleType.getTrunkCapacity();
+   * console.log(trunkCapacity); // 4
+   */
+  getTrunkCapacity() {
+    return this.get('trunkCapacity') || 2;
+  }
+
+  /**
+   * Set trunk capacity (number of suitcases).
+   * @param {number} capacity - Trunk capacity.
+   * @example
+   * vehicleType.setTrunkCapacity(4);
+   */
+  setTrunkCapacity(capacity) {
+    this.set('trunkCapacity', capacity);
+  }
+
+  /**
    * Get sort order.
    * @returns {number} Display order.
    * @example
@@ -198,6 +219,11 @@ class VehicleType extends BaseModel {
     const capacity = this.getDefaultCapacity();
     if (capacity && (capacity < 1 || capacity > 100)) {
       errors.push('Default capacity must be between 1 and 100');
+    }
+
+    const trunkCapacity = this.getTrunkCapacity();
+    if (trunkCapacity && (trunkCapacity < 0 || trunkCapacity > 50)) {
+      errors.push('Trunk capacity must be between 0 and 50');
     }
 
     const sortOrder = this.getSortOrder();
@@ -314,6 +340,7 @@ class VehicleType extends BaseModel {
         label: type.getName(),
         code: type.getCode(),
         capacity: type.getDefaultCapacity(),
+        trunkCapacity: type.getTrunkCapacity(),
         icon: type.getIcon(),
       }));
     } catch (error) {
@@ -367,6 +394,7 @@ class VehicleType extends BaseModel {
         description: 'Vehículo de pasajeros estándar',
         icon: 'car',
         defaultCapacity: 4,
+        trunkCapacity: 3,
         sortOrder: 1,
       },
       {
@@ -375,6 +403,7 @@ class VehicleType extends BaseModel {
         description: 'Vehículo utilitario deportivo',
         icon: 'car-suv',
         defaultCapacity: 6,
+        trunkCapacity: 6,
         sortOrder: 2,
       },
       {
@@ -383,6 +412,7 @@ class VehicleType extends BaseModel {
         description: 'Van de pasajeros',
         icon: 'bus',
         defaultCapacity: 8,
+        trunkCapacity: 8,
         sortOrder: 3,
       },
       {
@@ -391,6 +421,7 @@ class VehicleType extends BaseModel {
         description: 'Autobús de pasajeros',
         icon: 'bus',
         defaultCapacity: 20,
+        trunkCapacity: 20,
         sortOrder: 4,
       },
       {
@@ -399,6 +430,7 @@ class VehicleType extends BaseModel {
         description: 'Limusina de lujo',
         icon: 'car-garage',
         defaultCapacity: 8,
+        trunkCapacity: 4,
         sortOrder: 5,
       },
     ];
@@ -417,6 +449,7 @@ class VehicleType extends BaseModel {
           vehicleType.setDescription(typeData.description);
           vehicleType.setIcon(typeData.icon);
           vehicleType.setDefaultCapacity(typeData.defaultCapacity);
+          vehicleType.setTrunkCapacity(typeData.trunkCapacity);
           vehicleType.setSortOrder(typeData.sortOrder);
 
           await vehicleType.save(null, { useMasterKey: true });

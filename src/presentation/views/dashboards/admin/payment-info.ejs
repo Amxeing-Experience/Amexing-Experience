@@ -1,0 +1,484 @@
+<%
+/**
+ * Payment Info Management Page
+ * Manage payment information for receipts (Admin only)
+ * @author Denisse Maldonado
+ */
+
+const activeSection = 'payment-info';
+%>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-1 fw-bold">Métodos de Pago</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a></li>
+                        <li class="breadcrumb-item active">Métodos de Pago</li>
+                    </ol>
+                </nav>
+            </div>
+            <div>
+                <button type="button" class="btn btn-primary" id="addPaymentInfoBtn">
+                    <i class="ti ti-plus me-2"></i>Agregar Método de Pago
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        <!-- Alerts Container -->
+        <div id="paymentInfoAlerts"></div>
+
+        <!-- Payment Info Table -->
+        <div class="table-responsive">
+            <table id="paymentInfoTable" class="table table-hover" style="width:100%">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Banco</th>
+                        <th>Titular</th>
+                        <th>Cuenta</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Data will be loaded via DataTables -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Info Modal -->
+<div class="modal fade" id="paymentInfoModal" tabindex="-1" aria-labelledby="paymentInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentInfoModalLabel">
+                    <i class="ti ti-credit-card me-2"></i>Agregar Método de Pago
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Alerts Container -->
+                <div id="modalAlerts"></div>
+
+                <form id="paymentInfoForm" class="needs-validation" novalidate>
+                    <input type="hidden" id="paymentInfoId" name="paymentInfoId">
+                    
+                    <!-- Basic Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="name" class="form-label">Nombre <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="name" name="name" required placeholder="Ej: Bank of America - Principal">
+                            <div class="form-text">Nombre descriptivo para identificar este método de pago</div>
+                            <div class="invalid-feedback">Por favor ingrese un nombre</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="currency" class="form-label">Moneda</label>
+                            <select class="form-select" id="currency" name="currency">
+                                <option value="USD" selected>USD - Dólar Estadounidense</option>
+                                <option value="MXN">MXN - Peso Mexicano</option>
+                                <option value="EUR">EUR - Euro</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Banking Information -->
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">Información Bancaria</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="bank" class="form-label">Banco <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="bank" name="bank" required placeholder="Ej: Bank of America">
+                            <div class="invalid-feedback">Por favor ingrese el nombre del banco</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="accountHolder" class="form-label">Titular de la Cuenta <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="accountHolder" name="accountHolder" required placeholder="Ej: Angelica Tours LLC">
+                            <div class="invalid-feedback">Por favor ingrese el titular de la cuenta</div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="accountNumber" class="form-label">Número de Cuenta</label>
+                            <input type="text" class="form-control" id="accountNumber" name="accountNumber" placeholder="Número de cuenta">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="routingNumber" class="form-label">Routing Number</label>
+                            <input type="text" class="form-control" id="routingNumber" name="routingNumber" placeholder="Routing number">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="achRoutingNumber" class="form-label">ACH Routing Number</label>
+                            <input type="text" class="form-control" id="achRoutingNumber" name="achRoutingNumber" placeholder="ACH routing number">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="swiftCode" class="form-label">Código SWIFT</label>
+                            <input type="text" class="form-control" id="swiftCode" name="swiftCode" placeholder="Código SWIFT">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label for="iban" class="form-label">IBAN</label>
+                            <input type="text" class="form-control" id="iban" name="iban" placeholder="Número IBAN">
+                        </div>
+                    </div>
+
+                    <!-- Alternative Payment Methods -->
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">Métodos de Pago Alternativos</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="zelle" class="form-label">Zelle</label>
+                            <input type="email" class="form-control" id="zelle" name="zelle" placeholder="correo@ejemplo.com">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="paypal" class="form-label">PayPal</label>
+                            <input type="email" class="form-control" id="paypal" name="paypal" placeholder="correo@ejemplo.com">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="venmo" class="form-label">Venmo</label>
+                            <input type="text" class="form-control" id="venmo" name="venmo" placeholder="@usuario">
+                        </div>
+                    </div>
+
+                    <!-- Additional Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label for="notes" class="form-label">Notas Adicionales</label>
+                            <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Notas adicionales sobre este método de pago..."></textarea>
+                        </div>
+                    </div>
+
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="savePaymentInfoBtn">
+                    <i class="ti ti-check me-1"></i>Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deletePaymentInfoModal" tabindex="-1" aria-labelledby="deletePaymentInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deletePaymentInfoModalLabel">
+                    <i class="ti ti-trash me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro que desea eliminar el método de pago <strong id="deletePaymentInfoName"></strong>?</p>
+                <div class="alert alert-warning" role="alert">
+                    <i class="ti ti-alert-triangle me-2"></i>
+                    Esta acción no se puede deshacer.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="ti ti-trash me-1"></i>Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    'use strict';
+
+    let paymentInfoTable;
+    let deletePaymentInfoId = null;
+
+    // Get JWT token from cookies
+    function getAccessToken() {
+        const cookies = document.cookie.split(';');
+        for (let cookie of cookies) {
+            const [name, value] = cookie.trim().split('=');
+            if (name === 'accessToken') {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    // Show alert
+    function showAlert(containerId, message, type = 'danger') {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        container.appendChild(alertDiv);
+
+        setTimeout(() => {
+            if (alertDiv && alertDiv.parentNode) {
+                alertDiv.remove();
+            }
+        }, 5000);
+    }
+
+    // Clear alerts
+    function clearAlerts(containerId) {
+        const container = document.getElementById(containerId);
+        if (container) {
+            container.querySelectorAll('.alert').forEach(el => el.remove());
+        }
+    }
+
+    // Initialize DataTable
+    function initializeDataTable() {
+        paymentInfoTable = $('#paymentInfoTable').DataTable({
+            processing: true,
+            serverSide: false,
+            ajax: {
+                url: '/api/payment-info',
+                type: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`
+                },
+                dataSrc: 'data'
+            },
+            columns: [
+                { data: 'name' },
+                { data: 'bank' },
+                { data: 'accountHolder' },
+                { 
+                    data: 'accountNumber',
+                    render: function(data) {
+                        if (!data) return '<em class="text-muted">No especificado</em>';
+                        return '****' + data.slice(-4);
+                    }
+                },
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data ? '<span class="badge bg-success">Activo</span>' : '<span class="badge bg-danger">Inactivo</span>';
+                    }
+                },
+                {
+                    data: null,
+                    orderable: false,
+                    render: function(data, type, row) {
+                        return `
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-primary edit-btn" data-id="${row.id}" title="Editar">
+                                    <i class="ti ti-edit"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger delete-btn" data-id="${row.id}" data-name="${row.name}" title="Eliminar">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                    }
+                }
+            ],
+            order: [[4, 'desc'], [0, 'asc']], // Order by default first, then by name
+            language: {
+                url: '//cdn.datatables.net/plug-ins/1.13.7/i18n/es-ES.json'
+            },
+            responsive: true
+        });
+    }
+
+    // Show payment info modal
+    function showPaymentInfoModal(paymentInfo = null) {
+        const modal = new bootstrap.Modal(document.getElementById('paymentInfoModal'));
+        const form = document.getElementById('paymentInfoForm');
+        const title = document.getElementById('paymentInfoModalLabel');
+
+        clearAlerts('modalAlerts');
+        form.reset();
+        form.classList.remove('was-validated');
+
+        if (paymentInfo) {
+            // Edit mode
+            title.innerHTML = '<i class="ti ti-edit me-2"></i>Editar Método de Pago';
+            document.getElementById('paymentInfoId').value = paymentInfo.id;
+            document.getElementById('name').value = paymentInfo.name || '';
+            document.getElementById('bank').value = paymentInfo.bank || '';
+            document.getElementById('accountHolder').value = paymentInfo.accountHolder || '';
+            document.getElementById('accountNumber').value = paymentInfo.accountNumber || '';
+            document.getElementById('routingNumber').value = paymentInfo.routingNumber || '';
+            document.getElementById('achRoutingNumber').value = paymentInfo.achRoutingNumber || '';
+            document.getElementById('swiftCode').value = paymentInfo.swiftCode || '';
+            document.getElementById('iban').value = paymentInfo.iban || '';
+            document.getElementById('zelle').value = paymentInfo.zelle || '';
+            document.getElementById('paypal').value = paymentInfo.paypal || '';
+            document.getElementById('venmo').value = paymentInfo.venmo || '';
+            document.getElementById('notes').value = paymentInfo.notes || '';
+            document.getElementById('currency').value = paymentInfo.currency || 'USD';
+        } else {
+            // Create mode
+            title.innerHTML = '<i class="ti ti-plus me-2"></i>Agregar Método de Pago';
+        }
+
+        modal.show();
+    }
+
+    // Save payment info
+    async function savePaymentInfo() {
+        const form = document.getElementById('paymentInfoForm');
+        
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        const paymentInfoId = document.getElementById('paymentInfoId').value;
+        const isEdit = !!paymentInfoId;
+
+        const formData = {
+            name: document.getElementById('name').value.trim(),
+            bank: document.getElementById('bank').value.trim(),
+            accountHolder: document.getElementById('accountHolder').value.trim(),
+            accountNumber: document.getElementById('accountNumber').value.trim() || undefined,
+            routingNumber: document.getElementById('routingNumber').value.trim() || undefined,
+            achRoutingNumber: document.getElementById('achRoutingNumber').value.trim() || undefined,
+            swiftCode: document.getElementById('swiftCode').value.trim() || undefined,
+            iban: document.getElementById('iban').value.trim() || undefined,
+            zelle: document.getElementById('zelle').value.trim() || undefined,
+            paypal: document.getElementById('paypal').value.trim() || undefined,
+            venmo: document.getElementById('venmo').value.trim() || undefined,
+            notes: document.getElementById('notes').value.trim() || undefined,
+            currency: document.getElementById('currency').value
+        };
+
+        const saveBtn = document.getElementById('savePaymentInfoBtn');
+        const originalText = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="ti ti-loader-2 me-1 spinner-border spinner-border-sm"></i>Guardando...';
+
+        try {
+            const url = isEdit ? `/api/payment-info/${paymentInfoId}` : '/api/payment-info';
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('paymentInfoModal'));
+                modal.hide();
+                
+                showAlert('paymentInfoAlerts', result.message, 'success');
+                paymentInfoTable.ajax.reload();
+            } else {
+                showAlert('modalAlerts', result.error || 'Error al guardar', 'danger');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('modalAlerts', 'Error de conexión', 'danger');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalText;
+        }
+    }
+
+
+    // Delete payment info
+    async function deletePaymentInfo(paymentInfoId) {
+        try {
+            const response = await fetch(`/api/payment-info/${paymentInfoId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`
+                }
+            });
+
+            const result = await response.json();
+
+            if (result.success) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('deletePaymentInfoModal'));
+                modal.hide();
+                
+                showAlert('paymentInfoAlerts', result.message, 'success');
+                paymentInfoTable.ajax.reload();
+            } else {
+                showAlert('paymentInfoAlerts', result.error || 'Error al eliminar', 'danger');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showAlert('paymentInfoAlerts', 'Error de conexión', 'danger');
+        }
+    }
+
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeDataTable();
+
+        // Add payment info
+        document.getElementById('addPaymentInfoBtn').addEventListener('click', function() {
+            showPaymentInfoModal();
+        });
+
+        // Save payment info
+        document.getElementById('savePaymentInfoBtn').addEventListener('click', savePaymentInfo);
+
+        // Table event handlers
+        $('#paymentInfoTable').on('click', '.edit-btn', async function() {
+            const id = $(this).data('id');
+            try {
+                const response = await fetch(`/api/payment-info/${id}`, {
+                    headers: { 'Authorization': `Bearer ${getAccessToken()}` }
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showPaymentInfoModal(result.data);
+                }
+            } catch (error) {
+                console.error('Error loading payment info:', error);
+            }
+        });
+
+
+        $('#paymentInfoTable').on('click', '.delete-btn', function() {
+            deletePaymentInfoId = $(this).data('id');
+            const name = $(this).data('name');
+            document.getElementById('deletePaymentInfoName').textContent = name;
+            
+            const modal = new bootstrap.Modal(document.getElementById('deletePaymentInfoModal'));
+            modal.show();
+        });
+
+        // Confirm delete
+        document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+            if (deletePaymentInfoId) {
+                deletePaymentInfo(deletePaymentInfoId);
+                deletePaymentInfoId = null;
+            }
+        });
+    });
+})();
+</script>

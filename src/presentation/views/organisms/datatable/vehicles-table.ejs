@@ -41,6 +41,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         </div>
     </div>
 
+    <!-- Filtros -->
+    <div class="card-body border-bottom bg-light">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="filterRate" class="form-label fw-semibold">
+                    <i class="ti ti-percentage me-1"></i>Filtrar por Tarifa
+                </label>
+                <select class="form-select" id="filterRate">
+                    <option value="">Todas las tarifas</option>
+                    <!-- Options loaded dynamically -->
+                </select>
+            </div>
+        </div>
+    </div>
+
     <div class="card-body" id="vehicles-content">
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
@@ -209,6 +224,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             setTimeout(initWhenReady, 100);
             return;
         }
+        
         initVehiclesTable();
     }
 
@@ -219,12 +235,45 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
 
+        // Get JWT token from localStorage or cookies
+        function getAccessToken() {
+            // First try localStorage (used by other parts of the app)
+            const tokenFromStorage = localStorage.getItem('accessToken');
+            if (tokenFromStorage) {
+                return tokenFromStorage;
+            }
+            
+            // Fallback to cookies (httpOnly cookies won't work, but try anyway)
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Setup global AJAX configuration to include JWT token
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
+        });
         const dataTable = $(`#${tableId}`).DataTable({
             processing: true,
             serverSide: true,
             ajax: {
                 url: apiEndpoint,
                 type: 'GET',
+                data: function(d) {
+                    // Add rate filter parameter
+                    d.rateId = $('#filterRate').val();
+                    return d;
+                },
                 dataSrc: function(json) {
                     return json.data || [];
                 },
@@ -427,6 +476,38 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const defaultCapacity = $(this).find('option:selected').data('capacity');
             if (defaultCapacity && !$('#capacity').val()) $('#capacity').val(defaultCapacity);
         });
+
+        // Load rates for filter dropdown
+        function loadRatesFilter() {
+            $.ajax({
+                url: '/api/rates/active',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const select = $('#filterRate');
+                        select.find('option:not(:first)').remove();
+                        response.data.forEach(function(rate) {
+                            const option = $('<option></option>')
+                                .attr('value', rate.value)
+                                .text(rate.label)
+                                .attr('data-color', rate.color || '#6366F1');
+                            select.append(option);
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading rates for filter:', error);
+                }
+            });
+        }
+
+        // Reload DataTable when filter changes
+        $('#filterRate').on('change', function() {
+            dataTable.ajax.reload();
+        });
+
+        // Load rates on page load
+        loadRatesFilter();
 
         function loadVehicleTypes() {
             return $.ajax({

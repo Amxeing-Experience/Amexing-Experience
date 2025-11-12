@@ -1,0 +1,120 @@
+<%
+/**
+ * Filter Select Atomic Component
+ * Reusable select dropdown for filtering DataTables
+ *
+ * Atomic Design Level: Atom
+ * Category: Common Form Elements
+ *
+ * @param {string} id - Unique identifier for the select element
+ * @param {string} label - Label text for the filter
+ * @param {string} icon - Tabler icon class (e.g., 'ti-percentage', 'ti-user')
+ * @param {string} defaultOption - Text for the default "All" option (e.g., 'Todas las tarifas', 'Todos los usuarios')
+ * @param {string} apiEndpoint - API endpoint to fetch options (should return {success, data: [{value, label}]})
+ * @param {string} [width='col-md-3'] - Bootstrap column width class
+ * @param {boolean} [required=false] - Whether the field is required
+ * @param {string} [helpText] - Optional help text displayed below the select
+ *
+ * @example
+ * <%- include('../atoms/common/filter-select.ejs', {
+ *   id: 'filterRate',
+ *   label: 'Filtrar por Tarifa',
+ *   icon: 'ti-percentage',
+ *   defaultOption: 'Todas las tarifas',
+ *   apiEndpoint: '/api/rates/active',
+ *   width: 'col-md-4'
+ * }) %>
+ *
+ * JavaScript Integration:
+ * // Load options on page load
+ * loadFilterOptions('filterRate', '/api/rates/active');
+ *
+ * // Reload DataTable on change
+ * $('#filterRate').on('change', function() {
+ *   dataTable.ajax.reload();
+ * });
+ */
+
+const filterId = typeof id !== 'undefined' ? id : 'filterSelect';
+const filterLabel = typeof label !== 'undefined' ? label : 'Filtrar';
+const filterIcon = typeof icon !== 'undefined' ? icon : 'ti-filter';
+const filterDefault = typeof defaultOption !== 'undefined' ? defaultOption : 'Todos';
+const filterWidth = typeof width !== 'undefined' ? width : 'col-md-3';
+const filterRequired = typeof required !== 'undefined' ? required : false;
+const filterHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const filterApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '';
+%>
+
+<div class="<%= filterWidth %>">
+    <label for="<%= filterId %>" class="form-label fw-semibold">
+        <i class="<%= filterIcon %> me-1"></i><%= filterLabel %>
+        <% if (filterRequired) { %>
+            <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    <select class="form-select" id="<%= filterId %>" <%= filterRequired ? 'required' : '' %> data-api-endpoint="<%= filterApiEndpoint %>">
+        <option value=""><%= filterDefault %></option>
+        <!-- Options loaded dynamically from API -->
+    </select>
+    <% if (filterHelpText) { %>
+        <div class="form-text text-muted">
+            <small><%= filterHelpText %></small>
+        </div>
+    <% } %>
+</div>
+
+<script>
+/**
+ * Generic function to load filter options from API
+ * Can be called from parent component
+ *
+ * @param {string} selectId - ID of the select element
+ * @param {string} apiUrl - API endpoint URL
+ * @param {function} callback - Optional callback after loading
+ */
+window.loadFilterOptions = function(selectId, apiUrl, callback) {
+    $.ajax({
+        url: apiUrl,
+        type: 'GET',
+        success: function(response) {
+            if (response.success && response.data) {
+                const select = $(`#${selectId}`);
+                select.find('option:not(:first)').remove();
+
+                response.data.forEach(function(item) {
+                    const option = $('<option></option>')
+                        .attr('value', item.value)
+                        .text(item.label);
+
+                    // Support additional data attributes
+                    if (item.color) option.attr('data-color', item.color);
+                    if (item.icon) option.attr('data-icon', item.icon);
+
+                    select.append(option);
+                });
+
+                if (callback) callback(response.data);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error(`Error loading options for ${selectId}:`, error);
+        }
+    });
+};
+
+/**
+ * Auto-load options if API endpoint is provided
+ */
+(function() {
+    const selectElement = document.getElementById('<%= filterId %>');
+    if (selectElement) {
+        const apiEndpoint = selectElement.getAttribute('data-api-endpoint');
+        if (apiEndpoint && apiEndpoint.trim() !== '') {
+            // Wait for jQuery to be ready
+            $(document).ready(function() {
+                window.loadFilterOptions('<%= filterId %>', apiEndpoint);
+            });
+        }
+    }
+})();
+</script>

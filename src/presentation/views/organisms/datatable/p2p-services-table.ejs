@@ -41,6 +41,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         </div>
     </div>
 
+    <!-- Filtros -->
+    <div class="card-body border-bottom bg-light">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label for="filterRate-p2p" class="form-label fw-semibold">
+                    <i class="ti ti-percentage me-1"></i>Filtrar por Tarifa
+                </label>
+                <select class="form-select" id="filterRate-p2p">
+                    <option value="">Todas las tarifas</option>
+                    <!-- Options loaded dynamically -->
+                </select>
+            </div>
+        </div>
+    </div>
+
     <div class="card-body" id="services-content">
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
@@ -49,9 +64,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <th>Tarifa</th>
                         <th>Ruta</th>
                         <th>Tipo de Vehículo</th>
-                        <th>Costo</th>
+                        <th>Precio</th>
+                        <th>Precio Efectivo</th>
                         <th>Notas</th>
-                        <th>Estado</th>
+                        <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
                         <% } %>
@@ -238,6 +254,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         const showActions = <%= dtShowActions %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
+        const userRole = '<%= dtUserRole %>';
 
         // Extract serviceType from apiEndpoint
         const serviceTypeMatch = apiEndpoint.match(/serviceType=([^&]+)/);
@@ -297,6 +314,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             ajax: {
                 url: apiEndpoint,
                 type: 'GET',
+                data: function(d) {
+                    // Add rate filter parameter
+                    d.rateId = $('#filterRate-p2p').val();
+                    return d;
+                },
                 dataSrc: function(json) {
                     return json.data || [];
                 },
@@ -351,18 +373,68 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         return `<span class="badge bg-dark">${data || '-'}</span>`;
                     }
                 },
-                // 4. Costo
+                // 4. Precio (con surcharge de otros métodos de pago)
                 {
                     data: 'price',
-                    render: function(data) {
-                        const formatted = new Intl.NumberFormat('es-MX', {
+                    render: function(data, type, row) {
+                        const basePrice = data || 0;
+
+                        // Get surcharge percentage from global settings
+                        const surchargePercentage = window.APP_SETTINGS?.paymentSurchargePercentage || 21.09;
+                        const surcharge = (basePrice * surchargePercentage) / 100;
+                        const totalPrice = basePrice + surcharge;
+
+                        // For sorting and filtering, use total price
+                        if (type === 'sort' || type === 'filter') {
+                            return totalPrice;
+                        }
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
                             style: 'currency',
                             currency: 'MXN'
-                        }).format(data || 0);
-                        return `<div class="fw-bold text-success">${formatted}</div>`;
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-success" style="font-size: 1rem;">
+                                    ${formatMXN(totalPrice)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Tarjeta/Digital</small>
+                                </div>
+                            </div>
+                        `;
                     }
                 },
-                // 5. Notas
+                // 5. Precio Efectivo (con descuento por pago en efectivo)
+                {
+                    data: 'price',
+                    render: function(data, type, row) {
+                        const basePrice = data || 0;
+
+                        // For sorting and filtering, use base price
+                        if (type === 'sort' || type === 'filter') {
+                            return basePrice;
+                        }
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                    ${formatMXN(basePrice)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Efectivo</small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                },
+                // 6. Notas
                 {
                     data: 'note',
                     render: function(data) {
@@ -373,14 +445,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 },
                 // 6. Estado
-                {
+                ...(userRole !== 'department_manager' ? [{
                     data: 'active',
                     render: function(data) {
                         return data
                             ? '<span class="badge bg-success">Activo</span>'
                             : '<span class="badge bg-secondary">Inactivo</span>';
                     }
-                },
+                }] : []),
                 ...(showActions ? [{
                     data: null,
                     orderable: false,
@@ -495,6 +567,38 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $('#saveServiceBtn').on('click', function() {
             saveService();
         });
+
+        // Load rates for filter dropdown
+        function loadRatesFilter() {
+            $.ajax({
+                url: '/api/rates/active',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const select = $('#filterRate-p2p');
+                        select.find('option:not(:first)').remove();
+                        response.data.forEach(function(rate) {
+                            const option = $('<option></option>')
+                                .attr('value', rate.value)
+                                .text(rate.label)
+                                .attr('data-color', rate.color || '#6366F1');
+                            select.append(option);
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading rates for filter:', error);
+                }
+            });
+        }
+
+        // Reload DataTable when filter changes
+        $('#filterRate-p2p').on('change', function() {
+            dataTable.ajax.reload();
+        });
+
+        // Load rates on page load
+        loadRatesFilter();
 
         // Functions
 

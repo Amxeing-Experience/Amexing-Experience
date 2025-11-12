@@ -11,14 +11,10 @@
  * - Export-ready data formatting.
  * @author Amexing Development Team
  * @version 1.0.0
- * @since 2025-10-16
- * @example
- * // Usage example:
- * const controller = new AuditLogController();
- * await controller.getAuditLogs(req, res);
+ * @since 1.0.0
  */
 
-const AuditLog = require('../../../domain/models/AuditLog');
+const AuditLogHelper = require('./helpers/AuditLogHelper');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -33,157 +29,35 @@ class AuditLogController {
 
   /**
    * GET /api/audit/logs - Get audit logs with filtering and pagination.
-   *
-   * Query Parameters:
-   * - page: Page number (default: 1)
-   * - limit: Items per page (default: 50, max: 1000)
-   * - userId: Filter by user ID
-   * - username: Filter by username (partial match)
-   * - action: Filter by action (CREATE, UPDATE, DELETE, etc.)
-   * - entityType: Filter by entity type (Client, Employee, etc.)
-   * - entityId: Filter by entity ID
-   * - startDate: Filter by start date (ISO format)
-   * - endDate: Filter by end date (ISO format)
-   * - sortField: Field to sort by (default: timestamp)
-   * - sortDirection: Sort direction (asc/desc, default: desc).
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * // GET /api/audit/logs?action=UPDATE&startDate=2025-10-01&limit=100
+   * // GET /api/audit/logs?action=CREATE&entityType=Quote&limit=50
+   * // Returns paginated audit logs with optional filters
    */
   async getAuditLogs(req, res) {
     try {
       const currentUser = req.user;
       if (!currentUser) {
-        return this.sendError(res, 'Authentication required', 401);
+        return AuditLogHelper.sendError(res, 'Authentication required', 401);
       }
 
-      // Only admin and superadmin can view audit logs
-      const { userRole } = req;
-      if (userRole !== 'admin' && userRole !== 'superadmin') {
-        return this.sendError(res, 'Insufficient permissions', 403);
+      if (!AuditLogHelper.validatePermissions(req.userRole)) {
+        return AuditLogHelper.sendError(res, 'Insufficient permissions', 403);
       }
 
-      // Parse query parameters
-      const {
-        page = 1,
-        limit = this.defaultPageSize,
-        userId,
-        username,
-        action,
-        entityType,
-        entityId,
-        startDate,
-        endDate,
-        sortField = 'timestamp',
-        sortDirection = 'desc',
-      } = req.query;
+      const { pagination, filters } = AuditLogHelper.parseAuditLogParams(req.query);
+      const query = AuditLogHelper.buildAuditLogQuery(filters);
+      const dateValidation = AuditLogHelper.validateDateFilters(filters, res);
+      if (dateValidation) return dateValidation;
 
-      // Validate and sanitize pagination
-      const validatedPage = Math.max(1, parseInt(page, 10) || 1);
-      const validatedLimit = Math.min(this.maxPageSize, Math.max(1, parseInt(limit, 10) || this.defaultPageSize));
-      const skip = (validatedPage - 1) * validatedLimit;
+      AuditLogHelper.applySortingAndPagination(query, filters, pagination);
+      const [logs, totalCount] = await this.executeQuery(query);
+      const formattedLogs = AuditLogHelper.formatAuditLogs(logs);
+      const response = AuditLogHelper.buildResponse(formattedLogs, totalCount, pagination, filters);
 
-      // Build query
-      const Parse = require('parse/node');
-      const query = new Parse.Query(AuditLog);
-
-      // Apply filters
-      if (userId) {
-        query.equalTo('userId', userId);
-      }
-
-      if (username) {
-        query.contains('username', username);
-      }
-
-      if (action) {
-        query.equalTo('action', action.toUpperCase());
-      }
-
-      if (entityType) {
-        query.equalTo('entityType', entityType);
-      }
-
-      if (entityId) {
-        query.equalTo('entityId', entityId);
-      }
-
-      if (startDate) {
-        try {
-          const start = new Date(startDate);
-          query.greaterThanOrEqualTo('timestamp', start);
-        } catch (error) {
-          return this.sendError(res, 'Invalid startDate format', 400);
-        }
-      }
-
-      if (endDate) {
-        try {
-          const end = new Date(endDate);
-          query.lessThanOrEqualTo('timestamp', end);
-        } catch (error) {
-          return this.sendError(res, 'Invalid endDate format', 400);
-        }
-      }
-
-      // Apply sorting
-      if (sortDirection === 'asc') {
-        query.ascending(sortField);
-      } else {
-        query.descending(sortField);
-      }
-
-      // Apply pagination
-      query.skip(skip);
-      query.limit(validatedLimit);
-
-      // Execute query
-      const [logs, totalCount] = await Promise.all([
-        query.find({ useMasterKey: true }),
-        query.count({ useMasterKey: true }),
-      ]);
-
-      // Format logs for frontend
-      const formattedLogs = logs.map((log) => ({
-        id: log.id,
-        userId: log.get('userId'),
-        username: log.get('username'),
-        action: log.get('action'),
-        entityType: log.get('entityType'),
-        entityId: log.get('entityId'),
-        changes: log.get('changes'),
-        metadata: log.get('metadata'),
-        timestamp: log.get('timestamp'),
-        createdAt: log.get('createdAt'),
-      }));
-
-      // Calculate pagination metadata
-      const totalPages = Math.ceil(totalCount / validatedLimit);
-
-      const response = {
-        data: formattedLogs,
-        pagination: {
-          total: totalCount,
-          page: validatedPage,
-          limit: validatedLimit,
-          totalPages,
-          hasNext: validatedPage < totalPages,
-          hasPrev: validatedPage > 1,
-        },
-        filters: {
-          userId,
-          username,
-          action,
-          entityType,
-          entityId,
-          startDate,
-          endDate,
-        },
-      };
-
-      this.sendSuccess(res, response, 'Audit logs retrieved successfully');
+      AuditLogHelper.sendSuccess(res, response, 'Audit logs retrieved successfully');
     } catch (error) {
       logger.error('Error in AuditLogController.getAuditLogs', {
         error: error.message,
@@ -193,7 +67,7 @@ class AuditLogController {
         queryParams: req.query,
       });
 
-      this.sendError(
+      AuditLogHelper.sendError(
         res,
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve audit logs',
         500
@@ -207,60 +81,40 @@ class AuditLogController {
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * // GET /api/audit/user/abc123?limit=100
+   * // GET /api/audit/user/xyz789
+   * // Returns audit logs for user with ID xyz789
    */
   async getUserAuditLogs(req, res) {
     try {
       const currentUser = req.user;
-      const targetUserId = req.params.userId;
-
       if (!currentUser) {
-        return this.sendError(res, 'Authentication required', 401);
+        return AuditLogHelper.sendError(res, 'Authentication required', 401);
       }
 
-      // Only admin and superadmin can view audit logs
-      const { userRole } = req;
-      if (userRole !== 'admin' && userRole !== 'superadmin') {
-        return this.sendError(res, 'Insufficient permissions', 403);
+      if (!AuditLogHelper.validatePermissions(req.userRole)) {
+        return AuditLogHelper.sendError(res, 'Insufficient permissions', 403);
       }
 
-      if (!targetUserId) {
-        return this.sendError(res, 'User ID is required', 400);
+      const { userId } = req.params;
+      if (!userId) {
+        return AuditLogHelper.sendError(res, 'User ID is required', 400);
       }
 
-      const limit = Math.min(this.maxPageSize, parseInt(req.query.limit, 10) || this.defaultPageSize);
-
-      const logs = await AuditLog.queryByUser(targetUserId, limit);
-
-      const formattedLogs = logs.map((log) => ({
-        id: log.id,
-        userId: log.get('userId'),
-        username: log.get('username'),
-        action: log.get('action'),
-        entityType: log.get('entityType'),
-        entityId: log.get('entityId'),
-        changes: log.get('changes'),
-        metadata: log.get('metadata'),
-        timestamp: log.get('timestamp'),
-      }));
-
-      this.sendSuccess(
-        res,
-        {
-          userId: targetUserId,
-          logs: formattedLogs,
-          total: logs.length,
-        },
-        'User audit logs retrieved successfully'
-      );
+      req.query.userId = userId;
+      return this.getAuditLogs(req, res);
     } catch (error) {
       logger.error('Error in AuditLogController.getUserAuditLogs', {
         error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
         targetUserId: req.params.userId,
-        currentUser: req.user?.id,
       });
 
-      this.sendError(res, error.message, 500);
+      AuditLogHelper.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve user audit logs',
+        500
+      );
     }
   }
 
@@ -270,157 +124,186 @@ class AuditLogController {
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * // GET /api/audit/entity/Client/xyz789
+   * // GET /api/audit/entity/Quote/abc123
+   * // Returns audit logs for Quote with ID abc123
    */
   async getEntityAuditLogs(req, res) {
     try {
       const currentUser = req.user;
-      const { entityType, entityId } = req.params;
-
       if (!currentUser) {
-        return this.sendError(res, 'Authentication required', 401);
+        return AuditLogHelper.sendError(res, 'Authentication required', 401);
       }
 
-      // Only admin and superadmin can view audit logs
-      const { userRole } = req;
-      if (userRole !== 'admin' && userRole !== 'superadmin') {
-        return this.sendError(res, 'Insufficient permissions', 403);
+      if (!AuditLogHelper.validatePermissions(req.userRole)) {
+        return AuditLogHelper.sendError(res, 'Insufficient permissions', 403);
       }
 
-      if (!entityType) {
-        return this.sendError(res, 'Entity type is required', 400);
+      const { entityType, entityId } = req.params;
+      if (!entityType || !entityId) {
+        return AuditLogHelper.sendError(res, 'Entity type and ID are required', 400);
       }
 
-      const limit = Math.min(this.maxPageSize, parseInt(req.query.limit, 10) || this.defaultPageSize);
-
-      const logs = await AuditLog.queryByEntity(entityType, entityId, limit);
-
-      const formattedLogs = logs.map((log) => ({
-        id: log.id,
-        userId: log.get('userId'),
-        username: log.get('username'),
-        action: log.get('action'),
-        entityType: log.get('entityType'),
-        entityId: log.get('entityId'),
-        changes: log.get('changes'),
-        metadata: log.get('metadata'),
-        timestamp: log.get('timestamp'),
-      }));
-
-      this.sendSuccess(
-        res,
-        {
-          entityType,
-          entityId: entityId || 'all',
-          logs: formattedLogs,
-          total: logs.length,
-        },
-        'Entity audit logs retrieved successfully'
-      );
+      req.query.entityType = entityType;
+      req.query.entityId = entityId;
+      return this.getAuditLogs(req, res);
     } catch (error) {
       logger.error('Error in AuditLogController.getEntityAuditLogs', {
         error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
         entityType: req.params.entityType,
         entityId: req.params.entityId,
-        currentUser: req.user?.id,
       });
 
-      this.sendError(res, error.message, 500);
+      AuditLogHelper.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve entity audit logs',
+        500
+      );
     }
   }
 
   /**
-   * GET /api/audit/statistics - Get audit log statistics.
+   * GET /api/audit/statistics - Get audit log statistics and summaries.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * // GET /api/audit/statistics?startDate=2025-10-01&endDate=2025-10-31
+   * // GET /api/audit/statistics
+   * // Returns statistics about audit log entries
    */
   async getStatistics(req, res) {
     try {
       const currentUser = req.user;
-
       if (!currentUser) {
-        return this.sendError(res, 'Authentication required', 401);
+        return AuditLogHelper.sendError(res, 'Authentication required', 401);
       }
 
-      // Only admin and superadmin can view audit logs
-      const { userRole } = req;
-      if (userRole !== 'admin' && userRole !== 'superadmin') {
-        return this.sendError(res, 'Insufficient permissions', 403);
+      if (!AuditLogHelper.validatePermissions(req.userRole)) {
+        return AuditLogHelper.sendError(res, 'Insufficient permissions', 403);
       }
 
-      const {
-        startDate, endDate, userId, entityType,
-      } = req.query;
+      const { startDate, endDate } = req.query;
+      const dateValidation = AuditLogHelper.validateDateFilters({ startDate, endDate }, res);
+      if (dateValidation) return dateValidation;
 
-      const filters = {};
+      const baseQuery = AuditLogHelper.buildAuditLogQuery({ startDate, endDate });
 
-      if (userId) filters.userId = userId;
-      if (entityType) filters.entityType = entityType;
+      // Get statistics in parallel
+      const [totalLogs, uniqueUsers, actionBreakdown, entityTypeBreakdown, recentActivity] = await Promise.all([
+        baseQuery.count({ useMasterKey: true }),
+        this.getUniqueUsersCount(baseQuery),
+        this.getActionBreakdown(baseQuery),
+        this.getEntityTypeBreakdown(baseQuery),
+        this.getRecentActivity(),
+      ]);
 
-      if (startDate) {
-        try {
-          filters.startDate = new Date(startDate);
-        } catch (error) {
-          return this.sendError(res, 'Invalid startDate format', 400);
-        }
-      }
+      const statistics = {
+        totalLogs,
+        uniqueUsers,
+        actionBreakdown,
+        entityTypeBreakdown,
+        recentActivity,
+        period: {
+          startDate: startDate || null,
+          endDate: endDate || null,
+        },
+      };
 
-      if (endDate) {
-        try {
-          filters.endDate = new Date(endDate);
-        } catch (error) {
-          return this.sendError(res, 'Invalid endDate format', 400);
-        }
-      }
-
-      const statistics = await AuditLog.getStatistics(filters);
-
-      this.sendSuccess(res, statistics, 'Statistics retrieved successfully');
+      AuditLogHelper.sendSuccess(res, statistics, 'Statistics retrieved successfully');
     } catch (error) {
       logger.error('Error in AuditLogController.getStatistics', {
         error: error.message,
-        currentUser: req.user?.id,
-        queryParams: req.query,
+        stack: error.stack,
+        userId: req.user?.id,
       });
 
-      this.sendError(res, error.message, 500);
+      AuditLogHelper.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve statistics',
+        500
+      );
     }
   }
 
   /**
-   * Helper method to send successful response.
-   * @param {object} res - Express response object.
-   * @param {object} data - Response data.
-   * @param {string} [message] - Success message.
-   * @returns {void}
+   * Execute query and get results.
+   * @param {object} query - Parse query object.
+   * @returns {Promise<Array>} Array of [logs, totalCount].
    * @example
+   * const [logs, totalCount] = await controller.executeQuery(query);
    */
-  sendSuccess(res, data, message = 'Success') {
-    res.status(200).json({
-      success: true,
-      message,
-      data,
-      timestamp: new Date().toISOString(),
-    });
+  async executeQuery(query) {
+    return Promise.all([query.find({ useMasterKey: true }), query.count({ useMasterKey: true })]);
   }
 
   /**
-   * Helper method to send error response.
-   * @param {object} res - Express response object.
-   * @param {string} message - Error message.
-   * @param {number} [statusCode] - HTTP status code.
-   * @returns {void}
+   * Get unique users count from query results.
+   * @param {object} baseQuery - Base Parse query.
+   * @returns {Promise<number>} Number of unique users.
+   * @example
+   * const userCount = await controller.getUniqueUsersCount(baseQuery);
+   */
+  async getUniqueUsersCount(baseQuery) {
+    const logs = await baseQuery.find({ useMasterKey: true });
+    const uniqueUsers = new Set(logs.map((log) => log.get('userId')));
+    return uniqueUsers.size;
+  }
+
+  /**
+   * Get action breakdown statistics.
+   * @param {object} baseQuery - Base Parse query.
+   * @returns {Promise<object>} Action breakdown data.
+   * @example
+   * const breakdown = await controller.getActionBreakdown(baseQuery);
+   */
+  async getActionBreakdown(baseQuery) {
+    const logs = await baseQuery.find({ useMasterKey: true });
+    const breakdown = Object.create(null); // Use Object.create(null) to avoid prototype pollution
+    logs.forEach((log) => {
+      const action = log.get('action');
+      // Validate that action is a safe string and not a prototype property
+      if (typeof action === 'string' && action && !['__proto__', 'constructor', 'prototype'].includes(action)) {
+        breakdown[action] = (breakdown[action] || 0) + 1;
+      }
+    });
+    return breakdown;
+  }
+
+  /**
+   * Get entity type breakdown statistics.
+   * @param {object} baseQuery - Base Parse query.
+   * @returns {Promise<object>} Entity type breakdown data.
+   * @example
+   * const breakdown = await controller.getEntityTypeBreakdown(baseQuery);
+   */
+  async getEntityTypeBreakdown(baseQuery) {
+    const logs = await baseQuery.find({ useMasterKey: true });
+    const breakdown = Object.create(null); // Use Object.create(null) to avoid prototype pollution
+    logs.forEach((log) => {
+      const entityType = log.get('entityType');
+      // Validate that entityType is a safe string and not a prototype property
+      if (typeof entityType === 'string' && entityType && !['__proto__', 'constructor', 'prototype'].includes(entityType)) {
+        breakdown[entityType] = (breakdown[entityType] || 0) + 1;
+      }
+    });
+    return breakdown;
+  }
+
+  /**
+   * Get recent activity (last 24 hours).
+   * @returns {Promise<Array>} Recent activity data.
    * @example
    */
-  sendError(res, message, statusCode = 500) {
-    res.status(statusCode).json({
-      success: false,
-      error: message,
-      timestamp: new Date().toISOString(),
-    });
+  async getRecentActivity() {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const query = AuditLogHelper.buildAuditLogQuery({});
+    query.greaterThan('timestamp', yesterday);
+    query.descending('timestamp');
+    query.limit(10);
+
+    const logs = await query.find({ useMasterKey: true });
+    return AuditLogHelper.formatAuditLogs(logs);
   }
 }
 
