@@ -50,6 +50,7 @@ class PDFReceiptService {
    * @param {Array} quoteData.serviceItems - Array of service items/days.
    * @param {object} quoteData.totals - Subtotal, taxes, total amounts.
    * @param {boolean} quoteData.includePaymentInfo - Whether to include payment info (default: true).
+   * @param {object} quoteData.selectedPaymentInfo - Specific payment info to use (admin selected).
    * @returns {Promise<Buffer>} PDF buffer.
    * @throws {Error} If PDF generation fails.
    * @example
@@ -58,13 +59,14 @@ class PDFReceiptService {
    *   client: { fullName: 'John Doe', email: 'john@example.com', phone: '+1234567890' },
    *   serviceItems: [{ concept: 'Transfer', vehicleType: 'Sprinter', total: 9000 }],
    *   totals: { subtotal: 15500, iva: 2480, total: 17980 },
-   *   includePaymentInfo: true
+   *   includePaymentInfo: true,
+   *   selectedPaymentInfo: { bank: 'Chase', accountHolder: 'Test LLC' }
    * });
    */
   async generateReceipt(quoteData) {
     try {
       const {
-        quote, client, serviceItems, totals, includePaymentInfo = true,
+        quote, client, serviceItems, totals, includePaymentInfo = true, selectedPaymentInfo,
       } = quoteData;
 
       // Create PDF document with smaller margins
@@ -85,7 +87,7 @@ class PDFReceiptService {
 
       // Only include payment info if requested (admin/superadmin roles)
       if (includePaymentInfo) {
-        this.addPaymentInfo(doc);
+        this.addPaymentInfo(doc, selectedPaymentInfo);
       }
 
       this.addFooter(doc);
@@ -350,7 +352,8 @@ class PDFReceiptService {
         date.setDate(date.getDate() + (item.dayNumber - 1));
         const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December'];
-        description += `${monthNames[date.getMonth()]} ${date.getDate()}${this.getOrdinalSuffix(date.getDate())}\n`;
+        description += `${monthNames[date.getMonth()]} ${date.getDate()}`
+          + `${this.getOrdinalSuffix(date.getDate())}\n`;
       }
 
       if (item.concept) {
@@ -431,13 +434,23 @@ class PDFReceiptService {
     doc.font('Helvetica')
       .fontSize(10)
       // .text('SUBTOTAL', totalsX, doc.y)
-      .text(`SUBTOTAL  $ ${this.formatCurrency(totals.subtotal || 0)} MXN`, totalsX, doc.y, { width: totalsWidth, align: 'right' });
+      .text(
+        `SUBTOTAL  $ ${this.formatCurrency(totals.subtotal || 0)} MXN`,
+        totalsX,
+        doc.y,
+        { width: totalsWidth, align: 'right' }
+      );
 
     doc.y += 15;
 
     // Taxes
     doc// .text('TAXES', totalsX, doc.y)
-      .text(`TAXES  $ ${this.formatCurrency(totals.iva || 0)} MXN`, totalsX, doc.y, { width: totalsWidth, align: 'right' });
+      .text(
+        `TAXES  $ ${this.formatCurrency(totals.iva || 0)} MXN`,
+        totalsX,
+        doc.y,
+        { width: totalsWidth, align: 'right' }
+      );
 
     doc.y += 15;
 
@@ -445,7 +458,12 @@ class PDFReceiptService {
     doc.font('Helvetica-Bold')
       .fontSize(11)
       // .text('TOTAL', totalsX, doc.y)
-      .text(`TOTAL  $ ${this.formatCurrency(totals.total || 0)} MXN`, totalsX, doc.y, { width: totalsWidth, align: 'right' });
+      .text(
+        `TOTAL  $ ${this.formatCurrency(totals.total || 0)} MXN`,
+        totalsX,
+        doc.y,
+        { width: totalsWidth, align: 'right' }
+      );
 
     doc.y += 25;
   }
@@ -453,10 +471,14 @@ class PDFReceiptService {
   /**
    * Add payment information section.
    * @param {PDFDocument} doc - PDF document instance.
+   * @param {object} selectedPaymentInfo - Selected payment info (optional, falls back to default).
    * @example
    */
-  addPaymentInfo(doc) {
+  addPaymentInfo(doc, selectedPaymentInfo = null) {
     const margin = doc.page.margins.left;
+
+    // Use selected payment info if provided, otherwise use default
+    const paymentInfo = selectedPaymentInfo || this.paymentInfo;
 
     doc.font('Helvetica-Bold')
       .fontSize(10)
@@ -472,35 +494,112 @@ class PDFReceiptService {
       .fillColor('#333333');
 
     // Add payment info lines with consistent spacing
-    doc.text(`Bank: ${this.paymentInfo.bank}`, margin, currentY);
-    currentY += 12;
+    if (paymentInfo.bank) {
+      doc.text(`Bank: ${paymentInfo.bank}`, margin, currentY);
+      currentY += 12;
+    }
 
-    doc.text(`Account Holder: ${this.paymentInfo.accountHolder}`, margin, currentY);
-    currentY += 12;
+    if (paymentInfo.accountHolder) {
+      doc.text(`Account Holder: ${paymentInfo.accountHolder}`, margin, currentY);
+      currentY += 12;
+    }
 
-    doc.text(`Account Number: ${this.paymentInfo.accountNumber}`, margin, currentY);
-    currentY += 12;
+    if (paymentInfo.accountNumber) {
+      doc.text(`Account Number: ${paymentInfo.accountNumber}`, margin, currentY);
+      currentY += 12;
+    }
 
-    doc.text(`Routing Number: ${this.paymentInfo.routingNumber}`, margin, currentY);
-    currentY += 12;
+    if (paymentInfo.routingNumber) {
+      doc.text(`Routing Number: ${paymentInfo.routingNumber}`, margin, currentY);
+      currentY += 12;
+    }
 
-    doc.text(`ACH Routing Number: ${this.paymentInfo.achRoutingNumber}`, margin, currentY);
-    currentY += 12;
+    if (paymentInfo.achRoutingNumber) {
+      doc.text(`ACH Routing Number: ${paymentInfo.achRoutingNumber}`, margin, currentY);
+      currentY += 12;
+    }
 
-    // Zelle info positioned to the right
-    const zelleY = doc.y + 10; // Position Zelle info relative to payment info start
-    doc.font('Helvetica-Bold')
-      .fontSize(12)
-      .fillColor('#6c5ce7')
-      .text('Zelle', margin + 280, zelleY);
+    if (paymentInfo.swiftCode) {
+      doc.text(`SWIFT Code: ${paymentInfo.swiftCode}`, margin, currentY);
+      currentY += 12;
+    }
 
-    doc.fillColor('#333333')
-      .font('Helvetica')
-      .fontSize(8)
-      .text(this.companyContact, margin + 280, zelleY + 15);
+    if (paymentInfo.iban) {
+      doc.text(`IBAN: ${paymentInfo.iban}`, margin, currentY);
+      currentY += 12;
+    }
+
+    // Handle additional payment methods in right column
+    let rightColumnY = doc.y + 10;
+    const rightColumnX = margin + 280;
+    let hasRightColumn = false;
+
+    // Zelle info
+    if (paymentInfo.zelle) {
+      doc.font('Helvetica-Bold')
+        .fontSize(12)
+        .fillColor('#6c5ce7')
+        .text('Zelle', rightColumnX, rightColumnY);
+
+      doc.fillColor('#333333')
+        .font('Helvetica')
+        .fontSize(8)
+        .text(paymentInfo.zelle, rightColumnX, rightColumnY + 15);
+
+      rightColumnY += 35;
+      hasRightColumn = true;
+    }
+
+    // PayPal info
+    if (paymentInfo.paypal) {
+      doc.font('Helvetica-Bold')
+        .fontSize(12)
+        .fillColor('#003087')
+        .text('PayPal', rightColumnX, rightColumnY);
+
+      doc.fillColor('#333333')
+        .font('Helvetica')
+        .fontSize(8)
+        .text(paymentInfo.paypal, rightColumnX, rightColumnY + 15);
+
+      rightColumnY += 35;
+      hasRightColumn = true;
+    }
+
+    // Venmo info
+    if (paymentInfo.venmo) {
+      doc.font('Helvetica-Bold')
+        .fontSize(12)
+        .fillColor('#008cff')
+        .text('Venmo', rightColumnX, rightColumnY);
+
+      doc.fillColor('#333333')
+        .font('Helvetica')
+        .fontSize(8)
+        .text(paymentInfo.venmo, rightColumnX, rightColumnY + 15);
+
+      rightColumnY += 35;
+      hasRightColumn = true;
+    }
+
+    // Add notes if present
+    if (paymentInfo.notes) {
+      const notesY = Math.max(currentY, rightColumnY) + 10;
+      doc.font('Helvetica-Bold')
+        .fontSize(9)
+        .fillColor('#666666')
+        .text('Notes:', margin, notesY);
+
+      doc.font('Helvetica')
+        .fontSize(8)
+        .fillColor('#333333')
+        .text(paymentInfo.notes, margin, notesY + 12, { width: 400 });
+
+      currentY = notesY + 25;
+    }
 
     // Update doc.y to the end of the payment info section
-    const newY = Math.max(currentY, zelleY + 30) + 20;
+    const newY = Math.max(currentY, hasRightColumn ? rightColumnY : currentY) + 20;
     /* eslint-disable-next-line no-param-reassign */
     doc.y = newY;
   }

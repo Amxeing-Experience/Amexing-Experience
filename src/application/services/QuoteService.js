@@ -348,12 +348,19 @@ class QuoteService {
    * @param {string} quoteId - Quote ID to generate receipt for.
    * @param {string} userRole - User role (optional).
    * @param includePaymentInfoOverride
+   * @param paymentInfoId
    * @returns {Promise<object>} Result with success status and receipt data.
    * @throws {Error} If validation fails or quote is not in scheduled status.
    * @example
    * const result = await service.generateReceipt(currentUser, 'abc123', 'department_manager');
    */
-  async generateReceipt(currentUser, quoteId, userRole = null, includePaymentInfoOverride = null) {
+  async generateReceipt(
+    currentUser,
+    quoteId,
+    userRole = null,
+    includePaymentInfoOverride = null,
+    paymentInfoId = null
+  ) {
     try {
       // Validate user authentication
       if (!currentUser) {
@@ -414,17 +421,64 @@ class QuoteService {
       const iva = serviceItemsRaw.iva || 0;
       const total = serviceItemsRaw.total || 0;
 
-      // Determine whether to include payment info
+      // Determine whether to include payment info and get specific payment data
       // For admin role: use the override if provided, otherwise default to true
       // For other roles: follow the standard rule
       let includePaymentInfo;
+      let selectedPaymentInfo = null;
 
       if (role === 'admin' && includePaymentInfoOverride !== null && includePaymentInfoOverride !== undefined) {
         // Admin can override the payment info inclusion
         includePaymentInfo = includePaymentInfoOverride;
+
+        // If admin wants to include payment info and provided a specific ID, get that payment info
+        if (includePaymentInfo && paymentInfoId) {
+          try {
+            const PaymentInfo = require('../../domain/models/PaymentInfo');
+            selectedPaymentInfo = await PaymentInfo.getPaymentInfoById(paymentInfoId);
+            logger.info('Using specific payment info for receipt generation', {
+              paymentInfoId,
+              paymentInfoName: selectedPaymentInfo.name,
+              quoteId,
+              userRole: role,
+            });
+          } catch (error) {
+            logger.warn('Could not load specific payment info, using default', {
+              paymentInfoId,
+              error: error.message,
+              quoteId,
+            });
+            // Fall back to default payment info
+            try {
+              const PaymentInfo = require('../../domain/models/PaymentInfo');
+              selectedPaymentInfo = await PaymentInfo.getDefaultPaymentInfo();
+            } catch (fallbackError) {
+              logger.error('Could not load default payment info either', {
+                fallbackError: fallbackError.message,
+                quoteId,
+              });
+              selectedPaymentInfo = null;
+            }
+          }
+        }
       } else {
         // Default behavior: only admin and superadmin roles should see payment info
         includePaymentInfo = role === 'admin' || role === 'superadmin';
+
+        // For non-admin users or when no specific payment info requested, use default
+        if (includePaymentInfo) {
+          try {
+            const PaymentInfo = require('../../domain/models/PaymentInfo');
+            selectedPaymentInfo = await PaymentInfo.getDefaultPaymentInfo();
+          } catch (error) {
+            logger.warn('Could not load default payment info', {
+              error: error.message,
+              quoteId,
+              userRole: role,
+            });
+            selectedPaymentInfo = null;
+          }
+        }
       }
 
       // Prepare quote data for PDF generation
@@ -455,6 +509,7 @@ class QuoteService {
           total,
         },
         includePaymentInfo, // Pass the flag to PDF service
+        selectedPaymentInfo, // Pass the specific payment info data
       };
 
       // Generate PDF receipt

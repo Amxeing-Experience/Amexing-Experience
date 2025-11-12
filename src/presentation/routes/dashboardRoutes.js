@@ -51,6 +51,7 @@ router.get('/admin/tours', dashboardAuth.requireRole('admin'), (req, res) => adm
 router.get('/admin/quotes', dashboardAuth.requireRole('admin'), (req, res) => adminController.quotes(req, res));
 router.get('/admin/quotes/:id', dashboardAuth.requireRole('admin'), (req, res) => adminController.quoteDetail(req, res));
 router.get('/admin/invoices', dashboardAuth.requireRole('admin'), (req, res) => adminController.invoices(req, res));
+router.get('/admin/payment-info', dashboardAuth.requireRole('admin'), (req, res) => adminController.paymentInfo(req, res));
 router.get('/admin/fleet', dashboardAuth.requireRole('admin'), (req, res) => adminController.fleet(req, res));
 router.get('/admin/routes', dashboardAuth.requireRole('admin'), (req, res) => adminController.routes(req, res));
 router.get('/admin/billing', dashboardAuth.requireRole('admin'), (req, res) => adminController.billing(req, res));

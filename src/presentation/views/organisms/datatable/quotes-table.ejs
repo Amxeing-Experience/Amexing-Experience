@@ -155,15 +155,16 @@ const baseDashboardPath = dtUserRole === 'department_manager'
                 <p>¿Desea generar el recibo para la cotización <strong id="receiptQuoteFolio"></strong>?</p>
                 
                 <% if (dtUserRole === 'admin') { %>
-                <!-- Payment Info Option for Admin Only -->
+                <!-- Payment Info Selection for Admin Only -->
                 <div class="mb-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="checkbox" value="" id="includePaymentInfo" checked>
-                        <label class="form-check-label" for="includePaymentInfo">
-                            <strong>Incluir información de pago</strong>
-                            <small class="d-block text-muted">Incluye datos bancarios y métodos de pago en el recibo</small>
-                        </label>
-                    </div>
+                    <label for="paymentInfoSelect" class="form-label">
+                        <strong>Método de Pago a Incluir</strong>
+                    </label>
+                    <select class="form-select" id="paymentInfoSelect">
+                        <option value="">Sin información de pago</option>
+                        <option value="loading" disabled>Cargando métodos de pago...</option>
+                    </select>
+                    <div class="form-text">Selecciona qué información de pago incluir en el recibo</div>
                 </div>
                 <% } %>
                 
@@ -948,6 +949,55 @@ const baseDashboardPath = dtUserRole === 'department_manager'
         // Reserved Quote Action Functions
 
         /**
+         * Load payment info options for admin
+         */
+        async function loadPaymentInfoOptions() {
+            const userRole = '<%= dtUserRole %>';
+            if (userRole !== 'admin') return;
+
+            const select = document.getElementById('paymentInfoSelect');
+            if (!select) return;
+
+            try {
+                const response = await fetch('/api/payment-info', {
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+                
+                // Clear loading option
+                select.innerHTML = '<option value="">Sin información de pago</option>';
+                
+                if (result.success && result.data && result.data.length > 0) {
+                    result.data.forEach(paymentInfo => {
+                        const option = document.createElement('option');
+                        option.value = paymentInfo.id;
+                        option.textContent = paymentInfo.name;
+                        
+                        // Set default option as selected
+                        if (paymentInfo.isDefault) {
+                            option.selected = true;
+                        }
+                        
+                        select.appendChild(option);
+                    });
+                } else {
+                    const option = document.createElement('option');
+                    option.value = '';
+                    option.textContent = 'No hay métodos de pago configurados';
+                    option.disabled = true;
+                    select.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Error loading payment info options:', error);
+                select.innerHTML = '<option value="">Error al cargar métodos de pago</option>';
+            }
+        }
+
+        /**
          * Open generate receipt confirmation modal
          * @param {string} quoteId - Quote ID to generate receipt for
          * @param {string} quoteFolio - Quote folio for display
@@ -955,6 +1005,10 @@ const baseDashboardPath = dtUserRole === 'department_manager'
         function openGenerateReceiptModal(quoteId, quoteFolio) {
             generateReceiptQuoteId = quoteId;
             $('#receiptQuoteFolio').text(quoteFolio);
+            
+            // Load payment info options for admin
+            loadPaymentInfoOptions();
+            
             const receiptModal = new bootstrap.Modal(document.getElementById('generateReceiptModal'));
             receiptModal.show();
         }
@@ -994,13 +1048,19 @@ const baseDashboardPath = dtUserRole === 'department_manager'
             const originalText = confirmButton.html();
             confirmButton.prop('disabled', true).html('<i class="ti ti-loader ti-spin me-1"></i>Generando...');
 
-            // Get payment info checkbox value (admin only)
+            // Get selected payment info (admin only)
             const userRole = '<%= dtUserRole %>';
             let includePaymentInfo = true; // Default for non-admin roles
+            let selectedPaymentInfoId = null;
             
             if (userRole === 'admin') {
-                const checkbox = document.getElementById('includePaymentInfo');
-                includePaymentInfo = checkbox ? checkbox.checked : true;
+                const select = document.getElementById('paymentInfoSelect');
+                if (select && select.value) {
+                    selectedPaymentInfoId = select.value;
+                    includePaymentInfo = true; // Include payment info if a method is selected
+                } else {
+                    includePaymentInfo = false; // No payment info if nothing selected
+                }
             }
 
             // Create a form and submit it to trigger download
@@ -1021,7 +1081,10 @@ const baseDashboardPath = dtUserRole === 'department_manager'
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ includePaymentInfo })
+                body: JSON.stringify({ 
+                    includePaymentInfo,
+                    paymentInfoId: selectedPaymentInfoId 
+                })
             })
             .then(response => {
                 console.log('PDF generation response status:', response.status);
