@@ -256,7 +256,7 @@ describe('Invoice Request Workflow Integration', () => {
 
       expect(response.status).toBe(403);
       expect(response.body.success).toBe(false);
-      expect(response.body.error).toContain('No tiene permisos');
+      expect(response.body.error).toContain('Insufficient role level');
     });
 
     it('should require authentication for invoice endpoints', async () => {
