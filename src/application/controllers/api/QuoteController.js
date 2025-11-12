@@ -22,10 +22,10 @@ class QuoteController {
   /**
    * Create a new quote
    * POST /api/quotes
-   * Following ServiceController pattern for rate pointer assignment.
+   * Note: Rate is no longer required at quote level (v2.0.0+).
+   * Rates are now managed at subconcept/service level.
    * @param {object} req - Express request object.
    * @param {object} req.body - Request body.
-   * @param {string} req.body.rate - Rate ID (Rate objectId) - REQUIRED.
    * @param {string} [req.body.client] - Client ID (AmexingUser objectId) - OPTIONAL.
    * @param {string} [req.body.contactPerson] - Contact person name.
    * @param {string} [req.body.contactEmail] - Contact email.
@@ -38,7 +38,6 @@ class QuoteController {
   async createQuote(req, res) {
     // Declare variables at method scope for error logging
     let clientObj = null;
-    let rateObj = null;
     let createdByObj = null;
 
     try {
@@ -49,12 +48,9 @@ class QuoteController {
       }
 
       // 2. Extract fields from request body
-      // Accept both 'rate' and 'rateId' for compatibility (frontend sends rateId)
       const {
         client,
         clientId,
-        rate: rateFromBody,
-        rateId,
         contactPerson,
         contactEmail,
         contactPhone,
@@ -64,13 +60,7 @@ class QuoteController {
       } = req.body;
 
       // Normalize field names (accept both formats)
-      const rate = rateFromBody || rateId;
       const clientIdNormalized = client || clientId;
-
-      // Validate required fields
-      if (!rate) {
-        return this.sendError(res, 'La tarifa es requerida', 400);
-      }
 
       // 3. Create client pointer to AmexingUser (if provided)
       if (clientIdNormalized) {
@@ -81,14 +71,7 @@ class QuoteController {
         };
       }
 
-      // 4. Create rate pointer (required)
-      rateObj = {
-        __type: 'Pointer',
-        className: 'Rate',
-        objectId: rate,
-      };
-
-      // 4.5. Create createdBy pointer to current user (required)
+      // 4. Create createdBy pointer to current user (required)
       createdByObj = {
         __type: 'Pointer',
         className: 'AmexingUser',
@@ -105,7 +88,7 @@ class QuoteController {
       if (clientObj) {
         quote.set('client', clientObj); // Full Pointer object (optional)
       }
-      quote.set('rate', rateObj); // Full Pointer object (required)
+      // Note: Rate is no longer set at quote level (v2.0.0+)
       quote.set('createdBy', createdByObj); // Full Pointer object (required)
 
       // 8. Set basic fields
@@ -130,7 +113,6 @@ class QuoteController {
       logger.info('Attempting to save quote with data:', {
         folio,
         clientPointer: clientObj,
-        ratePointer: rateObj,
         contactPerson: contactPerson || '',
         contactEmail: contactEmail || '',
         contactPhone: contactPhone || '',
@@ -157,7 +139,6 @@ class QuoteController {
         quoteId: quote.id,
         folio,
         clientId: clientObj ? clientObj.objectId : null,
-        rateId: rateObj.objectId,
         createdBy: currentUser.id,
         createdByEmail: currentUser.get('email'),
       });
@@ -167,7 +148,6 @@ class QuoteController {
         id: quote.id,
         folio,
         clientId: clientObj ? clientObj.objectId : null,
-        rateId: rateObj.objectId,
         contactPerson: contactPerson || '',
         contactEmail: contactEmail || '',
         contactPhone: contactPhone || '',
@@ -189,7 +169,6 @@ class QuoteController {
         userId: req.user?.id,
         requestBody: req.body,
         clientPointerAttempted: clientObj,
-        ratePointerAttempted: rateObj,
       });
 
       // Return more detailed error message
@@ -290,11 +269,19 @@ class QuoteController {
       // Execute query
       const quotes = await filteredQuery.find({ useMasterKey: true });
 
-      // Format data for DataTables
-      const data = quotes.map((quote) => {
+      // Format data for DataTables and check for pending invoice requests
+      const data = await Promise.all(quotes.map(async (quote) => {
         const client = quote.get('client');
         const rate = quote.get('rate');
         const createdBy = quote.get('createdBy');
+
+        // Check if quote has pending invoice request
+        let hasPendingInvoiceRequest = false;
+        try {
+          hasPendingInvoiceRequest = await this.quoteService.hasPendingInvoiceRequest(quote.id);
+        } catch (error) {
+          logger.warn('Error checking pending invoice request', { quoteId: quote.id, error: error.message });
+        }
 
         return {
           id: quote.id,
@@ -334,13 +321,15 @@ class QuoteController {
           notes: quote.get('notes') || '',
           validUntil: quote.get('validUntil'),
           active: quote.get('active'),
+          hasPendingInvoiceRequest, // Add invoice status
           createdAt: quote.createdAt,
           updatedAt: quote.updatedAt,
         };
-      });
+      }));
 
       // DataTables response format
       const response = {
+        success: true,
         draw,
         recordsTotal,
         recordsFiltered,
@@ -1253,6 +1242,521 @@ class QuoteController {
   }
 
   /**
+   * Get available services filtered by specific rate (not quote-level).
+   * GET /api/quotes/services-by-rate/:rateId?numberOfPeople=X.
+   *
+   * Used when adding traslado subconcept - user selects rate first, then service.
+   * Returns services grouped by route with vehicle types and pricing.
+   * Filters vehicles by capacity if numberOfPeople query parameter is provided.
+   * Includes trunk capacity for each vehicle type.
+   * @param {object} req - Express request object.
+   * @param {string} req.params.rateId - Rate ID to filter services.
+   * @param {number} [req.query.numberOfPeople] - Optional number of people for capacity filtering.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/quotes/services-by-rate/ABC123?numberOfPeople=10
+   * Response: { success: true, data: [{ routeKey, originName, destinationName, vehicles: [{ capacity: 14, trunkCapacity: 10, ... }] }] }
+   */
+  async getAvailableServicesByRate(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // 2. Get rate ID from params and optional quoteNumberOfPeople from query
+      const { rateId } = req.params;
+      const quoteNumberOfPeople = parseInt(req.query.numberOfPeople) || 0;
+
+      if (!rateId) {
+        return this.sendError(res, 'El ID de la tarifa es requerido', 400);
+      }
+
+      // 3. Fetch rate
+      const rateQuery = new Parse.Query('Rate');
+      const rate = await rateQuery.get(rateId, { useMasterKey: true });
+
+      if (!rate) {
+        return this.sendError(res, 'Tarifa no encontrada', 404);
+      }
+
+      // 4. Get services filtered by this rate
+      const servicesQuery = new Parse.Query('Service');
+      servicesQuery.equalTo('rate', rate);
+      servicesQuery.equalTo('active', true);
+      servicesQuery.equalTo('exists', true);
+      servicesQuery.include('originPOI');
+      servicesQuery.include('destinationPOI');
+      servicesQuery.include('destinationPOI.serviceType');
+      servicesQuery.include('vehicleType');
+      servicesQuery.limit(1000); // Support large datasets
+
+      const services = await servicesQuery.find({ useMasterKey: true });
+
+      // 5. Group services by route (origin → destination)
+      const routeMap = new Map();
+
+      // Use for...of to support async price calculations
+      for (const service of services) {
+        const originPOI = service.get('originPOI');
+        const destinationPOI = service.get('destinationPOI');
+        const vehicleType = service.get('vehicleType');
+        const serviceType = destinationPOI?.get('serviceType');
+
+        const originId = originPOI ? originPOI.id : 'local';
+        const destinationId = destinationPOI ? destinationPOI.id : '';
+        const routeKey = `${originId}_${destinationId}`;
+
+        const originName = originPOI ? originPOI.get('name') : 'Local';
+        const destinationName = destinationPOI ? destinationPOI.get('name') : '';
+        const isRoundTrip = service.get('isRoundTrip') || false;
+
+        if (!routeMap.has(routeKey)) {
+          routeMap.set(routeKey, {
+            routeKey,
+            originName,
+            destinationName,
+            originId,
+            destinationId,
+            serviceType: serviceType ? serviceType.get('name') : '',
+            vehicles: [],
+            hasRoundTrip: false, // Will be set to true if any vehicle is round trip
+          });
+        }
+
+        // Update hasRoundTrip flag if this service is round trip
+        const route = routeMap.get(routeKey);
+        if (isRoundTrip) {
+          route.hasRoundTrip = true;
+        }
+
+        // Get vehicle capacity
+        const vehicleCapacity = vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4;
+        const trunkCapacity = vehicleType ? vehicleType.get('trunkCapacity') || 0 : 0;
+
+        // Filter by capacity if quoteNumberOfPeople is provided
+        // Only add vehicle if it meets capacity requirements
+        if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
+          // Get price breakdown with surcharge
+          const basePrice = service.get('price') || 0;
+          const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+          // Add vehicle type to this route with price breakdown and capacity info
+          route.vehicles.push({
+            serviceId: service.id,
+            vehicleType: vehicleType ? vehicleType.get('name') : '',
+            vehicleTypeId: vehicleType ? vehicleType.id : null,
+            capacity: vehicleCapacity,
+            trunkCapacity,
+            basePrice: priceBreakdown.basePrice, // Cash price (precio contado)
+            price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
+            surcharge: priceBreakdown.surcharge, // Surcharge amount
+            surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
+            note: service.get('note') || '',
+            isRoundTrip,
+          });
+        }
+      }
+
+      // 6. Convert map to array and add labels with appropriate arrows
+      const groupedRoutes = Array.from(routeMap.values()).map((route) => {
+        const arrow = route.hasRoundTrip ? '<->' : '->';
+        const label = route.originName === 'Local'
+          ? route.destinationName
+          : `${route.originName} ${arrow} ${route.destinationName}`;
+
+        return {
+          ...route,
+          label,
+        };
+      });
+
+      logger.info('Available services fetched and grouped by rate', {
+        rateId,
+        rateName: rate.get('name'),
+        servicesCount: services.length,
+        routesCount: groupedRoutes.length,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: groupedRoutes,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getAvailableServicesByRate', {
+        error: error.message,
+        stack: error.stack,
+        rateId: req.params.rateId,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener los servicios disponibles', 500);
+    }
+  }
+
+  /**
+   * Get available tours filtered by specific rate (not quote-level).
+   * GET /api/quotes/tours-by-rate/:rateId.
+   *
+   * Used when adding tour subconcept - user selects rate first, then tour.
+   * Returns tours grouped by destination with vehicle types and pricing.
+   * @param {object} req - Express request object.
+   * @param {string} req.params.rateId - Rate ID to filter tours.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/quotes/tours-by-rate/ABC123
+   * Response: { success: true, data: [{ destinationKey, destinationName, vehicles: [...] }] }
+   */
+  async getAvailableToursByRate(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // 2. Get rate ID from params
+      const { rateId } = req.params;
+      if (!rateId) {
+        return this.sendError(res, 'El ID de la tarifa es requerido', 400);
+      }
+
+      // 3. Fetch rate
+      const rateQuery = new Parse.Query('Rate');
+      const rate = await rateQuery.get(rateId, { useMasterKey: true });
+
+      if (!rate) {
+        return this.sendError(res, 'Tarifa no encontrada', 404);
+      }
+
+      // 4. Get tours filtered by this rate
+      const toursQuery = new Parse.Query('Tours');
+      toursQuery.equalTo('rate', rate);
+      toursQuery.equalTo('active', true);
+      toursQuery.equalTo('exists', true);
+      toursQuery.include('destinationPOI');
+      toursQuery.include('vehicleType');
+      toursQuery.limit(1000); // Support large datasets
+
+      const tours = await toursQuery.find({ useMasterKey: true });
+
+      // 5. Group tours by destination POI
+      const destinationMap = new Map();
+
+      // Use for...of to support async price calculations
+      for (const tour of tours) {
+        const destinationPOI = tour.get('destinationPOI');
+        const vehicleType = tour.get('vehicleType');
+
+        const destinationId = destinationPOI ? destinationPOI.id : 'unknown';
+        const destinationName = destinationPOI ? destinationPOI.get('name') : 'Sin destino';
+
+        if (!destinationMap.has(destinationId)) {
+          destinationMap.set(destinationId, {
+            destinationKey: destinationId,
+            destinationName,
+            vehicles: [],
+          });
+        }
+
+        // Get price breakdown with surcharge
+        const basePrice = tour.get('price') || 0;
+        const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+        // Get duration in minutes and convert to hours
+        const durationMinutes = tour.get('time') || 0;
+        const durationHours = Math.round((durationMinutes / 60) * 10) / 10; // Round to 1 decimal
+
+        // Add vehicle type to this destination with price breakdown
+        const destination = destinationMap.get(destinationId);
+        destination.vehicles.push({
+          tourId: tour.id,
+          vehicleType: vehicleType ? vehicleType.get('name') : '',
+          vehicleTypeId: vehicleType ? vehicleType.id : null,
+          capacity: vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4,
+          basePrice: priceBreakdown.basePrice, // Cash price (precio contado)
+          price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
+          surcharge: priceBreakdown.surcharge, // Surcharge amount
+          surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
+          durationMinutes, // Original duration in minutes
+          durationHours, // Converted to hours for display
+          minPassengers: tour.get('minPassengers') || null,
+          maxPassengers: tour.get('maxPassengers') || null,
+          note: tour.get('notes') || '',
+        });
+      }
+
+      // 6. Convert map to array and add labels
+      const groupedDestinations = Array.from(destinationMap.values()).map((destination) => ({
+        ...destination,
+        label: destination.destinationName, // For dropdown display
+      }));
+
+      logger.info('Available tours fetched and grouped by destination', {
+        rateId,
+        rateName: rate.get('name'),
+        toursCount: tours.length,
+        destinationsCount: groupedDestinations.length,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: groupedDestinations,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getAvailableToursByRate', {
+        error: error.message,
+        stack: error.stack,
+        rateId: req.params.rateId,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener los tours disponibles', 500);
+    }
+  }
+
+  /**
+   * Get unique tour destinations for a specific rate (Step 2 of 3-step tour selection).
+   * GET /api/quotes/tours/destinations-by-rate/:rateId.
+   *
+   * Returns list of unique destinations that have tours available for the specified rate.
+   * This is the second step in the tour selection flow: Rate → Destination → Vehicle.
+   * @param {object} req - Express request object with rateId in params.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * Response: {
+   *   success: true,
+   *   data: [
+   *     { destinationId: 'abc123', destinationName: 'San Miguel de Allende' },
+   *     { destinationId: 'def456', destinationName: 'Dolores Hidalgo' }
+   *   ]
+   * }
+   */
+  async getTourDestinationsByRate(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // 2. Get rate ID from params
+      const { rateId } = req.params;
+      if (!rateId) {
+        return this.sendError(res, 'El ID de la tarifa es requerido', 400);
+      }
+
+      // 3. Fetch rate
+      const rateQuery = new Parse.Query('Rate');
+      const rate = await rateQuery.get(rateId, { useMasterKey: true });
+
+      if (!rate) {
+        return this.sendError(res, 'Tarifa no encontrada', 404);
+      }
+
+      // 4. Get all tours for this rate
+      const toursQuery = new Parse.Query('Tours');
+      toursQuery.equalTo('rate', rate);
+      toursQuery.equalTo('active', true);
+      toursQuery.equalTo('exists', true);
+      toursQuery.include('destinationPOI');
+      toursQuery.limit(1000);
+
+      const tours = await toursQuery.find({ useMasterKey: true });
+
+      // 5. Extract unique destinations
+      const destinationMap = new Map();
+
+      tours.forEach((tour) => {
+        const destinationPOI = tour.get('destinationPOI');
+        if (destinationPOI) {
+          const destinationId = destinationPOI.id;
+          const destinationName = destinationPOI.get('name');
+
+          if (!destinationMap.has(destinationId)) {
+            destinationMap.set(destinationId, {
+              destinationId,
+              destinationName,
+            });
+          }
+        }
+      });
+
+      // 6. Convert map to array
+      const uniqueDestinations = Array.from(destinationMap.values());
+
+      logger.info('Tour destinations fetched for rate', {
+        rateId,
+        rateName: rate.get('name'),
+        destinationsCount: uniqueDestinations.length,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: uniqueDestinations,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getTourDestinationsByRate', {
+        error: error.message,
+        stack: error.stack,
+        rateId: req.params.rateId,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener destinos de tours', 500);
+    }
+  }
+
+  /**
+   * Get available vehicles for a specific rate and destination (Step 3 of 3-step tour selection).
+   * GET /api/quotes/tours/vehicles-by-rate-destination/:rateId/:destinationId?numberOfPeople=X.
+   *
+   * Returns list of vehicle types available for the specified rate + destination combination.
+   * Each vehicle includes tour details (tourId, price, duration, capacity, trunk capacity).
+   * Filters vehicles by capacity if numberOfPeople query parameter is provided.
+   * This is the third step in the tour selection flow: Rate → Destination → Vehicle.
+   * @param {object} req - Express request object with rateId and destinationId in params.
+   * @param {number} [req.query.numberOfPeople] - Optional number of people for capacity filtering.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/quotes/tours/vehicles-by-rate-destination/ABC123/POI456?numberOfPeople=10
+   * Response: {
+   *   success: true,
+   *   data: [
+   *     {
+   *       tourId: 'tour123',
+   *       vehicleType: 'Sprinter',
+   *       vehicleTypeId: 'veh456',
+   *       capacity: 14,
+   *       trunkCapacity: 10,
+   *       basePrice: 925.72,
+   *       price: 1065.58,
+   *       surcharge: 139.86,
+   *       surchargePercentage: 15.1,
+   *       durationMinutes: 120,
+   *       durationHours: 2.0
+   *     }
+   *   ]
+   * }
+   */
+  async getTourVehiclesByRateAndDestination(req, res) {
+    try {
+      // 1. Verify authenticated user
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // 2. Get rate ID, destination ID from params, and optional numberOfPeople from query
+      const { rateId, destinationId } = req.params;
+      const quoteNumberOfPeople = parseInt(req.query.numberOfPeople) || 0;
+
+      if (!rateId || !destinationId) {
+        return this.sendError(res, 'El ID de la tarifa y destino son requeridos', 400);
+      }
+
+      // 3. Fetch rate
+      const rateQuery = new Parse.Query('Rate');
+      const rate = await rateQuery.get(rateId, { useMasterKey: true });
+
+      if (!rate) {
+        return this.sendError(res, 'Tarifa no encontrada', 404);
+      }
+
+      // 4. Fetch destination POI
+      const poiQuery = new Parse.Query('POI');
+      const destinationPOI = await poiQuery.get(destinationId, { useMasterKey: true });
+
+      if (!destinationPOI) {
+        return this.sendError(res, 'Destino no encontrado', 404);
+      }
+
+      // 5. Get tours filtered by rate AND destination
+      const toursQuery = new Parse.Query('Tours');
+      toursQuery.equalTo('rate', rate);
+      toursQuery.equalTo('destinationPOI', destinationPOI);
+      toursQuery.equalTo('active', true);
+      toursQuery.equalTo('exists', true);
+      toursQuery.include('vehicleType');
+      toursQuery.limit(1000);
+
+      const tours = await toursQuery.find({ useMasterKey: true });
+
+      // 6. Build vehicle list with pricing
+      const vehicles = [];
+
+      for (const tour of tours) {
+        const vehicleType = tour.get('vehicleType');
+
+        // Get vehicle capacity
+        const vehicleCapacity = vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4;
+        const trunkCapacity = vehicleType ? vehicleType.get('trunkCapacity') || 0 : 0;
+
+        // Filter by capacity if quoteNumberOfPeople is provided
+        // Only add vehicle if it meets capacity requirements
+        if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
+          // Get price breakdown with surcharge
+          const basePrice = tour.get('price') || 0;
+          const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+
+          // Get duration in minutes and convert to hours
+          const durationMinutes = tour.get('time') || 0;
+          const durationHours = Math.round((durationMinutes / 60) * 10) / 10;
+
+          vehicles.push({
+            tourId: tour.id,
+            vehicleType: vehicleType ? vehicleType.get('name') : '',
+            vehicleTypeId: vehicleType ? vehicleType.id : null,
+            capacity: vehicleCapacity,
+            trunkCapacity,
+            basePrice: priceBreakdown.basePrice,
+            price: priceBreakdown.totalPrice,
+            surcharge: priceBreakdown.surcharge,
+            surchargePercentage: priceBreakdown.surchargePercentage,
+            durationMinutes,
+            durationHours,
+            minPassengers: tour.get('minPassengers') || null,
+            maxPassengers: tour.get('maxPassengers') || null,
+            note: tour.get('notes') || '',
+          });
+        }
+      }
+
+      logger.info('Tour vehicles fetched for rate and destination', {
+        rateId,
+        rateName: rate.get('name'),
+        destinationId,
+        destinationName: destinationPOI.get('name'),
+        vehiclesCount: vehicles.length,
+        userId: currentUser.id,
+      });
+
+      return res.json({
+        success: true,
+        data: vehicles,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getTourVehiclesByRateAndDestination', {
+        error: error.message,
+        stack: error.stack,
+        rateId: req.params.rateId,
+        destinationId: req.params.destinationId,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error al obtener vehículos de tours', 500);
+    }
+  }
+
+  /**
    * Generate share link for public quote viewing.
    * POST /api/quotes/:id/share-link.
    *
@@ -1536,6 +2040,161 @@ class QuoteController {
         className: 'AmexingUser',
         objectId: currentUser.id,
       });
+    }
+  }
+
+  /**
+   * Generate receipt for reserved quote.
+   * POST /api/quotes/:id/generate-receipt.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async generateReceipt(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const quoteId = req.params.id;
+
+      // Get payment info parameters from request body (for admin role)
+      const { includePaymentInfo, paymentInfoId } = req.body;
+
+      const result = await this.quoteService.generateReceipt(
+        currentUser,
+        quoteId,
+        req.userRole, // Pass userRole from JWT middleware
+        includePaymentInfo, // Pass the flag from request
+        paymentInfoId // Pass the specific payment info ID
+      );
+
+      // If PDF buffer is returned, send it as a downloadable file
+      if (result.success && result.data.pdfBuffer) {
+        const { pdfBuffer, filename } = result.data;
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', pdfBuffer.length);
+
+        return res.send(pdfBuffer);
+      }
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Error in QuoteController.generateReceipt', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al generar el recibo',
+        500
+      );
+    }
+  }
+
+  /**
+   * Request invoice for reserved quote.
+   * POST /api/quotes/:id/request-invoice.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async requestInvoice(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const quoteId = req.params.id;
+
+      const result = await this.quoteService.requestInvoice(
+        currentUser,
+        quoteId,
+        req.userRole // Pass userRole from JWT middleware
+      );
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Error in QuoteController.requestInvoice', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      // Check for specific business rule errors that should return 400
+      const businessRuleErrors = [
+        'There is already a pending invoice request for this quote',
+        'Quote must be in scheduled status to request invoice',
+        'Quote not found',
+        'Unauthorized: Role',
+      ];
+
+      const isBusinessRuleError = businessRuleErrors.some((errorText) => error.message.includes(errorText));
+
+      const statusCode = isBusinessRuleError ? 400 : 500;
+      let errorMessage;
+      if (isBusinessRuleError) {
+        errorMessage = error.message;
+      } else if (process.env.NODE_ENV === 'development') {
+        errorMessage = `Error: ${error.message}`;
+      } else {
+        errorMessage = 'Error al solicitar la factura';
+      }
+
+      return this.sendError(res, errorMessage, statusCode);
+    }
+  }
+
+  /**
+   * Cancel reservation for reserved quote.
+   * POST /api/quotes/:id/cancel-reservation.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async cancelReservation(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const quoteId = req.params.id;
+      const { reason } = req.body;
+
+      const result = await this.quoteService.cancelReservation(
+        currentUser,
+        quoteId,
+        reason || '',
+        req.userRole // Pass userRole from JWT middleware
+      );
+
+      return res.json(result);
+    } catch (error) {
+      logger.error('Error in QuoteController.cancelReservation', {
+        error: error.message,
+        stack: error.stack,
+        quoteId: req.params.id,
+        userId: req.user?.id,
+        reason: req.body?.reason,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al cancelar la reserva',
+        500
+      );
     }
   }
 

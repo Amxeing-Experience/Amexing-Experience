@@ -127,25 +127,6 @@
                 </div>
             </div>
 
-            <!-- Sección: Información de Tarifa -->
-            <div class="mb-4">
-                <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                    <i class="ti ti-percentage me-1"></i>
-                    Tarifa Aplicable
-                </h6>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="rateId" class="form-label">Tarifa <span class="text-danger">*</span></label>
-                        <select class="form-select" id="rateId" name="rateId" required>
-                            <option value="">Seleccionar tarifa</option>
-                        </select>
-                        <div class="form-text">Tarifa que se aplicará a todos los servicios de esta cotización</div>
-                        <div class="invalid-feedback">Por favor selecciona una tarifa</div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Sección: Notas Adicionales -->
             <div class="mb-4">
                 <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
@@ -173,7 +154,11 @@
                     <select class="form-select" id="status" name="status">
                         <option value="requested">Solicitado</option>
                         <option value="hold">Bloqueado</option>
-                        <option value="scheduled">Agendado</option>
+                        <% 
+                        // Show different text based on user role
+                        const scheduledText = (typeof userRole !== 'undefined' && userRole === 'admin') ? 'Aprobado' : 'Agendado';
+                        %>
+                        <option value="scheduled"><%= scheduledText %></option>
                         <option value="rejected">Rechazado</option>
                     </select>
                     <div class="form-text">El estado actual de la cotización</div>
@@ -186,7 +171,7 @@
                 <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                 <div>
                     <strong>Cotización:</strong>
-                    <p class="mb-0 mt-1">Define la información básica del cliente y la tarifa aplicable. Una vez creada, podrás agregar servicios en la siguiente sección.</p>
+                    <p class="mb-0 mt-1">Define la información básica del cliente. Una vez creada, podrás agregar servicios y seleccionar tarifas específicas para cada traslado en la siguiente sección.</p>
                 </div>
             </div>
 
@@ -445,34 +430,6 @@
         }
     }
 
-    // Load active rates
-    async function loadActiveRates() {
-        try {
-            const response = await fetch('/api/rates/active', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${getAccessToken()}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const result = await response.json();
-
-            if (result.success && result.data) {
-                const rateSelect = document.getElementById('rateId');
-                result.data.forEach(rate => {
-                    const option = document.createElement('option');
-                    option.value = rate.value;
-                    option.textContent = rate.label;
-                    rateSelect.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Error loading rates:', error);
-            showAlert('quoteInformationAlerts', 'Error al cargar las tarifas', 'danger');
-        }
-    }
-
     // Auto-fill contact information when client is selected (admin/superadmin only)
     async function handleClientSelection() {
         try {
@@ -641,10 +598,6 @@
                     document.getElementById('contactPhone').value = quote.contactPhone;
                 }
 
-                if (quote.rate && quote.rate.id) {
-                    document.getElementById('rateId').value = quote.rate.id;
-                }
-
                 if (quote.notes) {
                     document.getElementById('notes').value = quote.notes;
                 }
@@ -790,7 +743,6 @@
             contactPerson: document.getElementById('contactPerson').value.trim() || undefined,
             contactEmail: document.getElementById('contactEmail').value.trim() || undefined,
             contactPhone: document.getElementById('contactPhone').value.trim() || undefined,
-            rateId: document.getElementById('rateId').value,
             notes: document.getElementById('notes').value.trim() || undefined
         };
 
@@ -841,16 +793,12 @@
         try {
             // Load data based on user role
             if (userRole === 'department_manager') {
-                // For department manager: load current user as client and rates
-                loadCurrentUserAsClient(); // No longer async
-                await loadActiveRates();
+                // For department manager: load current user as client
+                loadCurrentUserAsClient();
             } else {
-                // For admin/superadmin: load clients and rates
-                await Promise.all([
-                    loadActiveClients(),
-                    loadActiveRates()
-                ]);
-                
+                // For admin/superadmin: load clients
+                await loadActiveClients();
+
                 // Setup client selection handler only for admin/superadmin
                 await handleClientSelection();
             }

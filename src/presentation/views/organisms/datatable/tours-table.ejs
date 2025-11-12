@@ -41,6 +41,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     </div>
   </div>
 
+  <!-- Filtros -->
+  <div class="card-body border-bottom bg-light">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <label for="filterRate-tours" class="form-label fw-semibold">
+          <i class="ti ti-percentage me-1"></i>Filtrar por Tarifa
+        </label>
+        <select class="form-select" id="filterRate-tours">
+          <option value="">Todas las tarifas</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
   <div class="card-body">
     <div class="table-responsive">
       <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
@@ -53,7 +67,6 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <th>Pasajeros</th>
             <th>Precio</th>
             <th>Precio Contado</th>
-            <th>Tarifa</th>
             <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
             <% if (dtShowActions) { %>
             <th class="text-center">Acciones</th>
@@ -346,6 +359,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         ajax: {
           url: API,
           type: 'GET',
+          data: function(d) {
+            // Add rate filter parameter
+            d.rateId = $('#filterRate-tours').val();
+            return d;
+          },
           dataSrc: function(json) {
             if (!json.success) {
               showErrorAlert('Error al cargar los datos de tours: ' + (json.error || 'Error desconocido'));
@@ -495,15 +513,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               `;
             }
           },
-          // 7. Tarifa
-          {
-            data: 'rate',
-            render: function(data, type, row) {
-              if (!data) return '-';
-              return data.name || 'Sin tarifa';
-            }
-          },
-          // 8. Estado
+          // 7. Estado
           ...(userRole !== 'department_manager' ? [{
             data: 'active',
             defaultContent: false,
@@ -1239,6 +1249,38 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
           }, 8000);
         }
       }
+
+      // Load rates for filter dropdown
+      function loadRatesFilter() {
+        $.ajax({
+          url: '/api/rates/active',
+          type: 'GET',
+          success: function(response) {
+            if (response.success && response.data) {
+              const select = $('#filterRate-tours');
+              select.find('option:not(:first)').remove();
+              response.data.forEach(function(rate) {
+                const option = $('<option></option>')
+                  .attr('value', rate.value)
+                  .text(rate.label)
+                  .attr('data-color', rate.color || '#6366F1');
+                select.append(option);
+              });
+            }
+          },
+          error: function(xhr, status, error) {
+            console.error('Error loading rates for filter:', error);
+          }
+        });
+      }
+
+      // Reload DataTable when filter changes
+      $('#filterRate-tours').on('change', function() {
+        table.ajax.reload();
+      });
+
+      // Load rates on page load
+      loadRatesFilter();
 
       function showSuccessAlert(message) {
         const alertHtml = `

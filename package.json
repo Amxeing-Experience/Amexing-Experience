@@ -249,6 +249,7 @@
     "multer": "^2.0.2",
     "parse": "^7.0.0",
     "parse-server": "8.4.0-alpha.2",
+    "pdfkit": "^0.17.2",
     "serve-favicon": "^2.5.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
