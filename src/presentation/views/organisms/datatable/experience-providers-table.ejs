@@ -142,6 +142,56 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         </div>
                         <div class="form-text">Costo base del proveedor (mínimo $0.00)</div>
                     </div>
+
+                    <!-- Sección: Disponibilidad (Opcional) -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-calendar-time me-1"></i>
+                            Disponibilidad <span class="text-muted fw-normal">(Opcional)</span>
+                        </h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">Selecciona Días y Configura Horarios</label>
+                            <div class="d-flex gap-2 flex-wrap mb-3" id="providerAvailableDaysContainer">
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="1" data-day-name="Lunes">
+                                    <i class="ti ti-calendar"></i> Lu
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="2" data-day-name="Martes">
+                                    <i class="ti ti-calendar"></i> Ma
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="3" data-day-name="Miércoles">
+                                    <i class="ti ti-calendar"></i> Mi
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="4" data-day-name="Jueves">
+                                    <i class="ti ti-calendar"></i> Ju
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="5" data-day-name="Viernes">
+                                    <i class="ti ti-calendar"></i> Vi
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="6" data-day-name="Sábado">
+                                    <i class="ti ti-calendar"></i> Sa
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="0" data-day-name="Domingo">
+                                    <i class="ti ti-calendar"></i> Do
+                                </button>
+                            </div>
+                            <div class="form-text">Selecciona días para configurar horarios individuales</div>
+                        </div>
+
+                        <!-- Contenedor de horarios por día -->
+                        <div id="providerDaySchedulesContainer" class="mb-3">
+                            <div id="providerNoDaysSelected" class="text-center text-muted py-4 border rounded bg-light">
+                                <i class="ti ti-calendar-off fs-3 d-block mb-2"></i>
+                                <p class="mb-0">Selecciona días para configurar sus horarios</p>
+                                <small class="text-muted">Cada día puede tener horarios diferentes</small>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info" role="alert">
+                            <i class="ti ti-info-circle me-2"></i>
+                            <small>Si no se especifica disponibilidad, el proveedor estará disponible todos los días sin restricción de horario</small>
+                        </div>
+                    </div>
                 </form>
             </div>
 
@@ -156,6 +206,35 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         </div>
     </div>
 </div>
+
+<!-- Template para fila de horario por día -->
+<template id="providerDayScheduleRowTemplate">
+    <div class="day-schedule-row mb-3 p-3 border rounded bg-light" data-day="">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <strong class="day-name text-primary">
+                    <i class="ti ti-calendar me-1"></i>
+                    <span></span>
+                </strong>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Hora de Inicio</label>
+                <input type="text" class="form-control form-control-sm day-start-time time-input" placeholder="HH:MM" maxlength="5">
+                <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Hora de Fin</label>
+                <input type="text" class="form-control form-control-sm day-end-time time-input" placeholder="HH:MM" maxlength="5">
+                <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-day-btn" title="Eliminar día">
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
 
 <script>
 (function() {
@@ -395,6 +474,104 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $(`#${tableId}`).on('click', '.delete-provider-btn', function() { deleteProvider($(this).data('id'), $(this).data('name')); });
         $('#saveProviderBtn').on('click', function() { saveProvider(); });
 
+        // ========== AVAILABILITY CALENDAR MANAGEMENT ==========
+        let daySchedules = {};
+
+        function initializeDaySelection() {
+            $('#providerAvailableDaysContainer .day-btn').removeClass('active btn-primary').addClass('btn-outline-primary');
+            $('#providerDaySchedulesContainer .day-schedule-row').remove();
+            daySchedules = {};
+            updateNoDaysMessage();
+        }
+
+        $(document).on('click', '#providerAvailableDaysContainer .day-btn', function() {
+            const dayCode = parseInt($(this).data('day'));
+            const dayName = $(this).data('day-name');
+            const isSelected = $(this).hasClass('active');
+            if (isSelected) {
+                removeDaySchedule(dayCode);
+                $(this).removeClass('active btn-primary').addClass('btn-outline-primary');
+            } else {
+                addDaySchedule(dayCode, dayName);
+                $(this).removeClass('btn-outline-primary').addClass('active btn-primary');
+            }
+            updateNoDaysMessage();
+        });
+
+        function addDaySchedule(dayCode, dayName, startTime = '', endTime = '') {
+            if (daySchedules[dayCode]) return;
+            const template = document.getElementById('providerDayScheduleRowTemplate');
+            const clone = template.content.cloneNode(true);
+            const row = clone.querySelector('.day-schedule-row');
+            row.setAttribute('data-day', dayCode);
+            row.querySelector('.day-name span').textContent = dayName;
+            if (startTime) row.querySelector('.day-start-time').value = startTime;
+            if (endTime) row.querySelector('.day-end-time').value = endTime;
+            insertDayScheduleSorted(row, dayCode);
+            daySchedules[dayCode] = { dayName: dayName, element: row };
+            attachTimeInputValidation(row.querySelector('.day-start-time'));
+            attachTimeInputValidation(row.querySelector('.day-end-time'));
+        }
+
+        function insertDayScheduleSorted(row, dayCode) {
+            const container = $('#providerDaySchedulesContainer');
+            const existingRows = container.find('.day-schedule-row');
+            const sortValue = dayCode === 0 ? 7 : dayCode;
+            let inserted = false;
+            existingRows.each(function() {
+                const existingDayCode = parseInt($(this).attr('data-day'));
+                const existingSortValue = existingDayCode === 0 ? 7 : existingDayCode;
+                if (sortValue < existingSortValue) {
+                    $(this).before(row);
+                    inserted = true;
+                    return false;
+                }
+            });
+            if (!inserted) container.append(row);
+        }
+
+        function removeDaySchedule(dayCode) {
+            if (!daySchedules[dayCode]) return;
+            $(daySchedules[dayCode].element).remove();
+            delete daySchedules[dayCode];
+        }
+
+        $(document).on('click', '.remove-day-btn', function() {
+            const row = $(this).closest('.day-schedule-row');
+            const dayCode = parseInt(row.attr('data-day'));
+            $(`#providerAvailableDaysContainer .day-btn[data-day="${dayCode}"]`).removeClass('active btn-primary').addClass('btn-outline-primary');
+            removeDaySchedule(dayCode);
+            updateNoDaysMessage();
+        });
+
+        function updateNoDaysMessage() {
+            const hasDays = Object.keys(daySchedules).length > 0;
+            $('#providerNoDaysSelected').toggle(!hasDays);
+        }
+
+        function attachTimeInputValidation(input) {
+            const $input = $(input);
+            $input.on('input', function() {
+                let value = $(this).val().replace(/[^0-9]/g, '');
+                if (value.length >= 2) {
+                    value = value.substring(0, 2) + ':' + value.substring(2, 4);
+                }
+                $(this).val(value);
+            });
+            $input.on('blur', function() {
+                const value = $(this).val();
+                if (!value) return;
+                const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+                if (!timeRegex.test(value)) {
+                    $(this).addClass('is-invalid');
+                    showModalError('Formato de hora inválido. Use HH:MM (00:00 a 23:59)');
+                } else {
+                    $(this).removeClass('is-invalid');
+                }
+            });
+        }
+        // ========== END AVAILABILITY CALENDAR MANAGEMENT ==========
+
         function openProviderModal(isEdit = false) {
             // Clear any previous modal alerts
             const alertsContainer = document.getElementById('providerModalAlerts');
@@ -410,6 +587,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#duration').val(''); // No default value - optional field
             $('#modalTitle').text(isEdit ? 'Editar Proveedor' : 'Crear Nuevo Proveedor');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Proveedor');
+            initializeDaySelection();
         }
 
         function loadProviderData(providerId) {
@@ -427,6 +605,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#providerType').val(provider.providerType || '');
                         $('#duration').val(provider.duration || '');
                         $('#cost').val(provider.cost || 0);
+
+                        // Set availability
+                        initializeDaySelection();
+                        if (provider.availability && Array.isArray(provider.availability) && provider.availability.length > 0) {
+                            provider.availability.forEach(schedule => {
+                                const dayBtn = $(`#providerAvailableDaysContainer .day-btn[data-day="${schedule.day}"]`);
+                                const dayName = dayBtn.data('day-name');
+                                addDaySchedule(schedule.day, dayName, schedule.startTime, schedule.endTime);
+                                dayBtn.removeClass('btn-outline-primary').addClass('active btn-primary');
+                            });
+                            updateNoDaysMessage();
+                        }
                     } else {
                         showErrorAlert('Formato de respuesta inválido');
                     }
@@ -464,6 +654,46 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const durationValue = $('#duration').val();
             if (durationValue) {
                 providerData.duration = parseFloat(durationValue);
+            }
+
+            // Add optional availability fields
+            if (Object.keys(daySchedules).length > 0) {
+                const availability = [];
+                const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+
+                for (const dayCode in daySchedules) {
+                    const scheduleRow = $(daySchedules[dayCode].element);
+                    const startTime = scheduleRow.find('.day-start-time').val();
+                    const endTime = scheduleRow.find('.day-end-time').val();
+                    const dayName = daySchedules[dayCode].dayName;
+
+                    if (!startTime || !endTime) {
+                        showModalError(`Debe especificar hora de inicio y fin para ${dayName}`);
+                        return;
+                    }
+
+                    if (!timeRegex.test(startTime)) {
+                        showModalError(`Formato de hora de inicio inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
+                        return;
+                    }
+                    if (!timeRegex.test(endTime)) {
+                        showModalError(`Formato de hora de fin inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
+                        return;
+                    }
+
+                    if (startTime >= endTime) {
+                        showModalError(`La hora de fin debe ser posterior a la hora de inicio para ${dayName}`);
+                        return;
+                    }
+
+                    availability.push({
+                        day: parseInt(dayCode),
+                        startTime: startTime,
+                        endTime: endTime
+                    });
+                }
+
+                providerData.availability = availability;
             }
 
             const url = isEdit ? `${apiEndpoint}/${providerId}` : apiEndpoint;
