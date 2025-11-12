@@ -22,6 +22,10 @@
 
 const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
+const {
+  validateDaySchedules,
+  sortDaySchedulesChronological,
+} = require('../../../infrastructure/utils/availabilityUtils');
 
 /**
  * ExperienceController class implementing RESTful API.
@@ -181,6 +185,7 @@ class ExperienceController {
       experienceDetails: this.formatExperienceDetails(includedExperiences),
       tours: includedTours.map((tour) => tour.id),
       tourDetails: this.formatTourDetails(includedTours),
+      availability: experience.get('availability') || null,
       active: experience.get('active'),
       createdAt: experience.createdAt,
       updatedAt: experience.updatedAt,
@@ -510,6 +515,30 @@ class ExperienceController {
         return this.sendError(res, vehicleTypeError.error, vehicleTypeError.status);
       }
 
+      // Process availability (optional)
+      const { availability } = req.body;
+      if (availability && Array.isArray(availability)) {
+        if (availability.length === 0) {
+          return this.sendError(
+            res,
+            'At least one day schedule must be provided if availability is set',
+            400
+          );
+        }
+
+        const availabilityValidation = validateDaySchedules(availability);
+        if (!availabilityValidation.valid) {
+          return this.sendError(
+            res,
+            `Invalid availability data: ${availabilityValidation.errors.join(', ')}`,
+            400
+          );
+        }
+
+        const sortedSchedules = sortDaySchedulesChronological(availability);
+        experienceObj.set('availability', sortedSchedules);
+      }
+
       // Save and respond
       await this.saveExperienceWithAudit(experienceObj, currentUser);
       return this.handleCreateExperienceSuccess(res, experienceObj, req.body, currentUser.id);
@@ -739,6 +768,33 @@ class ExperienceController {
       const vehicleTypeError = await this.updateVehicleTypeRelationship(experienceObj, req.body.vehicleType);
       if (vehicleTypeError) {
         return this.sendError(res, vehicleTypeError.error, vehicleTypeError.status);
+      }
+
+      // Update availability (optional)
+      const { availability } = req.body;
+      if (availability !== undefined) {
+        if (availability === null) {
+          // Remove availability (set to available anytime)
+          experienceObj.unset('availability');
+        } else if (Array.isArray(availability) && availability.length > 0) {
+          const availabilityValidation = validateDaySchedules(availability);
+          if (!availabilityValidation.valid) {
+            return this.sendError(
+              res,
+              `Invalid availability data: ${availabilityValidation.errors.join(', ')}`,
+              400
+            );
+          }
+
+          const sortedSchedules = sortDaySchedulesChronological(availability);
+          experienceObj.set('availability', sortedSchedules);
+        } else if (Array.isArray(availability) && availability.length === 0) {
+          return this.sendError(
+            res,
+            'At least one day schedule must be provided if availability is set',
+            400
+          );
+        }
       }
 
       // Save and respond
@@ -1029,6 +1085,7 @@ class ExperienceController {
       experienceCount: includedExperiences.length,
       tourCount: includedTours.length,
       totalItemCount: includedExperiences.length + includedTours.length,
+      availability: experience.get('availability') || null,
       active: experience.get('active'),
       createdAt: experience.createdAt,
       updatedAt: experience.updatedAt,
