@@ -266,7 +266,7 @@
   },
   "devDependencies": {
     "@commitlint/cli": "^20.1.0",
-    "@commitlint/config-conventional": "^18.4.3",
+    "@commitlint/config-conventional": "20.0.0",
     "auto-changelog": "^2.4.0",
     "conventional-changelog-cli": "^4.1.0",
     "depcheck": "^1.4.7",
