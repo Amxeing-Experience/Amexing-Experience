@@ -1194,7 +1194,7 @@ class QuoteController {
           vehicleType: vehicleType ? vehicleType.get('name') : '',
           vehicleTypeId: vehicleType ? vehicleType.id : null,
           capacity: vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4,
-          basePrice: priceBreakdown.basePrice, // Cash price (precio contado)
+          basePrice: priceBreakdown.basePrice, // Cash price (precio efectivo)
           price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
           surcharge: priceBreakdown.surcharge, // Surcharge amount
           surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
@@ -1350,7 +1350,7 @@ class QuoteController {
             vehicleTypeId: vehicleType ? vehicleType.id : null,
             capacity: vehicleCapacity,
             trunkCapacity,
-            basePrice: priceBreakdown.basePrice, // Cash price (precio contado)
+            basePrice: priceBreakdown.basePrice, // Cash price (precio efectivo)
             price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
             surcharge: priceBreakdown.surcharge, // Surcharge amount
             surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage
@@ -1478,7 +1478,7 @@ class QuoteController {
           vehicleType: vehicleType ? vehicleType.get('name') : '',
           vehicleTypeId: vehicleType ? vehicleType.id : null,
           capacity: vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4,
-          basePrice: priceBreakdown.basePrice, // Cash price (precio contado)
+          basePrice: priceBreakdown.basePrice, // Cash price (precio efectivo)
           price: priceBreakdown.totalPrice, // Price with surcharge (precio base - default display)
           surcharge: priceBreakdown.surcharge, // Surcharge amount
           surchargePercentage: priceBreakdown.surchargePercentage, // Current percentage

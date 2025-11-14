@@ -99,11 +99,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label for="email" class="form-label">Email Corporativo <span class="text-danger">*</span></label>
-                            <input type="email" class="form-control" id="email" name="email" required maxlength="255" placeholder="empleado@amexing.com">
-                            <div class="form-text">Email del empleado para acceso al sistema</div>
-                        </div>
+                        <%- include('../../atoms/common/email-input', {
+                            name: 'email',
+                            id: 'email',
+                            label: 'Email Corporativo',
+                            required: true,
+                            placeholder: 'empleado@amexing.com',
+                            helpText: 'Email del empleado para acceso al sistema',
+                            maxlength: 255
+                        }) %>
                     </div>
 
                     <!-- Sección: Asignación de Rol -->
@@ -141,10 +145,16 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             Datos Adicionales (Opcional)
                         </h6>
 
-                        <div class="mb-3">
-                            <label for="phone" class="form-label">Teléfono de Contacto</label>
-                            <input type="tel" class="form-control" id="phone" name="phone" maxlength="20" placeholder="+52 (999) 123-4567">
-                        </div>
+                        <%- include('../../atoms/common/phone-input', {
+                            name: 'phone',
+                            id: 'phone',
+                            label: 'Teléfono de Contacto',
+                            required: false,
+                            placeholder: '',
+                            helpText: 'Número de contacto del empleado',
+                            countryCode: 'MX',
+                            containerClass: 'mb-3'
+                        }) %>
 
                         <div class="row">
                             <div class="col-md-6 mb-3">

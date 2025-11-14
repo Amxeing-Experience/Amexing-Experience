@@ -47,17 +47,14 @@
                             <th style="min-width: 150px;">
                                 <i class="ti ti-car me-1"></i>Tipo Vehículo
                             </th>
-                            <th style="min-width: 100px;" class="text-center">
-                                <i class="ti ti-clock-hour-4 me-1"></i>Horas
-                            </th>
                             <th style="min-width: 120px;" class="text-end">
                                 <i class="ti ti-currency-dollar me-1"></i>Precio Unit.
                             </th>
-                            <th style="min-width: 140px;" class="text-end">
-                                <i class="ti ti-receipt me-1"></i>Total Día
-                            </th>
                             <th style="min-width: 300px;">
                                 <i class="ti ti-notes me-1"></i>Notas
+                            </th>
+                            <th style="min-width: 140px;" class="text-end">
+                                <i class="ti ti-receipt me-1"></i>Total Día
                             </th>
                             <th style="min-width: 100px;" class="text-center">
                                 <i class="ti ti-settings me-1"></i>Acciones
@@ -506,7 +503,6 @@ tr[data-row-type="subconcept"] {
                         time: "",
                         concept: oldDay.concept || "",
                         vehicleType: oldDay.vehicleType || "",
-                        hours: oldDay.hours,
                         unitPrice: oldDay.unitPrice,
                         total: oldDay.total || 0,
                         notes: oldDay.notes || ""
@@ -703,7 +699,7 @@ tr[data-row-type="subconcept"] {
             const separator = document.createElement('tr');
             separator.className = 'day-separator';
             separator.dataset.dayIndex = dayIndex;
-            separator.innerHTML = '<td colspan="8" class="p-0 border-0"></td>';
+            separator.innerHTML = '<td colspan="7" class="p-0 border-0"></td>';
 
             if (insertBeforeRow) {
                 tbody.insertBefore(separator, insertBeforeRow);
@@ -794,13 +790,6 @@ tr[data-row-type="subconcept"] {
                 </div>
             </td>
             <td></td>
-            <td class="text-center">
-                <button class="btn btn-sm btn-danger delete-day-btn"
-                        data-day-index="${dayIndex}"
-                        title="Eliminar día completo">
-                    <i class="ti ti-trash"></i>
-                </button>
-            </td>
         `;
 
         // Attach listeners
@@ -1123,17 +1112,6 @@ tr[data-row-type="subconcept"] {
             ${conceptCellHTML}
             ${vehicleCellHTML}
             <td>
-                <input type="number"
-                       class="form-control form-control-sm text-center"
-                       data-day-index="${dayIndex}"
-                       data-subconcept-index="${subconceptIndex}"
-                       data-field="hours"
-                       min="0"
-                       step="0.5"
-                       placeholder="0"
-                       value="${subconcept.hours !== null && subconcept.hours !== undefined ? subconcept.hours : ''}">
-            </td>
-            <td>
                 ${subType === 'traslado' || subType === 'tour' ? `
                     <!-- Traslado/Tour: Price + Number of People (no checkbox, always calculates vehicles) -->
                     <div class="d-flex flex-column gap-2">
@@ -1289,9 +1267,6 @@ tr[data-row-type="subconcept"] {
                 input.addEventListener('input', (e) => {
                     let value = e.target.value;
 
-                    if (field === 'hours') {
-                        value = value ? parseFloat(value) : null;
-                    }
 
                     updateSubconceptField(dayIndex, subconceptIndex, field, value);
                 });
@@ -1876,7 +1851,6 @@ tr[data-row-type="subconcept"] {
         subconcept.vehicleCapacity = transferData.capacity || null; // Store capacity for per-person calculations
         subconcept.vehiclePassengerCapacity = transferData.capacity || null; // NEW - Passenger capacity for display
         subconcept.vehicleTrunkCapacity = transferData.trunkCapacity || null; // NEW - Trunk capacity for display
-        subconcept.hours = 1; // Default for transfers
         subconcept.unitPrice = transferData.price;
         subconcept.notes = transferData.note || '';
 
@@ -1884,12 +1858,10 @@ tr[data-row-type="subconcept"] {
         subconcept.total = calculateSubconceptTotal(subconcept);
 
         // Update the UI fields without full re-render
-        const hoursInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="hours"]`);
         const priceInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="unitPrice"]`);
         const notesInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="notes"]`);
         const peopleInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="numberOfPeople"]`);
 
-        if (hoursInput) hoursInput.value = subconcept.hours;
         if (priceInput) priceInput.value = formatCurrency(subconcept.unitPrice);
         if (notesInput) notesInput.value = subconcept.notes;
         if (peopleInput) peopleInput.value = subconcept.numberOfPeople;
@@ -2375,14 +2347,12 @@ tr[data-row-type="subconcept"] {
         subconcept.surcharge = vehicleData.surcharge;
         subconcept.surchargePercentage = vehicleData.surchargePercentage;
 
-        // Set hours from duration (convert minutes to hours, rounded to 1 decimal)
-        subconcept.hours = Math.round((vehicleData.durationMinutes / 60) * 10) / 10;
 
         // Calculate vehicle multiplier based on numberOfPeople and capacity
         const numberOfPeople = subconcept.numberOfPeople || quoteNumberOfPeople;
         subconcept.vehicleMultiplier = Math.ceil(numberOfPeople / vehicleData.capacity);
 
-        // Calculate total: hours × unitPrice × vehicleMultiplier
+        // Calculate total: unitPrice × vehicleMultiplier
         subconcept.total = calculateSubconceptTotal(subconcept);
 
         console.log('Populated tour data:', {
@@ -2391,7 +2361,6 @@ tr[data-row-type="subconcept"] {
             vehicleType: subconcept.vehicleType,
             capacity: subconcept.vehicleCapacity,
             durationMinutes: subconcept.durationMinutes,
-            hours: subconcept.hours,
             basePrice: subconcept.basePrice,
             surcharge: subconcept.surcharge,
             unitPrice: subconcept.unitPrice,
@@ -2486,9 +2455,8 @@ tr[data-row-type="subconcept"] {
                 subconcept.experienceId = experience.id;
                 subconcept.experienceName = experience.name;
                 subconcept.concept = experience.name;
-                subconcept.hours = 1; // Always 1 for experiences
                 subconcept.unitPrice = experience.cost || 0;
-                subconcept.total = subconcept.hours * subconcept.unitPrice;
+                subconcept.total = subconcept.unitPrice;
 
                 // Save vehicle type if available
                 if (experience.vehicleType) {
@@ -2507,11 +2475,9 @@ tr[data-row-type="subconcept"] {
                 subconcept.includedExperiences = hasIncluded ? experience.experienceDetails : [];
 
                 // Update UI fields directly without full re-render to avoid infinite loop
-                const hoursInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="hours"]`);
-                const priceInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="unitPrice"]`);
+                        const priceInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="unitPrice"]`);
 
-                if (hoursInput) hoursInput.value = subconcept.hours;
-                if (priceInput) priceInput.value = formatCurrency(subconcept.unitPrice);
+                        if (priceInput) priceInput.value = formatCurrency(subconcept.unitPrice);
 
                 // Update vehicle type display if exists
                 const vehicleCell = document.querySelector(`tr[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"] td:nth-child(3)`);
@@ -2656,7 +2622,6 @@ tr[data-row-type="subconcept"] {
             time: subconcept.time || "",
             concept: subconcept.concept || "",
             vehicleType: subconcept.vehicleType || "N/A",
-            hours: subconcept.hours ?? 0,
             unitPrice: subconcept.unitPrice ?? 0,
             total: subconcept.total || 0,
             notes: subconcept.notes || "",
@@ -2713,7 +2678,6 @@ tr[data-row-type="subconcept"] {
             time: "",
             concept: "",
             vehicleType: type === "regular" ? "N/A" : (type === "experiencia" ? "N/A" : ""),
-            hours: type === "regular" ? 0 : 1,  // traslado and experiencia default to 1
             unitPrice: 0,
             total: 0,
             notes: "",
@@ -2770,7 +2734,6 @@ tr[data-row-type="subconcept"] {
      * @returns {number} - Calculated total
      */
     function calculateSubconceptTotal(subconcept) {
-        const hours = parseFloat(subconcept.hours) || 0;
         const unitPrice = parseFloat(subconcept.unitPrice) || 0;
         const numberOfPeople = parseInt(subconcept.numberOfPeople) || 1;
 
@@ -2810,7 +2773,7 @@ tr[data-row-type="subconcept"] {
             return Math.round(unitPrice * vehicleCount * 100) / 100;
         }
 
-        // EXPERIENCIA: Direct unit price, no hours multiplication
+        // EXPERIENCIA: Direct unit price
         if (subconcept.type === 'experiencia') {
             if (subconcept.isPerPerson) {
                 // Per-person pricing: unitPrice is per person, multiply by numberOfPeople
@@ -2821,7 +2784,7 @@ tr[data-row-type="subconcept"] {
                 });
                 return Math.round(unitPrice * numberOfPeople * 100) / 100;
             } else {
-                // Standard pricing: just unitPrice (no hours)
+                // Standard pricing: just unitPrice
                 console.log('Experiencia standard calculation:', {
                     unitPrice,
                     calculation: `$${unitPrice}`
@@ -2830,7 +2793,7 @@ tr[data-row-type="subconcept"] {
             }
         }
 
-        // REGULAR: Direct unit price, no hours multiplication (same as experiencia)
+        // REGULAR: Direct unit price (same as experiencia)
         if (subconcept.type === 'regular') {
             if (subconcept.isPerPerson) {
                 // Per-person pricing: unitPrice is per person, multiply by numberOfPeople
@@ -2841,7 +2804,7 @@ tr[data-row-type="subconcept"] {
                 });
                 return Math.round(unitPrice * numberOfPeople * 100) / 100;
             } else {
-                // Standard pricing: just unitPrice (no hours)
+                // Standard pricing: just unitPrice
                 console.log('Regular standard calculation:', {
                     unitPrice,
                     calculation: `$${unitPrice}`
@@ -2853,7 +2816,7 @@ tr[data-row-type="subconcept"] {
         // Fallback for traslados without vehicle capacity
         console.log('Fallback calculation (traslado without capacity)');
         subconcept.vehicleMultiplier = 1;
-        return Math.round(hours * unitPrice * 100) / 100;
+        return Math.round(unitPrice * 100) / 100;
     }
 
     function updateSubconceptField(dayIndex, subconceptIndex, field, value) {
@@ -2888,7 +2851,7 @@ tr[data-row-type="subconcept"] {
         }
 
         // Recalculate total if any pricing field changed
-        if (['hours', 'unitPrice', 'isPerPerson', 'numberOfPeople'].includes(field)) {
+        if (['unitPrice', 'isPerPerson', 'numberOfPeople'].includes(field)) {
             subconcept.total = calculateSubconceptTotal(subconcept);
 
             // Update vehicle multiplier badge text if traslado or tour

@@ -12,8 +12,13 @@ npm-shrinkwrap.json
 .env
 .env.local
 .env.development
+.env.staging
 .env.test                        # CRITICAL: Contains real AWS test credentials (root)
 environments/.env.test           # CRITICAL: Contains real AWS test credentials (environments/)
+environments/.env.staging        # CRITICAL: Contains staging credentials and secrets
+environments/.env.production     # CRITICAL: Production environment file
+environments/.env.development    # Development environment file
+environments/.env.local          # Local environment overrides
 .env.production
 *.env.backup
 **/.env.test                     # Prevent .env.test leaks in subdirectories
@@ -83,8 +88,12 @@ claude.md
 CLAUDE.md
 planning/
 
+# Deployment Documentation
+docs/STAGING_DEPLOYMENT.md
+
 # Local Development Scripts - NO COMMIT
 scripts/local/
+scripts/staging/
 scripts/oauth-real-*.js
 scripts/*-real-*.js
 scripts/seed-test-users.js

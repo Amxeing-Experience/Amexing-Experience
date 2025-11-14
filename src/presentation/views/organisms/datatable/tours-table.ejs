@@ -66,7 +66,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <th>Tipo de Vehículo</th>
             <th>Pasajeros</th>
             <th>Precio</th>
-            <th>Precio Contado</th>
+            <th>Precio Efectivo</th>
             <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
             <% if (dtShowActions) { %>
             <th class="text-center">Acciones</th>
@@ -485,7 +485,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
               `;
             }
           },
-          // 6. Precio Contado (base price - "Efectivo")
+          // 6. Precio Efectivo (base price - "Efectivo")
           {
             data: 'price',
             render: function(data, type, row) {

@@ -75,6 +75,7 @@ class ExperienceController {
       filteredQuery.include('experiences');
       filteredQuery.include('vehicleType');
       filteredQuery.include('tours');
+      filteredQuery.include('tours.destinationPOI');
       filteredQuery.skip(params.start);
       filteredQuery.limit(params.length);
 
@@ -179,6 +180,8 @@ class ExperienceController {
       providerType: experience.get('providerType'),
       duration: experience.get('duration'),
       cost: experience.get('cost'),
+      min_people: experience.get('min_people'),
+      time_journey: experience.get('time_journey'),
       vehicleType: this.formatVehicleType(vehicleType),
       vehicleTypeId: vehicleType ? vehicleType.id : null,
       experiences: includedExperiences.map((exp) => exp.id),
@@ -409,7 +412,7 @@ class ExperienceController {
    */
   createExperienceObject(data) {
     const {
-      name, description, type, providerType, duration, cost,
+      name, description, type, providerType, duration, cost, min_people: minPeople, time_journey: timeJourney,
     } = data;
 
     const Experience = Parse.Object.extend('Experience');
@@ -423,6 +426,12 @@ class ExperienceController {
     }
     if (duration !== undefined && duration !== null && duration !== '') {
       experienceObj.set('duration', parseFloat(duration));
+    }
+    if (minPeople !== undefined && minPeople !== null && minPeople !== '') {
+      experienceObj.set('min_people', parseInt(minPeople, 10));
+    }
+    if (timeJourney !== undefined && timeJourney !== null && timeJourney !== '') {
+      experienceObj.set('time_journey', parseFloat(timeJourney));
     }
     experienceObj.set('cost', parseFloat(cost));
     experienceObj.set('active', true);
@@ -567,7 +576,7 @@ class ExperienceController {
    */
   validateAndUpdateBasicFields(experienceObj, data) {
     const {
-      name, description, cost, duration, providerType, active,
+      name, description, cost, duration, providerType, active, min_people: minPeople, time_journey: timeJourney,
     } = data;
 
     if (name !== undefined) {
@@ -615,6 +624,28 @@ class ExperienceController {
           return { error: 'Provider type must be Exclusivo, Compartido, or Privado', status: 400 };
         }
         experienceObj.set('providerType', providerType || null);
+      }
+    }
+
+    if (minPeople !== undefined) {
+      if (minPeople === null || minPeople === '') {
+        experienceObj.set('min_people', null);
+      } else {
+        if (Number.isNaN(parseInt(minPeople, 10)) || parseInt(minPeople, 10) < 1) {
+          return { error: 'Minimum people must be a positive number', status: 400 };
+        }
+        experienceObj.set('min_people', parseInt(minPeople, 10));
+      }
+    }
+
+    if (timeJourney !== undefined) {
+      if (timeJourney === null || timeJourney === '') {
+        experienceObj.set('time_journey', null);
+      } else {
+        if (Number.isNaN(parseFloat(timeJourney)) || parseFloat(timeJourney) < 0) {
+          return { error: 'Journey time must be greater than or equal to 0', status: 400 };
+        }
+        experienceObj.set('time_journey', parseFloat(timeJourney));
       }
     }
 
@@ -1065,6 +1096,8 @@ class ExperienceController {
       providerType: experience.get('providerType'),
       duration: experience.get('duration'),
       cost: experience.get('cost'),
+      min_people: experience.get('min_people'),
+      time_journey: experience.get('time_journey'),
       vehicleType: vehicleType
         ? {
           id: vehicleType.id,
@@ -1077,11 +1110,17 @@ class ExperienceController {
         id: exp.id,
         name: exp.get('name'),
       })),
-      tours: includedTours.map((tour) => ({
-        id: tour.id,
-        destinationPOI: tour.get('destinationPOI'),
-        time: tour.get('time'),
-      })),
+      tours: includedTours.map((tour) => {
+        const poi = tour.get('destinationPOI');
+        return {
+          id: tour.id,
+          destinationPOI: poi ? {
+            objectId: poi.id,
+            name: poi.get('name'),
+          } : null,
+          time: tour.get('time'),
+        };
+      }),
       experienceCount: includedExperiences.length,
       tourCount: includedTours.length,
       totalItemCount: includedExperiences.length + includedTours.length,

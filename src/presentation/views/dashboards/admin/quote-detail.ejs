@@ -77,7 +77,7 @@ const menuItems = [
 
     <div class="col-lg-9" id="contentColumn">
         <% if (activeSection === 'information') { %>
-            <%- include('./sections/quote-information') %>
+            <%- include('./sections/quote-information', { quoteId: quoteId, userRole: userRole }) %>
         <% } else if (activeSection === 'services') { %>
             <%- include('./sections/quote-services') %>
         <% } else if (activeSection === 'summary') { %>

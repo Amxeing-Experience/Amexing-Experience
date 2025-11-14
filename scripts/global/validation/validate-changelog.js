@@ -12,7 +12,7 @@ const path = require('path');
 
 class ChangelogValidator {
   constructor() {
-    this.projectRoot = path.resolve(__dirname, '..');
+    this.projectRoot = path.resolve(__dirname, '../../..');
     this.changelogPath = path.join(this.projectRoot, 'CHANGELOG.md');
     this.errors = [];
     this.warnings = [];

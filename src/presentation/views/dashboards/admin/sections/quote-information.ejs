@@ -113,16 +113,28 @@
                         <div class="form-text">Nombre de la persona que recibirá la cotización</div>
                     </div>
 
-                    <div class="col-md-6 mb-3">
-                        <label for="contactEmail" class="form-label">Email de Contacto</label>
-                        <input type="email" class="form-control" id="contactEmail" name="contactEmail" placeholder="email@ejemplo.com">
-                        <div class="form-text">Email para enviar la cotización</div>
+                    <div class="col-md-6">
+                        <%- include('../../../atoms/common/email-input', {
+                            name: 'contactEmail',
+                            id: 'contactEmail',
+                            label: 'Email de Contacto',
+                            required: false,
+                            placeholder: 'email@ejemplo.com',
+                            helpText: 'Email para enviar la cotización',
+                            containerClass: 'mb-3'
+                        }) %>
                     </div>
 
-                    <div class="col-md-6 mb-3">
-                        <label for="contactPhone" class="form-label">Teléfono de Contacto</label>
-                        <input type="tel" class="form-control" id="contactPhone" name="contactPhone" placeholder="+52 123 456 7890">
-                        <div class="form-text">Teléfono de contacto directo</div>
+                    <div class="col-md-6">
+                        <%- include('../../../atoms/common/phone-input', {
+                            name: 'contactPhone',
+                            id: 'contactPhone',
+                            label: 'Teléfono de Contacto',
+                            required: false,
+                            helpText: 'Teléfono de contacto directo',
+                            countryCode: 'MX',
+                            containerClass: 'mb-3'
+                        }) %>
                     </div>
                 </div>
             </div>
@@ -216,12 +228,15 @@
                         <div class="invalid-feedback">Por favor ingresa el apellido</div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="qc_email" class="form-label">Email <span class="text-muted">(opcional)</span></label>
-                        <input type="email" class="form-control" id="qc_email" name="email" placeholder="email@ejemplo.com">
-                        <div class="form-text">Si no lo proporcionas, se generará un email temporal</div>
-                        <div class="invalid-feedback">Por favor ingresa un email válido</div>
-                    </div>
+                    <%- include('../../../atoms/common/email-input', {
+                        name: 'email',
+                        id: 'qc_email',
+                        label: 'Email',
+                        required: false,
+                        placeholder: 'email@ejemplo.com',
+                        helpText: 'Si no lo proporcionas, se generará un email temporal',
+                        containerClass: 'mb-3'
+                    }) %>
 
                     <div class="mb-3">
                         <label for="qc_companyName" class="form-label">Nombre de Empresa <span class="text-muted">(opcional)</span></label>
@@ -229,10 +244,15 @@
                         <div class="form-text">Nombre de la empresa del cliente</div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="qc_phone" class="form-label">Teléfono <span class="text-muted">(opcional)</span></label>
-                        <input type="tel" class="form-control" id="qc_phone" name="phone" placeholder="+52 123 456 7890">
-                    </div>
+                    <%- include('../../../atoms/common/phone-input', {
+                        name: 'phone',
+                        id: 'qc_phone',
+                        label: 'Teléfono',
+                        required: false,
+                        helpText: 'Número de contacto del cliente',
+                        countryCode: 'MX',
+                        containerClass: 'mb-3'
+                    }) %>
 
                     <div class="alert alert-info d-flex align-items-start" role="alert">
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>

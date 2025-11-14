@@ -100,9 +100,63 @@ function createSimpleHtmlParser(html) {
           attribs: attribs
         });
       }
+    } else if (selector.includes('.') && !selector.startsWith('.')) {
+      // Combined tag+class selector (e.g., button.country-selector)
+      const parts = selector.split('.');
+      const tagName = parts[0];
+      const className = parts[1];
+
+      const regex = new RegExp(`<(${tagName})([^>]*?)>`, 'gi');
+      const matches = html.matchAll(regex);
+
+      for (const match of matches) {
+        const fullMatch = match[0];
+        const foundTagName = match[1];
+        const attributes = match[2];
+        const attribs = {};
+
+        // Parse all attributes
+        if (attributes) {
+          const attrMatches = attributes.matchAll(/([\w-]+)(?:=["']([^"']*?)["'])?/g);
+          for (const attrMatch of attrMatches) {
+            attribs[attrMatch[1]] = attrMatch[2] || '';
+          }
+        }
+
+        // Check if element has the required class
+        const classAttr = attribs.class || '';
+        const classes = classAttr.split(/\s+/);
+        if (!classes.includes(className)) {
+          continue;
+        }
+
+        // Get text content
+        let textContent = '';
+        const startPos = html.indexOf(fullMatch) + fullMatch.length;
+        const endTag = `</${foundTagName}>`;
+        const endPos = html.indexOf(endTag, startPos);
+
+        if (endPos !== -1) {
+          textContent = html.substring(startPos, endPos).trim();
+          textContent = textContent.replace(/<[^>]*>/g, '').trim();
+          textContent = textContent
+            .replace(/&amp;/g, '&')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&quot;/g, '"')
+            .replace(/&#x27;/g, "'")
+            .replace(/&#x2F;/g, '/');
+        }
+
+        elements.push({
+          tagName: foundTagName,
+          attribs: attribs,
+          textContent: textContent
+        });
+      }
     } else if (selector.startsWith('.')) {
-      // CSS class selector (e.g., .user-info-section)
-      const className = selector.substring(1); // Remove the dot
+      // CSS class selector (e.g., .user-info-section or .dropdown-menu.country-dropdown)
+      const classNames = selector.substring(1).split('.'); // Remove first dot and split by dots
       const regex = new RegExp(`<([^>]+)\\s+class=["']([^"']*)["'][^>]*>`, 'gi');
       const matches = html.matchAll(regex);
 
@@ -112,7 +166,10 @@ function createSimpleHtmlParser(html) {
         const classAttr = match[2];
         const classes = classAttr.split(/\s+/);
 
-        if (classes.includes(className)) {
+        // Check if element has ALL required classes
+        const hasAllClasses = classNames.every(className => classes.includes(className));
+
+        if (hasAllClasses) {
           // Extract tag name and all attributes
           const tagMatch = fullMatch.match(/<(\w+)([^>]*?)>/);
           if (tagMatch) {
@@ -153,8 +210,76 @@ function createSimpleHtmlParser(html) {
           }
         }
       }
+    } else if (selector.includes('[') && selector.includes(']')) {
+      // Combined selector (e.g., input[type="tel"])
+      const selectorParts = selector.match(/^(\w+)?\[([^=\]]+)(?:=["']([^"']*)["'])?\]$/);
+
+      if (selectorParts) {
+        const tagName = selectorParts[1] || '\\w+';
+        const attrName = selectorParts[2];
+        const attrValue = selectorParts[3];
+
+        const regex = new RegExp(`<(${tagName})([^>]*?)>`, 'gi');
+        const matches = html.matchAll(regex);
+
+        for (const match of matches) {
+          const fullMatch = match[0];
+          const foundTagName = match[1];
+          const attributes = match[2];
+          const attribs = {};
+
+          // Parse all attributes
+          if (attributes) {
+            const attrMatches = attributes.matchAll(/([\w-]+)(?:=["']([^"']*?)["'])?/g);
+            for (const attrMatch of attrMatches) {
+              attribs[attrMatch[1]] = attrMatch[2] || '';
+            }
+          }
+
+          // Check if the attribute matches
+          if (attrName) {
+            const foundAttrValue = attribs[attrName];
+
+            if (attrValue) {
+              // Check for specific value
+              if (foundAttrValue !== attrValue) {
+                continue;
+              }
+            } else {
+              // Just check attribute exists
+              if (!foundAttrValue && foundAttrValue !== '') {
+                continue;
+              }
+            }
+          }
+
+          // Get text content
+          let textContent = '';
+          const startPos = html.indexOf(fullMatch) + fullMatch.length;
+          const endTag = `</${foundTagName}>`;
+          const endPos = html.indexOf(endTag, startPos);
+
+          if (endPos !== -1) {
+            textContent = html.substring(startPos, endPos).trim();
+            textContent = textContent.replace(/<[^>]*>/g, '').trim();
+            textContent = textContent
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&#x27;/g, "'")
+              .replace(/&#x2F;/g, '/');
+          }
+
+          elements.push({
+            tagName: foundTagName,
+            attribs: attribs,
+            textContent: textContent
+          });
+        }
+      }
     } else if (selector.startsWith('[') && selector.endsWith(']')) {
-      // Attribute selector (e.g., [data-bs-toggle="dropdown"])
+      // Attribute-only selector (e.g., [data-bs-toggle="dropdown"])
       const attrMatch = selector.match(/\[([^=\]]+)(?:=["']([^"']*)["'])?\]/);
       if (attrMatch) {
         const attrName = attrMatch[1];
@@ -348,15 +473,25 @@ const extractClasses = (html) => {
 const extractAttributes = (html, selector = ':first') => {
   const attributes = {};
 
-  // Find first element and extract its attributes
-  const match = html.match(/<(\w+)([^>]*)>/);
-  if (match) {
-    const attributeString = match[2];
+  if (selector === ':first') {
+    // Find first element and extract its attributes
+    const match = html.match(/<(\w+)([^>]*)>/);
+    if (match) {
+      const attributeString = match[2];
 
-    // Parse attributes using regex (include hyphens for data-* attributes)
-    const attrMatches = attributeString.matchAll(/([\w-]+)(?:=["']([^"']*)["'])?/g);
-    for (const attrMatch of attrMatches) {
-      attributes[attrMatch[1]] = attrMatch[2] || '';
+      // Parse attributes using regex (include hyphens for data-* attributes)
+      const attrMatches = attributeString.matchAll(/([\w-]+)(?:=["']([^"']*)["'])?/g);
+      for (const attrMatch of attrMatches) {
+        attributes[attrMatch[1]] = attrMatch[2] || '';
+      }
+    }
+  } else {
+    // Use the HTML parser to find specific elements
+    const $ = parseHTML(html);
+    const element = $(selector).get(0);
+
+    if (element && element.attribs) {
+      Object.assign(attributes, element.attribs);
     }
   }
 
@@ -537,8 +672,40 @@ const customMatchers = {
   /**
    * Check if HTML has specific attributes
    */
-  toHaveAttributes(received, expected, selector = ':first') {
-    const attributes = extractAttributes(received, selector);
+  toHaveAttributes(received, expected, selector) {
+    // Default selector based on expected attributes
+    let actualSelector = selector;
+    if (!actualSelector) {
+      // Determine selector from expected type or inputmode attribute
+      if (expected.type === 'email') {
+        actualSelector = 'input[type="email"]';
+      } else if (expected.type === 'tel') {
+        actualSelector = 'input[type="tel"]';
+      } else if (expected.type === 'submit' || expected.type === 'button' || expected.type === 'reset') {
+        // Button types - check for button element first
+        actualSelector = 'button';
+      } else if (expected.type) {
+        // Other input types
+        actualSelector = `input[type="${expected.type}"]`;
+      } else if (expected.inputmode === 'tel') {
+        // Check if it's a tel input with inputmode instead of type
+        actualSelector = 'input[inputmode="tel"]';
+      } else if (expected.autocomplete === 'email' || expected.autocomplete === 'work email' || expected.name || expected.id || expected.value !== undefined || expected.placeholder || expected.maxlength) {
+        // If autocomplete suggests email, or generic input attributes - try to find any input
+        if (expected.autocomplete && expected.autocomplete.includes('email')) {
+          actualSelector = 'input[type="email"]';
+        } else {
+          actualSelector = 'input';
+        }
+      } else if (expected['data-form'] || expected['data-action']) {
+        // Attributes commonly used on buttons
+        actualSelector = 'button';
+      } else {
+        actualSelector = ':first';
+      }
+    }
+
+    const attributes = extractAttributes(received, actualSelector);
     const missing = [];
 
     for (const [key, value] of Object.entries(expected)) {
@@ -554,7 +721,7 @@ const customMatchers = {
       };
     } else {
       return {
-        message: () => `Expected HTML to have attributes: ${missing.join(', ')}`,
+        message: () => `Expected HTML to have attributes: ${missing.join(', ')}. Found: ${JSON.stringify(attributes)}`,
         pass: false
       };
     }

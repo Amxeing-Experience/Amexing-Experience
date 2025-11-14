@@ -129,29 +129,14 @@ const registerRedirectTo = typeof redirectTo !== 'undefined' ? redirectTo : '';
             </div>
 
             <!-- Email -->
-            <div class="mb-3">
-                <label for="email" class="form-label text-dark fw-semibold">
-                    Email Address *
-                </label>
-                <div class="input-group">
-                    <span class="input-group-text">
-                        <i class="ti ti-mail"></i>
-                    </span>
-                    <input
-                        type="email"
-                        class="form-control form-control-lg"
-                        id="email"
-                        name="email"
-                        placeholder="Enter your email address"
-                        required
-                        value="<%= registerFormData.email || '' %>"
-                        autocomplete="email"
-                    >
-                    <div class="invalid-feedback">
-                        Please enter a valid email address.
-                    </div>
-                </div>
-            </div>
+            <%- include('../../atoms/common/email-input', {
+                name: 'email',
+                id: 'email',
+                label: 'Email Address',
+                required: true,
+                value: registerFormData.email || '',
+                placeholder: 'Enter your email address'
+            }) %>
         </div>
 
         <!-- Password Section -->

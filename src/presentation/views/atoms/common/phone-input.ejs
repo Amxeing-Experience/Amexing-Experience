@@ -1,0 +1,461 @@
+<%
+// Phone Input Atom - International phone input with country code selector
+// Parameters: name, id, label, required, value, countryCode, placeholder, helpText, containerClass, maxlength
+
+// Default parameters
+const inputName = typeof name !== 'undefined' ? name : '';
+const inputId = typeof id !== 'undefined' ? id : inputName || 'phone_' + Math.random().toString(36).substr(2, 9);
+const inputLabel = typeof label !== 'undefined' ? label : 'Teléfono';
+const inputRequired = typeof required !== 'undefined' ? required : false;
+const inputValue = typeof value !== 'undefined' ? value : '';
+const inputCountryCode = typeof countryCode !== 'undefined' ? countryCode : 'MX';
+const inputPlaceholder = typeof placeholder !== 'undefined' ? placeholder : '';
+const inputHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const inputMaxlength = typeof maxlength !== 'undefined' ? maxlength : 20;
+const inputContainerClass = typeof containerClass !== 'undefined' ? containerClass : '';
+
+// Country data - Organized by region (América, Europa, Asia)
+const countries = {
+  // AMÉRICA
+  MX: { name: 'México', code: '+52', flag: '🇲🇽', format: '(999) 123-4567', minLength: 10, maxLength: 10, region: 'América' },
+  US: { name: 'United States', code: '+1', flag: '🇺🇸', format: '(999) 123-4567', minLength: 10, maxLength: 10, region: 'América' },
+  CA: { name: 'Canada', code: '+1', flag: '🇨🇦', format: '(999) 123-4567', minLength: 10, maxLength: 10, region: 'América' },
+  CO: { name: 'Colombia', code: '+57', flag: '🇨🇴', format: '999 999 9999', minLength: 10, maxLength: 10, region: 'América' },
+  AR: { name: 'Argentina', code: '+54', flag: '🇦🇷', format: '99 9999-9999', minLength: 10, maxLength: 10, region: 'América' },
+  CL: { name: 'Chile', code: '+56', flag: '🇨🇱', format: '9 9999 9999', minLength: 9, maxLength: 9, region: 'América' },
+  PE: { name: 'Perú', code: '+51', flag: '🇵🇪', format: '999 999 999', minLength: 9, maxLength: 9, region: 'América' },
+  BR: { name: 'Brasil', code: '+55', flag: '🇧🇷', format: '(99) 99999-9999', minLength: 10, maxLength: 11, region: 'América' },
+  EC: { name: 'Ecuador', code: '+593', flag: '🇪🇨', format: '99 999 9999', minLength: 9, maxLength: 9, region: 'América' },
+
+  // EUROPA
+  ES: { name: 'España', code: '+34', flag: '🇪🇸', format: '999 999 999', minLength: 9, maxLength: 9, region: 'Europa' },
+  GB: { name: 'United Kingdom', code: '+44', flag: '🇬🇧', format: '9999 999999', minLength: 10, maxLength: 10, region: 'Europa' },
+  FR: { name: 'France', code: '+33', flag: '🇫🇷', format: '9 99 99 99 99', minLength: 9, maxLength: 9, region: 'Europa' },
+  DE: { name: 'Germany', code: '+49', flag: '🇩🇪', format: '999 99999999', minLength: 10, maxLength: 11, region: 'Europa' },
+  IT: { name: 'Italy', code: '+39', flag: '🇮🇹', format: '999 9999999', minLength: 9, maxLength: 10, region: 'Europa' },
+  PT: { name: 'Portugal', code: '+351', flag: '🇵🇹', format: '999 999 999', minLength: 9, maxLength: 9, region: 'Europa' },
+  NL: { name: 'Netherlands', code: '+31', flag: '🇳🇱', format: '9 99999999', minLength: 9, maxLength: 9, region: 'Europa' },
+  BE: { name: 'Belgium', code: '+32', flag: '🇧🇪', format: '999 99 99 99', minLength: 9, maxLength: 9, region: 'Europa' },
+  CH: { name: 'Switzerland', code: '+41', flag: '🇨🇭', format: '99 999 99 99', minLength: 9, maxLength: 9, region: 'Europa' },
+  SE: { name: 'Sweden', code: '+46', flag: '🇸🇪', format: '99-999 99 99', minLength: 9, maxLength: 10, region: 'Europa' },
+  NO: { name: 'Norway', code: '+47', flag: '🇳🇴', format: '999 99 999', minLength: 8, maxLength: 8, region: 'Europa' },
+  DK: { name: 'Denmark', code: '+45', flag: '🇩🇰', format: '99 99 99 99', minLength: 8, maxLength: 8, region: 'Europa' },
+  FI: { name: 'Finland', code: '+358', flag: '🇫🇮', format: '99 9999999', minLength: 9, maxLength: 10, region: 'Europa' },
+  PL: { name: 'Poland', code: '+48', flag: '🇵🇱', format: '999 999 999', minLength: 9, maxLength: 9, region: 'Europa' },
+  IE: { name: 'Ireland', code: '+353', flag: '🇮🇪', format: '99 999 9999', minLength: 9, maxLength: 9, region: 'Europa' },
+  AT: { name: 'Austria', code: '+43', flag: '🇦🇹', format: '999 9999999', minLength: 10, maxLength: 13, region: 'Europa' },
+
+  // ASIA Y MEDIO ORIENTE
+  CN: { name: 'China', code: '+86', flag: '🇨🇳', format: '999 9999 9999', minLength: 11, maxLength: 11, region: 'Asia' },
+  JP: { name: 'Japan', code: '+81', flag: '🇯🇵', format: '90-9999-9999', minLength: 10, maxLength: 10, region: 'Asia' },
+  KR: { name: 'South Korea', code: '+82', flag: '🇰🇷', format: '90-9999-9999', minLength: 9, maxLength: 10, region: 'Asia' },
+  IN: { name: 'India', code: '+91', flag: '🇮🇳', format: '99999 99999', minLength: 10, maxLength: 10, region: 'Asia' },
+  SG: { name: 'Singapore', code: '+65', flag: '🇸🇬', format: '9999 9999', minLength: 8, maxLength: 8, region: 'Asia' },
+  TH: { name: 'Thailand', code: '+66', flag: '🇹🇭', format: '99 999 9999', minLength: 9, maxLength: 9, region: 'Asia' },
+  MY: { name: 'Malaysia', code: '+60', flag: '🇲🇾', format: '99-999 9999', minLength: 9, maxLength: 10, region: 'Asia' },
+  PH: { name: 'Philippines', code: '+63', flag: '🇵🇭', format: '999 999 9999', minLength: 10, maxLength: 10, region: 'Asia' },
+  ID: { name: 'Indonesia', code: '+62', flag: '🇮🇩', format: '999-999-9999', minLength: 10, maxLength: 11, region: 'Asia' },
+  VN: { name: 'Vietnam', code: '+84', flag: '🇻🇳', format: '99 9999 9999', minLength: 9, maxLength: 10, region: 'Asia' },
+  TW: { name: 'Taiwan', code: '+886', flag: '🇹🇼', format: '9999 999 999', minLength: 9, maxLength: 9, region: 'Asia' },
+  HK: { name: 'Hong Kong', code: '+852', flag: '🇭🇰', format: '9999 9999', minLength: 8, maxLength: 8, region: 'Asia' },
+  AE: { name: 'UAE', code: '+971', flag: '🇦🇪', format: '99 999 9999', minLength: 9, maxLength: 9, region: 'Asia' },
+  SA: { name: 'Saudi Arabia', code: '+966', flag: '🇸🇦', format: '99 999 9999', minLength: 9, maxLength: 9, region: 'Asia' },
+  IL: { name: 'Israel', code: '+972', flag: '🇮🇱', format: '99-999-9999', minLength: 9, maxLength: 9, region: 'Asia' }
+};
+
+const selectedCountry = countries[inputCountryCode] || countries.MX;
+%>
+
+<div class="phone-input-wrapper <%= inputContainerClass %>" data-phone-wrapper="<%= inputId %>">
+    <!-- Label -->
+    <label for="<%= inputId %>" class="form-label">
+        <%= inputLabel %>
+        <% if (inputRequired) { %>
+            <span class="text-danger ms-1">*</span>
+        <% } %>
+    </label>
+
+    <!-- Input Group with Country Selector -->
+    <div class="input-group phone-input-group">
+        <!-- Country Code Dropdown -->
+        <button class="btn btn-outline-secondary dropdown-toggle country-selector"
+                type="button"
+                data-bs-toggle="dropdown"
+                aria-expanded="false"
+                id="<%= inputId %>_country_btn"
+                data-selected-country="<%= inputCountryCode %>">
+            <span class="country-flag"><%= selectedCountry.flag %></span>
+            <span class="country-code"><%= selectedCountry.code %></span>
+        </button>
+        <ul class="dropdown-menu country-dropdown" id="<%= inputId %>_country_dropdown">
+            <li class="dropdown-header">Selecciona un país</li>
+            <% Object.keys(countries).forEach(function(countryKey) {
+                const country = countries[countryKey];
+            %>
+            <li>
+                <a class="dropdown-item country-option <%= countryKey === inputCountryCode ? 'active' : '' %>"
+                   href="#"
+                   data-country="<%= countryKey %>"
+                   data-code="<%= country.code %>"
+                   data-flag="<%= country.flag %>"
+                   data-format="<%= country.format %>"
+                   data-min="<%= country.minLength %>"
+                   data-max="<%= country.maxLength %>">
+                    <span class="country-flag-option"><%= country.flag %></span>
+                    <span class="country-name"><%= country.name %></span>
+                    <span class="country-code-option text-muted ms-auto"><%= country.code %></span>
+                </a>
+            </li>
+            <% }); %>
+        </ul>
+
+        <!-- Phone Number Input -->
+        <input
+            type="tel"
+            class="form-control phone-number-input"
+            id="<%= inputId %>"
+            name="<%= inputName %>"
+            placeholder="<%= inputPlaceholder || selectedCountry.format %>"
+            value="<%= inputValue %>"
+            <% if (inputRequired) { %>required<% } %>
+            maxlength="<%= inputMaxlength %>"
+            autocomplete="tel-national"
+            inputmode="tel"
+            data-phone-input="<%= inputName %>"
+            data-country="<%= inputCountryCode %>"
+        >
+
+        <!-- Hidden input for full international number -->
+        <input type="hidden"
+               id="<%= inputId %>_full"
+               name="<%= inputName %>_full"
+               value="">
+
+        <!-- Validation Feedback -->
+        <div class="invalid-feedback">
+            Por favor proporciona un número de teléfono válido
+        </div>
+
+        <div class="valid-feedback">
+            Número de teléfono válido
+        </div>
+    </div>
+
+    <!-- Help Text -->
+    <% if (inputHelpText) { %>
+        <div class="form-text text-muted mt-1">
+            <%= inputHelpText %>
+        </div>
+    <% } %>
+</div>
+
+<style>
+    .phone-input-wrapper .phone-input-group {
+        position: relative;
+    }
+
+    .phone-input-wrapper .country-selector {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 100px;
+        border-right: 0;
+        background-color: #f8f9fa;
+        transition: all 0.3s ease;
+    }
+
+    .phone-input-wrapper .country-selector:hover {
+        background-color: #e9ecef;
+    }
+
+    .phone-input-wrapper .country-selector:focus {
+        background-color: #e9ecef;
+        border-color: #667eea;
+        box-shadow: none;
+    }
+
+    .phone-input-wrapper .country-flag {
+        font-size: 1.25rem;
+        line-height: 1;
+    }
+
+    .phone-input-wrapper .country-code {
+        font-family: monospace;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .phone-input-wrapper .phone-number-input {
+        border-left: 0;
+        transition: all 0.3s ease;
+    }
+
+    .phone-input-wrapper .phone-number-input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        border-left: 1px solid #667eea;
+    }
+
+    .phone-input-wrapper .phone-input-group:focus-within .country-selector {
+        border-color: #667eea;
+    }
+
+    .phone-input-wrapper .country-dropdown {
+        max-height: 300px;
+        overflow-y: auto;
+        min-width: 280px;
+    }
+
+    .phone-input-wrapper .country-option {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        cursor: pointer;
+    }
+
+    .phone-input-wrapper .country-option:hover {
+        background-color: #f8f9fa;
+    }
+
+    .phone-input-wrapper .country-option.active {
+        background-color: #667eea;
+        color: white;
+    }
+
+    .phone-input-wrapper .country-option.active .text-muted {
+        color: rgba(255, 255, 255, 0.8) !important;
+    }
+
+    .phone-input-wrapper .country-flag-option {
+        font-size: 1.25rem;
+        min-width: 1.5rem;
+    }
+
+    .phone-input-wrapper .country-name {
+        flex: 1;
+    }
+
+    .phone-input-wrapper .country-code-option {
+        font-family: monospace;
+        font-size: 0.875rem;
+    }
+
+    .phone-input-wrapper .phone-number-input.is-invalid {
+        border-color: #dc3545;
+    }
+
+    .phone-input-wrapper .phone-number-input.is-valid {
+        border-color: #198754;
+    }
+</style>
+
+<script>
+(function() {
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPhoneInput);
+    } else {
+        initPhoneInput();
+    }
+
+    function initPhoneInput() {
+        const phoneInput = document.getElementById('<%= inputId %>');
+        if (!phoneInput) return;
+
+        const countryBtn = document.getElementById('<%= inputId %>_country_btn');
+        const fullNumberInput = document.getElementById('<%= inputId %>_full');
+        const wrapper = phoneInput.closest('[data-phone-wrapper]');
+
+        // Country data for validation (constructed safely to avoid XSS)
+        const countries = {
+            <% Object.keys(countries).forEach(function(key, index) {
+                const country = countries[key];
+                const comma = index < Object.keys(countries).length - 1 ? ',' : '';
+            %>
+            <%= key %>: {
+                name: '<%= country.name %>',
+                code: '<%= country.code %>',
+                minLength: <%= country.minLength %>,
+                maxLength: <%= country.maxLength %>
+            }<%= comma %>
+            <% }); %>
+        };
+        let currentCountry = '<%= inputCountryCode %>';
+
+        // Country selection handler
+        const countryOptions = wrapper.querySelectorAll('.country-option');
+        countryOptions.forEach(option => {
+            option.addEventListener('click', function(e) {
+                e.preventDefault();
+
+                const country = this.dataset.country;
+                const code = this.dataset.code;
+                const flag = this.dataset.flag;
+                const format = this.dataset.format;
+
+                // Update button
+                countryBtn.querySelector('.country-flag').textContent = flag;
+                countryBtn.querySelector('.country-code').textContent = code;
+                countryBtn.dataset.selectedCountry = country;
+
+                // Update active state
+                countryOptions.forEach(opt => opt.classList.remove('active'));
+                this.classList.add('active');
+
+                // Update placeholder
+                phoneInput.placeholder = format;
+                phoneInput.dataset.country = country;
+
+                // Update current country
+                currentCountry = country;
+
+                // Revalidate current input
+                if (phoneInput.value) {
+                    validatePhone();
+                }
+
+                // Close dropdown
+                const dropdown = window.bootstrap.Dropdown.getInstance(countryBtn);
+                if (dropdown) dropdown.hide();
+            });
+        });
+
+        // Phone number validation
+        function validatePhone() {
+            const value = phoneInput.value.replace(/\D/g, ''); // Remove non-digits
+            const country = countries[currentCountry];
+
+            if (!value && !<%= inputRequired %>) {
+                // Optional field, empty is valid
+                phoneInput.classList.remove('is-invalid', 'is-valid');
+                fullNumberInput.value = '';
+                return true;
+            }
+
+            if (!value && <%= inputRequired %>) {
+                // Required field, empty is invalid
+                phoneInput.classList.add('is-invalid');
+                phoneInput.classList.remove('is-valid');
+                fullNumberInput.value = '';
+                return false;
+            }
+
+            // Validate length
+            const isValid = value.length >= country.minLength && value.length <= country.maxLength;
+
+            if (isValid) {
+                phoneInput.classList.remove('is-invalid');
+                phoneInput.classList.add('is-valid');
+                // Store full international number (E.164 format - digits only, no +)
+                const countryCodeDigits = country.code.replace(/\D/g, '');
+                fullNumberInput.value = countryCodeDigits + value;
+            } else {
+                phoneInput.classList.add('is-invalid');
+                phoneInput.classList.remove('is-valid');
+                fullNumberInput.value = '';
+            }
+
+            return isValid;
+        }
+
+        // Keypress event - prevent non-digit characters from being typed
+        phoneInput.addEventListener('keypress', function(e) {
+            // Allow only digits (0-9) and control keys
+            const charCode = e.which || e.keyCode;
+
+            // Allow: digits (0-9: charCode 48-57)
+            if (charCode >= 48 && charCode <= 57) {
+                return true;
+            }
+
+            // Block all other characters
+            e.preventDefault();
+            return false;
+        });
+
+        // Input event - sanitize to digits only
+        phoneInput.addEventListener('input', function() {
+            // Sanitize: allow ONLY digits (remove spaces, dashes, parentheses, letters, etc.)
+            let value = this.value;
+            const cursorPos = this.selectionStart;
+            const oldLength = value.length;
+
+            // Remove ALL non-digit characters
+            value = value.replace(/\D/g, '');
+
+            // Update value if changed
+            if (value !== this.value) {
+                this.value = value;
+                // Restore cursor position
+                const newLength = value.length;
+                const diff = newLength - oldLength;
+                this.setSelectionRange(cursorPos + diff, cursorPos + diff);
+            }
+
+            validatePhone();
+        });
+
+        // Paste event - intelligent handling of international numbers
+        phoneInput.addEventListener('paste', function(e) {
+            e.preventDefault();
+
+            const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+            const digitsOnly = pastedText.replace(/\D/g, '');
+
+            // Check if pasted number starts with country code
+            let detectedCountry = currentCountry;
+            let numberPart = digitsOnly;
+
+            // Try to detect country code from pasted number
+            for (const [countryCode, countryData] of Object.entries(countries)) {
+                const dialCode = countryData.code.replace('+', '');
+                if (digitsOnly.startsWith(dialCode)) {
+                    detectedCountry = countryCode;
+                    numberPart = digitsOnly.substring(dialCode.length);
+
+                    // Auto-select detected country
+                    const countryOption = wrapper.querySelector(`[data-country="${countryCode}"]`);
+                    if (countryOption) {
+                        countryOption.click();
+                    }
+                    break;
+                }
+            }
+
+            // Set the number part (without country code)
+            this.value = numberPart;
+            validatePhone();
+        });
+
+        // Blur event - final validation
+        phoneInput.addEventListener('blur', function() {
+            if (this.value) {
+                // Clean up formatting
+                const digitsOnly = this.value.replace(/\D/g, '');
+                this.value = digitsOnly;
+                validatePhone();
+            }
+        });
+
+        // Form submission validation
+        const form = phoneInput.closest('form');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const isValid = validatePhone();
+
+                if (!isValid && (<%= inputRequired %> || phoneInput.value)) {
+                    e.preventDefault();
+                    phoneInput.focus();
+                    return false;
+                }
+            });
+        }
+
+        // Initial validation if there's a value
+        if (phoneInput.value) {
+            validatePhone();
+        }
+    }
+})();
+</script>

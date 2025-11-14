@@ -8,7 +8,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const { SecureSecretsManager } = require('../src/infrastructure/secrets/secretsManager');
+const { SecureSecretsManager } = require('../../../src/infrastructure/secrets/secretsManager');
 
 /**
  * Environment-specific secret generation configuration.

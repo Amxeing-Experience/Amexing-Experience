@@ -6,12 +6,12 @@
  * the configurable surcharge percentage for non-cash payment methods.
  *
  * Key Concepts:
- * - Base Price (Precio Contado): Original price for cash payments
+ * - Base Price (Precio Efectivo): Original price for cash payments
  * - Surcharge: Additional percentage for non-cash payment methods (cards, digital wallets)
  * - Total Price (Precio Base): Base price + surcharge (displayed prominently).
  *
  * Legal Terminology:
- * - "Precio contado" = Cash discount price (legally correct term)
+ * - "Precio efectivo" = Cash discount price (legally correct term)
  * - "Precio base" = Standard price with surcharge included
  * - Cannot legally charge "commission fees", but CAN offer "cash discounts".
  *
@@ -241,7 +241,7 @@ class PricingHelper {
    * @example
    * const html = await pricingHelper.formatPriceBreakdownHTML(2500);
    * // Returns HTML with:
-   * // - Small muted text: "Contado: $2,500.00"
+   * // - Small muted text: "Efectivo: $2,500.00"
    * // - Large bold green: "$3,027.25"
    * // - Tiny muted text: "+21.09% otros métodos"
    */
@@ -251,7 +251,7 @@ class PricingHelper {
     return `
       <div class="price-breakdown">
         <div class="base-price text-muted" style="font-size: 0.875rem;">
-          <small>Contado: ${this.formatMXN(breakdown.basePrice)}</small>
+          <small>Efectivo: ${this.formatMXN(breakdown.basePrice)}</small>
         </div>
         <div class="total-price fw-bold text-success" style="font-size: 1.1rem;">
           ${this.formatMXN(breakdown.totalPrice)}

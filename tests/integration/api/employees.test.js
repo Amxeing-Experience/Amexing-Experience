@@ -341,23 +341,24 @@ describe('Employees API Integration Tests', () => {
   });
 
   describe('DELETE /api/employees/:id', () => {
-    let employeeToDelete;
-
-    beforeEach(async () => {
-      // Create a temporary employee for deletion test
-      employeeToDelete = new Parse.Object('AmexingUser');
-      employeeToDelete.set('username', `delete-test-${Date.now()}@amexing.test`);
-      employeeToDelete.set('email', `delete-test-${Date.now()}@amexing.test`);
-      employeeToDelete.set('password', 'TestPass123!');
-      employeeToDelete.set('firstName', 'Delete');
-      employeeToDelete.set('lastName', 'Test');
-      employeeToDelete.set('role', 'employee_amexing');
-      employeeToDelete.set('active', true);
-      employeeToDelete.set('exists', true);
-      await employeeToDelete.save(null, { useMasterKey: true });
-    });
+    // Helper function to create a fresh employee for each test
+    const createEmployeeForDeletion = async () => {
+      const employee = new Parse.Object('AmexingUser');
+      employee.set('username', `delete-test-${Date.now()}-${Math.random()}@amexing.test`);
+      employee.set('email', `delete-test-${Date.now()}-${Math.random()}@amexing.test`);
+      employee.set('password', 'TestPass123!');
+      employee.set('firstName', 'Delete');
+      employee.set('lastName', 'Test');
+      employee.set('role', 'employee_amexing');
+      employee.set('active', true);
+      employee.set('exists', true);
+      await employee.save(null, { useMasterKey: true });
+      return employee;
+    };
 
     it('should soft delete employee with admin', async () => {
+      const employeeToDelete = await createEmployeeForDeletion();
+
       const response = await request(app)
         .delete(`/api/employees/${employeeToDelete.id}`)
         .set('Authorization', `Bearer ${adminToken}`);
@@ -373,6 +374,8 @@ describe('Employees API Integration Tests', () => {
     });
 
     it('should soft delete employee with superadmin', async () => {
+      const employeeToDelete = await createEmployeeForDeletion();
+
       const response = await request(app)
         .delete(`/api/employees/${employeeToDelete.id}`)
         .set('Authorization', `Bearer ${superadminToken}`);
@@ -386,6 +389,8 @@ describe('Employees API Integration Tests', () => {
     });
 
     it('should return 403 for employee role', async () => {
+      const employeeToDelete = await createEmployeeForDeletion();
+
       const response = await request(app)
         .delete(`/api/employees/${employeeToDelete.id}`)
         .set('Authorization', `Bearer ${employeeToken}`);
@@ -395,6 +400,8 @@ describe('Employees API Integration Tests', () => {
     });
 
     it('should not physically delete from database', async () => {
+      const employeeToDelete = await createEmployeeForDeletion();
+
       await request(app)
         .delete(`/api/employees/${employeeToDelete.id}`)
         .set('Authorization', `Bearer ${adminToken}`);

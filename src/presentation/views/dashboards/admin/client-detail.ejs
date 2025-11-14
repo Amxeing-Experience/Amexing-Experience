@@ -441,14 +441,13 @@ document.addEventListener('DOMContentLoaded', function() {
                             Datos Adicionales (Opcional)
                         </h6>
 
-                        <%- include('../../molecules/common/form-field', {
-                            type: 'tel',
+                        <%- include('../../atoms/common/phone-input', {
                             name: 'phone',
                             id: 'employeePhone',
                             label: 'Teléfono de Contacto',
                             required: false,
-                            placeholder: '+52 (999) 123-4567',
-                            inputAttributes: { maxlength: '20' }
+                            helpText: 'Número de contacto del empleado',
+                            countryCode: 'MX'
                         }) %>
 
                         <%- include('../../molecules/common/form-field', {
