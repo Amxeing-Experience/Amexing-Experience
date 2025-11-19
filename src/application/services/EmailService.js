@@ -11,6 +11,17 @@ const {
   MailerSend, EmailParams, Sender, Recipient,
 } = require('mailersend');
 const logger = require('../../infrastructure/logger');
+const TemplateService = require('../../infrastructure/email/TemplateService');
+
+// Lazy load EmailLog to avoid Parse initialization issues in unit tests
+let EmailLog;
+const getEmailLog = () => {
+  if (!EmailLog) {
+    // eslint-disable-next-line global-require
+    EmailLog = require('../../domain/models/EmailLog');
+  }
+  return EmailLog;
+};
 
 class EmailService {
   constructor() {
@@ -54,7 +65,7 @@ class EmailService {
   }
 
   /**
-   * Send email using MailerSend.
+   * Send email using MailerSend with email traceability.
    * @param {object} emailData - Email configuration.
    * @param {string} emailData.to - Recipient email address.
    * @param {string} emailData.toName - Recipient name (optional).
@@ -64,6 +75,9 @@ class EmailService {
    * @param {string} emailData.from - Sender email (optional, uses default).
    * @param {string} emailData.fromName - Sender name (optional, uses default).
    * @param {Array} emailData.tags - Email tags for tracking (optional).
+   * @param {string} emailData.notificationType - Type of notification (e.g., 'booking_confirmation').
+   * @param {object} emailData.recipientUser - Parse.Object AmexingUser pointer (optional).
+   * @param {object} emailData.metadata - Additional metadata for tracking (optional).
    * @returns {Promise<object>} Send result.
    * @example
    */
@@ -75,6 +89,7 @@ class EmailService {
 
       const {
         to, toName, subject, text, html, from, fromName, tags,
+        notificationType, recipientUser, metadata,
       } = emailData;
 
       // Validate required fields
@@ -106,21 +121,58 @@ class EmailService {
 
       // Send email
       const result = await this.mailerSend.email.send(emailParams);
+      const messageId = result.body?.message_id || null;
+
+      // Log email to database for traceability
+      await this.logEmailSent({
+        messageId,
+        recipientEmail: to,
+        recipientUser,
+        notificationType: notificationType || 'generic',
+        subject,
+        htmlContent: html || '',
+        textContent: text || '',
+        status: 'sent',
+        metadata: metadata || {},
+        tags: tags || [],
+      });
 
       // Log success (without sensitive data)
       logger.info('Email sent successfully', {
-        messageId: result.body?.message_id || 'unknown',
+        messageId,
         to: this.maskEmail(to),
         subject,
+        notificationType,
         timestamp: new Date().toISOString(),
       });
 
       return {
         success: true,
-        messageId: result.body?.message_id,
+        messageId,
         data: result.body,
       };
     } catch (error) {
+      // Log failed email attempt to database
+      try {
+        await this.logEmailSent({
+          messageId: null,
+          recipientEmail: emailData.to,
+          recipientUser: emailData.recipientUser,
+          notificationType: emailData.notificationType || 'generic',
+          subject: emailData.subject,
+          htmlContent: emailData.html || '',
+          textContent: emailData.text || '',
+          status: 'failed',
+          metadata: emailData.metadata || {},
+          tags: emailData.tags || [],
+          error: error.message,
+        });
+      } catch (logError) {
+        logger.error('Failed to log email error', {
+          error: logError.message,
+        });
+      }
+
       // Log error (without sensitive data)
       logger.error('Failed to send email', {
         error: error.message,
@@ -137,54 +189,165 @@ class EmailService {
   }
 
   /**
-   * Send welcome email to new users.
+   * Log email to EmailLog for traceability.
+   * @param {object} logData - Email log data.
+   * @returns {Promise<Parse.Object>} Created EmailLog.
+   * @private
+   * @example
+   */
+  async logEmailSent(logData) {
+    try {
+      const emailLog = getEmailLog().create(logData);
+      await emailLog.save(null, { useMasterKey: true });
+
+      logger.debug('Email logged successfully', {
+        emailLogId: emailLog.id,
+        recipientEmail: this.maskEmail(logData.recipientEmail),
+        notificationType: logData.notificationType,
+        status: logData.status,
+      });
+
+      return emailLog;
+    } catch (error) {
+      logger.error('Failed to log email', {
+        error: error.message,
+        recipientEmail: this.maskEmail(logData.recipientEmail),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Send welcome email to new users using template.
    * @param {object} userData - User data.
    * @param {string} userData.email - User email.
    * @param {string} userData.name - User name.
    * @param {string} userData.role - User role (optional).
+   * @param {object} userData.recipientUser - AmexingUser pointer (optional).
+   * @param {string} userData.dashboardUrl - Dashboard URL (optional).
    * @returns {Promise<object>} Send result.
    * @example
+   * await emailService.sendWelcomeEmail({
+   *   email: 'user@example.com',
+   *   name: 'Juan Pérez',
+   *   role: 'Client',
+   *   dashboardUrl: 'https://amexing.com/dashboard'
+   * });
    */
   async sendWelcomeEmail(userData) {
-    const { email, name, role } = userData;
+    try {
+      const {
+        email, name, role, recipientUser, dashboardUrl,
+      } = userData;
 
-    const emailData = {
-      to: email,
-      toName: name,
-      subject: 'Welcome to Amexing System',
-      html: this.generateWelcomeEmailHTML(name, role),
-      text: this.generateWelcomeEmailText(name, role),
-      tags: ['welcome', 'onboarding'],
-    };
+      // Prepare template variables
+      const templateVariables = {
+        ...TemplateService.getCommonVariables(),
+        NOMBRE_USUARIO: name,
+        EMAIL_USUARIO: email,
+        TIPO_CUENTA: role || 'Cliente',
+        URL_DASHBOARD: dashboardUrl || process.env.APP_BASE_URL || 'http://localhost:1337',
+      };
 
-    return this.sendEmail(emailData);
+      // Render template
+      const { html, text } = TemplateService.render(
+        'welcome',
+        templateVariables,
+        { includeText: true }
+      );
+
+      // Send email
+      return await this.sendEmail({
+        to: email,
+        toName: name,
+        subject: '¡Bienvenido a Amexing Experience!',
+        html,
+        text,
+        tags: ['welcome', 'onboarding', 'registration'],
+        notificationType: 'welcome',
+        recipientUser,
+        metadata: {
+          role,
+          registrationDate: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to send welcome email', {
+        error: error.message,
+        email: this.maskEmail(userData.email),
+      });
+
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 
   /**
-   * Send password reset email.
+   * Send password reset email using template.
    * @param {object} resetData - Reset data.
    * @param {string} resetData.email - User email.
    * @param {string} resetData.name - User name.
-   * @param {string} resetData.resetToken - Password reset token.
    * @param {string} resetData.resetUrl - Reset URL.
+   * @param {object} resetData.recipientUser - AmexingUser pointer (optional).
+   * @param {string} resetData.expirationTime - Token expiration time (default: '1 hora').
    * @returns {Promise<object>} Send result.
    * @example
+   * await emailService.sendPasswordResetEmail({
+   *   email: 'user@example.com',
+   *   name: 'Juan Pérez',
+   *   resetUrl: 'https://amexing.com/reset-password?token=abc123',
+   *   expirationTime: '1 hora'
+   * });
    */
   async sendPasswordResetEmail(resetData) {
-    const {
-      email, name, resetUrl,
-    } = resetData;
+    try {
+      const {
+        email, name, resetUrl, recipientUser, expirationTime,
+      } = resetData;
 
-    const emailData = {
-      to: email,
-      toName: name,
-      subject: 'Password Reset Request - Amexing System',
-      html: this.generatePasswordResetEmailHTML(name, resetUrl),
-      text: this.generatePasswordResetEmailText(name, resetUrl),
-      tags: ['password-reset', 'security'],
-    };
+      // Prepare template variables
+      const templateVariables = {
+        ...TemplateService.getCommonVariables(),
+        NOMBRE_USUARIO: name,
+        URL_RESET: resetUrl,
+        TIEMPO_EXPIRACION: expirationTime || '1 hora',
+      };
 
-    return this.sendEmail(emailData);
+      // Render template
+      const { html, text } = TemplateService.render(
+        'password_reset',
+        templateVariables,
+        { includeText: true }
+      );
+
+      // Send email
+      return await this.sendEmail({
+        to: email,
+        toName: name,
+        subject: 'Restablecer Contraseña - Amexing Experience',
+        html,
+        text,
+        tags: ['password-reset', 'security', 'transactional'],
+        notificationType: 'password_reset',
+        recipientUser,
+        metadata: {
+          resetRequestedAt: new Date().toISOString(),
+          expirationTime: expirationTime || '1 hora',
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to send password reset email', {
+        error: error.message,
+        email: this.maskEmail(resetData.email),
+      });
+
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 
   /**
@@ -218,14 +381,16 @@ class EmailService {
    * @example
    */
   maskEmail(email) {
-    if (!email || typeof email !== 'string') return 'invalid-email';
+    if (!email || typeof email !== 'string' || !email.includes('@')) return '***';
 
     const [localPart, domain] = email.split('@');
-    if (!localPart || !domain) return 'invalid-email';
+    if (!localPart || !domain) return '***';
 
+    // For emails with 3+ characters in local part: first + ** + last
+    // For emails with 1-2 characters: *** (no domain shown for short emails)
     const maskedLocal = localPart.length > 2
-      ? localPart[0] + '*'.repeat(localPart.length - 2) + localPart[localPart.length - 1]
-      : '*'.repeat(localPart.length);
+      ? `${localPart[0]}**${localPart[localPart.length - 1]}`
+      : '***';
 
     return `${maskedLocal}@${domain}`;
   }
@@ -487,6 +652,175 @@ The Amexing Team
 ---
 This is an automated message from Amexing System. Please do not reply to this email.
     `.trim();
+  }
+
+  /**
+   * Send booking confirmation email using template.
+   * @param {object} bookingData - Booking information.
+   * @param {string} bookingData.recipientEmail - Recipient email address.
+   * @param {string} bookingData.recipientName - Recipient name.
+   * @param {object} bookingData.recipientUser - AmexingUser pointer (optional).
+   * @param {string} bookingData.bookingNumber - Booking/reservation number.
+   * @param {string} bookingData.serviceType - Type of service.
+   * @param {string} bookingData.date - Service date.
+   * @param {string} bookingData.time - Service time.
+   * @param {string} bookingData.location - Pickup/meeting location.
+   * @param {string} bookingData.buttonUrl - Call-to-action button URL (optional).
+   * @param {string} bookingData.buttonText - Call-to-action button text (optional).
+   * @param {string} bookingData.additionalMessage - Additional message (optional).
+   * @param {object} bookingData.metadata - Additional metadata for tracking.
+   * @returns {Promise<object>} Send result.
+   * @example
+   * await emailService.sendBookingConfirmation({
+   *   recipientEmail: 'client@example.com',
+   *   recipientName: 'Juan Pérez',
+   *   bookingNumber: 'AMX-12345',
+   *   serviceType: 'Traslado Aeropuerto',
+   *   date: '25 de enero, 2025',
+   *   time: '10:00 AM',
+   *   location: 'Hotel Rosewood',
+   *   metadata: { bookingId: 'abc123', quoteId: 'xyz789' }
+   * });
+   */
+  async sendBookingConfirmation(bookingData) {
+    try {
+      const {
+        recipientEmail,
+        recipientName,
+        recipientUser,
+        bookingNumber,
+        serviceType,
+        date,
+        time,
+        location,
+        buttonUrl,
+        buttonText,
+        additionalMessage,
+        metadata,
+      } = bookingData;
+
+      // Prepare template variables
+      const templateVariables = {
+        ...TemplateService.getCommonVariables(),
+        ASUNTO: 'Confirmación de Reserva',
+        TITULO_PRINCIPAL: 'Confirmación de Reserva',
+        NOMBRE_CLIENTE: recipientName,
+        CONTENIDO_MENSAJE: `
+          <p>¡Gracias por reservar con Amexing Experience!</p>
+          <p>Nos complace confirmar su reserva. A continuación encontrará los detalles de su servicio:</p>
+        `,
+        NUMERO_RESERVA: bookingNumber,
+        TIPO_SERVICIO: serviceType,
+        FECHA: date,
+        HORA: time,
+        LUGAR: location,
+        URL_BOTON: buttonUrl || '#',
+        TEXTO_BOTON: buttonText || 'Ver Detalles de Reserva',
+        MENSAJE_ADICIONAL: additionalMessage || 'Si tiene alguna pregunta o necesita hacer cambios, no dude en contactarnos.',
+      };
+
+      // Render template
+      const { html, text } = TemplateService.render(
+        'booking_confirmation',
+        templateVariables,
+        { includeText: true }
+      );
+
+      // Send email
+      return await this.sendEmail({
+        to: recipientEmail,
+        toName: recipientName,
+        subject: `Confirmación de Reserva ${bookingNumber} - Amexing Experience`,
+        html,
+        text,
+        tags: ['booking', 'confirmation', 'transactional'],
+        notificationType: 'booking_confirmation',
+        recipientUser,
+        metadata: {
+          ...metadata,
+          bookingNumber,
+          serviceType,
+          date,
+          time,
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to send booking confirmation email', {
+        error: error.message,
+        recipientEmail: this.maskEmail(bookingData.recipientEmail),
+        bookingNumber: bookingData.bookingNumber,
+      });
+
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
+   * Get email history for a user.
+   * @param {string} userId - AmexingUser objectId.
+   * @param {object} options - Query options.
+   * @returns {Promise<Array>} Email logs.
+   * @example
+   * const emails = await emailService.getEmailHistory(userId, { limit: 50 });
+   */
+  async getEmailHistory(userId, options = {}) {
+    try {
+      return await getEmailLog().getByRecipient(userId, options);
+    } catch (error) {
+      logger.error('Failed to retrieve email history', {
+        userId,
+        error: error.message,
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Resend an email from EmailLog.
+   * @param {string} emailLogId - EmailLog objectId.
+   * @returns {Promise<object>} Send result.
+   * @example
+   * await emailService.resendEmail('abc123');
+   */
+  async resendEmail(emailLogId) {
+    try {
+      const Parse = require('parse/node');
+      const query = new Parse.Query('EmailLog');
+      const emailLog = await query.get(emailLogId, { useMasterKey: true });
+
+      if (!emailLog) {
+        throw new Error('Email log not found');
+      }
+
+      // Resend using original data
+      return await this.sendEmail({
+        to: emailLog.get('recipientEmail'),
+        subject: `[Reenvío] ${emailLog.get('subject')}`,
+        html: emailLog.get('htmlContent'),
+        text: emailLog.get('textContent'),
+        tags: ['resend', ...(emailLog.get('tags') || [])],
+        notificationType: emailLog.get('notificationType'),
+        recipientUser: emailLog.get('recipientUser'),
+        metadata: {
+          ...emailLog.get('metadata'),
+          resendFrom: emailLogId,
+          resendAt: new Date().toISOString(),
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to resend email', {
+        emailLogId,
+        error: error.message,
+      });
+
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
   }
 }
 

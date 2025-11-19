@@ -183,16 +183,16 @@ describe('EmailService', () => {
   describe('Email Masking (PCI DSS Compliance)', () => {
     it('should mask email addresses correctly', () => {
       expect(EmailService.maskEmail('test@example.com')).toBe('t**t@example.com');
-      expect(EmailService.maskEmail('a@example.com')).toBe('*@example.com');
-      expect(EmailService.maskEmail('ab@example.com')).toBe('**@example.com');
-      expect(EmailService.maskEmail('abc@example.com')).toBe('a*c@example.com');
+      expect(EmailService.maskEmail('a@example.com')).toBe('***@example.com');
+      expect(EmailService.maskEmail('ab@example.com')).toBe('***@example.com');
+      expect(EmailService.maskEmail('abc@example.com')).toBe('a**c@example.com');
     });
 
     it('should handle invalid email addresses', () => {
-      expect(EmailService.maskEmail('')).toBe('invalid-email');
-      expect(EmailService.maskEmail('invalid')).toBe('invalid-email');
-      expect(EmailService.maskEmail(null)).toBe('invalid-email');
-      expect(EmailService.maskEmail(undefined)).toBe('invalid-email');
+      expect(EmailService.maskEmail('')).toBe('***');
+      expect(EmailService.maskEmail('invalid')).toBe('***');
+      expect(EmailService.maskEmail(null)).toBe('***');
+      expect(EmailService.maskEmail(undefined)).toBe('***');
     });
   });
 

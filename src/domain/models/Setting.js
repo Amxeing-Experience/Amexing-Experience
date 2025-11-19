@@ -42,7 +42,7 @@ const logger = require('../../infrastructure/logger');
 /**
  * Setting model for managing application settings.
  * Extends BaseModel to provide standardized database operations.
- * @extends BaseModel
+ * @augments BaseModel
  */
 class Setting extends BaseModel {
   constructor() {

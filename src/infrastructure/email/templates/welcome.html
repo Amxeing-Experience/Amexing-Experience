@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bienvenido a Amexing Experience</title>
+    <style>
+        /* Reset estilos */
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+        img { -ms-interpolation-mode: bicubic; border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+        table { border-collapse: collapse !important; }
+        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+
+        /* Estilos responsivos */
+        @media screen and (max-width: 600px) {
+            .mobile-hide { display: none !important; }
+            .mobile-center { text-align: center !important; }
+            .container { width: 100% !important; max-width: 100% !important; }
+            .padding { padding: 10px 5% 15px 5% !important; }
+            .section-padding { padding: 50px 15px 50px 15px !important; }
+        }
+    </style>
+</head>
+<body style="margin: 0 !important; padding: 0 !important; background-color: #f4f4f4;">
+
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+        <td align="center" style="padding: 40px 10px 40px 10px;">
+
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                <!-- Header -->
+                <tr>
+                    <td align="center" style="background-color: #1a1a1a; padding: 40px 20px; border-radius: 10px 10px 0 0;">
+                        <img src="{{LOGO_URL}}" alt="Amexing Experience" style="display: block; max-width: 200px; width: 100%; height: auto;">
+                    </td>
+                </tr>
+
+                <!-- Línea decorativa -->
+                <tr>
+                    <td style="background-color: #dc2626; height: 4px;"></td>
+                </tr>
+
+                <!-- Contenido -->
+                <tr>
+                    <td style="padding: 40px 30px 20px 30px;">
+                        <h1 style="color: #1a1a1a; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; margin: 0 0 20px 0; text-align: center;">
+                            ¡Bienvenido a Amexing Experience!
+                        </h1>
+
+                        <p style="color: #333333; font-family: Arial, sans-serif; font-size: 16px; line-height: 24px; margin: 0 0 20px 0;">
+                            Estimado/a {{NOMBRE_USUARIO}},
+                        </p>
+
+                        <p style="color: #555555; font-family: Arial, sans-serif; font-size: 15px; line-height: 24px; margin: 0 0 20px 0;">
+                            ¡Gracias por registrarte en Amexing Experience! Nos emociona tenerte como parte de nuestra comunidad.
+                        </p>
+
+                        <p style="color: #555555; font-family: Arial, sans-serif; font-size: 15px; line-height: 24px; margin: 0 0 30px 0;">
+                            Tu cuenta ha sido creada exitosamente y ya puedes acceder a todos nuestros servicios de transporte premium en San Miguel de Allende.
+                        </p>
+
+                        <!-- Información de cuenta -->
+                        <div style="background-color: #f8f8f8; border-radius: 8px; padding: 25px; margin: 0 0 30px 0;">
+                            <h2 style="color: #1a1a1a; font-family: Arial, sans-serif; font-size: 20px; font-weight: bold; margin: 0 0 15px 0;">
+                                Información de tu cuenta
+                            </h2>
+
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td style="padding: 8px 0;">
+                                        <strong style="color: #333333; font-family: Arial, sans-serif; font-size: 14px;">Email:</strong>
+                                    </td>
+                                    <td style="padding: 8px 0; text-align: right;">
+                                        <span style="color: #555555; font-family: Arial, sans-serif; font-size: 14px;">{{EMAIL_USUARIO}}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0;">
+                                        <strong style="color: #333333; font-family: Arial, sans-serif; font-size: 14px;">Tipo de cuenta:</strong>
+                                    </td>
+                                    <td style="padding: 8px 0; text-align: right;">
+                                        <span style="color: #dc2626; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;">{{TIPO_CUENTA}}</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Próximos pasos -->
+                        <div style="background-color: #e9f4ff; border-left: 4px solid #007bff; border-radius: 5px; padding: 20px; margin: 0 0 30px 0;">
+                            <p style="margin: 0 0 10px 0; color: #333333; font-family: Arial, sans-serif; font-size: 15px; font-weight: bold;">
+                                Próximos pasos:
+                            </p>
+                            <ul style="margin: 0; padding-left: 20px; color: #555555; font-family: Arial, sans-serif; font-size: 14px; line-height: 22px;">
+                                <li>Explora nuestros servicios de transporte premium</li>
+                                <li>Completa tu perfil para una experiencia personalizada</li>
+                                <li>Reserva tu primer servicio con nosotros</li>
+                            </ul>
+                        </div>
+
+                        <!-- Botón -->
+                        <div style="text-align: center; margin: 0 0 30px 0;">
+                            <a href="{{URL_DASHBOARD}}" style="background-color: #dc2626; color: #ffffff; display: inline-block; font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; line-height: 50px; text-align: center; text-decoration: none; width: 250px; border-radius: 25px;">
+                                Acceder a mi cuenta
+                            </a>
+                        </div>
+
+                        <p style="color: #555555; font-family: Arial, sans-serif; font-size: 14px; line-height: 22px; margin: 0 0 20px 0; text-align: center;">
+                            Si tienes alguna pregunta, nuestro equipo está aquí para ayudarte.
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Contacto -->
+                <tr>
+                    <td style="background-color: #f8f8f8; padding: 30px;">
+                        <h3 style="color: #1a1a1a; font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; text-align: center;">
+                            ¿Necesitas ayuda?
+                        </h3>
+
+                        <p style="color: #555555; font-family: Arial, sans-serif; font-size: 14px; text-align: center; margin: 0;">
+                            <strong>Teléfono:</strong> <a href="tel:+524151673990" style="color: #dc2626; text-decoration: none;">{{TELEFONO}}</a><br>
+                            <strong>Email:</strong> <a href="mailto:contact@amexingexperience.com" style="color: #dc2626; text-decoration: none;">{{EMAIL_CONTACTO}}</a>
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                    <td style="background-color: #1a1a1a; padding: 40px 30px; border-radius: 0 0 10px 10px;">
+                        <p style="color: #ffffff; font-family: Arial, sans-serif; font-size: 16px; font-style: italic; margin: 0 0 20px 0; text-align: center;">
+                            "{{TAGLINE}}"
+                        </p>
+
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td align="center">
+                                    <table cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td style="padding: 0 10px;">
+                                                <a href="{{INSTAGRAM}}" style="text-decoration: none;">
+                                                    <img src="https://cdn-icons-png.flaticon.com/512/174/174855.png" alt="Instagram" width="30" height="30" style="display: block;">
+                                                </a>
+                                            </td>
+                                            <td style="padding: 0 10px;">
+                                                <a href="{{FACEBOOK}}" style="text-decoration: none;">
+                                                    <img src="https://cdn-icons-png.flaticon.com/512/174/174848.png" alt="Facebook" width="30" height="30" style="display: block;">
+                                                </a>
+                                            </td>
+                                            <td style="padding: 0 10px;">
+                                                <a href="{{TRIPADVISOR}}" style="text-decoration: none;">
+                                                    <img src="https://cdn-icons-png.flaticon.com/512/174/174865.png" alt="TripAdvisor" width="30" height="30" style="display: block;">
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 30px;">
+                            <tr>
+                                <td align="center">
+                                    <p style="color: #cccccc; font-family: Arial, sans-serif; font-size: 13px; margin: 0;">
+                                        <a href="{{SITIO_WEB}}" style="color: #dc2626; text-decoration: none;">Sitio web</a> |
+                                        <a href="{{AVISO_PRIVACIDAD}}" style="color: #dc2626; text-decoration: none;">Aviso de privacidad</a>
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <p style="color: #999999; font-family: Arial, sans-serif; font-size: 12px; margin: 20px 0 0 0; text-align: center;">
+                            © {{AÑO}} Amexing Experience. Todos los derechos reservados.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

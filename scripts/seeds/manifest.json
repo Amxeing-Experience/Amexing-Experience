@@ -145,6 +145,17 @@
       "dependencies": ["001-seed-service-types", "005-seed-rates", "006-seed-vehicle-types", "009-seed-pois-tours"],
       "idempotent": true,
       "order": 10
+    },
+    {
+      "name": "011-create-emaillog-class",
+      "file": "011-create-emaillog-class.js",
+      "description": "Create EmailLog class with schema, indexes, and CLPs for email traceability and notification tracking",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": [],
+      "idempotent": true,
+      "order": 11
     }
   ],
   "notes": [
