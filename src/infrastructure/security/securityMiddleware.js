@@ -638,6 +638,7 @@ class SecurityMiddleware {
           || req.method === 'OPTIONS'
           || req.path.startsWith('/api/')
           || req.path === '/auth/login'
+          || req.path === '/auth/change-password'
         ) {
           // Generate CSRF token for forms if session exists
           if (req.session && (req.method === 'GET' || req.method === 'HEAD')) {
