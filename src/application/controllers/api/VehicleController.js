@@ -185,9 +185,12 @@ class VehicleController {
             model: vehicle.get('model'),
             year: vehicle.get('year'),
             licensePlate: vehicle.get('licensePlate'),
+            vin: vehicle.get('vin'),
+            vehicleId: vehicle.get('vehicleId'),
             vehicleTypeId: vehicleTypeData,
             rateId: rateData,
             capacity: vehicle.get('capacity'),
+            luggageCapacity: vehicle.get('luggageCapacity'),
             color: vehicle.get('color'),
             maintenanceStatus: vehicle.get('maintenanceStatus'),
             insuranceExpiry: vehicle.get('insuranceExpiry')?.toISOString(),
@@ -260,9 +263,12 @@ class VehicleController {
         model: vehicle.get('model'),
         year: vehicle.get('year'),
         licensePlate: vehicle.get('licensePlate'),
+        vin: vehicle.get('vin'),
+        vehicleId: vehicle.get('vehicleId'),
         vehicleTypeId: vehicle.get('vehicleTypeId')?.id,
         rateId: vehicle.get('rateId')?.id,
         capacity: vehicle.get('capacity'),
+        luggageCapacity: vehicle.get('luggageCapacity'),
         color: vehicle.get('color'),
         maintenanceStatus: vehicle.get('maintenanceStatus'),
         insuranceExpiry: vehicle.get('insuranceExpiry')?.toISOString().split('T')[0], // Format for input[type=date]
@@ -315,9 +321,12 @@ class VehicleController {
         model,
         year,
         licensePlate,
+        vin,
+        vehicleId,
         vehicleTypeId,
         rateId,
         capacity,
+        luggageCapacity,
         color,
         maintenanceStatus,
         insuranceExpiry,
@@ -332,6 +341,14 @@ class VehicleController {
       const isUnique = await Vehicle.isLicensePlateUnique(licensePlate);
       if (!isUnique) {
         return this.sendError(res, 'License plate already exists', 409);
+      }
+
+      // Validate VIN uniqueness if provided
+      if (vin && vin.trim()) {
+        const isVinUnique = await Vehicle.isVinUnique(vin);
+        if (!isVinUnique) {
+          return this.sendError(res, 'VIN already exists', 409);
+        }
       }
 
       // Validate VehicleType exists
@@ -371,8 +388,18 @@ class VehicleController {
       vehicle.set('model', model);
       vehicle.set('year', parseInt(year, 10));
       vehicle.set('licensePlate', licensePlate);
+      if (vin && vin.trim()) {
+        vehicle.set('vin', vin.toUpperCase().trim());
+      }
+      if (vehicleId && vehicleId.trim()) {
+        vehicle.set('vehicleId', vehicleId.trim());
+      }
       vehicle.set('vehicleTypeId', vehicleType);
       vehicle.set('capacity', parseInt(capacity, 10));
+
+      if (luggageCapacity !== undefined) {
+        vehicle.set('luggageCapacity', parseInt(luggageCapacity, 10));
+      }
       vehicle.set('color', color);
       vehicle.set('maintenanceStatus', maintenanceStatus);
       vehicle.set('active', true);
@@ -416,7 +443,9 @@ class VehicleController {
         model: vehicle.get('model'),
         year: vehicle.get('year'),
         licensePlate: vehicle.get('licensePlate'),
+        vin: vehicle.get('vin'),
         capacity: vehicle.get('capacity'),
+        luggageCapacity: vehicle.get('luggageCapacity'),
         color: vehicle.get('color'),
         maintenanceStatus: vehicle.get('maintenanceStatus'),
         insuranceExpiry: vehicle.get('insuranceExpiry'),
@@ -476,9 +505,12 @@ class VehicleController {
         model,
         year,
         licensePlate,
+        vin,
+        vehicleId: newVehicleId,
         vehicleTypeId,
         rateId,
         capacity,
+        luggageCapacity,
         color,
         maintenanceStatus,
         insuranceExpiry,
@@ -490,6 +522,7 @@ class VehicleController {
       if (model) vehicle.set('model', model);
       if (year) vehicle.set('year', parseInt(year, 10));
       if (capacity) vehicle.set('capacity', parseInt(capacity, 10));
+      if (luggageCapacity !== undefined) vehicle.set('luggageCapacity', parseInt(luggageCapacity, 10));
       if (color) vehicle.set('color', color);
       if (maintenanceStatus) vehicle.set('maintenanceStatus', maintenanceStatus);
       if (active !== undefined) vehicle.set('active', active);
@@ -501,12 +534,45 @@ class VehicleController {
       }
 
       // Update license plate if changed
-      if (licensePlate && licensePlate !== vehicle.get('licensePlate')) {
-        const isUnique = await Vehicle.isLicensePlateUnique(licensePlate, vehicleId);
-        if (!isUnique) {
-          return this.sendError(res, 'License plate already exists', 409);
+      if (licensePlate !== undefined && licensePlate.trim()) {
+        const normalizedLicensePlate = licensePlate.toUpperCase();
+        const currentLicensePlate = vehicle.get('licensePlate');
+
+        // Only check and update if the license plate is actually different
+        if (normalizedLicensePlate !== currentLicensePlate) {
+          const isUnique = await Vehicle.isLicensePlateUnique(normalizedLicensePlate, vehicleId);
+          if (!isUnique) {
+            return this.sendError(res, 'License plate already exists', 409);
+          }
+          vehicle.set('licensePlate', normalizedLicensePlate);
         }
-        vehicle.set('licensePlate', licensePlate);
+      }
+
+      // Update VIN if changed
+      if (vin !== undefined) {
+        const currentVin = vehicle.get('vin') || '';
+        const newVin = vin ? vin.toUpperCase().trim() : '';
+
+        if (newVin !== currentVin) {
+          if (newVin && newVin.trim()) {
+            const isVinUnique = await Vehicle.isVinUnique(newVin, vehicleId);
+            if (!isVinUnique) {
+              return this.sendError(res, 'VIN already exists', 409);
+            }
+            vehicle.set('vin', newVin);
+          } else {
+            vehicle.unset('vin');
+          }
+        }
+      }
+
+      // Update Vehicle ID if provided
+      if (newVehicleId !== undefined) {
+        if (newVehicleId && newVehicleId.trim()) {
+          vehicle.set('vehicleId', newVehicleId.trim());
+        } else {
+          vehicle.unset('vehicleId');
+        }
       }
 
       // Update vehicle type if changed
@@ -576,7 +642,9 @@ class VehicleController {
         model: vehicle.get('model'),
         year: vehicle.get('year'),
         licensePlate: vehicle.get('licensePlate'),
+        vin: vehicle.get('vin'),
         capacity: vehicle.get('capacity'),
+        luggageCapacity: vehicle.get('luggageCapacity'),
         color: vehicle.get('color'),
         maintenanceStatus: vehicle.get('maintenanceStatus'),
         insuranceExpiry: vehicle.get('insuranceExpiry'),
