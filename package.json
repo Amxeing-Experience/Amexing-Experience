@@ -21,7 +21,7 @@
     "test:all": "NODE_ENV=test node --experimental-vm-modules node_modules/.bin/jest --config .config/jest/jest.config.js",
     "test:watch": "NODE_ENV=test jest tests/integration tests/unit --watch --config .config/jest/jest.config.js",
     "test:coverage": "NODE_ENV=test jest tests/integration tests/unit --coverage --config .config/jest/jest.config.js",
-    "test:unit": "NODE_ENV=test jest tests/unit --config .config/jest/jest.config.js",
+    "test:unit": "NODE_ENV=test jest tests/unit --config .config/jest/jest.config.js || node scripts/check-test-teardown-exit.js",
     "test:integration": "NODE_ENV=test jest tests/integration --config .config/jest/jest.config.js",
     "test:security": "NODE_ENV=development node --experimental-vm-modules node_modules/.bin/jest tests/integration/security --testTimeout=30000 --config .config/jest/jest.config.js",
     "test:startup": "NODE_ENV=development node --experimental-vm-modules node_modules/.bin/jest tests/integration/application.startup.test.js --testTimeout=30000 --config .config/jest/jest.config.js",

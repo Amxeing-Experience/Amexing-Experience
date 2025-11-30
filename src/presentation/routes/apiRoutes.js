@@ -299,6 +299,7 @@ const ratesRoutes = require('./api/ratesRoutes');
 // Experience Management API routes
 const experiencesRoutes = require('./api/experiencesRoutes');
 const experienceImagesRoutes = require('./api/experienceImagesRoutes');
+const providerExperienciasRoutes = require('./api/providerExperienciasRoutes');
 // Tours Management API routes
 const toursRoutes = require('./api/toursRoutes');
 // Audit Log API routes
@@ -326,6 +327,7 @@ router.use('/services', servicesRoutes);
 router.use('/rates', ratesRoutes);
 router.use('/experiences', experiencesRoutes);
 router.use('/experiences', experienceImagesRoutes); // Experience images endpoints
+router.use('/', providerExperienciasRoutes); // Provider experiencias endpoints
 router.use('/tours', toursRoutes);
 router.use('/audit', auditRoutes); // Audit log endpoints
 router.use('/quotes', quotesRoutes); // Quote management endpoints
