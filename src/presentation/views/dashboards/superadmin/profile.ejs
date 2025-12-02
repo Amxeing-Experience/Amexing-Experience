@@ -1,0 +1,176 @@
+<%
+/**
+ * Employee Profile View
+ * Displays the employee's personal information and settings
+ * Created by Denisse Maldonado
+ */
+
+// User data setup
+const user = typeof userData !== 'undefined' && userData !== null ? userData : {};
+const profileData = {
+  username: user.username || '',
+  email: user.email || '',
+  firstName: user.firstName || '',
+  lastName: user.lastName || '',
+  fullName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
+  joinedDate: (user.createdAt || user.created_at || user._created_at) ? 
+    new Date(user.createdAt || user.created_at || user._created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 
+    'Jan 1, 2024',
+  lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never',
+  emailVerified: user.emailVerified || false,
+  active: user.active !== undefined ? user.active : true,
+  profilePicture: user.profilePicture || user.avatar || '',
+  role: user.role || 'employee',
+  organizationId: user.organizationId || ''
+};
+
+// Generate initials for avatar placeholder
+const initials = profileData.fullName.split(' ')
+  .map(word => word.charAt(0))
+  .join('')
+  .substring(0, 2)
+  .toUpperCase() || 'UN';
+
+// Format role display name
+const formatRoleName = (role) => {
+  if (role === 'department_manager') return 'Department Manager';
+  if (role === 'superadmin') return 'Super Admin';
+  if (role === 'employee_amexing') return 'Amexing Employee';
+  return role.charAt(0).toUpperCase() + role.slice(1);
+};
+%>
+
+<!-- Page Header -->
+<div class="page-breadcrumb">
+  <div class="row align-items-center">
+    <div class="col-12">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0 d-flex align-items-center">
+          <li class="breadcrumb-item">
+            <a href="/dashboard/superadmin" class="link">
+              <i class="ti ti-home fs-6"></i>
+            </a>
+          </li>
+          <li class="breadcrumb-item active" aria-current="page">My Profile</li>
+        </ol>
+      </nav>
+      <h1 class="mb-0 fw-bold">My Profile</h1>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Content -->
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-10">
+      <div class="card">
+        <div class="card-body">
+          <div class="row">
+            <!-- Profile Picture & Basic Info -->
+            <div class="col-lg-4 text-center mb-4 mb-lg-0">
+              <!-- Profile Picture -->
+              <div class="mb-3">
+                <% if (profileData.profilePicture) { %>
+                  <img src="<%= profileData.profilePicture %>" 
+                       alt="<%= profileData.fullName %>" 
+                       class="rounded-circle"
+                       width="150" 
+                       height="150"
+                       style="object-fit: cover; border: 4px solid #f0f0f0;"
+                       onerror="this.style.display='none'; document.getElementById('avatar-placeholder').style.display='flex';">
+                  <div id="avatar-placeholder" 
+                       class="rounded-circle d-none align-items-center justify-content-center text-white fw-bold mx-auto"
+                       style="width: 150px; height: 150px; background: #5D87FF; font-size: 2rem; border: 4px solid #f0f0f0;">
+                    <%= initials %>
+                  </div>
+                <% } else { %>
+                  <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold mx-auto"
+                       style="width: 150px; height: 150px; background: #5D87FF; font-size: 2rem; border: 4px solid #f0f0f0;">
+                    <%= initials %>
+                  </div>
+                <% } %>
+              </div>
+
+              <!-- Basic Info -->
+              <h3 class="mb-2"><%= profileData.fullName %></h3>
+              <p class="text-muted mb-2">
+                <span class="badge bg-light-primary text-primary">
+                  <%= formatRoleName(profileData.role) %>
+                </span>
+              </p>
+              <p class="text-muted mb-0">
+                <i class="ti ti-mail me-1"></i>
+                <%= profileData.email %>
+              </p>
+            </div>
+
+            <!-- Personal Information -->
+            <div class="col-lg-8">
+              <h5 class="mb-4">Personal Information</h5>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">First Name</label>
+                  <p class="fw-semibold mb-0"><%= profileData.firstName || 'Not provided' %></p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Last Name</label>
+                  <p class="fw-semibold mb-0"><%= profileData.lastName || 'Not provided' %></p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Email Address</label>
+                  <p class="fw-semibold mb-0">
+                    <%= profileData.email || 'Not provided' %>
+                    <% if (profileData.emailVerified) { %>
+                      <i class="ti ti-circle-check text-success ms-1" title="Verified"></i>
+                    <% } else { %>
+                      <i class="ti ti-alert-circle text-warning ms-1" title="Not Verified"></i>
+                    <% } %>
+                  </p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Account Status</label>
+                  <p class="fw-semibold mb-0">
+                    <% if (profileData.active) { %>
+                      <span class="badge bg-success">Active</span>
+                    <% } else { %>
+                      <span class="badge bg-danger">Inactive</span>
+                    <% } %>
+                  </p>
+                </div>
+                <div class="col-12 mb-3">
+                  <label class="text-muted small">Password</label>
+                  <p class="fw-semibold mb-0">
+                    <span class="text-muted">Last changed 30 days ago</span>
+                    <button class="btn btn-sm btn-outline-primary ms-2" id="change-password-btn">
+                      Change
+                    </button>
+                  </p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Member Since</label>
+                  <p class="fw-semibold mb-0"><%= profileData.joinedDate %></p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Last Login</label>
+                  <p class="fw-semibold mb-0"><%= profileData.lastLoginAt %></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const changePasswordBtn = document.getElementById('change-password-btn');
+  if (changePasswordBtn) {
+    changePasswordBtn.addEventListener('click', function() {
+  // Placeholder for change password functionality
+  window.location.href = '/dashboard/<%= profileData.role %>/change-password';
+    });
+  }
+});
+</script>

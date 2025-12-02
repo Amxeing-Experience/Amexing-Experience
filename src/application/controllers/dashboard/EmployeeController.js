@@ -141,47 +141,6 @@ class EmployeeController extends RoleBasedController {
   }
 
   /**
-   * Renders the employee profile page showing personal information and settings.
-   * Displays employee details including name, contact information, department,
-   * assigned company, and personal preferences. Allows employees to view and
-   * potentially update their profile information.
-   * @function profile
-   * @async
-   * @param {object} req - Express request object containing authenticated user information.
-   * @param {object} res - Express response object for rendering profile view.
-   * @returns {Promise<void>} Renders the employee profile view.
-   * @throws {Error} If user is not authenticated or profile data cannot be retrieved.
-   * @example
-   * // GET /dashboard/employee/profile
-   * // Requires authentication middleware and employee role
-   * router.get('/profile', employeeController.profile);
-   *
-   * // Response renders view with data:
-   * // {
-   * //   title: 'My Profile',
-   * //   profile: {}, // Employee profile object with personal information
-   * //   breadcrumb: {
-   * //     title: 'Profile',
-   * //     items: [{ name: 'Profile', active: true }]
-   * //   }
-   * // }
-   */
-  async profile(req, res) {
-    try {
-      await this.renderRoleView(req, res, 'profile', {
-        title: 'My Profile',
-        profile: {},
-        breadcrumb: {
-          title: 'Profile',
-          items: [{ name: 'Profile', active: true }],
-        },
-      });
-    } catch (error) {
-      this.handleError(res, error);
-    }
-  }
-
-  /**
    * Retrieves employee-specific statistics for dashboard display.
    * Fetches aggregated data including upcoming trips count, completed trips total,
    * monthly budget allocation, current budget usage, and number of saved routes.

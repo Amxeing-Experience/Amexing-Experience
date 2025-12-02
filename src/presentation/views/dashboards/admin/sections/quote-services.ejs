@@ -196,6 +196,12 @@
     padding: 0.375rem 0.75rem;
 }
 
+/* Price display styles */
+.tiny {
+    font-size: 0.7rem;
+}
+
+
 /* Day total container with rowspan */
 .day-total-container {
     display: flex;
@@ -379,15 +385,11 @@ tr[data-row-type="subconcept"] {
     }
 
     function getAccessToken() {
-        console.log('All cookies:', document.cookie);
         const cookies = document.cookie.split(';');
-        console.log('Parsed cookies:', cookies);
 
         for (let cookie of cookies) {
             const [name, value] = cookie.trim().split('=');
-            console.log(`Cookie: ${name} = ${value ? 'exists' : 'empty'}`);
             if (name === 'accessToken') {
-                console.log('Found accessToken!');
                 return value;
             }
         }
@@ -396,14 +398,12 @@ tr[data-row-type="subconcept"] {
         // Try to get from localStorage as fallback
         const localToken = localStorage.getItem('accessToken');
         if (localToken) {
-            console.log('Found token in localStorage');
             return localToken;
         }
 
         // Try to get from sessionStorage as fallback
         const sessionToken = sessionStorage.getItem('accessToken');
         if (sessionToken) {
-            console.log('Found token in sessionStorage');
             return sessionToken;
         }
 
@@ -518,9 +518,13 @@ tr[data-row-type="subconcept"] {
     // ==================
 
     async function loadServiceItems() {
-        console.log('=== loadServiceItems called ===');
-        console.log('quoteId:', quoteId);
-        console.log('isNewQuote:', isNewQuote);
+        const loadStart = Date.now();
+        console.log(`📥 [${loadStart}] === loadServiceItems called ===`);
+        console.log('   📋 Context:', {
+            quoteId,
+            isNewQuote,
+            currentServiceItemsData: serviceItemsData ? serviceItemsData.days?.length : 'none'
+        });
 
         if (isNewQuote) {
             console.log('New quote - showing empty state');
@@ -616,42 +620,65 @@ tr[data-row-type="subconcept"] {
     // ==================
 
     function renderTable() {
-        console.log('=== renderTable called ===');
+        const renderStart = Date.now();
+        console.log(`🎨 [${renderStart}] === renderTable called ===`);
+        
         const tbody = document.getElementById('servicesTableBody');
         const emptyState = document.getElementById('emptyState');
         const tableContainer = document.getElementById('servicesTableContainer');
 
-        console.log('tbody:', tbody);
-        console.log('emptyState:', emptyState);
-        console.log('tableContainer:', tableContainer);
+        console.log(`   🔍 DOM elements check:`, { 
+            tbody: !!tbody, 
+            emptyState: !!emptyState, 
+            tableContainer: !!tableContainer 
+        });
 
         if (!tbody || !emptyState || !tableContainer) {
-            console.error('Missing required DOM elements!');
+            console.error('   ❌ Missing required DOM elements!');
             return;
         }
 
         tbody.innerHTML = '';
+        console.log(`   🧹 Cleared table body`);
 
-        console.log('serviceItemsData.days.length:', serviceItemsData.days.length);
+        const daysCount = serviceItemsData.days.length;
+        console.log(`   📊 Days to render: ${daysCount}`);
 
-        if (serviceItemsData.days.length === 0) {
-            console.log('No days - showing empty state');
+        if (daysCount === 0) {
+            console.log('   📭 No days - showing empty state');
             emptyState.classList.remove('d-none');
             emptyState.classList.add('d-flex');
             tableContainer.classList.add('d-none');
             tableContainer.classList.remove('d-block');
         } else {
-            console.log('Rendering', serviceItemsData.days.length, 'days');
+            console.log(`   🏗️  Rendering ${daysCount} days`);
             emptyState.classList.remove('d-flex');
             emptyState.classList.add('d-none');
             tableContainer.classList.remove('d-none');
             tableContainer.classList.add('d-block');
 
             serviceItemsData.days.forEach((day, dayIndex) => {
-                console.log(`Rendering day ${dayIndex}:`, day);
+                const dayRenderStart = Date.now();
+                console.log(`   📅 [${dayRenderStart}] Rendering day ${dayIndex + 1}: ${day.subconcepts?.length || 0} subconcepts`);
+                
+                // Count experience subconcepts for debugging
+                const experienceSubconcepts = day.subconcepts?.filter(sub => sub.type === 'experiencia') || [];
+                if (experienceSubconcepts.length > 0) {
+                    console.log(`      🎭 Found ${experienceSubconcepts.length} experience subconcepts in day ${dayIndex + 1}`);
+                    experienceSubconcepts.forEach((exp, i) => {
+                        console.log(`         🎯 Experience ${i + 1}: ${exp.experienceId || 'no ID'} - "${exp.concept || 'no concept'}"`);
+                    });
+                }
+                
                 renderDay(dayIndex, true);
+                
+                const dayRenderTime = Date.now() - dayRenderStart;
+                console.log(`      ✅ Day ${dayIndex + 1} rendered in ${dayRenderTime}ms`);
             });
         }
+        
+        const totalRenderTime = Date.now() - renderStart;
+        console.log(`🎨 [+${totalRenderTime}ms] Table rendering completed`);
     }
 
     function renderDay(dayIndex, appendToEnd = false) {
@@ -800,7 +827,28 @@ tr[data-row-type="subconcept"] {
 
         const dateInput = tr.querySelector('input[data-field="dayDate"]');
         dateInput.addEventListener('change', (e) => {
-            updateDayField(dayIndex, 'dayDate', e.target.value);
+            const newDate = e.target.value;
+            const oldDate = serviceItemsData.days[dayIndex]?.dayDate;
+            
+            console.log(`🗓️  Day ${dayIndex + 1} date changed: "${oldDate || 'none'}" → "${newDate || 'none'}"`);
+            
+            updateDayField(dayIndex, 'dayDate', newDate);
+            
+            // Debounce the selector refresh to prevent rate limiting from rapid date changes
+            if (dateChangeDebounce.timeouts.has(dayIndex)) {
+                clearTimeout(dateChangeDebounce.timeouts.get(dayIndex));
+            }
+            
+            const timeoutId = setTimeout(() => {
+                console.log(`🕐 Executing debounced refresh for day ${dayIndex + 1} after ${dateChangeDebounce.delay}ms delay`);
+                // Refresh experience and tour selectors when date changes
+                refreshExperienceSelectorsForDay(dayIndex);
+                refreshTourSelectorsForDay(dayIndex);
+                dateChangeDebounce.timeouts.delete(dayIndex);
+            }, dateChangeDebounce.delay);
+            
+            dateChangeDebounce.timeouts.set(dayIndex, timeoutId);
+            console.log(`⏱️ Debouncing date change refresh for day ${dayIndex + 1} - will execute in ${dateChangeDebounce.delay}ms`);
         });
 
         // Attach listeners to all three "add subconcept" buttons
@@ -943,7 +991,6 @@ tr[data-row-type="subconcept"] {
                             id="experienceSelector_${dayIndex}_${subconceptIndex}">
                         <option value="">Seleccionar experiencia...</option>
                     </select>
-                    ${subconcept.concept ? `<small class="text-muted mt-1 d-block">${subconcept.concept}</small>` : ''}
                     <div id="experiencePackageTable_${dayIndex}_${subconceptIndex}" class="mt-2" style="display: none;"></div>
                 </td>
             `;
@@ -984,7 +1031,11 @@ tr[data-row-type="subconcept"] {
             `;
         } else if (subType === 'traslado') {
             const hasVehicle = subconcept.vehicleTypeId;
-            const hasCapacities = subconcept.vehiclePassengerCapacity !== null && subconcept.vehiclePassengerCapacity !== undefined;
+            // More robust capacity checking - use new fields if available, fallback to legacy field, show capacity info if we have a vehicle
+            const hasCapacities = hasVehicle && (
+                (subconcept.vehiclePassengerCapacity !== null && subconcept.vehiclePassengerCapacity !== undefined) ||
+                (subconcept.vehicleCapacity !== null && subconcept.vehicleCapacity !== undefined)
+            );
 
             // Determine the initial message for vehicle selector based on state
             let vehicleSelectorMessage = 'Primero seleccione un traslado';
@@ -1005,11 +1056,11 @@ tr[data-row-type="subconcept"] {
                         <div class="mt-2 small text-muted">
                             <div class="d-flex align-items-center gap-1">
                                 <i class="ti ti-users"></i>
-                                <span>Capacidad: ${subconcept.vehiclePassengerCapacity} personas</span>
+                                <span>Capacidad: ${subconcept.vehiclePassengerCapacity || subconcept.vehicleCapacity || 'N/D'} personas</span>
                             </div>
                             <div class="d-flex align-items-center gap-1">
                                 <i class="ti ti-briefcase"></i>
-                                <span>Maletas: ${subconcept.vehicleTrunkCapacity}</span>
+                                <span>Maletas: ${subconcept.vehicleTrunkCapacity || 'N/D'}</span>
                             </div>
                         </div>
                     ` : ''}
@@ -1031,7 +1082,11 @@ tr[data-row-type="subconcept"] {
             `;
         } else if (subType === 'tour') {
             const hasVehicle = subconcept.vehicleTypeId;
-            const hasCapacities = subconcept.vehiclePassengerCapacity !== null && subconcept.vehiclePassengerCapacity !== undefined;
+            // More robust capacity checking - use new fields if available, fallback to legacy field, show capacity info if we have a vehicle
+            const hasCapacities = hasVehicle && (
+                (subconcept.vehiclePassengerCapacity !== null && subconcept.vehiclePassengerCapacity !== undefined) ||
+                (subconcept.vehicleCapacity !== null && subconcept.vehicleCapacity !== undefined)
+            );
 
             // Determine the initial message for vehicle selector based on state
             let vehicleSelectorMessage = 'Primero seleccione un destino';
@@ -1044,8 +1099,7 @@ tr[data-row-type="subconcept"] {
                     <select class="form-select form-select-sm tour-vehicle-selector"
                             data-day-index="${dayIndex}"
                             data-subconcept-index="${subconceptIndex}"
-                            id="tourVehicleSelector_${dayIndex}_${subconceptIndex}"
-                            ${subconcept.destinationId ? '' : 'disabled'}>
+                            id="tourVehicleSelector_${dayIndex}_${subconceptIndex}">
                         <option value="">${vehicleSelectorMessage}</option>
                     </select>
 
@@ -1053,11 +1107,11 @@ tr[data-row-type="subconcept"] {
                         <div class="mt-2 small text-muted">
                             <div class="d-flex align-items-center gap-1">
                                 <i class="ti ti-users"></i>
-                                <span>Capacidad: ${subconcept.vehiclePassengerCapacity} personas</span>
+                                <span>Capacidad: ${subconcept.vehiclePassengerCapacity || subconcept.vehicleCapacity || 'N/D'} personas</span>
                             </div>
                             <div class="d-flex align-items-center gap-1">
                                 <i class="ti ti-briefcase"></i>
-                                <span>Maletas: ${subconcept.vehicleTrunkCapacity}</span>
+                                <span>Maletas: ${subconcept.vehicleTrunkCapacity || 'N/D'}</span>
                             </div>
                         </div>
                     ` : ''}
@@ -1113,16 +1167,31 @@ tr[data-row-type="subconcept"] {
             ${vehicleCellHTML}
             <td>
                 ${subType === 'traslado' || subType === 'tour' ? `
-                    <!-- Traslado/Tour: Price + Number of People (no checkbox, always calculates vehicles) -->
+                    <!-- Traslado/Tour: Price + Checkboxes + Number of People -->
                     <div class="d-flex flex-column gap-2">
-                        <!-- Unit Price Input (top) -->
+                        <!-- Unit Price Input (top) - readonly for traslado/tour -->
                         <input type="text"
-                               class="form-control form-control-sm text-end unit-price-input"
+                               class="form-control form-control-sm text-end unit-price-input bg-light"
                                data-day-index="${dayIndex}"
                                data-subconcept-index="${subconceptIndex}"
                                data-field="unitPrice"
                                placeholder="$0.00"
-                               value="${subconcept.unitPrice !== null && subconcept.unitPrice !== undefined ? formatCurrency(subconcept.unitPrice) : ''}">
+                               value="${subconcept.unitPrice !== null && subconcept.unitPrice !== undefined ? formatCurrency(subconcept.isCashPayment ? subconcept.unitPrice : subconcept.unitPrice + (subconcept.surcharge || subconcept.unitPrice * 0.21)) : ''}"
+                               readonly>
+
+                        <!-- Cash Payment Checkbox for traslado/tour -->
+                        <div class="form-check">
+                            <input type="checkbox"
+                                   class="form-check-input cash-payment-checkbox"
+                                   data-day-index="${dayIndex}"
+                                   data-subconcept-index="${subconceptIndex}"
+                                   data-field="isCashPayment"
+                                   id="cashPayment_${dayIndex}_${subconceptIndex}"
+                                   ${subconcept.isCashPayment ? 'checked' : ''}>
+                            <label class="form-check-label small" for="cashPayment_${dayIndex}_${subconceptIndex}">
+                                Pago en Efectivo
+                            </label>
+                        </div>
 
                         <!-- Number of People Input (bottom) - readonly for traslados/tours (uses quote's numberOfPeople) -->
                         <input type="number"
@@ -1137,29 +1206,30 @@ tr[data-row-type="subconcept"] {
                                title="Cantidad de personas de la cotización"
                                readonly>
                     </div>
-                ` : `
-                    <!-- Regular/Experiencia: Price + Checkbox + Number of People -->
+                ` : subType === 'experiencia' ? `
+                    <!-- Experiencia: Price + Checkbox + Number of People -->
                     <div class="d-flex flex-column gap-2">
-                        <!-- 1. Unit Price Input (top) -->
+                        <!-- 1. Unit Price Input (top) - readonly for experiencia -->
                         <input type="text"
-                               class="form-control form-control-sm text-end unit-price-input"
+                               class="form-control form-control-sm text-end unit-price-input bg-light"
                                data-day-index="${dayIndex}"
                                data-subconcept-index="${subconceptIndex}"
                                data-field="unitPrice"
                                placeholder="$0.00"
-                               value="${subconcept.unitPrice !== null && subconcept.unitPrice !== undefined ? formatCurrency(subconcept.unitPrice) : ''}">
+                               value="${subconcept.unitPrice !== null && subconcept.unitPrice !== undefined ? formatCurrency(subconcept.isCashPayment ? subconcept.unitPrice : subconcept.unitPrice + (subconcept.surcharge || subconcept.unitPrice * 0.21)) : ''}"
+                               readonly>
 
-                        <!-- 2. Per-Person Checkbox (middle) -->
+                        <!-- Cash Payment Checkbox for experiencia -->
                         <div class="form-check">
                             <input type="checkbox"
-                                   class="form-check-input"
+                                   class="form-check-input cash-payment-checkbox"
                                    data-day-index="${dayIndex}"
                                    data-subconcept-index="${subconceptIndex}"
-                                   data-field="isPerPerson"
-                                   id="perPerson_${dayIndex}_${subconceptIndex}"
-                                   ${subconcept.isPerPerson ? 'checked' : ''}>
-                            <label class="form-check-label small" for="perPerson_${dayIndex}_${subconceptIndex}">
-                                Por Persona
+                                   data-field="isCashPayment"
+                                   id="cashPayment_${dayIndex}_${subconceptIndex}"
+                                   ${subconcept.isCashPayment ? 'checked' : ''}>
+                            <label class="form-check-label small" for="cashPayment_${dayIndex}_${subconceptIndex}">
+                                Pago en Efectivo
                             </label>
                         </div>
 
@@ -1174,8 +1244,32 @@ tr[data-row-type="subconcept"] {
                                max="${quoteNumberOfPeople}"
                                step="1"
                                value="${subconcept.numberOfPeople !== null && subconcept.numberOfPeople !== undefined ? subconcept.numberOfPeople : quoteNumberOfPeople}"
-                               title="Máximo: ${quoteNumberOfPeople} personas"
-                               ${!subconcept.isPerPerson ? 'disabled' : ''}>
+                               title="Máximo: ${quoteNumberOfPeople} personas">
+                    </div>
+                ` : `
+                    <!-- Regular/Service: Price + Number of People (NO Cash Payment Checkbox) -->
+                    <div class="d-flex flex-column gap-2">
+                        <!-- Unit Price Input (top) -->
+                        <input type="text"
+                               class="form-control form-control-sm text-end unit-price-input"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="unitPrice"
+                               placeholder="$0.00"
+                               value="${subconcept.unitPrice !== null && subconcept.unitPrice !== undefined ? formatCurrency(subconcept.unitPrice) : ''}">
+
+                        <!-- Number of People Input (bottom) -->
+                        <input type="number"
+                               class="form-control form-control-sm text-center"
+                               data-day-index="${dayIndex}"
+                               data-subconcept-index="${subconceptIndex}"
+                               data-field="numberOfPeople"
+                               placeholder="${quoteNumberOfPeople} pers."
+                               min="1"
+                               max="${quoteNumberOfPeople}"
+                               step="1"
+                               value="${subconcept.numberOfPeople !== null && subconcept.numberOfPeople !== undefined ? subconcept.numberOfPeople : quoteNumberOfPeople}"
+                               title="Máximo: ${quoteNumberOfPeople} personas">
                     </div>
                 `}
             </td>
@@ -1203,43 +1297,30 @@ tr[data-row-type="subconcept"] {
         inputs.forEach(input => {
             const field = input.dataset.field;
 
-            // Special handling for unitPrice with currency formatting
             if (field === 'unitPrice') {
-                // On input: allow only numbers and decimal point
-                input.addEventListener('input', (e) => {
-                    let value = e.target.value;
-                    // Remove any non-numeric characters except decimal point
-                    value = value.replace(/[^0-9.]/g, '');
-                    // Ensure only one decimal point
-                    const parts = value.split('.');
-                    if (parts.length > 2) {
-                        value = parts[0] + '.' + parts.slice(1).join('');
-                    }
-                    e.target.value = value;
-                });
-
-                // On blur: format as currency for display
-                input.addEventListener('blur', (e) => {
-                    const numValue = parseCurrency(e.target.value);
-                    if (numValue !== null) {
-                        e.target.value = formatCurrency(numValue);
-                        updateSubconceptField(dayIndex, subconceptIndex, field, numValue);
-                    }
-                });
-
-                // On focus: remove formatting to show plain number
-                input.addEventListener('focus', (e) => {
-                    const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
-                    if (subconcept && subconcept.unitPrice !== null && subconcept.unitPrice !== undefined) {
-                        e.target.value = subconcept.unitPrice.toString();
-                    }
-                });
-            } else if (field === 'isPerPerson') {
-                // Checkbox handling for per-person pricing
-                input.addEventListener('change', (e) => {
-                    const isChecked = e.target.checked;
-                    updateSubconceptField(dayIndex, subconceptIndex, field, isChecked);
-                });
+                // Unit price input handling - only for editable fields (regular/service type)
+                if (!input.hasAttribute('readonly')) {
+                    input.addEventListener('input', (e) => {
+                        // Format currency as user types
+                        let value = e.target.value;
+                        
+                        // Remove any non-numeric characters except dots and commas
+                        value = value.replace(/[^0-9.,]/g, '');
+                        
+                        // Convert to number for validation and storage
+                        const numericValue = parseCurrency(value);
+                        
+                        // Update the subconcept field
+                        updateSubconceptField(dayIndex, subconceptIndex, field, numericValue);
+                    });
+                    
+                    input.addEventListener('blur', (e) => {
+                        // Format the final value on blur
+                        const numericValue = parseCurrency(e.target.value);
+                        e.target.value = formatCurrency(numericValue);
+                    });
+                }
+                // Skip event handlers for readonly unit price fields (traslado, tour, experiencia)
             } else if (field === 'numberOfPeople') {
                 // Number of people input handling with validation
                 input.addEventListener('input', (e) => {
@@ -1266,7 +1347,6 @@ tr[data-row-type="subconcept"] {
                 // Standard input handling for other fields
                 input.addEventListener('input', (e) => {
                     let value = e.target.value;
-
 
                     updateSubconceptField(dayIndex, subconceptIndex, field, value);
                 });
@@ -1310,6 +1390,43 @@ tr[data-row-type="subconcept"] {
             });
         }
 
+        // Attach cash payment checkbox listener (only for types that have the checkbox)
+        const cashPaymentCheckbox = tr.querySelector('.cash-payment-checkbox');
+        if (cashPaymentCheckbox) {
+            cashPaymentCheckbox.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+                if (subconcept) {
+                    subconcept.isCashPayment = isChecked;
+                    
+                    // Recalculate subconcept total with new pricing
+                    subconcept.total = calculateSubconceptTotal(subconcept);
+                    
+                    // Recalculate day total
+                    recalculateDayTotal(dayIndex);
+                    
+                    // Recalculate general totals
+                    recalculateGeneralTotals();
+                    
+                    markDirty();
+                    triggerAutoSave();
+
+                    // Update unit price display immediately for better UX
+                    updateUnitPriceDisplay(dayIndex, subconceptIndex, subconcept);
+
+                    console.log('Cash payment checkbox changed:', {
+                        dayIndex,
+                        subconceptIndex,
+                        isChecked,
+                        conceptName: subconcept.concept
+                    });
+
+                    // Re-render the day to update pricing display
+                    renderDay(dayIndex);
+                }
+            });
+        }
+
         // Initialize rate selector first, then transfer selector for traslado type
         if (subType === 'traslado') {
             setTimeout(() => {
@@ -1319,7 +1436,9 @@ tr[data-row-type="subconcept"] {
 
         // Initialize experience selector for experiencia type
         if (subType === 'experiencia') {
+            console.log(`🚀 Scheduling initExperienceSelector for day ${dayIndex + 1}, subconcept ${subconceptIndex} (100ms delay)`);
             setTimeout(() => {
+                console.log(`⚡ Executing scheduled initExperienceSelector for day ${dayIndex + 1}, subconcept ${subconceptIndex}`);
                 initExperienceSelector(dayIndex, subconceptIndex, subconcept);
             }, 100);
         }
@@ -1363,6 +1482,28 @@ tr[data-row-type="subconcept"] {
         });
     }
 
+    /**
+     * Update unit price input field display
+     * @param {number} dayIndex 
+     * @param {number} subconceptIndex 
+     * @param {object} subconcept 
+     */
+    function updateUnitPriceDisplay(dayIndex, subconceptIndex, subconcept) {
+        const priceInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="unitPrice"]`);
+        if (priceInput && subconcept.unitPrice !== null && subconcept.unitPrice !== undefined) {
+            // For types with cash payment checkbox (traslado, tour, experiencia), 
+            // show card price when unchecked, cash price when checked
+            if (subconcept.type !== 'regular' && subconcept.isCashPayment === false) {
+                // Show card price (with surcharge)
+                const cardPrice = subconcept.unitPrice + (subconcept.surcharge || subconcept.unitPrice * 0.21);
+                priceInput.value = formatCurrency(cardPrice);
+            } else {
+                // Show cash price (base price)
+                priceInput.value = formatCurrency(subconcept.unitPrice);
+            }
+        }
+    }
+
     function updateTotalsDisplay() {
         const subtotalEl = document.getElementById('subtotalDisplay');
         const ivaEl = document.getElementById('ivaDisplay');
@@ -1387,6 +1528,61 @@ tr[data-row-type="subconcept"] {
     // ==================
 
     let availableServices = []; // Cache for available services
+    
+    // Caching system for tour data to prevent rate limiting
+    const tourDataCache = {
+        destinations: new Map(), // stores destination data indexed by "rateId_dayDate"
+        vehicles: new Map(),     // stores vehicle data indexed by "rateId_destinationId_dayDate"
+        cacheTimeout: 5 * 60 * 1000 // 5 minutes cache timeout
+    };
+    
+    // Debouncing for date change handlers to prevent rate limiting
+    const dateChangeDebounce = {
+        timeouts: new Map(), // stores debounce timeouts indexed by dayIndex
+        delay: 1000 // 1 second debounce delay
+    };
+    
+    // Function to clear cache when needed (e.g., on page refresh or when data might be stale)
+    function clearTourCache() {
+        console.log('🧹 Clearing tour data cache');
+        tourDataCache.destinations.clear();
+        tourDataCache.vehicles.clear();
+    }
+    
+    // Function to handle rate limit errors with exponential backoff
+    async function fetchWithRetry(url, options, maxRetries = 3) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const response = await fetch(url, options);
+                
+                if (response.status === 429) {
+                    const retryAfter = response.headers.get('Retry-After') || Math.pow(2, attempt);
+                    console.warn(`🚫 Rate limit hit (attempt ${attempt}/${maxRetries}). Retrying after ${retryAfter}s...`);
+                    
+                    if (attempt < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, retryAfter * 1000));
+                        continue;
+                    } else {
+                        throw new Error(`Rate limit exceeded after ${maxRetries} attempts`);
+                    }
+                }
+                
+                return response;
+            } catch (error) {
+                // Don't retry if request was aborted (timeout)
+                if (error.name === 'AbortError') {
+                    console.error('🕐 Request timed out');
+                    throw new Error('Request timed out after 30 seconds');
+                }
+                
+                if (attempt === maxRetries) throw error;
+                
+                const delay = Math.pow(2, attempt) * 1000;
+                console.warn(`🔄 Request failed (attempt ${attempt}/${maxRetries}). Retrying in ${delay}ms...`, error.message);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
 
     async function loadAvailableServices() {
         if (availableServices.length > 0) {
@@ -1394,7 +1590,6 @@ tr[data-row-type="subconcept"] {
         }
 
         try {
-            console.log('Loading available services for quote...');
             const response = await fetch(`/api/quotes/${quoteId}/available-services`, {
                 method: 'GET',
                 headers: {
@@ -1407,7 +1602,6 @@ tr[data-row-type="subconcept"] {
 
             if (result.success && result.data) {
                 availableServices = result.data;
-                console.log(`Loaded ${availableServices.length} available services`);
                 return availableServices;
             } else {
                 console.error('Error loading services:', result.error);
@@ -1651,7 +1845,6 @@ tr[data-row-type="subconcept"] {
      */
     async function loadAvailableServicesByRate(rateId) {
         try {
-            console.log('Loading available services for rate:', rateId, 'with capacity filter:', quoteNumberOfPeople);
             const response = await fetch(`/api/quotes/services-by-rate/${rateId}?numberOfPeople=${quoteNumberOfPeople}`, {
                 method: 'GET',
                 headers: {
@@ -1661,9 +1854,14 @@ tr[data-row-type="subconcept"] {
             });
 
             const result = await response.json();
+            console.log('API Response for services-by-rate:', {
+                rateId,
+                success: result.success,
+                dataLength: result.data ? result.data.length : 'no data',
+                fullResponse: result
+            });
 
             if (result.success && result.data) {
-                console.log(`Loaded ${result.data.length} routes for rate ${rateId}`);
 
                 // Check if any routes have vehicles
                 const hasVehicles = result.data.some(route => route.vehicles && route.vehicles.length > 0);
@@ -1772,6 +1970,20 @@ tr[data-row-type="subconcept"] {
         // Clear existing options
         vehicleSelector.innerHTML = '<option value="">Seleccionar vehículo...</option>';
 
+        console.log('updateVehicleTypeSelector called with:', {
+            dayIndex,
+            subconceptIndex,
+            routeData: routeData,
+            vehiclesCount: routeData.vehicles ? routeData.vehicles.length : 'undefined/null'
+        });
+
+        // Check if vehicles exist
+        if (!routeData.vehicles || !Array.isArray(routeData.vehicles)) {
+            console.warn('No vehicles available for route:', routeData);
+            vehicleSelector.innerHTML = '<option value="">No hay vehículos disponibles</option>';
+            return;
+        }
+
         // Sort vehicles by price (lowest to highest)
         const sortedVehicles = [...routeData.vehicles].sort((a, b) => a.price - b.price);
 
@@ -1851,7 +2063,10 @@ tr[data-row-type="subconcept"] {
         subconcept.vehicleCapacity = transferData.capacity || null; // Store capacity for per-person calculations
         subconcept.vehiclePassengerCapacity = transferData.capacity || null; // NEW - Passenger capacity for display
         subconcept.vehicleTrunkCapacity = transferData.trunkCapacity || null; // NEW - Trunk capacity for display
-        subconcept.unitPrice = transferData.price;
+        subconcept.unitPrice = transferData.basePrice;
+        subconcept.basePrice = transferData.basePrice;
+        subconcept.surcharge = transferData.surcharge;
+        subconcept.surchargePercentage = transferData.surchargePercentage;
         subconcept.notes = transferData.note || '';
 
         // NOW calculate total with correct numberOfPeople and vehicleCapacity
@@ -1862,7 +2077,11 @@ tr[data-row-type="subconcept"] {
         const notesInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="notes"]`);
         const peopleInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="numberOfPeople"]`);
 
-        if (priceInput) priceInput.value = formatCurrency(subconcept.unitPrice);
+        if (priceInput) {
+            // For readonly fields (traslado, tour, experiencia), just show the unitPrice
+            // For editable fields (regular/service), also just show the unitPrice (no cash payment logic here)
+            priceInput.value = formatCurrency(subconcept.unitPrice);
+        }
         if (notesInput) notesInput.value = subconcept.notes;
         if (peopleInput) peopleInput.value = subconcept.numberOfPeople;
 
@@ -1880,6 +2099,9 @@ tr[data-row-type="subconcept"] {
         recalculateDayTotal(dayIndex);
         recalculateGeneralTotals();
 
+        // Update unit price display immediately
+        updateUnitPriceDisplay(dayIndex, subconceptIndex, subconcept);
+        
         markDirty();
         triggerAutoSave();
 
@@ -1892,13 +2114,48 @@ tr[data-row-type="subconcept"] {
 
     let availableExperiences = []; // Cache for available experiences
 
-    async function loadAvailableExperiences() {
-        if (availableExperiences.length > 0) {
-            return availableExperiences; // Return cached experiences
-        }
+    // Helper function to get day of week code from date string (0=Sunday, 1=Monday, etc.)
+    function getDayOfWeekCode(dateString) {
+        if (!dateString) return null;
+        
+        // Parse date string manually to avoid timezone issues
+        // Expected format: YYYY-MM-DD
+        const parts = dateString.split('-');
+        if (parts.length !== 3) return null;
+        
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1; // Month is 0-based in JS
+        const day = parseInt(parts[2], 10);
+        
+        const date = new Date(year, month, day);
+        return date.getDay(); // Returns 0-6 where 0=Sunday
+    }
 
+    // Helper function to check if experience is available on a specific day
+    function isExperienceAvailableOnDay(experience, dayCode) {
+        if (!experience.availability || !Array.isArray(experience.availability)) {
+            // If no availability set, assume available anytime
+            return true;
+        }
+        
+        // Check if any availability schedule matches the target day
+        const isAvailable = experience.availability.some(schedule => schedule.day === dayCode);
+        
+        // Debug log for experiences that don't match (to see what's being filtered out)
+        if (!isAvailable) {
+            const availableDays = experience.availability.map(s => s.day).join(',');
+            console.log(`     ❌ "${experience.name}" not available on day ${dayCode}, available on: [${availableDays}]`);
+        }
+        
+        return isAvailable;
+    }
+
+    async function loadAvailableExperiences(targetDate = null) {
+        const startTime = Date.now();
+        console.log(`   📡 [${startTime}] Starting API call to load experiences${targetDate ? ` for date ${targetDate}` : ''}`);
+        
         try {
-            console.log('Loading available experiences...');
+            const fetchStartTime = Date.now();
             const response = await fetch('/api/experiences?type=Experience&length=1000', {
                 method: 'GET',
                 headers: {
@@ -1906,22 +2163,245 @@ tr[data-row-type="subconcept"] {
                     'Content-Type': 'application/json'
                 }
             });
+            
+            const fetchTime = Date.now() - fetchStartTime;
+            console.log(`   🌐 [+${fetchTime}ms] API fetch completed, status: ${response.status}`);
 
+            const parseStartTime = Date.now();
             const result = await response.json();
+            const parseTime = Date.now() - parseStartTime;
+            console.log(`   📝 [+${parseTime}ms] JSON parse completed`);
 
             if (result.data && Array.isArray(result.data)) {
+                const filterStartTime = Date.now();
+                
                 // Filter only active experiences
-                availableExperiences = result.data.filter(exp => exp.active === true);
-                console.log(`Loaded ${availableExperiences.length} available experiences`);
-                return availableExperiences;
+                let experiences = result.data.filter(exp => exp.active === true);
+                console.log(`   📊 Found ${experiences.length} active experiences from ${result.data.length} total`);
+                
+                // If target date is provided, filter by day availability
+                if (targetDate) {
+                    const dayCode = getDayOfWeekCode(targetDate);
+                    console.log(`   📅 Target date: ${targetDate} = day code ${dayCode} (${['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][dayCode]})`);
+                    if (dayCode !== null) {
+                        const beforeCount = experiences.length;
+                        experiences = experiences.filter(exp => isExperienceAvailableOnDay(exp, dayCode));
+                        console.log(`   ✅ Filtered from ${beforeCount} to ${experiences.length} experiences available on day ${dayCode}`);
+                        
+                        // Log sample of filtered experiences for debugging
+                        if (experiences.length > 0 && experiences.length <= 3) {
+                            experiences.forEach(exp => {
+                                console.log(`     🎯 Available: "${exp.name}" (${exp.id})`);
+                            });
+                        } else if (experiences.length > 3) {
+                            console.log(`     🎯 Available experiences: "${experiences[0].name}", "${experiences[1].name}", "${experiences[2].name}" and ${experiences.length - 3} more...`);
+                        }
+                    }
+                }
+                
+                const filterTime = Date.now() - filterStartTime;
+                const totalTime = Date.now() - startTime;
+                console.log(`   ✅ [+${filterTime}ms filter, +${totalTime}ms total] Returning ${experiences.length} experiences`);
+                
+                return experiences;
             } else {
-                console.error('Error loading experiences:', result.error);
+                console.error('   ❌ Error loading experiences:', result.error || 'Invalid data structure');
+                console.log(`   📊 Response structure:`, { hasData: !!result.data, isArray: Array.isArray(result.data), keys: Object.keys(result) });
                 return [];
             }
         } catch (error) {
-            console.error('Error loading available experiences:', error);
+            const errorTime = Date.now() - startTime;
+            console.error(`   ❌ [+${errorTime}ms] Error loading available experiences:`, error);
             showAlert('servicesAlerts', 'Error al cargar las experiencias disponibles', 'danger');
             return [];
+        }
+    }
+
+    // Function to refresh all experience selectors for a specific day
+    async function refreshExperienceSelectorsForDay(dayIndex) {
+        const dayData = serviceItemsData.days[dayIndex];
+        if (!dayData) return;
+
+        const dayDate = dayData.dayDate;
+        console.log(`🔄 Refreshing experience selectors for day ${dayIndex + 1}, date: ${dayDate || 'none'}`);
+
+        // Find all experience selectors for this day
+        const experienceSelectors = document.querySelectorAll(`select[id^="experienceSelector_${dayIndex}_"]`);
+        
+        if (experienceSelectors.length === 0) {
+            console.log(`   ℹ️  No experience selectors found for day ${dayIndex + 1}`);
+            return;
+        }
+
+        try {
+            // Load experiences for the new date
+            console.log(`   🔍 Executing experience query for ${dayDate ? `day-of-week filtering (${dayDate})` : 'all experiences'}`);
+            const experiences = await loadAvailableExperiences(dayDate);
+
+            // Update each experience selector
+            experienceSelectors.forEach((selectElement, subIndex) => {
+                const subconceptIndex = selectElement.id.split('_')[2];
+                const subconcept = dayData.subconcepts[parseInt(subconceptIndex)];
+                
+                if (!subconcept || subconcept.type !== 'experiencia') return;
+
+                // Store current selection
+                const currentValue = selectElement.value;
+                console.log(`   🔧 Updating selector ${selectElement.id}, current selection: "${currentValue}"`);
+
+                if (experiences.length === 0) {
+                    selectElement.innerHTML = '<option value="">No hay experiencias disponibles para esta fecha</option>';
+                    console.log(`   📝 Set "no experiences" message`);
+                    
+                    // Clear concept since no experiences are available
+                    if (subconcept) {
+                        subconcept.concept = '';
+                    }
+                } else {
+                    // Clear and rebuild options
+                    selectElement.innerHTML = '<option value="">Seleccionar experiencia...</option>';
+
+                    let experienceStillAvailable = false;
+                    experiences.forEach(experience => {
+                        const option = document.createElement('option');
+                        option.value = experience.id;
+                        option.textContent = experience.name;
+                        
+                        // Restore selection if the experience is still available
+                        if (currentValue === experience.id) {
+                            option.selected = true;
+                            experienceStillAvailable = true;
+                        }
+                        
+                        selectElement.appendChild(option);
+                    });
+                    
+                    // If the previously selected experience is no longer available, clear the concept
+                    if (!experienceStillAvailable && currentValue) {
+                        console.log(`   🧹 Clearing concept - selected experience "${currentValue}" no longer available for this date`);
+                        if (subconcept) {
+                            subconcept.experienceId = null;
+                            subconcept.experienceName = '';
+                            subconcept.concept = '';
+                            subconcept.unitPrice = 0;
+                            subconcept.total = 0;
+                        }
+                    }
+                    
+                    console.log(`   📝 Added ${experiences.length} experiences + 1 default option = ${selectElement.options.length} total options`);
+                }
+
+                // Refresh Tom Select if it exists
+                if (selectElement.tomselect) {
+                    // Store current selection before updating
+                    const currentSelection = selectElement.tomselect.getValue();
+                    
+                    // Clear Tom Select options and reload from DOM
+                    selectElement.tomselect.clearOptions();
+                    selectElement.tomselect.sync();
+                    
+                    // Restore selection if the option still exists
+                    if (currentSelection && selectElement.querySelector(`option[value="${currentSelection}"]`)) {
+                        selectElement.tomselect.setValue(currentSelection, true);
+                        console.log(`   🔄 Tom Select updated and selection "${currentSelection}" restored`);
+                    } else {
+                        console.log(`   🔄 Tom Select updated, previous selection cleared (no longer available)`);
+                    }
+                    
+                    console.log(`   📊 Tom Select now has ${Object.keys(selectElement.tomselect.options).length} options`);
+                } else {
+                    console.log(`   ℹ️  No Tom Select instance found for ${selectElement.id}`);
+                }
+            });
+            
+            // Re-render the day to update the concept display and recalculate totals
+            console.log(`   🔄 Re-rendering day ${dayIndex + 1} to update displays`);
+            recalculateDayTotal(dayIndex);
+            recalculateGeneralTotals();
+            renderDay(dayIndex);
+        } catch (error) {
+            console.error('Error refreshing experience selectors:', error);
+        }
+    }
+
+    // Function to refresh all tour selectors for a specific day
+    async function refreshTourSelectorsForDay(dayIndex) {
+        const dayData = serviceItemsData.days[dayIndex];
+        if (!dayData) return;
+
+        const dayDate = dayData.dayDate;
+        console.log(`🔄 Refreshing tour selectors for day ${dayIndex + 1}, date: ${dayDate || 'none'}`);
+
+        // Find all tour destination selectors for this day (they depend on date availability)
+        const tourDestinationSelectors = document.querySelectorAll(`select[id^="tourDestinationSelector_${dayIndex}_"]`);
+        
+        if (tourDestinationSelectors.length === 0) {
+            console.log(`   ℹ️  No tour destination selectors found for day ${dayIndex + 1}`);
+            return;
+        }
+
+        try {
+            // Collect all unique rate IDs to minimize API calls
+            const uniqueRatesMap = new Map();
+            const selectorsToRefresh = [];
+            
+            for (const selectElement of tourDestinationSelectors) {
+                const subconceptIndex = selectElement.id.split('_')[2];
+                const subconcept = dayData.subconcepts[parseInt(subconceptIndex)];
+                
+                if (!subconcept || subconcept.type !== 'tour' || !subconcept.rateId) {
+                    console.log(`   ⏭️  Skipping selector ${selectElement.id} - no rate selected`);
+                    continue;
+                }
+
+                // Track unique rates for batch loading
+                if (!uniqueRatesMap.has(subconcept.rateId)) {
+                    uniqueRatesMap.set(subconcept.rateId, []);
+                }
+                uniqueRatesMap.get(subconcept.rateId).push({
+                    selectElement,
+                    subconceptIndex: parseInt(subconceptIndex),
+                    subconcept
+                });
+                
+                selectorsToRefresh.push({
+                    selectElement,
+                    subconceptIndex: parseInt(subconceptIndex),
+                    subconcept
+                });
+            }
+            
+            if (selectorsToRefresh.length === 0) {
+                console.log(`   ℹ️  No tour selectors need refreshing for day ${dayIndex + 1}`);
+                return;
+            }
+            
+            console.log(`   📊 Found ${selectorsToRefresh.length} tour selectors across ${uniqueRatesMap.size} unique rates`);
+            
+            // Pre-load destinations for all unique rates to utilize caching
+            const rateIds = Array.from(uniqueRatesMap.keys());
+            console.log(`   🚀 Pre-loading destinations for rates: ${rateIds.join(', ')}`);
+            
+            await Promise.all(rateIds.map(rateId => 
+                loadTourDestinationsByRate(rateId, dayDate)
+            ));
+            
+            // Now refresh each selector (most calls will hit cache)
+            for (const { selectElement, subconceptIndex, subconcept } of selectorsToRefresh) {
+                console.log(`   🔧 Refreshing tour destinations for selector ${selectElement.id}, rate: ${subconcept.rateId}`);
+                
+                // Re-initialize the destination selector with date filtering (will use cache)
+                await initTourDestinationSelector(dayIndex, subconceptIndex, subconcept, subconcept.rateId);
+                
+                console.log(`   ✅ Refreshed tour selector ${selectElement.id}`);
+            }
+            
+            console.log(`   🔄 Re-rendering day ${dayIndex + 1} after tour selector refresh`);
+            recalculateDayTotal(dayIndex);
+            recalculateGeneralTotals();
+            renderDay(dayIndex);
+        } catch (error) {
+            console.error('Error refreshing tour selectors:', error);
         }
     }
 
@@ -2049,6 +2529,12 @@ tr[data-row-type="subconcept"] {
                     destinationSelector.disabled = false;
                 }
                 initTourDestinationSelector(dayIndex, subconceptIndex, subconcept, subconcept.rateId);
+            } else {
+                // No rate selected, make sure vehicle selector is disabled
+                const vehicleSelector = document.getElementById(`tourVehicleSelector_${dayIndex}_${subconceptIndex}`);
+                if (vehicleSelector) {
+                    vehicleSelector.disabled = true;
+                }
             }
         });
     }
@@ -2064,12 +2550,18 @@ tr[data-row-type="subconcept"] {
             return;
         }
 
+        // Get the day's date for availability filtering
+        const dayData = serviceItemsData.days[dayIndex];
+        const dayDate = dayData ? dayData.dayDate : null;
+        
+        console.log(`🏛️ Loading tour destinations for rate ${rateId} filtered by date: ${dayDate || 'all dates'}`);
+
         // Show loading message
         destinationSelector.innerHTML = '<option value="">Cargando destinos...</option>';
         destinationSelector.disabled = true;
 
-        // Load destinations for this rate
-        loadTourDestinationsByRate(rateId).then(destinations => {
+        // Load destinations for this rate filtered by date
+        loadTourDestinationsByRate(rateId, dayDate).then(destinations => {
             // Destroy existing TomSelect if any
             if (destinationSelector.tomselect) {
                 destinationSelector.tomselect.destroy();
@@ -2120,6 +2612,8 @@ tr[data-row-type="subconcept"] {
                     const selectedDestination = destinations.find(d => d.destinationId === destinationId);
                     subconcept.destinationId = destinationId;
                     subconcept.destinationPOI = selectedDestination ? selectedDestination.destinationName : '';
+                    // For tours, set concept to destination name for display
+                    subconcept.concept = selectedDestination ? selectedDestination.destinationName : 'Tour';
 
                     // Clear vehicle selection
                     subconcept.tourId = null;
@@ -2159,34 +2653,92 @@ tr[data-row-type="subconcept"] {
                 }
             };
         }).catch(error => {
-            console.error('Error loading tour destinations:', error);
-            destinationSelector.innerHTML = '<option value="">Error al cargar destinos</option>';
+            console.error(`❌ Error loading tour destinations for rate ${rateId}:`, error);
+            console.error('   Stack:', error.stack);
+            destinationSelector.innerHTML = '<option value="">Error al cargar destinos - Ver consola</option>';
             destinationSelector.disabled = true;
+            
+            // Show user-friendly error
+            const errorMessage = error.message || 'Error desconocido';
+            showAlert('servicesAlerts', `Error al cargar destinos de tours: ${errorMessage}`, 'danger');
         });
     }
 
     /**
-     * Load tour destinations filtered by rate
-     * Returns unique destinations that have tours for the specified rate
+     * Load tour destinations filtered by rate and optionally by date availability
+     * Returns unique destinations that have tours for the specified rate (and date if provided)
+     * Uses caching to prevent rate limiting issues
      */
-    async function loadTourDestinationsByRate(rateId) {
+    async function loadTourDestinationsByRate(rateId, dayDate = null) {
         try {
-            const response = await fetch(`/api/quotes/tours/destinations-by-rate/${rateId}`, {
+            // Validate rate ID
+            if (!rateId) {
+                console.error('No rate ID provided for tour destinations');
+                return [];
+            }
+            
+            // Create cache key
+            const cacheKey = `${rateId}_${dayDate || 'all'}`;
+            const now = Date.now();
+            
+            // Check cache first
+            if (tourDataCache.destinations.has(cacheKey)) {
+                const cached = tourDataCache.destinations.get(cacheKey);
+                if (now - cached.timestamp < tourDataCache.cacheTimeout) {
+                    console.log(`🚀 Using cached tour destinations for rate ${rateId}, date: ${dayDate || 'all'}`);
+                    return cached.data;
+                }
+                // Cache expired, remove it
+                tourDataCache.destinations.delete(cacheKey);
+            }
+            
+            // Build URL with optional date parameter
+            let url = `/api/quotes/tours/destinations-by-rate/${rateId}`;
+            if (dayDate) {
+                url += `?dayDate=${encodeURIComponent(dayDate)}`;
+            }
+            
+            console.log(`🌐 Fetching tour destinations from API for rate ${rateId}, date: ${dayDate || 'all'}`);
+            
+            // Add timeout to prevent infinite loading
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                controller.abort();
+            }, 30000); // 30 second timeout
+            
+            const response = await fetchWithRetry(url, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                signal: controller.signal
             });
+            
+            clearTimeout(timeoutId);
+
+            // Check if response is ok first
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`HTTP Error ${response.status}: ${errorText}`);
+                throw new Error(`HTTP ${response.status}: ${response.statusText || 'Request failed'}`);
+            }
 
             const result = await response.json();
 
             if (result.success && result.data) {
-                console.log(`Loaded ${result.data.length} tour destinations for rate ${rateId}`);
+                // Cache the result
+                tourDataCache.destinations.set(cacheKey, {
+                    data: result.data,
+                    timestamp: now
+                });
+                
+                console.log(`✅ Successfully loaded ${result.data.length} tour destinations for rate ${rateId}`);
                 return result.data;
             } else {
-                console.error('Error loading tour destinations:', result.error);
-                return [];
+                const errorMsg = result.error || 'Unknown error from API';
+                console.error('API returned error:', errorMsg);
+                throw new Error(`API Error: ${errorMsg}`);
             }
         } catch (error) {
             console.error('Error loading tour destinations:', error);
@@ -2196,13 +2748,36 @@ tr[data-row-type="subconcept"] {
     }
 
     /**
-     * Load tour vehicles filtered by rate AND destination
-     * Returns vehicles available for the specified rate + destination combination
+     * Load tour vehicles filtered by rate AND destination and optionally by date availability
+     * Returns vehicles available for the specified rate + destination combination (and date if provided)
+     * Uses caching to prevent rate limiting issues
      */
-    async function loadTourVehiclesByRateAndDestination(rateId, destinationId) {
+    async function loadTourVehiclesByRateAndDestination(rateId, destinationId, dayDate = null) {
         try {
-            console.log('Loading tour vehicles for rate:', rateId, 'destination:', destinationId, 'with capacity filter:', quoteNumberOfPeople);
-            const response = await fetch(`/api/quotes/tours/vehicles-by-rate-destination/${rateId}/${destinationId}?numberOfPeople=${quoteNumberOfPeople}`, {
+            // Create cache key including numberOfPeople for accurate caching
+            const cacheKey = `${rateId}_${destinationId}_${dayDate || 'all'}_${quoteNumberOfPeople}`;
+            const now = Date.now();
+            
+            // Check cache first
+            if (tourDataCache.vehicles.has(cacheKey)) {
+                const cached = tourDataCache.vehicles.get(cacheKey);
+                if (now - cached.timestamp < tourDataCache.cacheTimeout) {
+                    console.log(`🚀 Using cached tour vehicles for rate ${rateId}, destination ${destinationId}, date: ${dayDate || 'all'}`);
+                    return cached.data;
+                }
+                // Cache expired, remove it
+                tourDataCache.vehicles.delete(cacheKey);
+            }
+            
+            // Build URL with numberOfPeople and optional date parameter
+            let url = `/api/quotes/tours/vehicles-by-rate-destination/${rateId}/${destinationId}?numberOfPeople=${quoteNumberOfPeople}`;
+            if (dayDate) {
+                url += `&dayDate=${encodeURIComponent(dayDate)}`;
+            }
+            
+            console.log(`🌐 Fetching tour vehicles from API for rate ${rateId}, destination ${destinationId}, date: ${dayDate || 'all'}`);
+            
+            const response = await fetchWithRetry(url, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${getAccessToken()}`,
@@ -2213,7 +2788,11 @@ tr[data-row-type="subconcept"] {
             const result = await response.json();
 
             if (result.success && result.data) {
-                console.log(`Loaded ${result.data.length} tour vehicles for rate ${rateId} and destination ${destinationId}`);
+                // Cache the result
+                tourDataCache.vehicles.set(cacheKey, {
+                    data: result.data,
+                    timestamp: now
+                });
 
                 // Check if any vehicles available
                 if (result.data.length === 0 && quoteNumberOfPeople > 0) {
@@ -2245,15 +2824,24 @@ tr[data-row-type="subconcept"] {
             return;
         }
 
+        // Get the day's date for availability filtering
+        const dayData = serviceItemsData.days[dayIndex];
+        const dayDate = dayData ? dayData.dayDate : null;
+        
+        console.log(`🚗 Loading tour vehicles for rate ${rateId}, destination ${destinationId}, filtered by date: ${dayDate || 'all dates'}`);
+
         // Show loading message
         vehicleSelector.innerHTML = '<option value="">Cargando vehículos...</option>';
         vehicleSelector.disabled = true;
 
-        // Load vehicles for this rate + destination
-        loadTourVehiclesByRateAndDestination(rateId, destinationId).then(vehicles => {
+        // Load vehicles for this rate + destination filtered by date
+        loadTourVehiclesByRateAndDestination(rateId, destinationId, dayDate).then(vehicles => {
+            console.log(`🚗 Tour vehicle selector update: Found ${vehicles.length} vehicles for rate ${rateId}, destination ${destinationId}`);
+            
             if (vehicles.length === 0) {
                 vehicleSelector.innerHTML = '<option value="">No hay vehículos disponibles</option>';
                 vehicleSelector.disabled = true;
+                console.log(`   ⚠️ No vehicles available - selector disabled`);
                 return;
             }
 
@@ -2262,6 +2850,7 @@ tr[data-row-type="subconcept"] {
 
             // Enable selector
             vehicleSelector.disabled = false;
+            console.log(`   ✅ Vehicle selector enabled with ${vehicles.length} options`);
 
             // Add vehicle options (solo tipo de vehículo, sin TomSelect)
             vehicles.forEach(vehicle => {
@@ -2280,8 +2869,13 @@ tr[data-row-type="subconcept"] {
                 vehicleSelector.appendChild(option);
             });
 
-            // Note: Don't auto-populate on init - data is already in subconcept
-            // Repopulation only happens on user selection via onchange event
+            // Check if we have a pre-selected vehicle and populate pricing data
+            const preSelectedOption = vehicleSelector.querySelector('option[selected]');
+            if (preSelectedOption && preSelectedOption.dataset.vehicleData) {
+                const vehicleData = JSON.parse(preSelectedOption.dataset.vehicleData);
+                console.log(`🏗️ Populating tour pricing data for pre-selected vehicle: ${vehicleData.vehicleType}`);
+                populateTourData(dayIndex, subconceptIndex, subconcept, vehicleData, true);
+            }
 
             // Handle vehicle selection change
             vehicleSelector.onchange = function(e) {
@@ -2313,7 +2907,7 @@ tr[data-row-type="subconcept"] {
     /**
      * Populate subconcept with selected tour vehicle data
      */
-    function populateTourData(dayIndex, subconceptIndex, subconcept, vehicleData = null) {
+    function populateTourData(dayIndex, subconceptIndex, subconcept, vehicleData = null, isInitialization = false) {
         // If vehicleData not provided, try to find it from current selection
         if (!vehicleData && subconcept.tourId && subconcept.vehicleTypeId) {
             const vehicleSelector = document.getElementById(`tourVehicleSelector_${dayIndex}_${subconceptIndex}`);
@@ -2340,9 +2934,14 @@ tr[data-row-type="subconcept"] {
         subconcept.vehiclePassengerCapacity = vehicleData.capacity || null; // NEW - Passenger capacity for display
         subconcept.vehicleTrunkCapacity = vehicleData.trunkCapacity || null; // NEW - Trunk capacity for display
         subconcept.durationMinutes = vehicleData.durationMinutes;
+        
+        // Ensure concept is set to destination name for tours (if not already set)
+        if (!subconcept.concept && subconcept.destinationPOI) {
+            subconcept.concept = subconcept.destinationPOI;
+        }
 
-        // Precio unitario: usar directamente el precio del tour (ya incluye recargo del backend)
-        subconcept.unitPrice = vehicleData.price;
+        // Precio unitario: usar el precio base (efectivo) del tour
+        subconcept.unitPrice = vehicleData.basePrice;
         subconcept.basePrice = vehicleData.basePrice;
         subconcept.surcharge = vehicleData.surcharge;
         subconcept.surchargePercentage = vehicleData.surchargePercentage;
@@ -2369,13 +2968,20 @@ tr[data-row-type="subconcept"] {
             total: subconcept.total
         });
 
-        // Re-render day to show updated data
-        renderDay(dayIndex);
-        recalculateDayTotal(dayIndex);
-        recalculateGeneralTotals();
-
-        markDirty();
-        triggerAutoSave();
+        // Re-render day to show updated data (skip during initialization to prevent loops)
+        if (!isInitialization) {
+            renderDay(dayIndex);
+            recalculateDayTotal(dayIndex);
+            recalculateGeneralTotals();
+            markDirty();
+            triggerAutoSave();
+        } else {
+            // During initialization, just recalculate without re-rendering to prevent loops
+            recalculateDayTotal(dayIndex);
+            recalculateGeneralTotals();
+            // Update unit price display even during initialization
+            updateUnitPriceDisplay(dayIndex, subconceptIndex, subconcept);
+        }
     }
 
     // ============================================================
@@ -2383,53 +2989,149 @@ tr[data-row-type="subconcept"] {
     // ============================================================
 
     function initExperienceSelector(dayIndex, subconceptIndex, subconcept) {
+        const startTime = Date.now();
         const selectElement = document.getElementById(`experienceSelector_${dayIndex}_${subconceptIndex}`);
+        
+        console.log(`🎯 [${startTime}] Initializing experience selector for day ${dayIndex + 1}, subconcept ${subconceptIndex}`);
+        
         if (!selectElement) {
-            console.error('Experience selector not found');
+            console.error(`   ❌ Experience selector element not found: experienceSelector_${dayIndex}_${subconceptIndex}`);
             return;
         }
 
-        // Load experiences
-        loadAvailableExperiences().then(experiences => {
-            if (experiences.length === 0) {
-                selectElement.innerHTML = '<option value="">No hay experiencias disponibles</option>';
-                return;
-            }
-
-            // Clear existing options
-            selectElement.innerHTML = '<option value="">Seleccionar experiencia...</option>';
-
-            // Add experience options (only name)
-            experiences.forEach(experience => {
-                const option = document.createElement('option');
-                option.value = experience.id;
-                option.textContent = experience.name;
-
-                // Pre-select if this matches the current experienceId
-                if (subconcept.experienceId === experience.id) {
-                    option.selected = true;
+        // Get the day's date to filter experiences by availability
+        const dayData = serviceItemsData.days[dayIndex];
+        const dayDate = dayData ? dayData.dayDate : null;
+        
+        console.log(`   📅 Day data: ${JSON.stringify({dayIndex, dayDate, hasSubconcept: !!subconcept, experienceId: subconcept?.experienceId})}`);
+        
+        // Check if element already has TomSelect initialized
+        if (selectElement.tomselect) {
+            console.log(`   🔄 Element already has TomSelect, destroying first`);
+            selectElement.tomselect.destroy();
+        }
+        
+        // Load experiences filtered by day availability
+        loadAvailableExperiences(dayDate)
+            .then(experiences => {
+                const loadTime = Date.now() - startTime;
+                console.log(`   📋 [+${loadTime}ms] Loaded ${experiences.length} experiences for initialization`);
+                
+                // Check if element still exists (might be removed during async operation)
+                const currentElement = document.getElementById(`experienceSelector_${dayIndex}_${subconceptIndex}`);
+                if (!currentElement) {
+                    console.log(`   ⚠️  Element disappeared during async load - aborting`);
+                    return;
+                }
+                
+                if (experiences.length === 0) {
+                    currentElement.innerHTML = '<option value="">No hay experiencias disponibles</option>';
+                    console.log(`   ⚠️  No experiences available for initialization`);
+                    return;
                 }
 
-                selectElement.appendChild(option);
-            });
+                // Clear existing options
+                currentElement.innerHTML = '<option value="">Seleccionar experiencia...</option>';
+                console.log(`   🧹 Cleared existing options`);
 
-            // Initialize Tom Select
-            const tomSelectInstance = new TomSelect(selectElement, {
-                placeholder: 'Buscar experiencia...',
-                maxOptions: 1000,
-                searchField: ['text'],
-                sortField: 'text',
-                closeAfterSelect: true,
-                onChange: function(experienceId) {
-                    if (experienceId) {
-                        populateExperienceData(dayIndex, subconceptIndex, experienceId);
+                // Add experience options (only name)
+                let optionsAdded = 0;
+                let preSelectedFound = false;
+                let preSelectedExperience = null;
+                
+                experiences.forEach(experience => {
+                    const option = document.createElement('option');
+                    option.value = experience.id;
+                    option.textContent = experience.name;
+
+                    // Pre-select if this matches the current experienceId
+                    if (subconcept.experienceId === experience.id) {
+                        option.selected = true;
+                        preSelectedFound = true;
+                        preSelectedExperience = experience;
+                        console.log(`   🎯 Pre-selecting experience: ${experience.name} (${experience.id})`);
                     }
-                }
-            });
 
-            // Note: Don't auto-populate on init - data is already in subconcept
-            // Repopulation only happens on user selection via onChange event
-        });
+                    currentElement.appendChild(option);
+                    optionsAdded++;
+                });
+                
+                console.log(`   ✅ Added ${optionsAdded} options to select element, pre-selected: ${preSelectedFound}`);
+                
+                // If we have a pre-selected experience but it wasn't found in the available experiences,
+                // this indicates a data consistency issue or filtering problem
+                if (subconcept.experienceId && !preSelectedFound) {
+                    console.warn(`   ⚠️  Pre-selected experience ID "${subconcept.experienceId}" not found in available experiences!`);
+                    console.log(`      Available experience IDs:`, experiences.map(exp => exp.id));
+                    console.log(`      Subconcept data:`, {
+                        experienceId: subconcept.experienceId,
+                        experienceName: subconcept.experienceName,
+                        concept: subconcept.concept
+                    });
+                }
+
+                // Initialize Tom Select
+                try {
+                    const tomSelectInstance = new TomSelect(currentElement, {
+                        placeholder: 'Buscar experiencia...',
+                        maxOptions: 1000,
+                        searchField: ['text'],
+                        sortField: 'text',
+                        closeAfterSelect: true,
+                        onChange: function(experienceId) {
+                            console.log(`   🔄 Experience changed: ${experienceId}`);
+                            if (experienceId) {
+                                populateExperienceData(dayIndex, subconceptIndex, experienceId);
+                            } else {
+                                // Clear experience data when no experience is selected
+                                clearExperienceData(dayIndex, subconceptIndex);
+                            }
+                        }
+                    });
+                    
+                    const totalTime = Date.now() - startTime;
+                    console.log(`   ✅ [+${totalTime}ms] TomSelect initialized successfully`);
+                    
+                } catch (error) {
+                    console.error(`   ❌ Error initializing TomSelect:`, error);
+                }
+
+                // Note: Don't auto-populate on init - data is already in subconcept
+                // Repopulation only happens on user selection via onChange event
+                
+                // However, if this is a package experience with existing data, render the package table
+                if (subconcept.isPackage && subconcept.includedExperiences && subconcept.includedExperiences.length > 0) {
+                    console.log(`   📦 Rendering existing package table for experience: ${subconcept.experienceName}`);
+                    renderExperiencePackageTable(dayIndex, subconceptIndex, subconcept.includedExperiences);
+                }
+            })
+            .catch(error => {
+                const errorTime = Date.now() - startTime;
+                console.error(`   ❌ [+${errorTime}ms] Error during experience loading:`, error);
+            });
+    }
+
+    function clearExperienceData(dayIndex, subconceptIndex) {
+        const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
+        if (!subconcept) return;
+
+        // Clear experience data
+        subconcept.experienceId = null;
+        subconcept.experienceName = '';
+        subconcept.concept = '';
+        subconcept.unitPrice = 0;
+        subconcept.total = 0;
+
+        // Recalculate totals
+        calculateSubconceptTotal(subconcept);
+        recalculateDayTotal(dayIndex);
+        recalculateGeneralTotals();
+
+        // Mark as dirty for saving
+        markDirty();
+
+        // Re-render the row to update the display
+        renderDay(dayIndex);
     }
 
     async function populateExperienceData(dayIndex, subconceptIndex, experienceId) {
@@ -2477,7 +3179,11 @@ tr[data-row-type="subconcept"] {
                 // Update UI fields directly without full re-render to avoid infinite loop
                         const priceInput = document.querySelector(`input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="unitPrice"]`);
 
-                        if (priceInput) priceInput.value = formatCurrency(subconcept.unitPrice);
+                        if (priceInput) {
+            // For readonly fields (traslado, tour, experiencia), just show the unitPrice
+            // For editable fields (regular/service), also just show the unitPrice (no cash payment logic here)
+            priceInput.value = formatCurrency(subconcept.unitPrice);
+        }
 
                 // Update vehicle type display if exists
                 const vehicleCell = document.querySelector(`tr[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"] td:nth-child(3)`);
@@ -2505,6 +3211,9 @@ tr[data-row-type="subconcept"] {
                     }
                 }
 
+                // Update unit price display immediately
+                updateUnitPriceDisplay(dayIndex, subconceptIndex, subconcept);
+                
                 // Recalculate totals
                 recalculateDayTotal(dayIndex);
                 recalculateGeneralTotals();
@@ -2597,26 +3306,28 @@ tr[data-row-type="subconcept"] {
             ? quoteNumberOfPeople
             : (subconcept.numberOfPeople || quoteNumberOfPeople);
 
-        // If already has type and per-person fields, update numberOfPeople if needed
-        if (subconcept.type && subconcept.isPerPerson !== undefined) {
-            return {
+        // If already has type, update numberOfPeople if needed
+        if (subconcept.type) {
+            const migrated = {
                 ...subconcept,
                 numberOfPeople: migratedNumberOfPeople
             };
+            
+            // Ensure capacity fields are populated for transfers/tours with vehicles
+            if ((subconcept.type === 'traslado' || subconcept.type === 'tour') && subconcept.vehicleTypeId) {
+                if (migrated.vehiclePassengerCapacity === undefined && subconcept.vehicleCapacity) {
+                    migrated.vehiclePassengerCapacity = subconcept.vehicleCapacity;
+                }
+                if (migrated.vehicleTrunkCapacity === undefined) {
+                    migrated.vehicleTrunkCapacity = null; // Will show as N/D in UI
+                }
+            }
+            
+            return migrated;
         }
 
-        // If has type but missing per-person fields, add them
-        if (subconcept.type && subconcept.isPerPerson === undefined) {
-            return {
-                ...subconcept,
-                isPerPerson: false,
-                numberOfPeople: migratedNumberOfPeople,
-                vehicleCapacity: subconcept.vehicleCapacity || null,
-                vehicleMultiplier: 1
-            };
-        }
 
-        // Otherwise, treat as "regular" type with per-person fields
+        // Otherwise, treat as "regular" type
         return {
             type: "regular",
             time: subconcept.time || "",
@@ -2625,10 +3336,10 @@ tr[data-row-type="subconcept"] {
             unitPrice: subconcept.unitPrice ?? 0,
             total: subconcept.total || 0,
             notes: subconcept.notes || "",
-            isPerPerson: false,
             numberOfPeople: migratedNumberOfPeople,
             vehicleCapacity: null,
-            vehicleMultiplier: 1
+            vehicleMultiplier: 1,
+            isCashPayment: subconcept.isCashPayment !== undefined ? subconcept.isCashPayment : false
         };
     }
 
@@ -2681,11 +3392,11 @@ tr[data-row-type="subconcept"] {
             unitPrice: 0,
             total: 0,
             notes: "",
-            // Per-person pricing fields
-            isPerPerson: false,
             numberOfPeople: quoteNumberOfPeople, // Default to quote's number of people
             vehicleCapacity: null,
-            vehicleMultiplier: 1
+            vehicleMultiplier: 1,
+            // Payment method fields
+            isCashPayment: type === 'regular' ? true : false
         };
 
         // Additional fields for traslados
@@ -2734,12 +3445,18 @@ tr[data-row-type="subconcept"] {
      * @returns {number} - Calculated total
      */
     function calculateSubconceptTotal(subconcept) {
-        const unitPrice = parseFloat(subconcept.unitPrice) || 0;
+        // Get the appropriate price based on cash payment checkbox
+        const basePrice = parseFloat(subconcept.unitPrice) || 0;
+        const surcharge = parseFloat(subconcept.surcharge) || (basePrice * 0.21);
+        const unitPrice = subconcept.isCashPayment ? basePrice : basePrice + surcharge;
         const numberOfPeople = parseInt(subconcept.numberOfPeople) || 1;
 
         console.log('calculateSubconceptTotal called:', {
             type: subconcept.type,
-            isPerPerson: subconcept.isPerPerson,
+            isCashPayment: subconcept.isCashPayment,
+            basePrice: basePrice,
+            surcharge: surcharge,
+            unitPrice: unitPrice,
             numberOfPeople,
             vehicleCapacity: subconcept.vehicleCapacity,
             currentMultiplier: subconcept.vehicleMultiplier
@@ -2775,42 +3492,20 @@ tr[data-row-type="subconcept"] {
 
         // EXPERIENCIA: Direct unit price
         if (subconcept.type === 'experiencia') {
-            if (subconcept.isPerPerson) {
-                // Per-person pricing: unitPrice is per person, multiply by numberOfPeople
-                console.log('Experiencia per-person calculation:', {
-                    unitPrice,
-                    numberOfPeople,
-                    calculation: `$${unitPrice} × ${numberOfPeople} people = $${unitPrice * numberOfPeople}`
-                });
-                return Math.round(unitPrice * numberOfPeople * 100) / 100;
-            } else {
-                // Standard pricing: just unitPrice
-                console.log('Experiencia standard calculation:', {
-                    unitPrice,
-                    calculation: `$${unitPrice}`
-                });
-                return Math.round(unitPrice * 100) / 100;
-            }
+            console.log('Experiencia calculation:', {
+                unitPrice,
+                calculation: `$${unitPrice}`
+            });
+            return Math.round(unitPrice * 100) / 100;
         }
 
         // REGULAR: Direct unit price (same as experiencia)
         if (subconcept.type === 'regular') {
-            if (subconcept.isPerPerson) {
-                // Per-person pricing: unitPrice is per person, multiply by numberOfPeople
-                console.log('Regular per-person calculation:', {
-                    unitPrice,
-                    numberOfPeople,
-                    calculation: `$${unitPrice} × ${numberOfPeople} people = $${unitPrice * numberOfPeople}`
-                });
-                return Math.round(unitPrice * numberOfPeople * 100) / 100;
-            } else {
-                // Standard pricing: just unitPrice
-                console.log('Regular standard calculation:', {
-                    unitPrice,
-                    calculation: `$${unitPrice}`
-                });
-                return Math.round(unitPrice * 100) / 100;
-            }
+            console.log('Regular calculation:', {
+                unitPrice,
+                calculation: `$${unitPrice}`
+            });
+            return Math.round(unitPrice * 100) / 100;
         }
 
         // Fallback for traslados without vehicle capacity
@@ -2823,35 +3518,15 @@ tr[data-row-type="subconcept"] {
         const subconcept = serviceItemsData.days[dayIndex]?.subconcepts[subconceptIndex];
         if (!subconcept) return;
 
-        // Handle checkbox field (boolean conversion)
-        if (field === 'isPerPerson') {
-            subconcept.isPerPerson = value === true || value === 'true' || value === 'on';
-
-            // Toggle numberOfPeople input enabled/disabled state
-            const peopleInput = document.querySelector(
-                `input[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"][data-field="numberOfPeople"]`
-            );
-            if (peopleInput) {
-                peopleInput.disabled = !subconcept.isPerPerson;
-            }
-
-            // Update vehicle multiplier badge visibility for traslados and tours
-            if (subconcept.type === 'traslado' || subconcept.type === 'tour') {
-                const badge = document.querySelector(
-                    `.vehicle-multiplier[data-day-index="${dayIndex}"][data-subconcept-index="${subconceptIndex}"]`
-                );
-                if (badge) {
-                    // Show badge if there's a vehicle selected
-                    const hasVehicle = subconcept.vehicleCapacity || subconcept.vehicleTypeId;
-                    badge.style.display = hasVehicle ? 'inline-block' : 'none';
-                }
-            }
+        if (field === 'isCashPayment') {
+            // Handle cash payment checkbox
+            subconcept.isCashPayment = value === true || value === 'true' || value === 'on';
         } else {
             subconcept[field] = value;
         }
 
         // Recalculate total if any pricing field changed
-        if (['unitPrice', 'isPerPerson', 'numberOfPeople'].includes(field)) {
+        if (['unitPrice', 'numberOfPeople'].includes(field)) {
             subconcept.total = calculateSubconceptTotal(subconcept);
 
             // Update vehicle multiplier badge text if traslado or tour
@@ -3086,7 +3761,26 @@ tr[data-row-type="subconcept"] {
     // ==================
 
     document.addEventListener('DOMContentLoaded', async function() {
-        await loadServiceItems();
+        const pageLoadStart = Date.now();
+        console.log(`🌟 [${pageLoadStart}] Page DOM loaded, starting initialization sequence`);
+        
+        try {
+            console.log(`📊 Page state check:`, {
+                quoteId,
+                isNewQuote,
+                hasServiceItemsData: !!serviceItemsData,
+                currentUrl: window.location.href
+            });
+            
+            await loadServiceItems();
+            
+            const initTime = Date.now() - pageLoadStart;
+            console.log(`✅ [+${initTime}ms] Service items loaded successfully`);
+            
+        } catch (error) {
+            const errorTime = Date.now() - pageLoadStart;
+            console.error(`❌ [+${errorTime}ms] Error during initialization:`, error);
+        }
 
         // Add Day buttons (top and bottom)
         const addDayBtn = document.getElementById('addDayBtn');

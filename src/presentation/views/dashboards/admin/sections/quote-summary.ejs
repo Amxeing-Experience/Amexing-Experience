@@ -298,7 +298,7 @@
 
     .pdf-export-mode .summary-table th:nth-child(2),
     .pdf-export-mode .summary-table td:nth-child(2) {
-        width: 30% !important;
+        width: 35% !important;
     }
 
     .pdf-export-mode .summary-table th:nth-child(3),
@@ -308,22 +308,17 @@
 
     .pdf-export-mode .summary-table th:nth-child(4),
     .pdf-export-mode .summary-table td:nth-child(4) {
-        width: 10% !important;
+        width: 12% !important;
     }
 
     .pdf-export-mode .summary-table th:nth-child(5),
     .pdf-export-mode .summary-table td:nth-child(5) {
-        width: 15% !important;
+        width: 12% !important;
     }
 
     .pdf-export-mode .summary-table th:nth-child(6),
     .pdf-export-mode .summary-table td:nth-child(6) {
-        width: 10% !important;
-    }
-
-    .pdf-export-mode .summary-table th:nth-child(7),
-    .pdf-export-mode .summary-table td:nth-child(7) {
-        width: 10% !important;
+        width: 16% !important;
     }
 
     .pdf-export-mode .summary-day-header {
@@ -424,6 +419,9 @@
                 <button id="exportPdfBtn" class="btn btn-primary" style="display: none;">
                     <i class="ti ti-download me-2"></i>Exportar a PDF
                 </button>
+                <button id="cancelReservationBtn" class="btn btn-danger" style="display: none;">
+                    <i class="ti ti-x me-2"></i>Cancelar Reserva
+                </button>
             </div>
         </div>
     </div>
@@ -506,10 +504,6 @@
                         <span class="summary-info-label">Cliente</span>
                         <span class="summary-info-value" id="summaryClientName">-</span>
                     </div>
-                    <div class="summary-info-item">
-                        <span class="summary-info-label">Tarifa Aplicada</span>
-                        <span id="summaryRateName">-</span>
-                    </div>
                 </div>
             </div>
 
@@ -522,18 +516,16 @@
                     <table class="summary-table table table-bordered">
                         <thead>
                             <tr>
-                                <th style="width: 8%;">Día</th>
-                                <th style="width: 30%;">Concepto</th>
-                                <th style="width: 12%;">Tipo Vehículo</th>
-                                <th style="width: 8%;">Horas</th>
-                                <th style="width: 10%;">Precio Unit.</th>
-                                <th style="width: 10%;">Total</th>
-                                <th style="width: 22%;">Notas</th>
+                                <th style="width: 10%;">Día</th>
+                                <th style="width: 40%;">Concepto</th>
+                                <th style="width: 20%;">Tipo Vehículo</th>
+                                <th style="width: 15%;">Total</th>
+                                <th style="width: 15%;">Notas</th>
                             </tr>
                         </thead>
                         <tbody id="summaryServicesTableBody">
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-4">
+                                <td colspan="5" class="text-center text-muted py-4">
                                     No hay servicios agregados
                                 </td>
                             </tr>
@@ -554,6 +546,17 @@
                     <div class="summary-total-row total">
                         <span>Total:</span>
                         <span id="summaryTotal">$0.00 MXN</span>
+                    </div>
+                    
+                    <!-- Per Person Total -->
+                    <div class="summary-per-person-section mt-3 pt-3" style="border-top: 1px solid #dee2e6;">
+                        <div class="summary-total-row" style="font-size: 1.1rem;">
+                            <span>Costo por Persona:</span>
+                            <span id="summaryPerPerson">$0.00 MXN</span>
+                        </div>
+                        <div class="text-muted text-center mt-1">
+                            <small id="summaryPersonCount">(0 personas)</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -594,22 +597,30 @@
             ?.split('=')[1];
     }
 
-    // Get quote status badge
+    // Get quote status badge - matches quotes table dropdown options
     function getStatusBadge(status) {
         const statusMap = {
-            'draft': { label: 'Borrador', class: 'bg-secondary' },
-            'sent': { label: 'Enviada', class: 'bg-info' },
-            'accepted': { label: 'Aceptada', class: 'bg-success' },
-            'rejected': { label: 'Rechazada', class: 'bg-danger' }
+            'requested': { label: 'SOLICITADO', class: 'bg-primary' },
+            'hold': { label: 'BLOQUEADO', class: 'bg-warning' },
+            'scheduled': { label: 'AGENDADO', class: 'bg-success' },
+            'rejected': { label: 'RECHAZADO', class: 'bg-danger' }
         };
 
-        const statusInfo = statusMap[status] || { label: status, class: 'bg-secondary' };
+        const statusInfo = statusMap[status] || { label: status.toUpperCase(), class: 'bg-secondary' };
         return `<span class="badge ${statusInfo.class}">${statusInfo.label}</span>`;
     }
 
     // Load quote summary
     async function loadQuoteSummary() {
         try {
+            let quote;
+            
+            <% if (locals.isPublicView && locals.quote) { %>
+            // For public views, use the server-provided quote data
+            quote = <%- JSON.stringify(locals.quote) %>;
+            console.log('Using server-provided quote data:', quote);
+            <% } else { %>
+            // For authenticated views, fetch via API
             const quoteId = '<%= quoteId %>';
             const token = getAccessToken();
 
@@ -627,18 +638,37 @@
                 throw new Error(result.error || 'Error al cargar la cotización');
             }
 
-            const quote = result.data;
-            console.log('Quote data loaded:', quote);
+            quote = result.data;
+            console.log('Quote data loaded via API:', quote);
+            <% } %>
 
             // Populate summary information
-            document.getElementById('summaryFolio').textContent = quote.folio || quoteId;
+            document.getElementById('summaryFolio').textContent = quote.folio || quote.id || 'N/A';
             document.getElementById('summaryCurrentDate').textContent = formatDateSpanish(new Date());
             document.getElementById('summaryGenerationDate').textContent = formatDateSpanish(quote.createdAt);
             document.getElementById('summaryStatus').innerHTML = getStatusBadge(quote.status);
 
-            // Atención a
-            const contactPerson = quote.contactPerson || 'No especificado';
-            document.getElementById('summaryContactPerson').textContent = contactPerson.toUpperCase();
+            // Atención a - Hide section if no contact person specified
+            const contactPerson = quote.contactPerson || '';
+            const summaryContactPersonElement = document.getElementById('summaryContactPerson');
+            
+            if (summaryContactPersonElement) {
+                // Find the parent section that contains the "Atención a" title
+                const attentionSection = summaryContactPersonElement.closest('.summary-section');
+                
+                if (!contactPerson || contactPerson.toLowerCase() === 'no especificado' || contactPerson.trim() === '') {
+                    // Hide the entire "Atención a" section
+                    if (attentionSection) {
+                        attentionSection.style.display = 'none';
+                    }
+                } else {
+                    // Show the section and update the content
+                    if (attentionSection) {
+                        attentionSection.style.display = 'block';
+                    }
+                    summaryContactPersonElement.textContent = contactPerson.toUpperCase();
+                }
+            }
 
             // Quote details
             document.getElementById('summaryEventType').textContent = quote.eventType || 'No especificado';
@@ -654,15 +684,6 @@
                 }
             }
             document.getElementById('summaryClientName').textContent = clientName;
-
-            // Rate name
-            if (quote.rate) {
-                const rateColor = quote.rate.color || '#6c757d';
-                document.getElementById('summaryRateName').innerHTML =
-                    `<span class="badge" style="background-color: ${rateColor};">${quote.rate.name}</span>`;
-            } else {
-                document.getElementById('summaryRateName').textContent = 'No especificada';
-            }
 
             // Render services table
             renderServicesTable(quote.serviceItems);
@@ -689,6 +710,17 @@
             const newShareBtn = shareBtn.cloneNode(true);
             shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
             newShareBtn.addEventListener('click', () => generateShareLink(quote.id));
+
+            // Show cancel reservation button only for scheduled quotes
+            const cancelBtn = document.getElementById('cancelReservationBtn');
+            if (quote.status === 'scheduled') {
+                cancelBtn.style.display = 'inline-block';
+
+                // Attach cancel reservation event listener
+                const newCancelBtn = cancelBtn.cloneNode(true);
+                cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+                newCancelBtn.addEventListener('click', () => showCancelReservationModal(quote));
+            }
             <% } %>
 
         } catch (error) {
@@ -710,7 +742,7 @@
         if (!serviceItems || !serviceItems.days || serviceItems.days.length === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
+                    <td colspan="5" class="text-center text-muted py-4">
                         No hay servicios agregados a esta cotización
                     </td>
                 </tr>
@@ -719,6 +751,11 @@
             document.getElementById('summarySubtotal').textContent = currencyFormatter.format(0);
             document.getElementById('summaryIVA').textContent = currencyFormatter.format(0);
             document.getElementById('summaryTotal').textContent = currencyFormatter.format(0);
+            
+            // Update per person display for empty case
+            const numberOfPeople = parseInt(document.getElementById('summaryNumberOfPeople').textContent) || 1;
+            document.getElementById('summaryPerPerson').textContent = currencyFormatter.format(0);
+            document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople} ${numberOfPeople === 1 ? 'persona' : 'personas'})`;
             return;
         }
 
@@ -727,13 +764,26 @@
             const subconceptsCount = day.subconcepts?.length || 0;
             const rowspan = subconceptsCount + 1; // +1 for day header row
 
+            // Calculate day total from stored subconcept totals
+            let actualDayTotal = 0;
+            if (day.subconcepts && day.subconcepts.length > 0) {
+                day.subconcepts.forEach(subconcept => {
+                    if (subconcept.total !== null && subconcept.total !== undefined) {
+                        actualDayTotal += subconcept.total;
+                    }
+                });
+            }
+
             // Day header row
             const dayHeaderRow = document.createElement('tr');
             dayHeaderRow.className = 'summary-day-header';
             dayHeaderRow.innerHTML = `
                 <td rowspan="${rowspan}" class="text-center align-middle"><strong>Día ${day.dayNumber}</strong></td>
-                <td colspan="3"><strong>${day.dayTitle || `Día ${day.dayNumber}`}</strong></td>
-                <td rowspan="${rowspan}" class="text-end align-middle bg-light"><strong>${currencyFormatter.format(day.dayTotal || 0)}</strong></td>
+                <td colspan="2"><strong>${day.dayTitle || `Día ${day.dayNumber}`}</strong></td>
+                <td class="text-end align-middle bg-light">
+                    <div style="font-size: 0.9rem; font-weight: bold;">Total Día</div>
+                    <div style="font-size: 1.1rem; font-weight: bold;">${currencyFormatter.format(actualDayTotal)}</div>
+                </td>
                 <td></td>
             `;
             tbody.appendChild(dayHeaderRow);
@@ -749,13 +799,30 @@
                     const time = subconcept.time || '';
                     const timeDisplay = time ? `<span class="text-muted">${time}</span> - ` : '';
 
+                    // Add service type badge
+                    let serviceTypeBadge = '';
+                    if (subconcept.type === 'traslado') {
+                        serviceTypeBadge = '<span class="badge bg-primary me-2">Traslado</span>';
+                    } else if (subconcept.type === 'experiencia') {
+                        serviceTypeBadge = '<span class="badge bg-success me-2">Experiencia</span>';
+                    } else if (subconcept.type === 'tour') {
+                        serviceTypeBadge = '<span class="badge bg-info me-2">Tour</span>';
+                    } else if (subconcept.type === 'regular') {
+                        serviceTypeBadge = '<span class="badge bg-secondary me-2">Servicio</span>';
+                    }
+
                     if (subconcept.type === 'experiencia') {
                         conceptHTML = `
-                            <div>${timeDisplay}<strong>${subconcept.concept || 'Experiencia'}</strong></div>
+                            <div>${serviceTypeBadge}${timeDisplay}<strong>${subconcept.concept || subconcept.tourName || 'Experiencia'}</strong></div>
                             ${subconcept.isPackage && subconcept.includedExperiences ? renderIncludedExperiences(subconcept.includedExperiences) : ''}
                         `;
+                    } else if (subconcept.type === 'tour') {
+                        // For tours, prioritize destinationPOI (the actual stored field), then other fallbacks
+                        const tourDestination = subconcept.destinationPOI || subconcept.destination || subconcept.concept || subconcept.tourName || subconcept.serviceType || 'Tour';
+                        conceptHTML = `${serviceTypeBadge}${timeDisplay}<strong>${tourDestination}</strong>`;
                     } else {
-                        conceptHTML = `${timeDisplay}${subconcept.concept || 'Sin especificar'}`;
+                        const conceptName = subconcept.concept || subconcept.tourName || subconcept.serviceType || 'Sin especificar';
+                        conceptHTML = `${serviceTypeBadge}${timeDisplay}${conceptName}`;
                     }
 
                     // Vehicle type with badge for traslados
@@ -771,42 +838,8 @@
                         vehicleTypeHTML = subconcept.vehicleType || (subconcept.type === 'regular' || subconcept.type === 'experiencia' ? 'N/A' : '-');
                     }
 
-                    // Hours
-                    const hours = subconcept.hours !== null && subconcept.hours !== undefined ? subconcept.hours : '-';
 
-                    // Unit price with per-person info
-                    let unitPriceHTML = '';
-                    if (subconcept.unitPrice !== null && subconcept.unitPrice !== undefined) {
-                        const priceFormatted = currencyFormatter.format(subconcept.unitPrice);
-
-                        if (subconcept.type === 'traslado') {
-                            // Traslado: Show price + people count
-                            const peopleCount = subconcept.numberOfPeople || 1;
-                            unitPriceHTML = `
-                                <div style="line-height: 1.4;">
-                                    <div>${priceFormatted}</div>
-                                    <small class="text-muted">${peopleCount} persona${peopleCount !== 1 ? 's' : ''}</small>
-                                </div>
-                            `;
-                        } else if (subconcept.isPerPerson) {
-                            // Regular/Experiencia with per-person enabled
-                            const peopleCount = subconcept.numberOfPeople || 1;
-                            unitPriceHTML = `
-                                <div style="line-height: 1.4;">
-                                    <div>${priceFormatted}</div>
-                                    <small class="text-success">✓ Por Persona</small>
-                                    <small class="text-muted d-block">${peopleCount} persona${peopleCount !== 1 ? 's' : ''}</small>
-                                </div>
-                            `;
-                        } else {
-                            // Standard pricing
-                            unitPriceHTML = priceFormatted;
-                        }
-                    } else {
-                        unitPriceHTML = '-';
-                    }
-
-                    // Total subconcept
+                    // Use the stored total directly (already calculated properly in services section)
                     const total = subconcept.total !== null && subconcept.total !== undefined
                         ? currencyFormatter.format(subconcept.total)
                         : '-';
@@ -814,17 +847,32 @@
                     // Notes - show actual notes or empty if none
                     const notes = subconcept.notes ? `<small>${subconcept.notes}</small>` : '';
 
-                    // Calculate the subconcept total to display
-                    const subTotal = subconcept.total !== null && subconcept.total !== undefined
-                        ? currencyFormatter.format(subconcept.total)
-                        : '-';
+                    // Format total with conditional payment type (only for types that have cash payment checkbox)
+                    let totalFormatted;
+                    if (subconcept.type === 'regular') {
+                        // Regular/service type: no payment type label
+                        totalFormatted = `
+                            <div class="text-end" style="font-weight: bold;">
+                                ${total}
+                            </div>
+                        `;
+                    } else {
+                        // Other types (traslado, tour, experiencia): show payment type
+                        const paymentTypeLabel = subconcept.isCashPayment ? 'Efectivo' : 'Tarjeta/Digital';
+                        const paymentTypeClass = subconcept.isCashPayment ? 'text-success' : 'text-primary';
+                        totalFormatted = `
+                            <div class="text-end" style="line-height: 1.3;">
+                                <div style="font-weight: bold;">${total}</div>
+                                <small class="${paymentTypeClass}">${paymentTypeLabel}</small>
+                            </div>
+                        `;
+                    }
 
-                    // Note: columns are: Día (skipped - rowspan), Concepto, Vehículo, Horas, Precio Unit., Total (skipped - rowspan), Notas
+                    // Note: columns are: Día (skipped - rowspan), Concepto, Vehículo, Total, Notas
                     subRow.innerHTML = `
                         <td>${conceptHTML}</td>
                         <td>${vehicleTypeHTML}</td>
-                        <td class="text-center">${hours}</td>
-                        <td class="text-end">${unitPriceHTML}</td>
+                        <td>${totalFormatted}</td>
                         <td>${notes}</td>
                     `;
 
@@ -833,10 +881,33 @@
             }
         });
 
+        // Calculate subtotal from stored subconcept totals
+        let actualSubtotal = 0;
+        serviceItems.days.forEach(day => {
+            if (day.subconcepts && day.subconcepts.length > 0) {
+                day.subconcepts.forEach(subconcept => {
+                    if (subconcept.total !== null && subconcept.total !== undefined) {
+                        actualSubtotal += subconcept.total;
+                    }
+                });
+            }
+        });
+
+        // Calculate IVA and total
+        const actualIVA = actualSubtotal * 0.16; // 16% IVA
+        const actualTotal = actualSubtotal + actualIVA;
+
         // Update totals
-        document.getElementById('summarySubtotal').textContent = currencyFormatter.format(serviceItems.subtotal || 0);
-        document.getElementById('summaryIVA').textContent = currencyFormatter.format(serviceItems.iva || 0);
-        document.getElementById('summaryTotal').textContent = currencyFormatter.format(serviceItems.total || 0);
+        document.getElementById('summarySubtotal').textContent = currencyFormatter.format(actualSubtotal);
+        document.getElementById('summaryIVA').textContent = currencyFormatter.format(actualIVA);
+        document.getElementById('summaryTotal').textContent = currencyFormatter.format(actualTotal);
+        
+        // Calculate and update per person total
+        const numberOfPeople = parseInt(document.getElementById('summaryNumberOfPeople').textContent) || 1;
+        const perPersonTotal = numberOfPeople > 0 ? actualTotal / numberOfPeople : 0;
+        
+        document.getElementById('summaryPerPerson').textContent = currencyFormatter.format(perPersonTotal);
+        document.getElementById('summaryPersonCount').textContent = `(${numberOfPeople} ${numberOfPeople === 1 ? 'persona' : 'personas'})`;
     }
 
     // Render included experiences for packages
@@ -1073,15 +1144,11 @@
                             yPosition += 4;
                         }
                         if (cellData[2]) {
-                            doc.text(`  Horas: ${cellData[2]}`, margin + 8, yPosition);
+                            doc.text(`  Precio: ${cellData[2]}`, margin + 8, yPosition);
                             yPosition += 4;
                         }
                         if (cellData[3]) {
-                            doc.text(`  Precio: ${cellData[3]}`, margin + 8, yPosition);
-                            yPosition += 4;
-                        }
-                        if (cellData[4]) {
-                            const notes = doc.splitTextToSize(`  Notas: ${cellData[4]}`, contentWidth - 10);
+                            const notes = doc.splitTextToSize(`  Notas: ${cellData[3]}`, contentWidth - 10);
                             doc.text(notes, margin + 8, yPosition);
                             yPosition += notes.length * 4;
                         }
@@ -1302,7 +1369,7 @@
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
-                            <a href="${data.shareUrl}" target="_blank" class="btn btn-primary">
+                            <a href="${data.shareUrl}" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
                                 <i class="ti ti-external-link me-2"></i>Abrir en Nueva Pestaña
                             </a>
                         </div>
@@ -1354,5 +1421,208 @@
         modalElement.addEventListener('hidden.bs.modal', () => {
             modalElement.remove();
         });
+    }
+
+    // Show cancel reservation modal
+    function showCancelReservationModal(quote) {
+        // Get the earliest event date from service items to calculate hours before event
+        let earliestEventDate = null;
+        if (quote.serviceItems && quote.serviceItems.days && quote.serviceItems.days.length > 0) {
+            quote.serviceItems.days.forEach(day => {
+                if (day.subconcepts && day.subconcepts.length > 0) {
+                    day.subconcepts.forEach(subconcept => {
+                        if (subconcept.startDate) {
+                            const eventDate = new Date(subconcept.startDate);
+                            if (!earliestEventDate || eventDate < earliestEventDate) {
+                                earliestEventDate = eventDate;
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // Calculate hours before event
+        const now = new Date();
+        const hoursBeforeEvent = earliestEventDate ? Math.max(0, Math.floor((earliestEventDate.getTime() - now.getTime()) / (1000 * 60 * 60))) : 0;
+        const requiresApproval = hoursBeforeEvent < 24;
+
+        // Format earliest event date
+        const eventDateStr = earliestEventDate ? 
+            earliestEventDate.toLocaleDateString('es-MX', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : 'No definida';
+
+        // Create modal HTML
+        const modalHtml = `
+            <div class="modal fade" id="cancelReservationModal" tabindex="-1" aria-labelledby="cancelReservationModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="cancelReservationModalLabel">
+                                <i class="ti ti-x me-2"></i>Cancelar Reserva
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert ${requiresApproval ? 'alert-warning' : 'alert-info'}">
+                                <i class="ti ${requiresApproval ? 'ti-alert-triangle' : 'ti-info-circle'} me-2"></i>
+                                ${requiresApproval ? 
+                                    `<strong>¡Atención!</strong> La cancelación es con menos de 24 horas de anticipación (${hoursBeforeEvent} horas restantes). Se creará una solicitud de cancelación que requerirá aprobación administrativa.` :
+                                    `La cancelación es con más de 24 horas de anticipación (${hoursBeforeEvent} horas restantes). La reserva se cancelará automáticamente.`
+                                }
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Folio de Cotización</label>
+                                    <div class="form-control-plaintext">${quote.folio || quote.id}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Fecha del Evento</label>
+                                    <div class="form-control-plaintext">${eventDateStr}</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="cancellationReason" class="form-label fw-semibold">
+                                    Motivo de la Cancelación <span class="text-danger">*</span>
+                                </label>
+                                <textarea 
+                                    class="form-control" 
+                                    id="cancellationReason" 
+                                    rows="4" 
+                                    placeholder="Por favor especifique el motivo de la cancelación..."
+                                    required
+                                ></textarea>
+                            </div>
+
+                            <div class="alert alert-secondary">
+                                <h6><i class="ti ti-info-circle me-2"></i>Información del Proceso:</h6>
+                                <ul class="mb-0">
+                                    ${requiresApproval ? 
+                                        `<li>Se creará una solicitud de cancelación para revisión</li>
+                                         <li>Un administrador revisará y aprobará/rechazará la solicitud</li>
+                                         <li>Recibirá notificación del resultado</li>` :
+                                        `<li>La reserva se cancelará inmediatamente</li>
+                                         <li>Se enviará confirmación de cancelación</li>
+                                         <li>No se requiere aprobación adicional</li>`
+                                    }
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-danger" id="confirmCancellationBtn">
+                                <i class="ti ti-check me-2"></i>
+                                ${requiresApproval ? 'Crear Solicitud' : 'Cancelar Reserva'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        const existingModal = document.getElementById('cancelReservationModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Insert modal into DOM
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Get modal element and show it
+        const modalElement = document.getElementById('cancelReservationModal');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+
+        // Attach confirmation button event listener
+        document.getElementById('confirmCancellationBtn').addEventListener('click', () => {
+            processCancellationRequest(quote, requiresApproval, hoursBeforeEvent, earliestEventDate, modal);
+        });
+
+        // Clean up modal when hidden
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            modalElement.remove();
+        });
+    }
+
+    // Process cancellation request
+    async function processCancellationRequest(quote, requiresApproval, hoursBeforeEvent, eventDate, modal) {
+        const reason = document.getElementById('cancellationReason').value.trim();
+
+        // Validate input
+        if (!reason) {
+            alert('Por favor ingrese un motivo para la cancelación');
+            return;
+        }
+
+        // Show loading state
+        const btn = document.getElementById('confirmCancellationBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        btn.disabled = true;
+
+        try {
+            // Get access token
+            const token = getAccessToken();
+
+            // Prepare request data
+            const requestData = {
+                reason: reason,
+                hoursBeforeEvent: hoursBeforeEvent,
+                eventDate: eventDate ? eventDate.toISOString() : null
+            };
+
+            // Call API to create cancellation request
+            const response = await fetch('/api/cancellation-requests', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    quoteFolio: quote.folio || quote.id,
+                    ...requestData
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Error al procesar la cancelación');
+            }
+
+            // Close modal
+            modal.hide();
+
+            // Show success message based on cancellation type
+            if (result.data.directCancellation || result.data.cancellationType === 'direct' || result.message.includes('cancelled successfully')) {
+                // Direct cancellation (24+ hours or no event date)
+                const message = result.message.includes('no event date') 
+                    ? 'La reserva ha sido cancelada exitosamente.\n\n(No se encontró fecha de evento - cancelación automática)'
+                    : 'La reserva ha sido cancelada exitosamente.';
+                alert(message);
+                // Refresh the page to show updated status
+                window.location.reload();
+            } else {
+                // Cancellation request created for approval (<24 hours)
+                alert(`Solicitud de cancelación creada exitosamente.\n\nID: ${result.data.requestId}\nEstado: Pendiente de aprobación\n\nRecibirá una notificación cuando sea revisada.`);
+                // Optional: Refresh to update UI or navigate to cancellation requests view
+            }
+
+        } catch (error) {
+            console.error('Error processing cancellation:', error);
+            alert(`Error al procesar la cancelación: ${error.message}`);
+
+            // Restore button state
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     }
 </script>

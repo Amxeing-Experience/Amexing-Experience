@@ -431,6 +431,442 @@ class InvoiceController {
   }
 
   /**
+   * Upload XML/PDF file for invoice.
+   * POST /api/invoices/upload-file.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async uploadInvoiceFile(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const userRole = req.userRole || currentUser.get('role');
+
+      // Validate permissions
+      if (!this.allowedRoles.includes(userRole)) {
+        return this.sendError(res, 'No tiene permisos para subir archivos de factura', 403);
+      }
+
+      const { invoiceId, fileType } = req.body;
+      const { file } = req;
+
+      // Validate required fields
+      if (!invoiceId) {
+        return this.sendError(res, 'Invoice ID es requerido', 400);
+      }
+
+      if (!fileType || !['xml', 'pdf'].includes(fileType)) {
+        return this.sendError(res, 'Tipo de archivo debe ser "xml" o "pdf"', 400);
+      }
+
+      if (!file) {
+        return this.sendError(res, 'Archivo es requerido', 400);
+      }
+
+      // Validate file extension
+      const allowedExtensions = {
+        xml: ['.xml'],
+        pdf: ['.pdf'],
+      };
+
+      const fileExtension = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
+      if (!allowedExtensions[fileType].includes(fileExtension)) {
+        return this.sendError(res, `Archivo ${fileType.toUpperCase()} debe tener extensión ${allowedExtensions[fileType].join(' o ')}`, 400);
+      }
+
+      // Find the invoice
+      const query = new Parse.Query('Invoice');
+      const invoice = await query.get(invoiceId, { useMasterKey: true });
+      if (!invoice) {
+        return this.sendError(res, 'Solicitud de factura no encontrada', 404);
+      }
+
+      // Allow file uploads in any status (admin may need to replace or correct files)
+
+      // Generate unique filename
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const uniqueFilename = `${fileType}_${invoiceId}_${timestamp}${fileExtension}`;
+
+      let uploadResult;
+      let storageMethod = 'gridfs'; // Default to GridFS
+
+      // Try S3 first if configured, fallback to GridFS
+      if (process.env.S3_BUCKET && process.env.AWS_REGION) {
+        try {
+          // Import FileStorageService
+          const FileStorageService = require('../../services/FileStorageService');
+
+          // Create file storage service for invoices
+          const fileStorageService = new FileStorageService({
+            baseFolder: 'invoices',
+            isPublic: false,
+            deletionStrategy: 'move',
+            presignedUrlExpires: 3600, // 1 hour
+          });
+
+          // Upload file to S3
+          uploadResult = await fileStorageService.uploadFile(
+            file.buffer,
+            uniqueFilename,
+            file.mimetype,
+            {
+              entityId: invoiceId,
+              metadata: {
+                invoiceId,
+                fileType,
+                originalName: file.originalname,
+                uploadedBy: currentUser.id,
+                uploadedAt: new Date().toISOString(),
+              },
+            }
+          );
+
+          storageMethod = 's3';
+
+          logger.info('File uploaded to S3', {
+            invoiceId,
+            fileType,
+            s3Key: uploadResult.s3Key,
+            storageMethod,
+          });
+        } catch (s3Error) {
+          logger.warn('S3 upload failed, falling back to GridFS', {
+            error: s3Error.message,
+            invoiceId,
+            fileType,
+          });
+          uploadResult = null; // Will use GridFS fallback below
+        }
+      }
+
+      // Use GridFS fallback if S3 not configured or failed
+      if (!uploadResult) {
+        // Create Parse.File for GridFS storage
+        const parseFile = new Parse.File(uniqueFilename, file.buffer, file.mimetype);
+        await parseFile.save(null, { useMasterKey: true });
+
+        uploadResult = {
+          s3Key: parseFile.name(),
+          s3Url: parseFile.url(),
+          bucket: 'gridfs', // Indicate GridFS storage
+          region: 'local',
+          storageMethod: 'gridfs',
+        };
+
+        logger.info('File uploaded to GridFS', {
+          invoiceId,
+          fileType,
+          fileName: parseFile.name(),
+          url: parseFile.url(),
+          storageMethod,
+        });
+      }
+
+      // Update invoice with file information
+      const fileField = fileType === 'xml' ? 'xmlFileS3Key' : 'pdfFileS3Key';
+      const urlField = fileType === 'xml' ? 'xmlFileUrl' : 'pdfFileUrl';
+      const storageField = fileType === 'xml' ? 'xmlStorageMethod' : 'pdfStorageMethod';
+
+      invoice.set(fileField, uploadResult.s3Key);
+      invoice.set(urlField, uploadResult.s3Url);
+      invoice.set(storageField, storageMethod);
+      invoice.set('updatedAt', new Date());
+
+      await invoice.save(null, { useMasterKey: true });
+
+      // Check if both XML and PDF files are now uploaded
+      const xmlFileKey = invoice.get('xmlFileS3Key');
+      const pdfFileKey = invoice.get('pdfFileS3Key');
+      const hasAllFiles = xmlFileKey && pdfFileKey;
+
+      let statusChanged = false;
+      if (hasAllFiles && invoice.get('status') === 'pending') {
+        // Auto-complete invoice when both files are uploaded (only if still pending)
+        const completionTimestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const autoInvoiceNumber = `AUTO-${invoiceId}-${completionTimestamp}`;
+
+        await invoice.markCompleted(
+          currentUser,
+          autoInvoiceNumber,
+          'Factura completada automáticamente al subir ambos archivos XML y PDF'
+        );
+
+        statusChanged = true;
+
+        logger.info('Invoice auto-completed after file upload', {
+          invoiceId,
+          invoiceNumber: autoInvoiceNumber,
+          triggeredBy: fileType,
+          completedBy: currentUser.id,
+        });
+      } else if (invoice.get('status') !== 'pending') {
+        logger.info('File uploaded to non-pending invoice (replacement/correction)', {
+          invoiceId,
+          currentStatus: invoice.get('status'),
+          fileType,
+          uploadedBy: currentUser.id,
+        });
+      }
+
+      logger.info('Invoice file uploaded successfully', {
+        invoiceId,
+        fileType,
+        storageMethod,
+        fileKey: uploadResult.s3Key,
+        userId: currentUser.id,
+        userRole,
+        originalFilename: file.originalname,
+        fileSize: file.size,
+        hasAllFiles,
+        statusChanged,
+        newStatus: invoice.get('status'),
+      });
+
+      return res.json({
+        success: true,
+        data: {
+          invoiceId,
+          fileType,
+          filename: uniqueFilename,
+          originalName: file.originalname,
+          fileKey: uploadResult.s3Key,
+          fileUrl: uploadResult.s3Url,
+          storageMethod,
+          fileSize: file.size,
+          hasAllFiles,
+          statusChanged,
+          newStatus: invoice.get('status'),
+          invoiceNumber: statusChanged ? invoice.get('invoiceNumber') : null,
+        },
+        message: statusChanged
+          ? `Archivo ${fileType.toUpperCase()} subido exitosamente. Factura completada automáticamente.`
+          : `Archivo ${fileType.toUpperCase()} subido exitosamente`,
+      });
+    } catch (error) {
+      logger.error('Error uploading invoice file', {
+        error: error.message,
+        stack: error.stack,
+        invoiceId: req.body?.invoiceId,
+        fileType: req.body?.fileType,
+        userId: req.user?.id,
+        userRole: req.userRole,
+        filename: req.file?.originalname,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al subir el archivo',
+        500
+      );
+    }
+  }
+
+  /**
+   * Get count of pending invoices for badge display.
+   * GET /api/invoices/pending-count.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async getPendingCount(req, res) {
+    try {
+      logger.info('getPendingCount called', {
+        hasUser: !!req.user,
+        userRole: req.userRole,
+        userId: req.user?.id,
+      });
+
+      const currentUser = req.user;
+      if (!currentUser) {
+        logger.warn('getPendingCount: No user found in request');
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const userRole = req.userRole || currentUser.get('role');
+      logger.info('getPendingCount: User role', { userRole });
+
+      // Validate permissions
+      if (!this.allowedRoles.includes(userRole)) {
+        logger.warn('getPendingCount: Insufficient permissions', { userRole, allowedRoles: this.allowedRoles });
+        return this.sendError(res, 'No tiene permisos para ver conteo de facturas', 403);
+      }
+
+      // Count pending invoices
+      const query = new Parse.Query('Invoice');
+      query.equalTo('status', 'pending');
+      query.equalTo('active', true);
+      query.equalTo('exists', true);
+
+      const count = await query.count({ useMasterKey: true });
+      logger.info('getPendingCount: Count result', { count });
+
+      return res.json({
+        success: true,
+        data: {
+          pendingCount: count,
+        },
+      });
+    } catch (error) {
+      logger.error('Error getting pending invoices count', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        userRole: req.userRole,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al obtener conteo de facturas',
+        500
+      );
+    }
+  }
+
+  /**
+   * Download invoice file (XML or PDF).
+   * GET /api/invoices/download/:invoiceId/:fileType.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async downloadInvoiceFile(req, res) {
+    try {
+      const currentUser = req.user;
+      if (!currentUser) {
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      const userRole = req.userRole || currentUser.get('role');
+      const { invoiceId, fileType } = req.params;
+
+      // Validate parameters
+      if (!invoiceId) {
+        return this.sendError(res, 'ID de factura requerido', 400);
+      }
+
+      if (!fileType || !['xml', 'pdf'].includes(fileType)) {
+        return this.sendError(res, 'Tipo de archivo debe ser "xml" o "pdf"', 400);
+      }
+
+      // Department managers only see their department's invoices
+      let departmentFilter = null;
+      if (userRole === 'department_manager') {
+        const userDepartment = currentUser.get('department');
+        if (!userDepartment) {
+          return this.sendError(res, 'Usuario no tiene departamento asignado', 403);
+        }
+        departmentFilter = userDepartment;
+      }
+
+      // Find the invoice with related quote
+      const query = new Parse.Query('Invoice');
+      query.include(['quote', 'quote.createdBy', 'quote.createdBy.department']);
+
+      const invoice = await query.get(invoiceId, { useMasterKey: true });
+      if (!invoice) {
+        return this.sendError(res, 'Factura no encontrada', 404);
+      }
+
+      // Check department access for department managers
+      if (departmentFilter) {
+        const quote = invoice.get('quote');
+        const quoteCreator = quote?.get('createdBy');
+        const creatorDepartment = quoteCreator?.get('department');
+
+        if (!creatorDepartment || creatorDepartment.id !== departmentFilter.id) {
+          return this.sendError(res, 'No tiene acceso a facturas de otros departamentos', 403);
+        }
+      }
+
+      // Check if invoice is completed and has files
+      if (invoice.get('status') !== 'completed') {
+        return this.sendError(res, 'Solo se pueden descargar archivos de facturas completadas', 400);
+      }
+
+      // Get file information
+      const fileKey = invoice.get(fileType === 'xml' ? 'xmlFileS3Key' : 'pdfFileS3Key');
+      const fileUrl = invoice.get(fileType === 'xml' ? 'xmlFileUrl' : 'pdfFileUrl');
+      const storageMethod = invoice.get(fileType === 'xml' ? 'xmlStorageMethod' : 'pdfStorageMethod') || 'gridfs';
+
+      if (!fileKey) {
+        return this.sendError(res, `Archivo ${fileType.toUpperCase()} no disponible para esta factura`, 404);
+      }
+
+      // Handle download based on storage method
+      if (storageMethod === 's3' && process.env.S3_BUCKET) {
+        try {
+          // Import FileStorageService
+          const FileStorageService = require('../../services/FileStorageService');
+
+          // Create file storage service
+          const fileStorageService = new FileStorageService({
+            baseFolder: 'invoices',
+            isPublic: false,
+            deletionStrategy: 'move',
+            presignedUrlExpires: 300, // 5 minutes for download
+          });
+
+          // Generate presigned download URL
+          const presignedUrl = await fileStorageService.generatePresignedUrl(fileKey, 'getObject', 300);
+
+          // Redirect to presigned URL for direct download
+          return res.redirect(presignedUrl);
+        } catch (s3Error) {
+          logger.error('S3 download error, falling back to direct URL', {
+            error: s3Error.message,
+            invoiceId,
+            fileType,
+            fileKey,
+          });
+
+          // Fallback to direct URL if presigned URL generation fails
+          if (fileUrl) {
+            return res.redirect(fileUrl);
+          }
+        }
+      }
+
+      // GridFS or direct URL fallback
+      if (fileUrl) {
+        return res.redirect(fileUrl);
+      }
+
+      // If we reach here, file exists in database but not accessible
+      logger.error('Invoice file exists but cannot be accessed', {
+        invoiceId,
+        fileType,
+        fileKey,
+        fileUrl,
+        storageMethod,
+      });
+
+      return this.sendError(res, 'Error al acceder al archivo solicitado', 500);
+    } catch (error) {
+      logger.error('Error downloading invoice file', {
+        error: error.message,
+        stack: error.stack,
+        invoiceId: req.params.invoiceId,
+        fileType: req.params.fileType,
+        userId: req.user?.id,
+        userRole: req.userRole,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al descargar el archivo',
+        500
+      );
+    }
+  }
+
+  /**
    * Send error response.
    * @param {object} res - Express response object.
    * @param {string} error - Error message.

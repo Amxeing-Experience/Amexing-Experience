@@ -68,7 +68,7 @@ const navigationItems = {
             { name: 'Clientes', icon: 'users', path: '/dashboard/admin/clients', id: 'clients' },
             { name: 'Reservaciones', icon: 'clipboard-list', path: '/dashboard/admin/bookings', id: 'bookings' },
             { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/admin/quotes', id: 'quotes' },
-            { name: 'Facturas', icon: 'receipt', path: '/dashboard/admin/invoices', id: 'invoices' }
+            { name: 'Facturas', icon: 'receipt', path: '/dashboard/admin/invoices', id: 'invoices', badge: { text: '0', color: 'warning' } }
         ]},
         { section: 'Gestión de Eventos', icon: 'ti-calendar', items: [
             { name: 'Eventos', icon: 'calendar-event', path: '/dashboard/admin/events', id: 'events' },
@@ -116,7 +116,8 @@ const navigationItems = {
             { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/department_manager', id: 'dashboard' },
             { name: 'My Team', icon: 'users', path: '/dashboard/department_manager/team', id: 'team' },
             { name: 'Team Bookings', icon: 'car', path: '/dashboard/department_manager/bookings', id: 'bookings' },
-            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/department_manager/quotes', id: 'quotes' }
+            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/department_manager/quotes', id: 'quotes' },
+            { name: 'Facturas', icon: 'receipt', path: '/dashboard/department_manager/invoices', id: 'invoices' }
         ]},
         { section: 'Servicios', icon: 'ti-briefcase', items: [
             { name: 'Vehículos', icon: 'car', path: '/dashboard/department_manager/vehicles', id: 'vehicles' },
@@ -278,19 +279,7 @@ const menuSections = navigationItems[userRole] || navigationItems.guest;
 
   /* Badge animations */
   .nav-badge {
-    animation: badgePulse 2s infinite;
-  }
-
-  @keyframes badgePulse {
-
-    0%,
-    100% {
-      transform: scale(1);
-    }
-
-    50% {
-      transform: scale(1.1);
-    }
+    /* No animation */
   }
 
   /* Loading state for menu items */

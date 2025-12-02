@@ -64,6 +64,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <th>Vehículo</th>
                         <th>Tipo</th>
                         <th>Placa</th>
+                        <th>VIN</th>
+                        <th>ID Veh.</th>
                         <th>Tarifa</th>
                         <th>Capacidad</th>
                         <th>Mantenimiento</th>
@@ -131,6 +133,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                 <input type="text" class="form-control" id="licensePlate" name="licensePlate" required maxlength="20" placeholder="Ej: ABC-123-XYZ" style="text-transform: uppercase;">
                             </div>
                         </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="vin" class="form-label">No. de Serie / VIN</label>
+                                <input type="text" class="form-control" id="vin" name="vin" maxlength="17" placeholder="Ej: 1HGBH41JXMN109186" pattern="[A-HJ-NPR-Z0-9]{17}" title="VIN: 17 caracteres, solo letras A-H, J-N, P-R, Z y números 0-9. No se permiten I, O, Q, S, T, U, V, W, X, Y" style="text-transform: uppercase;">
+                                <div class="form-text">Vehicle Identification Number (17 caracteres, opcional)<br>
+                                    <small class="text-muted">Caracteres permitidos: A-H, J-N, P-R, Z, 0-9. No usar: I, O, Q, S, T, U, V, W, X, Y</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="customVehicleId" class="form-label">ID de vehículo</label>
+                                <input type="text" class="form-control" id="customVehicleId" name="customVehicleId" placeholder="Ej: VH001">
+                                <div class="form-text">Identificador personalizado del vehículo (opcional)</div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Sección: Especificaciones -->
@@ -160,12 +177,17 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="capacity" class="form-label">Capacidad <span class="text-danger">*</span></label>
+                            <div class="col-md-4 mb-3">
+                                <label for="capacity" class="form-label">Capacidad Pax <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="capacity" name="capacity" required min="1" max="50" placeholder="Ej: 4">
                                 <div class="form-text">Número de pasajeros</div>
                             </div>
-                            <div class="col-md-6 mb-3">
+                            <div class="col-md-4 mb-3">
+                                <label for="luggageCapacity" class="form-label">Capacidad de Maletas</label>
+                                <input type="number" class="form-control" id="luggageCapacity" name="luggageCapacity" min="0" max="20" placeholder="Ej: 2">
+                                <div class="form-text">Número de maletas grandes</div>
+                            </div>
+                            <div class="col-md-4 mb-3">
                                 <label for="color" class="form-label">Color <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="color" name="color" required maxlength="50" placeholder="Ej: Negro">
                             </div>
@@ -305,6 +327,24 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 },
                 {
+                    data: 'vin',
+                    render: function(data) {
+                        if (data && data.trim()) {
+                            return `<small class="text-muted font-monospace">${data}</small>`;
+                        }
+                        return '<small class="text-muted">-</small>';
+                    }
+                },
+                {
+                    data: 'vehicleId',
+                    render: function(data) {
+                        if (data && data.trim()) {
+                            return `<span class="badge bg-info text-dark">${data}</span>`;
+                        }
+                        return '<small class="text-muted">-</small>';
+                    }
+                },
+                {
                     data: null,
                     render: function(data) {
                         if (!data.rateId) {
@@ -318,8 +358,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 {
                     data: 'capacity',
                     className: 'text-center',
-                    render: function(data) {
-                        return `<span class="badge bg-secondary">${data} pax</span>`;
+                    render: function(data, type, row) {
+                        const luggageCapacity = row.luggageCapacity || 0;
+                        return `<div class="text-center">
+                            <span class="badge bg-secondary">${data} pax</span>
+                            <br><small class="text-muted">${luggageCapacity} maletas</small>
+                        </div>`;
                     }
                 },
                 {
@@ -473,8 +517,19 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $(`#${tableId}`).on('click', '.delete-vehicle-btn', function() { deleteVehicle($(this).data('id'), $(this).data('name')); });
         $('#saveVehicleBtn').on('click', function() { saveVehicle(); });
         $('#vehicleType').on('change', function() {
-            const defaultCapacity = $(this).find('option:selected').data('capacity');
-            if (defaultCapacity && !$('#capacity').val()) $('#capacity').val(defaultCapacity);
+            const selectedOption = $(this).find('option:selected');
+            const defaultCapacity = selectedOption.data('capacity');
+            const defaultLuggageCapacity = selectedOption.data('trunk-capacity');
+            
+            // Always load default capacity when vehicle type changes
+            if (defaultCapacity) {
+                $('#capacity').val(defaultCapacity);
+            }
+            
+            // Always load default luggage capacity when vehicle type changes
+            if (defaultLuggageCapacity !== undefined) {
+                $('#luggageCapacity').val(defaultLuggageCapacity);
+            }
         });
 
         // Load rates for filter dropdown
@@ -518,7 +573,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         const select = $('#vehicleType');
                         select.find('option:not(:first)').remove();
                         response.data.forEach(function(type) {
-                            select.append(`<option value="${type.value}" data-capacity="${type.capacity}">${type.label}</option>`);
+                            select.append(`<option value="${type.value}" data-capacity="${type.capacity}" data-trunk-capacity="${type.trunkCapacity}">${type.label}</option>`);
                         });
                     }
                 },
@@ -582,7 +637,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#model').val(vehicle.model);
                         $('#year').val(vehicle.year);
                         $('#licensePlate').val(vehicle.licensePlate);
+                        $('#vin').val(vehicle.vin || '');
+                        $('#customVehicleId').val(vehicle.vehicleId || '');
                         $('#capacity').val(vehicle.capacity);
+                        $('#luggageCapacity').val(vehicle.luggageCapacity || '');
                         $('#color').val(vehicle.color);
                         $('#maintenanceStatus').val(vehicle.maintenanceStatus);
                         $('#insuranceExpiry').val(vehicle.insuranceExpiry || '');
@@ -603,6 +661,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
         function saveVehicle() {
             const form = $('#vehicleForm');
+            
+            // Custom VIN validation
+            const vinValue = $('#vin').val().trim();
+            if (vinValue && vinValue.length > 0) {
+                if (vinValue.length !== 17) {
+                    showModalError('VIN debe tener exactamente 17 caracteres');
+                    return;
+                }
+                if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vinValue)) {
+                    showModalError('VIN contiene caracteres inválidos. Solo se permiten: A-H, J-N, P-R, Z, 0-9 (sin I, O, Q, S, T, U, V, W, X, Y)');
+                    return;
+                }
+            }
+            
             if (!form[0].checkValidity()) {
                 form[0].reportValidity();
                 return;
@@ -615,9 +687,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 model: $('#model').val(),
                 year: parseInt($('#year').val()),
                 licensePlate: $('#licensePlate').val().toUpperCase(),
+                vin: $('#vin').val().toUpperCase().trim() || null,
+                vehicleId: $('#customVehicleId').val().trim() || null,
                 vehicleTypeId: $('#vehicleType').val(),
                 rateId: rateValue || null,
                 capacity: parseInt($('#capacity').val()),
+                luggageCapacity: $('#luggageCapacity').val() ? parseInt($('#luggageCapacity').val()) : null,
                 color: $('#color').val(),
                 maintenanceStatus: $('#maintenanceStatus').val(),
                 insuranceExpiry: $('#insuranceExpiry').val() || null

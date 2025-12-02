@@ -223,6 +223,69 @@ class Vehicle extends BaseModel {
   }
 
   /**
+   * Get luggage capacity (number of suitcases).
+   * @returns {number} Luggage capacity.
+   * @example
+   * const luggageCapacity = vehicle.getLuggageCapacity();
+   * console.log(luggageCapacity); // 2
+   */
+  getLuggageCapacity() {
+    return this.get('luggageCapacity') || 2;
+  }
+
+  /**
+   * Set luggage capacity (number of suitcases).
+   * @param {number} capacity - Luggage capacity.
+   * @example
+   * vehicle.setLuggageCapacity(4);
+   */
+  setLuggageCapacity(capacity) {
+    this.set('luggageCapacity', capacity);
+  }
+
+  /**
+   * Get VIN (Vehicle Identification Number).
+   * @returns {string} VIN number.
+   * @example
+   * const vin = vehicle.getVin();
+   * console.log(vin); // "1HGBH41JXMN109186"
+   */
+  getVin() {
+    return this.get('vin') || '';
+  }
+
+  /**
+   * Set VIN (Vehicle Identification Number).
+   * @param {string} vin - VIN number (17 characters).
+   * @example
+   * vehicle.setVin('1HGBH41JXMN109186');
+   */
+  setVin(vin) {
+    this.set('vin', vin ? vin.toUpperCase().trim() : '');
+  }
+
+  /**
+   * Get vehicle ID (custom identifier).
+   * @returns {string} Vehicle ID.
+   * @example
+   * const vehicleId = vehicle.getVehicleId();
+   * console.log(vehicleId); // "VH001"
+   */
+  getVehicleId() {
+    return this.get('vehicleId') || '';
+  }
+
+  /**
+   * Set vehicle ID (custom identifier).
+   * @param {string} vehicleId - Vehicle ID.
+   * @example
+   * vehicle.setVehicleId('VH001');
+   */
+  setVehicleId(vehicleId) {
+    this.set('vehicleId', vehicleId ? vehicleId.trim() : '');
+  }
+
+  /**
    * Get vehicle color.
    * @returns {string} Color.
    * @example
@@ -421,6 +484,15 @@ class Vehicle extends BaseModel {
       errors.push('Capacity must be between 1 and 100');
     }
 
+    const vin = this.getVin();
+    if (vin && vin.length !== 17) {
+      errors.push('VIN must be exactly 17 characters');
+    }
+
+    if (vin && vin.length === 17 && !/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
+      errors.push(`VIN contains invalid characters. Found: ${vin}. Only A-H, J-N, P-R, Z, 0-9 are allowed (no I, O, Q)`);
+    }
+
     return {
       valid: errors.length === 0,
       errors,
@@ -499,6 +571,38 @@ class Vehicle extends BaseModel {
         error: error.message,
       });
       return [];
+    }
+  }
+
+  /**
+   * Check if VIN is unique.
+   * @param {string} vin - VIN to check.
+   * @param {string} excludeId - Exclude this ID from check (for updates).
+   * @returns {Promise<boolean>} True if unique.
+   * @example
+   * const isUnique = await Vehicle.isVinUnique('1HGBH41JXMN109186');
+   * console.log(isUnique); // true
+   */
+  static async isVinUnique(vin, excludeId = null) {
+    if (!vin || vin.trim() === '') return true; // Empty VIN is allowed
+
+    try {
+      const query = new Parse.Query('Vehicle');
+      query.equalTo('vin', vin.toUpperCase().trim());
+      query.equalTo('exists', true);
+
+      if (excludeId) {
+        query.notEqualTo('objectId', excludeId);
+      }
+
+      const count = await query.count({ useMasterKey: true });
+      return count === 0;
+    } catch (error) {
+      logger.error('Error checking VIN uniqueness', {
+        vin,
+        error: error.message,
+      });
+      return false;
     }
   }
 

@@ -299,16 +299,20 @@ const ratesRoutes = require('./api/ratesRoutes');
 // Experience Management API routes
 const experiencesRoutes = require('./api/experiencesRoutes');
 const experienceImagesRoutes = require('./api/experienceImagesRoutes');
+const providerExperienciasRoutes = require('./api/providerExperienciasRoutes');
 // Tours Management API routes
 const toursRoutes = require('./api/toursRoutes');
 // Audit Log API routes
 const auditRoutes = require('./api/auditRoutes');
 // Quote Management API routes
 const quotesRoutes = require('./api/quotesRoutes');
+// Cancellation Requests API routes
+const cancellationRequestsRoutes = require('./api/cancellationRequestsRoutes');
 // Invoice Management API routes
 const invoicesRoutes = require('./api/invoicesRoutes');
 // Payment Info Management API routes
 const paymentInfoRoutes = require('./api/paymentInfoRoutes');
+const billingRoutes = require('./api/billingRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
@@ -326,11 +330,14 @@ router.use('/services', servicesRoutes);
 router.use('/rates', ratesRoutes);
 router.use('/experiences', experiencesRoutes);
 router.use('/experiences', experienceImagesRoutes); // Experience images endpoints
+router.use('/', providerExperienciasRoutes); // Provider experiencias endpoints
 router.use('/tours', toursRoutes);
 router.use('/audit', auditRoutes); // Audit log endpoints
 router.use('/quotes', quotesRoutes); // Quote management endpoints
+router.use('/cancellation-requests', cancellationRequestsRoutes); // Cancellation requests management endpoints
 router.use('/invoices', invoicesRoutes); // Invoice management endpoints
 router.use('/payment-info', paymentInfoRoutes); // Payment info management endpoints
+router.use('/billing', billingRoutes); // Billing info management endpoints
 
 /**
  * @swagger

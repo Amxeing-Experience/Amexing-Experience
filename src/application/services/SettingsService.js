@@ -37,6 +37,12 @@ const Parse = require('parse/node');
 const Setting = require('../../domain/models/Setting');
 const logger = require('../../infrastructure/logger');
 
+/**
+ * SettingsService for managing application settings
+ * Provides caching, validation, and CRUD operations for system settings
+ * Handles default values and persistence to Parse Server.
+ * @class SettingsService
+ */
 class SettingsService {
   constructor() {
     /**

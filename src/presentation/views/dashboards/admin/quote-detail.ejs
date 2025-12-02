@@ -76,12 +76,26 @@ const menuItems = [
     </div>
 
     <div class="col-lg-9" id="contentColumn">
+        <!-- DEBUG: Section Info -->
+        <script>
+            console.log('🔍 QUOTE DETAIL DEBUG:', {
+                activeSection: '<%= activeSection %>',
+                quoteId: '<%= quoteId %>',
+                isNewQuote: <%= isNewQuote %>,
+                currentSection: '<%= typeof currentSection !== "undefined" ? currentSection : "undefined" %>'
+            });
+        </script>
+        
         <% if (activeSection === 'information') { %>
             <%- include('./sections/quote-information', { quoteId: quoteId, userRole: userRole }) %>
         <% } else if (activeSection === 'services') { %>
-            <%- include('./sections/quote-services') %>
+            <%- include('./sections/quote-services', { quoteId: quoteId }) %>
         <% } else if (activeSection === 'summary') { %>
             <%- include('./sections/quote-summary') %>
+        <% } else { %>
+            <div class="alert alert-warning">
+                <strong>DEBUG:</strong> Unknown section '<%= activeSection %>'. Available: information, services, summary
+            </div>
         <% } %>
     </div>
 </div>

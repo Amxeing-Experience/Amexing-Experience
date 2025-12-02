@@ -9,10 +9,33 @@
  */
 
 const express = require('express');
+const multer = require('multer');
 
 const router = express.Router();
 const InvoiceController = require('../../../application/controllers/api/InvoiceController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Allow XML and PDF files only
+    const allowedMimes = ['application/xml', 'text/xml', 'application/pdf'];
+    const allowedExts = ['.xml', '.pdf'];
+
+    const isValidMime = allowedMimes.includes(file.mimetype);
+    const isValidExt = allowedExts.some((ext) => file.originalname.toLowerCase().endsWith(ext));
+
+    if (isValidMime || isValidExt) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos XML y PDF'), false);
+    }
+  },
+});
 
 // Initialize controller
 const invoiceController = new InvoiceController();
@@ -29,6 +52,18 @@ router.get(
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
   (req, res) => invoiceController.getPendingInvoices(req, res)
+);
+
+/**
+ * @description GET /api/invoices/pending-count - Get count of pending invoices for badge display.
+ * @access Admin, SuperAdmin
+ * @returns {object} Response with pending invoices count.
+ */
+router.get(
+  '/pending-count',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  (req, res) => invoiceController.getPendingCount(req, res)
 );
 
 /**
@@ -71,6 +106,36 @@ router.delete(
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
   (req, res) => invoiceController.cancelInvoice(req, res)
+);
+
+/**
+ * @description POST /api/invoices/upload-file - Upload XML/PDF file for invoice.
+ * @access Admin, SuperAdmin
+ * @param {string} invoiceId - Invoice ID (form data).
+ * @param {string} fileType - File type ('xml' or 'pdf') (form data).
+ * @param {File} file - File to upload (multipart/form-data).
+ * @returns {object} Upload confirmation with file details.
+ */
+router.post(
+  '/upload-file',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin (6) and SuperAdmin (7)
+  upload.single('file'),
+  (req, res) => invoiceController.uploadInvoiceFile(req, res)
+);
+
+/**
+ * @description GET /api/invoices/download/:invoiceId/:fileType - Download invoice file (XML or PDF).
+ * @access Department Manager, Admin, SuperAdmin
+ * @param {string} invoiceId - Invoice ID.
+ * @param {string} fileType - File type ('xml' or 'pdf').
+ * @returns {File} Invoice file stream for download.
+ */
+router.get(
+  '/download/:invoiceId/:fileType',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => invoiceController.downloadInvoiceFile(req, res)
 );
 
 module.exports = router;

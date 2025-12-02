@@ -12,11 +12,11 @@ const router = express.Router();
 
 /**
  * Rate limiter for read operations (GET)
- * 100 requests per 15 minutes per IP.
+ * 400 requests per 15 minutes per IP - increased for tour workflows with multiple API calls.
  */
 const readOperationsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  max: 400, // Limit each IP to 400 requests per windowMs - increased from 200 for tour workflows
   message: {
     success: false,
     error: 'Demasiadas solicitudes, por favor intente nuevamente más tarde',
@@ -27,11 +27,11 @@ const readOperationsLimiter = rateLimit({
 
 /**
  * Rate limiter for write operations (POST, PUT, DELETE)
- * 30 requests per 15 minutes per IP.
+ * 200 requests per 15 minutes per IP - increased for tour workflows with multiple updates.
  */
 const writeOperationsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30, // Limit each IP to 30 requests per windowMs
+  max: 200, // Limit each IP to 200 requests per windowMs - increased from 120 for tour workflows
   message: {
     success: false,
     error: 'Demasiadas solicitudes, por favor intente nuevamente más tarde',
@@ -107,6 +107,45 @@ router.post(
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
   (req, res) => QuoteController.createQuote(req, res)
+);
+
+/**
+ * GET /api/quotes/with-invoices - Get quotes with completed invoices for download.
+ * Private access (Department Manager, Admin and SuperAdmin).
+ *
+ * DataTables server-side processing for quotes that have completed invoices with XML/PDF files.
+ * Department managers only see quotes from their department.
+ * @returns {object} DataTables response with quotes containing invoice download information.
+ * @example
+ * // Response structure:
+ * {
+ *   draw: 1,
+ *   recordsTotal: 50,
+ *   recordsFiltered: 10,
+ *   data: [{
+ *     id: 'quote123',
+ *     folio: 'QTE-2025-0001',
+ *     client: { fullName: 'John Doe', companyName: 'ABC Corp' },
+ *     eventType: 'Wedding Reception',
+ *     numberOfPeople: 150,
+ *     invoice: {
+ *       objectId: 'inv456',
+ *       invoiceNumber: 'FAC-001',
+ *       processDate: '2025-01-15T10:30:00.000Z',
+ *       xmlFileUrl: 'https://s3.../invoice.xml',
+ *       pdfFileUrl: 'https://s3.../invoice.pdf',
+ *       xmlFileS3Key: 'invoices/xml/invoice.xml',
+ *       pdfFileS3Key: 'invoices/pdf/invoice.pdf'
+ *     }
+ *   }]
+ * }
+ */
+router.get(
+  '/with-invoices',
+  readOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager (4), Admin (6) and SuperAdmin (7)
+  (req, res) => QuoteController.getQuotesWithInvoices(req, res)
 );
 
 /**

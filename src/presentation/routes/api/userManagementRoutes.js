@@ -387,6 +387,35 @@ router.put('/:id', writeOperationsLimiter, jwtMiddleware.requirePermission('user
 
 /**
  * @swagger
+ * /api/users/me/profile:
+ *   put:
+ *     tags:
+ *       - User Management
+ *     summary: Update own profile information
+ *     description: Allow users to update their own profile data including billing information
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               billingInfo:
+ *                 type: object
+ *                 description: Billing information for invoices
+ *     responses:
+ *       200:
+ *         description: Profile updated successfully
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ */
+router.put('/me/profile', writeOperationsLimiter, async (req, res) => {
+  await userController.updateOwnProfile(req, res);
+});
+
+/**
+ * @swagger
  * /api/users/{id}:
  *   delete:
  *     tags:

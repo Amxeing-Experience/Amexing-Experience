@@ -118,23 +118,68 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         </h6>
 
                         <div class="mb-3">
-                            <label for="role" class="form-label">Rol <span class="text-danger">*</span></label>
-                            <select class="form-select" id="role" name="role" required>
-                                <option value="">Seleccionar rol...</option>
-                                <option value="employee_amexing">Empleado Amexing (Empleado administrativo con acceso completo)</option>
-                                <option value="driver">Conductor (Conductor con acceso a app móvil)</option>
-                            </select>
-                            <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
+                            <label class="form-label">Roles <span class="text-danger">*</span></label>
+                            <div class="role-selection">
+                                <!-- Administrator - Single select (mutually exclusive) -->
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="employee_amexing" id="role_admin" name="roles">
+                                    <label class="form-check-label" for="role_admin">
+                                        <i class="ti ti-briefcase me-1"></i>Administrativo
+                                    </label>
+                                </div>
+                                
+                                <!-- Employee types - Multiple select allowed -->
+                                <div class="employee-types mt-2">
+                                    <small class="text-muted">Tipos de empleado (se pueden seleccionar múltiples):</small>
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input employee-type" type="checkbox" value="driver" id="role_driver" name="roles">
+                                        <label class="form-check-label" for="role_driver">
+                                            <i class="ti ti-truck me-1"></i>Conductor
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input employee-type" type="checkbox" value="guia" id="role_guia" name="roles">
+                                        <label class="form-check-label" for="role_guia">
+                                            <i class="ti ti-map-pin me-1"></i>Guía
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input employee-type" type="checkbox" value="greeter" id="role_greeter" name="roles">
+                                        <label class="form-check-label" for="role_greeter">
+                                            <i class="ti ti-user-check me-1"></i>Greeter
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input employee-type" type="checkbox" value="limpieza" id="role_limpieza" name="roles">
+                                        <label class="form-check-label" for="role_limpieza">
+                                            <i class="ti ti-wash me-1"></i>Limpieza
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-text">Selecciona los roles para este empleado. Administrativo es exclusivo.</div>
                         </div>
 
                         <!-- Role descriptions -->
                         <div class="alert alert-info role-description d-none" id="roleDescriptionEmployeeAmexing">
-                            <strong><i class="ti ti-briefcase me-1"></i>Empleado Amexing:</strong>
+                            <strong><i class="ti ti-briefcase me-1"></i>Administrativo:</strong>
                             Empleado administrativo con acceso completo al sistema de gestión.
                         </div>
                         <div class="alert alert-warning role-description d-none" id="roleDescriptionDriver">
                             <strong><i class="ti ti-truck me-1"></i>Conductor:</strong>
                             Conductor con acceso a la aplicación móvil para gestión de viajes.
+                        </div>
+                        <div class="alert alert-info role-description d-none" id="roleDescriptionGuia">
+                            <strong><i class="ti ti-map me-1"></i>Guía:</strong>
+                            Personal especializado en brindar servicios de guía turística y acompañamiento.
+                        </div>
+                        <div class="alert alert-primary role-description d-none" id="roleDescriptionGreeter">
+                            <strong><i class="ti ti-heart-handshake me-1"></i>Greeter:</strong>
+                            Personal de recepción y bienvenida para atención al cliente.
+                        </div>
+                        <div class="alert alert-success role-description d-none" id="roleDescriptionLimpieza">
+                            <strong><i class="ti ti-broom me-1"></i>Limpieza:</strong>
+                            Personal de limpieza y mantenimiento de vehículos e instalaciones.
                         </div>
                     </div>
 
@@ -298,14 +343,38 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 data: null,
                 render: function(data, type, row) {
                     const roleLabels = {
-                        employee_amexing: 'Empleado',
-                        driver: 'Conductor'
+                        employee_amexing: 'Administrativo',
+                        driver: 'Conductor',
+                        guia: 'Guía',
+                        greeter: 'Greeter',
+                        limpieza: 'Limpieza'
                     };
-                    const role = row.role || row.roleId?.name || 'employee_amexing';
-                    const roleName = typeof role === 'string' ? role : role.name || 'employee_amexing';
-                    const roleLabel = roleLabels[roleName] || roleName;
-                    const badgeClass = roleName === 'driver' ? 'bg-warning' : 'bg-secondary';
-                    return `<span class="badge ${badgeClass}">${roleLabel}</span>`;
+                    
+                    const roleBadgeClasses = {
+                        employee_amexing: 'bg-info',
+                        driver: 'bg-warning',
+                        guia: 'bg-success',
+                        greeter: 'bg-primary',
+                        limpieza: 'bg-secondary'
+                    };
+                    
+                    // Get multiple roles from futureRoles array, fallback to single role
+                    let roles = [];
+                    if (row.futureRoles && Array.isArray(row.futureRoles) && row.futureRoles.length > 0) {
+                        // Show all selected roles including driver/conductor
+                        roles = row.futureRoles;
+                    } else {
+                        // Fallback to single role display
+                        const singleRole = row.displayRole || row.role || 'employee_amexing';
+                        roles = [singleRole];
+                    }
+                    
+                    // Create multiple badges
+                    return roles.map(roleName => {
+                        const roleLabel = roleLabels[roleName] || roleName;
+                        const badgeClass = roleBadgeClasses[roleName] || 'bg-secondary';
+                        return `<span class="badge ${badgeClass} me-1">${roleLabel}</span>`;
+                    }).join('');
                 }
             },
             {
@@ -405,17 +474,48 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }
     });
     
-    // Role selector change handler
-    $('#role').on('change', function() {
-        const selectedRole = $(this).val();
-        $('.role-description').addClass('d-none');
-
-        if (selectedRole === 'employee_amexing') {
+    // Multiple roles checkbox handlers
+    // Handle administrator role (exclusive)
+    $('#role_admin').on('change', function() {
+        if ($(this).is(':checked')) {
+            // Uncheck all employee types when admin is selected
+            $('.employee-type').prop('checked', false);
             $('#roleDescriptionEmployeeAmexing').removeClass('d-none');
-        } else if (selectedRole === 'driver') {
-            $('#roleDescriptionDriver').removeClass('d-none');
+        } else {
+            $('#roleDescriptionEmployeeAmexing').addClass('d-none');
         }
+        updateRoleDescriptions();
     });
+
+    // Handle employee types (can be multiple, but exclude admin)
+    $('.employee-type').on('change', function() {
+        if ($(this).is(':checked')) {
+            // Uncheck admin when any employee type is selected
+            $('#role_admin').prop('checked', false);
+            $('#roleDescriptionEmployeeAmexing').addClass('d-none');
+        }
+        updateRoleDescriptions();
+    });
+
+    // Function to update role descriptions based on selected checkboxes
+    function updateRoleDescriptions() {
+        $('.role-description').addClass('d-none');
+        
+        $('input[name="roles"]:checked').each(function() {
+            const role = $(this).val();
+            if (role === 'employee_amexing') {
+                $('#roleDescriptionEmployeeAmexing').removeClass('d-none');
+            } else if (role === 'driver') {
+                $('#roleDescriptionDriver').removeClass('d-none');
+            } else if (role === 'guia') {
+                $('#roleDescriptionGuia').removeClass('d-none');
+            } else if (role === 'greeter') {
+                $('#roleDescriptionGreeter').removeClass('d-none');
+            } else if (role === 'limpieza') {
+                $('#roleDescriptionLimpieza').removeClass('d-none');
+            }
+        });
+    }
 
     // Notes character counter
     $('#notes').on('input', function() {
@@ -436,7 +536,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     $('#lastName').val(e.lastName);
                     $('#email').val(e.email);
                     $('#phone').val(e.phone || '');
-                    $('#role').val(e.role || e.roleId?.name || 'employee_amexing');
+                    // Clear all role checkboxes first
+                    $('input[name="roles"]').prop('checked', false);
+                    
+                    // Populate multiple roles from futureRoles array
+                    if (e.futureRoles && Array.isArray(e.futureRoles) && e.futureRoles.length > 0) {
+                        e.futureRoles.forEach(role => {
+                            $(`input[name="roles"][value="${role}"]`).prop('checked', true);
+                        });
+                    } else {
+                        // Fallback to single role
+                        const singleRole = e.displayRole || e.role || 'employee_amexing';
+                        $(`input[name="roles"][value="${singleRole}"]`).prop('checked', true);
+                    }
+                    
                     $('#department').val(e.contextualData?.department || '');
                     $('#position').val(e.contextualData?.position || '');
                     $('#notes').val(e.contextualData?.notes || '');
@@ -444,7 +557,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     $('#modalTitle').text('Editar Empleado');
                     $('#saveButtonText').text('Actualizar Empleado');
                     $('#passwordInfo').hide();
-                    $('#role').trigger('change');
+                    
+                    // Trigger role descriptions update
+                    updateRoleDescriptions();
 
                     // Clear any previous modal alerts
                     const alertsContainer = document.getElementById('employeeModalAlerts');
@@ -470,6 +585,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
         $('#employeeForm')[0].reset();
         $('#employeeId').val('');
+        $('input[name="roles"]').prop('checked', false); // Clear role checkboxes
         $('#modalTitle').text('Crear Nuevo Empleado');
         $('#saveButtonText').text('Crear Empleado');
         $('#notesCharCount').text('0/500');
@@ -480,11 +596,18 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
     $('#saveEmployeeBtn').click(function() {
         const id = $('#employeeId').val();
+        
+        // Collect selected roles from checkboxes
+        const selectedRoles = [];
+        $('input[name="roles"]:checked').each(function() {
+            selectedRoles.push($(this).val());
+        });
+        
         const data = {
             firstName: $('#firstName').val(),
             lastName: $('#lastName').val(),
             email: $('#email').val(),
-            role: $('#role').val(),
+            roles: selectedRoles, // Send multiple roles
             phone: $('#phone').val() || null,
             department: $('#department').val() || null,
             position: $('#position').val() || null,
@@ -492,8 +615,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         };
 
         // Validate required fields
-        if (!data.firstName || !data.lastName || !data.email || !data.role) {
-            showModalError('Por favor completa todos los campos requeridos');
+        if (!data.firstName || !data.lastName || !data.email || selectedRoles.length === 0) {
+            showModalError('Por favor completa todos los campos requeridos y selecciona al menos un rol');
             return;
         }
 

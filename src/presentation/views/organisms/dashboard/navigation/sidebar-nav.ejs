@@ -347,5 +347,80 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Load pending invoices count for badge (with slight delay to allow token initialization)
+    setTimeout(loadPendingInvoicesCount, 500);
 });
+
+// Function to load and update the pending invoices badge count
+function loadPendingInvoicesCount() {
+    // Only load for admin/superadmin roles that can see invoices
+    const userRole = '<%= sidebarUserRole %>';
+    
+    if (!['admin', 'superadmin'].includes(userRole)) {
+        return;
+    }
+
+    const accessToken = localStorage.getItem('accessToken');
+
+    // Prepare headers based on whether we have an access token
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+    
+    if (accessToken) {
+        headers['Authorization'] = 'Bearer ' + accessToken;
+    }
+
+    fetch('/api/invoices/pending-count', {
+        method: 'GET',
+        headers: headers,
+        credentials: 'include' // Include cookies for authentication fallback
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateInvoicesBadge(data.data.pendingCount);
+        } else {
+            // If failed and no token, retry once after delay
+            if (!accessToken) {
+                setTimeout(loadPendingInvoicesCount, 1000);
+            }
+        }
+    })
+    .catch(error => {
+        console.warn('Error loading pending invoices count:', error);
+    });
+}
+
+// Function to update the invoices badge with pending count
+function updateInvoicesBadge(count) {
+    const invoicesNavItem = document.querySelector('[data-nav-id="invoices"]');
+    
+    if (!invoicesNavItem) {
+        return;
+    }
+
+    let badge = invoicesNavItem.querySelector('.nav-badge');
+    
+    if (count > 0) {
+        if (!badge) {
+            // Create badge if it doesn't exist
+            badge = document.createElement('span');
+            badge.className = 'badge bg-warning ms-auto nav-badge';
+            invoicesNavItem.appendChild(badge);
+        }
+        badge.textContent = count;
+        badge.style.display = '';
+    } else {
+        // Remove badge completely when count is 0
+        if (badge) {
+            badge.remove();
+        }
+    }
+}
+
+// Make the update function globally available for invoice completion updates
+window.updateInvoicesBadge = updateInvoicesBadge;
+window.loadPendingInvoicesCount = loadPendingInvoicesCount;
 </script>

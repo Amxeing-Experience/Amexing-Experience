@@ -141,7 +141,7 @@ class SecurityMiddleware {
         },
       },
       crossOriginEmbedderPolicy: false, // Disabled to allow S3 images
-      crossOriginOpenerPolicy: { policy: 'same-origin' },
+      crossOriginOpenerPolicy: { policy: 'unsafe-none' }, // Allow opening in new tabs
       crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin resources (S3 images)
       dnsPrefetchControl: { allow: false },
       expectCt: {
@@ -177,7 +177,7 @@ class SecurityMiddleware {
   getRateLimiter() {
     return rateLimit({
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
-      max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
+      max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || (this.isDevelopment ? 300 : 100),
       message: 'Too many requests from this IP, please try again later.',
       standardHeaders: true,
       legacyHeaders: false,
@@ -224,8 +224,8 @@ class SecurityMiddleware {
    */
   getApiRateLimiter() {
     return rateLimit({
-      windowMs: 1 * 60 * 1000,
-      max: 30,
+      windowMs: 1 * 60 * 1000, // 1 minute
+      max: this.isDevelopment ? 500 : 120, // Increased for development workflows: 500 in dev, 120 in production
       message: 'API rate limit exceeded.',
       standardHeaders: true,
       legacyHeaders: false,
@@ -638,6 +638,7 @@ class SecurityMiddleware {
           || req.method === 'OPTIONS'
           || req.path.startsWith('/api/')
           || req.path === '/auth/login'
+          || req.path === '/auth/change-password'
         ) {
           // Generate CSRF token for forms if session exists
           if (req.session && (req.method === 'GET' || req.method === 'HEAD')) {

@@ -66,23 +66,6 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
             <div class="card-body">
                 <div class="d-flex align-items-center">
                     <div class="flex-shrink-0">
-                        <div class="avatar avatar-sm bg-success rounded">
-                            <i class="ti ti-check text-white"></i>
-                        </div>
-                    </div>
-                    <div class="ms-3">
-                        <h6 class="mb-0">Completadas</h6>
-                        <p class="text-muted mb-0" id="completedCount">-</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-shrink-0">
                         <div class="avatar avatar-sm bg-info rounded">
                             <i class="ti ti-calendar text-white"></i>
                         </div>
@@ -266,6 +249,145 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
     </div>
 </div>
 
+<!-- Billing Information Modal -->
+<div class="modal fade" id="billingInfoModal" tabindex="-1" aria-labelledby="billingInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title text-white" id="billingInfoModalLabel">
+                    <i class="ti ti-receipt me-2"></i>Datos de Facturación del Usuario
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="billingUserInfo" class="mb-4">
+                    <!-- User info will be loaded here -->
+                </div>
+                
+                <div id="billingInfoContent">
+                    <!-- Billing info will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- File Upload Modal -->
+<div class="modal fade" id="uploadFilesModal" tabindex="-1" aria-labelledby="uploadFilesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="uploadFilesModalLabel">
+                    <i class="ti ti-upload me-2"></i>Subir Archivos de Factura
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="uploadInvoiceDetails" class="mb-4">
+                    <!-- Invoice details will be loaded here -->
+                </div>
+                
+                <!-- File Upload Instructions -->
+                <div class="alert alert-info d-flex align-items-start mb-4" role="alert">
+                    <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                    <div>
+                        <strong>Instrucciones:</strong>
+                        <ul class="mb-0 mt-1 ps-3">
+                            <li>Sube el archivo <strong>XML</strong> y el archivo <strong>PDF</strong> de la factura</li>
+                            <li>Los archivos deben estar en formato XML (.xml) y PDF (.pdf)</li>
+                            <li>Tamaño máximo: 10MB por archivo</li>
+                            <li>Una vez subidos, podrás completar la factura</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- XML File Upload Section -->
+                <div class="mb-4">
+                    <h6 class="text-primary mb-3">
+                        <i class="ti ti-file-code me-2"></i>Archivo XML
+                    </h6>
+                    <div id="xml-upload-section">
+                        <%- include('../../atoms/common/file-dropzone', {
+                            id: 'xml-dropzone',
+                            acceptedFiles: '.xml',
+                            maxFiles: 1,
+                            maxFileSize: 10,
+                            uploadUrl: '/api/invoices/upload-xml',
+                            helpText: 'Arrastra el archivo XML aquí o haz clic para seleccionar',
+                            paramName: 'xmlFile',
+                            autoProcessQueue: false
+                        }) %>
+                    </div>
+                </div>
+
+                <!-- PDF File Upload Section -->
+                <div class="mb-4">
+                    <h6 class="text-primary mb-3">
+                        <i class="ti ti-file-text me-2"></i>Archivo PDF
+                    </h6>
+                    <div id="pdf-upload-section">
+                        <%- include('../../atoms/common/file-dropzone', {
+                            id: 'pdf-dropzone',
+                            acceptedFiles: '.pdf',
+                            maxFiles: 1,
+                            maxFileSize: 10,
+                            uploadUrl: '/api/invoices/upload-pdf',
+                            helpText: 'Arrastra el archivo PDF aquí o haz clic para seleccionar',
+                            paramName: 'pdfFile',
+                            autoProcessQueue: false
+                        }) %>
+                    </div>
+                </div>
+
+                <!-- Upload Status -->
+                <div id="uploadStatus" class="mb-3" style="display: none;">
+                    <div class="progress">
+                        <div class="progress-bar" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <small class="text-muted mt-1 d-block" id="uploadStatusText">Preparando archivos...</small>
+                </div>
+
+                <!-- Upload Results -->
+                <div id="uploadResults" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card border-success" id="xmlResult" style="display: none;">
+                                <div class="card-body text-center p-3">
+                                    <i class="ti ti-check-circle text-success fs-2"></i>
+                                    <p class="mb-0 mt-2"><strong>XML subido correctamente</strong></p>
+                                    <small class="text-muted" id="xmlFileName">-</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card border-success" id="pdfResult" style="display: none;">
+                                <div class="card-body text-center p-3">
+                                    <i class="ti ti-check-circle text-success fs-2"></i>
+                                    <p class="mb-0 mt-2"><strong>PDF subido correctamente</strong></p>
+                                    <small class="text-muted" id="pdfFileName">-</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="uploadFilesBtn" disabled>
+                    <i class="ti ti-upload me-1"></i>Subir Archivos
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize invoice management
@@ -401,20 +523,36 @@ function initInvoiceManagement() {
                     }
                     
                     return `
-                        <div class="btn-group btn-group-sm" role="group">
+                        <div class="btn-group btn-group-sm justify-content-center" role="group">
                             <button type="button" 
-                                    class="btn btn-success complete-invoice-btn" 
+                                    class="btn btn-success btn-sm px-2" 
                                     data-id="${data.id}"
                                     data-bs-toggle="tooltip" 
                                     title="Completar Factura">
-                                <i class="ti ti-check"></i>
+                                <i class="ti ti-check text-white"></i>
                             </button>
                             <button type="button" 
-                                    class="btn btn-danger cancel-invoice-btn" 
+                                    class="btn btn-danger btn-sm px-2" 
                                     data-id="${data.id}"
                                     data-bs-toggle="tooltip" 
                                     title="Cancelar Solicitud">
-                                <i class="ti ti-x"></i>
+                                <i class="ti ti-x text-white"></i>
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-primary btn-sm px-2 upload-files-btn" 
+                                    data-id="${data.id}"
+                                    data-folio="${data.quote?.folio || 'N/A'}"
+                                    data-bs-toggle="tooltip" 
+                                    title="Subir XML/PDF">
+                                <i class="ti ti-upload text-white"></i>
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-info btn-sm px-2 view-billing-info-btn" 
+                                    data-user-id="${data.requestedBy?.id || ''}"
+                                    data-user-name="${data.requestedBy?.fullName || 'N/A'}"
+                                    data-bs-toggle="tooltip" 
+                                    title="Ver Datos de Facturación">
+                                <i class="ti ti-receipt text-white"></i>
                             </button>
                         </div>
                     `;
@@ -438,13 +576,13 @@ function initInvoiceManagement() {
     });
 
     // Event handlers
-    $('#invoices-table').on('click', '.complete-invoice-btn', function() {
+    $('#invoices-table').on('click', '.btn-success', function() {
         const invoiceId = $(this).data('id');
         selectedInvoiceId = invoiceId;
         loadInvoiceDetails(invoiceId);
     });
 
-    $('#invoices-table').on('click', '.cancel-invoice-btn', function() {
+    $('#invoices-table').on('click', '.btn-danger', function() {
         const invoiceId = $(this).data('id');
         selectedInvoiceId = invoiceId;
         
@@ -454,6 +592,34 @@ function initInvoiceManagement() {
         
         const cancelModal = new bootstrap.Modal(document.getElementById('cancelInvoiceModal'));
         cancelModal.show();
+    });
+
+    $('#invoices-table').on('click', '.upload-files-btn', function() {
+        const invoiceId = $(this).data('id');
+        const quoteFolio = $(this).data('folio');
+        selectedInvoiceId = invoiceId;
+        
+        // Find the invoice data in the table
+        const rowData = dataTable.row($(this).closest('tr')).data();
+        displayUploadInvoiceDetails(rowData);
+        
+        // Reset upload states
+        resetUploadModal();
+        
+        const uploadModal = new bootstrap.Modal(document.getElementById('uploadFilesModal'));
+        uploadModal.show();
+    });
+
+    $('#invoices-table').on('click', '.view-billing-info-btn', function() {
+        const userId = $(this).data('user-id');
+        const userName = $(this).data('user-name');
+        
+        if (!userId) {
+            showErrorAlert('No se encontró información del usuario');
+            return;
+        }
+        
+        loadUserBillingInfo(userId, userName);
     });
 
     $('#confirmCompleteBtn').on('click', function() {
@@ -466,6 +632,10 @@ function initInvoiceManagement() {
 
     $('#refreshBtn').on('click', function() {
         dataTable.ajax.reload();
+    });
+
+    $('#uploadFilesBtn').on('click', function() {
+        processFileUploads();
     });
 
     // Functions
@@ -599,9 +769,94 @@ function initInvoiceManagement() {
         const monthlyTotal = monthlyInvoices.reduce((sum, i) => sum + (i.quote?.total || 0), 0);
         
         document.getElementById('pendingCount').textContent = pending;
-        document.getElementById('completedCount').textContent = completed;
         document.getElementById('monthlyCount').textContent = monthlyInvoices.length;
         document.getElementById('monthlyTotal').textContent = `$${monthlyTotal.toLocaleString()}`;
+    }
+
+    async function loadUserBillingInfo(userId, userName) {
+        try {
+            const response = await fetch(`/api/billing/get-user/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`
+                }
+            });
+            
+            const result = await response.json();
+            if (result.success) {
+                displayUserBillingInfo(userName, result.data.billingInfo);
+                const billingModal = new bootstrap.Modal(document.getElementById('billingInfoModal'));
+                billingModal.show();
+            } else {
+                showErrorAlert(result.error || 'Error al cargar datos de facturación');
+            }
+        } catch (error) {
+            console.error('Error loading user billing info:', error);
+            showErrorAlert('Error al cargar datos de facturación');
+        }
+    }
+
+    function displayUserBillingInfo(userName, billingInfo) {
+        // Display user info
+        document.getElementById('billingUserInfo').innerHTML = `
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="ti ti-user me-2"></i>Usuario
+                    </h6>
+                    <p class="mb-0"><strong>${userName}</strong></p>
+                </div>
+            </div>
+        `;
+
+        // Display billing info
+        let billingContent = '';
+        
+        if (!billingInfo || Object.keys(billingInfo).length === 0) {
+            billingContent = `
+                <div class="alert alert-warning d-flex align-items-center" role="alert">
+                    <i class="ti ti-alert-triangle me-2"></i>
+                    <div>
+                        <strong>Sin datos de facturación</strong><br>
+                        Este usuario no ha configurado sus datos de facturación.
+                    </div>
+                </div>
+            `;
+        } else {
+            billingContent = `
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">
+                            <i class="ti ti-receipt me-2"></i>Datos de Facturación
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>RFC:</strong> ${billingInfo.rfc || 'No especificado'}</p>
+                                <p><strong>Razón Social:</strong> ${billingInfo.razonSocial || 'No especificado'}</p>
+                                <p><strong>Régimen Fiscal:</strong> ${billingInfo.regimenFiscal || 'No especificado'}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Uso CFDI:</strong> ${billingInfo.usoCfdi || 'No especificado'}</p>
+                                <p><strong>Email de Facturación:</strong> ${billingInfo.emailFacturacion || 'No especificado'}</p>
+                                <p><strong>Código Postal:</strong> ${billingInfo.codigoPostal || 'No especificado'}</p>
+                            </div>
+                        </div>
+                        ${billingInfo.direccion ? `<p><strong>Dirección:</strong> ${billingInfo.direccion}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+        
+        document.getElementById('billingInfoContent').innerHTML = billingContent;
+    }
+
+    function updateCountersOnCompletion() {
+        // Update pending counter when invoice is completed
+        const pendingElement = document.getElementById('pendingCount');
+        
+        if (pendingElement) {
+            const currentPending = parseInt(pendingElement.textContent) || 0;
+            pendingElement.textContent = Math.max(0, currentPending - 1);
+        }
     }
 
     function showSuccessAlert(message) {
@@ -643,5 +898,221 @@ function initInvoiceManagement() {
             });
         }, 8000);
     }
+
+    // File Upload Functions
+    function displayUploadInvoiceDetails(invoiceData) {
+        // Handle both invoice object and DataTables row data formats
+        const invoice = invoiceData || {};
+        const quote = invoice.quote || {};
+        const client = quote.client || {};
+        const requestedBy = invoice.requestedBy || {};
+        
+        const html = `
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="ti ti-file-invoice me-2"></i>Detalles de la Factura
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>Cotización:</strong> ${quote.folio || 'N/A'}</p>
+                            <p><strong>Cliente:</strong> ${client.fullName || 'N/A'}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Total:</strong> $${(quote.total || 0).toLocaleString()}</p>
+                            <p><strong>Fecha solicitud:</strong> ${invoice.requestDate ? new Date(invoice.requestDate).toLocaleDateString('es-MX') : 'N/A'}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.getElementById('uploadInvoiceDetails').innerHTML = html;
+    }
+
+    function resetUploadModal() {
+        // Hide upload status and results
+        document.getElementById('uploadStatus').style.display = 'none';
+        document.getElementById('uploadResults').style.display = 'none';
+        document.getElementById('xmlResult').style.display = 'none';
+        document.getElementById('pdfResult').style.display = 'none';
+        
+        // Reset progress
+        const progressBar = document.querySelector('#uploadStatus .progress-bar');
+        progressBar.style.width = '0%';
+        progressBar.setAttribute('aria-valuenow', '0');
+        
+        // Reset button state
+        const uploadBtn = document.getElementById('uploadFilesBtn');
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<i class="ti ti-upload me-1"></i>Subir Archivos';
+        
+        // Reset dropzone instances if they exist
+        try {
+            if (window['dropzone_xml-dropzone']) {
+                window['dropzone_xml-dropzone'].removeAllFiles();
+            }
+            if (window['dropzone_pdf-dropzone']) {
+                window['dropzone_pdf-dropzone'].removeAllFiles();
+            }
+        } catch (error) {
+            console.log('Dropzone instances not found, continuing...');
+        }
+    }
+
+    async function processFileUploads() {
+        const uploadBtn = document.getElementById('uploadFilesBtn');
+        const originalText = uploadBtn.innerHTML;
+        
+        try {
+            // Show loading state
+            uploadBtn.disabled = true;
+            uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Subiendo...';
+            
+            // Show upload status
+            document.getElementById('uploadStatus').style.display = 'block';
+            updateUploadProgress(0, 'Iniciando subida...');
+
+            // Get dropzone instances
+            const xmlDropzone = window['dropzone_xml-dropzone'];
+            const pdfDropzone = window['dropzone_pdf-dropzone'];
+
+            if (!xmlDropzone || !pdfDropzone) {
+                throw new Error('No se pudieron encontrar los componentes de subida');
+            }
+
+            // Check if files are selected
+            if (xmlDropzone.files.length === 0) {
+                throw new Error('Debe seleccionar un archivo XML');
+            }
+            if (pdfDropzone.files.length === 0) {
+                throw new Error('Debe seleccionar un archivo PDF');
+            }
+
+            const xmlFile = xmlDropzone.files[0];
+            const pdfFile = pdfDropzone.files[0];
+
+            // Upload XML file
+            updateUploadProgress(25, 'Subiendo archivo XML...');
+            const xmlResult = await uploadSingleFile(xmlFile, 'xml', selectedInvoiceId);
+            
+            // Upload PDF file
+            updateUploadProgress(75, 'Subiendo archivo PDF...');
+            const pdfResult = await uploadSingleFile(pdfFile, 'pdf', selectedInvoiceId);
+
+            // Show success
+            updateUploadProgress(100, 'Archivos subidos exitosamente');
+            showUploadResults(xmlResult, pdfResult);
+            
+            // Check if invoice was auto-completed
+            const statusChanged = xmlResult?.data?.statusChanged || pdfResult?.data?.statusChanged;
+            const invoiceNumber = xmlResult?.data?.invoiceNumber || pdfResult?.data?.invoiceNumber;
+            
+            if (statusChanged) {
+                showSuccessAlert(`Archivos subidos correctamente. ¡Factura completada automáticamente! Número: ${invoiceNumber}`);
+                
+                // Update counters when invoice is auto-completed
+                updateCountersOnCompletion();
+                
+                // Update sidebar badge counter
+                if (window.updateInvoicesBadge && typeof window.updateInvoicesBadge === 'function') {
+                    // Decrease badge count by 1
+                    const currentBadge = document.querySelector('[data-nav-id="invoices"] .nav-badge');
+                    const currentCount = currentBadge ? parseInt(currentBadge.textContent) || 0 : 0;
+                    window.updateInvoicesBadge(Math.max(0, currentCount - 1));
+                }
+            } else {
+                showSuccessAlert('Archivos subidos correctamente. Ya puedes completar la factura.');
+            }
+            
+            // Close modal after a short delay
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('uploadFilesModal')).hide();
+                dataTable.ajax.reload(); // Refresh table to show updated data
+            }, statusChanged ? 3000 : 2000); // Longer delay if status changed to let user read the message
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            showErrorAlert(`Error al subir archivos: ${error.message}`);
+            
+            // Reset button state
+            uploadBtn.disabled = false;
+            uploadBtn.innerHTML = originalText;
+        }
+    }
+
+    async function uploadSingleFile(file, fileType, invoiceId) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('invoiceId', invoiceId);
+        formData.append('fileType', fileType);
+
+        const response = await fetch(`/api/invoices/upload-file`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getAccessToken()}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Error uploading ${fileType} file`);
+        }
+
+        return await response.json();
+    }
+
+    function updateUploadProgress(progress, message) {
+        const progressBar = document.querySelector('#uploadStatus .progress-bar');
+        const statusText = document.getElementById('uploadStatusText');
+        
+        progressBar.style.width = `${progress}%`;
+        progressBar.setAttribute('aria-valuenow', progress);
+        statusText.textContent = message;
+    }
+
+    function showUploadResults(xmlResult, pdfResult) {
+        document.getElementById('uploadResults').style.display = 'block';
+        
+        // Show XML result
+        if (xmlResult && xmlResult.success) {
+            document.getElementById('xmlResult').style.display = 'block';
+            document.getElementById('xmlFileName').textContent = xmlResult.data.filename || 'Archivo XML';
+        }
+        
+        // Show PDF result
+        if (pdfResult && pdfResult.success) {
+            document.getElementById('pdfResult').style.display = 'block';
+            document.getElementById('pdfFileName').textContent = pdfResult.data.filename || 'Archivo PDF';
+        }
+    }
+
+    // Dropzone event listeners
+    document.addEventListener('dropzone:fileAdded', function(event) {
+        const { dropzoneId } = event.detail;
+        
+        // Enable upload button if both files are present
+        setTimeout(() => {
+            const xmlDropzone = window['dropzone_xml-dropzone'];
+            const pdfDropzone = window['dropzone_pdf-dropzone'];
+            
+            if (xmlDropzone && pdfDropzone && 
+                xmlDropzone.files.length > 0 && 
+                pdfDropzone.files.length > 0) {
+                document.getElementById('uploadFilesBtn').disabled = false;
+            }
+        }, 100);
+    });
+
+    document.addEventListener('dropzone:fileRemoved', function(event) {
+        // Disable upload button if any file is missing
+        const uploadBtn = document.getElementById('uploadFilesBtn');
+        uploadBtn.disabled = true;
+    });
 }
 </script>
+
+<!-- Include Dropzone.js library for file uploads -->
+<link rel="stylesheet" href="https://unpkg.com/dropzone@6.0.0-beta.2/dist/basic.css">
+<link rel="stylesheet" href="https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone.css">
+<script src="https://unpkg.com/dropzone@6.0.0-beta.2/dist/dropzone-min.js"></script>

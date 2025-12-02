@@ -60,7 +60,7 @@ class DashboardAuthMiddleware {
       return res.redirect(`/login?returnTo=${encodeURIComponent(req.originalUrl)}`);
     }
 
-    // Extract user info from JWT token if available
+    // Extract user info from JWT token or session
     let user = {
       id: 'unknown',
       username: 'unknown',
@@ -69,6 +69,7 @@ class DashboardAuthMiddleware {
       isActive: true,
     };
 
+    // First check JWT token
     if (accessToken) {
       try {
         const decoded = jwt.verify(accessToken, this.jwtSecret);
@@ -82,6 +83,16 @@ class DashboardAuthMiddleware {
       } catch (error) {
         logger.warn('Invalid JWT token:', error.message);
       }
+    } else if (sessionToken && req.session && req.session.user) {
+      // If no valid JWT user, check session
+      user = {
+        id: req.session.user.id || req.session.user.objectId || 'unknown',
+        username: req.session.user.username || 'unknown',
+        role: req.session.user.role || 'guest',
+        name: req.session.user.name || req.session.user.username || 'Unknown User',
+        email: req.session.user.email,
+        isActive: true,
+      };
     }
 
     // Attach user to request and locals for EJS templates

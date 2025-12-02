@@ -18,6 +18,7 @@ const jwt = require('jsonwebtoken');
 // const AuthenticationService = require('../../application/services/AuthenticationService'); // Unused import
 // const OAuthService = require('../../application/services/OAuthService'); // Unused import
 const jwtMiddleware = require('../../application/middleware/jwtMiddleware');
+const dashboardAuthMiddleware = require('../../application/middleware/dashboardAuthMiddleware');
 const logger = require('../../infrastructure/logger');
 
 const router = express.Router();
@@ -980,7 +981,8 @@ router.post('/reset-password', strictAuthRateLimit, async (req, res) => {
  *         $ref: '#/components/responses/UnauthorizedError'
  */
 // Change password (for authenticated users)
-router.post('/change-password', jwtMiddleware.authenticateToken, async (req, res) => {
+// Now accepts both JWT tokens and session-based authentication
+router.post('/change-password', dashboardAuthMiddleware.requireAuth, async (req, res) => {
   try {
     const { user } = req;
 
@@ -1002,16 +1004,10 @@ router.post('/change-password', jwtMiddleware.authenticateToken, async (req, res
       });
     }
 
-    const result = await Parse.Cloud.run(
-      'changePassword',
-      {
-        currentPassword,
-        newPassword,
-      },
-      {
-        user: { id: user.id },
-      }
-    );
+    // Call AuthenticationService directly instead of cloud function
+    // since we already have the authenticated user from middleware
+    const AuthenticationService = require('../../application/services/AuthenticationService');
+    const result = await AuthenticationService.changePassword(user.id, currentPassword, newPassword);
 
     res.json(result);
   } catch (error) {

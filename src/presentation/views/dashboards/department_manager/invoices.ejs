@@ -1,0 +1,64 @@
+<%
+/**
+ * Department Manager Invoices Management Page
+ * View and download invoice files for department quotes
+ *
+ * Layout Structure:
+ * - Direct row/column structure (no body-wrapper)
+ * - Container-fluid from Flexy Bootstrap
+ * - Consistent spacing and alignment
+ *
+ * Note: DataTables CSS/JS libraries are loaded via controller
+ * Department filtering is handled server-side in QuoteController
+ * Shows only quotes with completed invoices that have XML/PDF files
+ */
+
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'department_manager';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="mb-1 fw-bold">Facturas</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/department_manager" class="text-decoration-none">
+                                <i class="ti ti-home me-1"></i>Dashboard
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page">
+                            <i class="ti ti-receipt me-1"></i>Facturas
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Department Info Alert -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-info d-flex align-items-center" role="alert">
+            <i class="ti ti-info-circle me-2 fs-4"></i>
+            <div>
+                <strong>Facturas Disponibles:</strong> Solo puede ver y descargar facturas de cotizaciones completadas de su departamento que tienen archivos XML y PDF.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Invoices Content -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/datatable/invoices-quotes-table', {
+            tableId: 'invoices-table',
+            apiEndpoint: '/api/quotes/with-invoices',
+            userRole: currentUserRole,
+            showDownloadActions: true
+        }) %>
+    </div>
+</div>

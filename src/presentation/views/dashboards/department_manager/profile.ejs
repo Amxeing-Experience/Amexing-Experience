@@ -1,0 +1,521 @@
+<%
+/**
+ * Employee Profile View
+ * Displays the employee's personal information and settings
+ * Created by Denisse Maldonado
+ */
+
+// User data setup
+const user = typeof userData !== 'undefined' && userData !== null ? userData : {};
+const profileData = {
+  username: user.username || '',
+  email: user.email || '',
+  firstName: user.firstName || '',
+  lastName: user.lastName || '',
+  fullName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
+  joinedDate: (user.createdAt || user.created_at || user._created_at) ? 
+    new Date(user.createdAt || user.created_at || user._created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 
+    'Jan 1, 2024',
+  lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never',
+  emailVerified: user.emailVerified || false,
+  active: user.active !== undefined ? user.active : true,
+  profilePicture: user.profilePicture || user.avatar || '',
+  role: user.role || 'employee',
+  organizationId: user.organizationId || ''
+};
+
+// Generate initials for avatar placeholder
+const initials = profileData.fullName.split(' ')
+  .map(word => word.charAt(0))
+  .join('')
+  .substring(0, 2)
+  .toUpperCase() || 'UN';
+
+// Format role display name
+const formatRoleName = (role) => {
+  if (role === 'department_manager') return 'Department Manager';
+  if (role === 'superadmin') return 'Super Admin';
+  if (role === 'employee_amexing') return 'Amexing Employee';
+  return role.charAt(0).toUpperCase() + role.slice(1);
+};
+%>
+
+<!-- Page Header -->
+<div class="page-breadcrumb">
+  <div class="row align-items-center">
+    <div class="col-12">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0 d-flex align-items-center">
+          <li class="breadcrumb-item">
+            <a href="/dashboard/department_manager" class="link">
+              <i class="ti ti-home fs-6"></i>
+            </a>
+          </li>
+          <li class="breadcrumb-item active" aria-current="page">My Profile</li>
+        </ol>
+      </nav>
+      <h1 class="mb-0 fw-bold">My Profile</h1>
+    </div>
+  </div>
+</div>
+
+<!-- Profile Content -->
+<div class="container-fluid">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-10">
+      <div class="card">
+        <div class="card-body">
+          <div class="row">
+            <!-- Profile Picture & Basic Info -->
+            <div class="col-lg-4 text-center mb-4 mb-lg-0">
+              <!-- Profile Picture -->
+              <div class="mb-3">
+                <% if (profileData.profilePicture) { %>
+                  <img src="<%= profileData.profilePicture %>" 
+                       alt="<%= profileData.fullName %>" 
+                       class="rounded-circle"
+                       width="150" 
+                       height="150"
+                       style="object-fit: cover; border: 4px solid #f0f0f0;"
+                       onerror="this.style.display='none'; document.getElementById('avatar-placeholder').style.display='flex';">
+                  <div id="avatar-placeholder" 
+                       class="rounded-circle d-none align-items-center justify-content-center text-white fw-bold mx-auto"
+                       style="width: 150px; height: 150px; background: #5D87FF; font-size: 2rem; border: 4px solid #f0f0f0;">
+                    <%= initials %>
+                  </div>
+                <% } else { %>
+                  <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold mx-auto"
+                       style="width: 150px; height: 150px; background: #5D87FF; font-size: 2rem; border: 4px solid #f0f0f0;">
+                    <%= initials %>
+                  </div>
+                <% } %>
+              </div>
+
+              <!-- Basic Info -->
+              <h3 class="mb-2"><%= profileData.fullName %></h3>
+              <p class="text-muted mb-2">
+                <span class="badge bg-light-primary text-primary">
+                  <%= formatRoleName(profileData.role) %>
+                </span>
+              </p>
+              <p class="text-muted mb-0">
+                <i class="ti ti-mail me-1"></i>
+                <%= profileData.email %>
+              </p>
+            </div>
+
+            <!-- Personal Information -->
+            <div class="col-lg-8">
+              <h5 class="mb-4">Personal Information</h5>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">First Name</label>
+                  <p class="fw-semibold mb-0"><%= profileData.firstName || 'Not provided' %></p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Last Name</label>
+                  <p class="fw-semibold mb-0"><%= profileData.lastName || 'Not provided' %></p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Email Address</label>
+                  <p class="fw-semibold mb-0">
+                    <%= profileData.email || 'Not provided' %>
+                    <% if (profileData.emailVerified) { %>
+                      <i class="ti ti-circle-check text-success ms-1" title="Verified"></i>
+                    <% } else { %>
+                      <i class="ti ti-alert-circle text-warning ms-1" title="Not Verified"></i>
+                    <% } %>
+                  </p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Account Status</label>
+                  <p class="fw-semibold mb-0">
+                    <% if (profileData.active) { %>
+                      <span class="badge bg-success">Active</span>
+                    <% } else { %>
+                      <span class="badge bg-danger">Inactive</span>
+                    <% } %>
+                  </p>
+                </div>
+                <div class="col-12 mb-3">
+                  <label class="text-muted small">Password</label>
+                  <p class="fw-semibold mb-0">
+                    <span class="text-muted">Last changed 30 days ago</span>
+                    <button class="btn btn-sm btn-outline-primary ms-2" id="change-password-btn">
+                      Change
+                    </button>
+                  </p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Member Since</label>
+                  <p class="fw-semibold mb-0"><%= profileData.joinedDate %></p>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="text-muted small">Last Login</label>
+                  <p class="fw-semibold mb-0"><%= profileData.lastLoginAt %></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Billing Information Section -->
+      <div class="card mt-4">
+        <div class="card-header bg-light">
+          <h5 class="card-title mb-0">
+            <i class="ti ti-receipt me-2"></i>Datos de Facturación
+          </h5>
+          <p class="card-subtitle text-muted mb-0 mt-1">Información requerida para la emisión de facturas fiscales</p>
+        </div>
+        <div class="card-body">
+          <form id="billing-form" class="row">
+            <!-- Razón Social / Nombre -->
+            <div class="col-md-6 mb-3">
+              <label for="razonSocial" class="form-label">
+                Razón Social / Nombre <span class="text-danger">*</span>
+              </label>
+              <input type="text" class="form-control" id="razonSocial" name="razonSocial" 
+                     placeholder="Nombre de la empresa o persona física" required>
+            </div>
+
+            <!-- RFC -->
+            <div class="col-md-6 mb-3">
+              <label for="rfc" class="form-label">
+                RFC <span class="text-danger">*</span>
+              </label>
+              <input type="text" class="form-control" id="rfc" name="rfc" 
+                     placeholder="XAXX010101000 o AAA010101AAA" 
+                     maxlength="13" 
+                     style="text-transform: uppercase;" 
+                     required>
+              <div class="form-text">
+                <small>Personas físicas: 13 caracteres | Personas morales: 12 caracteres</small>
+              </div>
+            </div>
+
+            <!-- Código Postal -->
+            <div class="col-md-6 mb-3">
+              <label for="codigoPostal" class="form-label">
+                Código Postal <span class="text-danger">*</span>
+              </label>
+              <input type="text" class="form-control" id="codigoPostal" name="codigoPostal" 
+                     placeholder="12345" 
+                     pattern="[0-9]{5}"
+                     maxlength="5" 
+                     required>
+              <div class="form-text">5 dígitos</div>
+            </div>
+
+            <!-- Régimen Fiscal -->
+            <div class="col-md-6 mb-3">
+              <label for="regimenFiscal" class="form-label">
+                Régimen Fiscal <span class="text-danger">*</span>
+              </label>
+              <select class="form-select" id="regimenFiscal" name="regimenFiscal" required>
+                <option value="">Seleccionar régimen fiscal</option>
+                <option value="601">601 - General de Ley Personas Morales</option>
+                <option value="603">603 - Personas Morales con Fines no Lucrativos</option>
+                <option value="605">605 - Sueldos y Salarios e Ingresos Asimilados a Salarios</option>
+                <option value="606">606 - Arrendamiento</option>
+                <option value="607">607 - Régimen de Enajenación o Adquisición de Bienes</option>
+                <option value="608">608 - Demás ingresos</option>
+                <option value="610">610 - Residentes en el Extranjero sin Establecimiento Permanente en México</option>
+                <option value="611">611 - Ingresos por Dividendos (socios y accionistas)</option>
+                <option value="612">612 - Personas Físicas con Actividades Empresariales y Profesionales</option>
+                <option value="614">614 - Ingresos por intereses</option>
+                <option value="615">615 - Régimen de los ingresos por obtención de premios</option>
+                <option value="616">616 - Sin obligaciones fiscales</option>
+                <option value="620">620 - Sociedades Cooperativas de Producción que optan por diferir sus ingresos</option>
+                <option value="621">621 - Incorporación Fiscal</option>
+                <option value="622">622 - Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras</option>
+                <option value="623">623 - Opcional para Grupos de Sociedades</option>
+                <option value="624">624 - Coordinados</option>
+                <option value="625">625 - Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas</option>
+                <option value="626">626 - Régimen Simplificado de Confianza</option>
+              </select>
+            </div>
+
+            <!-- Dirección -->
+            <div class="col-12 mb-3">
+              <label for="direccion" class="form-label">
+                Dirección Fiscal <span class="text-danger">*</span>
+              </label>
+              <input type="text" class="form-control" id="direccion" name="direccion" 
+                     placeholder="Calle, número, colonia, ciudad, estado" required>
+            </div>
+
+            <!-- Uso de CFDI -->
+            <div class="col-md-6 mb-3">
+              <label for="usoCfdi" class="form-label">
+                Uso de CFDI <span class="text-danger">*</span>
+              </label>
+              <select class="form-select" id="usoCfdi" name="usoCfdi" required>
+                <option value="">Seleccionar uso de CFDI</option>
+                <option value="G01">G01 - Adquisición de mercancías</option>
+                <option value="G02">G02 - Devoluciones, descuentos o bonificaciones</option>
+                <option value="G03">G03 - Gastos en general</option>
+                <option value="I01">I01 - Construcciones</option>
+                <option value="I02">I02 - Mobilario y equipo de oficina por inversiones</option>
+                <option value="I03">I03 - Equipo de transporte</option>
+                <option value="I04">I04 - Equipo de computo y accesorios</option>
+                <option value="I05">I05 - Dados, troqueles, moldes, matrices y herramental</option>
+                <option value="I06">I06 - Comunicaciones telefónicas</option>
+                <option value="I07">I07 - Comunicaciones satelitales</option>
+                <option value="I08">I08 - Otra maquinaria y equipo</option>
+                <option value="D01">D01 - Honorarios médicos, dentales y gastos hospitalarios</option>
+                <option value="D02">D02 - Gastos médicos por incapacidad o discapacidad</option>
+                <option value="D03">D03 - Gastos funerales</option>
+                <option value="D04">D04 - Donativos</option>
+                <option value="D05">D05 - Intereses reales efectivamente pagados por créditos hipotecarios (casa habitación)</option>
+                <option value="D06">D06 - Aportaciones voluntarias al SAR</option>
+                <option value="D07">D07 - Primas por seguros de gastos médicos</option>
+                <option value="D08">D08 - Gastos de transportación escolar obligatoria</option>
+                <option value="D09">D09 - Depósitos en cuentas para el ahorro, primas que tengan como base planes de pensiones</option>
+                <option value="D10">D10 - Pagos por servicios educativos (colegiaturas)</option>
+                <option value="P01">P01 - Por definir</option>
+                <option value="S01">S01 - Sin efectos fiscales</option>
+                <option value="CP01">CP01 - Pagos</option>
+                <option value="CN01">CN01 - Nómina</option>
+              </select>
+            </div>
+
+            <!-- Email para envío de facturas -->
+            <div class="col-md-6 mb-3">
+              <label for="emailFacturacion" class="form-label">
+                Email para envío de facturas
+              </label>
+              <input type="email" class="form-control" id="emailFacturacion" name="emailFacturacion" 
+                     placeholder="facturacion@empresa.com">
+              <div class="form-text">Si no se especifica, se usará el email principal</div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="col-12 mt-3">
+              <button type="submit" class="btn btn-primary">
+                <i class="ti ti-device-floppy me-1"></i>Guardar Datos
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const changePasswordBtn = document.getElementById('change-password-btn');
+  if (changePasswordBtn) {
+    changePasswordBtn.addEventListener('click', function() {
+      // Placeholder for change password functionality
+      window.location.href = '/dashboard/<%= profileData.role %>/change-password';
+    });
+  }
+
+
+  // Billing form functionality
+  const billingForm = document.getElementById('billing-form');
+  const rfcInput = document.getElementById('rfc');
+  const codigoPostalInput = document.getElementById('codigoPostal');
+
+  // RFC validation and formatting
+  if (rfcInput) {
+    rfcInput.addEventListener('input', function(e) {
+      let value = e.target.value.toUpperCase().replace(/[^A-ZÑ&0-9]/g, '');
+      e.target.value = value;
+      
+      // RFC validation for both personas físicas and morales
+      let isValid = false;
+      let validationMessage = '';
+      
+      if (value.length === 12) {
+        // Personas morales (companies): 3 letters + 6 digits + 3 alphanumeric
+        isValid = /^[A-ZÑ&]{3}[0-9]{6}[A-V1-9][A-Z1-9][0-9A]$/.test(value);
+        validationMessage = isValid ? 'RFC válido (Persona moral)' : 'RFC inválido para persona moral';
+      } else if (value.length === 13) {
+        // Personas físicas (individuals): 4 letters + 6 digits + 3 alphanumeric  
+        isValid = /^[A-ZÑ&]{4}[0-9]{6}[A-V1-9][A-Z1-9][0-9A]$/.test(value);
+        validationMessage = isValid ? 'RFC válido (Persona física)' : 'RFC inválido para persona física';
+      }
+      
+      if (value.length === 12 || value.length === 13) {
+        e.target.classList.toggle('is-valid', isValid);
+        e.target.classList.toggle('is-invalid', !isValid);
+        
+        // Update help text with validation message
+        const helpText = e.target.nextElementSibling;
+        if (helpText && helpText.classList.contains('form-text')) {
+          helpText.innerHTML = `<small>${validationMessage}</small>`;
+          helpText.className = `form-text text-${isValid ? 'success' : 'danger'}`;
+        }
+      } else {
+        e.target.classList.remove('is-valid', 'is-invalid');
+        
+        // Reset help text
+        const helpText = e.target.nextElementSibling;
+        if (helpText && helpText.classList.contains('form-text')) {
+          helpText.innerHTML = '<small>Personas físicas: 13 caracteres | Personas morales: 12 caracteres</small>';
+          helpText.className = 'form-text';
+        }
+      }
+    });
+  }
+
+  // Código Postal validation
+  if (codigoPostalInput) {
+    codigoPostalInput.addEventListener('input', function(e) {
+      let value = e.target.value.replace(/[^0-9]/g, '');
+      e.target.value = value;
+      
+      const isValid = /^[0-9]{5}$/.test(value);
+      if (value.length === 5) {
+        e.target.classList.toggle('is-valid', isValid);
+        e.target.classList.toggle('is-invalid', !isValid);
+      } else {
+        e.target.classList.remove('is-valid', 'is-invalid');
+      }
+    });
+  }
+
+  // Billing form submission
+  if (billingForm) {
+    billingForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const formData = new FormData(billingForm);
+      const billingData = Object.fromEntries(formData);
+      
+      // Show loading state
+      const submitBtn = billingForm.querySelector('button[type="submit"]');
+      const originalText = submitBtn.innerHTML;
+      submitBtn.innerHTML = '<i class="ti ti-loader me-1"></i>Guardando...';
+      submitBtn.disabled = true;
+      
+      // Authentication is handled by HTTP cookies automatically
+      
+      // Save billing data to database using HTTP API
+      try {
+        const response = await fetch('/api/billing/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include', // Include authentication cookies
+          body: JSON.stringify(billingData)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          showAlert('success', 'Datos de facturación guardados exitosamente');
+          
+          // Also save to localStorage as backup for form persistence
+          localStorage.setItem('billingData', JSON.stringify(billingData));
+        } else {
+          throw new Error(result.error || 'Error al guardar los datos');
+        }
+      } catch (error) {
+        console.error('Error saving billing data:', error);
+        let errorMessage = 'Error al guardar los datos de facturación';
+        
+        if (error.message && error.message.includes('RFC')) {
+          errorMessage = 'Formato de RFC inválido. Verifica que sea correcto.';
+        } else if (error.message && error.message.includes('Código Postal')) {
+          errorMessage = 'Formato de Código Postal inválido. Debe tener 5 dígitos.';
+        } else if (error.message && error.message.includes('authenticated')) {
+          errorMessage = 'Sesión expirada. Por favor, inicia sesión nuevamente.';
+        } else if (error.message) {
+          errorMessage += ': ' + error.message;
+        }
+        
+        showAlert('error', errorMessage);
+      } finally {
+        // Reset button
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+      }
+    });
+  }
+
+  // Load billing data function (from database first, then localStorage as fallback)
+  async function loadBillingData() {
+    try {
+      // First try to load from database using HTTP API
+      const response = await fetch('/api/billing/get', {
+        method: 'GET',
+        credentials: 'include' // Include authentication cookies
+      });
+      const result = await response.json();
+      
+      if (result.success && result.billingInfo && Object.keys(result.billingInfo).length > 0) {
+        // Populate form fields with database data
+        Object.keys(result.billingInfo).forEach(key => {
+          const field = document.getElementById(key);
+          if (field && result.billingInfo[key]) {
+            field.value = result.billingInfo[key];
+          }
+        });
+        
+        console.log('Billing data loaded from database:', result.billingInfo);
+        
+        // Update localStorage with current database data
+        localStorage.setItem('billingData', JSON.stringify(result.billingInfo));
+        return;
+      }
+    } catch (error) {
+      console.warn('Could not load billing data from database, trying localStorage:', error.message);
+    }
+    
+    // Fallback to localStorage if database fails or has no data
+    try {
+      const savedData = localStorage.getItem('billingData');
+      if (savedData) {
+        const billingInfo = JSON.parse(savedData);
+        
+        // Populate form fields if billing data exists
+        Object.keys(billingInfo).forEach(key => {
+          const field = document.getElementById(key);
+          if (field && billingInfo[key]) {
+            field.value = billingInfo[key];
+          }
+        });
+        
+        console.log('Billing data loaded from localStorage:', billingInfo);
+      } else {
+        console.log('No billing data found in localStorage either');
+      }
+    } catch (error) {
+      console.error('Error loading billing data from localStorage:', error);
+      // Don't show error alert for loading, just log it
+    }
+  }
+
+  // Load existing billing data
+  loadBillingData();
+});
+
+function showAlert(type, message) {
+  const alertContainer = document.createElement('div');
+  alertContainer.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+  alertContainer.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+  alertContainer.innerHTML = `
+    <i class="ti ti-${type === 'success' ? 'check' : 'alert-circle'} me-2"></i>
+    ${message}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  `;
+  
+  document.body.appendChild(alertContainer);
+  
+  // Auto-remove after 5 seconds
+  setTimeout(() => {
+    if (alertContainer.parentNode) {
+      alertContainer.remove();
+    }
+  }, 5000);
+}
+</script>

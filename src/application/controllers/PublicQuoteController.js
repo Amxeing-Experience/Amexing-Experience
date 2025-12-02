@@ -266,11 +266,27 @@ class PublicQuoteController {
    * const subData = this.formatSubconcept(subconcept);
    */
   formatSubconcept(sub) {
+    // For tours, prioritize destination name over empty concept
+    let concept = sub.concept || '';
+    if (sub.type === 'tour' && (!concept || concept.trim() === '')) {
+      concept = sub.destinationPOI || sub.destination || 'Tour';
+    }
+
+    // For transfers, ensure we have proper service type
+    let serviceType = sub.serviceType || '';
+    if (sub.type === 'traslado' && (!serviceType || serviceType.trim() === '')) {
+      serviceType = 'Traslado';
+    } else if (sub.type === 'tour' && (!serviceType || serviceType.trim() === '')) {
+      serviceType = 'Tour';
+    } else if (sub.type === 'experiencia' && (!serviceType || serviceType.trim() === '')) {
+      serviceType = 'Experiencia';
+    }
+
     return {
       id: sub.id || '',
       type: sub.type || '',
-      concept: sub.concept || '',
-      serviceType: sub.serviceType || '',
+      concept,
+      serviceType,
       vehicleType: sub.vehicleType || '',
       vehicleTypeId: sub.vehicleTypeId || '',
       vehicleCapacity: sub.vehicleCapacity || null,
@@ -282,6 +298,9 @@ class PublicQuoteController {
       isPerPerson: sub.isPerPerson || false,
       numberOfPeople: sub.numberOfPeople || 1,
       total: sub.total || 0,
+      destinationPOI: sub.destinationPOI || '',
+      destination: sub.destination || '',
+      isCashPayment: sub.isCashPayment || false,
       // EXCLUDE: notes (business decision)
     };
   }
