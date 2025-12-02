@@ -68,6 +68,14 @@ const currentPath = '/dashboard/admin/clients';
             </div>
 
             <div class="modal-body">
+                <!-- Modal Alert Container -->
+                <div id="modalAlertContainer" class="mb-3" style="display: none;">
+                    <div id="modalAlert" class="alert" role="alert">
+                        <i id="modalAlertIcon" class="me-2"></i>
+                        <span id="modalAlertMessage"></span>
+                    </div>
+                </div>
+
                 <form id="createClientForm">
                     <!-- Sección: Información del Representante -->
                     <div class="mb-4">
@@ -111,6 +119,65 @@ const currentPath = '/dashboard/admin/clients';
                             helpText: 'Email del representante para acceso al sistema',
                             maxlength: 255
                         }) %>
+
+                        <!-- Custom Password Field with Toggle and Copy -->
+                        <div class="mb-3">
+                            <label for="clientPassword" class="form-label fw-semibold">
+                                Contraseña <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input 
+                                    type="password" 
+                                    class="form-control" 
+                                    id="clientPassword" 
+                                    name="password" 
+                                    placeholder="Contraseña segura"
+                                    minlength="12"
+                                    maxlength="100"
+                                    autocomplete="new-password"
+                                    required
+                                >
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="togglePasswordVisibility"
+                                    title="Mostrar/Ocultar contraseña"
+                                >
+                                    <i class="ti ti-eye" id="passwordToggleIcon"></i>
+                                </button>
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="copyPassword"
+                                    title="Copiar contraseña"
+                                >
+                                    <i class="ti ti-copy" id="copyIcon"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Mínimo 12 caracteres, incluir mayúsculas, minúsculas, números y caracteres especiales
+                            </div>
+                            <!-- Password validation feedback -->
+                            <div id="passwordValidationFeedback" class="invalid-feedback" style="display: none;">
+                                <ul class="mb-0" id="passwordValidationList">
+                                    <li id="lengthRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Mínimo 12 caracteres
+                                    </li>
+                                    <li id="uppercaseRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos una letra mayúscula
+                                    </li>
+                                    <li id="lowercaseRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos una letra minúscula
+                                    </li>
+                                    <li id="numberRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos un número
+                                    </li>
+                                    <li id="specialCharRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos un carácter especial (!@#$%^&*...)
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Sección: Información de la Empresa -->
@@ -257,7 +324,7 @@ const currentPath = '/dashboard/admin/clients';
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                         <div>
                             <strong>Acceso al sistema:</strong>
-                            <p class="mb-0 mt-1">Se generará una contraseña temporal automáticamente. El cliente recibirá instrucciones para configurar una nueva contraseña en su primer acceso.</p>
+                            <p class="mb-0 mt-1">El cliente podrá acceder al sistema con el email corporativo y la contraseña proporcionada. Podrá cambiar su contraseña desde su perfil.</p>
                         </div>
                     </div>
                 </form>
@@ -330,6 +397,51 @@ const currentPath = '/dashboard/admin/clients';
     // ========================================================================
 
     /**
+     * Show alert within the modal
+     * @param {string} message - Alert message
+     * @param {string} type - Alert type ('success', 'error', 'warning', 'info')
+     */
+    function showModalAlert(message, type = 'info') {
+        const alertContainer = document.getElementById('modalAlertContainer');
+        const alert = document.getElementById('modalAlert');
+        const icon = document.getElementById('modalAlertIcon');
+        const messageEl = document.getElementById('modalAlertMessage');
+
+        if (!alertContainer || !alert || !icon || !messageEl) return;
+
+        // Clear existing classes
+        alert.className = 'alert';
+        
+        // Set type-specific classes and icons
+        switch (type) {
+            case 'success':
+                alert.classList.add('alert-success');
+                icon.className = 'ti ti-check-circle me-2';
+                break;
+            case 'error':
+                alert.classList.add('alert-danger');
+                icon.className = 'ti ti-alert-circle me-2';
+                break;
+            case 'warning':
+                alert.classList.add('alert-warning');
+                icon.className = 'ti ti-alert-triangle me-2';
+                break;
+            default:
+                alert.classList.add('alert-info');
+                icon.className = 'ti ti-info-circle me-2';
+        }
+
+        // Set message and show
+        messageEl.textContent = message;
+        alertContainer.style.display = 'block';
+
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            alertContainer.style.display = 'none';
+        }, 3000);
+    }
+
+    /**
      * Initialize create client modal with validation
      */
     function initializeCreateClientModal() {
@@ -361,6 +473,124 @@ const currentPath = '/dashboard/admin/clients';
             });
         }
 
+        // Password visibility toggle
+        const passwordInput = document.getElementById('clientPassword');
+        const toggleBtn = document.getElementById('togglePasswordVisibility');
+        const toggleIcon = document.getElementById('passwordToggleIcon');
+
+        if (passwordInput && toggleBtn && toggleIcon) {
+            toggleBtn.addEventListener('click', function() {
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+                toggleIcon.className = isPassword ? 'ti ti-eye-off' : 'ti ti-eye';
+                toggleBtn.title = isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña';
+            });
+        }
+
+        // Password real-time validation
+        const passwordValidationFeedback = document.getElementById('passwordValidationFeedback');
+        const lengthReq = document.getElementById('lengthRequirement');
+        const uppercaseReq = document.getElementById('uppercaseRequirement');
+        const lowercaseReq = document.getElementById('lowercaseRequirement');
+        const numberReq = document.getElementById('numberRequirement');
+        const specialCharReq = document.getElementById('specialCharRequirement');
+
+        function validatePasswordRequirements(password) {
+            const requirements = {
+                length: password.length >= 12,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                number: /\d/.test(password),
+                specialChar: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
+            };
+
+            // Update visual feedback for each requirement
+            updateRequirement(lengthReq, requirements.length);
+            updateRequirement(uppercaseReq, requirements.uppercase);
+            updateRequirement(lowercaseReq, requirements.lowercase);
+            updateRequirement(numberReq, requirements.number);
+            updateRequirement(specialCharReq, requirements.specialChar);
+
+            // Show/hide validation feedback and update input styling
+            const allValid = Object.values(requirements).every(req => req);
+            const hasValue = password.length > 0;
+
+            if (hasValue && !allValid) {
+                passwordValidationFeedback.style.display = 'block';
+                passwordInput.classList.add('is-invalid');
+                passwordInput.classList.remove('is-valid');
+            } else if (hasValue && allValid) {
+                passwordValidationFeedback.style.display = 'none';
+                passwordInput.classList.remove('is-invalid');
+                passwordInput.classList.add('is-valid');
+            } else {
+                passwordValidationFeedback.style.display = 'none';
+                passwordInput.classList.remove('is-invalid', 'is-valid');
+            }
+
+            return allValid;
+        }
+
+        function updateRequirement(element, isValid) {
+            const icon = element.querySelector('i');
+            if (isValid) {
+                element.classList.remove('text-danger');
+                element.classList.add('text-success');
+                icon.className = 'ti ti-check-circle me-1';
+            } else {
+                element.classList.remove('text-success');
+                element.classList.add('text-danger');
+                icon.className = 'ti ti-x-circle me-1';
+            }
+        }
+
+        if (passwordInput) {
+            passwordInput.addEventListener('input', function() {
+                validatePasswordRequirements(this.value);
+            });
+
+            // Also validate on paste
+            passwordInput.addEventListener('paste', function() {
+                setTimeout(() => {
+                    validatePasswordRequirements(this.value);
+                }, 10);
+            });
+        }
+
+        // Copy password to clipboard
+        const copyBtn = document.getElementById('copyPassword');
+        const copyIcon = document.getElementById('copyIcon');
+
+        if (passwordInput && copyBtn && copyIcon) {
+            copyBtn.addEventListener('click', async function() {
+                if (!passwordInput.value.trim()) {
+                    showModalAlert('No hay contraseña para copiar', 'warning');
+                    return;
+                }
+
+                try {
+                    await navigator.clipboard.writeText(passwordInput.value);
+                    
+                    // Visual feedback
+                    const originalIcon = copyIcon.className;
+                    copyIcon.className = 'ti ti-check';
+                    copyBtn.classList.remove('btn-outline-secondary');
+                    copyBtn.classList.add('btn-success');
+                    
+                    setTimeout(() => {
+                        copyIcon.className = originalIcon;
+                        copyBtn.classList.remove('btn-success');
+                        copyBtn.classList.add('btn-outline-secondary');
+                    }, 1500);
+                    
+                    showModalAlert('Contraseña copiada al portapapeles', 'success');
+                } catch (err) {
+                    console.error('Error copying to clipboard:', err);
+                    showModalAlert('Error al copiar la contraseña', 'error');
+                }
+            });
+        }
+
         // Real-time validation
         const requiredFields = form.querySelectorAll('[required]');
 
@@ -383,6 +613,14 @@ const currentPath = '/dashboard/admin/clients';
                         isValid = false;
                     }
                 }
+
+                // Password validation
+                if (field.type === 'password' && value) {
+                    const passwordValid = validatePasswordRequirements(value);
+                    if (!passwordValid) {
+                        isValid = false;
+                    }
+                }
             });
 
             submitBtn.disabled = !isValid;
@@ -401,6 +639,7 @@ const currentPath = '/dashboard/admin/clients';
                 firstName: document.getElementById('clientFirstName').value.trim(),
                 lastName: document.getElementById('clientLastName').value.trim(),
                 email: document.getElementById('clientEmail').value.trim(),
+                password: document.getElementById('clientPassword').value.trim(),
                 companyName: document.getElementById('companyName').value.trim(),
                 phone: document.getElementById('clientPhone').value.trim() || undefined,
                 taxId: document.getElementById('clientTaxId').value.trim() || undefined,
@@ -436,8 +675,20 @@ const currentPath = '/dashboard/admin/clients';
                 charCounter.classList.add('text-muted');
             }
 
+            // Hide modal alert
+            const alertContainer = document.getElementById('modalAlertContainer');
+            if (alertContainer) {
+                alertContainer.style.display = 'none';
+            }
+
+            // Reset password validation feedback
+            const passwordValidationFeedback = document.getElementById('passwordValidationFeedback');
+            if (passwordValidationFeedback) {
+                passwordValidationFeedback.style.display = 'none';
+            }
+
             // Clear validation states
-            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid', 'is-valid'));
             form.querySelectorAll('.invalid-feedback').forEach(el => el.style.display = 'none');
         });
     }
