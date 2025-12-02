@@ -419,6 +419,9 @@
                 <button id="exportPdfBtn" class="btn btn-primary" style="display: none;">
                     <i class="ti ti-download me-2"></i>Exportar a PDF
                 </button>
+                <button id="cancelReservationBtn" class="btn btn-danger" style="display: none;">
+                    <i class="ti ti-x me-2"></i>Cancelar Reserva
+                </button>
             </div>
         </div>
     </div>
@@ -707,6 +710,17 @@
             const newShareBtn = shareBtn.cloneNode(true);
             shareBtn.parentNode.replaceChild(newShareBtn, shareBtn);
             newShareBtn.addEventListener('click', () => generateShareLink(quote.id));
+
+            // Show cancel reservation button only for scheduled quotes
+            const cancelBtn = document.getElementById('cancelReservationBtn');
+            if (quote.status === 'scheduled') {
+                cancelBtn.style.display = 'inline-block';
+
+                // Attach cancel reservation event listener
+                const newCancelBtn = cancelBtn.cloneNode(true);
+                cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+                newCancelBtn.addEventListener('click', () => showCancelReservationModal(quote));
+            }
             <% } %>
 
         } catch (error) {
@@ -1407,5 +1421,208 @@
         modalElement.addEventListener('hidden.bs.modal', () => {
             modalElement.remove();
         });
+    }
+
+    // Show cancel reservation modal
+    function showCancelReservationModal(quote) {
+        // Get the earliest event date from service items to calculate hours before event
+        let earliestEventDate = null;
+        if (quote.serviceItems && quote.serviceItems.days && quote.serviceItems.days.length > 0) {
+            quote.serviceItems.days.forEach(day => {
+                if (day.subconcepts && day.subconcepts.length > 0) {
+                    day.subconcepts.forEach(subconcept => {
+                        if (subconcept.startDate) {
+                            const eventDate = new Date(subconcept.startDate);
+                            if (!earliestEventDate || eventDate < earliestEventDate) {
+                                earliestEventDate = eventDate;
+                            }
+                        }
+                    });
+                }
+            });
+        }
+
+        // Calculate hours before event
+        const now = new Date();
+        const hoursBeforeEvent = earliestEventDate ? Math.max(0, Math.floor((earliestEventDate.getTime() - now.getTime()) / (1000 * 60 * 60))) : 0;
+        const requiresApproval = hoursBeforeEvent < 24;
+
+        // Format earliest event date
+        const eventDateStr = earliestEventDate ? 
+            earliestEventDate.toLocaleDateString('es-MX', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }) : 'No definida';
+
+        // Create modal HTML
+        const modalHtml = `
+            <div class="modal fade" id="cancelReservationModal" tabindex="-1" aria-labelledby="cancelReservationModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title" id="cancelReservationModalLabel">
+                                <i class="ti ti-x me-2"></i>Cancelar Reserva
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert ${requiresApproval ? 'alert-warning' : 'alert-info'}">
+                                <i class="ti ${requiresApproval ? 'ti-alert-triangle' : 'ti-info-circle'} me-2"></i>
+                                ${requiresApproval ? 
+                                    `<strong>¡Atención!</strong> La cancelación es con menos de 24 horas de anticipación (${hoursBeforeEvent} horas restantes). Se creará una solicitud de cancelación que requerirá aprobación administrativa.` :
+                                    `La cancelación es con más de 24 horas de anticipación (${hoursBeforeEvent} horas restantes). La reserva se cancelará automáticamente.`
+                                }
+                            </div>
+
+                            <div class="row mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Folio de Cotización</label>
+                                    <div class="form-control-plaintext">${quote.folio || quote.id}</div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-semibold">Fecha del Evento</label>
+                                    <div class="form-control-plaintext">${eventDateStr}</div>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="cancellationReason" class="form-label fw-semibold">
+                                    Motivo de la Cancelación <span class="text-danger">*</span>
+                                </label>
+                                <textarea 
+                                    class="form-control" 
+                                    id="cancellationReason" 
+                                    rows="4" 
+                                    placeholder="Por favor especifique el motivo de la cancelación..."
+                                    required
+                                ></textarea>
+                            </div>
+
+                            <div class="alert alert-secondary">
+                                <h6><i class="ti ti-info-circle me-2"></i>Información del Proceso:</h6>
+                                <ul class="mb-0">
+                                    ${requiresApproval ? 
+                                        `<li>Se creará una solicitud de cancelación para revisión</li>
+                                         <li>Un administrador revisará y aprobará/rechazará la solicitud</li>
+                                         <li>Recibirá notificación del resultado</li>` :
+                                        `<li>La reserva se cancelará inmediatamente</li>
+                                         <li>Se enviará confirmación de cancelación</li>
+                                         <li>No se requiere aprobación adicional</li>`
+                                    }
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                            <button type="button" class="btn btn-danger" id="confirmCancellationBtn">
+                                <i class="ti ti-check me-2"></i>
+                                ${requiresApproval ? 'Crear Solicitud' : 'Cancelar Reserva'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing modal if any
+        const existingModal = document.getElementById('cancelReservationModal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Insert modal into DOM
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Get modal element and show it
+        const modalElement = document.getElementById('cancelReservationModal');
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+
+        // Attach confirmation button event listener
+        document.getElementById('confirmCancellationBtn').addEventListener('click', () => {
+            processCancellationRequest(quote, requiresApproval, hoursBeforeEvent, earliestEventDate, modal);
+        });
+
+        // Clean up modal when hidden
+        modalElement.addEventListener('hidden.bs.modal', () => {
+            modalElement.remove();
+        });
+    }
+
+    // Process cancellation request
+    async function processCancellationRequest(quote, requiresApproval, hoursBeforeEvent, eventDate, modal) {
+        const reason = document.getElementById('cancellationReason').value.trim();
+
+        // Validate input
+        if (!reason) {
+            alert('Por favor ingrese un motivo para la cancelación');
+            return;
+        }
+
+        // Show loading state
+        const btn = document.getElementById('confirmCancellationBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+        btn.disabled = true;
+
+        try {
+            // Get access token
+            const token = getAccessToken();
+
+            // Prepare request data
+            const requestData = {
+                reason: reason,
+                hoursBeforeEvent: hoursBeforeEvent,
+                eventDate: eventDate ? eventDate.toISOString() : null
+            };
+
+            // Call API to create cancellation request
+            const response = await fetch('/api/cancellation-requests', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    quoteFolio: quote.folio || quote.id,
+                    ...requestData
+                })
+            });
+
+            const result = await response.json();
+
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Error al procesar la cancelación');
+            }
+
+            // Close modal
+            modal.hide();
+
+            // Show success message based on cancellation type
+            if (result.data.directCancellation || result.data.cancellationType === 'direct' || result.message.includes('cancelled successfully')) {
+                // Direct cancellation (24+ hours or no event date)
+                const message = result.message.includes('no event date') 
+                    ? 'La reserva ha sido cancelada exitosamente.\n\n(No se encontró fecha de evento - cancelación automática)'
+                    : 'La reserva ha sido cancelada exitosamente.';
+                alert(message);
+                // Refresh the page to show updated status
+                window.location.reload();
+            } else {
+                // Cancellation request created for approval (<24 hours)
+                alert(`Solicitud de cancelación creada exitosamente.\n\nID: ${result.data.requestId}\nEstado: Pendiente de aprobación\n\nRecibirá una notificación cuando sea revisada.`);
+                // Optional: Refresh to update UI or navigate to cancellation requests view
+            }
+
+        } catch (error) {
+            console.error('Error processing cancellation:', error);
+            alert(`Error al procesar la cancelación: ${error.message}`);
+
+            // Restore button state
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     }
 </script>

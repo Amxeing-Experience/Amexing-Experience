@@ -306,6 +306,8 @@ const toursRoutes = require('./api/toursRoutes');
 const auditRoutes = require('./api/auditRoutes');
 // Quote Management API routes
 const quotesRoutes = require('./api/quotesRoutes');
+// Cancellation Requests API routes
+const cancellationRequestsRoutes = require('./api/cancellationRequestsRoutes');
 // Invoice Management API routes
 const invoicesRoutes = require('./api/invoicesRoutes');
 // Payment Info Management API routes
@@ -331,6 +333,7 @@ router.use('/', providerExperienciasRoutes); // Provider experiencias endpoints
 router.use('/tours', toursRoutes);
 router.use('/audit', auditRoutes); // Audit log endpoints
 router.use('/quotes', quotesRoutes); // Quote management endpoints
+router.use('/cancellation-requests', cancellationRequestsRoutes); // Cancellation requests management endpoints
 router.use('/invoices', invoicesRoutes); // Invoice management endpoints
 router.use('/payment-info', paymentInfoRoutes); // Payment info management endpoints
 
