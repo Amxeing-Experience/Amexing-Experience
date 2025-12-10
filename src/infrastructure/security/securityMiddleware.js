@@ -1,8 +1,6 @@
 /* eslint-disable max-lines */
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const mongoSanitize = require('express-mongo-sanitize');
-const xss = require('xss-clean');
 const hpp = require('hpp');
 const cors = require('cors');
 const session = require('express-session');
@@ -10,6 +8,8 @@ const MongoStore = require('connect-mongo');
 const winston = require('winston');
 const csrf = require('csrf');
 const uidSafe = require('uid-safe');
+const createXssCleanWrapper = require('./xssCleanWrapper');
+const createMongoSanitizeWrapper = require('./mongoSanitizeWrapper');
 const sessionMetrics = require('../monitoring/sessionMetrics');
 
 /**
@@ -243,7 +243,7 @@ class SecurityMiddleware {
    * app.use(securityMiddleware.getMongoSanitizer());
    */
   getMongoSanitizer() {
-    return mongoSanitize({
+    return createMongoSanitizeWrapper({
       replaceWith: '_',
       onSanitize: ({ req, _key }) => {
         winston.warn(`Attempted NoSQL injection from IP ${req.ip} on field ${_key}`);
@@ -262,7 +262,7 @@ class SecurityMiddleware {
    * app.use(securityMiddleware.getXssProtection());
    */
   getXssProtection() {
-    return xss();
+    return createXssCleanWrapper();
   }
 
   /**

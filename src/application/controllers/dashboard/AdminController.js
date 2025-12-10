@@ -165,16 +165,32 @@ class AdminController extends RoleBasedController {
       // Determine active section (default: information)
       const section = req.query.section || 'information';
 
+      // Determine active subsection for tarifario
+      const subsection = req.query.subsection || null;
+
+      // Determine display name for the client
+      let displayName = '';
+      if (clientData.companyName) {
+        displayName = clientData.companyName;
+      } else if (clientData.firstName || clientData.lastName) {
+        displayName = `${clientData.firstName || ''} ${clientData.lastName || ''}`.trim();
+      } else if (clientData.email) {
+        displayName = clientData.email;
+      } else {
+        displayName = 'Cliente sin nombre';
+      }
+
       // Prepare view data
       const viewData = {
-        title: `Cliente: ${clientData.companyName || 'Sin nombre'}`,
+        title: `Cliente: ${displayName}`,
         client: clientData,
         section,
+        subsection,
         breadcrumb: null, // Disable automatic breadcrumb generation
       };
 
-      // Add DataTables assets if employees section is active
-      if (section === 'employees') {
+      // Add DataTables assets if employees or tarifario section is active
+      if (section === 'employees' || section === 'tarifario') {
         viewData.pageStyles = [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
@@ -981,6 +997,67 @@ class AdminController extends RoleBasedController {
           <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
         `,
       });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Vehicle types data endpoint for DataTables (session-based auth).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await vehicleTypesData(parameters);
+   * // Returns: operation result
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async vehicleTypesData(req, res) {
+    try {
+      const VehicleTypeController = require('../api/VehicleTypeController');
+
+      // Forward the request to the API controller
+      // The API controller will handle all DataTables parameters and return the expected format
+      await VehicleTypeController.getVehicleTypes(req, res);
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Get tours data for DataTable with session-based authentication
+   * Forwards request to API controller for tours data.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to tours data in DataTable format.
+   * @example
+   */
+  async toursData(req, res) {
+    try {
+      const ToursController = require('../api/ToursController');
+
+      // Forward the request to the API controller
+      // The API controller will handle all DataTables parameters and return the expected format
+      await ToursController.getTours(req, res);
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Get experiences data in DataTable format for dashboard.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to experiences data in DataTable format.
+   * @example
+   */
+  async experiencesData(req, res) {
+    try {
+      const ExperienceController = require('../api/ExperienceController');
+
+      // Forward the request to the API controller
+      // The API controller will handle all DataTables parameters and return the expected format
+      await ExperienceController.getExperiences(req, res);
     } catch (error) {
       this.handleError(res, error);
     }

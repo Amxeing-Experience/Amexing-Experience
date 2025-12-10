@@ -215,9 +215,26 @@ function initializeClientsDataTable(totalCount) {
             {
                 data: 'companyName',
                 render: function(data, type, row) {
-                    // Get company name from various possible fields
-                    const companyName = row.companyName || row.organizationName || row.company || '-';
-                    return `<strong class="text-dark">${companyName}</strong>`;
+                    // Get company name from various possible fields, fallback to personal name or email
+                    let displayName = row.companyName || row.organizationName || row.company;
+                    
+                    if (!displayName) {
+                        // Try to use personal name
+                        const firstName = row.firstName || '';
+                        const lastName = row.lastName || '';
+                        const fullName = `${firstName} ${lastName}`.trim();
+                        
+                        if (fullName) {
+                            displayName = fullName;
+                        } else if (row.email) {
+                            // Use email as last resort
+                            displayName = row.email;
+                        } else {
+                            displayName = 'Cliente';
+                        }
+                    }
+                    
+                    return `<strong class="text-dark">${displayName}</strong>`;
                 }
             },
             {

@@ -143,6 +143,11 @@ router.get('/guest/transport', dashboardAuth.requireRole('guest'), (req, res) =>
 router.get('/guest/help', dashboardAuth.requireRole('guest'), (req, res) => guestController.event(req, res));
 router.get('/guest/contact', dashboardAuth.requireRole('guest'), (req, res) => guestController.event(req, res));
 
+// Dashboard data endpoints for DataTables (session-based auth)
+router.get('/data/vehicle-types', dashboardAuth.requireRole('admin'), (req, res) => adminController.vehicleTypesData(req, res));
+router.get('/data/tours', dashboardAuth.requireRole('admin'), (req, res) => adminController.toursData(req, res));
+router.get('/data/experiences', dashboardAuth.requireRole('admin'), (req, res) => adminController.experiencesData(req, res));
+
 // Default dashboard redirect - redirect to user's role-specific dashboard
 router.get('/', dashboardAuth.requireAuth, (req, res) => {
   const userRole = req.user.role || 'guest';

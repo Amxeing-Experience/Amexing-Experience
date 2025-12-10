@@ -4,6 +4,7 @@
  */
 
 const activeSection = typeof section !== 'undefined' ? section : 'information';
+const activeSubsection = typeof subsection !== 'undefined' ? subsection : '';
 
 if (typeof client === 'undefined' || !client) {
     throw new Error('Client data is required');
@@ -20,7 +21,7 @@ const clientData = {
     email: client.email || '',
     phone: client.phone || '',
     active: typeof client.active !== 'undefined' ? client.active : true,
-    companyName: client.companyName || getNestedProperty(client, 'contextualData.companyName', 'Sin nombre'),
+    companyName: client.companyName || getNestedProperty(client, 'contextualData.companyName', ''),
     taxId: client.taxId || getNestedProperty(client, 'contextualData.taxId', ''),
     website: client.website || getNestedProperty(client, 'contextualData.website', ''),
     notes: client.notes || getNestedProperty(client, 'contextualData.notes', ''),
@@ -35,13 +36,35 @@ const clientData = {
 
 const clientId = clientData.id;
 const clientName = `${clientData.firstName} ${clientData.lastName}`.trim();
-const companyName = clientData.companyName;
+
+// Determine display name - prefer company name, then personal name, then email
+let displayName = '';
+if (clientData.companyName && clientData.companyName !== 'Sin nombre') {
+    displayName = clientData.companyName;
+} else if (clientName) {
+    displayName = clientName;
+} else if (clientData.email) {
+    displayName = clientData.email;
+} else {
+    displayName = 'Cliente';
+}
+
+const companyName = displayName;
 const isActive = clientData.active;
 
 const menuItems = [
     { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/admin/clients/${clientId}` },
     { label: 'Empleados', icon: 'users', section: 'employees', href: `/dashboard/admin/clients/${clientId}?section=employees` },
-    { label: 'Cotizaciones', icon: 'file-invoice', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` }
+    { label: 'Cotizaciones', icon: 'file-invoice', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` },
+    { label: 'Tarifario', icon: 'receipt-2', section: 'tarifario', href: `/dashboard/admin/clients/${clientId}?section=tarifario` }
+];
+
+// Tarifario subsections for tab navigation
+const tarifarioTabs = [
+    { label: 'Vehículos', icon: 'car', subsection: 'vehicles', href: `/dashboard/admin/clients/${clientId}?section=tarifario&subsection=vehicles` },
+    { label: 'Traslados', icon: 'briefcase', subsection: 'services', href: `/dashboard/admin/clients/${clientId}?section=tarifario&subsection=services` },
+    { label: 'Experiencias', icon: 'star', subsection: 'experiences', href: `/dashboard/admin/clients/${clientId}?section=tarifario&subsection=experiences` },
+    { label: 'Tours', icon: 'map', subsection: 'tours', href: `/dashboard/admin/clients/${clientId}?section=tarifario&subsection=tours` }
 ];
 %>
 
@@ -157,6 +180,259 @@ const menuItems = [
                     <p class="text-muted">Gestión de cotizaciones disponible próximamente.</p>
                 </div>
             </div>
+        <% } else if (activeSection === 'tarifario') { %>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white border-bottom-0">
+                    <h5 class="mb-0"><i class="ti ti-receipt-2 me-2 text-primary"></i>Tarifario del Cliente</h5>
+                    <p class="text-muted small mb-0 mt-1">Gestiona los servicios específicos para este cliente</p>
+                </div>
+                
+                <!-- Tab Navigation -->
+                <div class="tarifario-tabs border-bottom">
+                    <nav class="nav nav-tabs border-0" id="tarifario-nav" role="tablist">
+                        <% tarifarioTabs.forEach(function(tab, index) { %>
+                            <button class="nav-link <%= (activeSubsection === tab.subsection) || (index === 0 && !activeSubsection) ? 'active' : '' %>" 
+                                    id="<%= tab.subsection %>-tab" 
+                                    data-bs-toggle="tab" 
+                                    data-bs-target="#<%= tab.subsection %>-pane" 
+                                    type="button" 
+                                    role="tab" 
+                                    aria-controls="<%= tab.subsection %>-pane" 
+                                    aria-selected="<%= (activeSubsection === tab.subsection) || (index === 0 && !activeSubsection) ? 'true' : 'false' %>">
+                                <i class="ti ti-<%= tab.icon %> me-2"></i>
+                                <%= tab.label %>
+                            </button>
+                        <% }); %>
+                    </nav>
+                </div>
+
+                <!-- Tab Content -->
+                <div class="card-body p-0">
+                    <div class="tab-content" id="tarifario-content">
+                        <% tarifarioTabs.forEach(function(tab, index) { %>
+                            <div class="tab-pane fade <%= (activeSubsection === tab.subsection) || (index === 0 && !activeSubsection) ? 'show active' : '' %>" 
+                                 id="<%= tab.subsection %>-pane" 
+                                 role="tabpanel" 
+                                 aria-labelledby="<%= tab.subsection %>-tab" 
+                                 tabindex="0">
+                                
+                                <div class="p-4">
+                                    <% if (tab.subsection === 'vehicles') { %>
+                                        <!-- Vehicle Types Section -->
+                                        <div class="d-flex justify-content-between align-items-center mb-4">
+                                            <div>
+                                                <h4 class="fw-bold text-dark mb-1">
+                                                    <i class="ti ti-car me-2 text-primary"></i>Tipos de Vehículos
+                                                </h4>
+                                                <p class="text-muted mb-0">Gestiona los tipos de vehículos disponibles para <%= companyName %></p>
+                                            </div>
+                                            <button class="btn btn-primary" onclick="loadVehicleTypes()">
+                                                <i class="ti ti-refresh me-1"></i>Actualizar
+                                            </button>
+                                        </div>
+
+                                        <!-- Loading State -->
+                                        <div id="vehicle-types-loading" class="text-center py-5">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Cargando tipos de vehículos...</span>
+                                            </div>
+                                            <p class="text-muted mt-2">Cargando tipos de vehículos...</p>
+                                        </div>
+
+                                        <!-- Vehicle Types DataTable -->
+                                        <div id="vehicle-types-container" class="d-none">
+                                            <div class="table-responsive">
+                                                <table id="vehicleTypesTable" class="table table-striped table-hover">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Nombre</th>
+                                                            <th>Capacidad</th>
+                                                            <th>Maletas</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Data will be loaded via DataTables Ajax -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+
+                                        <!-- Empty State -->
+                                        <div id="vehicle-types-empty" class="text-center py-5 d-none">
+                                            <i class="ti ti-car-off" style="font-size: 3rem; color: #d1d5db;"></i>
+                                            <h5 class="mt-3 text-muted">No hay tipos de vehículos</h5>
+                                            <p class="text-muted">No se encontraron tipos de vehículos disponibles.</p>
+                                        </div>
+
+                                        <!-- Error State -->
+                                        <div id="vehicle-types-error" class="text-center py-5 d-none">
+                                            <i class="ti ti-alert-circle" style="font-size: 3rem; color: #dc3545;"></i>
+                                            <h5 class="mt-3 text-danger">Error al cargar</h5>
+                                            <p class="text-muted mb-3">No se pudieron cargar los tipos de vehículos.</p>
+                                            <button class="btn btn-outline-primary" onclick="loadVehicleTypes()">
+                                                <i class="ti ti-refresh me-1"></i>Intentar de nuevo
+                                            </button>
+                                        </div>
+                                    <% } else if (tab.subsection === 'tours') { %>
+                                        <!-- Tours Section -->
+                                        <div class="d-flex justify-content-between align-items-center mb-4">
+                                            <div>
+                                                <h4 class="fw-bold text-dark mb-1">
+                                                    <i class="ti ti-map me-2 text-primary"></i>Tours Disponibles
+                                                </h4>
+                                                <p class="text-muted mb-0">Gestiona los tours disponibles para <%= companyName %></p>
+                                            </div>
+                                            <button class="btn btn-primary" onclick="loadTours()">
+                                                <i class="ti ti-refresh me-1"></i>Actualizar
+                                            </button>
+                                        </div>
+                                        <!-- Loading State -->
+                                        <div id="tours-loading" class="text-center py-5">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Cargando tours...</span>
+                                            </div>
+                                            <p class="text-muted mt-2">Cargando tours...</p>
+                                        </div>
+                                        <!-- Tours DataTable -->
+                                        <div id="tours-container" class="d-none">
+                                            <div class="table-responsive">
+                                                <table id="toursTable" class="table table-striped table-hover">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Tarifa</th>
+                                                            <th>Destino</th>
+                                                            <th>Tiempo (Hrs min)</th>
+                                                            <th>Tipo de Vehículo</th>
+                                                            <th>Pasajeros</th>
+                                                            <th>Precio</th>
+                                                            <th>Precio Efectivo</th>
+                                                            <th>Precio Cliente</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Data will be loaded via DataTables Ajax -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <!-- Empty State -->
+                                        <div id="tours-empty" class="text-center py-5 d-none">
+                                            <i class="ti ti-map-off" style="font-size: 3rem; color: #d1d5db;"></i>
+                                            <h5 class="mt-3 text-muted">No hay tours</h5>
+                                            <p class="text-muted">No se encontraron tours disponibles.</p>
+                                        </div>
+                                        <!-- Error State -->
+                                        <div id="tours-error" class="text-center py-5 d-none">
+                                            <i class="ti ti-alert-circle" style="font-size: 3rem; color: #dc3545;"></i>
+                                            <h5 class="mt-3 text-danger">Error al cargar</h5>
+                                            <p class="text-muted mb-3">No se pudieron cargar los tours.</p>
+                                            <button class="btn btn-outline-primary" onclick="loadTours()">
+                                                <i class="ti ti-refresh me-1"></i>Intentar de nuevo
+                                            </button>
+                                        </div>
+                                    <% } else if (tab.subsection === 'experiences') { %>
+                                        <!-- Experiences Section -->
+                                        <div class="d-flex justify-content-between align-items-center mb-4">
+                                            <div>
+                                                <h4 class="fw-bold text-dark mb-1">
+                                                    <i class="ti ti-star me-2 text-primary"></i>Experiencias Disponibles
+                                                </h4>
+                                                <p class="text-muted mb-0">Gestiona las experiencias disponibles para <%= companyName %></p>
+                                            </div>
+                                            <button class="btn btn-primary" onclick="loadExperiences()">
+                                                <i class="ti ti-refresh me-1"></i>Actualizar
+                                            </button>
+                                        </div>
+                                        <!-- Loading State -->
+                                        <div id="experiences-loading" class="text-center py-5">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Cargando experiencias...</span>
+                                            </div>
+                                            <p class="text-muted mt-2">Cargando experiencias...</p>
+                                        </div>
+                                        <!-- Experiences DataTable -->
+                                        <div id="experiences-container" class="d-none">
+                                            <div class="table-responsive">
+                                                <table id="experiencesTable" class="table table-striped table-hover">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Nombre</th>
+                                                            <th>Descripción</th>
+                                                            <th>Duración</th>
+                                                            <th>Precio</th>
+                                                            <th>Precio Efectivo</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        <!-- Data will be loaded via DataTables Ajax -->
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                        <!-- Empty State -->
+                                        <div id="experiences-empty" class="text-center py-5 d-none">
+                                            <i class="ti ti-star-off" style="font-size: 3rem; color: #d1d5db;"></i>
+                                            <h5 class="mt-3 text-muted">No hay experiencias</h5>
+                                            <p class="text-muted">No se encontraron experiencias disponibles.</p>
+                                        </div>
+                                        <!-- Error State -->
+                                        <div id="experiences-error" class="text-center py-5 d-none">
+                                            <i class="ti ti-alert-circle" style="font-size: 3rem; color: #dc3545;"></i>
+                                            <h5 class="mt-3 text-danger">Error al cargar</h5>
+                                            <p class="text-muted mb-3">No se pudieron cargar las experiencias.</p>
+                                            <button class="btn btn-outline-primary" onclick="loadExperiences()">
+                                                <i class="ti ti-refresh me-1"></i>Intentar de nuevo
+                                            </button>
+                                        </div>
+                                    <% } else { %>
+                                        <!-- Other tabs placeholder -->
+                                        <div class="text-center py-5">
+                                            <div class="tarifario-icon-container mb-3">
+                                                <i class="ti ti-<%= tab.icon %>" style="font-size: 3.5rem; color: #f76b1c;"></i>
+                                            </div>
+                                            <h4 class="fw-bold text-dark mb-2"><%= tab.label %></h4>
+                                            <p class="text-muted mb-4">Gestión personalizada de <%= tab.label.toLowerCase() %> para <%= companyName %></p>
+                                            
+                                            <div class="row g-3 justify-content-center">
+                                                <div class="col-sm-6 col-md-4">
+                                                    <div class="tarifario-action-card">
+                                                        <i class="ti ti-plus-circle action-icon text-success"></i>
+                                                        <h6 class="mt-2 mb-1">Crear Nuevo</h6>
+                                                        <p class="text-muted small mb-0">Añadir <%= tab.label.toLowerCase() %> personalizado</p>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-6 col-md-4">
+                                                    <div class="tarifario-action-card">
+                                                        <i class="ti ti-list action-icon text-primary"></i>
+                                                        <h6 class="mt-2 mb-1">Ver Catálogo</h6>
+                                                        <p class="text-muted small mb-0">Explorar <%= tab.label.toLowerCase() %> disponibles</p>
+                                                    </div>
+                                                </div>
+                                                <div class="col-sm-6 col-md-4">
+                                                    <div class="tarifario-action-card">
+                                                        <i class="ti ti-settings action-icon text-warning"></i>
+                                                        <h6 class="mt-2 mb-1">Configurar</h6>
+                                                        <p class="text-muted small mb-0">Ajustar precios y condiciones</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="mt-4">
+                                                <button class="btn btn-primary me-2">
+                                                    <i class="ti ti-plus me-1"></i>Crear <%= tab.label %>
+                                                </button>
+                                                <button class="btn btn-outline-secondary">
+                                                    <i class="ti ti-eye me-1"></i>Ver Existentes
+                                                </button>
+                                            </div>
+                                        </div>
+                                    <% } %>
+                                </div>
+                            </div>
+                        <% }); %>
+                    </div>
+                </div>
+            </div>
         <% } %>
     </div>
 </div>
@@ -249,6 +525,146 @@ const menuItems = [
 
 .vertical-menu.collapsed .menu-icon {
     margin-right: 0;
+}
+
+/* Tarifario Tabs Styles */
+.tarifario-tabs {
+    background: #f8f9fa;
+    padding: 0 1.5rem;
+}
+
+.tarifario-tabs .nav-tabs {
+    border: none;
+}
+
+.tarifario-tabs .nav-link {
+    border: none;
+    color: #6c757d;
+    font-weight: 500;
+    padding: 1rem 1.5rem;
+    margin-right: 0.5rem;
+    border-radius: 0.5rem 0.5rem 0 0;
+    background: transparent;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.tarifario-tabs .nav-link:hover {
+    color: #f76b1c;
+    background: rgba(247, 107, 28, 0.1);
+}
+
+.tarifario-tabs .nav-link.active {
+    color: #f76b1c;
+    background: white;
+    border-bottom: 2px solid #f76b1c;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.1);
+}
+
+.tarifario-tabs .nav-link i {
+    font-size: 1.1rem;
+}
+
+/* Tarifario Action Cards */
+.tarifario-action-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    height: 100%;
+}
+
+.tarifario-action-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    border-color: #f76b1c;
+}
+
+.tarifario-action-card .action-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.tarifario-action-card h6 {
+    font-weight: 600;
+    color: #343a40;
+}
+
+.tarifario-icon-container {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: rgba(247, 107, 28, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto;
+}
+
+/* Tab Content Styling */
+.tab-content {
+    background: white;
+}
+
+.tab-pane {
+    min-height: 400px;
+}
+
+/* DataTable Custom Styles */
+#vehicleTypesTable {
+    font-size: 0.875rem;
+    width: 100% !important;
+}
+
+#vehicleTypesTable thead th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    padding: 1rem 0.75rem;
+}
+
+#vehicleTypesTable tbody tr:hover {
+    background-color: rgba(247, 107, 28, 0.05);
+}
+
+#vehicleTypesTable .btn-group .btn {
+    padding: 0.375rem 0.5rem;
+    border-radius: 0.25rem;
+}
+
+/* Ensure table containers take full width */
+#vehicle-types-container .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+#vehicle-types-container {
+    width: 100%;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .tarifario-tabs {
+        padding: 0 1rem;
+    }
+    
+    .tarifario-tabs .nav-link {
+        padding: 0.75rem 1rem;
+        margin-right: 0.25rem;
+        font-size: 0.875rem;
+    }
+    
+    .tarifario-action-card {
+        padding: 1rem;
+    }
+    
+    .tarifario-action-card .action-icon {
+        font-size: 2rem;
+    }
 }
 
 .menu-label {
@@ -345,8 +761,1154 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     }
+
+    // Tarifario tab functionality - URL sync
+    const tarifarioTabs = document.querySelectorAll('#tarifario-nav button[data-bs-toggle="tab"]');
+    tarifarioTabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const subsection = this.id.replace('-tab', '');
+            const currentUrl = new URL(window.location);
+            currentUrl.searchParams.set('subsection', subsection);
+            window.history.replaceState({}, '', currentUrl.toString());
+            
+            console.log('Tab clicked - loading data for subsection:', subsection);
+            
+            // Load data when specific tabs are activated
+            if (subsection === 'vehicles') {
+                // Stop any tours loading if in progress
+                if (window.toursLoadingTimer) {
+                    clearTimeout(window.toursLoadingTimer);
+                }
+                loadVehicleTypes();
+            } else if (subsection === 'tours') {
+                // Stop any vehicle types loading if in progress
+                if (window.vehicleTypesLoadingTimer) {
+                    clearTimeout(window.vehicleTypesLoadingTimer);
+                }
+                loadTours();
+            } else if (subsection === 'experiences') {
+                // Stop any other loading timers if in progress
+                if (window.vehicleTypesLoadingTimer) {
+                    clearTimeout(window.vehicleTypesLoadingTimer);
+                }
+                if (window.toursLoadingTimer) {
+                    clearTimeout(window.toursLoadingTimer);
+                }
+                loadExperiences();
+            }
+        });
+        
+        // Handle Bootstrap tab events for better UX
+        tab.addEventListener('shown.bs.tab', function() {
+            const subsection = this.id.replace('-tab', '');
+            console.log('Tab shown event for subsection:', subsection);
+        });
+    });
+
+    // Load data on initial load based on active tab
+    if (window.location.search.includes('section=tarifario')) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const subsection = urlParams.get('subsection');
+        
+        console.log('Initial load - subsection:', subsection);
+        
+        if (subsection === 'tours') {
+            window.toursLoadingTimer = setTimeout(loadTours, 500);
+        } else if (subsection === 'experiences') {
+            window.experiencesLoadingTimer = setTimeout(loadExperiences, 500);
+        } else if (subsection === 'vehicles' || !subsection) {
+            // Default to vehicles if no subsection specified
+            window.vehicleTypesLoadingTimer = setTimeout(loadVehicleTypes, 500);
+        } else {
+            // For other subsections (services, experiences), no data loading needed yet
+            console.log('No data loading implemented for subsection:', subsection);
+        }
+    }
 });
+
+// Vehicle Types DataTable
+let vehicleTypesTable = null;
+
+function loadVehicleTypes() {
+    const loading = document.getElementById('vehicle-types-loading');
+    const container = document.getElementById('vehicle-types-container');
+    const empty = document.getElementById('vehicle-types-empty');
+    const error = document.getElementById('vehicle-types-error');
+
+    // Reset states
+    loading?.classList.remove('d-none');
+    container?.classList.add('d-none');
+    empty?.classList.add('d-none');
+    error?.classList.add('d-none');
+
+    // First test: simple fetch to check dashboard data endpoint accessibility
+    console.log('Testing dashboard data endpoint accessibility...');
+    fetch('/dashboard/data/vehicle-types?draw=1&start=0&length=10', {
+        method: 'GET',
+        credentials: 'include' // Important: include cookies for session auth
+    })
+    .then(response => {
+        console.log('API Response:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('API Data:', data);
+        initDataTable();
+    })
+    .catch(err => {
+        console.error('API Test failed:', err);
+        loading?.classList.add('d-none');
+        const errorElement = document.getElementById('vehicle-types-error');
+        if (errorElement) {
+            errorElement.classList.remove('d-none');
+            const errorMsg = errorElement.querySelector('p');
+            if (errorMsg) {
+                errorMsg.textContent = `Error de conexión: ${err.message}`;
+            }
+        }
+    });
+}
+
+function initDataTable() {
+    try {
+        // Get element references for this function
+        const loading = document.getElementById('vehicle-types-loading');
+        const container = document.getElementById('vehicle-types-container');
+        const error = document.getElementById('vehicle-types-error');
+        
+        // Destroy existing DataTable if it exists
+        if (vehicleTypesTable) {
+            vehicleTypesTable.destroy();
+            vehicleTypesTable = null;
+        }
+
+        // Initialize DataTable
+        vehicleTypesTable = $('#vehicleTypesTable').DataTable({
+            processing: true,
+            serverSide: true,
+            scrollX: false,
+            autoWidth: false,
+            ajax: {
+                url: '/dashboard/data/vehicle-types',
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('DataTable Ajax error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText,
+                        error: error,
+                        thrown: thrown
+                    });
+                    loading?.classList.add('d-none');
+                    const errorElement = document.getElementById('vehicle-types-error');
+                    if (errorElement) {
+                        errorElement.classList.remove('d-none');
+                        // Add the actual error message
+                        const errorMsg = errorElement.querySelector('p');
+                        if (errorMsg) {
+                            errorMsg.textContent = `Error ${xhr.status}: ${xhr.statusText || 'No se pudieron cargar los tipos de vehículos'}`;
+                        }
+                    }
+                }
+            },
+            columns: [
+                {
+                    data: null,
+                    render: function(data) {
+                        const badgeColor = data.active ? 'bg-light text-dark border' : 'bg-secondary';
+                        return `<div>
+                                    <span class="badge ${badgeColor} mb-1">${data.name || '-'}</span>
+                                    <br><small class="text-muted">${data.description || 'Sin descripción'}</small>
+                                </div>`;
+                    }
+                },
+                {
+                    data: 'defaultCapacity',
+                    defaultContent: '-',
+                    className: 'text-center',
+                    render: function(data) {
+                        return `<span class="badge bg-info">${data}</span>`;
+                    }
+                },
+                {
+                    data: 'trunkCapacity',
+                    defaultContent: '-',
+                    className: 'text-center',
+                    render: function(data) {
+                        return `<span class="badge bg-warning text-dark">${data}</span>`;
+                    }
+                }
+            ],
+            order: [[0, 'asc']],
+            pageLength: 10,
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tipos de vehículos...'
+            },
+            responsive: true,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            initComplete: function() {
+                loading?.classList.add('d-none');
+                container?.classList.remove('d-none');
+            }
+        });
+
+    } catch (err) {
+        console.error('Error initializing vehicle types table:', err);
+        loading?.classList.add('d-none');
+        error?.classList.remove('d-none');
+    }
+}
+
+// Vehicle Type Actions
+function setClientPrice(vehicleTypeId) {
+    console.log('Set client price for vehicle type:', vehicleTypeId);
+    // TODO: Open pricing modal for this client
+    alert('Configurar precio específico para este cliente');
+}
+
+function configureVehicleType(vehicleTypeId) {
+    console.log('Configure vehicle type:', vehicleTypeId);
+    // TODO: Implement global configuration modal or redirect to admin page
+    const adminUrl = `/dashboard/admin/vehicles?section=types&vehicleTypeId=${vehicleTypeId}`;
+    window.open(adminUrl, '_blank');
+}
+
+function viewVehicleTypeDetails(vehicleTypeId) {
+    console.log('View vehicle type details:', vehicleTypeId);
+    // TODO: Implement details modal with vehicle specifications
+    alert('Ver detalles del tipo de vehículo');
+}
+
+// Tours DataTable
+let toursTable = null;
+function loadTours() {
+    const loading = document.getElementById('tours-loading');
+    const container = document.getElementById('tours-container');
+    const empty = document.getElementById('tours-empty');
+    const error = document.getElementById('tours-error');
+
+    // Reset states
+    loading?.classList.remove('d-none');
+    container?.classList.add('d-none');
+    empty?.classList.add('d-none');
+    error?.classList.add('d-none');
+
+    // First test: simple fetch to check dashboard data endpoint accessibility
+    console.log('Testing tours dashboard data endpoint accessibility...');
+    fetch('/dashboard/data/tours?draw=1&start=0&length=10', {
+        method: 'GET',
+        credentials: 'include' // Important: include cookies for session auth
+    })
+    .then(response => {
+        console.log('Tours API Response:', response.status, response.statusText);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Tours API Data:', data);
+        initToursDataTable();
+    })
+    .catch(err => {
+        console.error('Tours API Test failed:', err);
+        loading?.classList.add('d-none');
+        const errorElement = document.getElementById('tours-error');
+        if (errorElement) {
+            errorElement.classList.remove('d-none');
+            const errorMsg = errorElement.querySelector('p');
+            if (errorMsg) {
+                errorMsg.textContent = `Error de conexión: ${err.message}`;
+            }
+        }
+    });
+}
+
+function initToursDataTable() {
+    try {
+        // Get element references for this function
+        const loading = document.getElementById('tours-loading');
+        const container = document.getElementById('tours-container');
+        const error = document.getElementById('tours-error');
+        
+        // Destroy existing DataTable if it exists
+        if (toursTable) {
+            toursTable.destroy();
+            toursTable = null;
+        }
+
+        // Initialize Tours DataTable (matching the admin design closely)
+        toursTable = $('#toursTable').DataTable({
+            processing: true,
+            serverSide: true,
+            scrollX: false,
+            autoWidth: false,
+            ajax: {
+                url: '/dashboard/data/tours',
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Tours DataTable Ajax error:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        responseText: xhr.responseText,
+                        error: error,
+                        thrown: thrown
+                    });
+                    loading?.classList.add('d-none');
+                    const errorElement = document.getElementById('tours-error');
+                    if (errorElement) {
+                        errorElement.classList.remove('d-none');
+                        const errorMsg = errorElement.querySelector('p');
+                        if (errorMsg) {
+                            errorMsg.textContent = `Error ${xhr.status}: ${xhr.statusText || 'No se pudieron cargar los tours'}`;
+                        }
+                    }
+                }
+            },
+            columns: [
+                // Tarifa column with badge styling
+                {
+                    data: 'rate.name',
+                    render: function(data, type, row) {
+                        if (!data) return '-';
+                        
+                        // Remove "Tarifa" word from the beginning if present
+                        let displayName = data.replace(/^Tarifa\s*/i, '');
+                        const color = row.rate?.color || '#6366F1';
+                        
+                        return `<span class="badge px-2 py-1" style="background-color: ${color}; color: white; font-size: 0.75rem;">${displayName}</span>`;
+                    }
+                },
+                // Destino column
+                {
+                    data: 'destinationPOI',
+                    render: function(data, type, row) {
+                        if (!data) return '-';
+                        return `<strong>${data.name || 'Sin destino'}</strong>`;
+                    }
+                },
+                // Tiempo column
+                {
+                    data: 'time',
+                    render: function(data, type, row) {
+                        if (!data) return '-';
+                        const hours = Math.floor(data / 60);
+                        const minutes = data % 60;
+                        if (hours > 0 && minutes > 0) {
+                            return `${hours}h ${minutes}min`;
+                        } else if (hours > 0) {
+                            return `${hours}h`;
+                        } else {
+                            return `${minutes}min`;
+                        }
+                    }
+                },
+                // Tipo de Vehículo column
+                {
+                    data: 'vehicleType',
+                    render: function(data, type, row) {
+                        if (!data) return '-';
+                        return data.name || 'Sin tipo';
+                    }
+                },
+                // Pasajeros column
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        const minPassengers = row.minPassengers;
+                        const maxPassengers = row.maxPassengers;
+
+                        if (!minPassengers && !maxPassengers) {
+                            return '<span class="text-muted">Sin límite</span>';
+                        }
+
+                        if (minPassengers && maxPassengers) {
+                            return `${minPassengers} - ${maxPassengers} pax`;
+                        }
+
+                        if (minPassengers) {
+                            return `Mín: ${minPassengers} pax`;
+                        }
+
+                        if (maxPassengers) {
+                            return `Máx: ${maxPassengers} pax`;
+                        }
+
+                        return '-';
+                    }
+                },
+                // Precio (with surcharge - "Tarjeta/Digital") column
+                {
+                    data: 'price',
+                    render: function(data, type, row) {
+                        const basePrice = data || 0;
+                        const surchargePercentage = 21.09; // Standard surcharge percentage
+                        const surcharge = (basePrice * surchargePercentage) / 100;
+                        const totalPrice = basePrice + surcharge;
+
+                        // For sorting and filtering, use total price
+                        if (type === 'sort' || type === 'filter') {
+                            return totalPrice;
+                        }
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-success" style="font-size: 1rem;">
+                                    ${formatMXN(totalPrice)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Tarjeta/Digital</small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                },
+                // Precio Efectivo (base price - "Efectivo") column
+                {
+                    data: 'price',
+                    render: function(data, type, row) {
+                        const basePrice = data || 0;
+
+                        // For sorting and filtering, use base price
+                        if (type === 'sort' || type === 'filter') {
+                            return basePrice;
+                        }
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                    ${formatMXN(basePrice)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Efectivo</small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                },
+                // Precio Cliente (configurable) column
+                {
+                    data: null,
+                    orderable: false,
+                    render: function(data, type, row) {
+                        const tourId = row.id || row.objectId;
+                        const clientPrice = row.clientPrice || null; // This would come from a client-specific pricing table
+                        
+                        if (clientPrice) {
+                            const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                                style: 'currency',
+                                currency: 'MXN'
+                            }).format(amount);
+                            
+                            return `
+                                <div class="text-center">
+                                    <div class="fw-bold text-info mb-1">
+                                        ${formatMXN(clientPrice)}
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary configure-price-btn" data-tour-id="${tourId}">
+                                        <i class="ti ti-settings"></i> Editar
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            return `
+                                <div class="text-center">
+                                    <button class="btn btn-sm btn-primary configure-price-btn" data-tour-id="${tourId}">
+                                        <i class="ti ti-plus"></i> Configurar
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    }
+                }
+            ],
+            order: [
+                [0, 'asc'], // Tarifa
+                [1, 'asc']  // Destino
+            ],
+            pageLength: 25,
+            lengthMenu: [
+                [10, 25, 50, 100],
+                [10, 25, 50, 100]
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tours...'
+            },
+            responsive: true,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            initComplete: function() {
+                loading?.classList.add('d-none');
+                container?.classList.remove('d-none');
+                
+                // Check if we have data
+                if (this.api().data().length === 0) {
+                    container?.classList.add('d-none');
+                    const emptyElement = document.getElementById('tours-empty');
+                    if (emptyElement) {
+                        emptyElement.classList.remove('d-none');
+                    }
+                }
+                
+                // Add event delegation for configure price buttons
+                setupTourPriceButtons();
+            }
+        });
+    } catch (err) {
+        console.error('Error initializing tours table:', err);
+        loading?.classList.add('d-none');
+        error?.classList.remove('d-none');
+    }
+}
+
+// Setup event delegation for tour price buttons
+function setupTourPriceButtons() {
+    // Remove any existing event listeners to avoid duplicates
+    const tableContainer = document.getElementById('toursTable');
+    if (!tableContainer) return;
+    
+    // Use event delegation on the table container
+    tableContainer.addEventListener('click', function(event) {
+        // Check if the clicked element or its parent is a configure price button
+        const button = event.target.closest('.configure-price-btn');
+        if (button) {
+            event.preventDefault();
+            const tourId = button.getAttribute('data-tour-id');
+            if (tourId) {
+                configureTourClientPrice(tourId);
+            }
+        }
+    });
+}
+
+// Tour Client Price Configuration  
+// Make the function globally available
+window.configureTourClientPrice = function(tourId) {
+    const clientId = '<%= clientId %>';
+    console.log('Configure client price for tour:', tourId, 'Client:', clientId);
+    
+    // Find the tour data from the DataTable
+    let tourData = null;
+    
+    if (toursTable) {
+        // Try to find the tour data in the DataTable
+        toursTable.rows().every(function() {
+            const data = this.data();
+            if ((data.id || data.objectId) === tourId) {
+                tourData = data;
+                return false; // break the loop
+            }
+        });
+    }
+    
+    // Format currency
+    const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN'
+    }).format(amount);
+    
+    // If we couldn't find the data, use basic information
+    if (!tourData) {
+        console.warn('Could not find tour data in DataTable, using basic modal');
+        // Still show the modal with just the tour ID
+        document.getElementById('tourIdInput').value = tourId;
+        document.getElementById('tourDestino').value = 'Cargando...';
+        document.getElementById('tourTarifa').value = 'Cargando...';
+        document.getElementById('tourPrecioEfectivo').value = 'Cargando...';
+    } else {
+        // Populate modal fields with actual data
+        document.getElementById('tourIdInput').value = tourId;
+        document.getElementById('tourDestino').value = tourData.destinationPOI?.name || 'Sin destino';
+        document.getElementById('tourTarifa').value = tourData.rate?.name?.replace(/^Tarifa\s*/i, '') || 'Sin tarifa';
+        document.getElementById('tourPrecioEfectivo').value = formatMXN(tourData.price || 0);
+        
+        // Set client price if exists
+        const clientPriceInput = document.getElementById('tourPrecioCliente');
+        clientPriceInput.value = tourData.clientPrice || '';
+    }
+    
+    // Show the modal
+    try {
+        // Check if Bootstrap is loaded
+        if (typeof bootstrap === 'undefined') {
+            console.error('Bootstrap is not loaded');
+            alert('Error: Bootstrap no está cargado. Por favor recargue la página.');
+            return;
+        }
+        
+        const modalElement = document.getElementById('configureTourPriceModal');
+        if (!modalElement) {
+            console.error('Modal element not found');
+            alert('Error: No se pudo encontrar el modal. Por favor recargue la página.');
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(modalElement);
+        modal.show();
+        console.log('Modal should be visible now');
+    } catch (error) {
+        console.error('Error showing modal:', error);
+        alert('Error al mostrar el modal: ' + error.message);
+    }
+}
+
+// Initialize modal event handlers when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    const saveBtn = document.getElementById('saveTourClientPriceBtn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function() {
+            saveTourClientPrice();
+        });
+    }
+    
+    // Fix backdrop issue when modal is hidden
+    const modalElement = document.getElementById('configureTourPriceModal');
+    if (modalElement) {
+        modalElement.addEventListener('hidden.bs.modal', function() {
+            // Remove any remaining backdrop
+            const backdrops = document.querySelectorAll('.modal-backdrop');
+            backdrops.forEach(backdrop => {
+                backdrop.remove();
+            });
+            
+            // Remove modal-open class from body
+            document.body.classList.remove('modal-open');
+            
+            // Reset body styles
+            document.body.style.overflow = '';
+            document.body.style.paddingRight = '';
+        });
+        
+        // Also handle when modal is shown to ensure proper state
+        modalElement.addEventListener('shown.bs.modal', function() {
+            console.log('Modal is now visible and ready for interaction');
+        });
+    }
+});
+
+// Save Tour Client Price
+function saveTourClientPrice() {
+    const tourId = document.getElementById('tourIdInput').value;
+    const clientId = '<%= clientId %>';
+    const clientPrice = parseFloat(document.getElementById('tourPrecioCliente').value);
+    
+    // Validate input
+    if (!clientPrice || clientPrice <= 0) {
+        alert('Por favor ingrese un precio válido mayor a 0.');
+        return;
+    }
+    
+    console.log('Saving client price:', {
+        tourId,
+        clientId,
+        clientPrice
+    });
+    
+    // TODO: Implement API call to save client-specific pricing
+    // This would typically:
+    // 1. Call an API endpoint like /api/tours/:tourId/client-pricing
+    // 2. Save to a ClientTourPricing table
+    // 3. Update the DataTable to reflect the new price
+    
+    // For now, show success message and close modal
+    alert(`Precio cliente guardado exitosamente.\n\nTour ID: ${tourId}\nPrecio: ${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(clientPrice)}\n\n(Implementación de API pendiente)`);
+    
+    // Close modal properly
+    const modalElement = document.getElementById('configureTourPriceModal');
+    const modal = bootstrap.Modal.getInstance(modalElement);
+    if (modal) {
+        modal.hide();
+    } else {
+        // If no instance exists, create one and hide it
+        const newModal = new bootstrap.Modal(modalElement);
+        newModal.hide();
+    }
+    
+    // Reload the tours table to show updated price
+    if (toursTable) {
+        toursTable.ajax.reload(null, false);
+    }
+}
+
+// Experiences DataTable
+let experiencesTable = null;
+function loadExperiences() {
+    const loading = document.getElementById('experiences-loading');
+    const container = document.getElementById('experiences-container');
+    const empty = document.getElementById('experiences-empty');
+    const error = document.getElementById('experiences-error');
+
+    // Show loading state and hide others
+    loading?.classList.remove('d-none');
+    container?.classList.add('d-none');
+    empty?.classList.add('d-none');
+    error?.classList.add('d-none');
+
+    // Test API endpoint accessibility before initializing DataTable
+    console.log('Testing experiences dashboard data endpoint accessibility...');
+    
+    fetch('/dashboard/data/experiences', {
+        method: 'GET',
+        credentials: 'include', // Include session cookies
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => {
+        console.log('Experiences API Response:', response.status, response.statusText);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        console.log('Experiences API Data:', data);
+        initExperiencesDataTable();
+    })
+    .catch(err => {
+        console.error('Experiences API Test failed:', err);
+        loading?.classList.add('d-none');
+        error?.classList.remove('d-none');
+    });
+}
+
+function initExperiencesDataTable() {
+    const loading = document.getElementById('experiences-loading');
+    const container = document.getElementById('experiences-container');
+    const error = document.getElementById('experiences-error');
+
+    try {
+        // Destroy existing table if it exists
+        if (experiencesTable) {
+            experiencesTable.destroy();
+            experiencesTable = null;
+        }
+
+        // Initialize Experiences DataTable (matching the admin design closely)
+        experiencesTable = $('#experiencesTable').DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: '/dashboard/data/experiences',
+                type: 'GET',
+                data: function(d) {
+                    // Add filter to only show Experience type
+                    d.type = 'Experience';
+                    return d;
+                },
+                error: function(xhr, error, code) {
+                    console.error('Experiences DataTable Ajax error:', {
+                        status: xhr.status,
+                        error: error,
+                        code: code,
+                        responseText: xhr.responseText
+                    });
+                    
+                    loading?.classList.add('d-none');
+                    container?.classList.add('d-none');
+                    const errorElement = document.getElementById('experiences-error');
+                    if (errorElement) {
+                        errorElement.classList.remove('d-none');
+                    }
+                }
+            },
+            columns: [
+                // Nombre column
+                {
+                    data: 'name',
+                    render: function(data, type, row) {
+                        if (type === 'sort' || type === 'filter') {
+                            return data || '';
+                        }
+                        return `
+                            <div class="fw-semibold text-dark">${data || '-'}</div>
+                        `;
+                    }
+                },
+                // Descripción column
+                {
+                    data: 'description',
+                    render: function(data, type, row) {
+                        if (type === 'sort' || type === 'filter') {
+                            return data || '';
+                        }
+                        
+                        if (!data) return '-';
+                        
+                        // Truncate long descriptions
+                        if (data.length > 100) {
+                            return `
+                                <span title="${data.replace(/"/g, '&quot;')}">${data.substring(0, 100)}...</span>
+                            `;
+                        }
+                        
+                        return data;
+                    }
+                },
+                // Duración column - handle missing field gracefully
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        // Check multiple possible fields for duration
+                        const durationValue = row.duration || row.time_journey || null;
+                        
+                        if (type === 'sort' || type === 'filter') {
+                            return durationValue || 0;
+                        }
+                        
+                        if (!durationValue) return '-';
+                        
+                        return `
+                            <span class="text-muted">
+                                <i class="ti ti-clock me-1"></i>${durationValue} min
+                            </span>
+                        `;
+                    }
+                },
+                // Precio column (with surcharge - "Tarjeta/Digital")
+                {
+                    data: 'cost',
+                    render: function(data, type, row) {
+                        const baseCost = data || 0;
+                        const surchargePercentage = 21.09; // Standard surcharge percentage
+                        const surcharge = (baseCost * surchargePercentage) / 100;
+                        const totalPrice = baseCost + surcharge;
+
+                        // For sorting and filtering, use total price
+                        if (type === 'sort' || type === 'filter') {
+                            return totalPrice;
+                        }
+
+                        if (!baseCost) return '-';
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-success" style="font-size: 1rem;">
+                                    ${formatMXN(totalPrice)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Tarjeta/Digital</small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                },
+                // Precio Efectivo column (cash price without surcharge)
+                {
+                    data: 'cost',
+                    render: function(data, type, row) {
+                        const cashPrice = data || 0;
+                        
+                        // For sorting and filtering
+                        if (type === 'sort' || type === 'filter') {
+                            return cashPrice;
+                        }
+
+                        if (!cashPrice) return '-';
+
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(amount);
+
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                    ${formatMXN(cashPrice)}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    <small>Efectivo</small>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            ],
+            order: [
+                [0, 'asc']  // Name
+            ],
+            pageLength: 25,
+            lengthMenu: [
+                [10, 25, 50, 100],
+                [10, 25, 50, 100]
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando experiencias...'
+            },
+            responsive: true,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            initComplete: function() {
+                loading?.classList.add('d-none');
+                container?.classList.remove('d-none');
+                
+                // Check if we have data
+                if (this.api().data().length === 0) {
+                    container?.classList.add('d-none');
+                    const emptyElement = document.getElementById('experiences-empty');
+                    if (emptyElement) {
+                        emptyElement.classList.remove('d-none');
+                    }
+                }
+                
+                // Add event delegation for configure price buttons
+                setupExperiencePriceButtons();
+            }
+        });
+    } catch (err) {
+        console.error('Error initializing experiences table:', err);
+        loading?.classList.add('d-none');
+        error?.classList.remove('d-none');
+    }
+}
+
+// Setup event delegation for experience price buttons
+function setupExperiencePriceButtons() {
+    // Remove any existing event listeners to avoid duplicates
+    const tableContainer = document.getElementById('experiencesTable');
+    if (!tableContainer) return;
+    
+    // Use event delegation on the table container
+    tableContainer.addEventListener('click', function(event) {
+        // Check if the clicked element or its parent is a configure price button
+        const button = event.target.closest('.configure-experience-price-btn');
+        if (button) {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const experienceId = button.dataset.experienceId;
+            const experienceName = button.dataset.experienceName;
+            const experienceCost = parseFloat(button.dataset.experienceCost) || 0;
+            const currentPrice = parseFloat(button.dataset.currentPrice) || 0;
+            
+            // Open configuration modal
+            openExperiencePriceModal(experienceId, experienceName, experienceCost, currentPrice);
+        }
+    });
+}
+
+// Open experience price configuration modal
+function openExperiencePriceModal(experienceId, experienceName, baseCost, currentPrice) {
+    const modal = document.getElementById('configureExperiencePriceModal');
+    if (!modal) return;
+    
+    // Populate form fields
+    document.getElementById('experienceIdInput').value = experienceId;
+    document.getElementById('experienceNombre').value = experienceName;
+    document.getElementById('experienceCosto').value = new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN'
+    }).format(baseCost);
+    document.getElementById('experiencePrecioCliente').value = currentPrice.toFixed(2);
+    
+    // Show modal
+    const bootstrapModal = new bootstrap.Modal(modal);
+    bootstrapModal.show();
+}
+
+// Save experience client price
+function saveExperienceClientPrice() {
+    const experienceId = document.getElementById('experienceIdInput').value;
+    const clientPrice = parseFloat(document.getElementById('experiencePrecioCliente').value);
+    
+    if (!experienceId || !clientPrice || clientPrice <= 0) {
+        alert('Por favor, ingresa un precio válido.');
+        return;
+    }
+    
+    // TODO: Implement API call to save client-specific pricing
+    // This would typically:
+    // 1. Call an API endpoint like /api/experiences/:experienceId/client-pricing
+    // 2. Save to a ClientExperiencePricing table
+    // 3. Update the DataTable to reflect the new price
+    
+    // For now, show success message and close modal
+    alert(`Precio cliente guardado exitosamente.\n\nExperiencia ID: ${experienceId}\nPrecio: ${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(clientPrice)}\n\n(Implementación de API pendiente)`);
+    
+    // Close modal properly
+    const modalElement = document.getElementById('configureExperiencePriceModal');
+    const modal = bootstrap.Modal.getInstance(modalElement);
+    if (modal) {
+        modal.hide();
+    } else {
+        // If no instance exists, create one and hide it
+        const newModal = new bootstrap.Modal(modalElement);
+        newModal.hide();
+    }
+    
+    // Reload the experiences table to show updated price
+    if (experiencesTable) {
+        experiencesTable.ajax.reload(null, false);
+    }
+}
 </script>
+
+<!-- Configure Experience Client Price Modal -->
+<div class="modal fade" id="configureExperiencePriceModal" tabindex="-1" aria-labelledby="configureExperiencePriceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="configureExperiencePriceModalLabel">
+                    <i class="ti ti-currency-dollar me-2"></i>Configurar Precio Cliente - Experiencia
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="experienceClientPriceForm">
+                    <input type="hidden" id="experienceIdInput" name="experienceId">
+                    
+                    <!-- Experience Information (Read-only) -->
+                    <div class="mb-3">
+                        <label for="experienceNombre" class="form-label">
+                            <i class="ti ti-star me-1"></i>Experiencia
+                        </label>
+                        <input type="text" class="form-control" id="experienceNombre" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="experienceCosto" class="form-label">
+                            <i class="ti ti-currency-dollar me-1"></i>Costo Base
+                        </label>
+                        <input type="text" class="form-control" id="experienceCosto" readonly>
+                    </div>
+                    
+                    <!-- Editable Client Price -->
+                    <div class="mb-3">
+                        <label for="experiencePrecioCliente" class="form-label">
+                            <i class="ti ti-edit me-1"></i>Precio Cliente *
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" class="form-control" id="experiencePrecioCliente" 
+                                   step="0.01" min="0" placeholder="0.00" required>
+                            <span class="input-group-text">MXN</span>
+                        </div>
+                        <div class="form-text text-muted">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Establece un precio personalizado para este cliente
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" onclick="saveExperienceClientPrice()">
+                    <i class="ti ti-device-floppy me-1"></i>Guardar Precio
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configure Tour Client Price Modal -->
+<div class="modal fade" id="configureTourPriceModal" tabindex="-1" aria-labelledby="configureTourPriceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="configureTourPriceModalLabel">
+                    <i class="ti ti-currency-dollar me-2"></i>Configurar Precio Cliente
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="tourClientPriceForm">
+                    <input type="hidden" id="tourIdInput" name="tourId">
+                    
+                    <!-- Tour Information (Read-only) -->
+                    <div class="mb-3">
+                        <label for="tourDestino" class="form-label">
+                            <i class="ti ti-map-pin me-1"></i>Destino
+                        </label>
+                        <input type="text" class="form-control" id="tourDestino" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tourTarifa" class="form-label">
+                            <i class="ti ti-tag me-1"></i>Tarifa
+                        </label>
+                        <input type="text" class="form-control" id="tourTarifa" readonly>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="tourPrecioEfectivo" class="form-label">
+                            <i class="ti ti-cash me-1"></i>Precio Efectivo
+                        </label>
+                        <input type="text" class="form-control" id="tourPrecioEfectivo" readonly>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- Client Price (Editable) -->
+                    <div class="mb-3">
+                        <label for="tourPrecioCliente" class="form-label">
+                            <i class="ti ti-businessplan me-1"></i>Precio Cliente
+                            <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" 
+                                   class="form-control" 
+                                   id="tourPrecioCliente" 
+                                   name="clientPrice"
+                                   step="0.01" 
+                                   min="0" 
+                                   placeholder="0.00"
+                                   required>
+                            <span class="input-group-text">MXN</span>
+                        </div>
+                        <div class="form-text">
+                            Ingrese el precio personalizado para este cliente. Este precio reemplazará el precio estándar del tour.
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveTourClientPriceBtn">
+                    <i class="ti ti-device-floppy me-1"></i>Guardar Precio
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Create Employee Modal -->
 <div class="modal fade" id="createEmployeeModal" tabindex="-1" aria-labelledby="createEmployeeModalLabel" aria-hidden="true">
