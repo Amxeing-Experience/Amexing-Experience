@@ -16,6 +16,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'services-table';
 const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/services';
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const dtShowClientPricing = typeof showClientPricing !== 'undefined' ? showClientPricing : false;
 
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
@@ -108,6 +109,23 @@ table.dataTable tbody tr.hover {
 .price-container .small {
     margin-bottom: 0.2rem;
 }
+
+/* Make dropdown clickable in header */
+[id^="headerRateFilter-"] {
+    pointer-events: all !important;
+    z-index: 1000;
+    position: relative;
+    width: 100% !important;
+}
+
+/* Prevent DataTables from interfering with dropdown container */
+table.dataTable thead th:nth-child(2) div {
+    pointer-events: none;
+}
+
+table.dataTable thead th:nth-child(2) select {
+    pointer-events: all !important;
+}
 </style>
 
 <div class="card border-0 shadow-sm">
@@ -155,8 +173,8 @@ table.dataTable tbody tr.hover {
 
                 <!-- Currency Dropdown -->
                 <div class="d-flex align-items-center gap-1">
-                    <label for="currencyFilter" class="form-label mb-0 text-muted">Moneda:</label>
-                    <select class="form-select" id="currencyFilter" style="min-width: 100px;">
+                    <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
+                    <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
                         <option value="MXN" selected>MXN</option>
                         <option value="USD">USD</option>
                     </select>
@@ -164,8 +182,8 @@ table.dataTable tbody tr.hover {
 
                 <!-- Payment Type Dropdown -->
                 <div class="d-flex align-items-center gap-1">
-                    <label for="paymentTypeFilter" class="form-label mb-0 text-muted">Pago:</label>
-                    <select class="form-select" id="paymentTypeFilter" style="min-width: 140px;">
+                    <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
+                    <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
                         <option value="efectivo" selected>Efectivo</option>
                         <option value="transferencia">Transferencia</option>
                         <% if (!isDepartmentManager) { %>
@@ -180,16 +198,19 @@ table.dataTable tbody tr.hover {
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
                     <tr>
-                        <th style="width: 30%;">Ruta (One-way trip)</th>
-                        <th style="width: 20%;">
+                        <th style="width: 25%;">Ruta (One-way trip)</th>
+                        <th style="width: 30%; min-width: 250px;">
                             <div class="text-center mb-1" style="font-size: 0.875rem; font-weight: 500;">
                                 Seleccionar categoría...
                             </div>
-                            <select class="form-select" id="headerRateFilter" style="min-width: 120px; width: 100%;">
+                            <select class="form-select" id="headerRateFilter-<%= dtTableId %>" style="min-width: 120px; width: 100%;">
                             </select>
                         </th>
-                        <th style="width: 35%;">Notas</th>
+                        <th style="width: 30%;">Notas</th>
                         <th style="width: 15%;">Estado</th>
+                        <% if (dtShowClientPricing) { %>
+                            <th class="text-center" style="width: 15%;">Precio Cliente</th>
+                        <% } %>
                         <% if (dtShowActions) { %>
                             <th class="text-center" style="width: 15%;">Acciones</th>
                         <% } %>
@@ -345,6 +366,7 @@ table.dataTable tbody tr.hover {
         const tableId = '<%= dtTableId %>';
         const apiEndpoint = '<%= dtApiEndpoint %>';
         const showActions = <%= dtShowActions %>;
+        const showClientPricing = <%= dtShowClientPricing %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
         const userRole = '<%= dtUserRole %>';
@@ -534,8 +556,8 @@ table.dataTable tbody tr.hover {
                 {
                     data: null,
                     render: function(data, type, row) {
-                        const selectedRate = $('#headerRateFilter').val();
-                        const selectedRateText = $('#headerRateFilter option:selected').text();
+                        const selectedRate = $(`#headerRateFilter-${tableId}`).val();
+                        const selectedRateText = $(`#headerRateFilter-${tableId} option:selected`).text();
                         
                         // Check if we have price data for the selected rate
                         if (row.priceData && row.priceData.length > 0) {
@@ -676,7 +698,42 @@ table.dataTable tbody tr.hover {
                         return actions;
                     }
                 }] : [])
-            ],
+            ].concat(showClientPricing ? [{
+                data: null,
+                orderable: false,
+                searchable: false,
+                className: 'text-center',
+                render: function(data) {
+                    const serviceId = data.objectId || data.id;
+                    const clientPrice = data.clientPrice || null; // This would come from a client-specific pricing table
+                    
+                    if (clientPrice) {
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(amount);
+                        
+                        return `
+                            <div class="text-center">
+                                <div class="fw-bold text-info mb-1">
+                                    ${formatMXN(clientPrice)}
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary configure-client-price-btn" data-service-id="${serviceId}">
+                                    <i class="ti ti-settings"></i> Editar
+                                </button>
+                            </div>
+                        `;
+                    } else {
+                        return `
+                            <div class="text-center">
+                                <button class="btn btn-sm btn-primary configure-client-price-btn" data-service-id="${serviceId}">
+                                    <i class="ti ti-plus"></i> Configurar
+                                </button>
+                            </div>
+                        `;
+                    }
+                }
+            }] : []),
             language: {
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando traslados...'
@@ -698,8 +755,8 @@ table.dataTable tbody tr.hover {
                 });
                 
                 // Re-apply filters after table redraw
-                const currentPaymentType = $('#paymentTypeFilter').val();
-                const currentCurrency = $('#currencyFilter').val();
+                const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                 setTimeout(() => {
                     // Always apply currency formatting, even for default MXN
                     updatePricesForFilters(currentPaymentType, currentCurrency);
@@ -720,8 +777,8 @@ table.dataTable tbody tr.hover {
                 
                 // Apply initial currency formatting and department manager defaults
                 setTimeout(() => {
-                    const currentPaymentType = $('#paymentTypeFilter').val();
-                    const currentCurrency = $('#currencyFilter').val();
+                    const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                    const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                     
                     // For department managers, ensure transferencia is applied
                     if (isDepartmentManager && currentPaymentType === 'transferencia') {
@@ -778,7 +835,7 @@ table.dataTable tbody tr.hover {
             filteredData = filterServicesByType(filterType);
             
             // Apply current rate prices to filtered data (if any rate is selected)
-            const selectedRate = $('#headerRateFilter').val();
+            const selectedRate = $(`#headerRateFilter-${tableId}`).val();
             if (selectedRate && servicePricesMap.size > 0) {
                 filteredData = applyRatePricesToData(filteredData);
             }
@@ -796,7 +853,7 @@ table.dataTable tbody tr.hover {
                 type: 'GET',
                 success: function(response) {
                     if (response.success && response.data) {
-                        const select = $('#headerRateFilter');
+                        const select = $(`#headerRateFilter-${tableId}`);
                         select.find('option:not(:first)').remove();
                         response.data.forEach(function(rate) {
                             const option = $('<option></option>')
@@ -831,7 +888,7 @@ table.dataTable tbody tr.hover {
         let servicePricesMap = new Map();
 
         // Header rate filter change handler
-        $('#headerRateFilter').on('change', async function() {
+        $(`#headerRateFilter-${tableId}`).on('change', async function() {
             const selectedRate = $(this).val();
             const selectedRateText = $(this).find('option:selected').text();
             
@@ -900,8 +957,8 @@ table.dataTable tbody tr.hover {
                         
                         // Re-apply filters after table update
                         setTimeout(() => {
-                            const currentPaymentType = $('#paymentTypeFilter').val();
-                            const currentCurrency = $('#currencyFilter').val();
+                            const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                            const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                             if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
                                 updatePricesForFilters(currentPaymentType, currentCurrency);
                             }
@@ -930,8 +987,8 @@ table.dataTable tbody tr.hover {
                 
                 // Re-apply filters after table reset
                 setTimeout(() => {
-                    const currentPaymentType = $('#paymentTypeFilter').val();
-                    const currentCurrency = $('#currencyFilter').val();
+                    const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                    const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                     if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
                         updatePricesForFilters(currentPaymentType, currentCurrency);
                     }
@@ -1158,9 +1215,9 @@ table.dataTable tbody tr.hover {
         }
 
         // Payment type filter change handler
-        $('#paymentTypeFilter').on('change', function() {
+        $(`#paymentTypeFilter-${tableId}`).on('change', function() {
             const selectedPaymentType = $(this).val();
-            const selectedCurrency = $('#currencyFilter').val();
+            const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             console.log('Payment type changed:', selectedPaymentType);
             
             if (selectedPaymentType === 'transferencia') {
@@ -1192,9 +1249,9 @@ table.dataTable tbody tr.hover {
         });
 
         // Currency filter change handler
-        $('#currencyFilter').on('change', function() {
+        $(`#currencyFilter-${tableId}`).on('change', function() {
             const selectedCurrency = $(this).val();
-            const selectedPaymentType = $('#paymentTypeFilter').val();
+            const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
             console.log('Currency changed:', selectedCurrency);
             
             if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
@@ -1269,7 +1326,7 @@ table.dataTable tbody tr.hover {
             console.log('💼 Department manager detected - loading Agency Rate first');
             loadCurrentAgencyRate().then(() => {
                 // Set default payment type to transferencia AFTER agency rate is loaded
-                $('#paymentTypeFilter').val('transferencia');
+                $(`#paymentTypeFilter-${tableId}`).val('transferencia');
                 console.log('💼 Agency rate loaded, setting default to Transferencia');
                 
                 // Load exchange rate
@@ -1413,8 +1470,8 @@ table.dataTable tbody tr.hover {
                             
                             // Apply filters to expanded prices
                             setTimeout(() => {
-                                const currentPaymentType = $('#paymentTypeFilter').val();
-                                const currentCurrency = $('#currencyFilter').val();
+                                const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                                const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                                 // Always apply current filters to expanded prices
                                 updatePricesForFilters(currentPaymentType, currentCurrency);
                             }, 100);
@@ -1436,6 +1493,17 @@ table.dataTable tbody tr.hover {
                 
                 button.html('<i class="ti ti-chevron-down me-1"></i>Ver todos')
                       .removeClass('expanded');
+            }
+        });
+
+        // Handle configure client price functionality
+        $(document).on('click', '.configure-client-price-btn', function(e) {
+            e.preventDefault();
+            const button = $(this);
+            const serviceId = button.data('service-id');
+            
+            if (serviceId) {
+                configureServiceClientPrice(serviceId);
             }
         });
 
@@ -1930,6 +1998,36 @@ table.dataTable tbody tr.hover {
                 showSuccessAlert(message);
             } else {
                 showErrorAlert(message);
+            }
+        }
+
+        // Configure Service Client Price functionality (only available when showClientPricing is true)
+        function configureServiceClientPrice(serviceId) {
+            console.log('Configure client price for service:', serviceId);
+            
+            // Find the service data from the DataTable
+            let serviceData = null;
+            
+            if (dataTable) {
+                // Try to find the service data in the DataTable
+                dataTable.rows().every(function() {
+                    const data = this.data();
+                    if ((data.id || data.objectId) === serviceId) {
+                        serviceData = data;
+                        return false; // break the loop
+                    }
+                });
+            }
+            
+            // For now, show an alert with the service information
+            // This should be replaced with a proper modal implementation
+            if (serviceData) {
+                const origin = serviceData.originPOI?.name || 'Sin origen';
+                const destination = serviceData.destinationPOI?.name || 'Sin destino';
+                const route = origin !== 'Sin origen' ? `${origin} → ${destination}` : destination;
+                alert(`Configurar precio cliente para:\n\nRuta: ${route}\nID: ${serviceId}\n\n(Funcionalidad de modal pendiente)`);
+            } else {
+                alert(`Configurar precio cliente para Service ID: ${serviceId}\n\n(Funcionalidad de modal pendiente)`);
             }
         }
     }

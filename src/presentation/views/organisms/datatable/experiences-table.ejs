@@ -123,6 +123,31 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
     </div>
 
     <div class="card-body" id="experiences-content">
+        <!-- Filter Controls -->
+        <div class="d-flex justify-content-end align-items-center mb-3">
+            <!-- Trailing Dropdowns -->
+            <div class="d-flex gap-2 align-items-center">
+                <!-- Currency Dropdown -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
+                    <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
+                        <option value="MXN" selected>MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+
+                <!-- Payment Type Dropdown -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
+                    <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
+                        <option value="efectivo" selected>Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="transf_agencias">Transf. Agencias</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
@@ -133,7 +158,6 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         <th>Duración</th>
                         <th>Mín. Personas</th>
                         <th>Precio</th>
-                        <th>Precio Efectivo</th>
                         <% if (dtUserRole !== 'department_manager') { %><th>Última Act.</th><% } %>
                         <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
                         <% if (dtShowActions || canViewImages) { %>
@@ -775,6 +799,127 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             }
         });
 
+        // Setup experience filter functionality
+        function setupExperienceFilters() {
+            // Store current rates
+            let currentTransferRate = 0;
+            let currentAgencyRate = 0;
+            let currentExchangeRate = 0;
+            
+            // Function to apply USD rounding rules
+            function applyUSDRoundingRules(value) {
+                // Find the base (nearest multiple of 5 below or equal)
+                const base = Math.floor(value / 5) * 5;
+                
+                // Calculate remainder when dividing by 5
+                const remainder = value % 5;
+                
+                if (remainder === 0) {
+                    const lastDigitBeforeDecimal = Math.floor(value) % 10;
+                    if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
+                        return base + 5; // Round up
+                    } else {
+                        return base; // Keep as multiple of 5
+                    }
+                } else if (remainder <= 2.7) {
+                    // Round down to nearest 5
+                    return base;
+                } else {
+                    // Round up to next multiple of 5
+                    return base + 5;
+                }
+            }
+            
+            // Function to update displayed prices
+            function updatePrices(paymentType, currency) {
+                const table = $(`#${tableId}`);
+                if (!table.length) return;
+                
+                // Update price cell (column 6 - Precio)
+                table.find('tbody tr').each(function() {
+                    const row = $(this);
+                    const priceCell = row.find('td:nth-child(6)'); // Precio column only
+                    
+                    priceCell.each(function() {
+                        const cell = $(this);
+                        let originalPrice = cell.attr('data-original-price');
+                        
+                        if (!originalPrice) {
+                            // Extract numeric value from current display
+                            const currentText = cell.text().replace(/[^0-9.]/g, '');
+                            originalPrice = parseFloat(currentText) || 0;
+                            cell.attr('data-original-price', originalPrice);
+                        } else {
+                            originalPrice = parseFloat(originalPrice);
+                        }
+                        
+                        if (originalPrice === 0) return;
+                        
+                        let finalPrice = originalPrice;
+                        
+                        // Apply payment type rates
+                        if (paymentType === 'transferencia') {
+                            finalPrice = finalPrice * 1.035; // 3.5% transfer rate
+                        } else if (paymentType === 'transf_agencias') {
+                            finalPrice = finalPrice * 1.05; // 5% agency rate
+                        }
+                        
+                        // Apply currency conversion
+                        if (currency === 'USD') {
+                            finalPrice = finalPrice / 17.5; // Example exchange rate
+                            finalPrice = applyUSDRoundingRules(finalPrice);
+                            
+                            // Format as USD
+                            const formatted = new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: 'USD',
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0
+                            }).format(finalPrice);
+                            
+                            // Update cell HTML structure
+                            cell.html(`
+                                <div class="text-center">
+                                    <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                        ${formatted}
+                                    </div>
+                                </div>
+                            `);
+                        } else {
+                            // Format as MXN
+                            const formatted = new Intl.NumberFormat('es-MX', {
+                                style: 'currency',
+                                currency: 'MXN'
+                            }).format(finalPrice);
+                            
+                            // Update cell HTML structure
+                            cell.html(`
+                                <div class="text-center">
+                                    <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                        ${formatted}
+                                    </div>
+                                </div>
+                            `);
+                        }
+                    });
+                });
+            }
+            
+            // Currency filter change handler
+            $(`#currencyFilter-${tableId}`).on('change', function() {
+                const selectedCurrency = $(this).val();
+                const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                updatePrices(selectedPaymentType, selectedCurrency);
+            });
+            
+            // Payment type filter change handler
+            $(`#paymentTypeFilter-${tableId}`).on('change', function() {
+                const selectedPaymentType = $(this).val();
+                const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
+                updatePrices(selectedPaymentType, selectedCurrency);
+            });
+        }
+
         const dataTable = $(`#${tableId}`).DataTable({
             processing: true,
             serverSide: true,
@@ -911,38 +1056,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         return `<span class="text-info">${data} personas</span>`;
                     }
                 },
-                // 6. Precio (with surcharge - "Tarjeta/Digital")
-                {
-                    data: 'cost',
-                    render: function(data, type, row) {
-                        const baseCost = data || 0;
-                        const surchargePercentage = window.APP_SETTINGS?.paymentSurchargePercentage || 21.09;
-                        const surcharge = (baseCost * surchargePercentage) / 100;
-                        const totalPrice = baseCost + surcharge;
-
-                        // For sorting and filtering, use total price
-                        if (type === 'sort' || type === 'filter') {
-                            return totalPrice;
-                        }
-
-                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
-                            style: 'currency',
-                            currency: 'MXN'
-                        }).format(amount);
-
-                        return `
-                            <div class="text-center">
-                                <div class="fw-bold text-success" style="font-size: 1rem;">
-                                    ${formatMXN(totalPrice)}
-                                </div>
-                                <div class="text-muted" style="font-size: 0.75rem;">
-                                    <small>Tarjeta/Digital</small>
-                                </div>
-                            </div>
-                        `;
-                    }
-                },
-                // 6. Precio Efectivo (base cost - "Efectivo")
+                // 6. Precio (base price from database)
                 {
                     data: 'cost',
                     render: function(data, type, row) {
@@ -962,9 +1076,6 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             <div class="text-center">
                                 <div class="fw-bold text-primary" style="font-size: 1rem;">
                                     ${formatMXN(baseCost)}
-                                </div>
-                                <div class="text-muted" style="font-size: 0.75rem;">
-                                    <small>Efectivo</small>
                                 </div>
                             </div>
                         `;
@@ -1078,6 +1189,9 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                 });
             }
         });
+
+        // Setup filter functionality for Moneda and Pago dropdowns
+        setupExperienceFilters();
 
         $('#createExperienceBtn').on('click', function() { openExperienceModal(); });
         $(`#${tableId}`).on('click', '.edit-experience-btn', function() { loadExperienceData($(this).data('id')); });

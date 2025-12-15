@@ -16,6 +16,7 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-table';
 const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/tours';
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const dtShowClientPricing = typeof showClientPricing !== 'undefined' ? showClientPricing : false;
 
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
@@ -48,6 +49,55 @@ table.dataTable thead .sorting_desc::after {
 /* Ensure only our button shows */
 td.dt-control {
     position: relative;
+}
+
+/* Prevent sorting on price column header */
+table.dataTable thead th:nth-child(3) {
+    cursor: default !important;
+    position: relative;
+}
+
+table.dataTable thead th:nth-child(3)::before,
+table.dataTable thead th:nth-child(3)::after {
+    display: none !important;
+}
+
+/* Remove sorting class from price column header */
+table.dataTable thead th:nth-child(3).sorting {
+    cursor: default !important;
+    background-image: none !important;
+}
+
+/* Make dropdown clickable in header */
+[id^="headerRateFilter-"] {
+    pointer-events: all !important;
+    z-index: 1000;
+    position: relative;
+    width: 100% !important;
+}
+
+/* Prevent DataTables from interfering with dropdown container */
+table.dataTable thead th:nth-child(3) div {
+    pointer-events: none;
+}
+
+table.dataTable thead th:nth-child(3) select {
+    pointer-events: all !important;
+}
+
+/* Additional CSS for no-sort class */
+table.dataTable thead th.no-sort,
+table.dataTable thead th.no-sort.sorting,
+table.dataTable thead th.no-sort.sorting_asc,
+table.dataTable thead th.no-sort.sorting_desc {
+    cursor: default !important;
+    background-image: none !important;
+    padding-right: 8px !important;
+}
+
+table.dataTable thead th.no-sort::before,
+table.dataTable thead th.no-sort::after {
+    display: none !important;
 }
 
 /* Remove DataTables default row hover effect */
@@ -144,8 +194,8 @@ table.dataTable tbody tr.hover {
             <div class="d-flex gap-2 align-items-center">
                 <!-- Currency Dropdown -->
                 <div class="d-flex align-items-center gap-1">
-                    <label for="currencyFilter" class="form-label mb-0 text-muted">Moneda:</label>
-                    <select class="form-select" id="currencyFilter" style="min-width: 100px;">
+                    <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
+                    <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
                         <option value="MXN" selected>MXN</option>
                         <option value="USD">USD</option>
                     </select>
@@ -153,8 +203,8 @@ table.dataTable tbody tr.hover {
 
                 <!-- Payment Type Dropdown -->
                 <div class="d-flex align-items-center gap-1">
-                    <label for="paymentTypeFilter" class="form-label mb-0 text-muted">Pago:</label>
-                    <select class="form-select" id="paymentTypeFilter" style="min-width: 140px;">
+                    <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
+                    <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
                         <option value="efectivo" selected>Efectivo</option>
                         <option value="transferencia">Transferencia</option>
                         <% if (!isDepartmentManager) { %>
@@ -175,10 +225,13 @@ table.dataTable tbody tr.hover {
                             <div class="text-center mb-1" style="font-size: 0.875rem; font-weight: 500;">
                                 Seleccionar categoría...
                             </div>
-                            <select class="form-select" id="headerRateFilter" style="min-width: 120px; width: 100%;">
+                            <select class="form-select" id="headerRateFilter-<%= dtTableId %>" style="min-width: 120px; width: 100%;">
                             </select>
                         </th>
                         <th style="width: 20%;">Estado</th>
+                        <% if (dtShowClientPricing) { %>
+                            <th class="text-center" style="width: 15%;">Precio Cliente</th>
+                        <% } %>
                         <% if (dtShowActions) { %>
                             <th class="text-center" style="width: 15%;">Acciones</th>
                         <% } %>
@@ -378,6 +431,7 @@ table.dataTable tbody tr.hover {
         const tableId = '<%= dtTableId %>';
         const apiEndpoint = '<%= dtApiEndpoint %>';
         const showActions = <%= dtShowActions %>;
+        const showClientPricing = <%= dtShowClientPricing %>;
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
         const userRole = '<%= dtUserRole %>';
@@ -512,8 +566,8 @@ table.dataTable tbody tr.hover {
                 {
                     data: null,
                     render: function(data, type, row) {
-                        const selectedRate = $('#headerRateFilter').val();
-                        const selectedRateText = $('#headerRateFilter option:selected').text();
+                        const selectedRate = $(`#headerRateFilter-${tableId}`).val();
+                        const selectedRateText = $(`#headerRateFilter-${tableId} option:selected`).text();
                         
                         // Check if we have price data for the selected rate
                         if (row.priceData && row.priceData.length > 0) {
@@ -574,7 +628,8 @@ table.dataTable tbody tr.hover {
                                     </div>`;
                         }
                     },
-                    className: 'price-column'
+                    className: 'price-column',
+                    orderable: false
                 },
                 // 4. Estado
                 {
@@ -585,6 +640,42 @@ table.dataTable tbody tr.hover {
                             : '<span class="badge bg-secondary">Inactivo</span>';
                     }
                 },
+                ...(showClientPricing ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        const tourId = data.objectId || data.id;
+                        const clientPrice = data.clientPrice || null; // This would come from a client-specific pricing table
+                        
+                        if (clientPrice) {
+                            const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                                style: 'currency',
+                                currency: 'MXN'
+                            }).format(amount);
+                            
+                            return `
+                                <div class="text-center">
+                                    <div class="fw-bold text-info mb-1">
+                                        ${formatMXN(clientPrice)}
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary configure-client-price-btn" data-tour-id="${tourId}">
+                                        <i class="ti ti-settings"></i> Editar
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            return `
+                                <div class="text-center">
+                                    <button class="btn btn-sm btn-primary configure-client-price-btn" data-tour-id="${tourId}">
+                                        <i class="ti ti-plus"></i> Configurar
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    }
+                }] : []),
                 ...(showActions ? [{
                     data: null,
                     orderable: false,
@@ -651,6 +742,21 @@ table.dataTable tbody tr.hover {
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
                  '<"row"<"col-sm-12"tr>>' +
                  '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            columnDefs: [
+                {
+                    targets: 2, // Price column (0-indexed)
+                    orderable: false,
+                    searchable: false,
+                    className: 'no-sort'
+                }
+            ],
+            initComplete: function() {
+                // Remove sorting class from price column header after initialization
+                $(`#${tableId} thead th:nth-child(3)`).removeClass('sorting sorting_asc sorting_desc');
+                
+                // Ensure dropdown events are properly bound
+                setupHeaderDropdownEvents();
+            },
             drawCallback: function() {
                 // Reinitialize tooltips after table redraw
                 const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
@@ -659,8 +765,8 @@ table.dataTable tbody tr.hover {
                 });
                 
                 // Re-apply filters after table redraw
-                const currentPaymentType = $('#paymentTypeFilter').val();
-                const currentCurrency = $('#currencyFilter').val();
+                const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                 setTimeout(() => {
                     updatePricesForFilters(currentPaymentType, currentCurrency);
                 }, 50);
@@ -888,9 +994,9 @@ table.dataTable tbody tr.hover {
         }
 
         // Payment type filter change handler
-        $('#paymentTypeFilter').on('change', function() {
+        $(`#paymentTypeFilter-${tableId}`).on('change', function() {
             const selectedPaymentType = $(this).val();
-            const selectedCurrency = $('#currencyFilter').val();
+            const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             
             if (selectedPaymentType === 'transferencia') {
                 if (isDepartmentManager && currentAgencyRate <= 0) {
@@ -918,9 +1024,9 @@ table.dataTable tbody tr.hover {
         });
 
         // Currency filter change handler
-        $('#currencyFilter').on('change', function() {
+        $(`#currencyFilter-${tableId}`).on('change', function() {
             const selectedCurrency = $(this).val();
-            const selectedPaymentType = $('#paymentTypeFilter').val();
+            const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
             
             if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
                 loadCurrentExchangeRate().then(() => {
@@ -991,7 +1097,7 @@ table.dataTable tbody tr.hover {
             console.log('💼 Department manager detected - loading Agency Rate first');
             loadCurrentAgencyRate().then(() => {
                 // Set default payment type to transferencia AFTER agency rate is loaded
-                $('#paymentTypeFilter').val('transferencia');
+                $(`#paymentTypeFilter-${tableId}`).val('transferencia');
                 console.log('💼 Agency rate loaded, setting default to Transferencia');
                 
                 // Load exchange rate
@@ -1016,7 +1122,7 @@ table.dataTable tbody tr.hover {
                 type: 'GET',
                 success: function(response) {
                     if (response.success && response.data) {
-                        const select = $('#headerRateFilter');
+                        const select = $(`#headerRateFilter-${tableId}`);
                         select.find('option:not(:first)').remove();
                         
                         // Filter out Económico rate and add remaining rates
@@ -1045,8 +1151,63 @@ table.dataTable tbody tr.hover {
             });
         }
 
+        // Prevent header sorting when clicking on dropdown
+        $(`#headerRateFilter-${tableId}`).on('click', function(e) {
+            e.stopPropagation(); // Prevent the click from bubbling up to the table header
+            e.stopImmediatePropagation(); // Stop all other handlers
+        });
+
+        // Additional event handlers to ensure dropdown works
+        $(`#headerRateFilter-${tableId}`).on('mousedown', function(e) {
+            e.stopPropagation();
+        });
+
+        $(`#headerRateFilter-${tableId}`).on('focus', function(e) {
+            e.stopPropagation();
+        });
+
+        // Function to setup header dropdown events
+        function setupHeaderDropdownEvents() {
+            const dropdown = $(`#headerRateFilter-${tableId}`);
+            
+            // Remove any existing event listeners to avoid duplicates
+            dropdown.off('click mousedown focus');
+            
+            // Add comprehensive event handling
+            dropdown.on('click', function(e) {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                // Manually trigger dropdown opening if needed
+                if (!this.multiple) {
+                    this.focus();
+                    this.click();
+                }
+            });
+            
+            dropdown.on('mousedown', function(e) {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            });
+            
+            dropdown.on('focus', function(e) {
+                e.stopPropagation();
+            });
+            
+            // Prevent parent header from receiving events
+            dropdown.parent().on('click', function(e) {
+                if (e.target === dropdown[0]) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
+            });
+        }
+
+        // Initial setup
+        setupHeaderDropdownEvents();
+
         // Handle rate filter change in header
-        $('#headerRateFilter').on('change', async function() {
+        $(`#headerRateFilter-${tableId}`).on('change', async function() {
             const selectedRate = $(this).val();
             const selectedRateText = $(this).find('option:selected').text();
             
@@ -1082,8 +1243,8 @@ table.dataTable tbody tr.hover {
                         dataTable.draw();
                         
                         // Apply current filters to the new data
-                        const currentPaymentType = $('#paymentTypeFilter').val();
-                        const currentCurrency = $('#currencyFilter').val();
+                        const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                        const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                         setTimeout(() => {
                             updatePricesForFilters(currentPaymentType, currentCurrency);
                         }, 100);
@@ -1139,6 +1300,7 @@ table.dataTable tbody tr.hover {
                         }
                     },
                     success: function(response) {
+                        console.log('✅ Tour all-prices response:', response);
                         if (response.success && response.data) {
                             // Group prices by rate
                             const pricesByRate = {};
@@ -1249,16 +1411,18 @@ table.dataTable tbody tr.hover {
                             
                             // Apply filters to expanded prices
                             setTimeout(() => {
-                                const currentPaymentType = $('#paymentTypeFilter').val();
-                                const currentCurrency = $('#currencyFilter').val();
+                                const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                                const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                                 updatePricesForFilters(currentPaymentType, currentCurrency);
                             }, 100);
                         } else {
+                            console.error('❌ Invalid response format for tour all-prices:', response);
                             button.html('<i class="ti ti-chevron-down me-1"></i>Error al cargar')
                                   .prop('disabled', false);
                         }
                     },
-                    error: function() {
+                    error: function(xhr, status, error) {
+                        console.error('❌ AJAX Error loading tour all-prices:', { xhr, status, error, url: '/api/tours/' + rowId + '/all-prices' });
                         button.html('<i class="ti ti-chevron-down me-1"></i>Ver todos')
                               .prop('disabled', false);
                         showErrorAlert('Error al cargar precios de todas las tarifas');
@@ -1271,6 +1435,17 @@ table.dataTable tbody tr.hover {
                 
                 button.html('<i class="ti ti-chevron-down me-1"></i>Ver todos')
                       .removeClass('expanded');
+            }
+        });
+
+        // Handle configure client price functionality
+        $(document).on('click', '.configure-client-price-btn', function(e) {
+            e.preventDefault();
+            const button = $(this);
+            const tourId = button.data('tour-id');
+            
+            if (tourId) {
+                configureTourClientPrice(tourId);
             }
         });
 
@@ -1964,6 +2139,34 @@ table.dataTable tbody tr.hover {
                 showSuccessAlert(message);
             } else {
                 showErrorAlert(message);
+            }
+        }
+
+        // Configure Tour Client Price functionality (only available when showClientPricing is true)
+        function configureTourClientPrice(tourId) {
+            console.log('Configure client price for tour:', tourId);
+            
+            // Find the tour data from the DataTable
+            let tourData = null;
+            
+            if (dataTable) {
+                // Try to find the tour data in the DataTable
+                dataTable.rows().every(function() {
+                    const data = this.data();
+                    if ((data.id || data.objectId) === tourId) {
+                        tourData = data;
+                        return false; // break the loop
+                    }
+                });
+            }
+            
+            // For now, show an alert with the tour information
+            // This should be replaced with a proper modal implementation
+            if (tourData) {
+                const destination = tourData.destinationPOI?.name || 'Sin destino';
+                alert(`Configurar precio cliente para:\n\nTour: ${destination}\nID: ${tourId}\n\n(Funcionalidad de modal pendiente)`);
+            } else {
+                alert(`Configurar precio cliente para Tour ID: ${tourId}\n\n(Funcionalidad de modal pendiente)`);
             }
         }
     }
