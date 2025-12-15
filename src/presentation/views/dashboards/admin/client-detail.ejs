@@ -381,13 +381,16 @@ const tarifarioTabs = [
                                             </div>
                                         </div>
                                         <!-- Include Services Table Organism -->
-                                        <%- include('../../organisms/datatable/services-table', {
-                                            tableId: 'client-services-table',
-                                            apiEndpoint: '/api/services',
-                                            userRole: 'client',
-                                            showActions: false,
-                                            showClientPricing: true
-                                        }) %>
+                                        <div data-client-id="<%= clientId %>">
+                                            <%- include('../../organisms/datatable/services-table', {
+                                                tableId: 'client-services-table',
+                                                apiEndpoint: '/api/services',
+                                                userRole: 'client',
+                                                showActions: false,
+                                                showClientPricing: true,
+                                                clientId: clientId
+                                            }) %>
+                                        </div>
                                     <% } else { %>
                                         <!-- Other tabs placeholder -->
                                         <div class="text-center py-5">

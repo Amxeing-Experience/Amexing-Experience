@@ -49,6 +49,7 @@ class ServicesController {
     this.updateServiceRate = this.updateServiceRate.bind(this);
     this.toggleServiceStatus = this.toggleServiceStatus.bind(this);
     this.deleteService = this.deleteService.bind(this);
+    this.saveClientPrices = this.saveClientPrices.bind(this);
   }
 
   /**
@@ -1481,6 +1482,129 @@ class ServicesController {
 
       const message = error.code === 101 ? 'Servicio no encontrado' : 'Error al actualizar la tarifa';
       return this.sendError(res, message, error.code === 101 ? 404 : 500);
+    }
+  }
+
+  /**
+   * Save client-specific prices for a service.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async saveClientPrices(req, res) {
+    try {
+      const { clientId, serviceId, prices } = req.body;
+      const currentUser = req.user;
+
+      // Validate input
+      if (!clientId || !serviceId || !prices || !Array.isArray(prices)) {
+        return this.sendError(res, 'Datos incompletos', 400);
+      }
+
+      // Process each price
+      const objectsToSave = [];
+      const ClientPricesClass = Parse.Object.extend('ClientPrices');
+
+      // First, find and remove existing prices for this client and service
+      const existingQuery = new Parse.Query(ClientPricesClass);
+      const AmexingUser = Parse.Object.extend('AmexingUser');
+      const clientPointer = new AmexingUser();
+      clientPointer.id = clientId;
+
+      existingQuery.equalTo('clientPtr', clientPointer);
+      existingQuery.equalTo('itemType', 'SERVICES');
+      existingQuery.equalTo('itemId', serviceId);
+      existingQuery.equalTo('exists', true);
+
+      const existingPrices = await existingQuery.find({ useMasterKey: true });
+
+      // Create a map to track which prices to update vs create
+      const existingMap = new Map();
+      existingPrices.forEach((price) => {
+        const key = `${price.get('ratePtr').id}_${price.get('vehiclePtr').id}`;
+        existingMap.set(key, price);
+      });
+
+      // Process each new price
+      for (const priceData of prices) {
+        const key = `${priceData.ratePtr}_${priceData.vehiclePtr}`;
+        let priceObject = existingMap.get(key);
+
+        if (priceObject) {
+          // Update existing price
+          priceObject.set('precio', priceData.precio);
+          priceObject.set('basePrice', priceData.basePrice || 0);
+          priceObject.set('active', true);
+          existingMap.delete(key);
+        } else {
+          // Create new price
+          priceObject = new ClientPricesClass();
+
+          const Rate = Parse.Object.extend('Rate');
+          const ratePointer = new Rate();
+          ratePointer.id = priceData.ratePtr;
+
+          const VehicleType = Parse.Object.extend('VehicleType');
+          const vehiclePointer = new VehicleType();
+          vehiclePointer.id = priceData.vehiclePtr;
+
+          priceObject.set('clientPtr', clientPointer);
+          priceObject.set('ratePtr', ratePointer);
+          priceObject.set('vehiclePtr', vehiclePointer);
+          priceObject.set('itemType', 'SERVICES');
+          priceObject.set('itemId', serviceId);
+          priceObject.set('precio', priceData.precio);
+          priceObject.set('basePrice', priceData.basePrice || 0);
+          priceObject.set('currency', 'MXN');
+          priceObject.set('active', true);
+          priceObject.set('exists', true);
+          priceObject.set('createdBy', currentUser ? currentUser.id : null);
+        }
+
+        priceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
+        objectsToSave.push(priceObject);
+      }
+
+      // Mark remaining existing prices as deleted
+      existingMap.forEach((price) => {
+        price.set('exists', false);
+        price.set('active', false);
+        price.set('lastModifiedBy', currentUser ? currentUser.id : null);
+        objectsToSave.push(price);
+      });
+
+      // Save all objects
+      if (objectsToSave.length > 0) {
+        await Parse.Object.saveAll(objectsToSave, { useMasterKey: true });
+      }
+
+      logger.info('Client prices saved successfully', {
+        clientId,
+        serviceId,
+        priceCount: prices.length,
+        userId: currentUser?.id,
+      });
+
+      return res.json({
+        success: true,
+        message: `Se guardaron ${prices.length} precio(s) personalizados`,
+        data: {
+          saved: prices.length,
+          clientId,
+          serviceId,
+        },
+      });
+    } catch (error) {
+      logger.error('Error saving client prices', {
+        error: error.message,
+        stack: error.stack,
+        clientId: req.body?.clientId,
+        serviceId: req.body?.serviceId,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, `Error al guardar los precios: ${error.message}`, 500);
     }
   }
 

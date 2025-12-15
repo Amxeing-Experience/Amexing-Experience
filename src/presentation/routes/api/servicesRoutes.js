@@ -185,4 +185,19 @@ router.delete(
   (req, res) => ServicesController.deleteService(req, res)
 );
 
+/**
+ * POST /api/services/client-prices - Save client-specific prices for a service.
+ *
+ * Access: Admin (level 6+)
+ * Body: { clientId, serviceId, prices: [{ ratePtr, vehiclePtr, precio, basePrice }] }
+ * Returns: Success message with saved count.
+ */
+router.post(
+  '/client-prices',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ServicesController.saveClientPrices(req, res)
+);
+
 module.exports = router;

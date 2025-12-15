@@ -2019,17 +2019,344 @@ table.dataTable thead th:nth-child(2) select {
                 });
             }
             
-            // For now, show an alert with the service information
-            // This should be replaced with a proper modal implementation
             if (serviceData) {
-                const origin = serviceData.originPOI?.name || 'Sin origen';
-                const destination = serviceData.destinationPOI?.name || 'Sin destino';
-                const route = origin !== 'Sin origen' ? `${origin} → ${destination}` : destination;
-                alert(`Configurar precio cliente para:\n\nRuta: ${route}\nID: ${serviceId}\n\n(Funcionalidad de modal pendiente)`);
+                openServiceClientPricingModal(serviceId, serviceData);
             } else {
-                alert(`Configurar precio cliente para Service ID: ${serviceId}\n\n(Funcionalidad de modal pendiente)`);
+                console.error('Service data not found for ID:', serviceId);
+                alert('Error: No se encontró la información del servicio');
             }
         }
+
+        // Function to open the service client pricing modal
+        function openServiceClientPricingModal(serviceId, serviceData) {
+            // Set service info in modal
+            document.getElementById('modalServiceId').value = serviceId;
+            
+            const origin = serviceData.originPOI?.name || 'Sin origen';
+            const destination = serviceData.destinationPOI?.name || 'Sin destino';
+            const route = origin !== 'Sin origen' ? `${origin} → ${destination}` : destination;
+            
+            document.getElementById('serviceRouteName').innerHTML = `<strong>Ruta:</strong> ${route}`;
+            
+            // Load rates and prices for this service
+            loadServiceRatesAndPrices(serviceId, serviceData);
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('serviceClientPricingModal'));
+            modal.show();
+        }
+
+        // Function to load rates and their prices for the service
+        async function loadServiceRatesAndPrices(serviceId, serviceData) {
+            const container = document.getElementById('ratesAndPricesContainer');
+            container.innerHTML = `
+                <div class="text-center py-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando tarifas...</span>
+                    </div>
+                    <p class="text-muted mt-2">Cargando tarifas y precios...</p>
+                </div>
+            `;
+
+            try {
+                // Debug: Log the service data structure
+                console.log('Service data for modal:', serviceData);
+                
+                // Load all rate prices for this specific service
+                const ratePricesResponse = await fetch(`/api/services/${serviceId}/all-rate-prices`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!ratePricesResponse.ok) {
+                    throw new Error('Error al cargar las tarifas y precios');
+                }
+
+                const ratePricesData = await ratePricesResponse.json();
+                const ratePrices = ratePricesData.success ? ratePricesData.data : [];
+                
+                console.log('Loaded rate prices:', ratePrices);
+
+                // Build the rates and prices HTML
+                let ratesHtml = '';
+
+                // Group rate prices by rate
+                const rateGroups = {};
+                ratePrices.forEach(ratePrice => {
+                    const rate = ratePrice.rate;
+                    if (!rate) return;
+                    
+                    const rateId = rate.id;
+                    if (!rateGroups[rateId]) {
+                        rateGroups[rateId] = {
+                            rate: rate,
+                            vehicles: []
+                        };
+                    }
+                    rateGroups[rateId].vehicles.push(ratePrice);
+                });
+
+                // Generate HTML for each rate group
+                Object.keys(rateGroups).forEach(rateId => {
+                    const rateGroup = rateGroups[rateId];
+                    const rate = rateGroup.rate;
+                    
+                    ratesHtml += `
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <span class="badge" style="background-color: ${rate.color || '#6c757d'}">${rate.name}</span>
+                                </h5>
+                                <small class="text-muted">Configurar precios por tipo de vehículo</small>
+                            </div>
+                            <div class="card-body">
+                    `;
+
+                    // Generate HTML for each vehicle type in this rate
+                    rateGroup.vehicles.forEach(ratePrice => {
+                        const vehicleType = ratePrice.vehicleType;
+                        const currentPrice = ratePrice.price || 0;
+                        
+                        ratesHtml += `
+                            <div class="row align-items-center mb-3 pb-3 border-bottom">
+                                <div class="col-md-4">
+                                    <div class="d-flex align-items-center">
+                                        <i class="ti ti-car me-2 text-primary"></i>
+                                        <div>
+                                            <strong>${vehicleType?.name || 'Vehículo'}</strong>
+                                            <br>
+                                            <small class="text-muted">${vehicleType?.code || ''} - Capacidad: ${vehicleType?.defaultCapacity || 'N/A'} pax</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label mb-1">Precio Base:</label>
+                                    <div class="fw-bold text-muted">
+                                        ${currentPrice > 0 ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(currentPrice) : 'Sin precio'}
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="clientPrice_${rateId}_${vehicleType?.id}">Precio Cliente *</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" 
+                                               class="form-control client-price-input" 
+                                               id="clientPrice_${rateId}_${vehicleType?.id}"
+                                               data-rate-id="${rateId}"
+                                               data-vehicle-type-id="${vehicleType?.id}"
+                                               data-rate-name="${rate.name}"
+                                               data-vehicle-name="${vehicleType?.name}"
+                                               step="0.01" 
+                                               min="0" 
+                                               placeholder="0.00"
+                                               value="${currentPrice > 0 ? currentPrice.toFixed(2) : ''}">
+                                        <span class="input-group-text">MXN</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    ratesHtml += `
+                            </div>
+                        </div>
+                    `;
+                });
+
+                if (ratePrices.length === 0) {
+                    ratesHtml = `
+                        <div class="text-center py-4">
+                            <i class="ti ti-info-circle" style="font-size: 2rem; color: #6c757d;"></i>
+                            <h6 class="mt-2 text-muted">No hay tarifas activas</h6>
+                            <p class="text-muted mb-0">No se encontraron tarifas activas para configurar.</p>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML = ratesHtml;
+
+            } catch (error) {
+                console.error('Error loading rates and prices:', error);
+                console.error('Error details:', {
+                    message: error.message,
+                    stack: error.stack,
+                    serviceData: serviceData
+                });
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="ti ti-alert-circle" style="font-size: 2rem; color: #dc3545;"></i>
+                        <h6 class="mt-2 text-danger">Error al cargar</h6>
+                        <p class="text-muted mb-0">No se pudieron cargar las tarifas. Intenta de nuevo.</p>
+                        <small class="text-muted">${error.message}</small>
+                    </div>
+                `;
+            }
+        }
+
+        // Function to save all client prices
+        async function saveAllClientPrices() {
+            const serviceId = document.getElementById('modalServiceId').value;
+            const clientPrices = [];
+
+            // Get client ID from the page context (assuming it's available in the URL or as a data attribute)
+            let clientId = null;
+            
+            // Try to get client ID from URL
+            const urlParams = new URLSearchParams(window.location.pathname.split('/').slice(-1)[0]);
+            const pathSegments = window.location.pathname.split('/');
+            if (pathSegments.includes('clients') && pathSegments.length > pathSegments.indexOf('clients') + 1) {
+                clientId = pathSegments[pathSegments.indexOf('clients') + 1];
+            }
+            
+            // If not found in URL, try to get from a data attribute (if available)
+            if (!clientId) {
+                const clientElement = document.querySelector('[data-client-id]');
+                if (clientElement) {
+                    clientId = clientElement.dataset.clientId;
+                }
+            }
+
+            if (!clientId) {
+                console.error('Error: No se pudo identificar el cliente. Por favor, recarga la página.');
+                
+                // Show error notification if available
+                if (window.showNotification) {
+                    window.showNotification('error', 'Error: No se pudo identificar el cliente. Por favor, recarga la página.');
+                }
+                
+                // Restore button state
+                const saveButton = document.querySelector('#serviceClientPricingModal .btn-primary');
+                if (saveButton) {
+                    saveButton.disabled = false;
+                }
+                return;
+            }
+
+            // Collect all client prices from the form
+            document.querySelectorAll('.client-price-input').forEach(input => {
+                const rateId = input.dataset.rateId;
+                const vehicleTypeId = input.dataset.vehicleTypeId;
+                const rateName = input.dataset.rateName;
+                const vehicleName = input.dataset.vehicleName;
+                const price = parseFloat(input.value) || 0;
+                
+                // Get base price from the displayed value
+                const basePriceElement = input.closest('.row').querySelector('.fw-bold.text-muted');
+                let basePrice = 0;
+                if (basePriceElement) {
+                    const basePriceText = basePriceElement.textContent.replace(/[^0-9.]/g, '');
+                    basePrice = parseFloat(basePriceText) || 0;
+                }
+
+                // Only add prices that are different from base price
+                if (price > 0 && price !== basePrice) {
+                    clientPrices.push({
+                        ratePtr: rateId,
+                        vehiclePtr: vehicleTypeId,
+                        precio: price,
+                        basePrice: basePrice,
+                        rateName: rateName,
+                        vehicleName: vehicleName
+                    });
+                }
+            });
+
+            if (clientPrices.length === 0) {
+                // Show warning in console instead of alert
+                console.warn('No hay cambios en los precios. Ingresa precios diferentes a los precios base.');
+                
+                // Show notification if available
+                if (window.showNotification) {
+                    window.showNotification('warning', 'No hay cambios en los precios. Ingresa precios diferentes a los precios base.');
+                }
+                
+                // Restore button state
+                saveButton.disabled = false;
+                return;
+            }
+
+            console.log('Saving client prices:', {
+                clientId: clientId,
+                serviceId: serviceId,
+                prices: clientPrices
+            });
+
+            // Show loading state
+            const saveButton = document.querySelector('#serviceClientPricingModal .btn-primary');
+            const originalText = saveButton.innerHTML;
+            saveButton.disabled = true;
+            saveButton.innerHTML = '<i class="ti ti-loader-2 me-1 spinner-border spinner-border-sm"></i>Guardando...';
+
+            try {
+                // Save client prices using API
+                const response = await fetch('/api/services/client-prices', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
+                    },
+                    body: JSON.stringify({
+                        clientId: clientId,
+                        serviceId: serviceId,
+                        prices: clientPrices
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error al guardar los precios');
+                }
+
+                const result = await response.json();
+
+                // Show success message
+                const totalPrices = clientPrices.length;
+                const pricesList = clientPrices.map(p => 
+                    `${p.vehicleName} (${p.rateName}): ${new Intl.NumberFormat('es-MX', { 
+                        style: 'currency', 
+                        currency: 'MXN' 
+                    }).format(p.precio)}`
+                ).join('\n');
+                
+                // Show success notification if available (no alerts)
+                if (window.showNotification) {
+                    window.showNotification('success', result.message || `Se guardaron ${totalPrices} precio(s) personalizados para este servicio.`);
+                }
+                
+                // Log success for debugging
+                console.log('✅ Client prices saved:', result.message || 'Precios guardados exitosamente');
+
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('serviceClientPricingModal'));
+                if (modal) {
+                    modal.hide();
+                }
+
+                // Don't refresh the table automatically to avoid errors
+                // The prices are saved but the display will update on next page load
+                console.log('Client prices saved successfully. Refresh the page to see updated prices.');
+
+            } catch (error) {
+                console.error('Error saving client prices:', error);
+                
+                // Show error message if notification system is available
+                if (window.showNotification) {
+                    window.showNotification('error', 'Error al guardar los precios: ' + error.message);
+                }
+                
+                // Log error for debugging
+                console.error('❌ Error saving prices:', error.message);
+            } finally {
+                // Restore button state
+                saveButton.disabled = false;
+                saveButton.innerHTML = originalText;
+            }
+        }
+        
+        // Store the function in window scope for modal access
+        window._saveAllClientPrices = saveAllClientPrices;
     }
 
     // Initialize when DOM is ready
@@ -2038,8 +2365,78 @@ table.dataTable thead th:nth-child(2) select {
     } else {
         initWhenReady();
     }
+    
+    // Attach event listener after DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(function() {
+                const saveBtn = document.getElementById('saveClientPricesBtn');
+                if (saveBtn && window._saveAllClientPrices) {
+                    saveBtn.addEventListener('click', window._saveAllClientPrices);
+                }
+            }, 500);
+        });
+    } else {
+        setTimeout(function() {
+            const saveBtn = document.getElementById('saveClientPricesBtn');
+            if (saveBtn && window._saveAllClientPrices) {
+                saveBtn.addEventListener('click', window._saveAllClientPrices);
+            }
+        }, 500);
+    }
 })();
 </script>
+
+<!-- Service Client Pricing Modal -->
+<div class="modal fade" id="serviceClientPricingModal" tabindex="-1" aria-labelledby="serviceClientPricingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="serviceClientPricingModalLabel">
+                    <i class="ti ti-currency-dollar me-2"></i>Configurar Precios Cliente - Traslado
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Service Info -->
+                <div class="mb-4">
+                    <div class="card bg-light">
+                        <div class="card-body py-3">
+                            <h6 class="card-title mb-2">
+                                <i class="ti ti-route me-1"></i>Información del Traslado
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <p class="mb-0" id="serviceRouteName"><strong>Ruta:</strong> <span class="text-muted">Cargando...</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rates and Prices -->
+                <div class="mb-4">
+                    <h6 class="mb-3">
+                        <i class="ti ti-list me-1"></i>Precios por Tarifa
+                    </h6>
+                    <div id="ratesAndPricesContainer">
+                        <!-- Dynamic content will be loaded here -->
+                    </div>
+                </div>
+
+                <input type="hidden" id="modalServiceId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveClientPricesBtn">
+                    <i class="ti ti-device-floppy me-1"></i>Guardar Precios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Custom CSS for expandable prices -->
 <style>
