@@ -145,6 +145,72 @@
       "dependencies": ["001-seed-service-types", "005-seed-rates", "006-seed-vehicle-types", "009-seed-pois-tours"],
       "idempotent": true,
       "order": 10
+    },
+    {
+      "name": "013-seed-tour-catalog",
+      "file": "013-seed-tour-catalog.js",
+      "description": "Create Tour catalog from Tours table (rate-agnostic unique tours without passenger limits)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["009-seed-pois-tours", "010-seed-tours-from-csv"],
+      "idempotent": true,
+      "order": 13
+    },
+    {
+      "name": "015-populate-tour-prices-first-class",
+      "file": "015-populate-tour-prices-first-class.js",
+      "description": "Populate TourPrices with First Class rates for SEDAN and SUBURBAN vehicle types",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["013-seed-tour-catalog", "005-seed-rates", "006-seed-vehicle-types"],
+      "idempotent": true,
+      "order": 15
+    },
+    {
+      "name": "016-populate-tour-prices-green-class",
+      "file": "016-populate-tour-prices-green-class.js",
+      "description": "Populate TourPrices with Green Class rates for MODEL 3 and MODEL Y vehicle types",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["013-seed-tour-catalog", "005-seed-rates", "006-seed-vehicle-types"],
+      "idempotent": true,
+      "order": 16
+    },
+    {
+      "name": "017-populate-tour-prices-premium",
+      "file": "017-populate-tour-prices-premium.js",
+      "description": "Populate TourPrices with Premium rates for SEDAN, SUBURBAN, and SPRINTER vehicle types",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["013-seed-tour-catalog", "005-seed-rates", "006-seed-vehicle-types"],
+      "idempotent": true,
+      "order": 17
+    },
+    {
+      "name": "018-update-tour-prices-from-tours",
+      "file": "018-update-tour-prices-from-tours.js",
+      "description": "Update TourPrices with actual prices from Tours table by matching vehicleType, rate, and destinationPOI",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["015-populate-tour-prices-first-class", "016-populate-tour-prices-green-class", "017-populate-tour-prices-premium", "010-seed-tours-from-csv"],
+      "idempotent": true,
+      "order": 18
+    },
+    {
+      "name": "019-validate-tour-prices",
+      "file": "019-validate-tour-prices.js",
+      "description": "Validate TourPrices after price update to ensure actual prices from Tours table were applied",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": ["development", "staging", "production"],
+      "dependencies": ["018-update-tour-prices-from-tours"],
+      "idempotent": true,
+      "order": 19
     }
   ],
   "notes": [

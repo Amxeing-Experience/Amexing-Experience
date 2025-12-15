@@ -182,8 +182,10 @@ table.dataTable tbody tr.hover {
                     <tr>
                         <th style="width: 30%;">Ruta (One-way trip)</th>
                         <th style="width: 20%;">
+                            <div class="text-center mb-1" style="font-size: 0.875rem; font-weight: 500;">
+                                Seleccionar categoría...
+                            </div>
                             <select class="form-select" id="headerRateFilter" style="min-width: 120px; width: 100%;">
-                                <option value="">Seleccionar tarifa...</option>
                             </select>
                         </th>
                         <th style="width: 35%;">Notas</th>
@@ -565,13 +567,13 @@ table.dataTable tbody tr.hover {
                                 `;
                             }).join('');
                             
-                            // Always show "Ver todas las tarifas" button to see other rates
+                            // Always show "Ver todos" button to see other rates
                             const expandButton = `
                                 <button class="btn btn-link btn-sm p-0 mt-1 expand-prices-btn" 
                                         data-row-id="${row.id || row.objectId}"
                                         style="font-size: 0.75rem; text-decoration: none;">
                                     <i class="ti ti-chevron-down me-1"></i>
-                                    Ver todas las tarifas
+                                    Ver todos
                                 </button>`;
                             
                             return `<div class="price-container" data-row-id="${row.id || row.objectId}">
@@ -588,7 +590,7 @@ table.dataTable tbody tr.hover {
                                         data-row-id="${row.id || row.objectId}"
                                         style="font-size: 0.75rem; text-decoration: none;">
                                     <i class="ti ti-chevron-down me-1"></i>
-                                    Ver todas las tarifas
+                                    Ver todos
                                 </button>`;
                                 
                             return `<div class="price-container" data-row-id="${row.id || row.objectId}">
@@ -1422,7 +1424,7 @@ table.dataTable tbody tr.hover {
                         }
                     },
                     error: function() {
-                        button.html('<i class="ti ti-chevron-down me-1"></i>Ver todas las tarifas')
+                        button.html('<i class="ti ti-chevron-down me-1"></i>Ver todos')
                               .prop('disabled', false);
                         showErrorAlert('Error al cargar precios de todas las tarifas');
                     }
@@ -1432,7 +1434,7 @@ table.dataTable tbody tr.hover {
                 // Collapse - hide child row and restore original state
                 dtRow.child.hide();
                 
-                button.html('<i class="ti ti-chevron-down me-1"></i>Ver todas las tarifas')
+                button.html('<i class="ti ti-chevron-down me-1"></i>Ver todos')
                       .removeClass('expanded');
             }
         });

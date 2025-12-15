@@ -6,10 +6,7 @@
  *
  * Data Structure:
  * - destinationPOI: Destination point (required)
- * - vehicleType: Vehicle type (required)
  * - time: Duration in minutes (required)
- * - minPassengers: Minimum passengers (optional)
- * - maxPassengers: Maximum passengers (optional)
  * - notes: Tour description/notes (optional)
  * - availability: New availability format (optional)
  * - availableDays: Legacy availability format (optional)
@@ -19,13 +16,13 @@
  * - exists: Logical deletion flag (boolean)..
  *
  * Business Logic:
- * - Each unique combination of destination-vehicle-duration creates one tour
+ * - Each unique combination of destination-duration creates one tour
  * - Rate-specific pricing is handled separately in TourPrices table
- * - Preserves all tour metadata (duration, passenger limits, availability).
+ * - Preserves all tour metadata (duration, availability).
  *
  * Configuration:
  * - Idempotent: true - Can be run multiple times safely, creates unique combinations only
- * - Dependencies: 009-seed-pois-tours, 006-seed-vehicle-types, 010-seed-tours-from-csv
+ * - Dependencies: 009-seed-pois-tours, 010-seed-tours-from-csv
  * @author Denisse Maldonado
  * @version 1.0.0
  * @since 1.0.0
@@ -33,42 +30,22 @@
 
 const Parse = require('parse/node');
 const logger = require('../../src/infrastructure/logger');
-const SeedTracker = require('../global/seeds/seed-tracker');
 
 // Seed configuration
 const SEED_NAME = '013-seed-tour-catalog';
 const VERSION = '1.0.0';
 
 /**
- * Main seed execution function..
- * @returns {Promise<object>} Execution result with statistics
- * @example
- * const result = await seed();
+ * Run the seed
+ * @returns {Promise<object>} Seed result with statistics
  */
-async function seed() {
-  const tracker = new SeedTracker();
-  const environment = process.env.NODE_ENV || 'development';
+async function run() {
+  const startTime = Date.now();
+  const stats = { created: 0, skipped: 0, errors: 0 };
 
-  logger.info(`🌱 Starting ${SEED_NAME} v${VERSION}`, {
-    environment,
-    seed: SEED_NAME,
-  });
+  logger.info(`🌱 Starting ${SEED_NAME} v${VERSION}`);
 
   try {
-    // Check if seed already executed
-    const existingExecution = await tracker.getSeedExecution(SEED_NAME, environment);
-    if (existingExecution && existingExecution.success) {
-      logger.info(`✅ Seed ${SEED_NAME} already executed successfully in ${environment}`, {
-        lastExecuted: existingExecution.executedAt,
-        version: existingExecution.version,
-      });
-      return existingExecution;
-    }
-
-    // Start tracking
-    const execution = await tracker.startSeed(SEED_NAME, VERSION, environment);
-    const stats = { created: 0, skipped: 0, errors: 0 };
-
     // ==========================================
     // STEP 1: GET ALL TOURS FROM TOURS TABLE
     // ==========================================
@@ -78,7 +55,6 @@ async function seed() {
     const toursQuery = new Parse.Query(ToursClass);
     toursQuery.equalTo('exists', true);
     toursQuery.include('destinationPOI');
-    toursQuery.include('vehicleType');
     toursQuery.include('rate');
     toursQuery.limit(500);
 
@@ -92,17 +68,13 @@ async function seed() {
 
     for (const tour of originalTours) {
       const destinationPOI = tour.get('destinationPOI');
-      const vehicleType = tour.get('vehicleType');
       const time = tour.get('time');
 
-      // A tour is valid if it has destinationPOI + vehicleType + time
-      if (destinationPOI && vehicleType && time) {
+      // A tour is valid if it has destinationPOI + time
+      if (destinationPOI && time) {
         validTours.push({
           destinationPOI,
-          vehicleType,
           time,
-          minPassengers: tour.get('minPassengers'),
-          maxPassengers: tour.get('maxPassengers'),
           notes: tour.get('notes') || tour.get('note') || '',
           availability: tour.get('availability'),
           availableDays: tour.get('availableDays'),
@@ -123,8 +95,8 @@ async function seed() {
     let duplicates = 0;
 
     for (const tourData of validTours) {
-      // Create unique key: destination-vehicle-time
-      const tourKey = `${tourData.destinationPOI.id}-${tourData.vehicleType.id}-${tourData.time}`;
+      // Create unique key: destination-time
+      const tourKey = `${tourData.destinationPOI.id}-${tourData.time}`;
 
       if (!uniqueTours.has(tourKey)) {
         uniqueTours.set(tourKey, tourData);
@@ -133,8 +105,6 @@ async function seed() {
         const existing = uniqueTours.get(tourKey);
         const merged = {
           ...existing,
-          minPassengers: existing.minPassengers || tourData.minPassengers,
-          maxPassengers: existing.maxPassengers || tourData.maxPassengers,
           notes: existing.notes || tourData.notes,
           availability: existing.availability || tourData.availability,
           availableDays: existing.availableDays || tourData.availableDays,
@@ -158,7 +128,6 @@ async function seed() {
         // Check if tour already exists
         const existingQuery = new Parse.Query(TourClass);
         existingQuery.equalTo('destinationPOI', tourData.destinationPOI);
-        existingQuery.equalTo('vehicleType', tourData.vehicleType);
         existingQuery.equalTo('time', tourData.time);
         existingQuery.equalTo('exists', true);
 
@@ -166,7 +135,6 @@ async function seed() {
 
         if (existingTour) {
           stats.skipped += 1;
-          // eslint-disable-next-line no-continue
           continue;
         }
 
@@ -174,16 +142,9 @@ async function seed() {
         const newTour = new TourClass();
 
         newTour.set('destinationPOI', tourData.destinationPOI);
-        newTour.set('vehicleType', tourData.vehicleType);
         newTour.set('time', tourData.time);
 
         // Optional fields
-        if (tourData.minPassengers != null) {
-          newTour.set('minPassengers', tourData.minPassengers);
-        }
-        if (tourData.maxPassengers != null) {
-          newTour.set('maxPassengers', tourData.maxPassengers);
-        }
         if (tourData.notes) {
           newTour.set('notes', tourData.notes);
         }
@@ -215,38 +176,27 @@ async function seed() {
       }
     }
 
-    // Complete tracking
-    const result = await tracker.completeSeed(execution.id, stats);
+    const duration = Date.now() - startTime;
 
     logger.info(`✅ Seed ${SEED_NAME} completed successfully`, {
-      environment,
       stats,
-      duration: `${result.duration}ms`,
+      duration: `${duration}ms`,
     });
 
-    return result;
+    return {
+      success: true,
+      duration,
+      statistics: stats,
+    };
   } catch (error) {
     logger.error(`❌ Seed ${SEED_NAME} failed:`, error.message);
-    throw error;
+    throw new Error(`Seed failed: ${error.message}`);
   }
 }
 
 // Export for use by seed runner
 module.exports = {
-  name: SEED_NAME,
   version: VERSION,
-  description: 'Create Tour catalog from Tours table (rate-agnostic unique tours)',
-  dependencies: ['009-seed-pois-tours', '006-seed-vehicle-types', '010-seed-tours-from-csv'],
-  seed,
+  description: 'Create Tour catalog from Tours table (rate-agnostic unique tours without vehicle type)',
+  run,
 };
-
-// Run directly if called
-if (require.main === module) {
-  seed().then(() => {
-    process.exit(0);
-  }).catch((error) => {
-    // eslint-disable-next-line no-console
-    console.error('Seed failed:', error);
-    process.exit(1);
-  });
-}

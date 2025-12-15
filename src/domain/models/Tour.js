@@ -6,10 +6,7 @@
  *
  * Schema:
  * - destinationPOI: Pointer to POI table (destination location)
- * - vehicleType: Pointer to VehicleType table (MODEL 3, MODEL Y)
  * - time: Number (duration in minutes)
- * - minPassengers: Number (minimum passengers, optional)
- * - maxPassengers: Number (maximum passengers, optional)
  * - notes: String (tour description/notes, optional)
  * - availability: Array (new availability format, optional)
  * - availableDays: Array (legacy availability format, optional)
@@ -20,11 +17,10 @@
  *
  * Relationships:
  * - destinationPOI -> POI (many-to-one)
- * - vehicleType -> VehicleType (many-to-one)
  * - TourPrices -> Tour (one-to-many, inverse).
  * @author Denisse Maldonado
  * @version 1.0.0
- * @since 2024-12-11
+ * @since 2024-12-15
  */
 
 const Parse = require('parse/node');
@@ -59,26 +55,6 @@ class Tour extends Parse.Object {
   }
 
   /**
-   * Get vehicle type.
-   * @returns {Parse.Object|null} VehicleType object or null.
-   * @example
-   */
-  getVehicleType() {
-    return this.get('vehicleType');
-  }
-
-  /**
-   * Set vehicle type.
-   * @param {Parse.Object} vehicleType VehicleType object.
-   * @returns {Tour} This instance for chaining.
-   * @example
-   */
-  setVehicleType(vehicleType) {
-    this.set('vehicleType', vehicleType);
-    return this;
-  }
-
-  /**
    * Get tour duration in minutes.
    * @returns {number} Duration in minutes.
    * @example
@@ -95,54 +71,6 @@ class Tour extends Parse.Object {
    */
   setTime(time) {
     this.set('time', parseInt(time, 10));
-    return this;
-  }
-
-  /**
-   * Get minimum passengers.
-   * @returns {number|null} Minimum passengers or null.
-   * @example
-   */
-  getMinPassengers() {
-    return this.get('minPassengers');
-  }
-
-  /**
-   * Set minimum passengers.
-   * @param {number|null} minPassengers Minimum passengers.
-   * @returns {Tour} This instance for chaining.
-   * @example
-   */
-  setMinPassengers(minPassengers) {
-    if (minPassengers !== null && minPassengers !== undefined) {
-      this.set('minPassengers', parseInt(minPassengers, 10));
-    } else {
-      this.unset('minPassengers');
-    }
-    return this;
-  }
-
-  /**
-   * Get maximum passengers.
-   * @returns {number|null} Maximum passengers or null.
-   * @example
-   */
-  getMaxPassengers() {
-    return this.get('maxPassengers');
-  }
-
-  /**
-   * Set maximum passengers.
-   * @param {number|null} maxPassengers Maximum passengers.
-   * @returns {Tour} This instance for chaining.
-   * @example
-   */
-  setMaxPassengers(maxPassengers) {
-    if (maxPassengers !== null && maxPassengers !== undefined) {
-      this.set('maxPassengers', parseInt(maxPassengers, 10));
-    } else {
-      this.unset('maxPassengers');
-    }
     return this;
   }
 
@@ -313,25 +241,22 @@ class Tour extends Parse.Object {
    */
   getDisplayName() {
     const destination = this.getDestinationPOI();
-    const vehicleType = this.getVehicleType();
     const time = this.getTime();
 
     const destinationName = destination ? destination.get('name') : 'Unknown Destination';
-    const vehicleName = vehicleType ? vehicleType.get('name') : 'Unknown Vehicle';
     const timeHours = Math.round((time / 60) * 10) / 10; // Round to 1 decimal
 
-    return `${destinationName} | ${vehicleName} | ${timeHours}h`;
+    return `${destinationName} | ${timeHours}h`;
   }
 
   /**
    * Create standard Tour record with required fields.
    * @param {object} data Tour data.
    * @param {Parse.Object} data.destinationPOI POI object.
-   * @param {Parse.Object} data.vehicleType VehicleType object  
-   * @param {number} data.time Duration in minutes
-   * @param {boolean} [data.active=true] Active status
-   * @param {boolean} [data.exists=true] Exists status
-   * @returns {Tour} New Tour instance
+   * @param {number} data.time Duration in minutes.
+   * @param {boolean} [data.active] Active status.
+   * @param {boolean} [data.exists] Exists status.
+   * @returns {Tour} New Tour instance.
    * @example
    */
   static createTour(data) {
@@ -339,16 +264,9 @@ class Tour extends Parse.Object {
 
     // Required fields
     tour.setDestinationPOI(data.destinationPOI);
-    tour.setVehicleType(data.vehicleType);
     tour.setTime(data.time);
 
     // Optional fields
-    if (data.minPassengers !== undefined) {
-      tour.setMinPassengers(data.minPassengers);
-    }
-    if (data.maxPassengers !== undefined) {
-      tour.setMaxPassengers(data.maxPassengers);
-    }
     if (data.notes) {
       tour.setNotes(data.notes);
     }
@@ -381,7 +299,7 @@ class Tour extends Parse.Object {
     const query = new Parse.Query(Tour);
     query.equalTo('active', true);
     query.equalTo('exists', true);
-    query.include(['destinationPOI', 'vehicleType']);
+    query.include(['destinationPOI']);
     return query;
   }
 
@@ -395,21 +313,7 @@ class Tour extends Parse.Object {
     const query = new Parse.Query(Tour);
     query.equalTo('destinationPOI', destinationPOI);
     query.equalTo('exists', true);
-    query.include(['destinationPOI', 'vehicleType']);
-    return query;
-  }
-
-  /**
-   * Query helper to get tours by vehicle type.
-   * @param {Parse.Object} vehicleType VehicleType object.
-   * @returns {Parse.Query} Query for tours with specific vehicle type.
-   * @example
-   */
-  static getToursByVehicleTypeQuery(vehicleType) {
-    const query = new Parse.Query(Tour);
-    query.equalTo('vehicleType', vehicleType);
-    query.equalTo('exists', true);
-    query.include(['destinationPOI', 'vehicleType']);
+    query.include(['destinationPOI']);
     return query;
   }
 }

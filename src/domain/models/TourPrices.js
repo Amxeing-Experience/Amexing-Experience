@@ -7,19 +7,21 @@
  * Schema:
  * - ratePtr: Pointer to Rate table (Green Class, Premium, First Class, etc.)
  * - tourPtr: Pointer to Tour table (tour catalog entry)
- * - price: Number (price in MXN for this rate-tour combination)
+ * - vehicleType: Pointer to VehicleType table (SEDAN, SUBURBAN, etc.)
+ * - price: Number (price in MXN for this rate-tour-vehicle combination)
  * - currency: String (currency code, default 'MXN')
  * - active: Boolean (true = price is available for booking)
  * - exists: Boolean (true = visible, false = logically deleted).
  *
  * Relationships:
  * - ratePtr -> Rate (many-to-one)
- * - tourPtr -> Tour (many-to-one).
+ * - tourPtr -> Tour (many-to-one)
+ * - vehicleType -> VehicleType (many-to-one).
  *
  * Business Logic:
- * - Each Tour can have multiple TourPrices (one per Rate)
- * - Each Rate can have multiple TourPrices (one per Tour)
- * - Unique constraint: (ratePtr + tourPtr) combination should be unique.
+ * - Each Tour can have multiple TourPrices (one per Rate + VehicleType combination)
+ * - Each Rate can have multiple TourPrices (one per Tour + VehicleType combination)
+ * - Unique constraint: (ratePtr + tourPtr + vehicleType) combination should be unique.
  * @author Denisse Maldonado
  * @version 1.0.0
  * @since 2024-12-11
@@ -73,6 +75,26 @@ class TourPrices extends Parse.Object {
    */
   setTour(tour) {
     this.set('tourPtr', tour);
+    return this;
+  }
+
+  /**
+   * Get vehicle type.
+   * @returns {Parse.Object|null} VehicleType object or null.
+   * @example
+   */
+  getVehicleType() {
+    return this.get('vehicleType');
+  }
+
+  /**
+   * Set vehicle type.
+   * @param {Parse.Object} vehicleType VehicleType object.
+   * @returns {TourPrices} This instance for chaining.
+   * @example
+   */
+  setVehicleType(vehicleType) {
+    this.set('vehicleType', vehicleType);
     return this;
   }
 
@@ -179,12 +201,14 @@ class TourPrices extends Parse.Object {
   getDisplayName() {
     const rate = this.getRate();
     const tour = this.getTour();
+    const vehicleType = this.getVehicleType();
 
     const rateName = rate ? rate.get('name') : 'Unknown Rate';
     const tourName = tour ? tour.getDisplayName() : 'Unknown Tour';
+    const vehicleName = vehicleType ? vehicleType.get('name') : 'Unknown Vehicle';
     const price = this.getFormattedPrice();
 
-    return `${tourName} | ${rateName} | ${price}`;
+    return `${tourName} | ${vehicleName} | ${rateName} | ${price}`;
   }
 
   /**
@@ -192,6 +216,7 @@ class TourPrices extends Parse.Object {
    * @param {object} data TourPrices data.
    * @param {Parse.Object} data.rate Rate object.
    * @param {Parse.Object} data.tour Tour object.
+   * @param {Parse.Object} data.vehicleType VehicleType object.
    * @param {number} data.price Price amount.
    * @param {string} [data.currency] Currency code.
    * @param {boolean} [data.active] Active status.
@@ -205,6 +230,7 @@ class TourPrices extends Parse.Object {
     // Required fields
     tourPrice.setRate(data.rate);
     tourPrice.setTour(data.tour);
+    tourPrice.setVehicleType(data.vehicleType);
     tourPrice.setPrice(data.price);
 
     // Optional fields
@@ -224,7 +250,7 @@ class TourPrices extends Parse.Object {
     const query = new Parse.Query(TourPrices);
     query.equalTo('active', true);
     query.equalTo('exists', true);
-    query.include(['ratePtr', 'tourPtr', 'tourPtr.destinationPOI', 'tourPtr.vehicleType']);
+    query.include(['ratePtr', 'tourPtr', 'vehicleType', 'tourPtr.destinationPOI']);
     return query;
   }
 
@@ -238,7 +264,7 @@ class TourPrices extends Parse.Object {
     const query = new Parse.Query(TourPrices);
     query.equalTo('ratePtr', rate);
     query.equalTo('exists', true);
-    query.include(['ratePtr', 'tourPtr', 'tourPtr.destinationPOI', 'tourPtr.vehicleType']);
+    query.include(['ratePtr', 'tourPtr', 'vehicleType', 'tourPtr.destinationPOI']);
     return query;
   }
 
@@ -252,7 +278,7 @@ class TourPrices extends Parse.Object {
     const query = new Parse.Query(TourPrices);
     query.equalTo('tourPtr', tour);
     query.equalTo('exists', true);
-    query.include(['ratePtr', 'tourPtr', 'tourPtr.destinationPOI', 'tourPtr.vehicleType']);
+    query.include(['ratePtr', 'tourPtr', 'vehicleType', 'tourPtr.destinationPOI']);
     return query;
   }
 
@@ -268,7 +294,7 @@ class TourPrices extends Parse.Object {
     query.equalTo('ratePtr', rate);
     query.equalTo('tourPtr', tour);
     query.equalTo('exists', true);
-    query.include(['ratePtr', 'tourPtr', 'tourPtr.destinationPOI', 'tourPtr.vehicleType']);
+    query.include(['ratePtr', 'tourPtr', 'vehicleType', 'tourPtr.destinationPOI']);
     return query;
   }
 
@@ -286,7 +312,7 @@ class TourPrices extends Parse.Object {
     const query = new Parse.Query(TourPrices);
     query.matchesQuery('tourPtr', tourQuery);
     query.equalTo('exists', true);
-    query.include(['ratePtr', 'tourPtr', 'tourPtr.destinationPOI', 'tourPtr.vehicleType']);
+    query.include(['ratePtr', 'tourPtr', 'vehicleType', 'tourPtr.destinationPOI']);
     return query;
   }
 
@@ -297,14 +323,28 @@ class TourPrices extends Parse.Object {
    * @example
    */
   static getTourPricesByVehicleTypeQuery(vehicleType) {
-    const tourQuery = new Parse.Query('Tour');
-    tourQuery.equalTo('vehicleType', vehicleType);
-    tourQuery.equalTo('exists', true);
-
     const query = new Parse.Query(TourPrices);
-    query.matchesQuery('tourPtr', tourQuery);
+    query.equalTo('vehicleType', vehicleType);
     query.equalTo('exists', true);
-    query.include(['ratePtr', 'tourPtr', 'tourPtr.destinationPOI', 'tourPtr.vehicleType']);
+    query.include(['ratePtr', 'tourPtr', 'vehicleType', 'tourPtr.destinationPOI']);
+    return query;
+  }
+
+  /**
+   * Query helper to get tour price by rate, tour and vehicle type combination.
+   * @param {Parse.Object} rate Rate object.
+   * @param {Parse.Object} tour Tour object.
+   * @param {Parse.Object} vehicleType VehicleType object.
+   * @returns {Parse.Query} Query for specific rate-tour-vehicle combination.
+   * @example
+   */
+  static getTourPriceByRateAndTourAndVehicleQuery(rate, tour, vehicleType) {
+    const query = new Parse.Query(TourPrices);
+    query.equalTo('ratePtr', rate);
+    query.equalTo('tourPtr', tour);
+    query.equalTo('vehicleType', vehicleType);
+    query.equalTo('exists', true);
+    query.include(['ratePtr', 'tourPtr', 'vehicleType', 'tourPtr.destinationPOI']);
     return query;
   }
 
