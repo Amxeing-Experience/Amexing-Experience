@@ -20,6 +20,11 @@
 const PriceAdjustments = require('../../../domain/models/PriceAdjustments');
 const logger = require('../../../infrastructure/logger');
 
+/**
+ * Price Adjustments Controller
+ * Handles price adjustment operations including history retrieval and data management.
+ * Provides endpoints for DataTables server-side processing and price adjustment queries.
+ */
 class PriceAdjustmentsController {
   /**
    * Get adjustment history by type with DataTables server-side processing.

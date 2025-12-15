@@ -152,7 +152,12 @@ class ServicesController {
         }
       }
 
-      // Helper function to create base query (OR queries can't be cloned)
+      /**
+       * Helper function to create base query (OR queries can't be cloned)
+       * Creates a Parse query with aeropuerto-specific filters or general service filters.
+       * @returns {Parse.Query} Base query for services.
+       * @example
+       */
       const createBaseQuery = () => {
         let query;
         if (filterAeropuerto && aeropuertoPOIs.length > 0) {
@@ -220,7 +225,12 @@ class ServicesController {
         // because we can't easily combine OR queries
         const searchQueries = [];
 
-        // Helper to add constraints to each search query
+        /**
+         * Helper to add constraints to each search query
+         * Adds base constraints including existence, includes, and active status filters.
+         * @param {Parse.Query} query - Parse query to add constraints to.
+         * @example
+         */
         const addBaseConstraints = (query) => {
           query.equalTo('exists', true);
           query.include('originPOI');

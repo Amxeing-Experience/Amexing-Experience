@@ -29,7 +29,9 @@ const writeRateLimit = rateLimit({
 /**
  * Agency Rate API Routes.
  *
- * All routes require JWT authentication and Admin role (level 6+)
+ * All routes require JWT authentication
+ * Read operations: Department Manager level (level 4+)
+ * Write operations: Admin level (level 6+)
  * Provides endpoints for:
  * - DataTables server-side processing
  * - CRUD operations for agency rates
@@ -45,7 +47,7 @@ router.use(jwtMiddleware.authenticateToken);
 router.get(
   '/current',
   readRateLimit,
-  jwtMiddleware.requireRoleLevel(6), // Admin level and above
+  jwtMiddleware.requireRoleLevel(4), // Department Manager level and above
   (req, res) => agencyRateController.getCurrent(req, res)
 );
 

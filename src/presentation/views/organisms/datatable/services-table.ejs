@@ -20,6 +20,7 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+const isDepartmentManager = dtUserRole === 'department_manager';
 %>
 
 <style>
@@ -167,6 +168,9 @@ table.dataTable tbody tr.hover {
                     <select class="form-select" id="paymentTypeFilter" style="min-width: 140px;">
                         <option value="efectivo" selected>Efectivo</option>
                         <option value="transferencia">Transferencia</option>
+                        <% if (!isDepartmentManager) { %>
+                        <option value="transf_agencias">Transf. Agencias</option>
+                        <% } %>
                     </select>
                 </div>
             </div>
@@ -554,7 +558,7 @@ table.dataTable tbody tr.hover {
                                                 </div>
                                             </div>
                                             <div class="text-end">
-                                                <div class="fw-bold text-primary small">${price}</div>
+                                                <div class="fw-bold text-primary small" data-original-price="${price}">${price}</div>
                                             </div>
                                         </div>
                                     </div>
@@ -690,6 +694,14 @@ table.dataTable tbody tr.hover {
                 tooltipTriggerList.map(function (tooltipTriggerEl) {
                     return new bootstrap.Tooltip(tooltipTriggerEl);
                 });
+                
+                // Re-apply filters after table redraw
+                const currentPaymentType = $('#paymentTypeFilter').val();
+                const currentCurrency = $('#currencyFilter').val();
+                setTimeout(() => {
+                    // Always apply currency formatting, even for default MXN
+                    updatePricesForFilters(currentPaymentType, currentCurrency);
+                }, 50);
             }
         });
 
@@ -703,6 +715,19 @@ table.dataTable tbody tr.hover {
                 dataTable.clear();
                 dataTable.rows.add(filteredData);
                 dataTable.draw();
+                
+                // Apply initial currency formatting and department manager defaults
+                setTimeout(() => {
+                    const currentPaymentType = $('#paymentTypeFilter').val();
+                    const currentCurrency = $('#currencyFilter').val();
+                    
+                    // For department managers, ensure transferencia is applied
+                    if (isDepartmentManager && currentPaymentType === 'transferencia') {
+                        console.log('💼 Applying department manager defaults: Transferencia with Agency Rate');
+                    }
+                    
+                    updatePricesForFilters(currentPaymentType, currentCurrency);
+                }, 200);
                 
                 console.log('✅ DataTable updated with', filteredData.length, 'rows');
             } catch (error) {
@@ -871,6 +896,15 @@ table.dataTable tbody tr.hover {
                         dataTable.rows.add(updatedData);
                         dataTable.draw();
                         
+                        // Re-apply filters after table update
+                        setTimeout(() => {
+                            const currentPaymentType = $('#paymentTypeFilter').val();
+                            const currentCurrency = $('#currencyFilter').val();
+                            if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
+                                updatePricesForFilters(currentPaymentType, currentCurrency);
+                            }
+                        }, 100);
+                        
                     } else {
                         console.error('Error loading rate prices - response not successful:', response);
                         showErrorAlert('Error al cargar precios');
@@ -891,8 +925,368 @@ table.dataTable tbody tr.hover {
                 dataTable.clear();
                 dataTable.rows.add(resetData);
                 dataTable.draw();
+                
+                // Re-apply filters after table reset
+                setTimeout(() => {
+                    const currentPaymentType = $('#paymentTypeFilter').val();
+                    const currentCurrency = $('#currencyFilter').val();
+                    if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
+                        updatePricesForFilters(currentPaymentType, currentCurrency);
+                    }
+                }, 100);
             }
         });
+
+        // Store transfer rate data globally
+        let currentTransferRate = 0;
+        
+        // Store agency rate data globally (for department managers)
+        let currentAgencyRate = 0;
+        
+        // Store exchange rate data globally
+        let currentExchangeRate = 0;
+        
+        // Check if current user is department manager
+        const isDepartmentManager = (typeof userRole !== 'undefined' && userRole === 'department_manager');
+
+        // Load current transfer rate from API
+        function loadCurrentTransferRate() {
+            return $.ajax({
+                url: '/api/transfer-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentTransferRate = response.data.value || 0;
+                        console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
+                    } else {
+                        console.warn('⚠️ No active transfer rate found');
+                        currentTransferRate = 0;
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading transfer rate:', error);
+                    currentTransferRate = 0;
+                }
+            });
+        }
+
+        // Function to apply rate to price (transfer rate for regular users, agency rate for department managers)
+        function applyCommissionRate(priceString) {
+            const rateToUse = isDepartmentManager ? currentAgencyRate : currentTransferRate;
+            const rateName = isDepartmentManager ? 'agency rate' : 'transfer rate';
+            
+            if (rateToUse <= 0) return priceString;
+            
+            // Extract numeric value from price string (e.g., "$1,234.50" -> 1234.50)
+            const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
+            if (isNaN(numericValue)) return priceString;
+            
+            // Apply rate percentage
+            const newValue = numericValue * (1 + rateToUse / 100);
+            
+            console.log(`Applying ${rateName} ${rateToUse}% to $${numericValue} = $${newValue.toFixed(2)}`);
+            
+            // Format back to currency string
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2
+            }).format(newValue);
+        }
+
+        // Function to apply agency rate to price (for admin "Transf. Agencias" option)
+        function applyAgencyRate(priceString) {
+            if (currentAgencyRate <= 0) return priceString;
+            
+            // Extract numeric value from price string (e.g., "$1,234.50" -> 1234.50)
+            const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
+            if (isNaN(numericValue)) return priceString;
+            
+            // Apply agency rate percentage
+            const newValue = numericValue * (1 + currentAgencyRate / 100);
+            
+            console.log(`Applying agency rate ${currentAgencyRate}% to $${numericValue} = $${newValue.toFixed(2)}`);
+            
+            // Format back to currency string
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2
+            }).format(newValue);
+        }
+
+        // Function to format price with proper currency symbol
+        function formatPriceWithCurrency(value, currency) {
+            if (currency === 'USD') {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(value);
+            } else {
+                // MXN formatting - match backend format: "$1,234 MXN"
+                return `$${value.toLocaleString()} MXN`;
+            }
+        }
+        
+        // Function to apply currency conversion to price with custom rounding rules
+        function applyCurrencyConversion(priceString, currency) {
+            // Extract numeric value from price string (e.g., "$1,234.50 MXN" -> 1234.50)
+            // Remove any existing currency symbols, commas, and text
+            const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
+            if (isNaN(numericValue)) return priceString;
+            
+            if (currency === 'USD' && currentExchangeRate > 0) {
+                // Convert MXN to USD by dividing by exchange rate
+                const convertedValue = numericValue / currentExchangeRate;
+                
+                // Apply custom USD rounding rules
+                const roundedValue = applyUSDRoundingRules(convertedValue);
+                
+                // Debug log for rounding
+                if (console && console.log) {
+                    console.log(`USD Conversion: $${numericValue.toLocaleString()} MXN ÷ ${currentExchangeRate} = $${convertedValue.toFixed(2)} → ${formatPriceWithCurrency(roundedValue, 'USD')}`);
+                }
+                
+                return formatPriceWithCurrency(roundedValue, currency);
+            } else {
+                // MXN - always format consistently
+                return formatPriceWithCurrency(numericValue, 'MXN');
+            }
+        }
+        
+        // Function to apply USD rounding rules
+        function applyUSDRoundingRules(value) {
+            // Find the base (nearest multiple of 5 below or equal)
+            const base = Math.floor(value / 5) * 5;
+            
+            // Calculate remainder when dividing by 5
+            const remainder = value % 5;
+            
+            // Special case: if remainder is 0 and value is not already a multiple of 5
+            // or if remainder is between 0.1 and 2.7, round down to base
+            // if remainder is > 2.7, round up to next multiple of 5
+            
+            if (remainder === 0) {
+                // If exact multiple of 5, keep as is unless it needs adjustment per examples
+                // Based on example $123.0 = $125, we round up when it's .0
+                // But $170.0 stays $170, so this needs special handling
+                
+                // Check if the last digit is 3, 8 (which would make .0 round up)
+                const lastDigitBeforeDecimal = Math.floor(value) % 10;
+                if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
+                    return base + 5; // Round up
+                } else {
+                    return base; // Keep as multiple of 5
+                }
+            } else if (remainder <= 2.7) {
+                // Round down to nearest 5
+                return base;
+            } else {
+                // Round up to next multiple of 5
+                return base + 5;
+            }
+        }
+
+        // Function to update all displayed prices based on payment type and currency
+        function updatePricesForFilters(paymentType, currency) {
+            // Update main price column
+            $('.price-container').each(function() {
+                const container = $(this);
+                const originalPrices = container.find('.fw-bold');
+                
+                originalPrices.each(function() {
+                    const priceElement = $(this);
+                    let originalPrice = priceElement.data('original-price');
+                    
+                    // Store original price on first run
+                    if (!originalPrice) {
+                        originalPrice = priceElement.text();
+                        priceElement.data('original-price', originalPrice);
+                        console.log('💰 Storing original price:', originalPrice);
+                    }
+                    
+                    let finalPrice = originalPrice;
+                    
+                    // Apply appropriate rate based on payment type
+                    if (paymentType === 'transferencia') {
+                        finalPrice = applyCommissionRate(finalPrice);
+                    } else if (paymentType === 'transf_agencias') {
+                        finalPrice = applyAgencyRate(finalPrice);
+                    }
+                    
+                    // Always apply currency conversion/formatting
+                    finalPrice = applyCurrencyConversion(finalPrice, currency);
+                    
+                    priceElement.text(finalPrice);
+                });
+            });
+            
+            // Update expanded rates view if open
+            $('.vehicle-option .fw-bold').each(function() {
+                const priceElement = $(this);
+                let originalPrice = priceElement.data('original-price');
+                
+                if (!originalPrice) {
+                    originalPrice = priceElement.text();
+                    priceElement.data('original-price', originalPrice);
+                }
+                
+                let finalPrice = originalPrice;
+                
+                // Apply appropriate rate based on payment type
+                if (paymentType === 'transferencia') {
+                    finalPrice = applyCommissionRate(finalPrice);
+                } else if (paymentType === 'transf_agencias') {
+                    finalPrice = applyAgencyRate(finalPrice);
+                }
+                
+                // Always apply currency conversion/formatting
+                finalPrice = applyCurrencyConversion(finalPrice, currency);
+                
+                priceElement.text(finalPrice);
+            });
+        }
+
+        // Payment type filter change handler
+        $('#paymentTypeFilter').on('change', function() {
+            const selectedPaymentType = $(this).val();
+            const selectedCurrency = $('#currencyFilter').val();
+            console.log('Payment type changed:', selectedPaymentType);
+            
+            if (selectedPaymentType === 'transferencia') {
+                if (isDepartmentManager && currentAgencyRate <= 0) {
+                    // Load agency rate for department managers
+                    loadCurrentAgencyRate().then(() => {
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    });
+                } else if (!isDepartmentManager && currentTransferRate <= 0) {
+                    // Load transfer rate for other users
+                    loadCurrentTransferRate().then(() => {
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    });
+                } else {
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                }
+            } else if (selectedPaymentType === 'transf_agencias') {
+                // Load agency rate for admin "Transf. Agencias" option
+                if (currentAgencyRate <= 0) {
+                    loadCurrentAgencyRate().then(() => {
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    });
+                } else {
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                }
+            } else {
+                updatePricesForFilters(selectedPaymentType, selectedCurrency);
+            }
+        });
+
+        // Currency filter change handler
+        $('#currencyFilter').on('change', function() {
+            const selectedCurrency = $(this).val();
+            const selectedPaymentType = $('#paymentTypeFilter').val();
+            console.log('Currency changed:', selectedCurrency);
+            
+            if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
+                // Try to load exchange rate if not already loaded
+                loadCurrentExchangeRate().then(() => {
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                });
+            } else {
+                updatePricesForFilters(selectedPaymentType, selectedCurrency);
+            }
+        });
+
+        // Notification functions removed - transfer rate applied silently
+
+        // Load current agency rate from API (for department managers)
+        function loadCurrentAgencyRate() {
+            return $.ajax({
+                url: '/api/agency-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentAgencyRate = response.data.value || 0;
+                        console.log('✅ Current agency rate loaded:', currentAgencyRate + '%');
+                    } else {
+                        console.warn('⚠️ No active agency rate found');
+                        currentAgencyRate = 0;
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading agency rate:', error);
+                    currentAgencyRate = 0;
+                }
+            });
+        }
+
+        // Load current exchange rate from API
+        function loadCurrentExchangeRate() {
+            return $.ajax({
+                url: '/api/exchange-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentExchangeRate = response.data.value || 0;
+                        console.log('✅ Current exchange rate loaded:', currentExchangeRate, 'MXN per USD');
+                    } else {
+                        console.warn('⚠️ No active exchange rate found');
+                        currentExchangeRate = 0;
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading exchange rate:', error);
+                    currentExchangeRate = 0;
+                }
+            });
+        }
+
+        // Load rates on initialization based on user role
+        if (isDepartmentManager) {
+            // Load agency rate for department managers BEFORE initializing table
+            console.log('💼 Department manager detected - loading Agency Rate first');
+            loadCurrentAgencyRate().then(() => {
+                // Set default payment type to transferencia AFTER agency rate is loaded
+                $('#paymentTypeFilter').val('transferencia');
+                console.log('💼 Agency rate loaded, setting default to Transferencia');
+                
+                // Load exchange rate
+                loadCurrentExchangeRate();
+                
+                // Load rates for the header filter
+                loadRatesForFilter();
+                
+                // Initialize table with data (with correct rates applied)
+                initializeTable();
+                
+                console.log('💼 Department manager table initialized with AgencyRate applied');
+            });
+        } else {
+            // Load transfer rate for other users
+            loadCurrentTransferRate();
+            // Load exchange rate on initialization
+            loadCurrentExchangeRate();
+        }
 
         // Handle expand/collapse prices functionality
         $(document).on('click', '.expand-prices-btn', function(e) {
@@ -971,7 +1365,7 @@ table.dataTable tbody tr.hover {
                                                         <div class="text-muted" style="font-size: 0.75rem;">${capacityInfo}</div>
                                                     </div>
                                                 </div>
-                                                <div class="fw-bold small" style="color: ${rateColor}">${price}</div>
+                                                <div class="fw-bold small" style="color: ${rateColor}" data-original-price="${price}">${price}</div>
                                             </div>
                                         </div>
                                     `;
@@ -1014,6 +1408,14 @@ table.dataTable tbody tr.hover {
                             button.html('<i class="ti ti-chevron-up me-1"></i>Ver menos')
                                   .addClass('expanded')
                                   .prop('disabled', false);
+                            
+                            // Apply filters to expanded prices
+                            setTimeout(() => {
+                                const currentPaymentType = $('#paymentTypeFilter').val();
+                                const currentCurrency = $('#currencyFilter').val();
+                                // Always apply current filters to expanded prices
+                                updatePricesForFilters(currentPaymentType, currentCurrency);
+                            }, 100);
                         } else {
                             button.html('<i class="ti ti-chevron-down me-1"></i>Error al cargar')
                                   .prop('disabled', false);
@@ -1035,14 +1437,22 @@ table.dataTable tbody tr.hover {
             }
         });
 
-        // Load rates for the header filter
-        loadRatesForFilter();
-
-        // Initialize table with data
-        initializeTable();
-
-        // Load POIs and VehicleTypes for dropdowns
-        loadDropdownData();
+        // Initialize based on user role
+        if (isDepartmentManager) {
+            // For department managers, initialization is handled in the loadCurrentAgencyRate() promise above
+            // This ensures AgencyRate is loaded and payment type is set before table initialization
+            console.log('💼 Department manager initialization deferred to agency rate loading');
+            // Load POIs and VehicleTypes for dropdowns
+            loadDropdownData();
+        } else {
+            // For other users, proceed with normal initialization
+            // Load rates for the header filter
+            loadRatesForFilter();
+            // Initialize table with data
+            initializeTable();
+            // Load POIs and VehicleTypes for dropdowns
+            loadDropdownData();
+        }
 
         // Event Handlers
         $('#createServiceBtn').on('click', function() {
@@ -1650,7 +2060,7 @@ table.dataTable tbody tr.hover {
 
 /* Price styling in vehicle options */
 .vehicle-option .fw-bold {
-    font-size: 1.1rem;
+    font-size: 0.9rem;
 }
 
 /* DataTables child row styling */
@@ -1702,5 +2112,20 @@ table.dataTable tbody tr.hover {
 
 .rate-card:hover .rate-color-circle {
     transform: scale(1.2);
+}
+
+/* Transfer rate styling */
+.fw-bold.text-warning {
+    font-weight: 600 !important;
+    position: relative;
+}
+
+.transfer-rate-notification {
+    border-left: 4px solid #17a2b8;
+    background-color: rgba(23, 162, 184, 0.1);
+}
+
+.transfer-rate-notification .btn-close {
+    filter: brightness(0) saturate(100%) invert(31%) sepia(81%) saturate(1059%) hue-rotate(162deg) brightness(92%) contrast(86%);
 }
 </style>
