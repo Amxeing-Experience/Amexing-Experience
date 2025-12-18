@@ -3755,9 +3755,9 @@ csrf@^3.1.0:
     uid-safe "2.1.5"
 
 current-module-paths@^1.1.2:
-  version "1.1.2"
-  resolved "https://registry.yarnpkg.com/current-module-paths/-/current-module-paths-1.1.2.tgz#13a2d821b2f864c3adead261b7954b068510c32f"
-  integrity sha512-H4s4arcLx/ugbu1XkkgSvcUZax0L6tXUqnppGniQb8l5VjUKGHoayXE5RiriiPhYDd+kjZnaok1Uig13PKtKYQ==
+  version "1.1.3"
+  resolved "https://registry.yarnpkg.com/current-module-paths/-/current-module-paths-1.1.3.tgz#b106039be7d7e0c59b79e2a2d45c9773850de0ac"
+  integrity sha512-7AH+ZTRKikdK4s1RmY0l6067UD/NZc7p3zZVZxvmnH80G31kr0y0W0E6ibYM4IS01MEm8DiC5FnTcgcgkbFHoA==
 
 dargs@^7.0.0:
   version "7.0.0"
