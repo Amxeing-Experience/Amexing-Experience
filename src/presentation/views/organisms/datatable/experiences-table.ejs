@@ -23,6 +23,86 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
 %>
 
+<style>
+/* Enhanced TomSelect Dropdown Styles */
+.tomselect-option-enhanced {
+    padding: 8px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    transition: background-color 0.2s ease;
+}
+
+.tomselect-option-enhanced:last-child {
+    border-bottom: none;
+}
+
+.tomselect-option-enhanced .option-main {
+    margin-bottom: 4px;
+}
+
+.tomselect-option-enhanced .option-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+
+.tomselect-item-enhanced {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tomselect-item-enhanced .item-name {
+    font-weight: 500;
+}
+
+.no-results {
+    text-align: center;
+    padding: 20px;
+    color: #6c757d;
+}
+
+.no-results i {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    display: block;
+    opacity: 0.5;
+}
+
+/* Enhanced validation styles */
+.form-control.is-valid:focus,
+.form-control.is-invalid:focus {
+    box-shadow: none;
+}
+
+.form-control.is-valid {
+    border-color: #28a745;
+}
+
+.form-control.is-invalid {
+    border-color: #dc3545;
+}
+
+/* TomSelect improvements */
+.ts-dropdown .option {
+    padding: 0;
+}
+
+.ts-dropdown .option.active {
+    background-color: #f8f9fa !important;
+}
+
+.ts-dropdown .option:hover {
+    background-color: #e9ecef !important;
+}
+
+/* Better visual hierarchy for badges */
+.tomselect-option-enhanced .badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+}
+</style>
+
 <div class="card border-0 shadow-sm">
     <div class="card-header text-white" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%); border: none;">
         <div class="row align-items-center">
@@ -43,6 +123,31 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
     </div>
 
     <div class="card-body" id="experiences-content">
+        <!-- Filter Controls -->
+        <div class="d-flex justify-content-end align-items-center mb-3">
+            <!-- Trailing Dropdowns -->
+            <div class="d-flex gap-2 align-items-center">
+                <!-- Currency Dropdown -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
+                    <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
+                        <option value="MXN" selected>MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+
+                <!-- Payment Type Dropdown -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
+                    <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
+                        <option value="efectivo" selected>Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <option value="transf_agencias">Transf. Agencias</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
         <div class="table-responsive">
             <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
                 <thead class="table-light">
@@ -53,7 +158,6 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         <th>Duración</th>
                         <th>Mín. Personas</th>
                         <th>Precio</th>
-                        <th>Precio Efectivo</th>
                         <% if (dtUserRole !== 'department_manager') { %><th>Última Act.</th><% } %>
                         <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
                         <% if (dtShowActions || canViewImages) { %>
@@ -98,12 +202,14 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         <div class="mb-3">
                             <label for="name" class="form-label">Nombre de la Experiencia <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" id="name" name="name" required maxlength="200" placeholder="Ej: Tour Gastronómico en el Centro Histórico">
+                            <div class="invalid-feedback" id="name-error"></div>
                             <div class="form-text">Nombre descriptivo de la experiencia</div>
                         </div>
 
                         <div class="mb-3">
                             <label for="description" class="form-label">Descripción <span class="text-danger">*</span></label>
                             <textarea class="form-control" id="description" name="description" required rows="4" maxlength="1000" placeholder="Describe la experiencia en detalle..."></textarea>
+                            <div class="invalid-feedback" id="description-error"></div>
                             <div class="form-text">Descripción completa de la experiencia</div>
                         </div>
                     </div>
@@ -119,10 +225,22 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             id: 'experiences',
                             name: 'experiences',
                             multiple: true,
-                            placeholder: 'Buscar y seleccionar experiencias o proveedores...',
+                            placeholder: 'Buscar y seleccionar otras experiencias...',
                             maxItems: 20,
-                            label: 'Experiencias y Proveedores Incluidos (Opcional)',
-                            helpText: 'Selecciona las experiencias y proveedores que forman parte de este paquete (máximo 20).',
+                            label: 'Otras Experiencias Incluidas (Opcional)',
+                            helpText: 'Selecciona otras experiencias que forman parte de este paquete (máximo 20).',
+                            options: [],
+                            selected: []
+                        }) %>
+
+                        <%- include('../../atoms/common/tom-select', {
+                            id: 'provider-experiences',
+                            name: 'providerExperiences',
+                            multiple: true,
+                            placeholder: 'Buscar y seleccionar experiencias de proveedores...',
+                            maxItems: 20,
+                            label: 'Experiencias de Proveedores Incluidas (Opcional)',
+                            helpText: 'Selecciona las experiencias específicas de proveedores que forman parte de este paquete (máximo 20).',
                             options: [],
                             selected: []
                         }) %>
@@ -174,41 +292,13 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                                     <small class="text-muted">
                                         <i class="ti ti-info-circle me-1"></i>
                                         Este es un cálculo sugerido basado en los costos individuales.
-                                        Puedes establecer el precio final en el campo "Costo" abajo.
+                                        Puedes establecer el precio final en el campo "Costo" siguiente.
                                     </small>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Duración -->
-                        <div class="mb-3">
-                            <label for="duration" class="form-label">Duración</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="duration" name="duration" min="0" step="0.5" placeholder="2.5">
-                                <span class="input-group-text">horas</span>
-                            </div>
-                            <div class="form-text">Duración estimada en horas (campo opcional)</div>
-                        </div>
-
-                        <!-- Mínimo personas -->
-                        <div class="mb-3">
-                            <label for="min_people" class="form-label">Mínimo personas</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="min_people" name="min_people" min="1" step="1" placeholder="4">
-                                <span class="input-group-text">personas</span>
-                            </div>
-                            <div class="form-text">Número mínimo de personas requerido (campo opcional)</div>
-                        </div>
-                        <!-- Tiempo traslado -->
-                        <div class="mb-3">
-                            <label for="time_journey" class="form-label">Tiempo traslado</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control" id="time_journey" name="time_journey" min="0" step="0.1" placeholder="2.5">
-                                <span class="input-group-text">horas</span>
-                            </div>
-                            <div class="form-text">Tiempo estimado de traslado en horas (campo opcional)</div>
-                        </div>
-
+                        <!-- Costo -->
                         <div class="mb-3">
                             <label for="cost" class="form-label">Costo <span class="text-danger">*</span></label>
                             <div class="input-group">
@@ -216,16 +306,52 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                                 <input type="number" class="form-control" id="cost" name="cost" required min="0" step="0.01" placeholder="0.00">
                                 <span class="input-group-text">MXN</span>
                             </div>
+                            <div class="invalid-feedback" id="cost-error"></div>
                             <div class="form-text">Costo de la experiencia en pesos mexicanos</div>
                         </div>
 
-                        <!-- Tipo de Vehículo -->
-                        <div class="mb-3">
-                            <label for="vehicleType" class="form-label">Tipo de Vehículo</label>
-                            <select class="form-select" id="vehicleType" name="vehicleType">
-                                <option value="">Sin tipo de vehículo específico</option>
-                            </select>
-                            <div class="form-text">Tipo de vehículo requerido para esta experiencia (campo opcional)</div>
+                        <!-- Campos Opcionales - Layout Compacto -->
+                        <div class="row">
+                            <!-- Duración -->
+                            <div class="col-md-6 mb-3">
+                                <label for="duration" class="form-label">Duración</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="duration" name="duration" min="0" step="0.5" placeholder="2.5">
+                                    <span class="input-group-text">horas</span>
+                                </div>
+                                <div class="form-text">Duración estimada (opcional)</div>
+                            </div>
+
+                            <!-- Mínimo personas -->
+                            <div class="col-md-6 mb-3">
+                                <label for="min_people" class="form-label">Mínimo personas</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="min_people" name="min_people" min="1" step="1" placeholder="4">
+                                    <span class="input-group-text">personas</span>
+                                </div>
+                                <div class="form-text">Número mínimo requerido (opcional)</div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <!-- Tiempo traslado -->
+                            <div class="col-md-6 mb-3">
+                                <label for="time_journey" class="form-label">Tiempo traslado</label>
+                                <div class="input-group">
+                                    <input type="number" class="form-control" id="time_journey" name="time_journey" min="0" step="0.1" placeholder="2.5">
+                                    <span class="input-group-text">horas</span>
+                                </div>
+                                <div class="form-text">Tiempo de traslado (opcional)</div>
+                            </div>
+
+                            <!-- Tipo de Vehículo -->
+                            <div class="col-md-6 mb-3">
+                                <label for="vehicleType" class="form-label">Tipo de Vehículo</label>
+                                <select class="form-select" id="vehicleType" name="vehicleType">
+                                    <option value="">Sin tipo específico</option>
+                                </select>
+                                <div class="form-text">Vehículo requerido (opcional)</div>
+                            </div>
                         </div>
 
 
@@ -270,6 +396,21 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                                     <i class="ti ti-calendar-off fs-3 d-block mb-2"></i>
                                     <p class="mb-0">Selecciona días para configurar sus horarios</p>
                                     <small class="text-muted">Cada día puede tener horarios diferentes</small>
+                                </div>
+                            </div>
+
+                            <!-- Disponibilidad Sugerida de Proveedores (inicialmente oculto) -->
+                            <div id="suggestedAvailabilityContainer" style="display: none;" class="mb-3">
+                                <div class="alert alert-success border-0" role="alert">
+                                    <h6 class="alert-heading text-success mb-2">
+                                        <i class="ti ti-info-circle me-2"></i>Disponibilidad de Proveedores Seleccionados
+                                    </h6>
+                                    <div id="suggestedAvailabilityContent">
+                                        <div class="text-center text-muted py-2">
+                                            <i class="ti ti-calendar-off fs-5 d-block mb-1"></i>
+                                            <small>Selecciona experiencias de proveedores para ver su disponibilidad</small>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
 
@@ -350,6 +491,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
 
         // Variables globales para almacenar datos con costos
         let experiencesDataMap = {};
+        let providerExperiencesDataMap = {};
         let toursDataMap = {};
 
         /**
@@ -362,20 +504,23 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
         }
 
         /**
-         * Update suggested cost table based on selected experiences and tours
+         * Update suggested cost table based on selected experiences, provider experiences, and tours
          */
         function updateSuggestedCostTable() {
             const experiencesSelectElement = document.getElementById('experiences');
+            const providerExperiencesSelectElement = document.getElementById('provider-experiences');
             const toursSelectElement = document.getElementById('tours');
             const experiencesTomSelect = experiencesSelectElement?.tomselect;
+            const providerExperiencesTomSelect = providerExperiencesSelectElement?.tomselect;
             const toursTomSelect = toursSelectElement?.tomselect;
             const selectedExperienceIds = experiencesTomSelect?.getValue() || [];
+            const selectedProviderExperienceIds = providerExperiencesTomSelect?.getValue() || [];
             const selectedTourIds = toursTomSelect?.getValue() || [];
 
             const container = $('#suggestedCostContainer');
             const tbody = $('#suggestedCostBody');
 
-            if (selectedExperienceIds.length === 0 && selectedTourIds.length === 0) {
+            if (selectedExperienceIds.length === 0 && selectedProviderExperienceIds.length === 0 && selectedTourIds.length === 0) {
                 // No selections, hide table
                 container.hide();
                 return;
@@ -396,6 +541,24 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                     const row = `
                         <tr>
                             <td>${item.name} <span class="badge bg-primary badge-sm">Experiencia</span></td>
+                            <td class="text-end">$${formatMoney(cost)} MXN</td>
+                        </tr>
+                    `;
+                    tbody.append(row);
+                }
+            });
+
+            // Generate rows for each selected provider experience
+            selectedProviderExperienceIds.forEach(function(id) {
+                const item = providerExperiencesDataMap[id];
+                if (item) {
+                    const cost = parseFloat(item.price || 0);
+                    total += cost;
+
+                    const providerName = item.provider ? item.provider.name : 'Sin proveedor';
+                    const row = `
+                        <tr>
+                            <td>${item.name} <span class="badge bg-warning badge-sm">Proveedor</span> <small class="text-muted">(${providerName})</small></td>
                             <td class="text-end">$${formatMoney(cost)} MXN</td>
                         </tr>
                     `;
@@ -428,6 +591,141 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
         }
 
         /**
+         * Update suggested availability display based on selected experiences and provider experiences
+         */
+        function updateSuggestedAvailabilityDisplay() {
+            const container = $('#suggestedAvailabilityContainer');
+            const content = $('#suggestedAvailabilityContent');
+            
+            // Get selected experiences (regular)
+            const experiencesSelectElement = document.getElementById('experiences');
+            const experiencesTomSelectInstance = experiencesSelectElement?.tomselect;
+            const selectedExperiences = experiencesTomSelectInstance ? experiencesTomSelectInstance.getValue() : [];
+
+            // Get selected provider experiences
+            const providerExperiencesSelectElement = document.getElementById('provider-experiences');
+            const providerExperiencesTomSelectInstance = providerExperiencesSelectElement?.tomselect;
+            const selectedProviderExperiences = providerExperiencesTomSelectInstance ? providerExperiencesTomSelectInstance.getValue() : [];
+            
+            // If no selections from either dropdown, hide container
+            if ((!selectedExperiences || selectedExperiences.length === 0) && 
+                (!selectedProviderExperiences || selectedProviderExperiences.length === 0)) {
+                container.hide();
+                return;
+            }
+
+            // Build availability display
+            let availabilityHtml = '';
+            let hasAnyAvailability = false;
+
+            // Process regular experiences
+            selectedExperiences.forEach(function(experienceId) {
+                const experienceData = experiencesDataMap[experienceId];
+                if (experienceData) {
+                    const experienceName = experienceData.name;
+                    const availability = experienceData.availability;
+
+                    availabilityHtml += `
+                        <div class="border rounded p-2 mb-2 bg-light">
+                            <div class="d-flex align-items-center mb-1">
+                                <i class="ti ti-package text-primary me-1"></i>
+                                <strong class="text-primary">${experienceName}</strong>
+                                <small class="text-muted ms-2">(Experiencia)</small>
+                            </div>
+                    `;
+
+                    if (availability && Array.isArray(availability) && availability.length > 0) {
+                        hasAnyAvailability = true;
+                        availabilityHtml += renderAvailabilitySchedules(availability);
+                    } else {
+                        availabilityHtml += '<small class="text-success"><i class="ti ti-check-circle me-1"></i>Disponible todos los días</small>';
+                    }
+
+                    availabilityHtml += '</div>';
+                }
+            });
+
+            // Process provider experiences
+            selectedProviderExperiences.forEach(function(providerExperienceId) {
+                const providerExperienceData = providerExperiencesDataMap[providerExperienceId];
+                if (providerExperienceData) {
+                    const providerName = providerExperienceData.provider ? providerExperienceData.provider.name : 'Sin proveedor';
+                    const experienceName = providerExperienceData.name;
+                    const availability = providerExperienceData.availability;
+
+                    availabilityHtml += `
+                        <div class="border rounded p-2 mb-2 bg-light">
+                            <div class="d-flex align-items-center mb-1">
+                                <i class="ti ti-star text-primary me-1"></i>
+                                <strong class="text-primary">${experienceName}</strong>
+                                <small class="text-muted ms-2">(${providerName})</small>
+                            </div>
+                    `;
+
+                    if (availability && Array.isArray(availability) && availability.length > 0) {
+                        hasAnyAvailability = true;
+                        availabilityHtml += renderAvailabilitySchedules(availability);
+                    } else {
+                        availabilityHtml += '<small class="text-success"><i class="ti ti-check-circle me-1"></i>Disponible todos los días</small>';
+                    }
+
+                    availabilityHtml += '</div>';
+                }
+            });
+
+            // If no availability info found, show message
+            if (!hasAnyAvailability) {
+                availabilityHtml = `
+                    <div class="text-center text-success py-2">
+                        <i class="ti ti-check-circle fs-5 d-block mb-1"></i>
+                        <small>Las experiencias están disponibles todos los días</small>
+                    </div>
+                `;
+            }
+
+            // Update content and show container
+            content.html(availabilityHtml);
+            container.show();
+        }
+
+        /**
+         * Helper function to render availability schedules
+         */
+        function renderAvailabilitySchedules(availability) {
+            const dayNames = {
+                0: 'Domingo',
+                1: 'Lunes', 
+                2: 'Martes',
+                3: 'Miércoles',
+                4: 'Jueves',
+                5: 'Viernes',
+                6: 'Sábado'
+            };
+
+            let scheduleHtml = '';
+            availability.forEach(function(daySchedule) {
+                const dayName = dayNames[daySchedule.day] || `Día ${daySchedule.day}`;
+                scheduleHtml += `
+                    <div class="d-flex align-items-center mb-1">
+                        <small class="text-success fw-bold me-2" style="min-width: 70px;">${dayName}:</small>
+                `;
+                
+                if (daySchedule.times && Array.isArray(daySchedule.times) && daySchedule.times.length > 0) {
+                    const timeRanges = daySchedule.times.map(function(timeSlot) {
+                        return `${timeSlot.start}-${timeSlot.end}`;
+                    }).join(', ');
+                    scheduleHtml += `<small>${timeRanges}</small>`;
+                } else {
+                    scheduleHtml += '<small class="text-muted">Sin horarios específicos</small>';
+                }
+                
+                scheduleHtml += '</div>';
+            });
+
+            return scheduleHtml;
+        }
+
+        /**
          * Initialize suggested cost calculator by binding to Tom Select change event
          */
         let calculatorInitialized = false;
@@ -446,6 +744,18 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             if (experiencesTomSelectInstance) {
                 experiencesTomSelectInstance.on('change', function() {
                     updateSuggestedCostTable();
+                    updateSuggestedAvailabilityDisplay();
+                });
+            }
+
+            // Get provider experiences Tom Select instance
+            const providerExperiencesSelectElement = document.getElementById('provider-experiences');
+            const providerExperiencesTomSelectInstance = providerExperiencesSelectElement?.tomselect;
+            
+            if (providerExperiencesTomSelectInstance) {
+                providerExperiencesTomSelectInstance.on('change', function() {
+                    updateSuggestedCostTable();
+                    updateSuggestedAvailabilityDisplay();
                 });
             }
 
@@ -489,6 +799,127 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             }
         });
 
+        // Setup experience filter functionality
+        function setupExperienceFilters() {
+            // Store current rates
+            let currentTransferRate = 0;
+            let currentAgencyRate = 0;
+            let currentExchangeRate = 0;
+            
+            // Function to apply USD rounding rules
+            function applyUSDRoundingRules(value) {
+                // Find the base (nearest multiple of 5 below or equal)
+                const base = Math.floor(value / 5) * 5;
+                
+                // Calculate remainder when dividing by 5
+                const remainder = value % 5;
+                
+                if (remainder === 0) {
+                    const lastDigitBeforeDecimal = Math.floor(value) % 10;
+                    if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
+                        return base + 5; // Round up
+                    } else {
+                        return base; // Keep as multiple of 5
+                    }
+                } else if (remainder <= 2.7) {
+                    // Round down to nearest 5
+                    return base;
+                } else {
+                    // Round up to next multiple of 5
+                    return base + 5;
+                }
+            }
+            
+            // Function to update displayed prices
+            function updatePrices(paymentType, currency) {
+                const table = $(`#${tableId}`);
+                if (!table.length) return;
+                
+                // Update price cell (column 6 - Precio)
+                table.find('tbody tr').each(function() {
+                    const row = $(this);
+                    const priceCell = row.find('td:nth-child(6)'); // Precio column only
+                    
+                    priceCell.each(function() {
+                        const cell = $(this);
+                        let originalPrice = cell.attr('data-original-price');
+                        
+                        if (!originalPrice) {
+                            // Extract numeric value from current display
+                            const currentText = cell.text().replace(/[^0-9.]/g, '');
+                            originalPrice = parseFloat(currentText) || 0;
+                            cell.attr('data-original-price', originalPrice);
+                        } else {
+                            originalPrice = parseFloat(originalPrice);
+                        }
+                        
+                        if (originalPrice === 0) return;
+                        
+                        let finalPrice = originalPrice;
+                        
+                        // Apply payment type rates
+                        if (paymentType === 'transferencia') {
+                            finalPrice = finalPrice * 1.035; // 3.5% transfer rate
+                        } else if (paymentType === 'transf_agencias') {
+                            finalPrice = finalPrice * 1.05; // 5% agency rate
+                        }
+                        
+                        // Apply currency conversion
+                        if (currency === 'USD') {
+                            finalPrice = finalPrice / 17.5; // Example exchange rate
+                            finalPrice = applyUSDRoundingRules(finalPrice);
+                            
+                            // Format as USD
+                            const formatted = new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: 'USD',
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0
+                            }).format(finalPrice);
+                            
+                            // Update cell HTML structure
+                            cell.html(`
+                                <div class="text-center">
+                                    <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                        ${formatted}
+                                    </div>
+                                </div>
+                            `);
+                        } else {
+                            // Format as MXN
+                            const formatted = new Intl.NumberFormat('es-MX', {
+                                style: 'currency',
+                                currency: 'MXN'
+                            }).format(finalPrice);
+                            
+                            // Update cell HTML structure
+                            cell.html(`
+                                <div class="text-center">
+                                    <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                        ${formatted}
+                                    </div>
+                                </div>
+                            `);
+                        }
+                    });
+                });
+            }
+            
+            // Currency filter change handler
+            $(`#currencyFilter-${tableId}`).on('change', function() {
+                const selectedCurrency = $(this).val();
+                const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                updatePrices(selectedPaymentType, selectedCurrency);
+            });
+            
+            // Payment type filter change handler
+            $(`#paymentTypeFilter-${tableId}`).on('change', function() {
+                const selectedPaymentType = $(this).val();
+                const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
+                updatePrices(selectedPaymentType, selectedCurrency);
+            });
+        }
+
         const dataTable = $(`#${tableId}`).DataTable({
             processing: true,
             serverSide: true,
@@ -519,6 +950,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             
                             // Check various possible field names for included experiences
                             const experienceDetails = row.experienceDetails || row.experiences || row.includedExperiences || [];
+                            const providerExperienceDetails = row.providerExperienceDetails || row.providerExperiences || row.includedProviderExperiences || [];
                             const tourDetails = row.tourDetails || row.tours || row.includedTours || [];
                             
                             // Show included experiences
@@ -531,6 +963,19 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                                     return `<li style="color: var(--bs-primary);"><small class="text-primary">${name}</small></li>`;
                                 }).join('');
                                 content += `<ul class="mb-2" style="margin: 0; padding-left: 16px; list-style-type: disc;">${experienceItems}</ul>`;
+                            }
+                            
+                            // Show included provider experiences
+                            if (providerExperienceDetails && providerExperienceDetails.length > 0) {
+                                content += `<div class="mb-2"><small class="text-warning fw-semibold">Experiencias de Proveedores:</small></div>`;
+                                const providerExperienceItems = providerExperienceDetails.map(provExp => {
+                                    // Handle different object structures
+                                    if (typeof provExp === 'string') return provExp;
+                                    const name = provExp.name || provExp.title || 'Experiencia de proveedor sin nombre';
+                                    const providerName = provExp.provider?.name || 'Proveedor desconocido';
+                                    return `<li style="color: var(--bs-warning);"><small class="text-warning">${name} (${providerName})</small></li>`;
+                                }).join('');
+                                content += `<ul class="mb-2" style="margin: 0; padding-left: 16px; list-style-type: disc;">${providerExperienceItems}</ul>`;
                             }
                             
                             // Show included tours
@@ -575,8 +1020,9 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                     className: 'text-center',
                     render: function(data, type, row) {
                         const experienceCount = row.experienceCount || 0;
+                        const providerExperienceCount = row.providerExperienceCount || 0;
                         const tourCount = row.tourCount || 0;
-                        const totalCount = experienceCount + tourCount;
+                        const totalCount = experienceCount + providerExperienceCount + tourCount;
                         
                         if (totalCount === 0) {
                             return '<span class="text-muted">-</span>';
@@ -585,6 +1031,9 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         let html = '';
                         if (experienceCount > 0) {
                             html += `<span class="badge bg-primary me-1" title="Experiencias">${experienceCount} Exp</span>`;
+                        }
+                        if (providerExperienceCount > 0) {
+                            html += `<span class="badge bg-warning me-1" title="Experiencias de Proveedores">${providerExperienceCount} Prov</span>`;
                         }
                         if (tourCount > 0) {
                             html += `<span class="badge bg-success" title="Tours">${tourCount} Tours</span>`;
@@ -607,38 +1056,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         return `<span class="text-info">${data} personas</span>`;
                     }
                 },
-                // 6. Precio (with surcharge - "Tarjeta/Digital")
-                {
-                    data: 'cost',
-                    render: function(data, type, row) {
-                        const baseCost = data || 0;
-                        const surchargePercentage = window.APP_SETTINGS?.paymentSurchargePercentage || 21.09;
-                        const surcharge = (baseCost * surchargePercentage) / 100;
-                        const totalPrice = baseCost + surcharge;
-
-                        // For sorting and filtering, use total price
-                        if (type === 'sort' || type === 'filter') {
-                            return totalPrice;
-                        }
-
-                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
-                            style: 'currency',
-                            currency: 'MXN'
-                        }).format(amount);
-
-                        return `
-                            <div class="text-center">
-                                <div class="fw-bold text-success" style="font-size: 1rem;">
-                                    ${formatMXN(totalPrice)}
-                                </div>
-                                <div class="text-muted" style="font-size: 0.75rem;">
-                                    <small>Tarjeta/Digital</small>
-                                </div>
-                            </div>
-                        `;
-                    }
-                },
-                // 6. Precio Efectivo (base cost - "Efectivo")
+                // 6. Precio (base price from database)
                 {
                     data: 'cost',
                     render: function(data, type, row) {
@@ -658,9 +1076,6 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             <div class="text-center">
                                 <div class="fw-bold text-primary" style="font-size: 1rem;">
                                     ${formatMXN(baseCost)}
-                                </div>
-                                <div class="text-muted" style="font-size: 0.75rem;">
-                                    <small>Efectivo</small>
                                 </div>
                             </div>
                         `;
@@ -774,6 +1189,9 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                 });
             }
         });
+
+        // Setup filter functionality for Moneda and Pago dropdowns
+        setupExperienceFilters();
 
         $('#createExperienceBtn').on('click', function() { openExperienceModal(); });
         $(`#${tableId}`).on('click', '.edit-experience-btn', function() { loadExperienceData($(this).data('id')); });
@@ -962,6 +1380,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             // Load dropdown data
             Promise.all([
                 loadAvailableItems(),
+                loadAvailableProviderExperiences(),
                 loadAvailableTours(),
                 loadAvailableVehicleTypes()
             ]).then(() => {
@@ -1010,6 +1429,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             // Load dropdown data first, then populate selections
             Promise.all([
                 loadAvailableItems(experience.id),
+                loadAvailableProviderExperiences(experience.id),
                 loadAvailableTours(),
                 loadAvailableVehicleTypes()
             ]).then(() => {
@@ -1020,22 +1440,46 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                     $('#vehicleType').val(experience.vehicleTypeId);
                 }
                 
-                // Populate selected experiences and tours
-                if (experience.experienceDetails && experience.experienceDetails.length > 0) {
-                    const experienceIds = experience.experienceDetails.map(exp => exp.id);
-                    const experiencesSelect = document.getElementById('experiences');
-                    if (experiencesSelect?.tomselect) {
-                        experiencesSelect.tomselect.setValue(experienceIds);
+                // Wait for a small delay to ensure all TomSelect instances are fully initialized
+                setTimeout(() => {
+                    // Populate selected experiences, provider experiences, and tours
+                    if (experience.experienceDetails && experience.experienceDetails.length > 0) {
+                        const experienceIds = experience.experienceDetails.map(exp => exp.id);
+                        const experiencesSelect = document.getElementById('experiences');
+                        if (experiencesSelect?.tomselect) {
+                            experiencesSelect.tomselect.setValue(experienceIds);
+                        }
                     }
-                }
-                
-                if (experience.tourDetails && experience.tourDetails.length > 0) {
-                    const tourIds = experience.tourDetails.map(tour => tour.id);
-                    const toursSelect = document.getElementById('tours');
-                    if (toursSelect?.tomselect) {
-                        toursSelect.tomselect.setValue(tourIds);
+                    
+                    if (experience.providerExperienceDetails && experience.providerExperienceDetails.length > 0) {
+                        const providerExperienceIds = experience.providerExperienceDetails.map(provExp => provExp.id);
+                        const providerExperiencesSelect = document.getElementById('provider-experiences');
+                        
+                        if (providerExperiencesSelect?.tomselect) {
+                            const availableOptions = Object.keys(providerExperiencesSelect.tomselect.options);
+                            
+                            if (availableOptions.length > 0) {
+                                providerExperiencesSelect.tomselect.setValue(providerExperienceIds);
+                            } else {
+                                // Retry after another short delay if options aren't loaded yet
+                                setTimeout(() => {
+                                    const retryOptions = Object.keys(providerExperiencesSelect.tomselect.options);
+                                    if (retryOptions.length > 0) {
+                                        providerExperiencesSelect.tomselect.setValue(providerExperienceIds);
+                                    }
+                                }, 200);
+                            }
+                        }
                     }
-                }
+                    
+                    if (experience.tourDetails && experience.tourDetails.length > 0) {
+                        const tourIds = experience.tourDetails.map(tour => tour.id);
+                        const toursSelect = document.getElementById('tours');
+                        if (toursSelect?.tomselect) {
+                            toursSelect.tomselect.setValue(tourIds);
+                        }
+                    }
+                }, 100); // Small delay to ensure options are loaded
             });
         }
 
@@ -1051,8 +1495,65 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             if (toursSelect && !toursSelect.tomselect) {
                 new TomSelect(toursSelect, {
                     plugins: ['remove_button'],
-                    placeholder: 'Selecciona tours...',
+                    placeholder: 'Buscar tours por destino, tiempo o precio...',
                     allowEmptyOption: false,
+                    searchField: ['text', 'name', 'destination'],
+                    sortField: [
+                        {field: 'destination', direction: 'asc'},
+                        {field: 'time', direction: 'asc'},
+                        {field: 'price', direction: 'asc'}
+                    ],
+                    render: {
+                        option: function(data, escape) {
+                            const tour = toursDataMap[data.value];
+                            if (!tour) return `<div>${escape(data.text)}</div>`;
+                            
+                            const priceFormatted = formatMoney(tour.price || 0);
+                            const destination = tour.destinationPOI?.name || 'Destino no especificado';
+                            const time = tour.time || 'Tiempo no especificado';
+                            
+                            return `
+                                <div class="tomselect-option-enhanced">
+                                    <div class="option-main">
+                                        <strong>${escape(destination)}</strong>
+                                    </div>
+                                    <div class="option-meta">
+                                        <span class="badge bg-success me-2">Tour</span>
+                                        <span class="text-primary me-2"><i class="ti ti-clock"></i> ${escape(time)}</span>
+                                        <span class="text-success fw-bold">$${priceFormatted} MXN</span>
+                                    </div>
+                                    ${tour.vehicleType ? 
+                                        `<small class="text-info"><i class="ti ti-car"></i> ${escape(tour.vehicleType)}</small>` : 
+                                        '<small class="text-muted">Sin tipo de vehículo específico</small>'
+                                    }
+                                </div>
+                            `;
+                        },
+                        item: function(data, escape) {
+                            const tour = toursDataMap[data.value];
+                            if (!tour) return `<div>${escape(data.text)}</div>`;
+                            
+                            const priceFormatted = formatMoney(tour.price || 0);
+                            const destination = tour.destinationPOI?.name || 'Destino no especificado';
+                            
+                            return `
+                                <div class="tomselect-item-enhanced">
+                                    <span class="item-name">${escape(destination)}</span>
+                                    <small class="text-primary ms-2">${escape(tour.time || '')}</small>
+                                    <small class="text-success ms-2">$${priceFormatted}</small>
+                                </div>
+                            `;
+                        },
+                        no_results: function(data, escape) {
+                            return `
+                                <div class="no-results">
+                                    <i class="ti ti-search-off"></i>
+                                    <p class="mb-0">No se encontraron tours</p>
+                                    <small class="text-muted">Intenta buscar por destino, tiempo o precio</small>
+                                </div>
+                            `;
+                        }
+                    },
                     onChange: function(values) {
                         updateSuggestedCostTable();
                     }
@@ -1064,8 +1565,139 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             if (experiencesSelect && !experiencesSelect.tomselect) {
                 new TomSelect(experiencesSelect, {
                     plugins: ['remove_button'],
-                    placeholder: 'Selecciona experiencias...',
+                    placeholder: 'Buscar experiencias por nombre o costo...',
                     allowEmptyOption: false,
+                    searchField: ['text', 'name'],
+                    sortField: [
+                        {field: 'name', direction: 'asc'},
+                        {field: 'cost', direction: 'asc'}
+                    ],
+                    render: {
+                        option: function(data, escape) {
+                            const experience = experiencesDataMap[data.value];
+                            if (!experience) return `<div>${escape(data.text)}</div>`;
+                            
+                            const costFormatted = formatMoney(experience.cost || 0);
+                            return `
+                                <div class="tomselect-option-enhanced">
+                                    <div class="option-main">
+                                        <strong>${escape(experience.name)}</strong>
+                                    </div>
+                                    <div class="option-meta">
+                                        <span class="badge bg-primary me-2">Experiencia</span>
+                                        <span class="text-success fw-bold">$${costFormatted} MXN</span>
+                                    </div>
+                                </div>
+                            `;
+                        },
+                        item: function(data, escape) {
+                            const experience = experiencesDataMap[data.value];
+                            if (!experience) return `<div>${escape(data.text)}</div>`;
+                            
+                            const costFormatted = formatMoney(experience.cost || 0);
+                            return `
+                                <div class="tomselect-item-enhanced">
+                                    <span class="item-name">${escape(experience.name)}</span>
+                                    <small class="text-success ms-2">$${costFormatted}</small>
+                                </div>
+                            `;
+                        },
+                        no_results: function(data, escape) {
+                            return `
+                                <div class="no-results">
+                                    <i class="ti ti-search-off"></i>
+                                    <p class="mb-0">No se encontraron experiencias</p>
+                                    <small class="text-muted">Intenta con otros términos de búsqueda</small>
+                                </div>
+                            `;
+                        }
+                    },
+                    onChange: function(values) {
+                        // Validate that all selected experiences exist in the data map
+                        const validatedValues = values.filter(id => {
+                            const exists = experiencesDataMap.hasOwnProperty(id);
+                            if (!exists) {
+                                console.warn(`Experience ID ${id} not found in available data`);
+                                // Show user-friendly notification
+                                showToast('warning', `Experiencia no encontrada (ID: ${id}). Se ha removido de la selección.`);
+                            }
+                            return exists;
+                        });
+                        
+                        // If some values were invalid, update the selection
+                        if (validatedValues.length !== values.length) {
+                            this.setValue(validatedValues, true); // true = silent update
+                            return;
+                        }
+                        
+                        updateSuggestedCostTable();
+                    }
+                });
+            }
+
+            // Initialize provider experiences dropdown if it exists
+            const providerExperiencesSelect = document.getElementById('provider-experiences');
+            if (providerExperiencesSelect && !providerExperiencesSelect.tomselect) {
+                new TomSelect(providerExperiencesSelect, {
+                    plugins: ['remove_button'],
+                    placeholder: 'Buscar por experiencia, proveedor o precio...',
+                    allowEmptyOption: false,
+                    searchField: ['text', 'name', 'provider'],
+                    sortField: [
+                        {field: 'provider', direction: 'asc'},
+                        {field: 'name', direction: 'asc'},
+                        {field: 'price', direction: 'asc'}
+                    ],
+                    render: {
+                        option: function(data, escape) {
+                            const providerExperience = providerExperiencesDataMap[data.value];
+                            if (!providerExperience) return `<div>${escape(data.text)}</div>`;
+                            
+                            const priceFormatted = formatMoney(providerExperience.price || 0);
+                            const providerName = providerExperience.provider?.name || 'Sin proveedor';
+                            
+                            return `
+                                <div class="tomselect-option-enhanced">
+                                    <div class="option-main">
+                                        <strong>${escape(providerExperience.name)}</strong>
+                                    </div>
+                                    <div class="option-meta">
+                                        <span class="badge bg-warning me-2">Proveedor</span>
+                                        <span class="text-muted me-2">${escape(providerName)}</span>
+                                        <span class="text-success fw-bold">$${priceFormatted} MXN</span>
+                                    </div>
+                                    ${providerExperience.availability ? 
+                                        '<small class="text-primary"><i class="ti ti-calendar-check"></i> Con disponibilidad</small>' : 
+                                        '<small class="text-muted"><i class="ti ti-calendar"></i> Disponible siempre</small>'
+                                    }
+                                </div>
+                            `;
+                        },
+                        item: function(data, escape) {
+                            const providerExperience = providerExperiencesDataMap[data.value];
+                            if (!providerExperience) return `<div>${escape(data.text)}</div>`;
+                            
+                            const priceFormatted = formatMoney(providerExperience.price || 0);
+                            const providerName = providerExperience.provider?.name || 'Sin proveedor';
+                            
+                            return `
+                                <div class="tomselect-item-enhanced">
+                                    <span class="item-name">${escape(providerExperience.name)}</span>
+                                    <small class="text-muted ms-1">(${escape(providerName)})</small>
+                                    <small class="text-success ms-2">$${priceFormatted}</small>
+                                </div>
+                            `;
+                        },
+                        no_results: function(data, escape) {
+                            return `
+                                <div class="no-results">
+                                    <i class="ti ti-search-off"></i>
+                                    <p class="mb-0">No se encontraron experiencias de proveedores</p>
+                                    <small class="text-muted">Intenta buscar por nombre, proveedor o precio</small>
+                                </div>
+                            `;
+                        }
+                    },
                     onChange: function(values) {
                         updateSuggestedCostTable();
                     }
@@ -1074,20 +1706,12 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
         }
 
         function loadAvailableItems(currentId = null) {
-            // Build query parameters
-            const queryParams = { length: 1000 }; // Get all for selection
-
-            // Add exclusion parameter if editing existing experience (eliminates flickering)
-            if (currentId) {
-                queryParams.excludeId = currentId;
-            }
-
+            // Load regular experiences (not provider experiences)
             return $.ajax({
-                url: '/api/experiences',
+                url: '<%= dtApiEndpoint %>',
                 type: 'GET',
-                data: queryParams,
                 success: function(response) {
-                    if (response.data) {
+                    if (response.data && Array.isArray(response.data)) {
                         // Reset data map
                         experiencesDataMap = {};
 
@@ -1099,22 +1723,23 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             // Clear existing options
                             tomSelectInstance.clearOptions();
 
-                            // Add new options with cost information
-                            // Note: Backend already excludes currentId, no need for client-side filter
-                            response.data.forEach(function(item) {
-                                if (item.active) {
-                                    // Store complete data for cost calculation
-                                    experiencesDataMap[item.id] = {
-                                        id: item.id,
-                                        name: item.name,
-                                        cost: item.cost || 0
+                            // Add experiences as options (exclude current experience if editing and Provider type)
+                            response.data.forEach(function(experience) {
+                                if (experience.active && experience.id !== currentId && experience.type === 'Experience') {
+                                    // Store complete data for cost calculation and availability
+                                    experiencesDataMap[experience.id] = {
+                                        id: experience.id,
+                                        name: experience.name,
+                                        cost: experience.cost || 0,
+                                        type: experience.type,
+                                        availability: experience.availability
                                     };
 
-                                    // Add option to Tom Select with cost in display text
-                                    const costFormatted = formatMoney(item.cost || 0);
+                                    // Format display text
+                                    const costFormatted = formatMoney(experience.cost || 0);
                                     tomSelectInstance.addOption({
-                                        value: item.id,
-                                        text: `${item.name} - $${costFormatted} MXN`
+                                        value: experience.id,
+                                        text: `${experience.name} ($${costFormatted} MXN)`
                                     });
                                 }
                             });
@@ -1128,19 +1753,68 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                     }
                 },
                 error: function(xhr) {
-                    console.warn('No se pudieron cargar los items disponibles');
+                    console.warn('No se pudieron cargar las experiencias');
+                }
+            });
+        }
+
+        function loadAvailableProviderExperiences(currentId = null) {
+            // Load provider experiencias
+            return $.ajax({
+                url: '/api/provider-experiencias/all',
+                type: 'GET',
+                success: function(response) {
+                    if (response.data && Array.isArray(response.data)) {
+                        // Reset provider experiences data map
+                        providerExperiencesDataMap = {};
+                        
+                        // Get Tom Select instance for provider experiences
+                        const selectElement = document.getElementById('provider-experiences');
+                        const tomSelectInstance = selectElement ? selectElement.tomselect : null;
+
+                        if (tomSelectInstance) {
+                            // Clear existing options
+                            tomSelectInstance.clearOptions();
+
+                            // Add provider experiencias as options
+                            response.data.forEach(function(experiencia) {
+                                if (experiencia.active) {
+                                    // Store complete data for cost calculation and availability
+                                    providerExperiencesDataMap[experiencia.id] = {
+                                        id: experiencia.id,
+                                        name: experiencia.name,
+                                        price: experiencia.price || 0,
+                                        provider: experiencia.provider,
+                                        availability: experiencia.availability
+                                    };
+
+                                    // Format display text as "Experience Name - Provider Name"
+                                    const priceFormatted = formatMoney(experiencia.price || 0);
+                                    const providerName = experiencia.provider ? experiencia.provider.name : 'Sin proveedor';
+                                    tomSelectInstance.addOption({
+                                        value: experiencia.id,
+                                        text: `${experiencia.name} - ${providerName} ($${priceFormatted} MXN)`
+                                    });
+                                }
+                            });
+
+                            // Refresh the dropdown
+                            tomSelectInstance.refreshOptions(false);
+                        }
+                    }
+                },
+                error: function(xhr) {
+                    console.warn('No se pudieron cargar las experiencias de proveedores');
                 }
             });
         }
 
         function loadAvailableTours() {
-            console.log('loadAvailableTours: Starting to load tours...');
             return $.ajax({
                 url: '/api/tours',
                 type: 'GET',
                 data: { length: 1000 }, // Get all for selection
                 success: function(response) {
-                    console.log('loadAvailableTours: API response:', response);
                     // Fix: The API returns tours directly in response.data, not response.data.tours
                     if (response.data && Array.isArray(response.data)) {
                         // Reset tours data map
@@ -1155,7 +1829,6 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             tomSelectInstance.clearOptions();
 
                             // Add new options with price information
-                            console.log('loadAvailableTours: Found', response.data.length, 'tours');
                             response.data.forEach(function(item) {
                                 if (item.active) {
                                     // Store complete data for cost calculation
@@ -1243,6 +1916,13 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                 experiencesTomSelectInstance.clear();
             }
 
+            // Clear Tom Select values for provider experiences
+            const providerExperiencesSelectElement = document.getElementById('provider-experiences');
+            const providerExperiencesTomSelectInstance = providerExperiencesSelectElement ? providerExperiencesSelectElement.tomselect : null;
+            if (providerExperiencesTomSelectInstance) {
+                providerExperiencesTomSelectInstance.clear();
+            }
+
             // Clear Tom Select values for tours
             const toursSelectElement = document.getElementById('tours');
             const toursTomSelectInstance = toursSelectElement ? toursSelectElement.tomselect : null;
@@ -1257,7 +1937,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             initializeDaySelection();
 
             // Load experiences, tours, and vehicle types
-            $.when(loadAvailableItems(), loadAvailableTours(), loadAvailableVehicleTypes()).done(function() {
+            $.when(loadAvailableItems(), loadAvailableProviderExperiences(), loadAvailableTours(), loadAvailableVehicleTypes()).done(function() {
                 // All loaded successfully
             });
         }
@@ -1274,6 +1954,8 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                 success: function(response) {
                     if (response.success && response.data) {
                         const experience = response.data;
+                        
+                        
                         $('#experienceId').val(experience.id);
                         $('#name').val(experience.name);
                         $('#description').val(experience.description);
@@ -1285,6 +1967,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         // Load all items and set selected values
                         Promise.all([
                             loadAvailableItems(experience.id),
+                            loadAvailableProviderExperiences(experience.id),
                             loadAvailableTours(),
                             loadAvailableVehicleTypes()
                         ]).then(function() {
@@ -1294,6 +1977,17 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                                 const experiencesTomSelectInstance = experiencesSelectElement ? experiencesSelectElement.tomselect : null;
                                 if (experiencesTomSelectInstance) {
                                     experiencesTomSelectInstance.setValue(experience.experiences);
+                                }
+                            }
+
+                            // Set provider experiences values
+                            if (experience.providerExperienceDetails && experience.providerExperienceDetails.length > 0) {
+                                const providerExperienceIds = experience.providerExperienceDetails.map(provExp => provExp.id);
+                                const providerExperiencesSelectElement = document.getElementById('provider-experiences');
+                                const providerExperiencesTomSelectInstance = providerExperiencesSelectElement ? providerExperiencesSelectElement.tomselect : null;
+                                
+                                if (providerExperiencesTomSelectInstance) {
+                                    providerExperiencesTomSelectInstance.setValue(providerExperienceIds);
                                 }
                             }
 
@@ -1368,23 +2062,40 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             const experiencesTomSelectInstance = experiencesSelectElement ? experiencesSelectElement.tomselect : null;
             const selectedExperiences = experiencesTomSelectInstance ? experiencesTomSelectInstance.getValue() : [];
 
+            // Get values from Tom Select for provider experiences
+            const providerExperiencesSelectElement = document.getElementById('provider-experiences');
+            const providerExperiencesTomSelectInstance = providerExperiencesSelectElement ? providerExperiencesSelectElement.tomselect : null;
+            const selectedProviderExperiences = providerExperiencesTomSelectInstance ? providerExperiencesTomSelectInstance.getValue() : [];
+
             // Get values from Tom Select for tours
             const toursSelectElement = document.getElementById('tours');
             const toursTomSelectInstance = toursSelectElement ? toursSelectElement.tomselect : null;
             const selectedTours = toursTomSelectInstance ? toursTomSelectInstance.getValue() : [];
 
             // Validation
-            const totalItems = selectedExperiences.length + selectedTours.length;
+            const totalItems = selectedExperiences.length + selectedProviderExperiences.length + selectedTours.length;
+            
+            // Validate that all selected experiences exist in the data map
+            const invalidExperiences = selectedExperiences.filter(id => !experiencesDataMap.hasOwnProperty(id));
+            if (invalidExperiences.length > 0) {
+                showErrorAlert(`Las siguientes experiencias no están disponibles: ${invalidExperiences.join(', ')}. Por favor, actualiza la selección.`);
+                return;
+            }
+            
             if (selectedExperiences.length > 20) {
                 showErrorAlert('Máximo 20 experiencias permitidas');
+                return;
+            }
+            if (selectedProviderExperiences.length > 20) {
+                showErrorAlert('Máximo 20 experiencias de proveedores permitidas');
                 return;
             }
             if (selectedTours.length > 20) {
                 showErrorAlert('Máximo 20 tours permitidos');
                 return;
             }
-            if (totalItems > 30) {
-                showErrorAlert('Máximo 30 elementos totales permitidos (experiencias + tours combinados)');
+            if (totalItems > 40) {
+                showErrorAlert('Máximo 40 elementos totales permitidos (experiencias + experiencias de proveedores + tours combinados)');
                 return;
             }
 
@@ -1394,8 +2105,11 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                 type: $('#type').val(),
                 cost: parseFloat($('#cost').val()),
                 experiences: selectedExperiences,
+                providerExperiences: selectedProviderExperiences,
                 tours: selectedTours
             };
+
+            // DEBUG: Log the data being sent
 
             // Only include duration if it has a value
             const durationValue = $('#duration').val();
@@ -1745,6 +2459,194 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                 container.insertAdjacentHTML('afterbegin', alertHtml);
             }
         }
+
+        // ========== REAL-TIME VALIDATION SYSTEM ==========
+
+        /**
+         * Real-time validation configuration
+         */
+        const validationConfig = {
+            name: {
+                required: true,
+                minLength: 3,
+                maxLength: 200,
+                pattern: /^[a-zA-Z0-9\sáéíóúñÁÉÍÓÚÑ\-.,()]+$/,
+                patternMessage: 'Solo se permiten letras, números, espacios y signos de puntuación básicos'
+            },
+            description: {
+                required: true,
+                minLength: 10,
+                maxLength: 1000
+            },
+            cost: {
+                required: true,
+                min: 0,
+                max: 999999
+            },
+            duration: {
+                required: false,
+                min: 0,
+                max: 168 // Max 1 week in hours
+            },
+            min_people: {
+                required: false,
+                min: 1,
+                max: 1000
+            },
+            time_journey: {
+                required: false,
+                min: 0,
+                max: 48 // Max 2 days travel time
+            }
+        };
+
+        /**
+         * Validate individual field with real-time feedback
+         */
+        function validateField(fieldId, showSuccess = false) {
+            const field = document.getElementById(fieldId);
+            const config = validationConfig[fieldId];
+            const errorElement = document.getElementById(`${fieldId}-error`);
+            
+            if (!field || !config) return true;
+
+            const value = field.value.trim();
+            let isValid = true;
+            let errorMessage = '';
+
+            // Required field validation
+            if (config.required && !value) {
+                isValid = false;
+                errorMessage = 'Este campo es obligatorio';
+            }
+            // Length validations
+            else if (value && config.minLength && value.length < config.minLength) {
+                isValid = false;
+                errorMessage = `Debe tener al menos ${config.minLength} caracteres`;
+            }
+            else if (value && config.maxLength && value.length > config.maxLength) {
+                isValid = false;
+                errorMessage = `No puede exceder ${config.maxLength} caracteres`;
+            }
+            // Pattern validation
+            else if (value && config.pattern && !config.pattern.test(value)) {
+                isValid = false;
+                errorMessage = config.patternMessage || 'Formato inválido';
+            }
+            // Numeric validations
+            else if (value && config.min !== undefined && parseFloat(value) < config.min) {
+                isValid = false;
+                errorMessage = `El valor mínimo es ${config.min}`;
+            }
+            else if (value && config.max !== undefined && parseFloat(value) > config.max) {
+                isValid = false;
+                errorMessage = `El valor máximo es ${config.max}`;
+            }
+
+            // Apply validation state
+            if (isValid) {
+                field.classList.remove('is-invalid');
+                if (showSuccess && value) {
+                    field.classList.add('is-valid');
+                }
+                if (errorElement) {
+                    errorElement.textContent = '';
+                }
+            } else {
+                field.classList.remove('is-valid');
+                field.classList.add('is-invalid');
+                if (errorElement) {
+                    errorElement.textContent = errorMessage;
+                }
+            }
+
+            return isValid;
+        }
+
+        /**
+         * Validate entire form
+         */
+        function validateForm() {
+            const fieldIds = Object.keys(validationConfig);
+            let allValid = true;
+
+            fieldIds.forEach(fieldId => {
+                const isValid = validateField(fieldId, true);
+                if (!isValid) allValid = false;
+            });
+
+            return allValid;
+        }
+
+        /**
+         * Clear all validation states
+         */
+        function clearValidation() {
+            Object.keys(validationConfig).forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                const errorElement = document.getElementById(`${fieldId}-error`);
+                
+                if (field) {
+                    field.classList.remove('is-valid', 'is-invalid');
+                }
+                if (errorElement) {
+                    errorElement.textContent = '';
+                }
+            });
+        }
+
+        /**
+         * Initialize real-time validation
+         */
+        function initializeRealTimeValidation() {
+            Object.keys(validationConfig).forEach(fieldId => {
+                const field = document.getElementById(fieldId);
+                if (!field) return;
+
+                // Validate on input (for immediate feedback)
+                field.addEventListener('input', function() {
+                    // Debounce validation for better performance
+                    clearTimeout(this.validationTimeout);
+                    this.validationTimeout = setTimeout(() => {
+                        validateField(fieldId);
+                    }, 300);
+                });
+
+                // Validate on blur (when user leaves field)
+                field.addEventListener('blur', function() {
+                    validateField(fieldId, true);
+                });
+
+                // Clear validation state on focus (fresh start)
+                field.addEventListener('focus', function() {
+                    if (this.classList.contains('is-valid')) {
+                        this.classList.remove('is-valid');
+                    }
+                });
+            });
+
+            // Override form submission to validate first
+            const saveButton = document.getElementById('saveExperienceBtn');
+            if (saveButton) {
+                saveButton.addEventListener('click', function(e) {
+                    if (!validateForm()) {
+                        e.preventDefault();
+                        showErrorAlert('Por favor, corrija los errores en el formulario antes de continuar');
+                    }
+                });
+            }
+
+            console.log('Real-time validation initialized');
+        }
+
+        // Initialize validation when modal opens
+        $(document).on('shown.bs.modal', '#experienceModal', function() {
+            clearValidation();
+            // Small delay to ensure form is fully rendered
+            setTimeout(initializeRealTimeValidation, 100);
+        });
+
+        // ========== END REAL-TIME VALIDATION SYSTEM ==========
     }
 
     if (document.readyState === 'loading') {

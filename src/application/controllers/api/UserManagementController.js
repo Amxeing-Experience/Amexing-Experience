@@ -1087,6 +1087,65 @@ class UserManagementController {
   }
 
   /**
+   * PUT /api/users/me/profile - Update own profile information.
+   * Allows authenticated users to update their own profile data including billing information.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async updateOwnProfile(req, res) {
+    try {
+      const currentUser = req.user;
+
+      if (!currentUser || !currentUser.id) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      const updates = req.body;
+
+      // Only allow certain fields to be updated by the user themselves
+      const allowedFields = ['billingInfo'];
+      const sanitizedUpdates = {};
+
+      for (const field of allowedFields) {
+        if (updates[field] !== undefined) {
+          sanitizedUpdates[field] = updates[field];
+        }
+      }
+
+      if (Object.keys(sanitizedUpdates).length === 0) {
+        return this.sendError(res, 'No valid fields provided for update', 400);
+      }
+
+      // Update user's own profile using the service
+      const updatedUser = await this.userService.updateUser(currentUser.id, sanitizedUpdates, currentUser);
+
+      logger.info('User updated own profile', {
+        userId: currentUser.id,
+        updatedFields: Object.keys(sanitizedUpdates),
+        timestamp: new Date().toISOString(),
+      });
+
+      this.sendSuccess(res, { user: updatedUser }, 'Profile updated successfully');
+    } catch (error) {
+      logger.error('Error in UserManagementController.updateOwnProfile', {
+        error: error.message,
+        userId: req.user?.id,
+        updates: Object.keys(req.body || {}),
+      });
+
+      if (error.message.includes('not found')) {
+        this.sendError(res, 'User not found', 404);
+      } else if (error.message.includes('validation')) {
+        this.sendError(res, error.message, 400);
+      } else {
+        this.sendError(res, 'Failed to update profile', 500);
+      }
+    }
+  }
+
+  /**
    * Send error response.
    * @param {object} res - Express response object.
    * @param {string} message - Error message.

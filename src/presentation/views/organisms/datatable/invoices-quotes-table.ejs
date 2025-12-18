@@ -1,0 +1,255 @@
+<%
+/**
+ * Invoice Quotes DataTable Organism
+ * DataTable component for quotes with completed invoices for download
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showDownloadActions - Whether to show download action buttons
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'invoices-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/quotes/with-invoices';
+const dtShowDownloadActions = typeof showDownloadActions !== 'undefined' ? showDownloadActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'department_manager';
+
+// Only department managers can access this table
+const canDownload = dtUserRole === 'department_manager';
+
+// Dynamic base path based on user role
+const baseDashboardPath = '/dashboard/department_manager';
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-receipt me-2"></i>Facturas Disponibles
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Cotizaciones con facturas completadas y archivos disponibles para descarga</small>
+            </div>
+            <div class="col-auto">
+                <button type="button" class="btn btn-light btn-sm" id="refreshBtn">
+                    <i class="ti ti-refresh me-1"></i>Actualizar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="invoices-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Folio</th>
+                        <th>Tipo de Evento</th>
+                        <th class="text-center">No. Personas</th>
+                        <th class="text-center">Fecha de Factura</th>
+                        <% if (dtShowDownloadActions) { %>
+                            <th class="text-center">Descargas</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Wait for DOM and all dependencies to be ready
+    function initWhenReady() {
+        // Check if jQuery and DataTables are loaded
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        if (!jQuery.fn.dataTable) {
+            console.warn('DataTables not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+
+        initInvoicesTable();
+    }
+
+    function initInvoicesTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showDownloadActions = <%= dtShowDownloadActions %>;
+        const canDownload = <%= canDownload %>;
+
+        // Get JWT token from cookies
+        function getAccessToken() {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Initialize DataTable
+        const table = $('#' + tableId).DataTable({
+            processing: true,
+            serverSide: true,
+            responsive: true,
+            ajax: {
+                url: apiEndpoint,
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+                    }
+                },
+                data: function(d) {
+                    // Add custom parameters for filtering quotes with invoices
+                    d.hasInvoiceFiles = true; // Only show quotes with completed invoice files
+                    d.invoiceStatus = 'completed'; // Only completed invoices
+                }
+            },
+            columns: [
+                {
+                    data: 'folio',
+                    render: function(data) {
+                        return `<span class="fw-semibold text-primary">${data || 'N/A'}</span>`;
+                    }
+                },
+                {
+                    data: 'eventType',
+                    render: function(data) {
+                        if (!data || data.trim() === '') {
+                            return '<em class="text-muted">Sin especificar</em>';
+                        }
+                        return `<span class="text-truncate" style="max-width: 200px; display: inline-block;" title="${data}">${data}</span>`;
+                    }
+                },
+                {
+                    data: 'numberOfPeople',
+                    className: 'text-center',
+                    render: function(data) {
+                        return `<span class="fw-semibold">${data || 1}</span>`;
+                    }
+                },
+                {
+                    data: 'invoice',
+                    className: 'text-center',
+                    render: function(data) {
+                        if (!data || !data.processDate) {
+                            return '<em class="text-muted">N/A</em>';
+                        }
+                        const date = new Date(data.processDate);
+                        const dateStr = date.toLocaleDateString('es-MX', {
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit',
+                        });
+                        const timeStr = date.toLocaleTimeString('es-MX', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                        });
+                        return `<span class="text-muted small">${dateStr}<br>${timeStr}</span>`;
+                    }
+                },
+                ...(showDownloadActions ? [{
+                    data: 'invoice',
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        if (!data) return '<em class="text-muted">N/A</em>';
+                        
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+                        
+                        const hasXml = data.xmlFileUrl || data.xmlFileS3Key;
+                        const hasPdf = data.pdfFileUrl || data.pdfFileS3Key;
+                        
+                        if (hasXml) {
+                            actions += `<a href="/api/invoices/download/${data.objectId || data.id}/xml"
+                                           class="btn btn-outline-primary"
+                                           data-bs-toggle="tooltip"
+                                           data-bs-placement="top"
+                                           title="Descargar XML"
+                                           download>
+                                           <i class="ti ti-file-code"></i>
+                                       </a>`;
+                        }
+                        
+                        if (hasPdf) {
+                            actions += `<a href="/api/invoices/download/${data.objectId || data.id}/pdf"
+                                           class="btn btn-outline-danger"
+                                           data-bs-toggle="tooltip"
+                                           data-bs-placement="top"
+                                           title="Descargar PDF"
+                                           download>
+                                           <i class="ti ti-download me-1"></i>PDF
+                                       </a>`;
+                        }
+                        
+                        if (!hasXml && !hasPdf) {
+                            actions += '<span class="text-muted">Sin archivos</span>';
+                        }
+                        
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+            },
+            order: [[3, 'desc']], // Order by invoice date descending
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]],
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+        });
+
+        // Refresh button functionality
+        $('#refreshBtn').on('click', function() {
+            table.ajax.reload();
+        });
+
+        // Initialize tooltips
+        table.on('draw', function() {
+            $('[data-bs-toggle="tooltip"]').tooltip();
+        });
+
+        // Error handling
+        table.on('error.dt', function(e, settings, techNote, message) {
+            console.error('DataTable error:', message);
+            showErrorAlert('Error al cargar los datos de facturas. Por favor, recarga la página.');
+        });
+
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    <strong>Error:</strong> ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            $('#invoices-content').prepend(alertHtml);
+        }
+    }
+
+    // Initialize when ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>

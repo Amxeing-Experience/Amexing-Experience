@@ -140,6 +140,126 @@ class RoleBasedController extends DashboardController {
   }
 
   /**
+   * Renders the user profile page showing personal information and settings.
+   * Generic profile method that can be used by all role-based controllers.
+   * @function profile
+   * @async
+   * @param {object} req - Express request object containing authenticated user information.
+   * @param {object} res - Express response object for rendering profile view.
+   * @returns {Promise<void>} Renders the profile view.
+   * @throws {Error} If user is not authenticated or profile data cannot be retrieved.
+   * @example
+   */
+  async profile(req, res) {
+    try {
+      // Get basic user data from session/auth middleware
+      const basicUserData = req.session?.user || req.user || {};
+
+      // Fetch complete user data from Parse Server database
+      let fullUserData = {};
+      try {
+        const Parse = require('parse/node');
+
+        console.log('=== FETCHING USER FROM DATABASE ===');
+        console.log('basicUserData.id:', basicUserData.id);
+
+        // Try both Parse.User and AmexingUser tables
+        let parseUser = null;
+
+        // First try Parse.User table
+        try {
+          const userQuery = new Parse.Query(Parse.User);
+          userQuery.equalTo('objectId', basicUserData.id);
+          parseUser = await userQuery.first({ useMasterKey: true });
+          console.log('Parse.User query result:', parseUser ? 'Found' : 'Not found');
+        } catch (error) {
+          console.log('Parse.User query error:', error.message);
+        }
+
+        // If not found in Parse.User, try AmexingUser table
+        if (!parseUser) {
+          try {
+            const amexingUserQuery = new Parse.Query('AmexingUser');
+            amexingUserQuery.equalTo('objectId', basicUserData.id);
+            parseUser = await amexingUserQuery.first({ useMasterKey: true });
+            console.log('AmexingUser query result:', parseUser ? 'Found' : 'Not found');
+          } catch (error) {
+            console.log('AmexingUser query error:', error.message);
+          }
+        }
+
+        if (parseUser) {
+          console.log('User createdAt from DB:', parseUser.get('createdAt'));
+          console.log('User created_at from DB:', parseUser.get('created_at'));
+          console.log('User _created_at from DB:', parseUser.get('_created_at'));
+
+          fullUserData = {
+            id: parseUser.id,
+            objectId: parseUser.id,
+            username: parseUser.get('username'),
+            email: parseUser.get('email'),
+            firstName: parseUser.get('firstName'),
+            lastName: parseUser.get('lastName'),
+            fullName: parseUser.get('fullName'),
+            phone: parseUser.get('phone'),
+            department: parseUser.get('department'),
+            employeeId: parseUser.get('employeeId'),
+            createdAt: parseUser.get('createdAt') || parseUser.createdAt,
+            updatedAt: parseUser.get('updatedAt') || parseUser.updatedAt,
+            lastLoginAt: parseUser.get('lastLoginAt'),
+            emailVerified: parseUser.get('emailVerified'),
+            active: parseUser.get('active'),
+            exists: parseUser.get('exists'),
+            profilePicture: parseUser.get('profilePicture'),
+            role: parseUser.get('role') || basicUserData.role,
+            organizationId: parseUser.get('organizationId'),
+          };
+          console.log('Final fullUserData.createdAt:', fullUserData.createdAt);
+        } else {
+          console.log('User not found in either table');
+        }
+        console.log('=====================================');
+      } catch (dbError) {
+        console.error('Error fetching user from database:', dbError);
+        // Fall back to basic user data if database fetch fails
+        fullUserData = basicUserData;
+      }
+
+      // Prepare user data for the view
+      const profileData = {
+        id: fullUserData.id || fullUserData.objectId,
+        username: fullUserData.username,
+        email: fullUserData.email,
+        firstName: fullUserData.firstName || fullUserData.first_name || '',
+        lastName: fullUserData.lastName || fullUserData.last_name || '',
+        fullName: fullUserData.fullName || `${fullUserData.firstName || ''} ${fullUserData.lastName || ''}`.trim(),
+        phone: fullUserData.phone || fullUserData.phoneNumber || '',
+        department: fullUserData.department || '',
+        employeeId: fullUserData.employeeId || fullUserData.employee_id || '',
+        createdAt: fullUserData.createdAt,
+        lastLoginAt: fullUserData.lastLoginAt || fullUserData.last_login_at,
+        emailVerified: fullUserData.emailVerified || fullUserData.email_verified || false,
+        active: fullUserData.active !== undefined ? fullUserData.active : true,
+        exists: fullUserData.exists !== undefined ? fullUserData.exists : true,
+        profilePicture: fullUserData.profilePicture || fullUserData.avatar || '',
+        role: fullUserData.role || this.role,
+        organizationId: fullUserData.organizationId || fullUserData.organization_id || '',
+      };
+
+      await this.renderRoleView(req, res, 'profile', {
+        title: 'My Profile',
+        userData: profileData,
+        breadcrumb: {
+          title: 'Profile',
+          items: [{ name: 'Profile', active: true }],
+        },
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Get role-specific menu items.
    * @example
    * // GET endpoint example
@@ -333,6 +453,36 @@ class RoleBasedController extends DashboardController {
     };
 
     return settingsMap[this.role] || {};
+  }
+
+  /**
+   * Change password page handler for authenticated users.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // GET endpoint example
+   * const result = await RoleBasedController.changePassword(req, res);
+   * // Returns: renders change-password view
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * @returns {Promise<void>} - Promise resolving to view render.
+   */
+  async changePassword(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'change-password', {
+        title: 'Change Password',
+        csrfToken: res.locals.csrfToken,
+        breadcrumb: {
+          title: 'Change Password',
+          items: [
+            { name: 'Profile', href: `${this.getRoleDashboardRoute()}/profile` },
+            { name: 'Change Password', active: true },
+          ],
+        },
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
   }
 }
 

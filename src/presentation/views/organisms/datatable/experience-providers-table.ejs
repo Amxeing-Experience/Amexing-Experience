@@ -48,11 +48,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     <tr>
                         <th>Nombre</th>
                         <th>Descripción</th>
-                        <th>Tipo</th>
-                        <th>Duración</th>
-                        <th>Mín. Personas</th>
-                        <th>Precio</th>
-                        <th>Precio Efectivo</th>
+                        <th>Experiencias</th>
                         <th>Última Actualización</th>
                         <th>Estado</th>
                         <% if (dtShowActions) { %>
@@ -62,6 +58,135 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 </thead>
                 <tbody></tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Add Experience Modal -->
+<div class="modal fade" id="quickAddExperienceModal" tabindex="-1" aria-labelledby="quickAddExperienceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%);">
+                <h5 class="modal-title text-white" id="quickAddExperienceModalLabel">
+                    <i class="ti ti-plus me-2"></i>Agregar Experiencia Rápida
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Provider info -->
+                <div class="alert alert-info" role="alert">
+                    <i class="ti ti-info-circle me-2"></i>
+                    <strong>Proveedor:</strong> <span id="quickAddProviderName"></span>
+                </div>
+
+                <!-- Alert container for modal-specific errors -->
+                <div id="quickAddModalAlerts"></div>
+
+                <form id="quickAddExperienceForm">
+                    <input type="hidden" id="quickAddProviderId">
+                    
+                    <!-- Essential fields only for quick add -->
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <label for="quickExperienciaName" class="form-label">
+                                Nombre de la Experiencia <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="quickExperienciaName" required maxlength="200" 
+                                   placeholder="Ej: Tour Centro Histórico">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="quickExperienciaPrice" class="form-label">
+                                Precio <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="quickExperienciaPrice" required min="0" step="0.01" 
+                                       placeholder="0.00">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label for="quickExperienciaDescription" class="form-label">
+                            Descripción <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="quickExperienciaDescription" rows="3" required maxlength="1000"
+                                  placeholder="Descripción detallada de lo que incluye esta experiencia..."></textarea>
+                    </div>
+
+                    <!-- Optional fields in one row -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="quickExperienciaTipo" class="form-label">Tipo</label>
+                            <select class="form-select" id="quickExperienciaTipo">
+                                <option value="">Seleccionar (opcional)</option>
+                                <option value="Exclusivo">Exclusivo</option>
+                                <option value="Compartido">Compartido</option>
+                                <option value="Privado">Privado</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="quickExperienciaDuration" class="form-label">Duración (hrs)</label>
+                            <input type="number" class="form-control" id="quickExperienciaDuration" min="0" step="0.5" 
+                                   placeholder="2.5">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="quickExperienciaMaxPeople" class="form-label">Máx. Personas</label>
+                            <input type="number" class="form-control" id="quickExperienciaMaxPeople" min="1" step="1" 
+                                   placeholder="10">
+                        </div>
+                    </div>
+
+                    <!-- Disponibilidad Rápida -->
+                    <div class="mb-3">
+                        <label class="form-label fw-medium text-muted">
+                            Disponibilidad <span class="text-muted">(Opcional)</span>
+                        </label>
+                        
+                        <div class="alert alert-info py-2" role="alert">
+                            <small><i class="ti ti-info-circle me-1"></i>Selecciona días y configura horarios específicos, o déjalo vacío para disponibilidad completa</small>
+                        </div>
+                        
+                        <!-- Day selection buttons -->
+                        <div class="mb-3">
+                            <div class="d-flex gap-1 flex-wrap" id="quickAddAvailableDaysContainer">
+                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="1" data-day-name="Lunes">Lu</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="2" data-day-name="Martes">Ma</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="3" data-day-name="Miércoles">Mi</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="4" data-day-name="Jueves">Ju</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="5" data-day-name="Viernes">Vi</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="6" data-day-name="Sábado">Sa</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="0" data-day-name="Domingo">Do</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Selected schedule days container -->
+                        <div id="quickAddSelectedScheduleDays" class="mb-2"></div>
+                        
+                        <!-- No days selected message -->
+                        <div id="quickAddNoDaysSelected" class="text-center text-muted py-2 border rounded bg-light" style="font-size: 0.875rem;">
+                            <i class="ti ti-calendar-off me-1"></i>
+                            <small>Disponible todos los días (sin selección específica)</small>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-success" role="alert">
+                        <i class="ti ti-check-circle me-2"></i>
+                        <small>Esta experiencia se agregará inmediatamente al proveedor. Puedes editarla más tarde desde "Editar Proveedor".</small>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn" style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white;" id="saveQuickExperienceBtn">
+                    <i class="ti ti-check me-1"></i>Agregar Experiencia
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -105,103 +230,37 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <div class="form-text">Descripción completa del proveedor (máximo 1000 caracteres)</div>
                     </div>
 
-                    <!-- Tipo de Proveedor -->
-                    <div class="mb-3">
-                        <label for="providerType" class="form-label">
-                            Tipo de Proveedor
-                        </label>
-                        <select class="form-select" id="providerType" name="providerType">
-                            <option value="">Seleccione el tipo de proveedor (opcional)</option>
-                            <option value="Exclusivo">Exclusivo</option>
-                            <option value="Compartido">Compartido</option>
-                            <option value="Privado">Privado</option>
-                        </select>
-                        <div class="form-text">Tipo de proveedor según su disponibilidad (campo opcional)</div>
-                    </div>
+                    <!-- Hidden fields for compatibility -->
+                    <input type="hidden" id="providerType" name="providerType" value="">
+                    <input type="hidden" id="duration" name="duration" value="">
+                    <input type="hidden" id="min_people" name="min_people" value="">
+                    <input type="hidden" id="cost" name="cost" value="0">
 
-                    <!-- Duración -->
-                    <div class="mb-3">
-                        <label for="duration" class="form-label">
-                            Duración
-                        </label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" id="duration" name="duration" min="0" step="0.5" placeholder="2.5">
-                            <span class="input-group-text">horas</span>
-                        </div>
-                        <div class="form-text">Duración estimada en horas (campo opcional)</div>
-                    </div>
-
-                    <!-- Mínimo personas -->
-                    <div class="mb-3">
-                        <label for="min_people" class="form-label">Mínimo personas</label>
-                        <div class="input-group">
-                            <input type="number" class="form-control" id="min_people" name="min_people" min="1" step="1" placeholder="4">
-                            <span class="input-group-text">personas</span>
-                        </div>
-                        <div class="form-text">Número mínimo de personas requerido (campo opcional)</div>
-                    </div>
-
-                    <!-- Costo -->
-                    <div class="mb-3">
-                        <label for="cost" class="form-label">
-                            Costo <span class="text-danger">*</span>
-                        </label>
-                        <div class="input-group">
-                            <span class="input-group-text">$</span>
-                            <input type="number" class="form-control" id="cost" name="cost" required min="0" step="0.01" placeholder="0.00">
-                            <span class="input-group-text">MXN</span>
-                        </div>
-                        <div class="form-text">Costo base del proveedor (mínimo $0.00)</div>
-                    </div>
-
-                    <!-- Sección: Disponibilidad (Opcional) -->
+                    <!-- Sección: Experiencias del Proveedor -->
                     <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-calendar-time me-1"></i>
-                            Disponibilidad <span class="text-muted fw-normal">(Opcional)</span>
+                        <h6 class="fw-bold text-success border-bottom pb-2 mb-3">
+                            <i class="ti ti-sparkles me-1"></i>
+                            Experiencias del Proveedor
                         </h6>
-
-                        <div class="mb-3">
-                            <label class="form-label">Selecciona Días y Configura Horarios</label>
-                            <div class="d-flex gap-2 flex-wrap mb-3" id="providerAvailableDaysContainer">
-                                <button type="button" class="btn btn-outline-primary day-btn" data-day="1" data-day-name="Lunes">
-                                    <i class="ti ti-calendar"></i> Lu
-                                </button>
-                                <button type="button" class="btn btn-outline-primary day-btn" data-day="2" data-day-name="Martes">
-                                    <i class="ti ti-calendar"></i> Ma
-                                </button>
-                                <button type="button" class="btn btn-outline-primary day-btn" data-day="3" data-day-name="Miércoles">
-                                    <i class="ti ti-calendar"></i> Mi
-                                </button>
-                                <button type="button" class="btn btn-outline-primary day-btn" data-day="4" data-day-name="Jueves">
-                                    <i class="ti ti-calendar"></i> Ju
-                                </button>
-                                <button type="button" class="btn btn-outline-primary day-btn" data-day="5" data-day-name="Viernes">
-                                    <i class="ti ti-calendar"></i> Vi
-                                </button>
-                                <button type="button" class="btn btn-outline-primary day-btn" data-day="6" data-day-name="Sábado">
-                                    <i class="ti ti-calendar"></i> Sa
-                                </button>
-                                <button type="button" class="btn btn-outline-primary day-btn" data-day="0" data-day-name="Domingo">
-                                    <i class="ti ti-calendar"></i> Do
-                                </button>
-                            </div>
-                            <div class="form-text">Selecciona días para configurar horarios individuales</div>
-                        </div>
-
-                        <!-- Contenedor de horarios por día -->
-                        <div id="providerDaySchedulesContainer" class="mb-3">
-                            <div id="providerNoDaysSelected" class="text-center text-muted py-4 border rounded bg-light">
-                                <i class="ti ti-calendar-off fs-3 d-block mb-2"></i>
-                                <p class="mb-0">Selecciona días para configurar sus horarios</p>
-                                <small class="text-muted">Cada día puede tener horarios diferentes</small>
-                            </div>
-                        </div>
-
+                        
                         <div class="alert alert-info" role="alert">
                             <i class="ti ti-info-circle me-2"></i>
-                            <small>Si no se especifica disponibilidad, el proveedor estará disponible todos los días sin restricción de horario</small>
+                            <small>Agregue las diferentes experiencias/servicios que ofrece este proveedor. Cada experiencia es editable directamente.</small>
                         </div>
+                        
+                        <!-- Lista de experiencias editables inline -->
+                        <div id="providerExperienciasList" class="mb-3">
+                            <div id="noExperienciasMessage" class="text-center text-muted py-3 border rounded bg-light">
+                                <i class="ti ti-package-off fs-4 d-block mb-2"></i>
+                                <p class="mb-0">No hay experiencias agregadas</p>
+                                <small class="text-muted">Use el botón de abajo para agregar la primera experiencia</small>
+                            </div>
+                        </div>
+                        
+                        <!-- Botón para agregar nueva experiencia -->
+                        <button type="button" class="btn btn-sm btn-success" id="addExperienciaBtn">
+                            <i class="ti ti-plus me-1"></i>Agregar Nueva Experiencia
+                        </button>
                     </div>
                 </form>
             </div>
@@ -217,6 +276,120 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         </div>
     </div>
 </div>
+
+<!-- Template para experiencia editable inline -->
+<template id="experienciaEditableTemplate">
+    <div class="experiencia-editable card mb-3 border-success border-opacity-25" data-index="" data-id="">
+        <div class="card-body p-3">
+            <!-- Fila principal: Nombre, Tipo, Precio -->
+            <div class="row mb-2">
+                <div class="col-md-5">
+                    <label class="form-label form-label-sm fw-medium text-success">Nombre <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control form-control-sm experiencia-name-input" required maxlength="200" 
+                           placeholder="Ej: Tour Centro Histórico">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm fw-medium text-success">Tipo</label>
+                    <select class="form-select form-select-sm experiencia-tipo-input">
+                        <option value="">Seleccionar</option>
+                        <option value="Exclusivo">Exclusivo</option>
+                        <option value="Compartido">Compartido</option>
+                        <option value="Privado">Privado</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label form-label-sm fw-medium text-success">Precio <span class="text-danger">*</span></label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control experiencia-price-input" required min="0" step="0.01" 
+                               placeholder="0.00">
+                    </div>
+                </div>
+                <div class="col-md-1 d-flex align-items-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn w-100" title="Eliminar experiencia">
+                        <i class="ti ti-trash"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Descripción -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium text-success">Descripción <span class="text-danger">*</span></label>
+                <textarea class="form-control form-control-sm experiencia-description-input" rows="2" required maxlength="1000"
+                          placeholder="Descripción detallada de lo que incluye esta experiencia..."></textarea>
+            </div>
+            
+            <!-- Campos opcionales en una fila -->
+            <div class="row mb-2">
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium text-muted">Duración (hrs)</label>
+                    <input type="number" class="form-control form-control-sm experiencia-duration-input" min="0" step="0.5" 
+                           placeholder="2.5">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium text-muted">Mín. Personas</label>
+                    <input type="number" class="form-control form-control-sm experiencia-min-people-input" min="1" step="1" 
+                           placeholder="1">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium text-muted">Máx. Personas</label>
+                    <input type="number" class="form-control form-control-sm experiencia-max-people-input" min="1" step="1" 
+                           placeholder="10">
+                </div>
+            </div>
+            
+            <!-- Disponibilidad compacta -->
+            <div class="availability-section">
+                <!-- Availability Summary View (default) -->
+                <div class="availability-summary">
+                    <label class="form-label form-label-sm fw-medium text-muted d-flex justify-content-between align-items-center">
+                        <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                        <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Configurar horarios">
+                            <i class="ti ti-settings"></i>
+                        </button>
+                    </label>
+                    <div class="availability-display bg-light border rounded p-2" style="min-height: 35px;">
+                        <small class="text-success">
+                            <i class="ti ti-check-circle me-1"></i>
+                            <span class="availability-status">Disponible todos los días</span>
+                        </small>
+                    </div>
+                </div>
+                
+                <!-- Availability Configuration View (hidden by default) -->
+                <div class="availability-content" style="display: none;">
+                    <label class="form-label form-label-sm fw-medium text-muted d-flex justify-content-between align-items-center">
+                        <span>Configurar Disponibilidad</span>
+                        <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Cerrar configuración">
+                            <i class="ti ti-x"></i>
+                        </button>
+                    </label>
+                    <div class="mb-2">
+                        <div class="d-flex gap-1 flex-wrap experiencia-available-days-container">
+                            <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="1" data-day-name="Lunes">Lu</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="2" data-day-name="Martes">Ma</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="3" data-day-name="Miércoles">Mi</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="4" data-day-name="Jueves">Ju</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="5" data-day-name="Viernes">Vi</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="6" data-day-name="Sábado">Sa</button>
+                            <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="0" data-day-name="Domingo">Do</button>
+                        </div>
+                    </div>
+                    
+                    <div class="experiencia-selected-schedule-days mb-2"></div>
+                    
+                    <div class="experiencia-no-days-selected text-center text-muted py-2 border rounded bg-light" style="font-size: 0.875rem;">
+                        <i class="ti ti-calendar-off me-1"></i>
+                        <small>Selecciona días para configurar horarios</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Indicador de validez -->
+            <div class="validation-feedback" style="display: none;"></div>
+        </div>
+    </div>
+</template>
 
 <!-- Template para fila de horario por día -->
 <template id="providerDayScheduleRowTemplate">
@@ -299,91 +472,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     }
                 },
                 {
-                    data: 'providerType',
+                    data: 'experienciasCount',
                     render: function(data) {
-                        if (!data) return '<span class="text-muted">No especificado</span>';
-                        const badgeClass = {
-                            'Exclusivo': 'bg-primary',
-                            'Compartido': 'bg-success', 
-                            'Privado': 'bg-warning text-dark'
-                        }[data] || 'bg-secondary';
-                        return `<span class="badge ${badgeClass}">${data}</span>`;
-                    }
-                },
-                {
-                    data: 'duration',
-                    render: function(data) {
-                        if (!data) return '<span class="text-muted">No especificado</span>';
-                        return `<span class="text-primary">${data} hrs</span>`;
-                    }
-                },
-                {
-                    data: 'min_people',
-                    render: function(data) {
-                        if (!data) return '<span class="text-muted">No especificado</span>';
-                        return `<span class="text-info">${data} personas</span>`;
-                    }
-                },
-                // 6. Precio (with surcharge - "Tarjeta/Digital")
-                {
-                    data: 'cost',
-                    render: function(data, type, row) {
-                        const baseCost = data || 0;
-                        const surchargePercentage = window.APP_SETTINGS?.paymentSurchargePercentage || 21.09;
-                        const surcharge = (baseCost * surchargePercentage) / 100;
-                        const totalPrice = baseCost + surcharge;
-
-                        // For sorting and filtering, use total price
-                        if (type === 'sort' || type === 'filter') {
-                            return totalPrice;
+                        if (!data || data === 0) {
+                            return '<span class="text-muted">Sin experiencias</span>';
                         }
-
-                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
-                            style: 'currency',
-                            currency: 'MXN'
-                        }).format(amount);
-
-                        return `
-                            <div class="text-center">
-                                <div class="fw-bold text-success" style="font-size: 1rem;">
-                                    ${formatMXN(totalPrice)}
-                                </div>
-                                <div class="text-muted" style="font-size: 0.75rem;">
-                                    <small>Tarjeta/Digital</small>
-                                </div>
-                            </div>
-                        `;
+                        return `<span class="badge bg-info">${data} experiencia${data !== 1 ? 's' : ''}</span>`;
                     }
                 },
-                // 6. Precio Efectivo (base cost - "Efectivo")
-                {
-                    data: 'cost',
-                    render: function(data, type, row) {
-                        const baseCost = data || 0;
-
-                        // For sorting and filtering, use base cost
-                        if (type === 'sort' || type === 'filter') {
-                            return baseCost;
-                        }
-
-                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
-                            style: 'currency',
-                            currency: 'MXN'
-                        }).format(amount);
-
-                        return `
-                            <div class="text-center">
-                                <div class="fw-bold text-primary" style="font-size: 1rem;">
-                                    ${formatMXN(baseCost)}
-                                </div>
-                                <div class="text-muted" style="font-size: 0.75rem;">
-                                    <small>Efectivo</small>
-                                </div>
-                            </div>
-                        `;
-                    }
-                },
-                // 7. Última Actualización
+                // Última Actualización
                 {
                     data: 'updatedAt',
                     render: function(data) {
@@ -396,7 +493,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         })}</small>`;
                     }
                 },
-                // 8. Estado
+                // Estado
                 {
                     data: 'active',
                     render: function(data) {
@@ -421,6 +518,16 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                             data-bs-placement="top"
                                             title="Editar Proveedor">
                                             <i class="ti ti-edit"></i>
+                                        </button>`;
+
+                            actions += `<button type="button"
+                                            class="btn btn-success quick-add-experience-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Agregar Experiencia Rápida">
+                                            <i class="ti ti-plus"></i>
                                         </button>`;
 
                             actions += `<button type="button"
@@ -485,20 +592,908 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         // Event handlers
         $('#createProviderBtn').on('click', function() { openProviderModal(); });
         $(`#${tableId}`).on('click', '.edit-provider-btn', function() { loadProviderData($(this).data('id')); });
+        $(`#${tableId}`).on('click', '.quick-add-experience-btn', function() { openQuickAddExperienceModal($(this).data('id'), $(this).data('name')); });
         $(`#${tableId}`).on('click', '.manage-images-btn', function() { manageImages($(this).data('id'), $(this).data('name')); });
         $(`#${tableId}`).on('click', '.toggle-provider-status-btn', function() {
             toggleProviderStatus($(this).data('id'), $(this).data('current-status'), $(this).data('name'));
         });
         $(`#${tableId}`).on('click', '.delete-provider-btn', function() { deleteProvider($(this).data('id'), $(this).data('name')); });
         $('#saveProviderBtn').on('click', function() { saveProvider(); });
+        $('#saveQuickExperienceBtn').on('click', function() { saveQuickExperience(); });
+        
+        // ========== QUICK ADD EXPERIENCE MODAL ==========
+        function openQuickAddExperienceModal(providerId, providerName) {
+            $('#quickAddProviderId').val(providerId);
+            $('#quickAddProviderName').text(providerName);
+            $('#quickAddExperienceForm')[0].reset();
+            
+            // Reset availability
+            resetQuickAddAvailability();
+            
+            // Clear any previous alerts
+            const alertsContainer = document.getElementById('quickAddModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+            
+            $('#quickAddExperienceModal').modal('show');
+            
+            // Focus on name field
+            setTimeout(() => {
+                $('#quickExperienciaName').focus();
+            }, 500);
+        }
+        
+        function saveQuickExperience() {
+            const form = $('#quickAddExperienceForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+            
+            const providerId = $('#quickAddProviderId').val();
+            const experienciaData = {
+                name: $('#quickExperienciaName').val().trim(),
+                description: $('#quickExperienciaDescription').val().trim(),
+                price: parseFloat($('#quickExperienciaPrice').val()) || 0,
+                tipo: $('#quickExperienciaTipo').val() || null,
+                duration: $('#quickExperienciaDuration').val() ? parseFloat($('#quickExperienciaDuration').val()) : null,
+                max_people: $('#quickExperienciaMaxPeople').val() ? parseInt($('#quickExperienciaMaxPeople').val()) : null,
+                availability: collectQuickAddAvailability()
+            };
+            
+            $('#saveQuickExperienceBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
+            
+            $.ajax({
+                url: `/api/providers/${providerId}/experiencias`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(experienciaData),
+                success: function(response) {
+                    if (response.success) {
+                        $('#quickAddExperienceModal').modal('hide');
+                        dataTable.ajax.reload(null, false);
+                        showSuccessAlert('Experiencia agregada exitosamente');
+                    }
+                },
+                error: function(xhr) {
+                    const errorMessage = xhr.responseJSON?.error || 'Error al agregar la experiencia';
+                    showQuickAddModalError(errorMessage);
+                },
+                complete: function() {
+                    $('#saveQuickExperienceBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>Agregar Experiencia');
+                }
+            });
+        }
+        
+        function showQuickAddModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            const container = document.getElementById('quickAddModalAlerts');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+                
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+        
+        // ========== PROVIDER EXPERIENCIAS MANAGEMENT (INLINE EDITING) ==========
+        let providerExperiencias = [];
+        
+        $('#addExperienciaBtn').on('click', function() {
+            addNewExperienciaCard();
+        });
+        
+        $(document).on('click', '.delete-experiencia-btn', function() {
+            const index = $(this).closest('.experiencia-editable').data('index');
+            deleteExperiencia(index);
+        });
+        
+        // Handle real-time validation and saving
+        $(document).on('input change', '.experiencia-editable input, .experiencia-editable textarea, .experiencia-editable select', function() {
+            const card = $(this).closest('.experiencia-editable');
+            const index = card.data('index');
+            updateExperienciaFromCard(card, index);
+        });
+        
+        // Toggle availability section
+        $(document).on('click', '.toggle-availability-btn', function() {
+            const availabilitySection = $(this).closest('.availability-section');
+            const availabilitySummary = availabilitySection.find('.availability-summary');
+            const availabilityContent = availabilitySection.find('.availability-content');
+            
+            // Toggle between summary and configuration views
+            availabilitySummary.toggle();
+            availabilityContent.toggle();
+        });
+        
+        function addNewExperienciaCard() {
+            const index = providerExperiencias.length;
+            const experiencia = {
+                name: '',
+                description: '',
+                tipo: null,
+                price: 0,
+                duration: null,
+                min_people: null,
+                max_people: null,
+                availability: null
+            };
+            
+            providerExperiencias.push(experiencia);
+            renderExperienciaCard(experiencia, index);
+            
+            // Focus on the name input of the new card
+            setTimeout(() => {
+                $(`.experiencia-editable[data-index="${index}"] .experiencia-name-input`).focus();
+            }, 100);
+        }
+        
+        function renderExperienciaCard(experiencia, index) {
+            const template = document.getElementById('experienciaEditableTemplate');
+            const clone = template.content.cloneNode(true);
+            const card = clone.querySelector('.experiencia-editable');
+            
+            card.setAttribute('data-index', index);
+            card.setAttribute('data-id', experiencia.id || '');
+            
+            // Populate form fields
+            card.querySelector('.experiencia-name-input').value = experiencia.name || '';
+            card.querySelector('.experiencia-description-input').value = experiencia.description || '';
+            card.querySelector('.experiencia-tipo-input').value = experiencia.tipo || '';
+            card.querySelector('.experiencia-price-input').value = experiencia.price || '';
+            card.querySelector('.experiencia-duration-input').value = experiencia.duration || '';
+            card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
+            card.querySelector('.experiencia-max-people-input').value = experiencia.max_people || '';
+            
+            // Update availability display and populate availability interface
+            updateAvailabilityDisplay($(card), experiencia.availability);
+            populateAvailabilityInterface($(card), experiencia.availability);
+            
+            // Add to container
+            $('#providerExperienciasList').append(card);
+            updateNoExperienciasMessage();
+        }
+        
+        function updateExperienciaFromCard(card, index) {
+            if (index >= providerExperiencias.length) return;
+            
+            const experiencia = providerExperiencias[index];
+            experiencia.name = card.find('.experiencia-name-input').val().trim();
+            experiencia.description = card.find('.experiencia-description-input').val().trim();
+            experiencia.tipo = card.find('.experiencia-tipo-input').val().trim() || null;
+            experiencia.price = parseFloat(card.find('.experiencia-price-input').val()) || 0;
+            experiencia.duration = card.find('.experiencia-duration-input').val() ? parseFloat(card.find('.experiencia-duration-input').val()) : null;
+            experiencia.min_people = card.find('.experiencia-min-people-input').val() ? parseInt(card.find('.experiencia-min-people-input').val()) : null;
+            experiencia.max_people = card.find('.experiencia-max-people-input').val() ? parseInt(card.find('.experiencia-max-people-input').val()) : null;
+            
+            // Collect availability data from card
+            experiencia.availability = collectAvailabilityFromCard(card);
+            
+            // Update availability display in summary view
+            updateAvailabilityDisplay(card, experiencia.availability);
+            
+            // Validate and show feedback
+            validateExperienciaCard(card, experiencia);
+        }
+
+        function updateAvailabilityDisplay(card, availability) {
+            const availabilityStatusElement = card.find('.availability-status');
+            
+            if (availability && Array.isArray(availability) && availability.length > 0) {
+                // Build a compact availability summary
+                const dayNames = {
+                    0: 'Do', 1: 'Lu', 2: 'Ma', 3: 'Mi', 4: 'Ju', 5: 'Vi', 6: 'Sa'
+                };
+                
+                const availableDays = availability.map(daySchedule => {
+                    const dayName = dayNames[daySchedule.day] || daySchedule.day;
+                    if (daySchedule.times && daySchedule.times.length > 0) {
+                        return dayName;
+                    }
+                    return dayName;
+                }).join(', ');
+                
+                availabilityStatusElement.html(`
+                    <i class="ti ti-calendar-check me-1"></i>
+                    ${availableDays}
+                `);
+            } else {
+                // No specific availability configured
+                availabilityStatusElement.html(`
+                    <i class="ti ti-check-circle me-1"></i>
+                    Disponible todos los días
+                `);
+            }
+        }
+
+        function collectAvailabilityFromCard(card) {
+            const availability = [];
+            
+            // Find all selected days with schedules
+            card.find('.experiencia-selected-schedule-days .day-schedule-row').each(function() {
+                const dayScheduleRow = $(this);
+                const day = parseInt(dayScheduleRow.data('day'));
+                
+                const daySchedule = {
+                    day: day,
+                    times: []
+                };
+                
+                // Collect time slots for this day
+                dayScheduleRow.find('.time-slot-row').each(function() {
+                    const timeRow = $(this);
+                    const startTime = timeRow.find('.start-time').val();
+                    const endTime = timeRow.find('.end-time').val();
+                    
+                    if (startTime && endTime) {
+                        daySchedule.times.push({
+                            start: startTime,
+                            end: endTime
+                        });
+                    }
+                });
+                
+                // Only add if there are times or if the day is selected without specific times
+                if (daySchedule.times.length > 0) {
+                    availability.push(daySchedule);
+                }
+            });
+            
+            return availability.length > 0 ? availability : null;
+        }
+
+        function populateAvailabilityInterface(card, availability) {
+            if (!availability || !Array.isArray(availability)) {
+                return;
+            }
+
+            availability.forEach(function(daySchedule) {
+                const dayCode = daySchedule.day;
+                const dayName = getDayName(dayCode);
+                
+                // Activate the day button
+                const dayButton = card.find(`.experiencia-available-days-container .day-btn[data-day="${dayCode}"]`);
+                if (dayButton.length > 0) {
+                    dayButton.removeClass('btn-outline-primary').addClass('active btn-primary');
+                    
+                    // Create day schedule with existing times
+                    if (daySchedule.times && daySchedule.times.length > 0) {
+                        // Add day schedule with the first time slot
+                        addProviderExperienciaDaySchedule(card, dayCode, dayName, daySchedule.times[0].start, daySchedule.times[0].end);
+                        
+                        // Add any additional time slots
+                        for (let i = 1; i < daySchedule.times.length; i++) {
+                            const timeSlot = daySchedule.times[i];
+                            const dayScheduleRow = card.find(`.experiencia-selected-schedule-days .day-schedule-row[data-day="${dayCode}"]`);
+                            const timeSlotsContainer = dayScheduleRow.find('.time-slots-container');
+                            
+                            const newTimeSlot = $(`
+                                <div class="time-slot-row mb-1">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-auto">
+                                            <small class="text-muted">De:</small>
+                                        </div>
+                                        <div class="col">
+                                            <input type="time" class="form-control form-control-sm start-time" value="${timeSlot.start}">
+                                        </div>
+                                        <div class="col-auto">
+                                            <small class="text-muted">A:</small>
+                                        </div>
+                                        <div class="col">
+                                            <input type="time" class="form-control form-control-sm end-time" value="${timeSlot.end}">
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="button" class="btn btn-sm btn-outline-success add-time-slot-btn" title="Agregar horario">
+                                                <i class="ti ti-plus"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-time-slot-btn" title="Eliminar horario">
+                                                <i class="ti ti-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            `);
+                            
+                            timeSlotsContainer.append(newTimeSlot);
+                        }
+                    } else {
+                        // Add day with default times
+                        addProviderExperienciaDaySchedule(card, dayCode, dayName);
+                    }
+                }
+            });
+        }
+
+        function getDayName(dayCode) {
+            const dayNames = {
+                0: 'Domingo',
+                1: 'Lunes', 
+                2: 'Martes',
+                3: 'Miércoles',
+                4: 'Jueves',
+                5: 'Viernes',
+                6: 'Sábado'
+            };
+            return dayNames[dayCode] || `Día ${dayCode}`;
+        }
+
+        function addProviderExperienciaDaySchedule(card, dayCode, dayName, startTime = '09:00', endTime = '18:00') {
+            const selectedScheduleDays = card.find('.experiencia-selected-schedule-days');
+            const noDaysMessage = card.find('.experiencia-no-days-selected');
+            
+            // Check if day already exists
+            if (selectedScheduleDays.find(`.day-schedule-row[data-day="${dayCode}"]`).length > 0) {
+                return;
+            }
+
+            const dayScheduleRow = $(`
+                <div class="day-schedule-row mb-2 p-2 border rounded bg-light" data-day="${dayCode}">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <strong class="day-name text-primary">
+                                <i class="ti ti-calendar me-1"></i>
+                                <span>${dayName}</span>
+                            </strong>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="time-slots-container">
+                                <div class="time-slot-row mb-1">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-auto">
+                                            <small class="text-muted">De:</small>
+                                        </div>
+                                        <div class="col">
+                                            <input type="time" class="form-control form-control-sm start-time" value="${startTime}">
+                                        </div>
+                                        <div class="col-auto">
+                                            <small class="text-muted">A:</small>
+                                        </div>
+                                        <div class="col">
+                                            <input type="time" class="form-control form-control-sm end-time" value="${endTime}">
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="button" class="btn btn-sm btn-outline-success add-time-slot-btn" title="Agregar horario">
+                                                <i class="ti ti-plus"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-time-slot-btn" title="Eliminar horario">
+                                                <i class="ti ti-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-provider-day-btn w-100" title="Eliminar día">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+
+            selectedScheduleDays.append(dayScheduleRow);
+            noDaysMessage.hide();
+            
+            // Update the availability display
+            const cardIndex = parseInt(card.data('index'));
+            if (cardIndex >= 0) {
+                updateExperienciaFromCard(card, cardIndex);
+            }
+        }
+
+        function removeProviderExperienciaDaySchedule(card, dayCode) {
+            const selectedScheduleDays = card.find('.experiencia-selected-schedule-days');
+            const noDaysMessage = card.find('.experiencia-no-days-selected');
+            
+            selectedScheduleDays.find(`.day-schedule-row[data-day="${dayCode}"]`).remove();
+            
+            // Show no days message if no days selected
+            if (selectedScheduleDays.find('.day-schedule-row').length === 0) {
+                noDaysMessage.show();
+            }
+            
+            // Update the availability display
+            const cardIndex = parseInt(card.data('index'));
+            if (cardIndex >= 0) {
+                updateExperienciaFromCard(card, cardIndex);
+            }
+        }
+
+        function initializeExperienciaAvailability() {
+            // Clear previous availability data
+            experienciaAvailability = {};
+            $(document).find('#experienciaSelectedScheduleDays').empty();
+            
+            // Reset day buttons in experiencia form
+            $(document).find('#experienciaAvailableDaysContainer .day-btn').each(function() {
+                $(this).removeClass('active btn-primary').addClass('btn-outline-primary');
+            });
+        }
+
+        // Event handler for experiencia availability day buttons (provider experience cards)
+        $(document).on('click', '.experiencia-available-days-container .day-btn', function() {
+            const dayButton = $(this);
+            const card = dayButton.closest('.experiencia-editable');
+            const dayCode = parseInt(dayButton.data('day'));
+            const dayName = dayButton.data('day-name');
+            const isSelected = dayButton.hasClass('active');
+            
+            if (isSelected) {
+                removeProviderExperienciaDaySchedule(card, dayCode);
+                dayButton.removeClass('active btn-primary').addClass('btn-outline-primary');
+            } else {
+                addProviderExperienciaDaySchedule(card, dayCode, dayName);
+                dayButton.removeClass('btn-outline-primary').addClass('active btn-primary');
+            }
+        });
+
+        // Event handler for experiencia availability day buttons (main experience form)
+        $(document).on('click', '#experienciaAvailableDaysContainer .day-btn', function() {
+            const dayCode = parseInt($(this).data('day'));
+            const dayName = $(this).data('day-name');
+            const isSelected = $(this).hasClass('active');
+            if (isSelected) {
+                removeExperienciaDaySchedule(dayCode);
+                $(this).removeClass('active btn-primary').addClass('btn-outline-primary');
+            } else {
+                addExperienciaDaySchedule(dayCode, dayName);
+                $(this).removeClass('btn-outline-primary').addClass('active btn-primary');
+            }
+        });
+
+        // Event handler for removing provider experience availability day
+        $(document).on('click', '.remove-provider-day-btn', function() {
+            const row = $(this).closest('.day-schedule-row');
+            const card = $(this).closest('.experiencia-editable');
+            const dayCode = parseInt(row.attr('data-day'));
+            
+            // Reset day button
+            card.find(`.experiencia-available-days-container .day-btn[data-day="${dayCode}"]`).removeClass('active btn-primary').addClass('btn-outline-primary');
+            removeProviderExperienciaDaySchedule(card, dayCode);
+        });
+
+        // Event handler for adding time slots in provider experience cards
+        $(document).on('click', '.add-time-slot-btn', function() {
+            const card = $(this).closest('.experiencia-editable');
+            const timeSlotsContainer = $(this).closest('.time-slots-container');
+            
+            const newTimeSlot = $(`
+                <div class="time-slot-row mb-1">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-auto">
+                            <small class="text-muted">De:</small>
+                        </div>
+                        <div class="col">
+                            <input type="time" class="form-control form-control-sm start-time" value="09:00">
+                        </div>
+                        <div class="col-auto">
+                            <small class="text-muted">A:</small>
+                        </div>
+                        <div class="col">
+                            <input type="time" class="form-control form-control-sm end-time" value="18:00">
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-sm btn-outline-success add-time-slot-btn" title="Agregar horario">
+                                <i class="ti ti-plus"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-time-slot-btn" title="Eliminar horario">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+            
+            timeSlotsContainer.append(newTimeSlot);
+            
+            // Update availability
+            const cardIndex = parseInt(card.data('index'));
+            if (cardIndex >= 0) {
+                updateExperienciaFromCard(card, cardIndex);
+            }
+        });
+
+        // Event handler for removing time slots in provider experience cards
+        $(document).on('click', '.remove-time-slot-btn', function() {
+            const card = $(this).closest('.experiencia-editable');
+            const timeSlotsContainer = $(this).closest('.time-slots-container');
+            const timeSlotRow = $(this).closest('.time-slot-row');
+            
+            // Only remove if there's more than one time slot
+            if (timeSlotsContainer.find('.time-slot-row').length > 1) {
+                timeSlotRow.remove();
+                
+                // Update availability
+                const cardIndex = parseInt(card.data('index'));
+                if (cardIndex >= 0) {
+                    updateExperienciaFromCard(card, cardIndex);
+                }
+            }
+        });
+
+        // Event handler for time input changes in provider experience cards
+        $(document).on('change', '.experiencia-editable .start-time, .experiencia-editable .end-time', function() {
+            const card = $(this).closest('.experiencia-editable');
+            const cardIndex = parseInt(card.data('index'));
+            
+            if (cardIndex >= 0) {
+                updateExperienciaFromCard(card, cardIndex);
+            }
+        });
+
+        // Event handler for quick add availability day buttons
+        $(document).on('click', '#quickAddAvailableDaysContainer .day-btn', function() {
+            const dayCode = parseInt($(this).data('day'));
+            const dayName = $(this).data('day-name');
+            const isSelected = $(this).hasClass('active');
+            
+            if (isSelected) {
+                removeQuickAddDaySchedule(dayCode);
+                $(this).removeClass('active btn-primary').addClass('btn-outline-primary');
+            } else {
+                addQuickAddDaySchedule(dayCode, dayName);
+                $(this).removeClass('btn-outline-primary').addClass('active btn-primary');
+            }
+            
+            updateQuickAddNoDaysMessage();
+        });
+
+        // Event handler for removing quick add availability day
+        $(document).on('click', '.remove-quick-add-day-btn', function() {
+            const row = $(this).closest('.day-schedule-row');
+            const dayCode = parseInt(row.attr('data-day'));
+            $(`#quickAddAvailableDaysContainer .day-btn[data-day="${dayCode}"]`).removeClass('active btn-primary').addClass('btn-outline-primary');
+            removeQuickAddDaySchedule(dayCode);
+            updateQuickAddNoDaysMessage();
+        });
+
+        // Event handler for adding time slots in quick add form
+        $(document).on('click', '.add-quick-add-time-slot-btn', function() {
+            const timeSlotsContainer = $(this).closest('.time-slots-container');
+            
+            const newTimeSlot = $(`
+                <div class="time-slot-row mb-1">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-auto">
+                            <small class="text-muted">De:</small>
+                        </div>
+                        <div class="col">
+                            <input type="time" class="form-control form-control-sm start-time" value="09:00">
+                        </div>
+                        <div class="col-auto">
+                            <small class="text-muted">A:</small>
+                        </div>
+                        <div class="col">
+                            <input type="time" class="form-control form-control-sm end-time" value="18:00">
+                        </div>
+                        <div class="col-auto">
+                            <button type="button" class="btn btn-sm btn-outline-success add-quick-add-time-slot-btn" title="Agregar horario">
+                                <i class="ti ti-plus"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-quick-add-time-slot-btn" title="Eliminar horario">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+            
+            timeSlotsContainer.append(newTimeSlot);
+        });
+
+        // Event handler for removing time slots in quick add form
+        $(document).on('click', '.remove-quick-add-time-slot-btn', function() {
+            const timeSlotsContainer = $(this).closest('.time-slots-container');
+            const timeSlotRow = $(this).closest('.time-slot-row');
+            
+            // Only remove if there's more than one time slot
+            if (timeSlotsContainer.find('.time-slot-row').length > 1) {
+                timeSlotRow.remove();
+            }
+        });
+
+        // Event handler for removing experiencia availability day (main experience form)
+        $(document).on('click', '.remove-experiencia-day-btn', function() {
+            const row = $(this).closest('.day-schedule-row');
+            const dayCode = parseInt(row.attr('data-day'));
+            $(`#experienciaAvailableDaysContainer .day-btn[data-day="${dayCode}"]`).removeClass('active btn-primary').addClass('btn-outline-primary');
+            removeExperienciaDaySchedule(dayCode);
+            updateExperienciaNoDaysMessage();
+        });
+
+        function addExperienciaDaySchedule(dayCode, dayName, startTime = '09:00', endTime = '18:00') {
+            if (experienciaAvailability[dayCode]) return;
+
+            const row = $(`
+                <div class="day-schedule-row mb-2" data-day="${dayCode}">
+                    <div class="row align-items-center">
+                        <div class="col-3">
+                            <span class="fw-medium">${dayName}</span>
+                        </div>
+                        <div class="col-4">
+                            <input type="time" class="form-control form-control-sm day-start-time" value="${startTime}">
+                        </div>
+                        <div class="col-4">
+                            <input type="time" class="form-control form-control-sm day-end-time" value="${endTime}">
+                        </div>
+                        <div class="col-1">
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-experiencia-day-btn" title="Eliminar día">
+                                <i class="ti ti-x"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+
+            $('#experienciaSelectedScheduleDays').append(row);
+            experienciaAvailability[dayCode] = { dayName: dayName, element: row };
+            updateExperienciaNoDaysMessage();
+        }
+
+        function removeExperienciaDaySchedule(dayCode) {
+            if (!experienciaAvailability[dayCode]) return;
+            $(experienciaAvailability[dayCode].element).remove();
+            delete experienciaAvailability[dayCode];
+            updateExperienciaNoDaysMessage();
+        }
+
+        function updateExperienciaNoDaysMessage() {
+            const hasDays = Object.keys(experienciaAvailability).length > 0;
+            $('#experienciaNoDaysSelected').toggle(!hasDays);
+        }
+        
+        function validateExperienciaCard(card, experiencia) {
+            const feedback = card.find('.validation-feedback');
+            const errors = [];
+            
+            if (!experiencia.name) {
+                errors.push('El nombre es obligatorio');
+            }
+            if (!experiencia.description) {
+                errors.push('La descripción es obligatoria');
+            }
+            if (experiencia.price < 0) {
+                errors.push('El precio debe ser mayor o igual a 0');
+            }
+            if (experiencia.min_people && experiencia.max_people && experiencia.min_people > experiencia.max_people) {
+                errors.push('El mínimo de personas no puede ser mayor al máximo');
+            }
+            
+            if (errors.length > 0) {
+                feedback.html(`<small class="text-danger"><i class="ti ti-alert-circle me-1"></i>${errors.join(', ')}</small>`).show();
+                card.addClass('border-danger').removeClass('border-success');
+            } else {
+                feedback.hide();
+                card.addClass('border-success').removeClass('border-danger');
+            }
+            
+            return errors.length === 0;
+        }
+        
+        function updateNoExperienciasMessage() {
+            const hasExperiencias = $('.experiencia-editable').length > 0;
+            $('#noExperienciasMessage').toggle(!hasExperiencias);
+        }
+        
+        function deleteExperiencia(index) {
+            const experiencia = providerExperiencias[index];
+            
+            if (confirm(`¿Está seguro de que desea eliminar la experiencia "${experiencia.name || 'Sin nombre'}"?`)) {
+                providerExperiencias.splice(index, 1);
+                renderAllExperienciaCards();
+            }
+        }
+        
+        function renderAllExperienciaCards() {
+            // Clear all existing cards
+            $('.experiencia-editable').remove();
+            
+            // Render each experiencia as a card
+            providerExperiencias.forEach((exp, index) => {
+                renderExperienciaCard(exp, index);
+            });
+            
+            updateNoExperienciasMessage();
+        }
+        
+        function loadProviderExperiencias(providerId) {
+            if (!providerId) return;
+            
+            $.ajax({
+                url: `/api/providers/${providerId}/experiencias`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        providerExperiencias = response.data;
+                        renderAllExperienciaCards();
+                    }
+                },
+                error: function(xhr) {
+                    console.error('Error loading provider experiencias:', xhr.responseJSON?.error);
+                }
+            });
+        }
+
+        function collectExperienciasFromCards() {
+            const experiencias = [];
+            
+            $('.experiencia-editable').each(function(index) {
+                const card = $(this);
+                const id = card.data('id');
+                
+                const experiencia = {
+                    name: card.find('.experiencia-name-input').val().trim(),
+                    description: card.find('.experiencia-description-input').val().trim(),
+                    tipo: card.find('.experiencia-tipo-input').val().trim() || null,
+                    price: parseFloat(card.find('.experiencia-price-input').val()) || 0,
+                    duration: card.find('.experiencia-duration-input').val() ? parseFloat(card.find('.experiencia-duration-input').val()) : null,
+                    min_people: card.find('.experiencia-min-people-input').val() ? parseInt(card.find('.experiencia-min-people-input').val()) : null,
+                    max_people: card.find('.experiencia-max-people-input').val() ? parseInt(card.find('.experiencia-max-people-input').val()) : null,
+                    availability: collectAvailabilityFromCard(card),
+                    displayOrder: index
+                };
+                
+                // Only include experiences with at least name and description
+                if (experiencia.name && experiencia.description) {
+                    if (id) {
+                        experiencia.id = id;
+                    }
+                    experiencias.push(experiencia);
+                }
+            });
+            
+            return experiencias;
+        }
+
+        // ========== QUICK ADD AVAILABILITY MANAGEMENT ==========
+        let quickAddAvailability = {};
+
+        function addQuickAddDaySchedule(dayCode, dayName, startTime = '09:00', endTime = '18:00') {
+            if (quickAddAvailability[dayCode]) return;
+
+            const dayScheduleRow = $(`
+                <div class="day-schedule-row mb-2 p-2 border rounded bg-light" data-day="${dayCode}">
+                    <div class="row align-items-center">
+                        <div class="col-md-3">
+                            <strong class="day-name text-primary">
+                                <i class="ti ti-calendar me-1"></i>
+                                <span>${dayName}</span>
+                            </strong>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="time-slots-container">
+                                <div class="time-slot-row mb-1">
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-auto">
+                                            <small class="text-muted">De:</small>
+                                        </div>
+                                        <div class="col">
+                                            <input type="time" class="form-control form-control-sm start-time" value="${startTime}">
+                                        </div>
+                                        <div class="col-auto">
+                                            <small class="text-muted">A:</small>
+                                        </div>
+                                        <div class="col">
+                                            <input type="time" class="form-control form-control-sm end-time" value="${endTime}">
+                                        </div>
+                                        <div class="col-auto">
+                                            <button type="button" class="btn btn-sm btn-outline-success add-quick-add-time-slot-btn" title="Agregar horario">
+                                                <i class="ti ti-plus"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-danger remove-quick-add-time-slot-btn" title="Eliminar horario">
+                                                <i class="ti ti-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-1">
+                            <button type="button" class="btn btn-sm btn-outline-danger remove-quick-add-day-btn w-100" title="Eliminar día">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `);
+
+            $('#quickAddSelectedScheduleDays').append(dayScheduleRow);
+            
+            // Store in availability object
+            quickAddAvailability[dayCode] = {
+                day: dayCode,
+                times: [{ start: startTime, end: endTime }]
+            };
+        }
+
+        function removeQuickAddDaySchedule(dayCode) {
+            $('#quickAddSelectedScheduleDays').find(`.day-schedule-row[data-day="${dayCode}"]`).remove();
+            delete quickAddAvailability[dayCode];
+        }
+
+        function updateQuickAddNoDaysMessage() {
+            const selectedDays = $('#quickAddSelectedScheduleDays .day-schedule-row');
+            const noDaysMessage = $('#quickAddNoDaysSelected');
+            
+            if (selectedDays.length === 0) {
+                noDaysMessage.show();
+            } else {
+                noDaysMessage.hide();
+            }
+        }
+
+        function collectQuickAddAvailability() {
+            const availability = [];
+            
+            $('#quickAddSelectedScheduleDays .day-schedule-row').each(function() {
+                const dayScheduleRow = $(this);
+                const day = parseInt(dayScheduleRow.data('day'));
+                
+                const daySchedule = {
+                    day: day,
+                    times: []
+                };
+                
+                // Collect time slots for this day
+                dayScheduleRow.find('.time-slot-row').each(function() {
+                    const timeRow = $(this);
+                    const startTime = timeRow.find('.start-time').val();
+                    const endTime = timeRow.find('.end-time').val();
+                    
+                    if (startTime && endTime) {
+                        daySchedule.times.push({
+                            start: startTime,
+                            end: endTime
+                        });
+                    }
+                });
+                
+                if (daySchedule.times.length > 0) {
+                    availability.push(daySchedule);
+                }
+            });
+            
+            return availability.length > 0 ? availability : null;
+        }
+
+        function resetQuickAddAvailability() {
+            // Reset day buttons
+            $('#quickAddAvailableDaysContainer .day-btn').removeClass('active btn-primary').addClass('btn-outline-primary');
+            
+            // Clear selected schedules
+            $('#quickAddSelectedScheduleDays').empty();
+            
+            // Reset availability object
+            quickAddAvailability = {};
+            
+            // Show no days message
+            updateQuickAddNoDaysMessage();
+        }
+        // ========== END QUICK ADD AVAILABILITY MANAGEMENT ==========
+
+        // ========== END PROVIDER EXPERIENCIAS MANAGEMENT ==========
 
         // ========== AVAILABILITY CALENDAR MANAGEMENT ==========
-        let daySchedules = {};
+        let experienciaAvailability = {};
 
         function initializeDaySelection() {
             $('#providerAvailableDaysContainer .day-btn').removeClass('active btn-primary').addClass('btn-outline-primary');
             $('#providerDaySchedulesContainer .day-schedule-row').remove();
-            daySchedules = {};
+            experienciaAvailability = {};
             updateNoDaysMessage();
         }
 
@@ -517,7 +1512,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         });
 
         function addDaySchedule(dayCode, dayName, startTime = '', endTime = '') {
-            if (daySchedules[dayCode]) return;
+            if (experienciaAvailability[dayCode]) return;
             const template = document.getElementById('providerDayScheduleRowTemplate');
             const clone = template.content.cloneNode(true);
             const row = clone.querySelector('.day-schedule-row');
@@ -526,7 +1521,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             if (startTime) row.querySelector('.day-start-time').value = startTime;
             if (endTime) row.querySelector('.day-end-time').value = endTime;
             insertDayScheduleSorted(row, dayCode);
-            daySchedules[dayCode] = { dayName: dayName, element: row };
+            experienciaAvailability[dayCode] = { dayName: dayName, element: row };
             attachTimeInputValidation(row.querySelector('.day-start-time'));
             attachTimeInputValidation(row.querySelector('.day-end-time'));
         }
@@ -549,9 +1544,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         }
 
         function removeDaySchedule(dayCode) {
-            if (!daySchedules[dayCode]) return;
-            $(daySchedules[dayCode].element).remove();
-            delete daySchedules[dayCode];
+            if (!experienciaAvailability[dayCode]) return;
+            $(experienciaAvailability[dayCode].element).remove();
+            delete experienciaAvailability[dayCode];
         }
 
         $(document).on('click', '.remove-day-btn', function() {
@@ -563,7 +1558,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         });
 
         function updateNoDaysMessage() {
-            const hasDays = Object.keys(daySchedules).length > 0;
+            const hasDays = Object.keys(experienciaAvailability).length > 0;
             $('#providerNoDaysSelected').toggle(!hasDays);
         }
 
@@ -607,6 +1602,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $('#modalTitle').text(isEdit ? 'Editar Proveedor' : 'Crear Nuevo Proveedor');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Proveedor');
             initializeDaySelection();
+            
+            // Reset experiencias
+            providerExperiencias = [];
+            $('.experiencia-editable').remove();
+            updateNoExperienciasMessage();
         }
 
         function loadProviderData(providerId) {
@@ -621,22 +1621,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#providerId').val(provider.id);
                         $('#name').val(provider.name);
                         $('#description').val(provider.description || '');
-                        $('#providerType').val(provider.providerType || '');
-                        $('#duration').val(provider.duration || '');
-                        $('#min_people').val(provider.min_people || '');
-                        $('#cost').val(provider.cost || 0);
-
-                        // Set availability
-                        initializeDaySelection();
-                        if (provider.availability && Array.isArray(provider.availability) && provider.availability.length > 0) {
-                            provider.availability.forEach(schedule => {
-                                const dayBtn = $(`#providerAvailableDaysContainer .day-btn[data-day="${schedule.day}"]`);
-                                const dayName = dayBtn.data('day-name');
-                                addDaySchedule(schedule.day, dayName, schedule.startTime, schedule.endTime);
-                                dayBtn.removeClass('btn-outline-primary').addClass('active btn-primary');
-                            });
-                            updateNoDaysMessage();
+                        // Don't set providerType, duration, min_people, or cost for providers
+                        
+                        // Load provider experiencias
+                        if (provider.id) {
+                            loadProviderExperiencias(provider.id);
                         }
+
+                        // Provider availability has been moved to individual experiencias
+                        updateNoDaysMessage();
                     } else {
                         showErrorAlert('Formato de respuesta inválido');
                     }
@@ -661,69 +1654,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 name: $('#name').val().trim(),
                 description: $('#description').val().trim(),
                 type: 'Provider',
-                cost: parseFloat($('#cost').val()) || 0
+                cost: 0  // Always 0 for providers, costs are in experiencias
             };
 
-            // Only include providerType if it has a value
-            const providerTypeValue = $('#providerType').val();
-            if (providerTypeValue) {
-                providerData.providerType = providerTypeValue;
-            }
+            // Don't include providerType anymore - it's now part of individual experiencias
 
-            // Only include duration if it has a value
-            const durationValue = $('#duration').val();
-            if (durationValue) {
-                providerData.duration = parseFloat(durationValue);
-            }
+            // Don't include duration or min_people for providers anymore
 
-            // Only include min_people if it has a value
-            const minPeopleValue = $('#min_people').val();
-            if (minPeopleValue) {
-                providerData.min_people = parseInt(minPeopleValue, 10);
-            }
-
-            // Add optional availability fields
-            if (Object.keys(daySchedules).length > 0) {
-                const availability = [];
-                const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-
-                for (const dayCode in daySchedules) {
-                    const scheduleRow = $(daySchedules[dayCode].element);
-                    const startTime = scheduleRow.find('.day-start-time').val();
-                    const endTime = scheduleRow.find('.day-end-time').val();
-                    const dayName = daySchedules[dayCode].dayName;
-
-                    if (!startTime || !endTime) {
-                        showModalError(`Debe especificar hora de inicio y fin para ${dayName}`);
-                        return;
-                    }
-
-                    if (!timeRegex.test(startTime)) {
-                        showModalError(`Formato de hora de inicio inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
-                        return;
-                    }
-                    if (!timeRegex.test(endTime)) {
-                        showModalError(`Formato de hora de fin inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
-                        return;
-                    }
-
-                    if (startTime >= endTime) {
-                        showModalError(`La hora de fin debe ser posterior a la hora de inicio para ${dayName}`);
-                        return;
-                    }
-
-                    availability.push({
-                        day: parseInt(dayCode),
-                        startTime: startTime,
-                        endTime: endTime
-                    });
-                }
-
-                providerData.availability = availability;
-            }
+            // Provider availability has been moved to individual experiencias
 
             const url = isEdit ? `${apiEndpoint}/${providerId}` : apiEndpoint;
             const method = isEdit ? 'PUT' : 'POST';
+            
+            // Collect all experiencia data from the inline cards
+            const experienciasToSave = collectExperienciasFromCards();
 
             $('#saveProviderBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
 
@@ -732,8 +1676,65 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 type: method,
                 contentType: 'application/json',
                 data: JSON.stringify(providerData),
-                success: function(response) {
+                success: async function(response) {
                     if (response.success) {
+                        const actualProviderId = response.data?.id || response.data?.objectId || providerId;
+                        
+                        // Save experiencias for the provider
+                        if (actualProviderId && experienciasToSave.length > 0) {
+                            try {
+                                // First, get existing experiencias if editing
+                                let existingExperiencias = [];
+                                if (isEdit) {
+                                    const expResponse = await $.ajax({
+                                        url: `/api/providers/${actualProviderId}/experiencias`,
+                                        type: 'GET'
+                                    });
+                                    if (expResponse.success && expResponse.data) {
+                                        existingExperiencias = expResponse.data;
+                                    }
+                                }
+                                
+                                // Delete removed experiencias
+                                const currentIds = experienciasToSave.filter(e => e.id).map(e => e.id);
+                                for (const existing of existingExperiencias) {
+                                    if (!currentIds.includes(existing.id)) {
+                                        await $.ajax({
+                                            url: `/api/providers/${actualProviderId}/experiencias/${existing.id}`,
+                                            type: 'DELETE'
+                                        });
+                                    }
+                                }
+                                
+                                // Update or create experiencias
+                                for (let i = 0; i < experienciasToSave.length; i++) {
+                                    const exp = experienciasToSave[i];
+                                    exp.displayOrder = i;
+                                    
+                                    if (exp.id) {
+                                        // Update existing
+                                        await $.ajax({
+                                            url: `/api/providers/${actualProviderId}/experiencias/${exp.id}`,
+                                            type: 'PUT',
+                                            contentType: 'application/json',
+                                            data: JSON.stringify(exp)
+                                        });
+                                    } else {
+                                        // Create new
+                                        await $.ajax({
+                                            url: `/api/providers/${actualProviderId}/experiencias`,
+                                            type: 'POST',
+                                            contentType: 'application/json',
+                                            data: JSON.stringify(exp)
+                                        });
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error saving experiencias:', error);
+                                showErrorAlert('Proveedor guardado pero hubo un error al guardar las experiencias');
+                            }
+                        }
+                        
                         $('#providerModal').modal('hide');
                         dataTable.ajax.reload();
                         showSuccessAlert(isEdit ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente');

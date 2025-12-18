@@ -824,6 +824,102 @@ class AmexingUser extends BaseModel {
   }
 
   /**
+   * Get user's display role (for UI purposes).
+   * @returns {string} - Display role (guia, greeter, limpieza, etc.) or actual role name.
+   * @example
+   * const displayRole = user.getDisplayRole();
+   * console.log(displayRole); // 'guia'
+   */
+  getDisplayRole() {
+    return this.get('displayRole') || this.get('role') || 'employee_amexing';
+  }
+
+  /**
+   * Set user's display role (for UI purposes).
+   * @param {string} displayRole - Display role name.
+   * @example
+   * user.setDisplayRole('guia');
+   */
+  setDisplayRole(displayRole) {
+    this.set('displayRole', displayRole);
+  }
+
+  /**
+   * Get user's job title.
+   * @returns {string} - Human-readable job title.
+   * @example
+   * const title = user.getJobTitle();
+   * console.log(title); // 'Guía Turístico'
+   */
+  getJobTitle() {
+    return this.get('jobTitle') || this.getDisplayRoleTitle();
+  }
+
+  /**
+   * Set user's job title.
+   * @param {string} jobTitle - Human-readable job title.
+   * @example
+   * user.setJobTitle('Guía Turístico');
+   */
+  setJobTitle(jobTitle) {
+    this.set('jobTitle', jobTitle);
+  }
+
+  /**
+   * Get user's future roles array (for multiple roles support).
+   * @returns {string[]} - Array of future role names.
+   * @example
+   * const futureRoles = user.getFutureRoles();
+   * console.log(futureRoles); // ['driver', 'guia']
+   */
+  getFutureRoles() {
+    return this.get('futureRoles') || [];
+  }
+
+  /**
+   * Set user's future roles array.
+   * @param {string[]} futureRoles - Array of role names.
+   * @example
+   * user.setFutureRoles(['driver', 'guia', 'greeter']);
+   */
+  setFutureRoles(futureRoles) {
+    this.set('futureRoles', futureRoles || []);
+  }
+
+  /**
+   * Add a future role to the user.
+   * @param {string} roleName - Role name to add.
+   * @example
+   * user.addFutureRole('greeter');
+   */
+  addFutureRole(roleName) {
+    const currentRoles = this.getFutureRoles();
+    if (!currentRoles.includes(roleName)) {
+      currentRoles.push(roleName);
+      this.setFutureRoles(currentRoles);
+    }
+  }
+
+  /**
+   * Get display role title based on display role.
+   * @returns {string} - Human-readable title for display role.
+   * @example
+   * const title = user.getDisplayRoleTitle();
+   * console.log(title); // 'Guía Turístico'
+   */
+  getDisplayRoleTitle() {
+    const displayRole = this.getDisplayRole();
+    const roleTitles = {
+      employee_amexing: 'Empleado Administrativo',
+      driver: 'Conductor',
+      guia: 'Guía Turístico',
+      greeter: 'Personal de Recepción',
+      limpieza: 'Personal de Limpieza',
+    };
+    return roleTitles[displayRole] || displayRole;
+  }
+
+  /**
    * Get user's role name for backward compatibility.
    * @returns {Promise<string>} - Role name or 'guest'.
    * @example

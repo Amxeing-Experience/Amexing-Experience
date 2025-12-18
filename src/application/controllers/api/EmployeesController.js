@@ -31,7 +31,7 @@ class EmployeesController {
     this.maxPageSize = 100;
     this.defaultPageSize = 25;
     this.employeeRole = 'employee_amexing';
-    this.allowedEmployeeRoles = ['employee_amexing', 'driver'];
+    this.allowedEmployeeRoles = ['employee_amexing', 'driver', 'guia', 'greeter', 'limpieza'];
   }
 
   /**
@@ -61,6 +61,7 @@ class EmployeesController {
       const options = this.parseQueryParams(req.query);
 
       // Add role filter to get both employee_amexing and driver users
+      // Note: guia, greeter, limpieza now use 'driver' role with displayRole field
       options.filters = options.filters || {};
       options.filters.roleNames = ['employee_amexing', 'driver'];
 
@@ -180,16 +181,29 @@ class EmployeesController {
       if (!employeeData.firstName?.toString().trim()) missingFields.push('firstName');
       if (!employeeData.lastName?.toString().trim()) missingFields.push('lastName');
       if (!employeeData.email?.toString().trim()) missingFields.push('email');
-      if (!employeeData.role?.toString().trim()) missingFields.push('role');
+      // Check if roles array or single role is provided
+      const hasRoles = (employeeData.roles && Array.isArray(employeeData.roles) && employeeData.roles.length > 0)
+                       || employeeData.role?.toString().trim();
+      if (!hasRoles) missingFields.push('roles');
 
       if (missingFields.length > 0) {
         return this.sendError(res, `Campos requeridos faltantes: ${missingFields.join(', ')}`, 400);
       }
 
-      // Validate role (only employee_amexing and driver are allowed)
-      const allowedRoles = ['employee_amexing', 'driver'];
-      if (!allowedRoles.includes(employeeData.role)) {
-        return this.sendError(res, `Rol inválido. Los roles permitidos son: ${allowedRoles.join(', ')}`, 400);
+      // Validate roles
+      const allowedRoles = ['employee_amexing', 'driver', 'guia', 'greeter', 'limpieza'];
+      let selectedRoles = [];
+
+      if (employeeData.roles && Array.isArray(employeeData.roles)) {
+        selectedRoles = employeeData.roles;
+      } else if (employeeData.role) {
+        selectedRoles = [employeeData.role]; // Backward compatibility
+      }
+
+      // Check all selected roles are valid
+      const invalidRoles = selectedRoles.filter((role) => !allowedRoles.includes(role));
+      if (invalidRoles.length > 0) {
+        return this.sendError(res, `Roles inválidos: ${invalidRoles.join(', ')}. Los roles permitidos son: ${allowedRoles.join(', ')}`, 400);
       }
 
       // Email format validation
@@ -204,23 +218,42 @@ class EmployeesController {
       // Force Amexing organization
       employeeData.organizationId = 'amexing';
 
-      // Find and assign the roleId based on the provided role
+      // selectedRoles already validated and set above in validation section
+
+      // Determine actual role for RBAC system based on role priority
+      let actualRole;
+
+      if (selectedRoles.includes('employee_amexing')) {
+        // Administrator role takes precedence
+        actualRole = 'employee_amexing';
+      } else {
+        // All other employee types map to driver for permissions
+        actualRole = 'driver';
+      }
+
+      // Find and assign the actual roleId
       const Parse = require('parse/node');
       const roleQuery = new Parse.Query('Role');
-      roleQuery.equalTo('name', employeeData.role); // Use role from body
+      roleQuery.equalTo('name', actualRole); // Use actual role for RBAC
       roleQuery.equalTo('active', true);
       roleQuery.equalTo('exists', true);
       const roleObject = await roleQuery.first({ useMasterKey: true });
 
       if (!roleObject) {
         throw new Error(
-          `Role '${employeeData.role}' not found in database. Please ensure roles are properly configured.`
+          `Role '${actualRole}' not found in database. Please ensure roles are properly configured.`
         );
       }
 
-      // Set roleId as Pointer to Role object
+      // Set roleId as Pointer to Role object (always driver for new employee types)
       employeeData.roleId = roleObject.id;
-      // Keep role field as provided
+
+      // Store multiple roles in futureRoles, keep single displayRole for backward compatibility
+      employeeData.futureRoles = selectedRoles; // Store all selected roles
+      employeeData.displayRole = selectedRoles[0]; // First role for backward compatibility
+
+      // Keep role field for backward compatibility
+      employeeData.role = actualRole;
 
       // Generate secure random password
       employeeData.password = this.generateSecurePassword();
@@ -313,14 +346,75 @@ class EmployeesController {
         currentUser.role = currentUserRole;
       }
 
-      // Prevent role change - employees must be either employee_amexing or driver
-      const allowedEmployeeRoles = ['employee_amexing', 'driver'];
-      if (updateData.role && !allowedEmployeeRoles.includes(updateData.role)) {
+      // Validate roles - employees must have valid role(s)
+      const allowedEmployeeRoles = ['employee_amexing', 'driver', 'guia', 'greeter', 'limpieza'];
+
+      // Check roles array or single role
+      if (updateData.roles && Array.isArray(updateData.roles)) {
+        const invalidRoles = updateData.roles.filter((role) => !allowedEmployeeRoles.includes(role));
+        if (invalidRoles.length > 0) {
+          return this.sendError(
+            res,
+            `Roles inválidos: ${invalidRoles.join(', ')}. Los roles permitidos son: ${allowedEmployeeRoles.join(', ')}`,
+            400
+          );
+        }
+      } else if (updateData.role && !allowedEmployeeRoles.includes(updateData.role)) {
         return this.sendError(
           res,
           `Cannot change employee role. Must be one of: ${allowedEmployeeRoles.join(', ')}`,
           400
         );
+      }
+
+      // Apply multiple roles strategy for updates
+      if (updateData.roles || updateData.role) {
+        // Handle multiple roles: get from 'roles' array or fallback to single 'role' field
+        let selectedRoles = [];
+        if (updateData.roles && Array.isArray(updateData.roles)) {
+          selectedRoles = updateData.roles;
+        } else if (updateData.role) {
+          selectedRoles = [updateData.role]; // Backward compatibility
+        }
+
+        if (selectedRoles.length === 0) {
+          return this.sendError(res, 'At least one role must be specified', 400);
+        }
+
+        // Determine actual role for RBAC system based on role priority
+        let actualRole;
+
+        if (selectedRoles.includes('employee_amexing')) {
+          // Administrator role takes precedence
+          actualRole = 'employee_amexing';
+        } else {
+          // All other employee types map to driver for permissions
+          actualRole = 'driver';
+        }
+
+        // Find and assign the actual roleId
+        const Parse = require('parse/node');
+        const roleQuery = new Parse.Query('Role');
+        roleQuery.equalTo('name', actualRole); // Use actual role for RBAC
+        roleQuery.equalTo('active', true);
+        roleQuery.equalTo('exists', true);
+        const roleObject = await roleQuery.first({ useMasterKey: true });
+
+        if (!roleObject) {
+          return this.sendError(
+            res,
+            `Role '${actualRole}' not found in database. Please ensure roles are properly configured.`,
+            500
+          );
+        }
+
+        // Set multiple roles and backward compatibility fields
+        updateData.futureRoles = selectedRoles; // Store all selected roles
+        updateData.displayRole = selectedRoles[0]; // First role for backward compatibility
+
+        // Set actual role and roleId for RBAC system
+        updateData.role = actualRole;
+        updateData.roleId = roleObject.id;
       }
 
       // Update user using service
@@ -487,7 +581,7 @@ class EmployeesController {
    */
   async fetchEmployee(employeeId) {
     const Parse = require('parse/node');
-    const query = new Parse.Query(Parse.User);
+    const query = new Parse.Query('AmexingUser');
     query.equalTo('exists', true);
     query.include('roleId');
     query.include('departmentId');
@@ -547,6 +641,10 @@ class EmployeesController {
       roleId: roleInfo.roleId,
       departmentId: user.get('departmentId')?.id || null,
       contextualData: user.get('contextualData'),
+      // Display role fields for UI
+      displayRole: user.get('displayRole') || roleInfo.roleName,
+      futureRoles: user.get('futureRoles') || [],
+      jobTitle: user.get('jobTitle') || '',
     };
   }
 

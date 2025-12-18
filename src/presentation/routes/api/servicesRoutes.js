@@ -20,7 +20,7 @@
 
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const ServiceController = require('../../../application/controllers/api/ServiceController');
+const ServicesController = require('../../../application/controllers/api/ServicesController');
 const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 
 const router = express.Router();
@@ -68,7 +68,7 @@ router.get(
   '/',
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4), // Department Manager and above
-  (req, res) => ServiceController.getServices(req, res)
+  (req, res) => ServicesController.getServices(req, res)
 );
 
 /**
@@ -80,7 +80,75 @@ router.get(
  * This endpoint is optimized for dropdown/select elements and returns
  * only active services in a simplified format.
  */
-router.get('/active', jwtMiddleware.authenticateToken, (req, res) => ServiceController.getActiveServices(req, res));
+router.get('/active', jwtMiddleware.authenticateToken, (req, res) => ServicesController.getActiveServices(req, res));
+
+/**
+ * GET /api/services/with-rate-prices - Get services with prices for a specific rate.
+ *
+ * Access: Authenticated users (department manager and above)
+ * Query: rateId (required)
+ * Returns: Services with their prices for the specified rate.
+ */
+router.get(
+  '/with-rate-prices',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  (req, res) => ServicesController.getServicesWithRatePrices(req, res)
+);
+
+/**
+ * GET /api/services/:id/all-rate-prices - Get all rate prices for a specific service.
+ *
+ * Access: Authenticated users (department manager and above)
+ * Returns: All rate prices for the service.
+ */
+router.get(
+  '/:id/all-rate-prices',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  (req, res) => ServicesController.getAllRatePricesForService(req, res)
+);
+
+/**
+ * GET /api/services/:id/all-rate-prices-with-client-prices?clientId=xxx - Get rate prices with client overrides.
+ *
+ * Access: Authenticated users (department manager and above)
+ * Returns: Complete rate pricing structure with client-specific price overrides.
+ */
+router.get(
+  '/:id/all-rate-prices-with-client-prices',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  (req, res) => ServicesController.getAllRatePricesForServiceWithClientPrices(req, res)
+);
+
+/**
+ * GET /api/services/debug-rate-prices - Debug endpoint to examine RatePrices data.
+ *
+ * Access: Authenticated users (department manager and above)
+ * Query: clientId?, serviceId? (optional filters)
+ * Returns: Detailed RatePrices data with statistics for debugging.
+ */
+router.get(
+  '/debug-rate-prices',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  (req, res) => ServicesController.debugRatePrices(req, res)
+);
+
+/**
+ * GET /api/services/debug-client-prices - Debug endpoint to examine ClientPrices data.
+ *
+ * Access: Authenticated users (department manager and above)
+ * Query: clientId?, serviceId? (optional filters)
+ * Returns: Detailed ClientPrices data comparing Parse SDK vs HTTP approaches.
+ */
+router.get(
+  '/debug-client-prices',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  (req, res) => ServicesController.debugClientPrices(req, res)
+);
 
 /**
  * GET /api/services/:id - Get single service by ID.
@@ -92,7 +160,7 @@ router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(4), // Department Manager and above
-  (req, res) => ServiceController.getServiceById(req, res)
+  (req, res) => ServicesController.getServiceById(req, res)
 );
 
 // =================
@@ -111,7 +179,7 @@ router.post(
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => ServiceController.createService(req, res)
+  (req, res) => ServicesController.createService(req, res)
 );
 
 /**
@@ -126,7 +194,7 @@ router.patch(
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => ServiceController.toggleServiceStatus(req, res)
+  (req, res) => ServicesController.toggleServiceStatus(req, res)
 );
 
 /**
@@ -141,7 +209,7 @@ router.put(
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => ServiceController.updateService(req, res)
+  (req, res) => ServicesController.updateService(req, res)
 );
 
 /**
@@ -155,7 +223,22 @@ router.delete(
   writeOperationsLimiter,
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
-  (req, res) => ServiceController.deleteService(req, res)
+  (req, res) => ServicesController.deleteService(req, res)
+);
+
+/**
+ * POST /api/services/client-prices - Save client-specific prices for a service.
+ *
+ * Access: Admin (level 6+)
+ * Body: { clientId, serviceId, prices: [{ ratePtr, vehiclePtr, precio, basePrice }] }
+ * Returns: Success message with saved count.
+ */
+router.post(
+  '/client-prices',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ServicesController.saveClientPrices(req, res)
 );
 
 module.exports = router;

@@ -1,0 +1,1132 @@
+<%
+/**
+ * Admin Price Settings Management Page
+ * Manages price adjustment factors with historical tracking
+ *
+ * Layout Structure:
+ * - Vertical navigation menu (collapsible)
+ * - Four sections: Exchange Rate, Inflation %, Agency %, Transfer %
+ * - Section-based content rendering with current value cards and history tables
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const activeSection = typeof section !== 'undefined' ? section : 'exchange-rate';
+
+// Menu items configuration
+const menuItems = [
+    { label: 'Tipo de Cambio', icon: 'currency-dollar', section: 'exchange-rate', href: '/dashboard/admin/price-settings' },
+    { label: '% de Inflación', icon: 'trending-up', section: 'inflation', href: '/dashboard/admin/price-settings?section=inflation' },
+    { label: '% de Agencia', icon: 'percentage', section: 'agency', href: '/dashboard/admin/price-settings?section=agency' },
+    { label: '% Transferencia', icon: 'credit-card', section: 'transfer', href: '/dashboard/admin/price-settings?section=transfer' }
+];
+
+// Section display names
+const sectionNames = {
+    'exchange-rate': 'Tipo de Cambio (USD a MXN)',
+    'inflation': 'Porcentaje de Inflación',
+    'agency': 'Porcentaje de Agencia',
+    'transfer': 'Porcentaje de Transferencia'
+};
+
+// Get current section data
+const currentSection = menuItems.find(item => item.section === activeSection);
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h2 class="mb-1 fw-bold">
+                    <i class="ti ti-settings me-2 text-primary"></i>
+                    Ajustes de Precio
+                </h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a>
+                        </li>
+                        <li class="breadcrumb-item active">
+                            <i class="ti ti-settings me-1"></i>Ajustes de Precio
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="/dashboard/admin" class="btn btn-sm btn-outline-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>Volver
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content with Vertical Menu -->
+<div class="row mt-4">
+    <!-- Vertical Menu Column -->
+    <div class="col-lg-3 mb-3 mb-lg-0" id="menuColumn">
+        <nav class="vertical-menu card border-0 shadow-sm">
+            <div class="card-body p-3">
+                <div class="menu-header mb-3">
+                    <h6 class="text-uppercase text-muted fw-bold menu-title" style="font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 0;">AJUSTES</h6>
+                    <button class="btn btn-sm btn-link text-muted p-0 menu-toggle-btn" id="menuToggle" type="button" aria-label="Colapsar menú">
+                        <i class="ti ti-menu-2 fs-5"></i>
+                    </button>
+                </div>
+                <% menuItems.forEach(function(item) { %>
+                    <a href="<%= item.href %>" class="menu-item <%= item.section === activeSection ? 'active' : '' %>" data-bs-toggle="tooltip" data-bs-placement="right" title="<%= item.label %>">
+                        <i class="ti ti-<%= item.icon %> menu-icon"></i><span class="menu-label"><%= item.label %></span>
+                    </a>
+                <% }); %>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Content Column -->
+    <div class="col-lg-9" id="contentColumn">
+        <!-- Section Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h4 class="mb-1 fw-bold">
+                            <i class="ti ti-<%= currentSection.icon %> me-2 text-primary"></i>
+                            <%= sectionNames[activeSection] %>
+                        </h4>
+                        <p class="text-muted mb-0">Gestione los valores actuales y revise el historial de cambios</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Value Card and New Adjustment Form -->
+        <div class="row mb-4">
+            <!-- Current Value Display Card -->
+            <div class="col-lg-6 mb-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center justify-content-between mb-3">
+                            <h6 class="card-title mb-0">
+                                <i class="ti ti-info-circle me-2"></i>Valor Actual
+                            </h6>
+                            <div class="badge bg-success">Activo</div>
+                        </div>
+                        
+                        <!-- Exchange Rate Display -->
+                        <% if (activeSection === 'exchange-rate') { %>
+                            <% if (typeof currentExchangeRate !== 'undefined' && currentExchangeRate.value) { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary">$<%= currentExchangeRate.formatted %></div>
+                                <div class="text-muted">MXN por USD</div>
+                            </div>
+
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date(currentExchangeRate.lastUpdated).toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-success">Activo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } else { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary">$18.50</div>
+                                <div class="text-muted">MXN por USD (Valor por defecto)</div>
+                            </div>
+
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date().toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-warning">Por defecto</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } %>
+                        <!-- Inflation Rate Display -->
+                        <% } else if (activeSection === 'inflation') { %>
+                            <% if (typeof currentInflationRate !== 'undefined' && currentInflationRate.value) { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary"><%= currentInflationRate.formatted %>%</div>
+                                <div class="text-muted">Tasa de Inflación Anual</div>
+                            </div>
+
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date(currentInflationRate.lastUpdated).toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-success">Activo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } else { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary">5.25%</div>
+                                <div class="text-muted">Tasa de Inflación (Valor por defecto)</div>
+                            </div>
+
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date().toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-warning">Por defecto</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } %>
+                        <!-- Agency Rate Display -->
+                        <% } else if (activeSection === 'agency') { %>
+                            <% if (typeof currentAgencyRate !== 'undefined' && currentAgencyRate.value) { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary"><%= currentAgencyRate.formatted %>%</div>
+                                <div class="text-muted">Porcentaje de Agencia</div>
+                            </div>
+
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date(currentAgencyRate.lastUpdated).toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-success">Activo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } else { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary">15.0%</div>
+                                <div class="text-muted">Porcentaje de Agencia (Valor por defecto)</div>
+                            </div>
+
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date().toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-warning">Por defecto</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } %>
+                        <!-- Transfer Rate Display -->
+                        <% } else if (activeSection === 'transfer') { %>
+                            <% if (typeof currentTransferRate !== 'undefined' && currentTransferRate.value) { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary"><%= currentTransferRate.formatted %>%</div>
+                                <div class="text-muted">Porcentaje de Traslado</div>
+                            </div>
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date(currentTransferRate.lastUpdated).toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-success">Activo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } else { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary">3.0%</div>
+                                <div class="text-muted">Porcentaje de Traslado (Valor por defecto)</div>
+                            </div>
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date().toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-warning">Por defecto</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } %>
+                        <% } %>
+
+                        <div id="noCurrentValue" class="text-center py-3 text-muted" style="display: none;">
+                            <i class="ti ti-info-circle display-6 text-muted mb-2"></i>
+                            <p class="mb-0">No hay valor configurado</p>
+                            <small>Configure el primer valor usando el formulario</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- New Adjustment Form -->
+            <div class="col-lg-6 mb-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <h6 class="card-title mb-3">
+                            <i class="ti ti-plus me-2"></i>Nuevo Ajuste
+                        </h6>
+                        
+                        <form id="adjustmentForm">
+                            <div class="mb-3">
+                                <label for="adjustmentValue" class="form-label">
+                                    <% if (activeSection === 'exchange-rate') { %>
+                                        Tipo de Cambio (MXN por USD)
+                                    <% } else { %>
+                                        Porcentaje (%)
+                                    <% } %>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <div class="input-group">
+                                    <% if (activeSection === 'exchange-rate') { %>
+                                        <span class="input-group-text">$</span>
+                                    <% } %>
+                                    <input type="number" class="form-control" id="adjustmentValue" 
+                                           step="0.01" min="0" required
+                                           placeholder="<%= activeSection === 'exchange-rate' ? '18.50' : (activeSection === 'transfer' ? '3.00' : '5.25') %>">
+                                    <% if (activeSection !== 'exchange-rate') { %>
+                                        <span class="input-group-text">%</span>
+                                    <% } else { %>
+                                        <span class="input-group-text">MXN</span>
+                                    <% } %>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="effectiveDateInput" class="form-label">
+                                    Fecha Efectiva <span class="text-danger">*</span>
+                                </label>
+                                <input type="datetime-local" class="form-control" id="effectiveDateInput" required>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="adjustmentNote" class="form-label">Nota (opcional)</label>
+                                <textarea class="form-control" id="adjustmentNote" rows="3" 
+                                          placeholder="Razón del cambio o comentarios adicionales..."></textarea>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100" id="submitAdjustment">
+                                <i class="ti ti-check me-2"></i>Guardar Ajuste
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header text-white" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border: none;">
+                        <div class="d-flex align-items-center">
+                            <h5 class="card-title mb-0 text-white">
+                                <i class="ti ti-history me-2"></i>Historial de Cambios
+                            </h5>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table id="adjustmentsHistoryTable" class="table table-hover" style="width:100%">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Valor</th>
+                                        <th>Fecha Efectiva</th>
+                                        <th>Modificado Por</th>
+                                        <th>Fecha Creación</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success/Error Alerts -->
+<div id="alertsContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999; width: 350px;"></div>
+
+<!-- Vertical Menu Styles -->
+<style>
+/* Vertical Menu Styles */
+.vertical-menu {
+    position: sticky;
+    top: 1rem;
+    transition: all 0.3s ease;
+}
+
+.vertical-menu.collapsed {
+    max-width: 80px;
+}
+
+.menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s ease;
+}
+
+.vertical-menu.collapsed .menu-header {
+    justify-content: center;
+}
+
+.vertical-menu.collapsed .menu-title,
+.vertical-menu.collapsed .menu-label {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+    transition: opacity 0.2s ease, width 0.3s ease;
+}
+
+.vertical-menu:not(.collapsed) .menu-title,
+.vertical-menu:not(.collapsed) .menu-label {
+    opacity: 1;
+    width: auto;
+    transition: opacity 0.3s ease 0.1s, width 0.3s ease;
+}
+
+.menu-toggle-btn {
+    text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.menu-toggle-btn:hover {
+    transform: scale(1.1);
+    color: #6366f1 !important;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    color: #5a6a85;
+    text-decoration: none;
+    border-radius: 0.375rem;
+    margin-bottom: 0.25rem;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.vertical-menu.collapsed .menu-item {
+    justify-content: center;
+    padding: 0.75rem;
+}
+
+.menu-item:hover {
+    background-color: #f8f9fa;
+    color: #6366f1;
+}
+
+.menu-item.active {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    font-weight: 600;
+}
+
+.menu-icon {
+    font-size: 1.25rem;
+    min-width: 1.25rem;
+    transition: margin 0.3s ease;
+}
+
+.vertical-menu:not(.collapsed) .menu-icon {
+    margin-right: 0.5rem;
+}
+
+.vertical-menu.collapsed .menu-icon {
+    margin-right: 0;
+}
+
+.menu-label {
+    transition: opacity 0.2s ease, width 0.3s ease;
+}
+
+/* Column transitions */
+#menuColumn, #contentColumn {
+    transition: all 0.3s ease;
+}
+
+#menuColumn.collapsed {
+    flex: 0 0 auto;
+    width: auto;
+}
+
+#contentColumn.expanded {
+    flex: 1;
+}
+
+/* Current value display */
+#currentValueDisplay .display-3 {
+    font-weight: 700;
+    color: #6366f1;
+}
+
+/* Responsive styles */
+@media (max-width: 991.98px) {
+    .vertical-menu {
+        position: static;
+    }
+    #menuToggle {
+        display: none;
+    }
+}
+</style>
+
+<!-- Price Settings JavaScript -->
+<script>
+// Global variable for current section
+const currentSection = '<%= activeSection %>';
+
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Menu toggle functionality
+    initializeMenuToggle();
+    
+    // Load current value (now server-side rendered)
+    // loadCurrentValue();
+    
+    // Initialize history table
+    initializeHistoryTable();
+    
+    // Form submission
+    initializeAdjustmentForm();
+    
+    // Set default datetime
+    setDefaultDateTime();
+});
+
+function initializeMenuToggle() {
+    const menuToggle = document.getElementById('menuToggle');
+    const verticalMenu = document.querySelector('.vertical-menu');
+    const menuColumn = document.getElementById('menuColumn');
+    const contentColumn = document.getElementById('contentColumn');
+
+    if (menuToggle && verticalMenu) {
+        // Check localStorage for saved state
+        const isCollapsed = localStorage.getItem('priceSettingsMenuCollapsed') === 'true';
+        if (isCollapsed) {
+            verticalMenu.classList.add('collapsed');
+            menuColumn.classList.add('collapsed');
+            contentColumn.classList.add('expanded');
+        }
+
+        // Initialize tooltips for menu items
+        const menuItems = document.querySelectorAll('.menu-item[data-bs-toggle="tooltip"]');
+        menuItems.forEach(item => {
+            new bootstrap.Tooltip(item, {
+                trigger: 'hover',
+                boundary: 'window'
+            });
+        });
+
+        // Toggle menu on button click
+        menuToggle.addEventListener('click', function() {
+            const isCurrentlyCollapsed = verticalMenu.classList.toggle('collapsed');
+            menuColumn.classList.toggle('collapsed');
+            contentColumn.classList.toggle('expanded');
+
+            // Save state to localStorage
+            localStorage.setItem('priceSettingsMenuCollapsed', isCurrentlyCollapsed);
+
+            // Update aria-label
+            this.setAttribute('aria-label', isCurrentlyCollapsed ? 'Expandir menú' : 'Colapsar menú');
+
+            // Enable/disable tooltips based on state
+            menuItems.forEach(item => {
+                const tooltip = bootstrap.Tooltip.getInstance(item);
+                if (tooltip) {
+                    if (isCurrentlyCollapsed) {
+                        tooltip.enable();
+                    } else {
+                        tooltip.disable();
+                    }
+                }
+            });
+        });
+
+        // Disable tooltips initially if menu is not collapsed
+        if (!isCollapsed) {
+            menuItems.forEach(item => {
+                const tooltip = bootstrap.Tooltip.getInstance(item);
+                if (tooltip) {
+                    tooltip.disable();
+                }
+            });
+        }
+    }
+}
+
+function loadCurrentValue() {
+    fetch(`/api/price-adjustments/${currentSection}/current`, {
+        headers: {
+            'Authorization': `Bearer ${getAccessToken()}`
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.data) {
+            displayCurrentValue(data.data);
+        } else {
+            displayNoCurrentValue();
+        }
+    })
+    .catch(error => {
+        console.error('Error loading current value:', error);
+        displayNoCurrentValue();
+    });
+}
+
+function displayCurrentValue(adjustment) {
+    const displayDiv = document.getElementById('currentValueDisplay');
+    const detailsDiv = document.getElementById('currentValueDetails');
+    
+    displayDiv.innerHTML = `
+        <div class="display-3 fw-bold text-primary">${adjustment.formattedValue}</div>
+        <div class="text-muted mt-2">${adjustment.note || 'Sin notas adicionales'}</div>
+    `;
+    
+    // Fill details
+    document.getElementById('effectiveDate').textContent = 
+        new Date(adjustment.effectiveDate).toLocaleDateString('es-ES');
+    document.getElementById('createdBy').textContent = 
+        adjustment.createdBy?.username || 'Sistema';
+    
+    detailsDiv.style.display = 'block';
+}
+
+function displayNoCurrentValue() {
+    document.getElementById('currentValueDisplay').style.display = 'none';
+    document.getElementById('noCurrentValue').style.display = 'block';
+}
+
+function initializeHistoryTable() {
+    // Use different API endpoints based on current section
+    let apiUrl, columns;
+    
+    if (currentSection === 'exchange-rate') {
+        apiUrl = '/api/exchange-rate/history';
+        columns = [
+            {
+                title: 'Fecha',
+                width: '30%'
+            },
+            {
+                title: 'Valor',
+                width: '25%'
+            },
+            {
+                title: 'Descripción',
+                width: '30%'
+            },
+            {
+                title: 'Estado',
+                width: '15%'
+            }
+        ];
+    } else if (currentSection === 'inflation') {
+        apiUrl = '/api/inflation-rate/history';
+        columns = [
+            {
+                title: 'Fecha',
+                width: '30%'
+            },
+            {
+                title: 'Valor',
+                width: '25%'
+            },
+            {
+                title: 'Descripción',
+                width: '30%'
+            },
+            {
+                title: 'Estado',
+                width: '15%'
+            }
+        ];
+    } else if (currentSection === 'agency') {
+        apiUrl = '/api/agency-rate/history';
+        columns = [
+            {
+                title: 'Fecha',
+                width: '30%'
+            },
+            {
+                title: 'Valor',
+                width: '25%'
+            },
+            {
+                title: 'Descripción',
+                width: '30%'
+            },
+            {
+                title: 'Estado',
+                width: '15%'
+            }
+        ];
+    } else if (currentSection === 'transfer') {
+        apiUrl = '/api/transfer-rate/history';
+        columns = [
+            {
+                title: 'Fecha',
+                width: '30%'
+            },
+            {
+                title: 'Valor',
+                width: '25%'
+            },
+            {
+                title: 'Descripción',
+                width: '30%'
+            },
+            {
+                title: 'Estado',
+                width: '15%'
+            }
+        ];
+    } else {
+        // Fallback to price-adjustments for other sections
+        apiUrl = `/api/price-adjustments/${currentSection}`;
+        columns = [
+            {
+                data: 'formattedValue',
+                render: function(data, type, row) {
+                    return `<span class="fw-bold text-primary">${data}</span>`;
+                }
+            },
+            {
+                data: 'effectiveDate',
+                render: function(data) {
+                    return new Date(data).toLocaleString('es-ES');
+                }
+            },
+            {
+                data: 'createdBy.username',
+                render: function(data, type, row) {
+                    return data || row.createdBy?.email || 'Sistema';
+                }
+            },
+            {
+                data: 'createdAt',
+                render: function(data) {
+                    return new Date(data).toLocaleString('es-ES');
+                }
+            },
+            {
+                data: 'note',
+                render: function(data) {
+                    if (!data) return '<span class="text-muted">-</span>';
+                    const truncated = data.length > 50 ? data.substring(0, 50) + '...' : data;
+                    return `<span title="${data}">${truncated}</span>`;
+                }
+            },
+            {
+                data: 'active',
+                render: function(data) {
+                    return data 
+                        ? '<span class="badge bg-success">Activo</span>'
+                        : '<span class="badge bg-secondary">Histórico</span>';
+                }
+            }
+        ];
+    }
+
+    $('#adjustmentsHistoryTable').DataTable({
+        processing: true,
+        serverSide: currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer', // Use server-side for exchange rate, inflation, agency, and transfer
+        ajax: {
+            url: apiUrl,
+            type: 'GET',
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            },
+            dataSrc: (currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer') ? 'data' : 'data'
+        },
+        columns: columns,
+        order: (currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer') ? [[0, 'desc']] : [[1, 'desc']], // Order by date descending
+        language: {
+            url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json'
+        },
+        responsive: true,
+        pageLength: 10,
+        lengthMenu: [[10, 25, 50, 100], [10, 25, 50, 100]]
+    });
+}
+
+// View exchange rate details function
+function viewExchangeRate(rateId) {
+    fetch(`/api/exchange-rate/${rateId}`, {
+        headers: {
+            'Authorization': `Bearer ${getAccessToken()}`
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const rate = data.data;
+            showAlert('info', `
+                <strong>Detalles del Tipo de Cambio</strong><br>
+                <strong>Valor:</strong> $${rate.formatted} MXN por USD<br>
+                <strong>Descripción:</strong> ${rate.description || 'Sin descripción'}<br>
+                <strong>Estado:</strong> ${rate.active ? 'Activo' : 'Inactivo'}<br>
+                <strong>Creado:</strong> ${new Date(rate.createdAt).toLocaleString('es-MX')}<br>
+                ${rate.createdBy ? `<strong>Creado por:</strong> ${rate.createdBy.name}` : ''}
+            `);
+        } else {
+            showAlert('danger', 'Error al obtener detalles del tipo de cambio');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Error al cargar los detalles');
+    });
+}
+
+function initializeAdjustmentForm() {
+    document.getElementById('adjustmentForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            value: parseFloat(document.getElementById('adjustmentValue').value),
+            effectiveDate: document.getElementById('effectiveDateInput').value,
+            description: document.getElementById('adjustmentNote').value || '' // Changed from 'note' to 'description'
+        };
+        
+        // Add currency for exchange rate
+        if (currentSection === 'exchange-rate') {
+            formData.currency = 'MXN';
+        }
+        
+        const submitBtn = document.getElementById('submitAdjustment');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="ti ti-loader ti-spin me-2"></i>Guardando...';
+        
+        // Use different API endpoints based on current section
+        const apiUrl = currentSection === 'exchange-rate' 
+            ? '/api/exchange-rate' 
+            : currentSection === 'inflation'
+            ? '/api/inflation-rate'
+            : currentSection === 'agency'
+            ? '/api/agency-rate'
+            : currentSection === 'transfer'
+            ? '/api/transfer-rate'
+            : `/api/price-adjustments/${currentSection}`;
+        
+        fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getAccessToken()}`
+            },
+            body: JSON.stringify(formData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAlert('success', 'Ajuste guardado exitosamente');
+                document.getElementById('adjustmentForm').reset();
+                setDefaultDateTime();
+                updateCurrentValue(); // Update the current value display
+                $('#adjustmentsHistoryTable').DataTable().ajax.reload();
+            } else {
+                showAlert('danger', data.error || 'Error al guardar el ajuste');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showAlert('danger', 'Error al guardar el ajuste');
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="ti ti-check me-2"></i>Guardar Ajuste';
+        });
+    });
+}
+
+function updateCurrentValue() {
+    if (currentSection === 'exchange-rate') {
+        fetch('/api/exchange-rate/current', {
+            headers: {
+                'Authorization': `Bearer ${getAccessToken()}`
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const rate = data.data;
+                
+                // Update the display value
+                const displayElement = document.querySelector('#currentValueDisplay .display-3');
+                if (displayElement) {
+                    displayElement.textContent = `$${rate.formatted}`;
+                }
+                
+                // Update the effective date
+                const effectiveDateElement = document.getElementById('effectiveDate');
+                if (effectiveDateElement) {
+                    const date = new Date(rate.createdAt);
+                    effectiveDateElement.textContent = date.toLocaleDateString('es-MX', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                }
+                
+                // Show the current value display if it was hidden
+                document.getElementById('currentValueDisplay').style.display = 'block';
+                document.getElementById('noCurrentValue').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error updating current value:', error);
+        });
+    } else if (currentSection === 'inflation') {
+        fetch('/api/inflation-rate/current', {
+            headers: {
+                'Authorization': `Bearer ${getAccessToken()}`
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const rate = data.data;
+                
+                // Update the display value
+                const displayElement = document.querySelector('#currentValueDisplay .display-3');
+                if (displayElement) {
+                    displayElement.textContent = `${rate.formatted}%`;
+                }
+                
+                // Update the effective date
+                const effectiveDateElement = document.getElementById('effectiveDate');
+                if (effectiveDateElement) {
+                    const date = new Date(rate.createdAt);
+                    effectiveDateElement.textContent = date.toLocaleDateString('es-MX', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                }
+                
+                // Show the current value display if it was hidden
+                document.getElementById('currentValueDisplay').style.display = 'block';
+                document.getElementById('noCurrentValue').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error updating current value:', error);
+        });
+    } else if (currentSection === 'agency') {
+        fetch('/api/agency-rate/current', {
+            headers: {
+                'Authorization': `Bearer ${getAccessToken()}`
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const rate = data.data;
+                
+                // Update the display value
+                const displayElement = document.querySelector('#currentValueDisplay .display-3');
+                if (displayElement) {
+                    displayElement.textContent = `${rate.formatted}%`;
+                }
+                
+                // Update the effective date
+                const effectiveDateElement = document.getElementById('effectiveDate');
+                if (effectiveDateElement) {
+                    const date = new Date(rate.createdAt);
+                    effectiveDateElement.textContent = date.toLocaleDateString('es-MX', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                }
+                
+                // Show the current value display if it was hidden
+                document.getElementById('currentValueDisplay').style.display = 'block';
+                document.getElementById('noCurrentValue').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error updating current value:', error);
+        });
+    } else if (currentSection === 'transfer') {
+        fetch('/api/transfer-rate/current', {
+            headers: {
+                'Authorization': `Bearer ${getAccessToken()}`
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const rate = data.data;
+                
+                // Update the display value
+                const displayElement = document.querySelector('#currentValueDisplay .display-3');
+                if (displayElement) {
+                    displayElement.textContent = `${rate.formatted}%`;
+                }
+                
+                // Update the effective date
+                const effectiveDateElement = document.getElementById('effectiveDate');
+                if (effectiveDateElement) {
+                    const date = new Date(rate.createdAt);
+                    effectiveDateElement.textContent = date.toLocaleDateString('es-MX', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                    });
+                }
+                
+                // Show the current value display if it was hidden
+                document.getElementById('currentValueDisplay').style.display = 'block';
+                document.getElementById('noCurrentValue').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error updating current value:', error);
+        });
+    }
+}
+
+function setDefaultDateTime() {
+    const now = new Date();
+    const localDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    document.getElementById('effectiveDateInput').value = localDateTime.toISOString().slice(0, 16);
+}
+
+function getAccessToken() {
+    // Get token from cookie or API
+    return document.cookie.split('; ')
+        .find(row => row.startsWith('accessToken='))
+        ?.split('=')[1];
+}
+
+function showAlert(type, message) {
+    const alertsContainer = document.getElementById('alertsContainer');
+    const alertId = 'alert-' + Date.now();
+    
+    const alertHtml = `
+        <div id="${alertId}" class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    alertsContainer.insertAdjacentHTML('beforeend', alertHtml);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const alertElement = document.getElementById(alertId);
+        if (alertElement) {
+            bootstrap.Alert.getOrCreateInstance(alertElement).close();
+        }
+    }, 5000);
+}
+</script>

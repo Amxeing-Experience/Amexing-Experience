@@ -1655,9 +1655,11 @@ class QuoteController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // 2. Get rate ID, destination ID from params, and optional numberOfPeople from query
+      // 2. Get rate ID, destination ID from params, and optional numberOfPeople and dayDate from query
       const { rateId, destinationId } = req.params;
       const quoteNumberOfPeople = parseInt(req.query.numberOfPeople) || 0;
+      // TODO: Implement day-of-week filtering if needed
+      // const { dayDate } = req.query;
 
       if (!rateId || !destinationId) {
         return this.sendError(res, 'El ID de la tarifa y destino son requeridos', 400);
@@ -1690,43 +1692,49 @@ class QuoteController {
 
       const tours = await toursQuery.find({ useMasterKey: true });
 
+      if (tours.length === 0) {
+        return this.sendResponse(res, []);
+      }
+
       // 6. Build vehicle list with pricing
       const vehicles = [];
 
       for (const tour of tours) {
         const vehicleType = tour.get('vehicleType');
 
-        // Get vehicle capacity
-        const vehicleCapacity = vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4;
-        const trunkCapacity = vehicleType ? vehicleType.get('trunkCapacity') || 0 : 0;
+        if (vehicleType) {
+          // Get vehicle capacity
+          const vehicleCapacity = vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4;
+          const trunkCapacity = vehicleType ? vehicleType.get('trunkCapacity') || 0 : 0;
 
-        // Filter by capacity if quoteNumberOfPeople is provided
-        // Only add vehicle if it meets capacity requirements
-        if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
-          // Get price breakdown with surcharge
-          const basePrice = tour.get('price') || 0;
-          const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
+          // Filter by capacity if quoteNumberOfPeople is provided
+          // Only add vehicle if it meets capacity requirements
+          if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
+            // Get price breakdown with surcharge
+            const basePrice = tour.get('price') || 0;
+            const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
 
-          // Get duration in minutes and convert to hours
-          const durationMinutes = tour.get('time') || 0;
-          const durationHours = Math.round((durationMinutes / 60) * 10) / 10;
+            // Get duration in minutes and convert to hours
+            const durationMinutes = tour.get('time') || 0;
+            const durationHours = Math.round((durationMinutes / 60) * 10) / 10;
 
-          vehicles.push({
-            tourId: tour.id,
-            vehicleType: vehicleType ? vehicleType.get('name') : '',
-            vehicleTypeId: vehicleType ? vehicleType.id : null,
-            capacity: vehicleCapacity,
-            trunkCapacity,
-            basePrice: priceBreakdown.basePrice,
-            price: priceBreakdown.totalPrice,
-            surcharge: priceBreakdown.surcharge,
-            surchargePercentage: priceBreakdown.surchargePercentage,
-            durationMinutes,
-            durationHours,
-            minPassengers: tour.get('minPassengers') || null,
-            maxPassengers: tour.get('maxPassengers') || null,
-            note: tour.get('notes') || '',
-          });
+            vehicles.push({
+              tourId: tour.id,
+              vehicleType: vehicleType ? vehicleType.get('name') : '',
+              vehicleTypeId: vehicleType ? vehicleType.id : null,
+              capacity: vehicleCapacity,
+              trunkCapacity,
+              basePrice: priceBreakdown.basePrice,
+              price: priceBreakdown.totalPrice,
+              surcharge: priceBreakdown.surcharge,
+              surchargePercentage: priceBreakdown.surchargePercentage,
+              durationMinutes,
+              durationHours,
+              minPassengers: tour.get('minPassengers') || null,
+              maxPassengers: tour.get('maxPassengers') || null,
+              note: tour.get('notes') || '',
+            });
+          }
         }
       }
 
@@ -2193,6 +2201,290 @@ class QuoteController {
       return this.sendError(
         res,
         process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al cancelar la reserva',
+        500
+      );
+    }
+  }
+
+  /**
+   * Get quotes with completed invoices and file information
+   * GET /api/quotes/with-invoices
+   * Filters quotes that have completed invoices with XML and PDF files available
+   * Department managers can only access quotes from their department.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async getQuotesWithInvoices(req, res) {
+    console.log('🔍🔍🔍 getQuotesWithInvoices method START - FIRST LINE!');
+    try {
+      console.log('🔍 getQuotesWithInvoices method called!');
+      console.log('User info:', {
+        hasUser: !!req.user,
+        userRole: req.userRole,
+        userId: req.user?.objectId || req.user?.userId || req.user?.id,
+      });
+
+      logger.info('getQuotesWithInvoices called', {
+        hasUser: !!req.user,
+        userRole: req.userRole,
+        userId: req.user?.objectId || req.user?.userId || req.user?.id,
+        query: req.query,
+      });
+
+      const currentUser = req.user;
+      if (!currentUser) {
+        logger.warn('getQuotesWithInvoices: No user found');
+        return this.sendError(res, 'Autenticación requerida', 401);
+      }
+
+      // Parse DataTables parameters
+      const draw = parseInt(req.query.draw, 10) || 1;
+      const start = parseInt(req.query.start, 10) || 0;
+      const length = Math.min(parseInt(req.query.length, 10) || 25, 100);
+      const searchValue = req.query.search?.value || '';
+      const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
+      const sortDirection = req.query.order?.[0]?.dir || 'desc';
+
+      // Column mapping for sorting (matches frontend columns order)
+      const sortColumns = [
+        'quote.folio', // 0
+        'quote.client.fullName', // 1
+        'quote.eventType', // 2
+        'quote.numberOfPeople', // 3
+        'invoiceNumber', // 4
+        'processDate', // 5
+        null, // 6 - Files (not sortable)
+        null, // 7 - Downloads (not sortable)
+      ];
+
+      const sortBy = sortColumns[sortColumnIndex] || 'processDate';
+
+      // Build base query for invoices with completed status and files
+      const Invoice = Parse.Object.extend('Invoice');
+      const query = new Parse.Query(Invoice);
+
+      // Base conditions for all completed invoices
+      query.equalTo('status', 'completed');
+      query.equalTo('exists', true);
+
+      // For now, let's get all completed invoices and filter for files later in code
+      // This avoids compound query issues with Parse.Query.or()
+
+      // Department manager filtering based on requestedBy field
+      if (req.userRole === 'department_manager') {
+        // Get the full AmexingUser record to access user information
+        const userId = currentUser.objectId || currentUser.userId || currentUser.id;
+
+        logger.info('Department manager filtering - user details', {
+          userId,
+          currentUser: {
+            objectId: currentUser.objectId,
+            userId: currentUser.userId,
+            id: currentUser.id,
+            username: currentUser.username,
+            role: currentUser.role,
+          },
+        });
+
+        try {
+          const AmexingUser = Parse.Object.extend('AmexingUser');
+          const fullUserQuery = new Parse.Query(AmexingUser);
+          fullUserQuery.equalTo('objectId', userId);
+
+          logger.info('Looking up AmexingUser with objectId', { userId });
+          const fullUser = await fullUserQuery.first({ useMasterKey: true });
+
+          if (!fullUser) {
+            logger.warn('Department manager AmexingUser record not found', { userId });
+            return res.status(400).json({
+              success: false,
+              error: 'User account not found. Please contact administrator.',
+              code: 'USER_NOT_FOUND',
+            });
+          }
+
+          logger.info('Found AmexingUser record', {
+            id: fullUser.id,
+            username: fullUser.get('username'),
+            role: fullUser.get('role'),
+            departmentId: fullUser.get('departmentId'),
+          });
+
+          // Filter by requestedBy field
+          query.equalTo('requestedBy', fullUser);
+
+          logger.info('Applied requestedBy filtering for department manager', {
+            userId,
+            username: fullUser.get('username'),
+            departmentId: fullUser.get('departmentId'),
+          });
+        } catch (departmentError) {
+          logger.error('Error fetching department manager user details', {
+            error: departmentError.message,
+            userId,
+            stack: departmentError.stack,
+          });
+
+          return res.status(500).json({
+            success: false,
+            error: 'Error retrieving user information',
+            code: 'USER_LOOKUP_ERROR',
+          });
+        }
+      }
+
+      // Include related data
+      query.include(['quote', 'quote.client', 'requestedBy']);
+
+      // Search functionality - temporarily disabled to fix main query issue
+      // TODO: Re-implement search with proper compound query handling
+      if (searchValue.trim()) {
+        logger.info('Search functionality temporarily disabled during query refactoring', {
+          searchValue,
+          userRole: req.userRole,
+        });
+      }
+
+      // Get total count for pagination (create separate count query)
+      const totalQuery = new Parse.Query(Invoice);
+      totalQuery.equalTo('status', 'completed');
+      totalQuery.equalTo('exists', true);
+
+      // Apply same role-based filtering for count query
+      if (req.userRole === 'department_manager') {
+        const userId = currentUser.objectId || currentUser.userId || currentUser.id;
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        const fullUserQuery = new Parse.Query(AmexingUser);
+        fullUserQuery.equalTo('objectId', userId);
+        const fullUser = await fullUserQuery.first({ useMasterKey: true });
+
+        if (fullUser) {
+          totalQuery.equalTo('requestedBy', fullUser);
+        }
+      }
+
+      const totalRecords = await totalQuery.count({ useMasterKey: true });
+
+      // Apply sorting
+      if (sortBy && sortBy !== 'null') {
+        if (sortDirection === 'desc') {
+          query.descending(sortBy);
+        } else {
+          query.ascending(sortBy);
+        }
+      } else {
+        // Default sort by process date descending
+        query.descending('processDate');
+      }
+
+      // Apply pagination
+      query.skip(start);
+      query.limit(length);
+
+      // Execute query
+      logger.info('Executing invoices query with filters', {
+        userRole: req.userRole,
+        searchValue,
+        sortBy,
+        sortDirection,
+      });
+
+      logger.info('About to execute invoice query...');
+      const invoices = await query.find({ useMasterKey: true });
+      logger.info('Invoice query executed successfully', { count: invoices.length });
+
+      logger.info('Invoices found', {
+        count: invoices.length,
+        firstInvoiceId: invoices.length > 0 ? invoices[0].id : null,
+      });
+
+      // Transform invoices data to match expected format - only include invoices with files
+      const invoicesData = [];
+
+      for (const invoice of invoices) {
+        try {
+          // Check if invoice has at least one file (XML or PDF)
+          const hasXmlFile = invoice.get('xmlFileS3Key') || invoice.get('xmlFileUrl');
+          const hasPdfFile = invoice.get('pdfFileS3Key') || invoice.get('pdfFileUrl');
+
+          if (hasXmlFile || hasPdfFile) {
+            const quote = invoice.get('quote');
+
+            // Build invoice data object
+            const invoiceData = {
+              objectId: quote ? quote.id : null,
+              folio: quote ? quote.get('folio') : 'N/A',
+              eventType: quote ? quote.get('eventType') : 'N/A',
+              numberOfPeople: quote ? (quote.get('numberOfPeople') || 1) : 1,
+              status: quote ? quote.get('status') : 'N/A',
+              createdAt: quote ? quote.get('createdAt') : invoice.get('createdAt'),
+              updatedAt: quote ? quote.get('updatedAt') : invoice.get('updatedAt'),
+              client: null,
+              invoice: {
+                objectId: invoice.id,
+                invoiceNumber: invoice.get('invoiceNumber'),
+                processDate: invoice.get('processDate'),
+                xmlFileS3Key: invoice.get('xmlFileS3Key'),
+                xmlFileUrl: invoice.get('xmlFileUrl'),
+                xmlStorageMethod: invoice.get('xmlStorageMethod'),
+                pdfFileS3Key: invoice.get('pdfFileS3Key'),
+                pdfFileUrl: invoice.get('pdfFileUrl'),
+                pdfStorageMethod: invoice.get('pdfStorageMethod'),
+              },
+            };
+
+            // Add client information if available
+            const client = quote ? quote.get('client') : null;
+            if (client) {
+              invoiceData.client = {
+                objectId: client.id,
+                fullName: client.get('fullName') || `${client.get('firstName')} ${client.get('lastName')}`,
+                companyName: client.get('companyName'),
+                email: client.get('email'),
+              };
+            }
+
+            invoicesData.push(invoiceData);
+          }
+        } catch (invoiceError) {
+          logger.error('Error processing invoice data', {
+            invoiceId: invoice.id,
+            error: invoiceError.message,
+            stack: invoiceError.stack,
+          });
+          // Error logged, skip to next invoice
+        }
+      }
+
+      logger.info('Invoices with quotes retrieved successfully', {
+        userId: currentUser.objectId || currentUser.userId || currentUser.id,
+        userRole: req.userRole,
+        totalRecords,
+        filteredRecords: invoicesData.length,
+        returnedRecords: invoicesData.length,
+        searchValue,
+      });
+
+      return res.json({
+        draw,
+        recordsTotal: totalRecords,
+        recordsFiltered: invoicesData.length,
+        data: invoicesData,
+      });
+    } catch (error) {
+      logger.error('Error in QuoteController.getQuotesWithInvoices', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+        userRole: req.userRole,
+        query: req.query,
+      });
+
+      return this.sendError(
+        res,
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Error al cargar las facturas',
         500
       );
     }

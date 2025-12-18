@@ -18,6 +18,52 @@ const jwtMiddleware = require('../../../application/middleware/jwtMiddleware');
 
 /**
  * @swagger
+ * /api/tours/with-rate-prices:
+ *   get:
+ *     tags:
+ *       - Tours
+ *     summary: Get tours with prices for a specific rate
+ *     description: |\
+ *       Get all tours with their price information for a specific rate from TourPrices table.
+ *
+ *       **Access:** Department Manager and above
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: rateId
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Rate object ID
+ *     responses:
+ *       200:
+ *         description: Tours with prices retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       400:
+ *         description: Rate ID required
+ */
+router.get('/with-rate-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getToursWithRatePrices(req, res));
+
+/**
+ * @swagger
  * /api/tours:
  *   get:
  *     tags:
@@ -186,6 +232,63 @@ router.post('/', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursControlle
  *         description: Tour not found
  */
 router.get('/:id', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getTourById(req, res));
+
+/**
+ * @swagger
+ * /api/tours/{id}/all-prices:
+ *   get:
+ *     tags:
+ *       - Tours
+ *     summary: Get all prices for a specific tour
+ *     description: |\
+ *       Get all prices from TourPrices table for a specific tour, grouped by rate and vehicle type.
+ *
+ *       **Access:** Department Manager and above
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tour object ID
+ *     responses:
+ *       200:
+ *         description: Tour prices retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       price:
+ *                         type: number
+ *                       formattedPrice:
+ *                         type: string
+ *                       rate:
+ *                         type: object
+ *                       vehicleType:
+ *                         type: object
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Tour not found
+ */
+router.get('/:id/all-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getAllTourPrices(req, res));
 
 /**
  * @swagger

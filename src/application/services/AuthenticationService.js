@@ -505,13 +505,53 @@ class AuthenticationService extends AuthenticationServiceCore {
         throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User not found');
       }
 
-      const isValidPassword = await user.validatePassword(currentPassword);
+      // Validate current password using bcrypt directly since AmexingUser isn't registered as a subclass
+      logger.info('Change password validation attempt', {
+        userId: user.id,
+        username: user.get('username'),
+        email: user.get('email') ? this.maskEmail(user.get('email')) : null,
+      });
+
+      // Get the stored password hash
+      const bcrypt = require('bcrypt');
+      const hashedPassword = user.get('password') || user.get('passwordHash');
+
+      if (!hashedPassword) {
+        logger.error('No password hash found for user', {
+          userId: user.id,
+          username: user.get('username'),
+        });
+        throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'User password not found');
+      }
+
+      // Validate password using bcrypt
+      const isValidPassword = await bcrypt.compare(currentPassword, hashedPassword);
 
       if (!isValidPassword) {
+        logger.error('Password validation failed - incorrect password', {
+          userId: user.id,
+          username: user.get('username'),
+        });
         throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Current password is incorrect');
       }
 
-      await user.setPassword(newPassword);
+      logger.info('Password validation successful', {
+        userId: user.id,
+        username: user.get('username'),
+      });
+
+      // Set new password with bcrypt hashing
+      const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+      const newHashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Save hash in both fields for compatibility
+      user.set('password', newHashedPassword);
+      user.set('passwordHash', newHashedPassword);
+      user.set('passwordChangedAt', new Date());
+      user.set('mustChangePassword', false);
+      user.set('loginAttempts', 0);
+      user.set('lockedUntil', null);
+
       await user.save(null, { useMasterKey: true });
 
       logger.logSecurityEvent('PASSWORD_CHANGED', {

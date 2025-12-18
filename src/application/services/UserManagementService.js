@@ -97,6 +97,9 @@ class UserManagementService {
         'firstName',
         'lastName',
         'roleId',
+        'displayRole',
+        'jobTitle',
+        'futureRoles',
         'active',
         'exists',
         'emailVerified',
@@ -474,6 +477,10 @@ class UserManagementService {
         'firstName',
         'lastName',
         'role',
+        'roleId',
+        'displayRole',
+        'futureRoles',
+        'jobTitle',
         'active',
         'emailVerified',
         'mustChangePassword',
@@ -483,7 +490,18 @@ class UserManagementService {
 
       allowedUpdateFields.forEach((field) => {
         if (Object.prototype.hasOwnProperty.call(updates, field)) {
-          user.set(field, updates[field]);
+          // Handle roleId specially - it needs to be a Pointer, not a string
+          if (field === 'roleId' && updates[field]) {
+            // Create a Pointer to the Role object
+            const rolePointer = {
+              __type: 'Pointer',
+              className: 'Role',
+              objectId: updates[field],
+            };
+            user.set(field, rolePointer);
+          } else {
+            user.set(field, updates[field]);
+          }
         }
       });
 
@@ -1452,6 +1470,23 @@ class UserManagementService {
     const clientId = user.get('clientId');
     const departmentId = user.get('departmentId');
 
+    // Handle displayRole for employees created before displayRole feature
+    let displayRole = user.get('displayRole');
+    if (!displayRole && roleName === 'driver') {
+      // For employees with driver role but no displayRole set,
+      // check if they might be one of the new employee types
+      // This handles legacy employees created during transition
+      const futureRoles = user.get('futureRoles') || [];
+      const possibleDisplayRoles = ['guia', 'greeter', 'limpieza'];
+      const inferredDisplayRole = futureRoles.find((role) => possibleDisplayRoles.includes(role));
+      displayRole = inferredDisplayRole || roleName;
+
+      // Log for debugging (commented out for production)
+      // console.log(`Employee ${user.get('email')}: role=${roleName}, displayRole=${user.get('displayRole')}, futureRoles=${JSON.stringify(futureRoles)}, inferred=${displayRole}`);
+    } else {
+      displayRole = displayRole || roleName || 'guest';
+    }
+
     return {
       id: user.id,
       email: user.get('email'),
@@ -1459,6 +1494,9 @@ class UserManagementService {
       firstName: user.get('firstName'),
       lastName: user.get('lastName'),
       role: roleName || 'guest',
+      displayRole, // Use computed displayRole from above logic
+      jobTitle: user.get('jobTitle') || '', // Add jobTitle
+      futureRoles: user.get('futureRoles') || [], // Add futureRoles for future support
       roleDisplayName: roleDisplayName || roleName || 'Invitado', // Fallback to roleName or default
       roleId: roleObjectId,
       active: active !== undefined ? active : true,

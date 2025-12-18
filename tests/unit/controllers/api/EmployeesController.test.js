@@ -589,4 +589,361 @@ describe('EmployeesController', () => {
       );
     });
   });
+
+  // Tests for Multiple Roles Functionality
+  describe('Multiple Roles Functionality', () => {
+    const mockAdminUser = {
+      id: 'admin-123',
+    };
+
+    beforeEach(() => {
+      mockReq.user = mockAdminUser;
+      mockReq.userRole = 'admin';
+    });
+
+    describe('createEmployee with roles array', () => {
+      it('should create employee with multiple roles successfully', async () => {
+        mockReq.body = {
+          email: 'multiemployee@amexing.test',
+          firstName: 'Multi',
+          lastName: 'Role Employee',
+          roles: ['driver', 'guia', 'greeter'], // Multiple roles
+        };
+
+        const mockCreatedUser = {
+          id: 'multi-employee-123',
+          email: 'multiemployee@amexing.test',
+          role: 'driver', // RBAC role
+          futureRoles: ['driver', 'guia', 'greeter'], // Display roles
+          displayRole: 'driver',
+        };
+
+        mockUserService.createUser.mockResolvedValue({
+          success: true,
+          user: mockCreatedUser,
+        });
+
+        await employeesController.createEmployee(mockReq, mockRes);
+
+        expect(mockUserService.createUser).toHaveBeenCalledWith(
+          expect.objectContaining({
+            email: 'multiemployee@amexing.test',
+            role: 'driver', // Actual RBAC role
+            futureRoles: ['driver', 'guia', 'greeter'], // All selected roles
+            displayRole: 'driver', // First role for backward compatibility
+            organizationId: 'amexing',
+          }),
+          mockAdminUser
+        );
+
+        expect(mockRes.json).toHaveBeenCalledWith(
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              employee: expect.objectContaining({
+                user: expect.objectContaining({
+                  id: mockCreatedUser.id,
+                  role: mockCreatedUser.role,
+                }),
+                success: true,
+              }),
+            }),
+            message: expect.stringContaining('Empleado creado exitosamente'),
+          })
+        );
+      });
+
+      it('should handle Administrator role as exclusive', async () => {
+        mockReq.body = {
+          email: 'adminemployee@amexing.test',
+          firstName: 'Admin',
+          lastName: 'Employee',
+          roles: ['employee_amexing'], // Administrator role
+        };
+
+        const mockCreatedUser = {
+          id: 'admin-employee-123',
+          email: 'adminemployee@amexing.test',
+          role: 'employee_amexing', // RBAC role stays as admin
+          futureRoles: ['employee_amexing'],
+          displayRole: 'employee_amexing',
+        };
+
+        mockUserService.createUser.mockResolvedValue({
+          success: true,
+          user: mockCreatedUser,
+        });
+
+        await employeesController.createEmployee(mockReq, mockRes);
+
+        expect(mockUserService.createUser).toHaveBeenCalledWith(
+          expect.objectContaining({
+            role: 'employee_amexing', // Admin role preserved
+            futureRoles: ['employee_amexing'],
+            displayRole: 'employee_amexing',
+          }),
+          mockAdminUser
+        );
+      });
+
+      it('should validate roles array against allowed roles', async () => {
+        mockReq.body = {
+          email: 'invalidemployee@amexing.test',
+          firstName: 'Invalid',
+          lastName: 'Employee',
+          roles: ['driver', 'invalid_role', 'guia'], // Contains invalid role
+        };
+
+        await employeesController.createEmployee(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledWith({
+          success: false,
+          error: expect.stringContaining('Roles inválidos: invalid_role'),
+          timestamp: expect.any(String),
+        });
+      });
+
+      it('should require at least one role', async () => {
+        mockReq.body = {
+          email: 'noroleemployee@amexing.test',
+          firstName: 'No Role',
+          lastName: 'Employee',
+          roles: [], // Empty roles array
+        };
+
+        await employeesController.createEmployee(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledWith({
+          success: false,
+          error: expect.stringContaining('Campos requeridos faltantes: roles'),
+          timestamp: expect.any(String),
+        });
+      });
+
+      it('should maintain backward compatibility with single role field', async () => {
+        mockReq.body = {
+          email: 'backwardemployee@amexing.test',
+          firstName: 'Backward',
+          lastName: 'Compatible Employee',
+          role: 'guia', // Single role field for backward compatibility
+        };
+
+        const mockCreatedUser = {
+          id: 'backward-employee-123',
+          email: 'backwardemployee@amexing.test',
+          role: 'driver', // Maps to driver for RBAC
+          futureRoles: ['guia'], // Single role in array
+          displayRole: 'guia',
+        };
+
+        mockUserService.createUser.mockResolvedValue({
+          success: true,
+          user: mockCreatedUser,
+        });
+
+        await employeesController.createEmployee(mockReq, mockRes);
+
+        expect(mockUserService.createUser).toHaveBeenCalledWith(
+          expect.objectContaining({
+            role: 'driver', // Maps to driver for permissions
+            futureRoles: ['guia'], // Original role stored for display
+            displayRole: 'guia',
+          }),
+          mockAdminUser
+        );
+      });
+    });
+
+    describe('updateEmployee with roles array', () => {
+      beforeEach(() => {
+        mockReq.params = { id: 'employee-123' };
+      });
+
+      it('should update employee roles successfully', async () => {
+        mockReq.body = {
+          roles: ['driver', 'limpieza'], // Updated roles
+        };
+
+        const mockUpdatedUser = {
+          id: 'employee-123',
+          role: 'driver',
+          futureRoles: ['driver', 'limpieza'],
+          displayRole: 'driver',
+        };
+
+        mockUserService.updateUser.mockResolvedValue({
+          success: true,
+          user: mockUpdatedUser,
+          futureRoles: ['driver', 'limpieza'],
+          displayRole: 'driver',
+        });
+
+        await employeesController.updateEmployee(mockReq, mockRes);
+
+        expect(mockUserService.updateUser).toHaveBeenCalledWith(
+          'employee-123',
+          expect.objectContaining({
+            role: 'driver', // RBAC role
+            futureRoles: ['driver', 'limpieza'], // Display roles
+            displayRole: 'driver', // First role
+          }),
+          mockAdminUser
+        );
+
+        expect(mockRes.json).toHaveBeenCalledWith(
+          expect.objectContaining({
+            success: true,
+            data: expect.objectContaining({
+              futureRoles: ['driver', 'limpieza'],
+              displayRole: 'driver',
+              user: expect.objectContaining({
+                role: 'driver',
+              }),
+            }),
+          })
+        );
+      });
+
+      it('should validate updated roles array', async () => {
+        mockReq.body = {
+          roles: ['driver', 'invalid_role'], // Invalid role in update
+        };
+
+        await employeesController.updateEmployee(mockReq, mockRes);
+
+        expect(mockRes.status).toHaveBeenCalledWith(400);
+        expect(mockRes.json).toHaveBeenCalledWith({
+          success: false,
+          error: expect.stringContaining('Roles inválidos: invalid_role'),
+          timestamp: expect.any(String),
+        });
+      });
+
+      it('should handle Administrator role updates', async () => {
+        mockReq.body = {
+          roles: ['employee_amexing'], // Change to Administrator
+        };
+
+        const mockUpdatedUser = {
+          id: 'employee-123',
+          role: 'employee_amexing', // Admin role preserved
+          futureRoles: ['employee_amexing'],
+          displayRole: 'employee_amexing',
+        };
+
+        mockUserService.updateUser.mockResolvedValue({
+          success: true,
+          user: mockUpdatedUser,
+          futureRoles: ['employee_amexing'],
+          displayRole: 'employee_amexing',
+        });
+
+        await employeesController.updateEmployee(mockReq, mockRes);
+
+        expect(mockUserService.updateUser).toHaveBeenCalledWith(
+          'employee-123',
+          expect.objectContaining({
+            role: 'employee_amexing', // Admin role for RBAC
+            futureRoles: ['employee_amexing'],
+            displayRole: 'employee_amexing',
+          }),
+          mockAdminUser
+        );
+      });
+
+      it('should maintain backward compatibility with single role updates', async () => {
+        mockReq.body = {
+          role: 'greeter', // Single role field update
+        };
+
+        const mockUpdatedUser = {
+          id: 'employee-123',
+          role: 'driver',
+          futureRoles: ['greeter'],
+          displayRole: 'greeter',
+        };
+
+        mockUserService.updateUser.mockResolvedValue({
+          success: true,
+          user: mockUpdatedUser,
+          futureRoles: ['greeter'],
+          displayRole: 'greeter',
+        });
+
+        await employeesController.updateEmployee(mockReq, mockRes);
+
+        expect(mockUserService.updateUser).toHaveBeenCalledWith(
+          'employee-123',
+          expect.objectContaining({
+            role: 'driver', // Maps to driver for RBAC
+            futureRoles: ['greeter'], // Single role in array
+            displayRole: 'greeter',
+          }),
+          mockAdminUser
+        );
+      });
+    });
+
+    describe('Role priority logic', () => {
+      it('should map all employee types to driver role except Administrator', async () => {
+        const testCases = [
+          {
+            input: ['driver', 'guia'],
+            expectedRole: 'driver',
+            description: 'Multiple employee roles map to driver',
+          },
+          {
+            input: ['greeter', 'limpieza'],
+            expectedRole: 'driver',
+            description: 'Service roles map to driver',
+          },
+          {
+            input: ['employee_amexing'],
+            expectedRole: 'employee_amexing',
+            description: 'Administrator role preserved',
+          },
+          {
+            input: ['driver'],
+            expectedRole: 'driver',
+            description: 'Single driver role',
+          },
+        ];
+
+        for (const testCase of testCases) {
+          mockReq.body = {
+            email: `test${Date.now()}@amexing.test`,
+            firstName: 'Test',
+            lastName: 'Employee',
+            roles: testCase.input,
+          };
+
+          const mockCreatedUser = {
+            id: `test-${Date.now()}`,
+            email: mockReq.body.email,
+            role: testCase.expectedRole,
+            futureRoles: testCase.input,
+          };
+
+          mockUserService.createUser.mockResolvedValue({
+            success: true,
+            user: mockCreatedUser,
+          });
+
+          await employeesController.createEmployee(mockReq, mockRes);
+
+          expect(mockUserService.createUser).toHaveBeenCalledWith(
+            expect.objectContaining({
+              role: testCase.expectedRole,
+              futureRoles: testCase.input,
+            }),
+            mockAdminUser
+          );
+
+          jest.clearAllMocks();
+        }
+      });
+    });
+  });
 });

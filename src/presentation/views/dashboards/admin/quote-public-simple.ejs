@@ -255,7 +255,6 @@
                             <th>Concepto</th>
                             <th>Tipo de Servicio</th>
                             <th>Tipo de Vehículo</th>
-                            <th class="text-end">Horas</th>
                             <th class="text-end">Precio Unitario</th>
                             <th class="text-end">Total</th>
                         </tr>
@@ -271,8 +270,14 @@
                                 <% } %>
                                 <%= sub.vehicleType || '-' %>
                             </td>
-                            <td class="text-end"><%= sub.hours || 0 %></td>
-                            <td class="text-end">$<%= (sub.unitPrice || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 }) %></td>
+                            <td class="text-end">
+                                <div>$<%= (sub.unitPrice || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 }) %></div>
+                                <% if (sub.type !== 'regular') { %>
+                                    <small class="text-muted">
+                                        <%= sub.isCashPayment ? 'Efectivo' : 'Tarjeta/Digital' %>
+                                    </small>
+                                <% } %>
+                            </td>
                             <td class="text-end">$<%= (sub.total || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 }) %></td>
                         </tr>
                         <% }); %>
@@ -298,6 +303,16 @@
                     </tr>
                 </tbody>
             </table>
+
+            <!-- Total per Person -->
+            <div class="text-center mt-3 p-3" style="background: #f8f9fa; border-radius: 0.5rem; border: 1px solid #dee2e6;">
+                <div style="font-size: 1.1rem; font-weight: 600; color: #0d6efd;">
+                    Costo por Persona: $<%= ((quote.serviceItems.total || 0) / (quote.numberOfPeople || 1)).toLocaleString('es-MX', { minimumFractionDigits: 2 }) %>
+                </div>
+                <small class="text-muted">
+                    (<%= quote.numberOfPeople || 1 %> <%= (quote.numberOfPeople || 1) === 1 ? 'persona' : 'personas' %>)
+                </small>
+            </div>
         </div>
         <% } else { %>
         <div class="info-section">

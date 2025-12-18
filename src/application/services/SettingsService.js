@@ -38,8 +38,10 @@ const Setting = require('../../domain/models/Setting');
 const logger = require('../../infrastructure/logger');
 
 /**
- * Service for managing application settings with caching support.
- * Provides methods to get, set, and cache application settings.
+ * SettingsService for managing application settings
+ * Provides caching, validation, and CRUD operations for system settings
+ * Handles default values and persistence to Parse Server.
+ * @class SettingsService
  */
 class SettingsService {
   constructor() {

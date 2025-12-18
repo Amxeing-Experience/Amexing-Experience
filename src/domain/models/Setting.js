@@ -40,8 +40,10 @@ const BaseModel = require('./BaseModel');
 const logger = require('../../infrastructure/logger');
 
 /**
- * Setting model for managing application settings.
- * Extends BaseModel to provide standardized database operations.
+ * Setting model class for managing application settings
+ * Extends BaseModel to inherit common Parse Object functionality
+ * Handles system-wide configuration settings and preferences.
+ * @class Setting
  * @augments BaseModel
  */
 class Setting extends BaseModel {

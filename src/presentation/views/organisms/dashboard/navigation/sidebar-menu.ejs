@@ -45,15 +45,17 @@ const navigationItems = {
             { name: 'Role Management', icon: 'shield', path: '/dashboard/superadmin/roles', id: 'roles' },
             { name: 'Reportes', icon: 'report', path: '/dashboard/superadmin/reports', id: 'reports' }
         ]},
+        // Tarifario Section
+        { section: 'Tarifario', icon: 'ti-receipt-2', items: [
+            { name: 'Gestión de Vehículos', icon: 'car', path: '/dashboard/superadmin/vehicles', id: 'vehicles' },
+            { name: 'Gestión de Traslados', icon: 'briefcase', path: '/dashboard/superadmin/services', id: 'services' },
+            { name: 'Gestión de Experiencias', icon: 'star', path: '/dashboard/superadmin/experiences', id: 'experiences' },
+            { name: 'Gestión de Tours', icon: 'map', path: '/dashboard/superadmin/tours', id: 'tours' }
+        ]},
         // Equipo y Recursos Section
         { section: 'Equipo y Recursos', icon: 'ti-users', items: [
             { name: 'Gestión de Empleados', icon: 'user-check', path: '/dashboard/superadmin/employees', id: 'employees' },
-            { name: 'Gestión de Vehículos', icon: 'car', path: '/dashboard/superadmin/vehicles', id: 'vehicles' },
-            { name: 'Gestión de Destinos', icon: 'map-pin', path: '/dashboard/superadmin/pois', id: 'pois' },
-            { name: 'Gestión de Traslados', icon: 'briefcase', path: '/dashboard/superadmin/services', id: 'services' },
-            { name: 'Gestión de Experiencias', icon: 'star', path: '/dashboard/superadmin/experiences', id: 'experiences' },
-            { name: 'Gestión de Tarifas', icon: 'currency-dollar', path: '/dashboard/superadmin/pricing', id: 'pricing' },
-            { name: 'Gestión de Tours', icon: 'map', path: '/dashboard/superadmin/tours', id: 'tours' }
+            { name: 'Gestión de Destinos', icon: 'map-pin', path: '/dashboard/superadmin/pois', id: 'pois' }
         ]}
     ],
     admin: [
@@ -68,22 +70,18 @@ const navigationItems = {
             { name: 'Clientes', icon: 'users', path: '/dashboard/admin/clients', id: 'clients' },
             { name: 'Reservaciones', icon: 'clipboard-list', path: '/dashboard/admin/bookings', id: 'bookings' },
             { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/admin/quotes', id: 'quotes' },
-            { name: 'Facturas', icon: 'receipt', path: '/dashboard/admin/invoices', id: 'invoices' }
+            { name: 'Ajustes de Precio', icon: 'settings', path: '/dashboard/admin/price-settings', id: 'price-settings' }
         ]},
-        { section: 'Gestión de Eventos', icon: 'ti-calendar', items: [
-            { name: 'Eventos', icon: 'calendar-event', path: '/dashboard/admin/events', id: 'events' },
-            { name: 'Calendario', icon: 'calendar', path: '/dashboard/admin/schedule', id: 'schedule' }
-        ]},
-        { section: 'Gestión', icon: 'ti-users', items: [
-            { name: 'Empleados', icon: 'user-check', path: '/dashboard/admin/employees', id: 'employees' },
+        { section: 'Tarifario', icon: 'ti-receipt-2', items: [
             { name: 'Vehículos', icon: 'car', path: '/dashboard/admin/vehicles', id: 'vehicles' },
-            { name: 'Destinos', icon: 'map-pin', path: '/dashboard/admin/pois', id: 'pois' },
             { name: 'Traslados', icon: 'briefcase', path: '/dashboard/admin/services', id: 'services' },
             { name: 'Experiencias', icon: 'star', path: '/dashboard/admin/experiences', id: 'experiences' },
-            { name: 'Tarifas', icon: 'currency-dollar', path: '/dashboard/admin/pricing', id: 'pricing' },
             { name: 'Tours', icon: 'map', path: '/dashboard/admin/tours', id: 'tours' }
         ]},
-        { section: 'Configuración', icon: 'ti-settings', items: [
+        { section: 'Gestión', icon: 'ti-users', items: [
+            { name: 'Facturas', icon: 'receipt', path: '/dashboard/admin/invoices', id: 'invoices', badge: { text: '0', color: 'warning' } },
+            { name: 'Empleados', icon: 'user-check', path: '/dashboard/admin/employees', id: 'employees' },
+            { name: 'Destinos', icon: 'map-pin', path: '/dashboard/admin/pois', id: 'pois' },
             { name: 'Métodos de Pago', icon: 'credit-card', path: '/dashboard/admin/payment-info', id: 'payment-info' }
         ]}
     ],
@@ -116,17 +114,14 @@ const navigationItems = {
             { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/department_manager', id: 'dashboard' },
             { name: 'My Team', icon: 'users', path: '/dashboard/department_manager/team', id: 'team' },
             { name: 'Team Bookings', icon: 'car', path: '/dashboard/department_manager/bookings', id: 'bookings' },
-            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/department_manager/quotes', id: 'quotes' }
+            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/department_manager/quotes', id: 'quotes' },
+            { name: 'Facturas', icon: 'receipt', path: '/dashboard/department_manager/invoices', id: 'invoices' }
         ]},
         { section: 'Servicios', icon: 'ti-briefcase', items: [
             { name: 'Vehículos', icon: 'car', path: '/dashboard/department_manager/vehicles', id: 'vehicles' },
             { name: 'Traslados', icon: 'briefcase', path: '/dashboard/department_manager/services', id: 'services' },
             { name: 'Experiencias', icon: 'star', path: '/dashboard/department_manager/experiences', id: 'experiences' },
             { name: 'Tours', icon: 'map', path: '/dashboard/department_manager/tours', id: 'tours' }
-        ]},
-        { section: 'Budget & Reports', icon: 'ti-chart-line', items: [
-            { name: 'Budget Management', icon: 'coin', path: '/dashboard/department_manager/budgets', id: 'budgets' },
-            { name: 'Department Reports', icon: 'report', path: '/dashboard/department_manager/reports', id: 'reports' }
         ]}
     ],
     employee: [
@@ -278,19 +273,7 @@ const menuSections = navigationItems[userRole] || navigationItems.guest;
 
   /* Badge animations */
   .nav-badge {
-    animation: badgePulse 2s infinite;
-  }
-
-  @keyframes badgePulse {
-
-    0%,
-    100% {
-      transform: scale(1);
-    }
-
-    50% {
-      transform: scale(1.1);
-    }
+    /* No animation */
   }
 
   /* Loading state for menu items */

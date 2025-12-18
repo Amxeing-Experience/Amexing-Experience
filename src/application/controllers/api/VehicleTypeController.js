@@ -206,6 +206,7 @@ class VehicleTypeController {
         label: type.get('name'),
         code: type.get('code'),
         capacity: type.get('defaultCapacity') || 4,
+        trunkCapacity: type.get('trunkCapacity') || 2,
         icon: type.get('icon') || 'car',
       }));
 

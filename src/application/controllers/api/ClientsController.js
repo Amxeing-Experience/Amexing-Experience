@@ -157,7 +157,7 @@ class ClientsController {
   /**
    * POST /api/clients - Create new client user (department_manager role).
    * Only SuperAdmin and Admin can create clients.
-   * Automatically generates secure password and forces password change on first login.
+   * Requires a secure password to be provided for immediate system access.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
@@ -167,6 +167,7 @@ class ClientsController {
    *   firstName: 'John',
    *   lastName: 'Doe',
    *   email: 'john@company.com',
+   *   // password field: string (min 12 chars, upper+lower+digit+special)
    *   companyName: 'ACME Corp',
    *   phone: '+52 999 123 4567',
    *   taxId: 'ABC123456XXX',
@@ -197,6 +198,7 @@ class ClientsController {
       if (!clientData.lastName?.trim()) missingFields.push('lastName');
       if (!clientData.email?.trim()) missingFields.push('email');
       if (!clientData.companyName?.trim()) missingFields.push('companyName');
+      if (!clientData.password?.trim()) missingFields.push('password');
 
       if (missingFields.length > 0) {
         return this.sendError(res, `Campos requeridos faltantes: ${missingFields.join(', ')}`, 400);
@@ -206,6 +208,18 @@ class ClientsController {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(clientData.email)) {
         return this.sendError(res, 'Formato de email inválido', 400);
+      }
+
+      // Password validation
+      const password = clientData.password.trim();
+      if (password.length < 12) {
+        return this.sendError(res, 'La contraseña debe tener al menos 12 caracteres', 400);
+      }
+
+      // Validate password complexity (at least one uppercase, one lowercase, one number, one special character)
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{12,}$/;
+      if (!passwordRegex.test(password)) {
+        return this.sendError(res, 'La contraseña debe incluir al menos una mayúscula, una minúscula, un número y un carácter especial', 400);
       }
 
       // Generate username from email (lowercase)
@@ -233,9 +247,10 @@ class ClientsController {
       // Also set legacy role field for backward compatibility
       clientData.role = this.clientRole;
 
-      // Generate secure random password
-      clientData.password = this.generateSecurePassword();
-      clientData.mustChangePassword = true;
+      // Use the provided password (already validated above)
+      clientData.password = password;
+      // Since admin is setting the password directly, client doesn't need to change it immediately
+      clientData.mustChangePassword = false;
 
       // Store company info in contextualData for easy retrieval and filtering
       clientData.contextualData = {
@@ -267,7 +282,7 @@ class ClientsController {
         res,
         {
           client: result.user,
-          message: 'Cliente creado exitosamente. Se ha generado una contraseña temporal.',
+          message: 'Cliente creado exitosamente. Podrá acceder al sistema con la contraseña proporcionada.',
         },
         'Cliente creado exitosamente',
         201

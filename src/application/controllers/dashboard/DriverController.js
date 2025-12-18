@@ -122,46 +122,6 @@ class DriverController extends RoleBasedController {
   }
 
   /**
-   * Renders the driver profile page for viewing and editing driver information.
-   * Displays and manages driver profile information including:.
-   * - Personal information (name, contact details).
-   * - Vehicle information (make, model, license plate).
-   * - License and certification details.
-   * - Insurance information.
-   * - Driver rating and reviews.
-   * - Account settings and preferences.
-   * - Document uploads and verification status.
-   * @function profile
-   * @async
-   * @param {object} req - Express request object.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>} Renders the driver profile view.
-   * @throws {Error} When unable to load profile data or render view.
-   * @example
-   * // Route usage
-   * router.get('/dashboard/driver/profile', driverController.profile);
-   * @todo Implement profile data fetching from AmexingUser collection.
-   * @todo Add profile edit functionality.
-   * @todo Add document upload for license and insurance.
-   * @todo Add vehicle management interface.
-   * @todo Implement profile verification status checks.
-   */
-  async profile(req, res) {
-    try {
-      await this.renderRoleView(req, res, 'profile', {
-        title: 'Driver Profile',
-        profile: {},
-        breadcrumb: {
-          title: 'Profile',
-          items: [{ name: 'Profile', active: true }],
-        },
-      });
-    } catch (error) {
-      this.handleError(res, error);
-    }
-  }
-
-  /**
    * Retrieves driver statistics for dashboard display.
    * Calculates and aggregates driver performance metrics including:.
    * - Trip counts for various time periods.
