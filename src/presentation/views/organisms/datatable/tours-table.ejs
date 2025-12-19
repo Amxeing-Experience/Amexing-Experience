@@ -1,7 +1,7 @@
 <%
 /**
  * Tours DataTable Organism
- * DataTable component for tours management
+ * DataTable component for tours management with expandable pricing
  *
  * Atomic Design Level: Organism
  * Category: Dashboard Data Tables
@@ -16,1311 +16,2355 @@ const dtTableId = typeof tableId !== 'undefined' ? tableId : 'tours-table';
 const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/tours';
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const dtShowClientPricing = typeof showClientPricing !== 'undefined' ? showClientPricing : false;
 
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+const isDepartmentManager = dtUserRole === 'department_manager';
 %>
 
+<style>
+/* Hide default DataTables sorting icons */
+.dt-control::before,
+.dt-control::after {
+    display: none !important;
+}
+
+/* Custom styling for price column */
+.price-expand-container {
+    text-align: left;
+}
+
+/* Hide any default sorting indicators */
+table.dataTable thead .sorting::before,
+table.dataTable thead .sorting::after,
+table.dataTable thead .sorting_asc::before,
+table.dataTable thead .sorting_asc::after,
+table.dataTable thead .sorting_desc::before,
+table.dataTable thead .sorting_desc::after {
+    display: none !important;
+}
+
+/* Ensure only our button shows */
+td.dt-control {
+    position: relative;
+}
+
+/* Prevent sorting on price column header */
+table.dataTable thead th:nth-child(3) {
+    cursor: default !important;
+    position: relative;
+}
+
+table.dataTable thead th:nth-child(3)::before,
+table.dataTable thead th:nth-child(3)::after {
+    display: none !important;
+}
+
+/* Remove sorting class from price column header */
+table.dataTable thead th:nth-child(3).sorting {
+    cursor: default !important;
+    background-image: none !important;
+}
+
+/* Make dropdown clickable in header */
+[id^="headerRateFilter-"] {
+    pointer-events: all !important;
+    z-index: 1000;
+    position: relative;
+    width: 100% !important;
+}
+
+/* Prevent DataTables from interfering with dropdown container */
+table.dataTable thead th:nth-child(3) div {
+    pointer-events: none;
+}
+
+table.dataTable thead th:nth-child(3) select {
+    pointer-events: all !important;
+}
+
+/* Additional CSS for no-sort class */
+table.dataTable thead th.no-sort,
+table.dataTable thead th.no-sort.sorting,
+table.dataTable thead th.no-sort.sorting_asc,
+table.dataTable thead th.no-sort.sorting_desc {
+    cursor: default !important;
+    background-image: none !important;
+    padding-right: 8px !important;
+}
+
+table.dataTable thead th.no-sort::before,
+table.dataTable thead th.no-sort::after {
+    display: none !important;
+}
+
+/* Remove DataTables default row hover effect */
+table.dataTable tbody tr:hover,
+table.dataTable tbody tr.hover {
+    background-color: transparent !important;
+}
+
+/* Add hover effect specifically to expand button */
+.expand-btn:hover {
+    background-color: rgba(0, 123, 255, 0.1) !important;
+    border-radius: 4px !important;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
+}
+
+.expand-btn:hover i,
+.expand-btn:hover small {
+    color: #0d6efd !important;
+}
+
+/* Smooth transition for expand button */
+.expand-btn {
+    transition: all 0.2s ease;
+}
+
+/* Custom styling for nav pills with borders */
+.nav-pills .nav-link {
+    border: 1px solid #dee2e6;
+    color: #6c757d;
+    background-color: transparent;
+    margin-right: 0.25rem;
+    transition: all 0.2s ease;
+}
+
+.nav-pills .nav-link:hover {
+    border-color: #10b981;
+    color: #10b981;
+    background-color: rgba(16, 185, 129, 0.1);
+}
+
+.nav-pills .nav-link.active {
+    border-color: #10b981;
+    background-color: #10b981;
+    color: white;
+}
+
+/* Price column styling */
+.price-container {
+    text-align: left;
+}
+
+.price-container .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.4rem;
+}
+
+.price-container .small {
+    margin-bottom: 0.2rem;
+}
+</style>
+
 <div class="card border-0 shadow-sm">
-  <div class="card-header text-white" style="background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%); border: none;">
-    <div class="row align-items-center">
-      <div class="col">
-        <h5 class="card-title mb-0 text-white">
-          <i class="ti ti-map me-2"></i>Gestión de Tours
-        </h5>
-        <small class="text-white" style="opacity: 0.9;">Administra tours</small>
-      </div>
-      <div class="col-auto">
-        <% if (canCreate) { %>
-        <button type="button" class="btn btn-light btn-sm" id="createTourBtn">
-          <i class="ti ti-plus me-1"></i>Nuevo Tour
-        </button>
-        <% } %>
-      </div>
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    Tours
+                </h5>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createTourBtn">
+                        <i class="ti ti-plus me-1"></i>Nuevo Tour
+                    </button>
+                <% } %>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- Filtros -->
-  <div class="card-body border-bottom bg-light">
-    <div class="row g-3">
-      <div class="col-md-3">
-        <label for="filterRate-tours" class="form-label fw-semibold">
-          <i class="ti ti-percentage me-1"></i>Filtrar por Tarifa
-        </label>
-        <select class="form-select" id="filterRate-tours">
-          <option value="">Todas las tarifas</option>
-        </select>
-      </div>
-    </div>
-  </div>
+    <div class="card-body" id="tours-content">
+        <!-- Filter Controls -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <!-- Leading Pills (Segmented Control) -->
+            <ul class="nav nav-pills" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active filter-pill" data-filter="all" type="button" role="tab">
+                        Todos los Tours
+                    </button>
+                </li>
+            </ul>
 
-  <div class="card-body">
-    <div class="table-responsive">
-      <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
-        <thead class="table-light">
-          <tr>
-            <th>Tarifa</th>
-            <th>Destino</th>
-            <th>Tiempo (Hrs min)</th>
-            <th>Tipo de Vehículo</th>
-            <th>Pasajeros</th>
-            <th>Precio</th>
-            <th>Precio Efectivo</th>
-            <% if (dtUserRole !== 'department_manager') { %><th>Estado</th><% } %>
-            <% if (dtShowActions) { %>
-            <th class="text-center">Acciones</th>
-            <% } %>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+            <!-- Trailing Dropdowns -->
+            <div class="d-flex gap-2 align-items-center">
+                <!-- Currency Dropdown -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
+                    <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
+                        <option value="MXN" selected>MXN</option>
+                        <option value="USD">USD</option>
+                    </select>
+                </div>
+
+                <!-- Payment Type Dropdown -->
+                <div class="d-flex align-items-center gap-1">
+                    <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
+                    <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
+                        <option value="efectivo" selected>Efectivo</option>
+                        <option value="transferencia">Transferencia</option>
+                        <% if (!isDepartmentManager) { %>
+                        <option value="transf_agencias">Transf. Agencias</option>
+                        <% } %>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 30%;">Tour (Destino)</th>
+                        <th style="width: 15%;">Tiempo</th>
+                        <th style="width: 20%;">
+                            <div class="text-center mb-1" style="font-size: 0.875rem; font-weight: 500;">
+                                Seleccionar categoría...
+                            </div>
+                            <select class="form-select" id="headerRateFilter-<%= dtTableId %>" style="min-width: 120px; width: 100%;">
+                            </select>
+                        </th>
+                        <th style="width: 20%;">Estado</th>
+                        <% if (dtShowClientPricing) { %>
+                            <th class="text-center" style="width: 15%;">Precio Cliente</th>
+                        <% } %>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center" style="width: 15%;">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
     </div>
-  </div>
 </div>
 
 <!-- Tour Modal -->
 <div class="modal fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title text-white" id="tourModalLabel">
-          <i class="ti ti-map-plus me-2"></i><span id="modalTitle">Crear Nuevo Tour</span>
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="tourModalLabel">
+                    <i class="ti ti-map me-2"></i><span id="modalTitle">Crear Nuevo Tour</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
 
-      <div class="modal-body">
-        <!-- Alert container for modal-specific errors -->
-        <div id="tourModalAlerts"></div>
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="tourModalAlerts"></div>
 
-        <form id="tourForm">
-          <input type="hidden" id="tourId">
+                <form id="tourForm">
+                    <input type="hidden" id="tourId">
 
-          <!-- Sección: Información del Tour -->
-          <div class="mb-4">
-            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-              <i class="ti ti-info-circle me-1"></i>
-              Información del Tour
-            </h6>
+                    <!-- Sección: Información del Tour -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-route me-1"></i>
+                            Información del Tour
+                        </h6>
 
-            <%- include('../../atoms/common/tom-select', {
-                id: 'destinationPOI',
-                name: 'destinationPOI',
-                multiple: false,
-                placeholder: 'Seleccionar destino',
-                label: 'Destino',
-                required: true,
-                helpText: 'Punto de interés de destino para el tour',
-                options: [],
-                selected: []
-            }) %>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <%- include('../../atoms/common/tom-select', {
+                                    id: 'destinationPOI',
+                                    name: 'destinationPOI',
+                                    multiple: false,
+                                    placeholder: 'Seleccionar destino',
+                                    label: 'Destino',
+                                    required: true,
+                                    helpText: 'Destino del tour',
+                                    options: [],
+                                    selected: []
+                                }) %>
+                            </div>
+                        </div>
 
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label for="timeHours" class="form-label">Duración <span class="text-danger">*</span></label>
-                <div class="row">
-                  <div class="col-6">
-                    <div class="input-group">
-                      <input type="number" class="form-control" id="timeHours" name="timeHours" min="0" max="23" placeholder="0">
-                      <span class="input-group-text">hrs</span>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="timeHours" class="form-label">Duración <span class="text-danger">*</span></label>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="timeHours" name="timeHours" min="0" max="23" placeholder="0">
+                                            <span class="input-group-text">hrs</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="input-group">
+                                            <input type="number" class="form-control" id="timeMinutes" name="timeMinutes" min="0" max="59" placeholder="0">
+                                            <span class="input-group-text">min</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                  </div>
-                  <div class="col-6">
-                    <div class="input-group">
-                      <input type="number" class="form-control" id="timeMinutes" name="timeMinutes" min="0" max="59" placeholder="0">
-                      <span class="input-group-text">min</span>
+
+                    <!-- Sección: Disponibilidad (Opcional) -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-calendar-time me-1"></i>
+                            Disponibilidad <span class="text-muted fw-normal">(Opcional)</span>
+                        </h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">Selecciona Días y Configura Horarios</label>
+                            <div class="d-flex gap-2 flex-wrap mb-3" id="availableDaysContainer">
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="1" data-day-name="Lunes">
+                                    <i class="ti ti-calendar"></i> Lu
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="2" data-day-name="Martes">
+                                    <i class="ti ti-calendar"></i> Ma
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="3" data-day-name="Miércoles">
+                                    <i class="ti ti-calendar"></i> Mi
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="4" data-day-name="Jueves">
+                                    <i class="ti ti-calendar"></i> Ju
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="5" data-day-name="Viernes">
+                                    <i class="ti ti-calendar"></i> Vi
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="6" data-day-name="Sábado">
+                                    <i class="ti ti-calendar"></i> Sa
+                                </button>
+                                <button type="button" class="btn btn-outline-primary day-btn" data-day="0" data-day-name="Domingo">
+                                    <i class="ti ti-calendar"></i> Do
+                                </button>
+                            </div>
+                            <div class="form-text">Selecciona días para configurar horarios individuales</div>
+                        </div>
+
+                        <!-- Contenedor de horarios por día -->
+                        <div id="daySchedulesContainer" class="mb-3">
+                            <div id="noDaysSelected" class="text-center text-muted py-4 border rounded bg-light">
+                                <i class="ti ti-calendar-off fs-3 d-block mb-2"></i>
+                                <p class="mb-0">Selecciona días para configurar sus horarios</p>
+                                <small class="text-muted">Cada día puede tener horarios diferentes</small>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info" role="alert">
+                            <i class="ti ti-info-circle me-2"></i>
+                            <small>Si no se especifica disponibilidad, el tour estará disponible todos los días sin restricción de horario</small>
+                        </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="vehicleType" class="form-label">Tipo de Vehículo <span class="text-danger">*</span></label>
-                <select class="form-select" id="vehicleType" name="vehicleType" required>
-                  <option value="">Seleccionar tipo de vehículo...</option>
-                  <!-- Las opciones se cargarán dinámicamente -->
-                </select>
-              </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Tour:</strong>
+                            <p class="mb-0 mt-1">Define un destino turístico específico con duración y disponibilidad. Los precios se manejan por separado según vehículo y tarifa.</p>
+                        </div>
+                    </div>
+                </form>
             </div>
 
-            <!-- Sección: Rango de Pasajeros (Opcional) -->
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label for="minPassengers" class="form-label">Mínimo de Pasajeros <span class="text-muted">(Opcional)</span></label>
-                <input type="number" class="form-control" id="minPassengers" name="minPassengers" min="1" placeholder="Ej: 2">
-                <div class="form-text">Número mínimo de pasajeros requerido</div>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="maxPassengers" class="form-label">Máximo de Pasajeros <span class="text-muted">(Opcional)</span></label>
-                <input type="number" class="form-control" id="maxPassengers" name="maxPassengers" min="1" placeholder="Ej: 8">
-                <div class="form-text">Número máximo de pasajeros permitido</div>
-              </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveTourBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Tour</span>
+                </button>
             </div>
-
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label for="price" class="form-label">Precio <span class="text-danger">*</span></label>
-                <div class="input-group">
-                  <span class="input-group-text">$</span>
-                  <input type="number" class="form-control" id="price" name="price" required min="0" step="0.01" placeholder="0.00">
-                </div>
-              </div>
-              <div class="col-md-6 mb-3">
-                <label for="rate" class="form-label">Tarifa <span class="text-danger">*</span></label>
-                <select class="form-select" id="rate" name="rate" required>
-                  <option value="">Seleccionar tarifa...</option>
-                  <!-- Las opciones se cargarán dinámicamente -->
-                </select>
-              </div>
-            </div>
-
-            <div class="row">
-              <div class="col-12 mb-3">
-                <label for="notes" class="form-label">Notas <span class="text-muted">(Opcional)</span></label>
-                <textarea class="form-control" id="notes" name="notes" rows="3" placeholder="Información adicional sobre el tour, instrucciones especiales, etc."></textarea>
-                <div class="form-text">Información adicional o notas sobre el tour</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Sección: Disponibilidad (Opcional) -->
-          <div class="mb-4">
-            <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-              <i class="ti ti-calendar-time me-1"></i>
-              Disponibilidad <span class="text-muted fw-normal">(Opcional)</span>
-            </h6>
-
-            <div class="mb-3">
-              <label class="form-label">Selecciona Días y Configura Horarios</label>
-              <div class="d-flex gap-2 flex-wrap mb-3" id="availableDaysContainer">
-                <button type="button" class="btn btn-outline-primary day-btn" data-day="1" data-day-name="Lunes">
-                  <i class="ti ti-calendar"></i> Lu
-                </button>
-                <button type="button" class="btn btn-outline-primary day-btn" data-day="2" data-day-name="Martes">
-                  <i class="ti ti-calendar"></i> Ma
-                </button>
-                <button type="button" class="btn btn-outline-primary day-btn" data-day="3" data-day-name="Miércoles">
-                  <i class="ti ti-calendar"></i> Mi
-                </button>
-                <button type="button" class="btn btn-outline-primary day-btn" data-day="4" data-day-name="Jueves">
-                  <i class="ti ti-calendar"></i> Ju
-                </button>
-                <button type="button" class="btn btn-outline-primary day-btn" data-day="5" data-day-name="Viernes">
-                  <i class="ti ti-calendar"></i> Vi
-                </button>
-                <button type="button" class="btn btn-outline-primary day-btn" data-day="6" data-day-name="Sábado">
-                  <i class="ti ti-calendar"></i> Sa
-                </button>
-                <button type="button" class="btn btn-outline-primary day-btn" data-day="0" data-day-name="Domingo">
-                  <i class="ti ti-calendar"></i> Do
-                </button>
-              </div>
-              <div class="form-text">Selecciona días para configurar horarios individuales</div>
-            </div>
-
-            <!-- Contenedor de horarios por día -->
-            <div id="daySchedulesContainer" class="mb-3">
-              <div id="noDaysSelected" class="text-center text-muted py-4 border rounded bg-light">
-                <i class="ti ti-calendar-off fs-3 d-block mb-2"></i>
-                <p class="mb-0">Selecciona días para configurar sus horarios</p>
-                <small class="text-muted">Cada día puede tener horarios diferentes</small>
-              </div>
-            </div>
-
-            <div class="alert alert-info" role="alert">
-              <i class="ti ti-info-circle me-2"></i>
-              <small>Si no se especifica disponibilidad, el tour estará disponible todos los días sin restricción de horario</small>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-          <i class="ti ti-x me-1"></i>Cancelar
-        </button>
-        <button type="button" class="btn btn-primary" id="saveTourBtn">
-          <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Tour</span>
-        </button>
-      </div>
+        </div>
     </div>
-  </div>
 </div>
 
 <!-- Template para fila de horario por día -->
 <template id="dayScheduleRowTemplate">
-  <div class="day-schedule-row mb-3 p-3 border rounded bg-light" data-day="">
-    <div class="row align-items-center">
-      <div class="col-md-3">
-        <strong class="day-name text-primary">
-          <i class="ti ti-calendar me-1"></i>
-          <span></span>
-        </strong>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label small mb-1">Hora de Inicio</label>
-        <input type="text" class="form-control form-control-sm day-start-time time-input" placeholder="HH:MM" maxlength="5">
-        <div class="invalid-feedback"></div>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label small mb-1">Hora de Fin</label>
-        <input type="text" class="form-control form-control-sm day-end-time time-input" placeholder="HH:MM" maxlength="5">
-        <div class="invalid-feedback"></div>
-      </div>
-      <div class="col-md-1 text-end">
-        <button type="button" class="btn btn-sm btn-outline-danger remove-day-btn" title="Eliminar día">
-          <i class="ti ti-x"></i>
-        </button>
-      </div>
+    <div class="day-schedule-row mb-3 p-3 border rounded bg-light" data-day="">
+        <div class="row align-items-center">
+            <div class="col-md-3">
+                <strong class="day-name text-primary">
+                    <i class="ti ti-calendar me-1"></i>
+                    <span></span>
+                </strong>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Hora de Inicio</label>
+                <input type="text" class="form-control form-control-sm day-start-time time-input" placeholder="HH:MM" maxlength="5">
+                <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small mb-1">Hora de Fin</label>
+                <input type="text" class="form-control form-control-sm day-end-time time-input" placeholder="HH:MM" maxlength="5">
+                <div class="invalid-feedback"></div>
+            </div>
+            <div class="col-md-1 text-end">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-day-btn" title="Eliminar día">
+                    <i class="ti ti-x"></i>
+                </button>
+            </div>
+        </div>
     </div>
-  </div>
 </template>
 
 <script>
-  (function() {
+(function() {
     // Wait for DOM and all dependencies to be ready
     function initWhenReady() {
-      // Check if jQuery and DataTables are loaded
-      if (typeof jQuery === 'undefined') {
-        console.warn('jQuery not loaded yet, waiting...');
-        setTimeout(initWhenReady, 100);
-        return;
-      }
+        // Check if jQuery and DataTables are loaded
+        if (typeof jQuery === 'undefined') {
+            console.warn('jQuery not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
 
-      if (!jQuery.fn.dataTable) {
-        console.warn('DataTables not loaded yet, waiting...');
-        setTimeout(initWhenReady, 100);
-        return;
-      }
+        if (!jQuery.fn.dataTable) {
+            console.warn('DataTables not loaded yet, waiting...');
+            setTimeout(initWhenReady, 100);
+            return;
+        }
 
-      // All dependencies loaded, initialize
-      initToursTable();
+        initToursTable();
     }
 
     function initToursTable() {
-      const API = '<%= dtApiEndpoint %>';
-      const userRole = '<%= dtUserRole %>';
-      let table;
-      let selectedDays = []; // Track selected days
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const showClientPricing = <%= dtShowClientPricing %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+        const userRole = '<%= dtUserRole %>';
 
-      // Get JWT token from localStorage or cookies
-      function getAccessToken() {
-        // First try localStorage (used by other parts of the app)
-        const tokenFromStorage = localStorage.getItem('accessToken');
-        if (tokenFromStorage) {
-          return tokenFromStorage;
-        }
-        
-        // Fallback to cookies (httpOnly cookies won't work, but try anyway)
-        const cookies = document.cookie.split(';');
-        for (let cookie of cookies) {
-          const [name, value] = cookie.trim().split('=');
-          if (name === 'accessToken') {
-            return value;
-          }
-        }
-        return null;
-      }
-
-      // Setup global AJAX configuration to include JWT token
-      $.ajaxSetup({
-        beforeSend: function(xhr) {
-          const token = getAccessToken();
-          if (token) {
-            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-          }
-        }
-      });
-
-      // Helper functions for badge color contrast
-      function getLuminance(hex) {
-        // WCAG 2.0 luminance calculation
-        const rgb = parseInt(hex.slice(1), 16);
-        const r = (rgb >> 16) & 0xff;
-        const g = (rgb >> 8) & 0xff;
-        const b = (rgb >> 0) & 0xff;
-
-        const [rsRGB, gsRGB, bsRGB] = [r/255, g/255, b/255].map(val => {
-          return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
-        });
-
-        return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
-      }
-
-      function getContrastTextColor(backgroundColor) {
-        const luminance = getLuminance(backgroundColor);
-        return luminance > 0.5 ? '#1F2937' : '#FFFFFF';
-      }
-
-      table = $('#<%= dtTableId %>').DataTable({
-        processing: true,
-        serverSide: true,
-        deferRender: true,
-        ajax: {
-          url: API,
-          type: 'GET',
-          data: function(d) {
-            // Add rate filter parameter
-            d.rateId = $('#filterRate-tours').val();
-            return d;
-          },
-          dataSrc: function(json) {
-            if (!json.success) {
-              showErrorAlert('Error al cargar los datos de tours: ' + (json.error || 'Error desconocido'));
-              return [];
+        // Get JWT token from localStorage or cookies
+        function getAccessToken() {
+            // First try localStorage (used by other parts of the app)
+            const tokenFromStorage = localStorage.getItem('accessToken');
+            if (tokenFromStorage) {
+                return tokenFromStorage;
             }
-
-            // Update total count display
-            $('#total-tours-count').text(json.recordsTotal || 0);
-
-            return json.data || [];
-          },
-          error: function(xhr, error, thrown) {
-            console.error('Error loading tours:', error);
-            showErrorAlert('Error al cargar los tours');
-          }
-        },
-        columns: [
-          // 0. Tarifa (moved to first position with badge styling)
-          {
-            data: 'rate.name',
-            render: function(data, type, row) {
-              if (!data) return '-';
-
-              // Remove "Tarifa" word from the beginning if present
-              let displayName = data.replace(/^Tarifa\s*/i, '');
-
-              const color = row.rate?.color || '#6366F1';
-              const textColor = getContrastTextColor(color);
-
-              return `<span class="badge px-3 py-2" style="background-color: ${color}; color: ${textColor}; font-size: 0.875rem;">${displayName}</span>`;
-            }
-          },
-          // 1. Destino
-          {
-            data: 'destinationPOI',
-            render: function(data, type, row) {
-              if (!data) return '-';
-              return `<div><strong>${data.name || 'Sin destino'}</strong></div>`;
-            }
-          },
-          // 2. Tiempo
-          {
-            data: 'time',
-            render: function(data, type, row) {
-              if (!data) return '-';
-              const hours = Math.floor(data / 60);
-              const minutes = data % 60;
-              if (hours > 0 && minutes > 0) {
-                return `${hours}h ${minutes}min`;
-              } else if (hours > 0) {
-                return `${hours}h`;
-              } else {
-                return `${minutes}min`;
-              }
-            }
-          },
-          // 3. Tipo de Vehículo
-          {
-            data: 'vehicleType',
-            render: function(data, type, row) {
-              if (!data) return '-';
-              return data.name || 'Sin tipo';
-            }
-          },
-          // 4. Pasajeros
-          {
-            data: null,
-            render: function(data, type, row) {
-              const minPassengers = row.minPassengers;
-              const maxPassengers = row.maxPassengers;
-
-              if (!minPassengers && !maxPassengers) {
-                return '<span class="text-muted">Sin límite</span>';
-              }
-
-              if (minPassengers && maxPassengers) {
-                return `${minPassengers} - ${maxPassengers} pax`;
-              }
-
-              if (minPassengers) {
-                return `Mín: ${minPassengers} pax`;
-              }
-
-              if (maxPassengers) {
-                return `Máx: ${maxPassengers} pax`;
-              }
-
-              return '-';
-            }
-          },
-          // 5. Precio (with surcharge - "Tarjeta/Digital")
-          {
-            data: 'price',
-            render: function(data, type, row) {
-              const basePrice = data || 0;
-              const surchargePercentage = window.APP_SETTINGS?.paymentSurchargePercentage || 21.09;
-              const surcharge = (basePrice * surchargePercentage) / 100;
-              const totalPrice = basePrice + surcharge;
-
-              // For sorting and filtering, use total price
-              if (type === 'sort' || type === 'filter') {
-                return totalPrice;
-              }
-
-              const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
-                style: 'currency',
-                currency: 'MXN'
-              }).format(amount);
-
-              return `
-                <div class="text-center">
-                  <div class="fw-bold text-success" style="font-size: 1rem;">
-                    ${formatMXN(totalPrice)}
-                  </div>
-                  <div class="text-muted" style="font-size: 0.75rem;">
-                    <small>Tarjeta/Digital</small>
-                  </div>
-                </div>
-              `;
-            }
-          },
-          // 6. Precio Efectivo (base price - "Efectivo")
-          {
-            data: 'price',
-            render: function(data, type, row) {
-              const basePrice = data || 0;
-
-              // For sorting and filtering, use base price
-              if (type === 'sort' || type === 'filter') {
-                return basePrice;
-              }
-
-              const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
-                style: 'currency',
-                currency: 'MXN'
-              }).format(amount);
-
-              return `
-                <div class="text-center">
-                  <div class="fw-bold text-primary" style="font-size: 1rem;">
-                    ${formatMXN(basePrice)}
-                  </div>
-                  <div class="text-muted" style="font-size: 0.75rem;">
-                    <small>Efectivo</small>
-                  </div>
-                </div>
-              `;
-            }
-          },
-          // 7. Estado
-          ...(userRole !== 'department_manager' ? [{
-            data: 'active',
-            defaultContent: false,
-            render: function(data, type, row) {
-              if (data) {
-                return '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Activo</span>';
-              } else {
-                return '<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Inactivo</span>';
-              }
-            }
-          }] : []),
-          <% if (dtShowActions) { %> {
-            data: null,
-            orderable: false,
-            render: function(data, type, row) {
-              let actions = '<div class="btn-group btn-group-sm" role="group">';
-
-              <% if (canEdit) { %>
-              /* Edit button */
-              actions += `<button type="button"
-                                class="btn btn-primary edit-btn"
-                                data-id="${row.id || row.objectId}"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="Editar">
-                                <i class="ti ti-edit"></i>
-                            </button>`;
-              <% } %>
-
-              <% if (canEdit) { %>
-              /* Toggle status button */
-              const statusIcon = row.active ? 'ti-eye-off' : 'ti-eye-check';
-              const statusTitle = row.active ? 'Desactivar' : 'Activar';
-              const statusClass = row.active ? 'btn-warning' : 'btn-success';
-
-              actions += `<button type="button"
-                                class="btn ${statusClass} toggle-btn"
-                                data-id="${row.id || row.objectId}"
-                                data-active="${row.active}"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="${statusTitle}">
-                                <i class="ti ${statusIcon}"></i>
-                            </button>`;
-              <% } %>
-
-              <% if (canDelete) { %>
-              /* Delete button */
-              actions += `<button type="button"
-                                class="btn btn-danger delete-btn"
-                                data-id="${row.id || row.objectId}"
-                                data-tour-name="${row.destinationPOI?.name || 'Tour'}"
-                                data-bs-toggle="tooltip"
-                                data-bs-placement="top"
-                                title="Eliminar">
-                                <i class="ti ti-trash"></i>
-                            </button>`;
-              <% } %>
-
-              actions += '</div>';
-              return actions;
-            }
-          }
-          <% } %>
-        ],
-        pageLength: 25,
-        lengthMenu: [
-          [10, 25, 50, 100],
-          [10, 25, 50, 100]
-        ],
-        order: [
-          [0, 'asc'], // 1. Tarifa
-          [1, 'asc']  // 2. Destino
-        ],
-        pagingType: 'full_numbers',
-        language: {
-          processing: "Procesando...",
-          search: "Buscar:",
-          lengthMenu: "Mostrar _MENU_ registros",
-          info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-          infoEmpty: "Mostrando 0 a 0 de 0 registros",
-          infoFiltered: "(filtrado de _MAX_ registros totales)",
-          loadingRecords: "Cargando...",
-          zeroRecords: "No se encontraron registros coincidentes",
-          emptyTable: "No hay datos disponibles en la tabla",
-          paginate: {
-            first: "Primero",
-            previous: "Anterior",
-            next: "Siguiente",
-            last: "Último"
-          }
-        },
-        drawCallback: function(settings) {
-          // Reinitialize tooltips after table redraw
-          const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-          tooltipTriggerList.map(function(tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl);
-          });
-        }
-      });
-
-      // Day selection handling
-      function initializeDaySelection() {
-        $('.day-btn').removeClass('active btn-primary').addClass('btn-outline-primary');
-
-        // Clear day schedules
-        $('#daySchedulesContainer .day-schedule-row').remove();
-        daySchedules = {};
-        updateNoDaysMessage();
-
-        // Legacy support
-        selectedDays = [];
-      }
-
-      // Object to store day schedules
-      let daySchedules = {};
-
-      // Handle day button clicks
-      $(document).on('click', '.day-btn', function() {
-        const dayCode = parseInt($(this).data('day'));
-        const dayName = $(this).data('day-name');
-        const isSelected = $(this).hasClass('active');
-
-        if (isSelected) {
-          // Deselect: Remove day schedule
-          removeDaySchedule(dayCode);
-          $(this).removeClass('active btn-primary').addClass('btn-outline-primary');
-        } else {
-          // Select: Add day schedule
-          addDaySchedule(dayCode, dayName);
-          $(this).removeClass('btn-outline-primary').addClass('active btn-primary');
-        }
-
-        updateNoDaysMessage();
-      });
-
-      // Add day schedule row
-      function addDaySchedule(dayCode, dayName, startTime = '', endTime = '') {
-        // Check if already exists
-        if (daySchedules[dayCode]) return;
-
-        // Clone template
-        const template = document.getElementById('dayScheduleRowTemplate');
-        const clone = template.content.cloneNode(true);
-        const row = clone.querySelector('.day-schedule-row');
-
-        // Set day code and name
-        row.setAttribute('data-day', dayCode);
-        row.querySelector('.day-name span').textContent = dayName;
-
-        // Set initial values if provided
-        if (startTime) row.querySelector('.day-start-time').value = startTime;
-        if (endTime) row.querySelector('.day-end-time').value = endTime;
-
-        // Add to container (sorted by day code)
-        insertDayScheduleSorted(row, dayCode);
-
-        // Store in daySchedules object
-        daySchedules[dayCode] = {
-          dayName: dayName,
-          element: row
-        };
-
-        // Attach time validation to inputs
-        attachTimeInputValidation(row.querySelector('.day-start-time'));
-        attachTimeInputValidation(row.querySelector('.day-end-time'));
-      }
-
-      // Insert day schedule row in chronological order (Mon-Sun)
-      function insertDayScheduleSorted(row, dayCode) {
-        const container = $('#daySchedulesContainer');
-        const existingRows = container.find('.day-schedule-row');
-
-        // Convert day code for sorting (Sunday = 7 for sorting purposes)
-        const sortValue = dayCode === 0 ? 7 : dayCode;
-
-        let inserted = false;
-        existingRows.each(function() {
-          const existingDayCode = parseInt($(this).attr('data-day'));
-          const existingSortValue = existingDayCode === 0 ? 7 : existingDayCode;
-
-          if (sortValue < existingSortValue) {
-            $(this).before(row);
-            inserted = true;
-            return false; // Break loop
-          }
-        });
-
-        if (!inserted) {
-          container.append(row);
-        }
-      }
-
-      // Remove day schedule row
-      function removeDaySchedule(dayCode) {
-        if (!daySchedules[dayCode]) return;
-
-        // Remove from DOM
-        $(daySchedules[dayCode].element).remove();
-
-        // Remove from daySchedules object
-        delete daySchedules[dayCode];
-      }
-
-      // Handle remove day button clicks
-      $(document).on('click', '.remove-day-btn', function() {
-        const row = $(this).closest('.day-schedule-row');
-        const dayCode = parseInt(row.attr('data-day'));
-
-        // Deselect day button
-        $(`.day-btn[data-day="${dayCode}"]`).removeClass('active btn-primary').addClass('btn-outline-primary');
-
-        // Remove schedule
-        removeDaySchedule(dayCode);
-        updateNoDaysMessage();
-      });
-
-      // Update "no days selected" message visibility
-      function updateNoDaysMessage() {
-        const hasDays = Object.keys(daySchedules).length > 0;
-        $('#noDaysSelected').toggle(!hasDays);
-      }
-
-      // Time input validation and formatting
-      function attachTimeInputValidation(input) {
-        const $input = $(input);
-
-        $input.on('input', function() {
-          let value = $(this).val().replace(/[^0-9]/g, ''); // Remove non-digits
-
-          // Auto-format: add ":" after 2 digits
-          if (value.length >= 2) {
-            value = value.substring(0, 2) + ':' + value.substring(2, 4);
-          }
-
-          $(this).val(value);
-        });
-
-        $input.on('blur', function() {
-          const value = $(this).val();
-          if (!value) return;
-
-          // Validate format HH:MM (00:00 to 23:59)
-          const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-          if (!timeRegex.test(value)) {
-            $(this).addClass('is-invalid');
-            showModalError('Formato de hora inválido. Use HH:MM (00:00 a 23:59)');
-          } else {
-            $(this).removeClass('is-invalid');
-          }
-        });
-      }
-
-      // Attach time validation to time inputs
-      $(document).on('focus', '.time-input', function() {
-        if (!$(this).data('validation-attached')) {
-          attachTimeInputValidation(this);
-          $(this).data('validation-attached', true);
-        }
-      });
-
-      // Load dropdown options when modal opens
-      function loadDropdownOptions() {
-        // Load Active POIs (filtered by Tours service type)
-        $.ajax({
-          url: '/api/pois/active?serviceType=Tours',
-          type: 'GET',
-          success: function(data) {
-            if (data.success && data.data) {
-              const selectElement = document.getElementById('destinationPOI');
-
-              // Destroy existing Tom Select instance if it exists
-              if (selectElement && selectElement.tomselect) {
-                selectElement.tomselect.destroy();
-              }
-
-              // Clear the select element
-              const select = $('#destinationPOI');
-              select.empty();
-
-              // Initialize Tom Select first (on empty select)
-              if (typeof TomSelect !== 'undefined') {
-                const tomSelectInstance = new TomSelect('#destinationPOI', {
-                  plugins: [],
-                  maxOptions: 1000,
-                  placeholder: 'Seleccionar destino',
-                  maxItems: 1,
-                  highlight: true,
-                  searchField: ['text'],
-                  valueField: 'value',
-                  labelField: 'text',
-                  sortField: 'text',
-                  closeAfterSelect: true,
-                  persist: false
-                });
-
-                // Store instance reference
-                selectElement.tomselect = tomSelectInstance;
-
-                // Load options using Tom Select API (prevents auto-selection)
-                tomSelectInstance.clearOptions();
-                data.data.forEach(poi => {
-                  tomSelectInstance.addOption({ value: poi.value, text: poi.label });
-                });
-                tomSelectInstance.refreshOptions(false);
-                tomSelectInstance.clear(); // Clear selection to start empty
-              }
-            }
-          },
-          error: function(xhr, status, error) {
-            console.error('Error loading POIs for Tours:', error);
-          }
-        });
-
-        // Load Active Vehicle Types
-        $.ajax({
-          url: '/api/vehicle-types/active',
-          type: 'GET',
-          success: function(data) {
-            if (data.success && data.data) {
-              const select = $('#vehicleType');
-              select.empty().append('<option value="">Seleccionar tipo de vehículo...</option>');
-              data.data.forEach(vt => {
-                select.append(`<option value="${vt.value}">${vt.label}</option>`);
-              });
-            }
-          },
-          error: function(xhr, status, error) {
-            console.error('Error loading vehicle types:', error);
-          }
-        });
-
-        // Load Active Rates
-        $.ajax({
-          url: '/api/rates/active',
-          type: 'GET',
-          success: function(data) {
-            if (data.success && data.data) {
-              const select = $('#rate');
-              select.empty().append('<option value="">Seleccionar tarifa...</option>');
-              data.data.forEach(rate => {
-                select.append(`<option value="${rate.value}">${rate.label}</option>`);
-              });
-            }
-          },
-          error: function(xhr, status, error) {
-            console.error('Error loading rates:', error);
-          }
-        });
-      }
-
-      $('#<%= dtTableId %>').on('click', '.edit-btn', function() {
-        const id = $(this).data('id');
-        loadDropdownOptions(); // Load dropdown options first
-
-        $.ajax({
-          url: `${API}/${id}`,
-          type: 'GET',
-          success: function(data) {
-            if (data.success) {
-              const t = data.data.tour;
-              $('#tourId').val(t.id || t.objectId);
-
-              // Set POI destination (wait for Tom Select to initialize)
-              setTimeout(() => {
-                const destinationValue = t.destinationPOI?.objectId || t.destinationPOI?.id || '';
-                const selectElement = document.getElementById('destinationPOI');
-
-                if (selectElement && selectElement.tomselect) {
-                  // Use Tom Select API to set value
-                  selectElement.tomselect.setValue(destinationValue, true);
-                } else {
-                  // Fallback to jQuery if Tom Select not initialized
-                  $('#destinationPOI').val(destinationValue);
+            
+            // Fallback to cookies (httpOnly cookies won't work, but try anyway)
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
                 }
-              }, 500);
-
-              // Set time (convert from minutes to hours and minutes)
-              const totalMinutes = t.time || 0;
-              const hours = Math.floor(totalMinutes / 60);
-              const minutes = totalMinutes % 60;
-              $('#timeHours').val(hours);
-              $('#timeMinutes').val(minutes);
-
-              // Set vehicle type
-              setTimeout(() => {
-                $('#vehicleType').val(t.vehicleType?.objectId || t.vehicleType?.id || '');
-              }, 500);
-
-              $('#price').val(t.price || '');
-
-              // Set passenger range
-              $('#minPassengers').val(t.minPassengers || '');
-              $('#maxPassengers').val(t.maxPassengers || '');
-
-              // Set notes
-              $('#notes').val(t.notes || '');
-
-              // Set rate
-              setTimeout(() => {
-                $('#rate').val(t.rate?.objectId || t.rate?.id || '');
-              }, 500);
-
-              // Set availability (NEW FORMAT: array of day schedules)
-              initializeDaySelection();
-              if (t.availability && Array.isArray(t.availability) && t.availability.length > 0) {
-                // Load day schedules from new format
-                t.availability.forEach(schedule => {
-                  const dayBtn = $(`.day-btn[data-day="${schedule.day}"]`);
-                  const dayName = dayBtn.data('day-name');
-
-                  // Add day schedule with times
-                  addDaySchedule(schedule.day, dayName, schedule.startTime, schedule.endTime);
-
-                  // Activate day button
-                  dayBtn.removeClass('btn-outline-primary').addClass('active btn-primary');
-                });
-
-                updateNoDaysMessage();
-              } else if (t.availableDays && Array.isArray(t.availableDays) && t.availableDays.length > 0) {
-                // LEGACY FORMAT: Migrate to new format (all days share same times)
-                const sharedStartTime = t.startTime || '';
-                const sharedEndTime = t.endTime || '';
-
-                t.availableDays.forEach(dayCode => {
-                  const dayBtn = $(`.day-btn[data-day="${dayCode}"]`);
-                  const dayName = dayBtn.data('day-name');
-
-                  // Add day schedule with shared times
-                  addDaySchedule(dayCode, dayName, sharedStartTime, sharedEndTime);
-
-                  // Activate day button
-                  dayBtn.removeClass('btn-outline-primary').addClass('active btn-primary');
-                });
-
-                updateNoDaysMessage();
-              }
-
-              $('#modalTitle').text('Editar Tour');
-              $('#saveButtonText').text('Actualizar Tour');
-
-              // Clear any previous modal alerts
-              const alertsContainer = document.getElementById('tourModalAlerts');
-              if (alertsContainer) {
-                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
-              }
-
-              $('#tourModal').modal('show');
             }
-          },
-          error: function(xhr) {
-            showModalError(xhr.responseJSON?.error || 'Error al cargar el tour');
-          }
+            return null;
+        }
+
+        // Setup global AJAX configuration to include JWT token
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
         });
-      });
 
-      $('#createTourBtn').click(() => {
-        // Clear any previous modal alerts
-        const alertsContainer = document.getElementById('tourModalAlerts');
-        if (alertsContainer) {
-          alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
-        }
+        // Load dropdown data
+        let poisData = [];
+        let ratesData = [];
 
-        loadDropdownOptions(); // Load dropdown options
-        $('#tourForm')[0].reset();
-        $('#tourId').val('');
-        initializeDaySelection(); // Reset day selection (clears daySchedules too)
-        $('#modalTitle').text('Crear Nuevo Tour');
-        $('#saveButtonText').text('Crear Tour');
-        $('#tourModal').modal('show');
-      });
+        // Color contrast functions for rate badges
+        function getLuminance(hex) {
+            // WCAG 2.0 luminance calculation
+            const rgb = parseInt(hex.slice(1), 16);
+            const r = (rgb >> 16) & 0xff;
+            const g = (rgb >> 8) & 0xff;
+            const b = (rgb >> 0) & 0xff;
 
-      $('#saveTourBtn').click(function() {
-        const id = $('#tourId').val();
-
-        // Calculate total time in minutes
-        const hours = parseInt($('#timeHours').val()) || 0;
-        const minutes = parseInt($('#timeMinutes').val()) || 0;
-        const totalMinutes = (hours * 60) + minutes;
-
-        const data = {
-          destinationPOI: $('#destinationPOI').val(),
-          time: totalMinutes,
-          vehicleType: $('#vehicleType').val(),
-          price: parseFloat($('#price').val()) || 0,
-          rate: $('#rate').val()
-        };
-
-        // Add optional passenger range fields
-        const minPassengers = $('#minPassengers').val();
-        const maxPassengers = $('#maxPassengers').val();
-        
-        if (minPassengers && minPassengers.trim() !== '') {
-          data.minPassengers = parseInt(minPassengers);
-        }
-        
-        if (maxPassengers && maxPassengers.trim() !== '') {
-          data.maxPassengers = parseInt(maxPassengers);
-        }
-
-        // Add optional notes field
-        const notes = $('#notes').val();
-        if (notes && notes.trim() !== '') {
-          data.notes = notes.trim();
-        }
-
-        // Add optional availability fields (NEW FORMAT: array of day schedules)
-        if (Object.keys(daySchedules).length > 0) {
-          const availability = [];
-          const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-
-          // Collect and validate each day schedule
-          for (const dayCode in daySchedules) {
-            const scheduleRow = $(daySchedules[dayCode].element);
-            const startTime = scheduleRow.find('.day-start-time').val();
-            const endTime = scheduleRow.find('.day-end-time').val();
-            const dayName = daySchedules[dayCode].dayName;
-
-            // Validate both times are provided
-            if (!startTime || !endTime) {
-              showModalError(`Debe especificar hora de inicio y fin para ${dayName}`);
-              return;
-            }
-
-            // Validate time format
-            if (!timeRegex.test(startTime)) {
-              showModalError(`Formato de hora de inicio inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
-              return;
-            }
-            if (!timeRegex.test(endTime)) {
-              showModalError(`Formato de hora de fin inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
-              return;
-            }
-
-            // Validate endTime > startTime
-            if (startTime >= endTime) {
-              showModalError(`La hora de fin debe ser posterior a la hora de inicio para ${dayName}`);
-              return;
-            }
-
-            // Add to availability array
-            availability.push({
-              day: parseInt(dayCode),
-              startTime: startTime,
-              endTime: endTime
+            const [rsRGB, gsRGB, bsRGB] = [r/255, g/255, b/255].map(val => {
+                return val <= 0.03928 ? val / 12.92 : Math.pow((val + 0.055) / 1.055, 2.4);
             });
-          }
 
-          // Add availability array to data (sorted by day code happens on backend)
-          data.availability = availability;
+            return 0.2126 * rsRGB + 0.7152 * gsRGB + 0.0722 * bsRGB;
         }
 
-        // Validate required fields
-        if (!data.destinationPOI || !data.time || !data.vehicleType || !data.price || !data.rate) {
-          showModalError('Por favor completa todos los campos requeridos');
-          return;
+        function getContrastTextColor(backgroundColor) {
+            const luminance = getLuminance(backgroundColor);
+            return luminance > 0.5 ? '#1F2937' : '#FFFFFF';
         }
 
-        if (data.time <= 0) {
-          showModalError('La duración debe ser mayor a 0 minutos');
-          return;
+        // Load all data once
+        let allToursData = [];
+        let filteredData = [];
+
+        // Load data from API
+        function loadAllTours() {
+            return new Promise((resolve, reject) => {
+                $.ajax({
+                    url: apiEndpoint,
+                    type: 'GET',
+                    success: function(response) {
+                        if (response.success && response.data) {
+                            allToursData = response.data;
+                            filteredData = allToursData; // Show all tours by default
+                            resolve(allToursData);
+                        } else {
+                            reject('Invalid response format');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error loading tours:', error);
+                        reject('Error loading tours');
+                    }
+                });
+            });
         }
 
-        $.ajax({
-          url: id ? `${API}/${id}` : API,
-          type: id ? 'PUT' : 'POST',
-          contentType: 'application/json',
-          data: JSON.stringify(data),
-          success: function(result) {
-            if (result.success) {
-              showSuccessAlert(`Tour ${id?'actualizado':'creado'} exitosamente`);
-              $('#tourModal').modal('hide');
-              table.ajax.reload(null, false);
+        // DataTable Configuration (Client-side)
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: false, // Changed to client-side
+            data: [], // Will be populated after data loads
+            columns: [
+                // 1. Tour (Destination)
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        const destination = row.destinationPOI?.name || 'Tour';
+                        
+                        if (type === 'filter' || type === 'sort') {
+                            return destination;
+                        }
+                        
+                        return `
+                            <div class="d-flex flex-column">
+                                <div class="fw-semibold" style="font-size: 0.9rem;">
+                                    ${destination}
+                                </div>
+                            </div>
+                        `;
+                    }
+                },
+                // 2. Tiempo
+                {
+                    data: 'time',
+                    render: function(data, type, row) {
+                        if (!data) return '-';
+                        const hours = Math.floor(data / 60);
+                        const minutes = data % 60;
+                        
+                        if (type === 'filter' || type === 'sort') {
+                            return data; // Return numeric for sorting
+                        }
+                        
+                        if (hours > 0 && minutes > 0) {
+                            return `${hours}h ${minutes}min`;
+                        } else if (hours > 0) {
+                            return `${hours}h`;
+                        } else {
+                            return `${minutes}min`;
+                        }
+                    }
+                },
+                // 3. Precios & Vehículos (based on selected rate from header dropdown)
+                {
+                    data: null,
+                    render: function(data, type, row) {
+                        const selectedRate = $(`#headerRateFilter-${tableId}`).val();
+                        const selectedRateText = $(`#headerRateFilter-${tableId} option:selected`).text();
+                        
+                        // Check if we have price data for the selected rate
+                        if (row.priceData && row.priceData.length > 0) {
+                            // Show vehicle types for selected rate (sorted by price low to high)
+                            const sortedPrices = [...row.priceData].sort((a, b) => (a.price || 0) - (b.price || 0));
+                            let pricesHtml = sortedPrices.map(p => {
+                                // Get capacity info from price data
+                                const defaultCapacity = p.vehicleType?.defaultCapacity || 4;
+                                const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
+                                const vehicleName = p.vehicleType?.name || 'Vehículo';
+                                const price = p.formattedPrice;
+                                
+                                return `
+                                    <div class="price-item-card p-2 mb-2 border rounded bg-white" style="border-left: 3px solid #6c757d;">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="flex-grow-1">
+                                                <div class="fw-semibold small text-dark">${vehicleName}</div>
+                                                <div class="text-muted d-flex align-items-center gap-2" style="font-size: 0.7rem;">
+                                                    <span>${defaultCapacity} <i class="ti ti-user"></i></span>
+                                                    <span>${trunkCapacity} <i class="ti ti-briefcase"></i></span>
+                                                </div>
+                                            </div>
+                                            <div class="text-end">
+                                                <div class="fw-bold text-primary small" data-original-price="${price}">${price}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('');
+                            
+                            // Add expand button for all rates
+                            const expandButton = `
+                                <button class="btn btn-link btn-sm p-0 mt-1 expand-prices-btn" 
+                                        data-row-id="${row.id || row.objectId}"
+                                        style="font-size: 0.75rem; text-decoration: none;">
+                                    <i class="ti ti-chevron-down me-1"></i>
+                                    Ver todos
+                                </button>`;
+                            
+                            return `<div class="price-container" data-row-id="${row.id || row.objectId}">
+                                        <div class="small text-primary fw-semibold mb-2">${selectedRateText}</div>
+                                        ${pricesHtml}
+                                        ${expandButton}
+                                    </div>`;
+                        } else {
+                            // Show placeholder when no rate selected or no data available
+                            const expandButton = `
+                                <button class="btn btn-link btn-sm p-0 mt-1 expand-prices-btn" 
+                                        data-row-id="${row.id || row.objectId}"
+                                        style="font-size: 0.75rem; text-decoration: none;">
+                                    <i class="ti ti-chevron-down me-1"></i>
+                                    Ver todos
+                                </button>`;
+                            
+                            return `<div class="price-container" data-row-id="${row.id || row.objectId}">
+                                        <div class="text-muted small">Selecciona una categoría</div>
+                                        ${expandButton}
+                                    </div>`;
+                        }
+                    },
+                    className: 'price-column',
+                    orderable: false
+                },
+                // 4. Estado
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data
+                            ? '<span class="badge bg-success">Activo</span>'
+                            : '<span class="badge bg-secondary">Inactivo</span>';
+                    }
+                },
+                ...(showClientPricing ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        const tourId = data.objectId || data.id;
+                        const clientPrice = data.clientPrice || null; // This would come from a client-specific pricing table
+                        
+                        if (clientPrice) {
+                            const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                                style: 'currency',
+                                currency: 'MXN'
+                            }).format(amount);
+                            
+                            return `
+                                <div class="text-center">
+                                    <div class="fw-bold text-info mb-1">
+                                        ${formatMXN(clientPrice)}
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-primary configure-client-price-btn" data-tour-id="${tourId}">
+                                        <i class="ti ti-settings"></i> Editar
+                                    </button>
+                                </div>
+                            `;
+                        } else {
+                            return `
+                                <div class="text-center">
+                                    <button class="btn btn-sm btn-primary configure-client-price-btn" data-tour-id="${tourId}">
+                                        <i class="ti ti-plus"></i> Configurar
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    }
+                }] : []),
+                ...(showActions ? [{
+                    data: null,
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-center',
+                    render: function(data) {
+                        let actions = '<div class="btn-group btn-group-sm" role="group">';
+
+                        if (canEdit) {
+                            // Edit button
+                            actions += `<button type="button"
+                                            class="btn btn-primary edit-tour-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Editar Tour">
+                                            <i class="ti ti-edit"></i>
+                                        </button>`;
+
+                            // Toggle status button
+                            const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                            const statusTitle = data.active ? 'Desactivar Tour' : 'Activar Tour';
+                            const statusClass = data.active ? 'btn-warning' : 'btn-success';
+
+                            actions += `<button type="button"
+                                            class="btn ${statusClass} toggle-status-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-current-status="${data.active}"
+                                            data-destination="${data.destinationPOI?.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="${statusTitle}">
+                                            <i class="ti ${statusIcon}"></i>
+                                        </button>`;
+                        }
+
+                        if (canDelete) {
+                            // Delete button
+                            actions += `<button type="button"
+                                            class="btn btn-danger delete-tour-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-destination="${data.destinationPOI?.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Eliminar Tour">
+                                            <i class="ti ti-trash"></i>
+                                        </button>`;
+                        }
+
+                        actions += '</div>';
+                        return actions;
+                    }
+                }] : [])
+            ],
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tours...'
+            },
+            order: [
+                [0, 'asc'],  // 1. Destino
+            ],
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                 '<"row"<"col-sm-12"tr>>' +
+                 '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            columnDefs: [
+                {
+                    targets: 2, // Price column (0-indexed)
+                    orderable: false,
+                    searchable: false,
+                    className: 'no-sort'
+                }
+            ],
+            initComplete: function() {
+                // Remove sorting class from price column header after initialization
+                $(`#${tableId} thead th:nth-child(3)`).removeClass('sorting sorting_asc sorting_desc');
+                
+                // Ensure dropdown events are properly bound
+                setupHeaderDropdownEvents();
+            },
+            drawCallback: function() {
+                // Reinitialize tooltips after table redraw
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+                
+                // Re-apply filters after table redraw
+                const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                const currentCurrency = $(`#currencyFilter-${tableId}`).val();
+                setTimeout(() => {
+                    updatePricesForFilters(currentPaymentType, currentCurrency);
+                }, 50);
+            }
+        });
+
+        // Initialize data and table
+        async function initializeTable() {
+            try {
+                await loadAllTours();
+                // Data loaded successfully
+                
+                // Clear existing data and add filtered data
+                dataTable.clear();
+                dataTable.rows.add(filteredData);
+                dataTable.draw();
+                
+                console.log('✅ DataTable updated with', filteredData.length, 'rows');
+            } catch (error) {
+                console.error('Error initializing table:', error);
+                showErrorAlert('Error al cargar los tours');
+            }
+        }
+
+        // Store transfer rate data globally
+        let currentTransferRate = 0;
+        
+        // Store agency rate data globally (for department managers)
+        let currentAgencyRate = 0;
+        
+        // Store exchange rate data globally
+        let currentExchangeRate = 0;
+        
+        // Check if current user is department manager
+        const isDepartmentManager = (typeof userRole !== 'undefined' && userRole === 'department_manager');
+
+        // Load current transfer rate from API
+        function loadCurrentTransferRate() {
+            return $.ajax({
+                url: '/api/transfer-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentTransferRate = response.data.value || 0;
+                        console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
+                    } else {
+                        console.warn('⚠️ No active transfer rate found');
+                        currentTransferRate = 0;
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading transfer rate:', error);
+                    currentTransferRate = 0;
+                }
+            });
+        }
+
+        // Function to apply rate to price (transfer rate for regular users, agency rate for department managers)
+        function applyCommissionRate(priceString) {
+            const rateToUse = isDepartmentManager ? currentAgencyRate : currentTransferRate;
+            const rateName = isDepartmentManager ? 'agency rate' : 'transfer rate';
+            
+            if (rateToUse <= 0) return priceString;
+            
+            // Extract numeric value from price string (e.g., "$1,234.50" -> 1234.50)
+            const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
+            if (isNaN(numericValue)) return priceString;
+            
+            // Apply rate percentage
+            const newValue = numericValue * (1 + rateToUse / 100);
+            
+            console.log(`Applying ${rateName} ${rateToUse}% to $${numericValue} = $${newValue.toFixed(2)}`);
+            
+            // Format back to currency string
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2
+            }).format(newValue);
+        }
+
+        // Function to apply agency rate to price (for admin "Transf. Agencias" option)
+        function applyAgencyRate(priceString) {
+            if (currentAgencyRate <= 0) return priceString;
+            
+            // Extract numeric value from price string (e.g., "$1,234.50" -> 1234.50)
+            const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
+            if (isNaN(numericValue)) return priceString;
+            
+            // Apply agency rate percentage
+            const newValue = numericValue * (1 + currentAgencyRate / 100);
+            
+            console.log(`Applying agency rate ${currentAgencyRate}% to $${numericValue} = $${newValue.toFixed(2)}`);
+            
+            // Format back to currency string
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2
+            }).format(newValue);
+        }
+
+        // Function to format price with proper currency symbol
+        function formatPriceWithCurrency(value, currency) {
+            if (currency === 'USD') {
+                return new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(value);
             } else {
-              showModalError(result.error || 'Error al guardar el tour');
+                // MXN formatting - match backend format: "$1,234 MXN"
+                return `$${value.toLocaleString()} MXN`;
             }
-          },
-          error: function(xhr) {
-            showModalError(xhr.responseJSON?.error || 'Error al guardar el tour');
-          }
-        });
-      });
-
-      $('#<%= dtTableId %>').on('click', '.toggle-btn', function() {
-        const id = $(this).data('id');
-        const active = $(this).data('active');
-        toggleTourStatus(id, active);
-      });
-
-      $('#<%= dtTableId %>').on('click', '.delete-btn', function() {
-        const id = $(this).data('id');
-        const name = $(this).data('tour-name');
-        deleteTour(id, name);
-      });
-
-      function toggleTourStatus(tourId, currentStatus) {
-        const newStatus = !currentStatus;
-        const action = newStatus ? 'activar' : 'desactivar';
-        const actionTitle = newStatus ? 'Activar' : 'Desactivar';
-        const btnClass = newStatus ? 'btn-success' : 'btn-warning';
-
-        const modalHtml = `
-            <div class="modal fade" id="confirmToggleTourModal" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">${actionTitle} Tour</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p>¿Estás seguro de que deseas ${action} este tour?</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="button" class="btn ${btnClass}" id="confirmToggleTourBtn">${actionTitle}</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Remove existing modal if any
-        $('#confirmToggleTourModal').remove();
-        $('body').append(modalHtml);
-
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('confirmToggleTourModal'));
-        modal.show();
-
-        // Handle confirmation
-        $('#confirmToggleTourBtn').on('click', function() {
-          $.ajax({
-            url: `${API}/${tourId}/toggle-status`,
-            type: 'PATCH',
-            contentType: 'application/json',
-            data: JSON.stringify({
-              active: newStatus
-            }),
-            success: function(result) {
-              if (result.success) {
-                modal.hide();
-                table.ajax.reload(null, false);
-                showSuccessAlert(`Tour ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
-              } else {
-                modal.hide();
-                showErrorAlert(result.error || 'Error al cambiar el estado del tour');
-              }
-            },
-            error: function(xhr) {
-              modal.hide();
-              const errorMsg = xhr.responseJSON?.error || 'Error al cambiar el estado del tour';
-              showErrorAlert(errorMsg);
-            }
-          });
-        });
-      }
-
-      function deleteTour(tourId, tourName) {
-        const modalHtml = `
-            <div class="modal fade" id="confirmDeleteTourModal" tabindex="-1">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header bg-danger text-white">
-                            <h5 class="modal-title">Eliminar Tour</h5>
-                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p>¿Estás seguro de que deseas eliminar el tour <strong>"${tourName}"</strong>?</p>
-                            <p class="text-muted mb-0">Esta acción se puede revertir.</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                            <button type="button" class="btn btn-danger" id="confirmDeleteTourBtn">Eliminar</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Remove existing modal if any
-        $('#confirmDeleteTourModal').remove();
-
-        // Add modal to body
-        $('body').append(modalHtml);
-
-        // Show modal
-        const modal = new bootstrap.Modal(document.getElementById('confirmDeleteTourModal'));
-        modal.show();
-
-        // Handle confirmation
-        $('#confirmDeleteTourBtn').on('click', function() {
-          $.ajax({
-            url: `${API}/${tourId}`,
-            type: 'DELETE',
-            success: function(result) {
-              if (result.success) {
-                modal.hide();
-                table.ajax.reload(null, false);
-                showSuccessAlert(`Tour "${tourName}" eliminado exitosamente`);
-              } else {
-                modal.hide();
-                showErrorAlert(result.error || 'Error al eliminar el tour');
-              }
-            },
-            error: function(xhr) {
-              modal.hide();
-              const error = xhr.responseJSON?.error || 'Error al eliminar el tour';
-              showErrorAlert(error);
-            }
-          });
-        });
-      }
-
-      function showModalError(message) {
-        const alertHtml = `
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="ti ti-alert-circle me-2"></i>
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        `;
-
-        const container = document.getElementById('tourModalAlerts');
-        if (container) {
-          container.querySelectorAll('.alert').forEach(el => el.remove());
-          container.insertAdjacentHTML('afterbegin', alertHtml);
-
-          setTimeout(() => {
-            container.querySelectorAll('.alert').forEach(el => {
-              el.classList.remove('show');
-              setTimeout(() => el.remove(), 150);
-            });
-          }, 8000);
         }
-      }
-
-      // Load rates for filter dropdown
-      function loadRatesFilter() {
-        $.ajax({
-          url: '/api/rates/active',
-          type: 'GET',
-          success: function(response) {
-            if (response.success && response.data) {
-              const select = $('#filterRate-tours');
-              select.find('option:not(:first)').remove();
-              response.data.forEach(function(rate) {
-                const option = $('<option></option>')
-                  .attr('value', rate.value)
-                  .text(rate.label)
-                  .attr('data-color', rate.color || '#6366F1');
-                select.append(option);
-              });
+        
+        // Function to apply currency conversion to price with custom rounding rules
+        function applyCurrencyConversion(priceString, currency) {
+            // Extract numeric value from price string (e.g., "$1,234.50 MXN" -> 1234.50)
+            const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
+            if (isNaN(numericValue)) return priceString;
+            
+            if (currency === 'USD' && currentExchangeRate > 0) {
+                // Convert MXN to USD by dividing by exchange rate
+                const convertedValue = numericValue / currentExchangeRate;
+                
+                // Apply custom USD rounding rules
+                const roundedValue = applyUSDRoundingRules(convertedValue);
+                
+                return formatPriceWithCurrency(roundedValue, 'USD');
+            } else {
+                // MXN - always format consistently
+                return formatPriceWithCurrency(numericValue, 'MXN');
             }
-          },
-          error: function(xhr, status, error) {
-            console.error('Error loading rates for filter:', error);
-          }
+        }
+        
+        // Function to apply USD rounding rules
+        function applyUSDRoundingRules(value) {
+            // Find the base (nearest multiple of 5 below or equal)
+            const base = Math.floor(value / 5) * 5;
+            
+            // Calculate remainder when dividing by 5
+            const remainder = value % 5;
+            
+            if (remainder === 0) {
+                const lastDigitBeforeDecimal = Math.floor(value) % 10;
+                if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
+                    return base + 5; // Round up
+                } else {
+                    return base; // Keep as multiple of 5
+                }
+            } else if (remainder <= 2.7) {
+                // Round down to nearest 5
+                return base;
+            } else {
+                // Round up to next multiple of 5
+                return base + 5;
+            }
+        }
+
+        // Function to update all displayed prices based on payment type and currency
+        function updatePricesForFilters(paymentType, currency) {
+            // Update main price column
+            $('.price-container').each(function() {
+                const container = $(this);
+                const originalPrices = container.find('.fw-bold');
+                
+                originalPrices.each(function() {
+                    const priceElement = $(this);
+                    let originalPrice = priceElement.data('original-price');
+                    
+                    // Store original price on first run
+                    if (!originalPrice) {
+                        originalPrice = priceElement.text();
+                        priceElement.data('original-price', originalPrice);
+                    }
+                    
+                    let finalPrice = originalPrice;
+                    
+                    // Apply appropriate rate based on payment type
+                    if (paymentType === 'transferencia') {
+                        finalPrice = applyCommissionRate(finalPrice);
+                    } else if (paymentType === 'transf_agencias') {
+                        finalPrice = applyAgencyRate(finalPrice);
+                    }
+                    
+                    // Always apply currency conversion/formatting
+                    finalPrice = applyCurrencyConversion(finalPrice, currency);
+                    
+                    priceElement.text(finalPrice);
+                });
+            });
+            
+            // Update expanded rates view if open
+            $('.vehicle-option .fw-bold').each(function() {
+                const priceElement = $(this);
+                let originalPrice = priceElement.data('original-price');
+                
+                if (!originalPrice) {
+                    originalPrice = priceElement.text();
+                    priceElement.data('original-price', originalPrice);
+                }
+                
+                let finalPrice = originalPrice;
+                
+                // Apply appropriate rate based on payment type
+                if (paymentType === 'transferencia') {
+                    finalPrice = applyCommissionRate(finalPrice);
+                } else if (paymentType === 'transf_agencias') {
+                    finalPrice = applyAgencyRate(finalPrice);
+                }
+                
+                // Always apply currency conversion/formatting
+                finalPrice = applyCurrencyConversion(finalPrice, currency);
+                
+                priceElement.text(finalPrice);
+            });
+        }
+
+        // Payment type filter change handler
+        $(`#paymentTypeFilter-${tableId}`).on('change', function() {
+            const selectedPaymentType = $(this).val();
+            const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
+            
+            if (selectedPaymentType === 'transferencia') {
+                if (isDepartmentManager && currentAgencyRate <= 0) {
+                    loadCurrentAgencyRate().then(() => {
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    });
+                } else if (!isDepartmentManager && currentTransferRate <= 0) {
+                    loadCurrentTransferRate().then(() => {
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    });
+                } else {
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                }
+            } else if (selectedPaymentType === 'transf_agencias') {
+                if (currentAgencyRate <= 0) {
+                    loadCurrentAgencyRate().then(() => {
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    });
+                } else {
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                }
+            } else {
+                updatePricesForFilters(selectedPaymentType, selectedCurrency);
+            }
         });
-      }
 
-      // Reload DataTable when filter changes
-      $('#filterRate-tours').on('change', function() {
-        table.ajax.reload();
-      });
+        // Currency filter change handler
+        $(`#currencyFilter-${tableId}`).on('change', function() {
+            const selectedCurrency = $(this).val();
+            const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+            
+            if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
+                loadCurrentExchangeRate().then(() => {
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                });
+            } else {
+                updatePricesForFilters(selectedPaymentType, selectedCurrency);
+            }
+        });
 
-      // Load rates on page load
-      loadRatesFilter();
+        // Load current agency rate from API (for department managers)
+        function loadCurrentAgencyRate() {
+            return $.ajax({
+                url: '/api/agency-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentAgencyRate = response.data.value || 0;
+                        console.log('✅ Current agency rate loaded:', currentAgencyRate + '%');
+                    } else {
+                        console.warn('⚠️ No active agency rate found');
+                        currentAgencyRate = 0;
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading agency rate:', error);
+                    currentAgencyRate = 0;
+                }
+            });
+        }
 
-      function showSuccessAlert(message) {
-        const alertHtml = `
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="ti ti-check-circle me-2"></i>
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        `;
-        document.querySelectorAll('.alert').forEach(el => el.remove());
-        const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
-        cardBody.insertAdjacentHTML('afterbegin', alertHtml);
-        setTimeout(() => {
-          document.querySelectorAll('.alert').forEach(el => {
-            el.classList.remove('show');
-            setTimeout(() => el.remove(), 150);
-          });
-        }, 5000);
-      }
+        // Load current exchange rate from API
+        function loadCurrentExchangeRate() {
+            return $.ajax({
+                url: '/api/exchange-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentExchangeRate = response.data.value || 0;
+                        console.log('✅ Current exchange rate loaded:', currentExchangeRate, 'MXN per USD');
+                    } else {
+                        console.warn('⚠️ No active exchange rate found');
+                        currentExchangeRate = 0;
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading exchange rate:', error);
+                    currentExchangeRate = 0;
+                }
+            });
+        }
 
-      function showErrorAlert(message) {
-        const alertHtml = `
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="ti ti-alert-circle me-2"></i>
-                ${message}
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-        `;
-        document.querySelectorAll('.alert').forEach(el => el.remove());
-        const cardBody = document.querySelector('#<%= dtTableId %>').closest('.card-body');
-        cardBody.insertAdjacentHTML('afterbegin', alertHtml);
-      }
+        // Load rates on initialization based on user role
+        if (isDepartmentManager) {
+            // Load agency rate for department managers BEFORE initializing table
+            console.log('💼 Department manager detected - loading Agency Rate first');
+            loadCurrentAgencyRate().then(() => {
+                // Set default payment type to transferencia AFTER agency rate is loaded
+                $(`#paymentTypeFilter-${tableId}`).val('transferencia');
+                console.log('💼 Agency rate loaded, setting default to Transferencia');
+                
+                // Load exchange rate
+                loadCurrentExchangeRate();
+                
+                // Initialize table with data (with correct rates applied)
+                initializeTable();
+                
+                console.log('💼 Department manager table initialized with AgencyRate applied');
+            });
+        } else {
+            // Load transfer rate for other users
+            loadCurrentTransferRate();
+            // Load exchange rate on initialization
+            loadCurrentExchangeRate();
+        }
+
+        // Load rates for header filter dropdown (excluding Económico)
+        function loadRatesForFilter() {
+            $.ajax({
+                url: '/api/rates/active',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const select = $(`#headerRateFilter-${tableId}`);
+                        select.find('option:not(:first)').remove();
+                        
+                        // Filter out Económico rate and add remaining rates
+                        const filteredRates = response.data.filter(rate => 
+                            rate.label && !rate.label.toLowerCase().includes('económico')
+                        );
+                        
+                        filteredRates.forEach(function(rate) {
+                            const option = $('<option></option>')
+                                .attr('value', rate.value)
+                                .text(rate.label);
+                            select.append(option);
+                        });
+                        ratesData = filteredRates;
+                        
+                        // Auto-select first option and trigger change event
+                        if (filteredRates.length > 0) {
+                            select.val(filteredRates[0].value);
+                            select.trigger('change');
+                        }
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading rates:', error);
+                }
+            });
+        }
+
+        // Prevent header sorting when clicking on dropdown
+        $(`#headerRateFilter-${tableId}`).on('click', function(e) {
+            e.stopPropagation(); // Prevent the click from bubbling up to the table header
+            e.stopImmediatePropagation(); // Stop all other handlers
+        });
+
+        // Additional event handlers to ensure dropdown works
+        $(`#headerRateFilter-${tableId}`).on('mousedown', function(e) {
+            e.stopPropagation();
+        });
+
+        $(`#headerRateFilter-${tableId}`).on('focus', function(e) {
+            e.stopPropagation();
+        });
+
+        // Function to setup header dropdown events
+        function setupHeaderDropdownEvents() {
+            const dropdown = $(`#headerRateFilter-${tableId}`);
+            
+            // Remove any existing event listeners to avoid duplicates
+            dropdown.off('click mousedown focus');
+            
+            // Add comprehensive event handling
+            dropdown.on('click', function(e) {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                
+                // Manually trigger dropdown opening if needed
+                if (!this.multiple) {
+                    this.focus();
+                    this.click();
+                }
+            });
+            
+            dropdown.on('mousedown', function(e) {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            });
+            
+            dropdown.on('focus', function(e) {
+                e.stopPropagation();
+            });
+            
+            // Prevent parent header from receiving events
+            dropdown.parent().on('click', function(e) {
+                if (e.target === dropdown[0]) {
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                }
+            });
+        }
+
+        // Initial setup
+        setupHeaderDropdownEvents();
+
+        // Handle rate filter change in header
+        $(`#headerRateFilter-${tableId}`).on('change', async function() {
+            const selectedRate = $(this).val();
+            const selectedRateText = $(this).find('option:selected').text();
+            
+            console.log('Category filter changed:', { selectedRate, selectedRateText });
+            
+            if (selectedRate) {
+                // Load tour prices for the selected category
+                try {
+                    console.log('Making API request to load tour prices for category:', selectedRate);
+                    
+                    const response = await $.ajax({
+                        url: '/api/tours/with-rate-prices',
+                        type: 'GET',
+                        data: { rateId: selectedRate },
+                        beforeSend: function(xhr) {
+                            const token = getAccessToken();
+                            if (token) {
+                                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                            }
+                        }
+                    });
+                    
+                    if (response.success && response.data) {
+                        console.log('✅ Tours with prices loaded:', response.data.length, 'tours');
+                        
+                        // Update the data with price information
+                        allToursData = response.data;
+                        filteredData = allToursData;
+                        
+                        // Update table
+                        dataTable.clear();
+                        dataTable.rows.add(filteredData);
+                        dataTable.draw();
+                        
+                        // Apply current filters to the new data
+                        const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                        const currentCurrency = $(`#currencyFilter-${tableId}`).val();
+                        setTimeout(() => {
+                            updatePricesForFilters(currentPaymentType, currentCurrency);
+                        }, 100);
+                        
+                        console.log('✅ Table updated with rate prices');
+                    } else {
+                        console.error('❌ Invalid response format:', response);
+                    }
+                } catch (error) {
+                    console.error('❌ Error loading tour prices for category:', error);
+                    // Fallback to tours without prices
+                    await loadAllTours();
+                    dataTable.clear();
+                    dataTable.rows.add(filteredData);
+                    dataTable.draw();
+                }
+            } else {
+                // No category selected, load all tours without prices
+                console.log('No category selected, loading tours without prices');
+                await loadAllTours();
+                dataTable.clear();
+                dataTable.rows.add(filteredData);
+                dataTable.draw();
+            }
+        });
+
+        // Handle expand/collapse prices functionality
+        $(document).on('click', '.expand-prices-btn', function(e) {
+            e.preventDefault();
+            const button = $(this);
+            const rowId = button.data('row-id');
+            const isExpanded = button.hasClass('expanded');
+            
+            // Find the DataTable row
+            const row = dataTable.rows().nodes().to$().filter(function() {
+                return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
+            }).first();
+            
+            const dtRow = dataTable.row(row);
+            
+            if (!isExpanded) {
+                // Expand - load and show all prices for this tour
+                button.prop('disabled', true).html('<i class="ti ti-spinner ti-spin me-1"></i>Cargando...');
+                
+                // Make API call to get TourPrices for this tour
+                $.ajax({
+                    url: '/api/tours/' + rowId + '/all-prices',
+                    type: 'GET',
+                    beforeSend: function(xhr) {
+                        const token = getAccessToken();
+                        if (token) {
+                            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    },
+                    success: function(response) {
+                        console.log('✅ Tour all-prices response:', response);
+                        if (response.success && response.data) {
+                            // Group prices by rate
+                            const pricesByRate = {};
+                            response.data.forEach(item => {
+                                const rateName = item.rate?.name || 'Sin tarifa';
+                                if (!pricesByRate[rateName]) {
+                                    pricesByRate[rateName] = [];
+                                }
+                                pricesByRate[rateName].push(item);
+                            });
+                            
+                            // Define consistent rate ordering (excluding Económico since it's filtered out)
+                            const rateOrder = ['First Class', 'Green Class', 'Premium'];
+                            
+                            // Sort rate names according to our defined order
+                            const sortedRateNames = Object.keys(pricesByRate).sort((a, b) => {
+                                const indexA = rateOrder.indexOf(a);
+                                const indexB = rateOrder.indexOf(b);
+                                
+                                // If both rates are in our predefined order, sort by that order
+                                if (indexA !== -1 && indexB !== -1) {
+                                    return indexA - indexB;
+                                }
+                                // If only A is in the order, A comes first
+                                if (indexA !== -1) return -1;
+                                // If only B is in the order, B comes first
+                                if (indexB !== -1) return 1;
+                                // If neither is in the order, sort alphabetically
+                                return a.localeCompare(b);
+                            });
+                            
+                            // Generate card-based HTML for all rates in consistent order
+                            let allRatesHtml = '<div class="row g-3 mt-2">';
+                            
+                            sortedRateNames.forEach(rateName => {
+                                const prices = pricesByRate[rateName];
+                                
+                                // Get rate color from the first price item (all items have same rate)
+                                const rateColor = prices[0]?.rate?.color || '#6c757d';
+                                
+                                // Generate light background color from rate color
+                                const bgColor = rateColor + '15'; // Add alpha transparency
+                                
+                                // Generate vehicle options (sorted by price low to high)
+                                const sortedPrices = [...prices].sort((a, b) => (a.price || 0) - (b.price || 0));
+                                const vehicleOptionsHtml = sortedPrices.map(p => {
+                                    const vehicleName = p.vehicleType?.name || 'Vehículo';
+                                    const price = p.formattedPrice || `$${p.price || 0}`;
+                                    
+                                    // Get capacity info from database
+                                    const defaultCapacity = p.vehicleType?.defaultCapacity || 4;
+                                    const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
+                                    const capacityInfo = `${defaultCapacity} <i class="ti ti-user"></i> ${trunkCapacity} <i class="ti ti-briefcase"></i>`;
+                                    
+                                    return `
+                                        <div class="vehicle-option p-2 mb-1 border rounded bg-white">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="rate-color-indicator me-2" style="background-color: ${rateColor}; width: 3px; height: 30px; border-radius: 2px;"></div>
+                                                    <div>
+                                                        <div class="fw-semibold small">${vehicleName}</div>
+                                                        <div class="text-muted" style="font-size: 0.75rem;">${capacityInfo}</div>
+                                                    </div>
+                                                </div>
+                                                <div class="fw-bold small" style="color: ${rateColor}" data-original-price="${price}">${price}</div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('');
+                                
+                                allRatesHtml += `
+                                    <div class="col-lg-3 col-md-6 col-sm-12">
+                                        <div class="rate-card p-3 rounded-3 h-100" style="background-color: ${bgColor}; border-left: 4px solid ${rateColor};">
+                                            <div class="d-flex align-items-center mb-2">
+                                                <div class="rate-color-circle me-2" style="background-color: ${rateColor}; width: 12px; height: 12px; border-radius: 50%;"></div>
+                                                <h6 class="mb-0 fw-bold" style="color: ${rateColor}">${rateName}</h6>
+                                            </div>
+                                            
+                                            ${vehicleOptionsHtml}
+                                        </div>
+                                    </div>
+                                `;
+                            });
+                            
+                            allRatesHtml += '</div>';
+                            
+                            // Create child row with full width content
+                            const childRowContent = `
+                                <div class="p-4 bg-light border-top">
+                                    <div class="container-fluid">
+                                        <div class="mb-3">
+                                            <h6 class="mb-0 text-muted">
+                                                <i class="ti ti-list me-2"></i>
+                                                Comparar todas las tarifas disponibles
+                                            </h6>
+                                        </div>
+                                        ${allRatesHtml}
+                                    </div>
+                                </div>
+                            `;
+                            
+                            // Add child row to DataTable
+                            dtRow.child(childRowContent).show();
+                            
+                            button.html('<i class="ti ti-chevron-up me-1"></i>Ver menos')
+                                  .addClass('expanded')
+                                  .prop('disabled', false);
+                            
+                            // Apply filters to expanded prices
+                            setTimeout(() => {
+                                const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                                const currentCurrency = $(`#currencyFilter-${tableId}`).val();
+                                updatePricesForFilters(currentPaymentType, currentCurrency);
+                            }, 100);
+                        } else {
+                            console.error('❌ Invalid response format for tour all-prices:', response);
+                            button.html('<i class="ti ti-chevron-down me-1"></i>Error al cargar')
+                                  .prop('disabled', false);
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('❌ AJAX Error loading tour all-prices:', { xhr, status, error, url: '/api/tours/' + rowId + '/all-prices' });
+                        button.html('<i class="ti ti-chevron-down me-1"></i>Ver todos')
+                              .prop('disabled', false);
+                        showErrorAlert('Error al cargar precios de todas las tarifas');
+                    }
+                });
+                
+            } else {
+                // Collapse - hide child row and restore original state
+                dtRow.child.hide();
+                
+                button.html('<i class="ti ti-chevron-down me-1"></i>Ver todos')
+                      .removeClass('expanded');
+            }
+        });
+
+        // Handle configure client price functionality
+        $(document).on('click', '.configure-client-price-btn', function(e) {
+            e.preventDefault();
+            const button = $(this);
+            const tourId = button.data('tour-id');
+            
+            if (tourId) {
+                configureTourClientPrice(tourId);
+            }
+        });
+
+        // Initialize based on user role
+        if (isDepartmentManager) {
+            // For department managers, initialization is handled in the loadCurrentAgencyRate() promise above
+            console.log('💼 Department manager initialization deferred to agency rate loading');
+            // Load rates for the header filter
+            loadRatesForFilter();
+            // Load POIs for dropdowns
+            loadDropdownData();
+        } else {
+            // For other users, proceed with normal initialization
+            // Load rates for the header filter
+            loadRatesForFilter();
+            // Initialize table with data
+            initializeTable();
+            // Load POIs for dropdowns
+            loadDropdownData();
+        }
+
+        // Object to store day schedules
+        let daySchedules = {};
+
+        // Day selection handling
+        function initializeDaySelection() {
+            $('.day-btn').removeClass('active btn-primary').addClass('btn-outline-primary');
+
+            // Clear day schedules
+            $('#daySchedulesContainer .day-schedule-row').remove();
+            daySchedules = {};
+            updateNoDaysMessage();
+        }
+
+        // Handle day button clicks
+        $(document).on('click', '.day-btn', function() {
+            const dayCode = parseInt($(this).data('day'));
+            const dayName = $(this).data('day-name');
+            const isSelected = $(this).hasClass('active');
+
+            if (isSelected) {
+                // Deselect: Remove day schedule
+                removeDaySchedule(dayCode);
+                $(this).removeClass('active btn-primary').addClass('btn-outline-primary');
+            } else {
+                // Select: Add day schedule
+                addDaySchedule(dayCode, dayName);
+                $(this).removeClass('btn-outline-primary').addClass('active btn-primary');
+            }
+
+            updateNoDaysMessage();
+        });
+
+        // Add day schedule row
+        function addDaySchedule(dayCode, dayName, startTime = '', endTime = '') {
+            // Check if already exists
+            if (daySchedules[dayCode]) return;
+
+            // Clone template
+            const template = document.getElementById('dayScheduleRowTemplate');
+            const clone = template.content.cloneNode(true);
+            const row = clone.querySelector('.day-schedule-row');
+
+            // Set day code and name
+            row.setAttribute('data-day', dayCode);
+            row.querySelector('.day-name span').textContent = dayName;
+
+            // Set initial values if provided
+            if (startTime) row.querySelector('.day-start-time').value = startTime;
+            if (endTime) row.querySelector('.day-end-time').value = endTime;
+
+            // Add to container (sorted by day code)
+            insertDayScheduleSorted(row, dayCode);
+
+            // Store in daySchedules object
+            daySchedules[dayCode] = {
+                dayName: dayName,
+                element: row
+            };
+
+            // Attach time validation to inputs
+            attachTimeInputValidation(row.querySelector('.day-start-time'));
+            attachTimeInputValidation(row.querySelector('.day-end-time'));
+        }
+
+        // Insert day schedule row in chronological order (Mon-Sun)
+        function insertDayScheduleSorted(row, dayCode) {
+            const container = $('#daySchedulesContainer');
+            const existingRows = container.find('.day-schedule-row');
+
+            // Convert day code for sorting (Sunday = 7 for sorting purposes)
+            const sortValue = dayCode === 0 ? 7 : dayCode;
+
+            let inserted = false;
+            existingRows.each(function() {
+                const existingDayCode = parseInt($(this).attr('data-day'));
+                const existingSortValue = existingDayCode === 0 ? 7 : existingDayCode;
+
+                if (sortValue < existingSortValue) {
+                    $(this).before(row);
+                    inserted = true;
+                    return false; // Break loop
+                }
+            });
+
+            if (!inserted) {
+                container.append(row);
+            }
+        }
+
+        // Remove day schedule row
+        function removeDaySchedule(dayCode) {
+            if (!daySchedules[dayCode]) return;
+
+            // Remove from DOM
+            $(daySchedules[dayCode].element).remove();
+
+            // Remove from daySchedules object
+            delete daySchedules[dayCode];
+        }
+
+        // Handle remove day button clicks
+        $(document).on('click', '.remove-day-btn', function() {
+            const row = $(this).closest('.day-schedule-row');
+            const dayCode = parseInt(row.attr('data-day'));
+
+            // Deselect day button
+            $(`.day-btn[data-day="${dayCode}"]`).removeClass('active btn-primary').addClass('btn-outline-primary');
+
+            // Remove schedule
+            removeDaySchedule(dayCode);
+            updateNoDaysMessage();
+        });
+
+        // Update "no days selected" message visibility
+        function updateNoDaysMessage() {
+            const hasDays = Object.keys(daySchedules).length > 0;
+            $('#noDaysSelected').toggle(!hasDays);
+        }
+
+        // Time input validation and formatting
+        function attachTimeInputValidation(input) {
+            const $input = $(input);
+
+            $input.on('input', function() {
+                let value = $(this).val().replace(/[^0-9]/g, ''); // Remove non-digits
+
+                // Auto-format: add ":" after 2 digits
+                if (value.length >= 2) {
+                    value = value.substring(0, 2) + ':' + value.substring(2, 4);
+                }
+
+                $(this).val(value);
+            });
+
+            $input.on('blur', function() {
+                const value = $(this).val();
+                if (!value) return;
+
+                // Validate format HH:MM (00:00 to 23:59)
+                const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+                if (!timeRegex.test(value)) {
+                    $(this).addClass('is-invalid');
+                    showModalError('Formato de hora inválido. Use HH:MM (00:00 a 23:59)');
+                } else {
+                    $(this).removeClass('is-invalid');
+                }
+            });
+        }
+
+        // Attach time validation to time inputs
+        $(document).on('focus', '.time-input', function() {
+            if (!$(this).data('validation-attached')) {
+                attachTimeInputValidation(this);
+                $(this).data('validation-attached', true);
+            }
+        });
+
+        // Load dropdown options when modal opens
+        function loadDropdownData() {
+            // Load Active POIs (filtered by Tours service type)
+            $.ajax({
+                url: '/api/pois/active?serviceType=Tours',
+                type: 'GET',
+                success: function(data) {
+                    if (data.success && data.data) {
+                        poisData = data.data;
+
+                        const selectElement = document.getElementById('destinationPOI');
+
+                        // Destroy existing Tom Select instance if it exists
+                        if (selectElement && selectElement.tomselect) {
+                            selectElement.tomselect.destroy();
+                        }
+
+                        // Clear the select element
+                        const select = $('#destinationPOI');
+                        select.empty();
+
+                        // Initialize Tom Select first (on empty select)
+                        if (typeof TomSelect !== 'undefined') {
+                            const tomSelectInstance = new TomSelect('#destinationPOI', {
+                                plugins: [],
+                                maxOptions: 1000,
+                                placeholder: 'Seleccionar destino',
+                                maxItems: 1,
+                                highlight: true,
+                                searchField: ['text'],
+                                valueField: 'value',
+                                labelField: 'text',
+                                sortField: 'text',
+                                closeAfterSelect: true,
+                                persist: false
+                            });
+
+                            // Store instance reference
+                            selectElement.tomselect = tomSelectInstance;
+
+                            // Load options using Tom Select API (prevents auto-selection)
+                            tomSelectInstance.clearOptions();
+                            data.data.forEach(poi => {
+                                tomSelectInstance.addOption({ value: poi.value, text: poi.label });
+                            });
+                            tomSelectInstance.refreshOptions(false);
+                            tomSelectInstance.clear(); // Clear selection to start empty
+                        }
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error loading POIs for Tours:', error);
+                }
+            });
+        }
+
+        // Event Handlers
+        $('#createTourBtn').on('click', function() {
+            openTourModal();
+        });
+
+        // Helper function to wait for Tom Select to be initialized
+        function waitForTomSelect(elementId, maxAttempts = 50) {
+            return new Promise((resolve, reject) => {
+                let attempts = 0;
+                const checkInterval = setInterval(() => {
+                    const element = document.getElementById(elementId);
+                    if (element && element.tomselect) {
+                        clearInterval(checkInterval);
+                        resolve(element.tomselect);
+                    } else {
+                        attempts++;
+                        if (attempts >= maxAttempts) {
+                            clearInterval(checkInterval);
+                            reject(new Error(`Tom Select not initialized on #${elementId}`));
+                        }
+                    }
+                }, 100);
+            });
+        }
+
+        async function openTourModal(isEdit = false) {
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('tourModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+
+            $('#tourModal').modal('show');
+            $('#tourForm')[0].reset();
+            $('#tourId').val('');
+            $('#modalTitle').text(isEdit ? 'Editar Tour' : 'Crear Nuevo Tour');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Tour');
+
+            try {
+                // Wait for and clear Tom Select instances
+                const destTS = await waitForTomSelect('destinationPOI');
+                destTS.clear();
+            } catch (error) {
+                console.error('Error clearing Tom Select:', error);
+            }
+        }
+
+        // Edit tour
+        $(`#${tableId}`).on('click', '.edit-tour-btn', function() {
+            const tourId = $(this).data('id');
+            loadTourData(tourId);
+        });
+
+        async function loadTourData(tourId) {
+            // Open modal first in edit mode (this will reset the form)
+            await openTourModal(true);
+
+            $.ajax({
+                url: `${apiEndpoint}/${tourId}`,
+                type: 'GET',
+                success: async function(response) {
+                    if (response.success && response.data) {
+                        const tour = response.data.tour;
+
+                        try {
+                            // Wait for Tom Select instances
+                            const destTS = await waitForTomSelect('destinationPOI');
+
+                            // Populate the form with the data
+                            $('#tourId').val(tour.id);
+
+                            // Set Tom Select values
+                            if (tour.destinationPOI?.id) {
+                                destTS.setValue(tour.destinationPOI.id);
+                            }
+
+                            // Set time (convert from minutes to hours and minutes)
+                            const totalMinutes = tour.time || 0;
+                            const hours = Math.floor(totalMinutes / 60);
+                            const minutes = totalMinutes % 60;
+                            $('#timeHours').val(hours);
+                            $('#timeMinutes').val(minutes);
+
+                            // Set availability (NEW FORMAT: array of day schedules)
+                            initializeDaySelection();
+                            if (tour.availability && Array.isArray(tour.availability) && tour.availability.length > 0) {
+                                // Load day schedules from new format
+                                tour.availability.forEach(schedule => {
+                                    const dayBtn = $(`.day-btn[data-day="${schedule.day}"]`);
+                                    const dayName = dayBtn.data('day-name');
+
+                                    // Add day schedule with times
+                                    addDaySchedule(schedule.day, dayName, schedule.startTime, schedule.endTime);
+
+                                    // Activate day button
+                                    dayBtn.removeClass('btn-outline-primary').addClass('active btn-primary');
+                                });
+
+                                updateNoDaysMessage();
+                            }
+
+                        } catch (error) {
+                            console.error('Error setting Tom Select values:', error);
+                        }
+                    } else {
+                        showErrorAlert('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', { xhr, status, error });
+                    const errorMessage = xhr.responseJSON?.error || 'Error al cargar el tour';
+                    showModalError(errorMessage);
+                }
+            });
+        }
+
+        // Toggle status
+        $(`#${tableId}`).on('click', '.toggle-status-btn', function() {
+            const tourId = $(this).data('id');
+            const currentStatus = $(this).data('current-status');
+            const destination = $(this).data('destination');
+            toggleTourStatus(tourId, currentStatus, destination);
+        });
+
+        // Delete tour
+        $(`#${tableId}`).on('click', '.delete-tour-btn', function() {
+            const tourId = $(this).data('id');
+            const destination = $(this).data('destination');
+            deleteTour(tourId, destination);
+        });
+
+        // Save tour
+        $('#saveTourBtn').on('click', function() {
+            saveTour();
+        });
+
+        async function saveTour() {
+            const form = $('#tourForm');
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+
+            const tourId = $('#tourId').val();
+            const isEdit = !!tourId;
+
+            try {
+                // Wait for Tom Select instances
+                const destTS = await waitForTomSelect('destinationPOI');
+
+                // Get values from Tom Select
+                const destinationPOI = destTS.getValue();
+
+                // Calculate total time in minutes
+                const hours = parseInt($('#timeHours').val()) || 0;
+                const minutes = parseInt($('#timeMinutes').val()) || 0;
+                const totalMinutes = (hours * 60) + minutes;
+
+                const tourData = {
+                    destinationPOI: destinationPOI,
+                    time: totalMinutes
+                };
+
+                // Add optional availability fields (NEW FORMAT: array of day schedules)
+                if (Object.keys(daySchedules).length > 0) {
+                    const availability = [];
+                    const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
+
+                    // Collect and validate each day schedule
+                    for (const dayCode in daySchedules) {
+                        const scheduleRow = $(daySchedules[dayCode].element);
+                        const startTime = scheduleRow.find('.day-start-time').val();
+                        const endTime = scheduleRow.find('.day-end-time').val();
+                        const dayName = daySchedules[dayCode].dayName;
+
+                        // Validate both times are provided
+                        if (!startTime || !endTime) {
+                            showModalError(`Debe especificar hora de inicio y fin para ${dayName}`);
+                            return;
+                        }
+
+                        // Validate time format
+                        if (!timeRegex.test(startTime)) {
+                            showModalError(`Formato de hora de inicio inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
+                            return;
+                        }
+                        if (!timeRegex.test(endTime)) {
+                            showModalError(`Formato de hora de fin inválido para ${dayName}. Use HH:MM (00:00 a 23:59)`);
+                            return;
+                        }
+
+                        // Validate endTime > startTime
+                        if (startTime >= endTime) {
+                            showModalError(`La hora de fin debe ser posterior a la hora de inicio para ${dayName}`);
+                            return;
+                        }
+
+                        // Add to availability array
+                        availability.push({
+                            day: parseInt(dayCode),
+                            startTime: startTime,
+                            endTime: endTime
+                        });
+                    }
+
+                    // Add availability array to data (sorted by day code happens on backend)
+                    tourData.availability = availability;
+                }
+
+                // Validate required fields
+                if (!tourData.destinationPOI || !tourData.time) {
+                    showModalError('Por favor completa todos los campos requeridos');
+                    return;
+                }
+
+                if (tourData.time <= 0) {
+                    showModalError('La duración debe ser mayor a 0 minutos');
+                    return;
+                }
+
+                const url = isEdit ? `${apiEndpoint}/${tourId}` : apiEndpoint;
+                const method = isEdit ? 'PUT' : 'POST';
+
+                $.ajax({
+                    url,
+                    type: method,
+                    contentType: 'application/json',
+                    data: JSON.stringify(tourData),
+                    success: function(response) {
+                        if (response.success) {
+                            $('#tourModal').modal('hide');
+                            // Reload all data and refresh current filter
+                            initializeTable();
+                            showSuccessAlert(isEdit ? 'Tour actualizado exitosamente' : 'Tour creado exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        let errorMessage = 'Error al guardar el tour';
+
+                        if (xhr.responseJSON?.error) {
+                            const error = xhr.responseJSON.error;
+                            if (error.includes('already exists') || error.includes('ya existe')) {
+                                errorMessage = 'Ya existe un tour con este destino y duración.';
+                            } else if (error.includes('required')) {
+                                errorMessage = 'Todos los campos requeridos deben ser completados.';
+                            } else {
+                                errorMessage = error;
+                            }
+                        }
+
+                        showModalError(errorMessage);
+                    }
+                });
+            } catch (error) {
+                console.error('Error getting Tom Select values:', error);
+                showModalError('Error al obtener los valores del formulario');
+            }
+        }
+
+        function toggleTourStatus(tourId, currentStatus, destination) {
+            const newStatus = !currentStatus;
+            const action = newStatus ? 'activar' : 'desactivar';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmToggleTourModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${actionTitle} Tour</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas ${action} el tour <strong>"${destination}"</strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn ${btnClass}" id="confirmToggleTourBtn">${actionTitle}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmToggleTourModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmToggleTourModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmToggleTourBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${tourId}/toggle-status`,
+                    type: 'PATCH',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            // Reload all data and refresh current filter
+                            initializeTable();
+                            showAlert('success', `Tour ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+                        } else {
+                            modal.hide();
+                            showAlert('danger', response.error || 'Error desconocido');
+                        }
+                    },
+                    error: function(xhr) {
+                        console.error('Toggle error:', xhr);
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado del tour';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        function deleteTour(tourId, destination) {
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmDeleteTourModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white">Eliminar Tour</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas eliminar el tour <strong>"${destination}"</strong>?</p>
+                                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeleteTourBtn">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmDeleteTourModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteTourModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmDeleteTourBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${tourId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            // Reload all data and refresh current filter
+                            initializeTable();
+                            showAlert('success', 'Tour eliminado exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al eliminar el tour';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        /**
+         * Show error alert message inside the modal
+         * @param {string} message - Error message to display
+         */
+        function showModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('tourModalAlerts');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+
+        /**
+         * Show success alert message
+         * @param {string} message - Success message to display
+         */
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('tours-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        /**
+         * Show error alert message
+         * @param {string} message - Error message to display
+         */
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('tours-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        }
+
+        // Legacy function for backward compatibility
+        function showAlert(type, message) {
+            if (type === 'success') {
+                showSuccessAlert(message);
+            } else {
+                showErrorAlert(message);
+            }
+        }
+
+        // Configure Tour Client Price functionality (only available when showClientPricing is true)
+        function configureTourClientPrice(tourId) {
+            console.log('Configure client price for tour:', tourId);
+            
+            // Find the tour data from the DataTable
+            let tourData = null;
+            
+            if (dataTable) {
+                // Try to find the tour data in the DataTable
+                dataTable.rows().every(function() {
+                    const data = this.data();
+                    if ((data.id || data.objectId) === tourId) {
+                        tourData = data;
+                        return false; // break the loop
+                    }
+                });
+            }
+            
+            // For now, show an alert with the tour information
+            // This should be replaced with a proper modal implementation
+            if (tourData) {
+                const destination = tourData.destinationPOI?.name || 'Sin destino';
+                alert(`Configurar precio cliente para:\n\nTour: ${destination}\nID: ${tourId}\n\n(Funcionalidad de modal pendiente)`);
+            } else {
+                alert(`Configurar precio cliente para Tour ID: ${tourId}\n\n(Funcionalidad de modal pendiente)`);
+            }
+        }
     }
 
-    // Start initialization when DOM is ready
+    // Initialize when DOM is ready
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initWhenReady);
+        document.addEventListener('DOMContentLoaded', initWhenReady);
     } else {
-      // DOM already loaded
-      initWhenReady();
+        initWhenReady();
     }
-  })();
+})();
 </script>
+
+<!-- Custom CSS for expandable prices -->
+<style>
+/* Price container styling */
+.price-container {
+    min-height: 60px;
+}
+
+.prices-list {
+    margin-bottom: 4px;
+}
+
+.price-item {
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.price-item:last-child {
+    margin-bottom: 0;
+}
+
+/* Expand button styling */
+.expand-prices-btn {
+    color: #6c757d !important;
+    font-weight: 500;
+    transition: all 0.2s ease-in-out;
+    border: none !important;
+    background: none !important;
+}
+
+.expand-prices-btn:hover {
+    color: #495057 !important;
+    text-decoration: none !important;
+}
+
+.expand-prices-btn:focus {
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.expand-prices-btn i {
+    transition: transform 0.2s ease-in-out;
+}
+
+.expand-prices-btn.expanded i {
+    transform: rotate(180deg);
+}
+
+/* Badge styling for vehicle types */
+.price-item .badge {
+    font-size: 0.7rem;
+    min-width: 50px;
+    text-align: center;
+}
+
+/* Price column specific styling */
+.price-column {
+    vertical-align: top !important;
+    max-width: 200px;
+}
+
+/* Animation for expanding/collapsing */
+.prices-list {
+    transition: all 0.3s ease-in-out;
+}
+
+/* Enhanced card styling for expanded rates */
+.rate-card {
+    border: 1px solid rgba(0,0,0,0.1);
+    transition: all 0.2s ease-in-out;
+}
+
+.rate-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.vehicle-option {
+    transition: all 0.2s ease-in-out;
+    border: 1px solid #e9ecef !important;
+}
+
+.vehicle-option:hover {
+    border-color: #007bff !important;
+    box-shadow: 0 2px 8px rgba(0,123,255,0.15);
+}
+
+/* Rate-specific styling */
+.rate-card .h5 {
+    font-weight: 700;
+}
+
+.rate-card .fw-semibold {
+    color: #495057;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .rate-card {
+        margin-bottom: 0.75rem;
+    }
+    
+    .vehicle-option {
+        padding: 0.5rem !important;
+    }
+    
+    .dataTables_wrapper table.dataTable tbody tr.child .container-fluid {
+        padding: 0 1rem;
+    }
+}
+
+/* Icon styling */
+.rate-card i[class*="ti-"] {
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+}
+
+/* Price styling in vehicle options */
+.vehicle-option .fw-bold {
+    font-size: 0.9rem;
+}
+
+/* DataTables child row styling */
+.dataTables_wrapper table.dataTable tbody tr.child {
+    background-color: transparent;
+}
+
+.dataTables_wrapper table.dataTable tbody tr.child td {
+    padding: 0 !important;
+    border: none !important;
+}
+
+.dataTables_wrapper table.dataTable tbody tr.child td div {
+    border-left: 3px solid #007bff;
+    animation: fadeInUp 0.3s ease-in-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Expanded row styling */
+.dataTables_wrapper table.dataTable tbody tr.child .container-fluid {
+    max-width: 100%;
+    padding: 0 2rem;
+}
+
+/* Rate color indicators */
+.rate-color-indicator {
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.rate-color-circle {
+    transition: all 0.2s ease-in-out;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.vehicle-option:hover .rate-color-indicator {
+    transform: scaleY(1.1);
+}
+
+.rate-card:hover .rate-color-circle {
+    transform: scale(1.2);
+}
+
+/* Transfer rate styling */
+.fw-bold.text-warning {
+    font-weight: 600 !important;
+    position: relative;
+}
+
+.transfer-rate-notification {
+    border-left: 4px solid #17a2b8;
+    background-color: rgba(23, 162, 184, 0.1);
+}
+
+.transfer-rate-notification .btn-close {
+    filter: brightness(0) saturate(100%) invert(31%) sepia(81%) saturate(1059%) hue-rotate(162deg) brightness(92%) contrast(86%);
+}
+</style>

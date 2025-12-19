@@ -165,16 +165,32 @@ class AdminController extends RoleBasedController {
       // Determine active section (default: information)
       const section = req.query.section || 'information';
 
+      // Determine active subsection for tarifario
+      const subsection = req.query.subsection || null;
+
+      // Determine display name for the client
+      let displayName = '';
+      if (clientData.companyName) {
+        displayName = clientData.companyName;
+      } else if (clientData.firstName || clientData.lastName) {
+        displayName = `${clientData.firstName || ''} ${clientData.lastName || ''}`.trim();
+      } else if (clientData.email) {
+        displayName = clientData.email;
+      } else {
+        displayName = 'Cliente sin nombre';
+      }
+
       // Prepare view data
       const viewData = {
-        title: `Cliente: ${clientData.companyName || 'Sin nombre'}`,
+        title: `Cliente: ${displayName}`,
         client: clientData,
         section,
+        subsection,
         breadcrumb: null, // Disable automatic breadcrumb generation
       };
 
-      // Add DataTables assets if employees section is active
-      if (section === 'employees') {
+      // Add DataTables assets if employees or tarifario section is active
+      if (section === 'employees' || section === 'tarifario') {
         viewData.pageStyles = [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
@@ -970,6 +986,192 @@ class AdminController extends RoleBasedController {
       await this.renderRoleView(req, res, 'invoices', {
         title: 'Gestión de Facturas',
         breadcrumb: null,
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Vehicle types data endpoint for DataTables (session-based auth).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await vehicleTypesData(parameters);
+   * // Returns: operation result
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async vehicleTypesData(req, res) {
+    try {
+      const VehicleTypeController = require('../api/VehicleTypeController');
+
+      // Forward the request to the API controller
+      // The API controller will handle all DataTables parameters and return the expected format
+      await VehicleTypeController.getVehicleTypes(req, res);
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Get tours data for DataTable with session-based authentication
+   * Forwards request to API controller for tours data.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to tours data in DataTable format.
+   * @example
+   */
+  async toursData(req, res) {
+    try {
+      const ToursController = require('../api/ToursController');
+
+      // Forward the request to the API controller
+      // The API controller will handle all DataTables parameters and return the expected format
+      await ToursController.getTours(req, res);
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Get experiences data in DataTable format for dashboard.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to experiences data in DataTable format.
+   * @example
+   */
+  async experiencesData(req, res) {
+    try {
+      const ExperienceController = require('../api/ExperienceController');
+
+      // Forward the request to the API controller
+      // The API controller will handle all DataTables parameters and return the expected format
+      await ExperienceController.getExperiences(req, res);
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Price Settings management page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await priceSettings(parameters);
+   * // Returns: operation result
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async priceSettings(req, res) {
+    try {
+      // Import rate models
+      const ExchangeRate = require('../../../domain/models/ExchangeRate');
+      const InflationRate = require('../../../domain/models/InflationRate');
+      const AgencyRate = require('../../../domain/models/AgencyRate');
+      const TransferRate = require('../../../domain/models/TransferRate');
+
+      // Get current rates
+      let currentExchangeRate = await ExchangeRate.getCurrentExchangeRate();
+      let currentInflationRate = await InflationRate.getCurrentInflationRate();
+      let currentAgencyRate = await AgencyRate.getCurrentAgencyRate();
+      let currentTransferRate = await TransferRate.getCurrentTransferRate();
+
+      // Create default inflation rate if none exists
+      if (!currentInflationRate) {
+        try {
+          currentInflationRate = await InflationRate.createInflationRate({
+            value: 5.25,
+            description: 'Tasa de inflación inicial del sistema',
+            createdBy: null,
+          });
+        } catch (error) {
+          console.warn('Could not create default inflation rate:', error.message);
+        }
+      }
+
+      // Create default agency rate if none exists
+      if (!currentAgencyRate) {
+        try {
+          currentAgencyRate = await AgencyRate.createAgencyRate({
+            value: 15.0,
+            description: 'Rate de agencia inicial del sistema',
+            createdBy: null,
+          });
+        } catch (error) {
+          console.warn('Could not create default agency rate:', error.message);
+        }
+      }
+
+      // Create default transfer rate if none exists
+      if (!currentTransferRate) {
+        try {
+          currentTransferRate = await TransferRate.createTransferRate({
+            value: 3.0,
+            description: 'Porcentaje de traslado inicial del sistema',
+            createdBy: null,
+          });
+        } catch (error) {
+          console.warn('Could not create default transfer rate:', error.message);
+        }
+      }
+
+      // Create default exchange rate if none exists
+      if (!currentExchangeRate) {
+        try {
+          currentExchangeRate = await ExchangeRate.createExchangeRate({
+            value: 18.50,
+            description: 'Tipo de cambio inicial del sistema (USD a MXN)',
+            createdBy: null,
+          });
+        } catch (error) {
+          console.warn('Could not create default exchange rate:', error.message);
+        }
+      }
+
+      const exchangeValue = currentExchangeRate ? currentExchangeRate.get('value') : 18.50;
+      const inflationValue = currentInflationRate ? currentInflationRate.get('value') : 5.25;
+      const agencyValue = currentAgencyRate ? currentAgencyRate.get('value') : 15.0;
+      const transferValue = currentTransferRate ? currentTransferRate.get('value') : 3.0;
+
+      await this.renderRoleView(req, res, 'price-settings', {
+        title: 'Ajustes de Precio',
+        section: req.query.section || 'exchange-rate',
+        currentExchangeRate: {
+          value: exchangeValue,
+          formatted: ExchangeRate.formatValue(exchangeValue),
+          lastUpdated: currentExchangeRate ? currentExchangeRate.get('createdAt') : new Date(),
+          id: currentExchangeRate ? currentExchangeRate.id : null,
+        },
+        currentInflationRate: {
+          value: inflationValue,
+          formatted: InflationRate.formatValue(inflationValue),
+          lastUpdated: currentInflationRate ? currentInflationRate.get('createdAt') : new Date(),
+          id: currentInflationRate ? currentInflationRate.id : null,
+        },
+        currentAgencyRate: {
+          value: agencyValue,
+          formatted: AgencyRate.formatValue(agencyValue),
+          lastUpdated: currentAgencyRate ? currentAgencyRate.get('createdAt') : new Date(),
+          id: currentAgencyRate ? currentAgencyRate.id : null,
+        },
+        currentTransferRate: {
+          value: transferValue,
+          formatted: TransferRate.formatValue(transferValue),
+          lastUpdated: currentTransferRate ? currentTransferRate.get('createdAt') : new Date(),
+          id: currentTransferRate ? currentTransferRate.id : null,
+        },
+        breadcrumb: null, // Disable automatic breadcrumb
         pageStyles: [
           'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
           'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',

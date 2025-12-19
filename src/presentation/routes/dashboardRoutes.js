@@ -48,6 +48,7 @@ router.get('/admin/experiences', dashboardAuth.requireRole('admin'), (req, res) 
 router.get('/admin/schedule', dashboardAuth.requireRole('admin'), (req, res) => adminController.schedule(req, res));
 router.get('/admin/bookings', dashboardAuth.requireRole('admin'), (req, res) => adminController.bookings(req, res));
 router.get('/admin/vehicles', dashboardAuth.requireRole('admin'), (req, res) => adminController.vehicles(req, res));
+router.get('/admin/price-settings', dashboardAuth.requireRole('admin'), (req, res) => adminController.priceSettings(req, res));
 router.get('/admin/pois', dashboardAuth.requireRole('admin'), (req, res) => adminController.pois(req, res));
 router.get('/admin/services', dashboardAuth.requireRole('admin'), (req, res) => adminController.services(req, res));
 router.get('/admin/pricing', dashboardAuth.requireRole('admin'), (req, res) => adminController.pricing(req, res));
@@ -142,6 +143,11 @@ router.get('/guest/event', dashboardAuth.requireRole('guest'), (req, res) => gue
 router.get('/guest/transport', dashboardAuth.requireRole('guest'), (req, res) => guestController.transport(req, res));
 router.get('/guest/help', dashboardAuth.requireRole('guest'), (req, res) => guestController.event(req, res));
 router.get('/guest/contact', dashboardAuth.requireRole('guest'), (req, res) => guestController.event(req, res));
+
+// Dashboard data endpoints for DataTables (session-based auth)
+router.get('/data/vehicle-types', dashboardAuth.requireRole('admin'), (req, res) => adminController.vehicleTypesData(req, res));
+router.get('/data/tours', dashboardAuth.requireRole('admin'), (req, res) => adminController.toursData(req, res));
+router.get('/data/experiences', dashboardAuth.requireRole('admin'), (req, res) => adminController.experiencesData(req, res));
 
 // Default dashboard redirect - redirect to user's role-specific dashboard
 router.get('/', dashboardAuth.requireAuth, (req, res) => {

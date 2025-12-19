@@ -169,10 +169,12 @@ class ValidationMiddleware {
         req.body = value;
         break;
       case 'query':
-        req.query = value;
+        // Use Object.assign to merge with existing query object
+        Object.assign(req.query, value);
         break;
       case 'params':
-        req.params = value;
+        // Use Object.assign for params as well to be safe
+        Object.assign(req.params, value);
         break;
       default:
         // Do nothing for invalid properties
