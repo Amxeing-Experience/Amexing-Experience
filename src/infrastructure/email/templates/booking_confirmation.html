@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amexing Experience - {{ASUNTO}}</title>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
+    <style>
+        /* Reset estilos */
+        body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+        table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+        img { -ms-interpolation-mode: bicubic; }
+        img { border: 0; height: auto; line-height: 100%; outline: none; text-decoration: none; }
+        table { border-collapse: collapse !important; }
+        body { height: 100% !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+
+        /* Estilos responsivos */
+        @media screen and (max-width: 600px) {
+            .mobile-hide { display: none !important; }
+            .mobile-center { text-align: center !important; }
+            .container { width: 100% !important; max-width: 100% !important; }
+            .responsive-table { width: 100% !important; }
+            .padding { padding: 10px 5% 15px 5% !important; }
+            .padding-meta { padding: 30px 5% 0px 5% !important; text-align: center; }
+            .no-padding { padding: 0 !important; }
+            .section-padding { padding: 50px 15px 50px 15px !important; }
+            .mobile-button { width: 100% !important; }
+        }
+    </style>
+</head>
+<body style="margin: 0 !important; padding: 0 !important; background-color: #f4f4f4;">
+
+<!-- Tabla principal -->
+<table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+        <td align="center" style="padding: 40px 10px 40px 10px;">
+
+            <!-- Contenedor del email -->
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+
+                <!-- Header con logo -->
+                <tr>
+                    <td align="center" style="background-color: #f45355; padding: 40px 20px 40px 20px; border-radius: 10px 10px 0 0;">
+                        <img src="{{LOGO_URL}}" alt="Amexing Experience" style="display: block; max-width: 200px; width: 100%; height: auto;">
+                    </td>
+                </tr>
+
+                <!-- Línea decorativa -->
+                <tr>
+                    <td style="background-color: #1a1a1a; height: 4px;"></td>
+                </tr>
+
+                <!-- Contenido principal -->
+                <tr>
+                    <td style="padding: 40px 30px 20px 30px;">
+                        <!-- Título del mensaje -->
+                        <h1 style="color: #1a1a1a; font-family: Arial, sans-serif; font-size: 28px; font-weight: bold; margin: 0 0 20px 0; text-align: center;">
+                            {{TITULO_PRINCIPAL}}
+                        </h1>
+
+                        <!-- Saludo -->
+                        <p style="color: #333333; font-family: Arial, sans-serif; font-size: 16px; line-height: 24px; margin: 0 0 20px 0;">
+                            Estimado/a {{NOMBRE_CLIENTE}},
+                        </p>
+
+                        <!-- Contenido del mensaje -->
+                        <div style="color: #555555; font-family: Arial, sans-serif; font-size: 15px; line-height: 24px; margin: 0 0 30px 0;">
+                            {{CONTENIDO_MENSAJE}}
+                        </div>
+
+                        <!-- Sección de detalles (para reservas/confirmaciones) -->
+                        <div style="background-color: #f8f8f8; border-radius: 8px; padding: 25px; margin: 0 0 30px 0;">
+                            <h2 style="color: #1a1a1a; font-family: Arial, sans-serif; font-size: 20px; font-weight: bold; margin: 0 0 15px 0;">
+                                Detalles de su servicio
+                            </h2>
+
+                            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td style="padding: 8px 0;">
+                                        <strong style="color: #333333; font-family: Arial, sans-serif; font-size: 14px;">Número de reserva:</strong>
+                                    </td>
+                                    <td style="padding: 8px 0; text-align: right;">
+                                        <span style="color: #f45355; font-family: Arial, sans-serif; font-size: 14px; font-weight: bold;">{{NUMERO_RESERVA}}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0;">
+                                        <strong style="color: #333333; font-family: Arial, sans-serif; font-size: 14px;">Servicio:</strong>
+                                    </td>
+                                    <td style="padding: 8px 0; text-align: right;">
+                                        <span style="color: #555555; font-family: Arial, sans-serif; font-size: 14px;">{{TIPO_SERVICIO}}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0;">
+                                        <strong style="color: #333333; font-family: Arial, sans-serif; font-size: 14px;">Fecha:</strong>
+                                    </td>
+                                    <td style="padding: 8px 0; text-align: right;">
+                                        <span style="color: #555555; font-family: Arial, sans-serif; font-size: 14px;">{{FECHA}}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0;">
+                                        <strong style="color: #333333; font-family: Arial, sans-serif; font-size: 14px;">Hora:</strong>
+                                    </td>
+                                    <td style="padding: 8px 0; text-align: right;">
+                                        <span style="color: #555555; font-family: Arial, sans-serif; font-size: 14px;">{{HORA}}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0;">
+                                        <strong style="color: #333333; font-family: Arial, sans-serif; font-size: 14px;">Lugar de encuentro:</strong>
+                                    </td>
+                                    <td style="padding: 8px 0; text-align: right;">
+                                        <span style="color: #555555; font-family: Arial, sans-serif; font-size: 14px;">{{LUGAR}}</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <!-- Botón de acción -->
+                        <div style="text-align: center; margin: 0 0 30px 0;">
+                            <a href="{{URL_BOTON}}" style="background-color: #f45355; color: #ffffff; display: inline-block; font-family: Arial, sans-serif; font-size: 16px; font-weight: bold; line-height: 50px; text-align: center; text-decoration: none; width: 250px; -webkit-text-size-adjust: none; border-radius: 25px;">
+                                {{TEXTO_BOTON}}
+                            </a>
+                        </div>
+
+                        <!-- Mensaje adicional -->
+                        <p style="color: #555555; font-family: Arial, sans-serif; font-size: 14px; line-height: 22px; margin: 0 0 20px 0; text-align: center;">
+                            {{MENSAJE_ADICIONAL}}
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Sección de contacto -->
+                <tr>
+                    <td style="background-color: #f8f8f8; padding: 30px;">
+                        <h3 style="color: #1a1a1a; font-family: Arial, sans-serif; font-size: 18px; font-weight: bold; margin: 0 0 15px 0; text-align: center;">
+                            ¿Necesita asistencia?
+                        </h3>
+
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td align="center">
+                                    <table cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td style="padding: 0 15px;">
+                                                <p style="color: #555555; font-family: Arial, sans-serif; font-size: 14px; margin: 0;">
+                                                    <strong>Teléfono:</strong><br>
+                                                    <a href="tel:+524151673990" style="color: #f45355; text-decoration: none;">{{TELEFONO}}</a>
+                                                </p>
+                                            </td>
+                                            <td style="padding: 0 15px;">
+                                                <p style="color: #555555; font-family: Arial, sans-serif; font-size: 14px; margin: 0;">
+                                                    <strong>Email:</strong><br>
+                                                    <a href="mailto:contact@amexingexperience.com" style="color: #f45355; text-decoration: none;">{{EMAIL_CONTACTO}}</a>
+                                                </p>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <p style="color: #555555; font-family: Arial, sans-serif; font-size: 13px; margin: 20px 0 0 0; text-align: center;">
+                            <strong>Emergencias 24/7:</strong> <a href="tel:+524151535067" style="color: #f45355; text-decoration: none;">{{TELEFONO_EMERGENCIAS}}</a>
+                        </p>
+                    </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                    <td style="background-color: #1a1a1a; padding: 40px 30px; border-radius: 0 0 10px 10px;">
+                        <!-- Tagline -->
+                        <p style="color: #ffffff; font-family: Arial, sans-serif; font-size: 16px; font-style: italic; margin: 0 0 20px 0; text-align: center;">
+                            "{{TAGLINE}}"
+                        </p>
+
+                        <!-- Redes sociales -->
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td align="center">
+                                    <table cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            <td style="padding: 0 10px;">
+                                                <a href="{{INSTAGRAM}}" style="text-decoration: none;">
+                                                    <img src="https://cdn-icons-png.flaticon.com/512/174/174855.png" alt="Instagram" width="30" height="30" style="display: block;">
+                                                </a>
+                                            </td>
+                                            <td style="padding: 0 10px;">
+                                                <a href="{{FACEBOOK}}" style="text-decoration: none;">
+                                                    <img src="https://cdn-icons-png.flaticon.com/512/174/174848.png" alt="Facebook" width="30" height="30" style="display: block;">
+                                                </a>
+                                            </td>
+                                            <td style="padding: 0 10px;">
+                                                <table cellpadding="0" cellspacing="0" border="0" style="background-color: #34E0A1; border-radius: 50%; width: 30px; height: 30px;">
+                                                    <tr>
+                                                        <td align="center" valign="middle" style="width: 30px; height: 30px; line-height: 30px;">
+                                                            <a href="{{TRIPADVISOR}}" style="color: white; font-weight: bold; font-size: 16px; font-family: Arial, sans-serif; text-decoration: none; display: block;">T</a>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Enlaces del footer -->
+                        <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top: 30px;">
+                            <tr>
+                                <td align="center">
+                                    <p style="color: #cccccc; font-family: Arial, sans-serif; font-size: 13px; margin: 0;">
+                                        <a href="{{SITIO_WEB}}" style="color: #f45355; text-decoration: none;">Sitio web</a> |
+                                        <a href="{{AVISO_PRIVACIDAD}}" style="color: #f45355; text-decoration: none;">Aviso de privacidad</a>
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Copyright -->
+                        <p style="color: #999999; font-family: Arial, sans-serif; font-size: 12px; margin: 20px 0 0 0; text-align: center;">
+                            © {{AÑO}} Amexing Experience. Todos los derechos reservados.
+                        </p>
+                    </td>
+                </tr>
+
+            </table>
+            <!-- Fin del contenedor -->
+
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

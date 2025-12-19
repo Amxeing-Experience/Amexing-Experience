@@ -16,6 +16,13 @@ module.exports = {
     ecmaVersion: 'latest',
     sourceType: 'module',
   },
+  settings: {
+    'import/resolver': {
+      node: {
+        extensions: ['.js', '.json']
+      }
+    }
+  },
   rules: {
     'no-console': process.env.NODE_ENV === 'production' ? 'error' : 'warn',
     'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'warn',
@@ -40,6 +47,7 @@ module.exports = {
     'import/no-extraneous-dependencies': ['error', {
       devDependencies: ['**/*.test.js', '**/*.spec.js', 'tests/**/*.js'],
     }],
+    'import/no-unresolved': ['error', { ignore: ['uuid', 'mailersend'] }],
     // Security plugin rules - PCI DSS Requirement 6.2.1
     'security/detect-object-injection': 'warn', // Downgraded to warning
     'security/detect-non-literal-regexp': 'error',

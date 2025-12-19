@@ -1,0 +1,54 @@
+AMEXING EXPERIENCE
+¡Bienvenido!
+
+═══════════════════════════════════════════════════════════════
+
+¡BIENVENIDO A AMEXING EXPERIENCE!
+
+Estimado/a {{NOMBRE_USUARIO}},
+
+¡Gracias por registrarte en Amexing Experience! Nos emociona tenerte como parte de nuestra comunidad.
+
+Tu cuenta ha sido creada exitosamente y ya puedes acceder a todos nuestros servicios de transporte premium en San Miguel de Allende.
+
+═══════════════════════════════════════════════════════════════
+INFORMACIÓN DE TU CUENTA
+═══════════════════════════════════════════════════════════════
+
+Email:              {{EMAIL_USUARIO}}
+Tipo de cuenta:     {{TIPO_CUENTA}}
+
+═══════════════════════════════════════════════════════════════
+PRÓXIMOS PASOS
+═══════════════════════════════════════════════════════════════
+
+- Explora nuestros servicios de transporte premium
+- Completa tu perfil para una experiencia personalizada
+- Reserva tu primer servicio con nosotros
+
+Accede a tu cuenta:
+{{URL_DASHBOARD}}
+
+═══════════════════════════════════════════════════════════════
+
+Si tienes alguna pregunta, nuestro equipo está aquí para ayudarte.
+
+═══════════════════════════════════════════════════════════════
+¿NECESITAS AYUDA?
+═══════════════════════════════════════════════════════════════
+
+Teléfono: {{TELEFONO}}
+Email: {{EMAIL_CONTACTO}}
+
+═══════════════════════════════════════════════════════════════
+
+"{{TAGLINE}}"
+
+Sitio web: {{SITIO_WEB}}
+Aviso de privacidad: {{AVISO_PRIVACIDAD}}
+
+Instagram: {{INSTAGRAM}}
+Facebook: {{FACEBOOK}}
+TripAdvisor: {{TRIPADVISOR}}
+
+© {{AÑO}} Amexing Experience. Todos los derechos reservados.

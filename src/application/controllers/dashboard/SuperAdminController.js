@@ -290,6 +290,26 @@ class SuperAdminController extends RoleBasedController {
   }
 
   /**
+   * Emails management page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await emails(parameters);
+   * // Returns: operation result
+   */
+  async emails(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'emails', {
+        title: 'Gestión de Correos',
+        breadcrumb: null, // Disable automatic breadcrumb
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Audit logs page.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
