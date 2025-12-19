@@ -20,19 +20,6 @@
 
 A PCI DSS 4.0 compliant e-commerce platform built with Parse Server, Node.js, and MongoDB. This project implements Clean Architecture with MVC pattern, following SOLID principles and security-first design.
 
-## ✨ Key Features
-
-- 🔒 **PCI DSS 4.0 Compliant** - Payment card industry standards
-- 🛡️ **Security First** - Comprehensive middleware with Helmet.js, rate limiting, XSS protection
-- 🏗️ **Clean Architecture** - MVC pattern with domain-driven design
-- ⚡ **Parse Server** - Powerful BaaS with cloud functions
-- 🎯 **MongoDB** - NoSQL database with advanced security
-- 📊 **PM2 Ready** - Production-ready process management
-- 📝 **Comprehensive Logging** - Winston logger with audit trails
-- 📧 **Email System** - MailerSend integration with professional HTML templates
-- 💰 **Dynamic Pricing** - Client-specific rates and pricing management
-- 🎫 **Tours Management** - Complete catalog with 837+ services
-
 ## 🚀 Quick Start
 
 ```bash
