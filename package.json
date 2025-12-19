@@ -236,7 +236,7 @@
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "csrf": "^3.1.0",
-    "dotenv": "^16.3.1",
+    "dotenv": "^17.2.3",
     "dropzone": "^6.0.0-beta.2",
     "ejs": "^3.1.9",
     "exceljs": "^4.4.0",
