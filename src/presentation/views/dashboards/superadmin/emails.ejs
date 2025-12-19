@@ -1,0 +1,462 @@
+<%
+/**
+ * Emails Management Page
+ * SuperAdmin dashboard page for email system management and testing
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'superadmin';
+const currentPath = '/dashboard/superadmin/emails';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row">
+    <div class="col-12">
+        <div class="mb-4">
+            <h2 class="mb-1 fw-bold">Gestión de Correos</h2>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0">
+                    <li class="breadcrumb-item">
+                        <a href="/dashboard/superadmin" class="text-decoration-none">
+                            <i class="ti ti-home me-1"></i>Dashboard
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page">
+                        <i class="ti ti-mail me-1"></i>Correos
+                    </li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- Usage Statistics -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">
+                    <i class="ti ti-chart-bar me-2 text-primary"></i>Uso de Cuenta MailerSend
+                </h6>
+
+                <!-- Loading State -->
+                <div id="usageLoading" class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                    <span class="text-muted">Cargando estadísticas...</span>
+                </div>
+
+                <!-- Error State -->
+                <div id="usageError" class="alert alert-warning" style="display: none;">
+                    <i class="ti ti-alert-triangle me-2"></i>
+                    <span id="usageErrorMessage"></span>
+                </div>
+
+                <!-- Stats Content -->
+                <div id="usageStats" style="display: none;">
+                    <div class="row">
+                        <!-- Today Stats -->
+                        <div class="col-md-6 mb-3">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-dark">
+                                        <i class="ti ti-calendar-day me-1"></i>Hoy
+                                    </span>
+                                    <span class="badge bg-primary" id="todayPercentage">0%</span>
+                                </div>
+                                <div class="progress mb-2" style="height: 20px;">
+                                    <div id="todayProgressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <small class="text-muted">
+                                    <strong id="todaySent">0</strong> enviados de <strong id="todayLimit">100</strong> disponibles
+                                    (<strong id="todayRemaining">100</strong> restantes)
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Month Stats -->
+                        <div class="col-md-6 mb-3">
+                            <div class="border rounded p-3 bg-light">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold text-dark">
+                                        <i class="ti ti-calendar-month me-1"></i>Este Mes
+                                    </span>
+                                    <span class="badge bg-info" id="monthPercentage">0%</span>
+                                </div>
+                                <div class="progress mb-2" style="height: 20px;">
+                                    <div id="monthProgressBar" class="progress-bar bg-info" role="progressbar" style="width: 0%"></div>
+                                </div>
+                                <small class="text-muted">
+                                    <strong id="monthSent">0</strong> enviados de <strong id="monthLimit">3,000</strong> disponibles
+                                    (<strong id="monthRemaining">3,000</strong> restantes)
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Stats -->
+                    <div class="row mt-2">
+                        <div class="col-md-4">
+                            <div class="text-center p-2 border-end">
+                                <i class="ti ti-check text-success me-1"></i>
+                                <strong id="monthSuccessful">0</strong>
+                                <small class="text-muted ms-1">Exitosos</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-2 border-end">
+                                <i class="ti ti-alert-circle text-danger me-1"></i>
+                                <strong id="monthFailed">0</strong>
+                                <small class="text-muted ms-1">Fallidos</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-2">
+                                <i class="ti ti-percentage text-primary me-1"></i>
+                                <strong id="successRate">0%</strong>
+                                <small class="text-muted ms-1">Tasa de Éxito</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Email Form -->
+<div class="row">
+    <div class="col-lg-8 col-12">
+        <div class="card shadow-sm">
+            <div class="card-header text-white" style="background: linear-gradient(135deg, #5D87FF 0%, #49BEFF 100%);">
+                <h5 class="mb-0 text-white">
+                    <i class="ti ti-mail-forward me-2"></i>Enviar Email de Prueba
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-4">
+                    Utiliza este formulario para verificar que la configuración de MailerSend está funcionando correctamente.
+                    El email de prueba se enviará a la dirección que especifiques.
+                </p>
+
+                <form id="testEmailForm">
+                    <!-- Email Input Component -->
+                    <%- include('../../atoms/common/email-input', {
+                        name: 'email',
+                        id: 'testEmail',
+                        label: 'Dirección de Email',
+                        required: true,
+                        placeholder: 'ejemplo@correo.com',
+                        helpText: 'Ingresa el email donde deseas recibir la prueba'
+                    }) %>
+
+                    <!-- Template Selection -->
+                    <div class="mb-3">
+                        <label for="templateSelect" class="form-label">
+                            Plantilla de Email
+                            <span class="text-danger ms-1">*</span>
+                        </label>
+                        <select class="form-select" id="templateSelect" name="template" required>
+                            <option value="">Selecciona una plantilla...</option>
+                            <option value="simple">Email Simple (sin plantilla)</option>
+                            <option value="welcome">Bienvenida</option>
+                            <option value="booking_confirmation">Confirmación de Reserva</option>
+                            <option value="password_reset">Restablecimiento de Contraseña</option>
+                        </select>
+                        <div class="form-text">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Selecciona la plantilla que deseas probar
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-flex gap-2 align-items-center">
+                        <button type="submit" class="btn btn-primary" id="sendTestBtn">
+                            <i class="ti ti-send me-2"></i>Enviar Email de Prueba
+                        </button>
+                        <button type="reset" class="btn btn-outline-secondary">
+                            <i class="ti ti-x me-2"></i>Limpiar
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Result Message Area -->
+                <div id="testEmailResult" class="mt-4" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Information Card -->
+    <div class="col-lg-4 col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">
+                    <i class="ti ti-info-circle me-2 text-primary"></i>Información
+                </h6>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2">
+                        <i class="ti ti-check text-success me-2"></i>
+                        <small>Email registrado en EmailLog</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="ti ti-check text-success me-2"></i>
+                        <small>Trazabilidad completa</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="ti ti-check text-success me-2"></i>
+                        <small>PCI DSS Compliant</small>
+                    </li>
+                    <li class="mb-2">
+                        <i class="ti ti-check text-success me-2"></i>
+                        <small>Configuración MailerSend</small>
+                    </li>
+                </ul>
+
+                <hr class="my-3">
+
+                <div class="alert alert-info mb-0 p-2" style="font-size: 0.85rem;">
+                    <i class="ti ti-bulb me-1"></i>
+                    <strong>Tip:</strong> Revisa tu bandeja de entrada y spam después de enviar.
+                </div>
+            </div>
+        </div>
+
+        <!-- Coming Soon Features -->
+        <div class="card shadow-sm border-0 mt-3">
+            <div class="card-body">
+                <h6 class="fw-bold mb-3">
+                    <i class="ti ti-clock me-2 text-warning"></i>Próximamente
+                </h6>
+                <ul class="list-unstyled text-muted mb-0" style="font-size: 0.9rem;">
+                    <li class="mb-2">
+                        <i class="ti ti-arrow-right me-2"></i>Gestión de plantillas
+                    </li>
+                    <li class="mb-2">
+                        <i class="ti ti-arrow-right me-2"></i>Envíos masivos
+                    </li>
+                    <li class="mb-2">
+                        <i class="ti ti-arrow-right me-2"></i>Estadísticas de envío
+                    </li>
+                    <li class="mb-2">
+                        <i class="ti ti-arrow-right me-2"></i>Historial de emails
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for Form Handling -->
+<script>
+(function() {
+    'use strict';
+
+    const form = document.getElementById('testEmailForm');
+    const resultDiv = document.getElementById('testEmailResult');
+    const submitBtn = document.getElementById('sendTestBtn');
+    const emailInput = document.getElementById('testEmail');
+
+    // Get JWT token from API (cookie is HTTP-only, can't read directly)
+    async function getAccessToken() {
+        try {
+            const response = await fetch('/api/auth/current-token', {
+                method: 'GET',
+                credentials: 'include' // Important: send cookies with request
+            });
+
+            if (!response.ok) {
+                console.error('Failed to get token:', response.status);
+                return null;
+            }
+
+            const data = await response.json();
+            return data.success ? data.token : null;
+        } catch (error) {
+            console.error('Error getting token:', error);
+            return null;
+        }
+    }
+
+    // Show result message
+    function showResult(type, message, messageId = null) {
+        resultDiv.style.display = 'block';
+        resultDiv.className = `alert alert-${type} alert-dismissible fade show`;
+
+        let icon = type === 'success' ? 'check' : 'alert-circle';
+        let content = `<i class="ti ti-${icon} me-2"></i>${message}`;
+
+        if (messageId) {
+            content += `<br><small class="text-muted mt-1 d-block">ID de mensaje: ${messageId}</small>`;
+        }
+
+        content += `
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+
+        resultDiv.innerHTML = content;
+
+        // Auto-hide success messages after 10 seconds
+        if (type === 'success') {
+            setTimeout(() => {
+                const alert = bootstrap.Alert.getInstance(resultDiv);
+                if (alert) {
+                    alert.close();
+                }
+            }, 10000);
+        }
+    }
+
+    // Handle form submission
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const email = emailInput.value.trim();
+        const template = document.getElementById('templateSelect').value;
+
+        // Basic validation
+        if (!email) {
+            showResult('danger', 'Por favor ingresa una dirección de email');
+            return;
+        }
+
+        if (!template) {
+            showResult('danger', 'Por favor selecciona una plantilla de email');
+            return;
+        }
+
+        // Disable button and show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+
+        try {
+            // Get authentication token from API
+            const token = await getAccessToken();
+            if (!token) {
+                throw new Error('No se pudo obtener el token de autenticación. Por favor inicia sesión nuevamente.');
+            }
+
+            // Send test email
+            const response = await fetch('/api/emails/send-test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ email, template })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                showResult(
+                    'success',
+                    `Email enviado exitosamente a <strong>${email}</strong>. Revisa tu bandeja de entrada.`,
+                    result.messageId
+                );
+                form.reset();
+            } else {
+                showResult('danger', result.error || 'Error al enviar el email');
+            }
+        } catch (error) {
+            console.error('Error sending test email:', error);
+            showResult('danger', `Error de red: ${error.message}`);
+        } finally {
+            // Re-enable button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="ti ti-send me-2"></i>Enviar Email de Prueba';
+        }
+    });
+
+    // Handle form reset
+    form.addEventListener('reset', () => {
+        resultDiv.style.display = 'none';
+    });
+
+    // Load usage statistics
+    async function loadUsageStats() {
+        const loadingDiv = document.getElementById('usageLoading');
+        const errorDiv = document.getElementById('usageError');
+        const statsDiv = document.getElementById('usageStats');
+        const errorMessage = document.getElementById('usageErrorMessage');
+
+        try {
+            // Get authentication token
+            const token = await getAccessToken();
+            if (!token) {
+                throw new Error('No se pudo obtener el token de autenticación');
+            }
+
+            // Fetch usage statistics
+            const response = await fetch('/api/emails/usage', {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                const { today, month } = result.data;
+
+                // Update today's stats
+                document.getElementById('todaySent').textContent = today.sent;
+                document.getElementById('todayLimit').textContent = today.limit.toLocaleString();
+                document.getElementById('todayRemaining').textContent = today.remaining;
+                document.getElementById('todayPercentage').textContent = today.percentage + '%';
+                document.getElementById('todayProgressBar').style.width = today.percentage + '%';
+
+                // Update progress bar color based on usage
+                const todayBar = document.getElementById('todayProgressBar');
+                if (today.percentage >= 90) {
+                    todayBar.className = 'progress-bar bg-danger';
+                } else if (today.percentage >= 70) {
+                    todayBar.className = 'progress-bar bg-warning';
+                } else {
+                    todayBar.className = 'progress-bar';
+                }
+
+                // Update month's stats
+                document.getElementById('monthSent').textContent = month.sent;
+                document.getElementById('monthLimit').textContent = month.limit.toLocaleString();
+                document.getElementById('monthRemaining').textContent = month.remaining.toLocaleString();
+                document.getElementById('monthPercentage').textContent = month.percentage + '%';
+                document.getElementById('monthProgressBar').style.width = month.percentage + '%';
+
+                // Update month progress bar color
+                const monthBar = document.getElementById('monthProgressBar');
+                if (month.percentage >= 90) {
+                    monthBar.className = 'progress-bar bg-danger';
+                } else if (month.percentage >= 70) {
+                    monthBar.className = 'progress-bar bg-warning';
+                } else {
+                    monthBar.className = 'progress-bar bg-info';
+                }
+
+                // Update additional stats
+                document.getElementById('monthSuccessful').textContent = month.successful;
+                document.getElementById('monthFailed').textContent = month.failed;
+                document.getElementById('successRate').textContent = month.successRate + '%';
+
+                // Show stats, hide loading
+                loadingDiv.style.display = 'none';
+                statsDiv.style.display = 'block';
+            } else {
+                throw new Error(result.error || 'Error al cargar estadísticas');
+            }
+        } catch (error) {
+            console.error('Error loading usage stats:', error);
+
+            // Show error message
+            errorMessage.textContent = error.message;
+            loadingDiv.style.display = 'none';
+            errorDiv.style.display = 'block';
+        }
+    }
+
+    // Load stats on page load
+    loadUsageStats();
+
+    // Auto-refresh stats every 60 seconds
+    setInterval(loadUsageStats, 60000);
+})();
+</script>

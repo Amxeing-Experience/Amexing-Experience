@@ -1,0 +1,48 @@
+AMEXING EXPERIENCE
+{{ASUNTO}}
+
+═══════════════════════════════════════════════════════════════
+
+{{TITULO_PRINCIPAL}}
+
+Estimado/a {{NOMBRE_CLIENTE}},
+
+{{CONTENIDO_MENSAJE}}
+
+═══════════════════════════════════════════════════════════════
+DETALLES DE SU SERVICIO
+═══════════════════════════════════════════════════════════════
+
+Número de reserva:     {{NUMERO_RESERVA}}
+Servicio:              {{TIPO_SERVICIO}}
+Fecha:                 {{FECHA}}
+Hora:                  {{HORA}}
+Lugar de encuentro:    {{LUGAR}}
+
+═══════════════════════════════════════════════════════════════
+
+{{TEXTO_BOTON}}:
+{{URL_BOTON}}
+
+{{MENSAJE_ADICIONAL}}
+
+═══════════════════════════════════════════════════════════════
+¿NECESITA ASISTENCIA?
+═══════════════════════════════════════════════════════════════
+
+Teléfono: {{TELEFONO}}
+Email: {{EMAIL_CONTACTO}}
+Emergencias 24/7: {{TELEFONO_EMERGENCIAS}}
+
+═══════════════════════════════════════════════════════════════
+
+"{{TAGLINE}}"
+
+Sitio web: {{SITIO_WEB}}
+Aviso de privacidad: {{AVISO_PRIVACIDAD}}
+
+Instagram: {{INSTAGRAM}}
+Facebook: {{FACEBOOK}}
+TripAdvisor: {{TRIPADVISOR}}
+
+© {{AÑO}} Amexing Experience. Todos los derechos reservados.

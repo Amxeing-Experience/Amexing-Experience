@@ -842,6 +842,117 @@ function registerCloudFunctions() {
       });
     });
 
+    // Test Data Creation Function
+    /**
+     * Cloud function to create test Services data for development.
+     * Creates aeropuerto services with various POIs and vehicle types.
+     * @function createTestServicesData
+     * @param {Parse.Cloud.FunctionRequest} request - The Parse Cloud function request object.
+     * @returns {Promise<object>} - Promise resolving to creation result with statistics.
+     */
+    Parse.Cloud.define('createTestServicesData', async (request) => {
+      try {
+        logger.info('Creating test Services data...');
+
+        // Check if Services table already has data
+        const ServicesClass = Parse.Object.extend('Services');
+        const existingQuery = new Parse.Query(ServicesClass);
+        existingQuery.equalTo('exists', true);
+        const existingCount = await existingQuery.count({ useMasterKey: true });
+
+        if (existingCount > 0) {
+          logger.info(`Services table already has ${existingCount} records`);
+          return { success: true, message: `Already exists: ${existingCount} services`, created: 0 };
+        }
+
+        // Get ServiceType for Aeropuerto
+        const ServiceTypeClass = Parse.Object.extend('ServiceType');
+        const serviceTypeQuery = new Parse.Query(ServiceTypeClass);
+        serviceTypeQuery.equalTo('name', 'Aeropuerto');
+        const aeropuertoServiceType = await serviceTypeQuery.first({ useMasterKey: true });
+
+        if (!aeropuertoServiceType) {
+          throw new Error('No Aeropuerto ServiceType found');
+        }
+
+        // Get aeropuerto POIs
+        const POIClass = Parse.Object.extend('POI');
+        const poisQuery = new Parse.Query(POIClass);
+        poisQuery.equalTo('serviceType', aeropuertoServiceType);
+        poisQuery.equalTo('exists', true);
+        const aeropuertoPOIs = await poisQuery.find({ useMasterKey: true });
+
+        // Get vehicle types
+        const VehicleTypeClass = Parse.Object.extend('VehicleType');
+        const vehicleTypesQuery = new Parse.Query(VehicleTypeClass);
+        vehicleTypesQuery.equalTo('exists', true);
+        const vehicleTypes = await vehicleTypesQuery.find({ useMasterKey: true });
+
+        if (aeropuertoPOIs.length === 0 || vehicleTypes.length === 0) {
+          throw new Error(`Insufficient data: POIs=${aeropuertoPOIs.length}, VehicleTypes=${vehicleTypes.length}`);
+        }
+
+        logger.info(`Found ${aeropuertoPOIs.length} aeropuerto POIs, ${vehicleTypes.length} vehicle types`);
+
+        // Create test services
+        const servicesToCreate = [];
+        let count = 0;
+
+        // Create services between different POIs
+        for (let i = 0; i < Math.min(3, aeropuertoPOIs.length); i++) {
+          for (let j = i + 1; j < Math.min(4, aeropuertoPOIs.length); j++) {
+            for (let k = 0; k < Math.min(2, vehicleTypes.length); k++) {
+              if (count >= 15) break; // Limit to 15 services
+
+              const service = new ServicesClass();
+              service.set('originPOI', aeropuertoPOIs[i]);
+              service.set('destinationPOI', aeropuertoPOIs[j]);
+              service.set('vehicleType', vehicleTypes[k]);
+              service.set('note', `Test service ${count + 1}: ${aeropuertoPOIs[i].get('name')} → ${aeropuertoPOIs[j].get('name')}`);
+              service.set('active', true);
+              service.set('exists', true);
+
+              servicesToCreate.push(service);
+              count++;
+            }
+          }
+        }
+
+        // Also create some services without originPOI (return trips)
+        for (let i = 0; i < Math.min(2, aeropuertoPOIs.length); i++) {
+          for (let k = 0; k < Math.min(1, vehicleTypes.length); k++) {
+            if (count >= 20) break;
+
+            const service = new ServicesClass();
+            // No originPOI for return trips
+            service.set('destinationPOI', aeropuertoPOIs[i]);
+            service.set('vehicleType', vehicleTypes[k]);
+            service.set('note', `Return trip to ${aeropuertoPOIs[i].get('name')}`);
+            service.set('active', true);
+            service.set('exists', true);
+
+            servicesToCreate.push(service);
+            count++;
+          }
+        }
+
+        // Save all services
+        logger.info(`Saving ${servicesToCreate.length} test services...`);
+        await Parse.Object.saveAll(servicesToCreate, { useMasterKey: true });
+
+        logger.info(`✅ Created ${servicesToCreate.length} test Services records!`);
+
+        return {
+          success: true,
+          created: servicesToCreate.length,
+          message: `Created ${servicesToCreate.length} test services`,
+        };
+      } catch (error) {
+        logger.error('Error creating test Services data:', error);
+        throw new Parse.Error(Parse.Error.SCRIPT_FAILED, `Failed to create test data: ${error.message}`);
+      }
+    });
+
     // Job Functions (Scheduled Tasks)
     /**
      * Scheduled job that cleans up expired Parse sessions from the database.

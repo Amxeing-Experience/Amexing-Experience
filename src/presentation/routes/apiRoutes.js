@@ -295,6 +295,7 @@ const vehicleImagesRoutes = require('./api/vehicleImagesRoutes');
 const poisRoutes = require('./api/poisRoutes');
 const serviceTypesRoutes = require('./api/serviceTypesRoutes');
 const servicesRoutes = require('./api/servicesRoutes');
+const servicesNewRoutes = require('./api/servicesNewRoutes');
 const ratesRoutes = require('./api/ratesRoutes');
 // Experience Management API routes
 const experiencesRoutes = require('./api/experiencesRoutes');
@@ -313,6 +314,13 @@ const invoicesRoutes = require('./api/invoicesRoutes');
 // Payment Info Management API routes
 const paymentInfoRoutes = require('./api/paymentInfoRoutes');
 const billingRoutes = require('./api/billingRoutes');
+// Price Adjustments API routes
+const priceAdjustmentsRoutes = require('./api/priceAdjustmentsRoutes');
+// Exchange Rate API routes
+const exchangeRateRoutes = require('./api/exchangeRateRoutes');
+const inflationRateRoutes = require('./api/inflationRateRoutes');
+const agencyRateRoutes = require('./api/agencyRateRoutes');
+const transferRateRoutes = require('./api/transferRateRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
@@ -327,6 +335,7 @@ router.use('/vehicles', vehicleImagesRoutes); // Vehicle images endpoints
 router.use('/pois', poisRoutes);
 router.use('/service-types', serviceTypesRoutes);
 router.use('/services', servicesRoutes);
+router.use('/services-new', servicesNewRoutes);
 router.use('/rates', ratesRoutes);
 router.use('/experiences', experiencesRoutes);
 router.use('/experiences', experienceImagesRoutes); // Experience images endpoints
@@ -338,6 +347,191 @@ router.use('/cancellation-requests', cancellationRequestsRoutes); // Cancellatio
 router.use('/invoices', invoicesRoutes); // Invoice management endpoints
 router.use('/payment-info', paymentInfoRoutes); // Payment info management endpoints
 router.use('/billing', billingRoutes); // Billing info management endpoints
+router.use('/price-adjustments', priceAdjustmentsRoutes); // Price adjustments management endpoints
+router.use('/exchange-rate', exchangeRateRoutes); // Exchange rate management endpoints
+router.use('/inflation-rate', inflationRateRoutes); // Inflation rate management endpoints
+router.use('/agency-rate', agencyRateRoutes); // Agency rate management endpoints
+router.use('/transfer-rate', transferRateRoutes); // Transfer rate management endpoints
+
+/**
+ * Email Test Endpoint - SuperAdmin Only
+ * Sends a test email to verify MailerSend configuration.
+ */
+router.post('/emails/send-test', jwtMiddleware.requireRoleLevel(7), async (req, res) => {
+  try {
+    const { email, template } = req.body;
+
+    // Validate email format - Simple and safe email validation
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email || typeof email !== 'string' || !emailPattern.test(email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Dirección de email inválida',
+      });
+    }
+
+    // Validate template selection
+    if (!template) {
+      return res.status(400).json({
+        success: false,
+        error: 'Por favor selecciona una plantilla de email',
+      });
+    }
+
+    // Import email service
+    const emailService = require('../../application/services/EmailService');
+
+    // Check if email service is available
+    if (!emailService.isAvailable()) {
+      return res.status(503).json({
+        success: false,
+        error: 'El servicio de email no está configurado. Por favor verifica las variables de entorno MAILERSEND_API_TOKEN y EMAIL_FROM.',
+      });
+    }
+
+    let result;
+
+    // Send email based on selected template
+    switch (template) {
+      case 'simple':
+        result = await emailService.sendEmail({
+          to: email,
+          subject: 'Email de Prueba - Amexing Experience',
+          html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #5D87FF;">Email de Prueba</h1>
+          <p>Este es un email de prueba del sistema Amexing Experience.</p>
+          <p>Si recibiste este email, significa que la configuración de MailerSend está funcionando correctamente.</p>
+          <hr style="border: 1px solid #eee; margin: 20px 0;">
+          <p style="color: #666; font-size: 12px;">
+            Enviado desde el panel de SuperAdmin por ${req.user.email}<br>
+            ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}
+          </p>
+        </div>
+      `,
+          text: `Email de Prueba - Amexing Experience\n\nEste es un email de prueba del sistema Amexing Experience.\n\nSi recibiste este email, significa que la configuración de MailerSend está funcionando correctamente.\n\nEnviado por ${req.user.email} el ${new Date().toLocaleString('es-MX')}`,
+          tags: ['test', 'manual', 'superadmin', 'simple'],
+          notificationType: 'test',
+          metadata: {
+            sentBy: req.user.id,
+            sentByEmail: req.user.email,
+            sentAt: new Date().toISOString(),
+            template: 'simple',
+          },
+        });
+        break;
+
+      case 'welcome':
+        result = await emailService.sendWelcomeEmail({
+          email,
+          name: 'Usuario de Prueba',
+          role: 'SuperAdmin',
+          dashboardUrl: `${process.env.APP_BASE_URL}/dashboard/superadmin`,
+        });
+        break;
+
+      case 'booking_confirmation':
+        result = await emailService.sendBookingConfirmation({
+          recipientEmail: email,
+          recipientName: 'Usuario de Prueba',
+          bookingNumber: `TEST-${Date.now()}`,
+          serviceType: 'Aeropuerto',
+          date: new Date(Date.now() + 86400000).toLocaleDateString('es-MX'),
+          time: '10:00 AM',
+          location: 'Aeropuerto Internacional de la Ciudad de México',
+          metadata: {
+            test: true,
+            sentBy: req.user.id,
+          },
+        });
+        break;
+
+      case 'password_reset':
+        result = await emailService.sendPasswordResetEmail({
+          email,
+          name: 'Usuario de Prueba',
+          resetUrl: `${process.env.APP_BASE_URL}/reset-password?token=test-token-123`,
+          expirationTime: '1 hora',
+        });
+        break;
+
+      default:
+        return res.status(400).json({
+          success: false,
+          error: 'Plantilla no válida',
+        });
+    }
+
+    // Log the test email send
+    logger.info('Test email sent from SuperAdmin dashboard', {
+      sentBy: req.user.email,
+      recipient: emailService.maskEmail(email),
+      template,
+      success: result.success,
+      messageId: result.messageId,
+      error: result.error || null,
+    });
+
+    // Return result (include error details if failed)
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        error: result.error || 'Error desconocido al enviar el email',
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    logger.error('Error sending test email:', {
+      error: error.message,
+      stack: error.stack,
+      user: req.user?.email,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: `Error al enviar el email de prueba: ${error.message}`,
+    });
+  }
+});
+
+/**
+ * Email Usage Stats Endpoint - SuperAdmin Only
+ * Gets email usage statistics and quotas.
+ */
+router.get('/emails/usage', jwtMiddleware.requireRoleLevel(7), async (req, res) => {
+  try {
+    const emailService = require('../../application/services/EmailService');
+
+    // Check if email service is available
+    if (!emailService.isAvailable()) {
+      return res.status(503).json({
+        success: false,
+        error: 'El servicio de email no está configurado',
+      });
+    }
+
+    // Get usage statistics
+    const stats = await emailService.getUsageStats();
+
+    if (!stats.success) {
+      return res.status(500).json(stats);
+    }
+
+    res.json(stats);
+  } catch (error) {
+    logger.error('Error getting email usage stats:', {
+      error: error.message,
+      stack: error.stack,
+      user: req.user?.email,
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener estadísticas de uso de email',
+    });
+  }
+});
 
 /**
  * @swagger
