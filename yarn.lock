@@ -7319,7 +7319,7 @@ magic-string@^0.30.21:
   dependencies:
     "@jridgewell/sourcemap-codec" "^1.5.5"
 
-mailersend@2.6.0:
+mailersend@^2.6.0:
   version "2.6.0"
   resolved "https://registry.yarnpkg.com/mailersend/-/mailersend-2.6.0.tgz#74806b1722c86cccf6295f4abc69ae0a3b013668"
   integrity sha512-YX2Gyc6Wyw4Q4IsJ4np2Reof8nFWQ2OP/yXZTZcGCz4B7B1BOAYs71Kjb1uNRTTfDChP7rzzWBoOaX6iNlvPAg==
