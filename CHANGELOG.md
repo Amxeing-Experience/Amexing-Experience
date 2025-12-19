@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2025-12-19
+
+### Added
+- Initial setup for version 0.5.0
+- Email template management UI (planned)
+- Bulk email sending capabilities (planned)
+- Email analytics and reporting (planned)
+- Advanced pricing rule engine (planned)
+- Quote automation workflows (planned)
+
+### Changed
+- Repository migrated to M4u2002/Amexing-Experience
+
+### Fixed
+- (To be documented as fixes are implemented)
+
+### Security
+- (To be documented as security updates are made)
+
 ## [0.4.0] - 2025-12-19
 
 ### Added
@@ -165,6 +184,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Semgrep static security analysis
 - Complete API documentation
 
-[Unreleased]: https://github.com/AmexingExperience/amexing-web/compare/v0.2.0...HEAD
-[0.2.0]: https://github.com/AmexingExperience/amexing-web/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/AmexingExperience/amexing-web/releases/tag/v0.1.0
+[Unreleased]: https://github.com/M4u2002/Amexing-Experience/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/M4u2002/Amexing-Experience/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/M4u2002/Amexing-Experience/compare/v0.2.0...v0.4.0
+[0.2.0]: https://github.com/M4u2002/Amexing-Experience/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/M4u2002/Amexing-Experience/releases/tag/v0.1.0

@@ -1,6 +1,6 @@
 {
   "name": "amexing-web",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "PCI DSS compliant e-commerce platform with Parse Server backend",
   "main": "src/index.js",
   "scripts": {
@@ -232,7 +232,7 @@
     "aws-sdk": "^2.1692.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
-    "connect-mongo": "^5.1.0",
+    "connect-mongo": "^6.0.0",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "csrf": "^3.1.0",
@@ -267,7 +267,7 @@
     "xss-clean": "^0.1.4"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.1.0",
+    "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "20.0.0",
     "auto-changelog": "^2.4.0",
     "conventional-changelog-cli": "^4.1.0",

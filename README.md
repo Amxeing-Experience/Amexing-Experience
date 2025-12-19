@@ -1,16 +1,16 @@
 # AmexingWeb
 
 <!-- Status Badges -->
-[![Build Status](https://img.shields.io/github/actions/workflow/status/black4ninja/amexing-web/pr-validation.yml?branch=main&label=build&logo=github&style=flat-square)](https://github.com/black4ninja/amexing-web/actions/workflows/pr-validation.yml)
-[![Security Scan](https://img.shields.io/github/actions/workflow/status/black4ninja/amexing-web/pci-security-scan.yml?branch=main&label=security%20scan&logo=shield&style=flat-square&color=success)](https://github.com/black4ninja/amexing-web/actions/workflows/pci-security-scan.yml)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/M4u2002/Amexing-Experience/pr-validation.yml?branch=main&label=build&logo=github&style=flat-square)](https://github.com/M4u2002/Amexing-Experience/actions/workflows/pr-validation.yml)
+[![Security Scan](https://img.shields.io/github/actions/workflow/status/M4u2002/Amexing-Experience/pci-security-scan.yml?branch=main&label=security%20scan&logo=shield&style=flat-square&color=success)](https://github.com/M4u2002/Amexing-Experience/actions/workflows/pci-security-scan.yml)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?logo=node.js&style=flat-square)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 
 <!-- Compliance & Quality Badges -->
 [![PCI DSS](https://img.shields.io/badge/PCI%20DSS-4.0%20Compliant-gold?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSJ3aGl0ZSIvPgo8L3N2Zz4K)](https://www.pcisecuritystandards.org/)
-[![Code Quality](https://img.shields.io/badge/code%20quality-ESLint%20%2B%20Prettier-blue?style=flat-square&logo=eslint)](https://github.com/black4ninja/amexing-web/actions)
-[![Dependencies](https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen?style=flat-square&logo=dependabot)](https://github.com/black4ninja/amexing-web/network/dependencies)
+[![Code Quality](https://img.shields.io/badge/code%20quality-ESLint%20%2B%20Prettier-blue?style=flat-square&logo=eslint)](https://github.com/M4u2002/Amexing-Experience/actions)
+[![Dependencies](https://img.shields.io/badge/dependencies-up%20to%20date-brightgreen?style=flat-square&logo=dependabot)](https://github.com/M4u2002/Amexing-Experience/network/dependencies)
 
 <!-- Technology Stack Badges -->
 [![Parse Server](https://img.shields.io/badge/Parse%20Server-7.0-blueviolet?style=flat-square&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMjIgOEwxMiAxNEwyIDhMMTIgMloiIGZpbGw9IndoaXRlIi8+Cjwvc3ZnPgo=)](https://parseplatform.org/)
