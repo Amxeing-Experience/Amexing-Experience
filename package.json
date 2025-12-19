@@ -286,7 +286,7 @@
     "lint-staged": "^15.2.0",
     "mongodb-memory-server": "^10.3.0",
     "nodemon": "^3.0.2",
-    "prettier": "^3.1.1",
+    "prettier": "^3.7.4",
     "sonarqube-scanner": "^4.3.0",
     "standard-version": "^9.5.0",
     "supertest": "^6.3.3",
