@@ -184,9 +184,9 @@ describe('EmailService Integration Tests', () => {
 
       const htmlContent = emailLog.get('htmlContent');
 
-      // Verify logo URL is present and dynamic
+      // Verify logo URL is present and dynamic (vertical logo used in email templates)
       const expectedBaseUrl = process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 1337}`;
-      expect(htmlContent).toContain('img/amexing_logo_horizontal.avif');
+      expect(htmlContent).toContain('img/amexing_logo_vertical.avif');
       expect(htmlContent).toContain(expectedBaseUrl);
     }, 15000);
   });

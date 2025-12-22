@@ -17,6 +17,7 @@ npm-shrinkwrap.json
 environments/.env.test           # CRITICAL: Contains real AWS test credentials (environments/)
 environments/.env.staging        # CRITICAL: Contains staging credentials and secrets
 environments/.env.production     # CRITICAL: Production environment file
+environments/.env.production-local  # CRITICAL: Production-local environment file (should not be committed)
 environments/.env.development    # Development environment file
 environments/.env.local          # Local environment overrides
 .env.production
@@ -105,4 +106,5 @@ tests/oauth/real-flow/
 reports/
 *.env.development
 *.env.local
+*.env.production-local
 backups/

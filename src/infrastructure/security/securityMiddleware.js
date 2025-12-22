@@ -8,6 +8,7 @@ const MongoStore = require('connect-mongo');
 const winston = require('winston');
 const csrf = require('csrf');
 const uidSafe = require('uid-safe');
+const { randomUUID } = require('crypto');
 const createXssCleanWrapper = require('./xssCleanWrapper');
 const createMongoSanitizeWrapper = require('./mongoSanitizeWrapper');
 const sessionMetrics = require('../monitoring/sessionMetrics');
@@ -553,9 +554,8 @@ class SecurityMiddleware {
    * app.use(securityMiddleware.requestId());
    */
   requestId() {
-    const { v4: uuid } = require('uuid');
     return (req, res, next) => {
-      req.id = req.headers['x-request-id'] || uuid();
+      req.id = req.headers['x-request-id'] || randomUUID();
       res.setHeader('X-Request-Id', req.id);
       next();
     };
