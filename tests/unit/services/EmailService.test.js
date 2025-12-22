@@ -57,12 +57,14 @@ describe('EmailService', () => {
     });
 
     it('should handle missing API token gracefully', () => {
-      // Set invalid token and reset modules
-      process.env.MAILERSEND_API_TOKEN = 'your-mailersend-api-token-change-this';
+      // Delete environment variables to test missing config
+      delete process.env.MAILERSEND_API_TOKEN;
+      delete process.env.EMAIL_FROM;
+      delete process.env.EMAIL_FROM_NAME;
       jest.resetModules();
-      
+
       const TestEmailService = require('../../../src/application/services/EmailService');
-      
+
       // The service should handle missing token gracefully
       expect(typeof TestEmailService).toBe('object');
       expect(TestEmailService.isAvailable()).toBe(false);
@@ -199,8 +201,8 @@ describe('EmailService', () => {
   describe('Email Templates', () => {
     it('should generate HTML welcome email template', () => {
       const html = EmailService.generateWelcomeEmailHTML('Test User', 'admin');
-      
-      expect(html).toContain('Welcome to Amexing System');
+
+      expect(html).toContain('Welcome to Amexing Experience');
       expect(html).toContain('Test User');
       expect(html).toContain('admin');
       expect(html).toContain('DOCTYPE html');
@@ -208,8 +210,8 @@ describe('EmailService', () => {
 
     it('should generate text welcome email template', () => {
       const text = EmailService.generateWelcomeEmailText('Test User', 'admin');
-      
-      expect(text).toContain('Welcome to Amexing System');
+
+      expect(text).toContain('Welcome to Amexing Experience');
       expect(text).toContain('Test User');
       expect(text).toContain('admin');
     });
