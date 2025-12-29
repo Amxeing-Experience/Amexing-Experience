@@ -422,6 +422,49 @@ PARSE_APP_ID=myappid
 PARSE_APP_ID = myappid  # ❌ Espacios
 ```
 
+### Problema 8: CSS/JS No Cargan (404 Errors)
+
+**Síntomas**:
+```
+GET /css/style.css 404 (Not Found)
+GET /flexy-bootstrap-lite-1.0.0/assets/libs/bootstrap/dist/css/bootstrap.min.css 404
+```
+
+**Causa**: Archivos estáticos faltando en `public/` después de git pull.
+
+**Soluciones**:
+
+```bash
+# 1. Verificar que existen los archivos estáticos
+ls -la public/flexy-bootstrap-lite-1.0.0/
+ls -la public/css/
+ls -la public/js/
+
+# 2. Si faltan, verificar .gitignore
+cat .gitignore | grep -E "public|dist|css|js"
+
+# 3. Opciones de solución:
+# Opción A: Copiar desde otro ambiente que funciona
+scp -r user@working-server:/path/to/amexing-web/public/ ./
+
+# Opción B: Descargar Flexy Bootstrap template
+# https://www.wrappixel.com/templates/flexy-bootstrap-admin-lite/
+# Extraer a public/flexy-bootstrap-lite-1.0.0/
+
+# Opción C: Restaurar desde backup del equipo
+
+# 4. Verificar permisos
+chmod -R 755 public/
+
+# 5. Reiniciar servidor
+yarn dev
+```
+
+**Prevención futura**:
+- Asegurar que `public/flexy-bootstrap-lite-1.0.0/` NO está en .gitignore
+- Verificar que archivos custom de `public/css/` y `public/js/` están committed
+- Documentar estructura de `public/` en el repositorio
+
 ## 🔍 Comandos de Troubleshooting
 
 ### Verificación Rápida del Sistema

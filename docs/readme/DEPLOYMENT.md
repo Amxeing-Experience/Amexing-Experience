@@ -13,19 +13,77 @@ This guide covers the manual deployment process for AmexingWeb to staging and pr
 - [Web Server Setup](#-web-server-setup)
 - [Health Monitoring](#-health-monitoring)
 
+## ⚠️ Critical Pre-Deployment Checks
+
+**BEFORE deploying to a new server or after fresh clone**, verify these essential items:
+
+### 1. Static Assets Verification
+
+The project uses static frontend assets from Flexy Bootstrap template. These are **NOT built**, they must exist in the repository.
+
+**Check that these directories exist**:
+```bash
+# Verify static assets are present
+ls -la public/flexy-bootstrap-lite-1.0.0/
+ls -la public/flexy-bootstrap-lite-1.0.0/assets/libs/
+ls -la public/css/
+ls -la public/js/
+```
+
+**If missing**, these were likely ignored by .gitignore. You need to:
+1. Copy from another working environment
+2. Or download Flexy Bootstrap template
+3. Ensure `public/` directory structure matches production
+
+**Common symptom**: Pages load but CSS/JS files return 404 errors.
+
+### 2. Database Seeding (First Deployment Only)
+
+**Production and Staging REQUIRE initial database seeding** to create:
+- RBAC roles (8 roles: Guest → SuperAdmin)
+- RBAC permissions (30+ permissions)
+- SuperAdmin user (from env vars)
+- Initial system data
+
+**⚠️ CRITICAL**: Seeds should only run ONCE on first deployment:
+
+```bash
+# Check if database is already seeded
+yarn seed:status
+
+# If database is empty, seed it:
+NODE_ENV=production yarn seed  # For production
+NODE_ENV=staging yarn seed     # For staging
+```
+
+**DO NOT run seeds if database already has data** - this could cause duplicates or errors.
+
+### 3. Environment Variables
+
+Verify all required environment variables are set:
+
+```bash
+# Check critical vars exist
+cat environments/.env.production | grep -E "PARSE_APP_ID|PARSE_MASTER_KEY|DATABASE_URI|SESSION_SECRET"
+```
+
+Missing any? Deployment will fail. See [Environment Setup](#-environment-setup) section below.
+
+---
+
 ## 🌍 Environments Overview
 
-| Environment | Branch Source | Port | Database | Deploy Method |
-|-------------|---------------|------|----------|---------------|
-| **Development** | `development` | 1337 | AmexingDEV | Local (`yarn dev`) |
-| **Staging** | `release-x.y.z` | 1338 | AmexingSTAGING | **Manual** (SSH + PM2) |
-| **Production** | `main` (tagged) | 1337 | AmexingPROD | **Manual** (SSH + PM2) |
+| Environment | Branch Source | Port | Database | Deploy Method | Needs Seeds? |
+|-------------|---------------|------|----------|---------------|--------------|
+| **Development** | `development` | 1337 | AmexingDEV | Local (`yarn dev`) | No (local only) |
+| **Staging** | `release-x.y.z` | 1338 | AmexingSTAGING | **Manual** (SSH + PM2) | **Yes** (first time) |
+| **Production** | `main` (tagged) | 1337 | AmexingPROD | **Manual** (SSH + PM2) | **Yes** (first time) |
 
 ### Environment Purpose
 
-- **Development**: Local development, rapid iteration, hot-reload
-- **Staging**: Pre-production testing, QA validation, integration testing
-- **Production**: Live application serving real users
+- **Development**: Local development, rapid iteration, hot-reload (NO seeds needed)
+- **Staging**: Pre-production testing, QA validation, integration testing (**Seeds on first deploy**)
+- **Production**: Live application serving real users (**Seeds on first deploy only**)
 
 ## 🚧 Deploy to Staging (Manual)
 

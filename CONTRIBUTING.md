@@ -18,6 +18,22 @@ cp environments/.env.example environments/.env.development
 yarn dev  # http://localhost:1337
 ```
 
+### ⚠️ Troubleshooting: Si páginas no cargan CSS/JS
+
+**Problema común**: Después de clonar, las páginas cargan pero sin estilos (CSS) o JavaScript.
+
+**Causa**: Los archivos estáticos de `public/` pueden estar faltando si fueron ignorados por `.gitignore`.
+
+**Solución rápida**:
+```bash
+# Verificar que existan los assets
+ls -la public/flexy-bootstrap-lite-1.0.0/
+ls -la public/css/
+ls -la public/js/
+
+# Si faltan, copiar desde otro ambiente o contactar al equipo
+```
+
 **Primera vez?** Lee la sección de [Gitflow Strategy](#-gitflow-strategy) para entender el flujo de ramas.
 
 ## 📋 Gitflow Strategy
