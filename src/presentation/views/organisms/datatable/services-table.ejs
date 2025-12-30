@@ -726,7 +726,7 @@ table.dataTable thead th:nth-child(2) select {
                     render: function(data) {
                         let actions = '<div class="btn-group btn-group-sm" role="group">';
 
-                        if (canEdit) {
+                        if (canEditServices) {
                             // Edit button
                             actions += `<button type="button"
                                             class="btn btn-primary edit-service-btn"
@@ -755,7 +755,7 @@ table.dataTable thead th:nth-child(2) select {
                                         </button>`;
                         }
 
-                        if (canDelete) {
+                        if (canDeleteServices) {
                             // Delete button
                             actions += `<button type="button"
                                             class="btn btn-danger delete-service-btn"
