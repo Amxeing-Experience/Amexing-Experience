@@ -8,6 +8,7 @@ const MongoStore = require('connect-mongo');
 const winston = require('winston');
 const csrf = require('csrf');
 const uidSafe = require('uid-safe');
+const { randomUUID } = require('crypto');
 const createXssCleanWrapper = require('./xssCleanWrapper');
 const createMongoSanitizeWrapper = require('./mongoSanitizeWrapper');
 const sessionMetrics = require('../monitoring/sessionMetrics');
@@ -177,7 +178,7 @@ class SecurityMiddleware {
   getRateLimiter() {
     return rateLimit({
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
-      max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || (this.isDevelopment ? 5000 : 100), // Increased to 5000 for development
+      max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || (this.isDevelopment ? 50000 : 100), // Increased to 50000 for development
       message: 'Too many requests from this IP, please try again later.',
       standardHeaders: true,
       legacyHeaders: false,
@@ -206,7 +207,7 @@ class SecurityMiddleware {
   getStrictRateLimiter() {
     return rateLimit({
       windowMs: 15 * 60 * 1000,
-      max: this.isDevelopment ? 200 : 5, // Increased to 200 for development
+      max: this.isDevelopment ? 5000 : 5, // Increased to 5000 for development
       message: 'Too many attempts. Please try again later.',
       skipSuccessfulRequests: false,
     });
@@ -225,7 +226,7 @@ class SecurityMiddleware {
   getApiRateLimiter() {
     return rateLimit({
       windowMs: 1 * 60 * 1000, // 1 minute
-      max: this.isDevelopment ? 10000 : 120, // Increased to 10000 for development workflows
+      max: this.isDevelopment ? 100000 : 120, // Increased to 100000 for development workflows
       message: 'API rate limit exceeded.',
       standardHeaders: true,
       legacyHeaders: false,
@@ -553,9 +554,8 @@ class SecurityMiddleware {
    * app.use(securityMiddleware.requestId());
    */
   requestId() {
-    const { v4: uuid } = require('uuid');
     return (req, res, next) => {
-      req.id = req.headers['x-request-id'] || uuid();
+      req.id = req.headers['x-request-id'] || randomUUID();
       res.setHeader('X-Request-Id', req.id);
       next();
     };

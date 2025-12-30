@@ -293,6 +293,27 @@ curl http://localhost:1337/parse/serverInfo
 grep PARSE .env
 ```
 
+### CSS/JS Files Not Loading (404 Errors)
+
+**Symptom**: Pages load but without styles or JavaScript. Browser console shows 404 errors for CSS/JS files.
+
+**Cause**: Static assets from Flexy Bootstrap template are missing (may have been ignored by `.gitignore`).
+
+**Solution**:
+```bash
+# Verify static assets exist
+ls -la public/flexy-bootstrap-lite-1.0.0/
+ls -la public/css/
+ls -la public/js/
+
+# If missing, you need to:
+# 1. Copy from another working environment
+# 2. Or download Flexy Bootstrap template
+# 3. Contact team for static assets backup
+```
+
+**Note**: These files are **NOT built** - they must exist in the repository. See [Deployment Guide](../readme/DEPLOYMENT.md#critical-pre-deployment-checks) for complete details.
+
 ---
 
 ## Next Steps
