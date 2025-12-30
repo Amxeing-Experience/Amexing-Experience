@@ -4,9 +4,13 @@
 
 ```bash
 # Clone and setup
-git clone <repo-url> && cd amexing-web
-cp .env.example .env
+git clone <repo-url>
+cd amexing-web
 yarn install
+
+# Configure environment
+cp environments/.env.example environments/.env.development
+# Edit .env.development with your credentials
 
 # Start development server
 yarn dev
@@ -14,6 +18,8 @@ yarn dev
 # Access application
 open http://localhost:1337
 ```
+
+**First time?** Read [CONTRIBUTING.md](../../CONTRIBUTING.md) for gitflow and development process.
 
 ## 🔧 Development Commands
 
