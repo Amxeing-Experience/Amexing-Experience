@@ -251,11 +251,20 @@ describe('ClientsController', () => {
           email: validClientData.email,
           firstName: validClientData.firstName,
           lastName: validClientData.lastName,
+          password: validClientData.password,
           role: 'department_manager', // Should force role
           roleId: 'role-department-manager-id', // Pointer ID
           organizationId: 'client',
-          mustChangePassword: true,
-          // password is auto-generated
+          username: validClientData.username,
+          active: true,
+          exists: true,
+          company: 'Test Company',
+          companyName: 'Test Company',
+          mustChangePassword: false,
+          contextualData: expect.objectContaining({
+            companyName: 'Test Company',
+            createdVia: 'admin_panel',
+          }),
         }),
         mockUser
       );
