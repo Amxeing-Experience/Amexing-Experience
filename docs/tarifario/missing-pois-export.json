@@ -1,0 +1,108 @@
+{
+  "version": "1.0.0",
+  "generated": "2025-12-30T19:12:27.809Z",
+  "source": "Development Database (AmexingDEV)",
+  "total": 12,
+  "byServiceType": {
+    "Unknown": 10,
+    "Tours": 2
+  },
+  "pois": [
+    {
+      "name": "Centro Histórico de Mérida",
+      "serviceType": "Unknown",
+      "description": "Centro histórico de la ciudad blanca",
+      "address": "Plaza Grande, Centro, 97000 Mérida, Yuc.",
+      "latitude": 20.9674,
+      "longitude": -89.5926
+    },
+    {
+      "name": "Chichén Itzá",
+      "serviceType": "Unknown",
+      "description": "Zona arqueológica maya patrimonio de la humanidad",
+      "address": "Zona Arqueológica, 97751 Chichén Itzá, Yuc.",
+      "latitude": 20.6843,
+      "longitude": -88.5678
+    },
+    {
+      "name": "Uxmal",
+      "serviceType": "Unknown",
+      "description": "Zona arqueológica maya",
+      "address": "Carretera Mérida-Campeche Km 78, 97844 Uxmal, Yuc.",
+      "latitude": 20.3587,
+      "longitude": -89.7714
+    },
+    {
+      "name": "Cenotes de Dzitnup",
+      "serviceType": "Unknown",
+      "description": "Cenotes cristalinos para nadar",
+      "address": "Carretera Valladolid-Chichén Itzá Km 7, Dzitnup, Yuc.",
+      "latitude": 20.7167,
+      "longitude": -88.2167
+    },
+    {
+      "name": "Playa de Progreso",
+      "serviceType": "Unknown",
+      "description": "Puerto de playa en la costa yucateca",
+      "address": "Malecón de Progreso, 97320 Progreso, Yuc.",
+      "latitude": 21.2833,
+      "longitude": -89.6667
+    },
+    {
+      "name": "Centro Histórico de Mérida",
+      "serviceType": "Unknown",
+      "description": "Centro histórico de la ciudad blanca",
+      "address": "Plaza Grande, Centro, 97000 Mérida, Yuc.",
+      "latitude": 20.9674,
+      "longitude": -89.5926
+    },
+    {
+      "name": "Chichén Itzá",
+      "serviceType": "Unknown",
+      "description": "Zona arqueológica maya patrimonio de la humanidad",
+      "address": "Zona Arqueológica, 97751 Chichén Itzá, Yuc.",
+      "latitude": 20.6843,
+      "longitude": -88.5678
+    },
+    {
+      "name": "Uxmal",
+      "serviceType": "Unknown",
+      "description": "Zona arqueológica maya",
+      "address": "Carretera Mérida-Campeche Km 78, 97844 Uxmal, Yuc.",
+      "latitude": 20.3587,
+      "longitude": -89.7714
+    },
+    {
+      "name": "Cenotes de Dzitnup",
+      "serviceType": "Unknown",
+      "description": "Cenotes cristalinos para nadar",
+      "address": "Carretera Valladolid-Chichén Itzá Km 7, Dzitnup, Yuc.",
+      "latitude": 20.7167,
+      "longitude": -88.2167
+    },
+    {
+      "name": "Playa de Progreso",
+      "serviceType": "Unknown",
+      "description": "Puerto de playa en la costa yucateca",
+      "address": "Malecón de Progreso, 97320 Progreso, Yuc.",
+      "latitude": 21.2833,
+      "longitude": -89.6667
+    },
+    {
+      "name": "Prueba Tour",
+      "serviceType": "Tours",
+      "description": "",
+      "address": "",
+      "latitude": null,
+      "longitude": null
+    },
+    {
+      "name": "Cañada de la Virgen",
+      "serviceType": "Tours",
+      "description": "",
+      "address": "",
+      "latitude": null,
+      "longitude": null
+    }
+  ]
+}

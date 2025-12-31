@@ -647,4 +647,149 @@ describe('Seed System Verification', () => {
       expect(true).toBe(true); // Placeholder - behavior tested in above tests
     });
   });
+
+  describe('Services and Pricing System', () => {
+    describe('Services Catalog (Seed 020)', () => {
+      test('should have exactly 69 Services in catalog', async () => {
+        const ServicesClass = Parse.Object.extend('Services');
+        const query = new Parse.Query(ServicesClass);
+        query.equalTo('exists', true);
+
+        const count = await query.count({ useMasterKey: true });
+        expect(count).toBe(69);
+      });
+
+      test('should have Services with rate-agnostic structure', async () => {
+        const ServicesClass = Parse.Object.extend('Services');
+        const query = new Parse.Query(ServicesClass);
+        query.equalTo('exists', true);
+        query.limit(10);
+
+        const services = await query.find({ useMasterKey: true });
+
+        for (const service of services) {
+          // Should NOT have rate field (rate-agnostic)
+          expect(service.get('rate')).toBeUndefined();
+          // MUST have destinationPOI
+          expect(service.get('destinationPOI')).toBeDefined();
+        }
+      });
+    });
+
+    describe('RatePrices (Seed 021)', () => {
+      test('should have exactly 621 RatePrices', async () => {
+        const RatePricesClass = Parse.Object.extend('RatePrices');
+        const query = new Parse.Query(RatePricesClass);
+        query.equalTo('exists', true);
+
+        const count = await query.count({ useMasterKey: true });
+        expect(count).toBe(621);
+      });
+
+      test('should have RatePrices with valid service Pointers', async () => {
+        const RatePricesClass = Parse.Object.extend('RatePrices');
+        const query = new Parse.Query(RatePricesClass);
+        query.equalTo('exists', true);
+        query.include('service');
+        query.limit(10);
+
+        const ratePrices = await query.find({ useMasterKey: true });
+
+        for (const rp of ratePrices) {
+          const servicePtr = rp.get('service');
+          expect(servicePtr).toBeDefined();
+          expect(servicePtr.id).toBeDefined();
+        }
+      });
+    });
+
+    describe('ClientPrices (Seed 022)', () => {
+      test('should have exactly 159 ClientPrices', async () => {
+        const ClientPricesClass = Parse.Object.extend('ClientPrices');
+        const query = new Parse.Query(ClientPricesClass);
+        query.equalTo('exists', true);
+
+        const count = await query.count({ useMasterKey: true });
+        expect(count).toBe(159);
+      });
+
+      test('should have 8-9 department_manager users (clients)', async () => {
+        const AmexingUserClass = Parse.Object.extend('AmexingUser');
+        const query = new Parse.Query(AmexingUserClass);
+        query.include('roleId');
+        query.equalTo('exists', true);
+
+        const users = await query.find({ useMasterKey: true });
+
+        const clientUsers = users.filter(u => {
+          const role = u.get('roleId');
+          return role && role.get('name') === 'department_manager' && role.get('organization') === 'client';
+        });
+
+        // 8 clientes + 1 test user = 9 total expected
+        expect(clientUsers.length).toBeGreaterThanOrEqual(8);
+        expect(clientUsers.length).toBeLessThanOrEqual(9);
+      });
+
+      test('should have all client users with roleId as Pointer (NOT string)', async () => {
+        const AmexingUserClass = Parse.Object.extend('AmexingUser');
+        const query = new Parse.Query(AmexingUserClass);
+        query.include('roleId');
+        query.equalTo('exists', true);
+
+        const users = await query.find({ useMasterKey: true });
+
+        const clientUsers = users.filter(u => {
+          const role = u.get('roleId');
+          return role && role.get('name') === 'department_manager';
+        });
+
+        for (const user of clientUsers) {
+          const roleId = user.get('roleId');
+          expect(roleId).toBeDefined();
+          expect(typeof roleId).toBe('object');
+          expect(roleId.className).toBe('Role');
+          expect(roleId.get('name')).toBe('department_manager');
+        }
+      });
+
+      test('should have all client users with contextualData.companyName', async () => {
+        const AmexingUserClass = Parse.Object.extend('AmexingUser');
+        const query = new Parse.Query(AmexingUserClass);
+        query.include('roleId');
+        query.equalTo('exists', true);
+
+        const users = await query.find({ useMasterKey: true });
+
+        const clientUsers = users.filter(u => {
+          const role = u.get('roleId');
+          return role && role.get('name') === 'department_manager' && role.get('organization') === 'client';
+        });
+
+        for (const user of clientUsers) {
+          const contextualData = user.get('contextualData');
+          expect(contextualData).toBeDefined();
+          expect(contextualData.companyName).toBeDefined();
+          expect(typeof contextualData.companyName).toBe('string');
+        }
+      });
+
+      test('should have ClientPrices with valid clientPtr to AmexingUser', async () => {
+        const ClientPricesClass = Parse.Object.extend('ClientPrices');
+        const query = new Parse.Query(ClientPricesClass);
+        query.equalTo('exists', true);
+        query.include('clientPtr');
+        query.limit(10);
+
+        const clientPrices = await query.find({ useMasterKey: true });
+
+        for (const cp of clientPrices) {
+          const clientPtr = cp.get('clientPtr');
+          expect(clientPtr).toBeDefined();
+          expect(clientPtr.id).toBeDefined();
+          expect(clientPtr.className).toBe('AmexingUser');
+        }
+      });
+    });
+  });
 });

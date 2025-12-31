@@ -19,13 +19,16 @@
  *
  * @idempotent true - Can be run multiple times safely, skips duplicates
  * @dependencies 001-seed-service-types, 002-seed-pois-local, 003-seed-pois-aeropuerto, 004-seed-pois-ciudades, 005-seed-rates, 006-seed-vehicle-types
- * @version 1.0.0
+ * @version 1.1.0
  * @since 2024-10-26
  */
 
 const Parse = require('parse/node');
 const fs = require('fs');
 const path = require('path');
+
+// Seed version constant
+const VERSION = '1.1.0';
 
 // CSV file path
 const CSV_PATH = path.join(__dirname, '../../docs/tarifario/Estructura_Tarifario.csv');

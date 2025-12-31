@@ -56,7 +56,13 @@ class TestDatabaseSeeder {
       // 3. Seed Test Users (all roles)
       await this.seedTestUsers();
 
-      // 4. Verify seeding success
+      // 4. Seed Service Data (for pricing tests)
+      // NOTE: These seeds are NOT executed by default to keep tests fast
+      // They are only executed when testing seed functionality specifically
+      // Uncomment to enable full service data seeding:
+      // await this.seedServiceData();
+
+      // 5. Verify seeding success
       await this.verifySeedData();
 
       this.logger.success('Complete system seed finished successfully');
@@ -69,6 +75,50 @@ class TestDatabaseSeeder {
       this.logger.error(`Seed failed: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Seed Service Data
+   * Executes RBAC seeds + seeds 001-007, 020-022 for service pricing system
+   * WARNING: This is slow and should only be used for seed-specific tests
+   */
+  async seedServiceData() {
+    this.logger.info('Seeding service data (this may take a while)...');
+
+    // Import and run each seed directly
+    const seeds = [
+      // RBAC seeds (required for seed 022 user creation)
+      { name: '000-seed-rbac-roles', path: '../../scripts/seeds/000-seed-rbac-roles.js' },
+      { name: '000-seed-rbac-permissions', path: '../../scripts/seeds/000-seed-rbac-permissions.js' },
+      // Service data seeds
+      { name: '001-seed-service-types', path: '../../scripts/seeds/001-seed-service-types.js' },
+      { name: '002-seed-pois-local', path: '../../scripts/seeds/002-seed-pois-local.js' },
+      { name: '003-seed-pois-aeropuerto', path: '../../scripts/seeds/003-seed-pois-aeropuerto.js' },
+      { name: '004-seed-pois-ciudades', path: '../../scripts/seeds/004-seed-pois-ciudades.js' },
+      { name: '005-seed-rates', path: '../../scripts/seeds/005-seed-rates.js' },
+      { name: '006-seed-vehicle-types', path: '../../scripts/seeds/006-seed-vehicle-types.js' },
+      { name: '007-seed-services-from-csv', path: '../../scripts/seeds/007-seed-services-from-csv.js' },
+      { name: '020-seed-services-catalog', path: '../../scripts/seeds/020-seed-services-catalog.js' },
+      { name: '021-seed-rate-prices', path: '../../scripts/seeds/021-seed-rate-prices.js' },
+      { name: '022-seed-client-prices', path: '../../scripts/seeds/022-seed-client-prices.js' }
+    ];
+
+    for (const seed of seeds) {
+      try {
+        this.logger.info(`Running seed: ${seed.name}`);
+        const seedModule = require(seed.path);
+        if (seedModule && typeof seedModule.run === 'function') {
+          await seedModule.run();
+        } else {
+          this.logger.warn(`Seed ${seed.name} does not export a run() function`);
+        }
+      } catch (error) {
+        this.logger.warn(`Seed ${seed.name} failed: ${error.message}`);
+        // Continue with other seeds even if one fails
+      }
+    }
+
+    this.logger.success('Service data seeded');
   }
 
   /**

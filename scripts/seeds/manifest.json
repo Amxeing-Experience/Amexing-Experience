@@ -152,7 +152,7 @@
       "name": "007-seed-services-from-csv",
       "file": "007-seed-services-from-csv.js",
       "description": "Import 837 services from Estructura_Tarifario.csv with POI+serviceType matching and batch processing",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "enabled": true,
       "environments": [
         "development",
@@ -256,6 +256,23 @@
       "order": 13
     },
     {
+      "name": "014-seed-tour-prices",
+      "file": "014-seed-tour-prices.js",
+      "description": "Create TourPrices with rate-specific pricing for all tours",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [
+        "013-seed-tour-catalog"
+      ],
+      "idempotent": true,
+      "order": 14
+    },
+    {
       "name": "015-populate-tour-prices-first-class",
       "file": "015-populate-tour-prices-first-class.js",
       "description": "Populate TourPrices with First Class rates for SEDAN and SUBURBAN vehicle types",
@@ -348,6 +365,65 @@
       ],
       "idempotent": true,
       "order": 19
+    },
+    {
+      "name": "020-seed-services-catalog",
+      "file": "020-seed-services-catalog.js",
+      "description": "Create Services catalog from CSV (69 rate-agnostic base routes for ClientPrices)",
+      "version": "4.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [
+        "001-seed-service-types",
+        "002-seed-pois-local",
+        "003-seed-pois-aeropuerto",
+        "004-seed-pois-ciudades"
+      ],
+      "idempotent": true,
+      "order": 20
+    },
+    {
+      "name": "021-seed-rate-prices",
+      "file": "021-seed-rate-prices.js",
+      "description": "Create RatePrices with current database schema using vehicle-specific pricing from Service table",
+      "version": "2.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [
+        "005-seed-rates",
+        "006-seed-vehicle-types",
+        "020-seed-services-catalog"
+      ],
+      "idempotent": true,
+      "order": 21
+    },
+    {
+      "name": "022-seed-client-prices",
+      "file": "022-seed-client-prices.js",
+      "description": "Create ClientPrices (8 sample records) and client users (6 department_managers) from CSV with correct roleId Pointers",
+      "version": "2.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [
+        "000-seed-rbac-roles",
+        "020-seed-services-catalog",
+        "005-seed-rates",
+        "006-seed-vehicle-types"
+      ],
+      "idempotent": true,
+      "order": 22
     }
   ],
   "notes": [

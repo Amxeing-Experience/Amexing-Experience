@@ -28,8 +28,6 @@
  */
 
 const Parse = require('parse/node');
-const logger = require('../../src/infrastructure/logger');
-const SeedTracker = require('../global/seeds/seed-tracker');
 
 // Seed configuration
 const SEED_NAME = '014-seed-tour-prices';
@@ -53,27 +51,10 @@ const DEFAULT_TOUR_PRICES = {
  * const result = await seed();
  */
 async function seed() {
-  const tracker = new SeedTracker();
-  const environment = process.env.NODE_ENV || 'development';
-
-  logger.info(`🌱 Starting ${SEED_NAME} v${VERSION}`, {
-    environment,
-    seed: SEED_NAME,
-  });
+  const startTime = Date.now();
+  console.log(`🌱 Starting ${SEED_NAME} v${VERSION}`);
 
   try {
-    // Check if seed already executed
-    const existingExecution = await tracker.getSeedExecution(SEED_NAME, environment);
-    if (existingExecution && existingExecution.success) {
-      logger.info(`✅ Seed ${SEED_NAME} already executed successfully in ${environment}`, {
-        lastExecuted: existingExecution.executedAt,
-        version: existingExecution.version,
-      });
-      return existingExecution;
-    }
-
-    // Start tracking
-    const execution = await tracker.startSeed(SEED_NAME, VERSION, environment);
     const stats = {
       created: 0, skipped: 0, errors: 0, priceMatches: 0, defaultPrices: 0,
     };
@@ -81,7 +62,7 @@ async function seed() {
     // ==========================================
     // STEP 1: LOAD TOURS AND RATES
     // ==========================================
-    logger.info('📋 Loading Tours and Rates...');
+    console.log('📋 Loading Tours and Rates...');
 
     // Get all tours from Tour table
     const TourClass = Parse.Object.extend('Tour');
@@ -101,13 +82,13 @@ async function seed() {
 
     const rates = await ratesQuery.find({ useMasterKey: true });
 
-    logger.info(`Found ${tours.length} tours and ${rates.length} rates`);
-    logger.info(`Will create ${tours.length * rates.length} tour prices`);
+    console.log(`Found ${tours.length} tours and ${rates.length} rates`);
+    console.log(`Will create ${tours.length * rates.length} tour prices`);
 
     // ==========================================
     // STEP 2: BUILD PRICE LOOKUP FROM ORIGINAL TOURS TABLE
     // ==========================================
-    logger.info('💰 Building price lookup from original Tours table...');
+    console.log('💰 Building price lookup from original Tours table...');
 
     const ToursClass = Parse.Object.extend('Tours');
     const originalToursQuery = new Parse.Query(ToursClass);
@@ -135,12 +116,12 @@ async function seed() {
       }
     }
 
-    logger.info(`Built price lookup with ${priceLookup.size} entries from original Tours table`);
+    console.log(`Built price lookup with ${priceLookup.size} entries from original Tours table`);
 
     // ==========================================
     // STEP 3: CREATE TOUR PRICES
     // ==========================================
-    logger.info('📦 Creating TourPrices records...');
+    console.log('📦 Creating TourPrices records...');
 
     const TourPricesClass = Parse.Object.extend('TourPrices');
 
@@ -149,7 +130,7 @@ async function seed() {
       const rateName = rate.get('name');
       const defaultPrice = DEFAULT_TOUR_PRICES[rateName] || DEFAULT_TOUR_PRICES['First Class'];
 
-      logger.info(`Creating tour prices for ${rateName} (${rateIndex + 1}/${rates.length})...`);
+      console.log(`Creating tour prices for ${rateName} (${rateIndex + 1}/${rates.length})...`);
 
       let rateCreated = 0;
       let rateSkipped = 0;
@@ -202,25 +183,21 @@ async function seed() {
           rateCreated += 1;
         } catch (error) {
           stats.errors += 1;
-          logger.error(`Error creating tour price for ${rateName}:`, error.message);
+          console.error(`Error creating tour price for ${rateName}:`, error.message);
         }
       }
 
-      logger.info(`  ✅ ${rateName}: created ${rateCreated}, skipped ${rateSkipped}`);
+      console.log(`  ✅ ${rateName}: created ${rateCreated}, skipped ${rateSkipped}`);
     }
 
-    // Complete tracking
-    const result = await tracker.completeSeed(execution.id, stats);
+    const duration = Date.now() - startTime;
+    console.log(`✅ Seed ${SEED_NAME} completed successfully`);
+    console.log(`📊 Statistics:`, stats);
+    console.log(`⏱️ Duration: ${duration}ms`);
 
-    logger.info(`✅ Seed ${SEED_NAME} completed successfully`, {
-      environment,
-      stats,
-      duration: `${result.duration}ms`,
-    });
-
-    return result;
+    return { success: true, stats, duration };
   } catch (error) {
-    logger.error(`❌ Seed ${SEED_NAME} failed:`, error.message);
+    console.error(`❌ Seed ${SEED_NAME} failed:`, error.message);
     throw error;
   }
 }
@@ -231,7 +208,7 @@ module.exports = {
   version: VERSION,
   description: 'Create TourPrices with rate-specific pricing for all tours',
   dependencies: ['013-seed-tour-catalog'],
-  seed,
+  run: seed,
 };
 
 // Run directly if called

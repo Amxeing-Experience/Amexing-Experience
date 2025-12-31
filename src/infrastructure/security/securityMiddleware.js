@@ -4,11 +4,11 @@ const rateLimit = require('express-rate-limit');
 const hpp = require('hpp');
 const cors = require('cors');
 const session = require('express-session');
-const MongoStore = require('connect-mongo');
-const winston = require('winston');
+const { MongoStore } = require('connect-mongo');
 const csrf = require('csrf');
 const uidSafe = require('uid-safe');
 const { randomUUID } = require('crypto');
+const winston = require('../logger'); // Use configured logger instead of raw winston
 const createXssCleanWrapper = require('./xssCleanWrapper');
 const createMongoSanitizeWrapper = require('./mongoSanitizeWrapper');
 const sessionMetrics = require('../monitoring/sessionMetrics');
@@ -430,11 +430,37 @@ class SecurityMiddleware {
     // production: Requires HTTPS, strict sameSite, domain restriction
     // production-local: HTTP compatible for localhost testing with production database
     // development: Relaxed settings for development
-    const cookieSecure = this.isProduction ? true : process.env.COOKIE_SECURE === 'true' || false;
 
-    const cookieSameSite = this.isProduction ? 'strict' : process.env.COOKIE_SAMESITE || 'lax';
+    // CRITICAL FIX: Check if running on localhost (regardless of NODE_ENV)
+    const isLocalhost = process.env.PARSE_PUBLIC_SERVER_URL?.includes('localhost')
+                       || process.env.PARSE_SERVER_URL?.includes('localhost');
 
-    const cookieDomain = this.isProduction ? process.env.COOKIE_DOMAIN : undefined;
+    let cookieSecure;
+    if (isLocalhost) {
+      cookieSecure = false;
+    } else if (this.isProduction) {
+      cookieSecure = true;
+    } else {
+      cookieSecure = process.env.COOKIE_SECURE === 'true' || false;
+    }
+
+    let cookieSameSite;
+    if (isLocalhost) {
+      cookieSameSite = 'lax';
+    } else if (this.isProduction) {
+      cookieSameSite = 'strict';
+    } else {
+      cookieSameSite = process.env.COOKIE_SAMESITE || 'lax';
+    }
+
+    let cookieDomain;
+    if (isLocalhost) {
+      cookieDomain = undefined;
+    } else if (this.isProduction) {
+      cookieDomain = process.env.COOKIE_DOMAIN;
+    } else {
+      cookieDomain = undefined;
+    }
 
     // Log cookie configuration for debugging
     winston.info('Session cookie configuration', {

@@ -1,0 +1,9 @@
+clientIndex,companyName,itemType,service_origin,service_destination,rate_name,vehicle_code,precio,basePrice,currency
+1,Test Department Manager,SERVICES,,San Miguel de Allende,Premium,SEDAN,1500,1500,MXN
+1,Test Department Manager,SERVICES,Aguascalientes,San Miguel de Allende,Premium,SUBURBAN,2200,2200,MXN
+abercrombie,Abercrombie & Kent Mexico,SERVICES,,San Miguel de Allende,Premium,SEDAN,1500,1500,MXN
+proserpina,Proserpina,SERVICES,Aguascalientes,San Miguel de Allende,Premium,SEDAN,1500,1500,MXN
+proserpina,Proserpina,SERVICES,León,San Miguel de Allende,Premium,SUBURBAN,2200,2200,MXN
+Clevia,Clevia,SERVICES,Aguascalientes,San Miguel de Allende,Económico,SEDAN,1250,1250,MXN
+Godandi&Sons,Godandi & Sons,SERVICES,León,San Miguel de Allende,Green Class,MODEL 3,2200,2200,MXN
+Jaunt,Jaunt,SERVICES,Guanajuato,San Miguel de Allende,First Class,SEDAN,1800,1800,MXN
