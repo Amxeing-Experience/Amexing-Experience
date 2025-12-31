@@ -1,6 +1,6 @@
 {
   "name": "amexing-web",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "PCI DSS compliant e-commerce platform with Parse Server backend",
   "main": "src/index.js",
   "scripts": {
