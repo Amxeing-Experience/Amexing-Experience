@@ -435,6 +435,13 @@ table.dataTable tbody tr.hover {
         const canEdit = <%= canEdit %>;
         const canDelete = <%= canDelete %>;
         const userRole = '<%= dtUserRole %>';
+        
+        console.log('🚀 Tours table initializing...', {
+            tableId,
+            apiEndpoint,
+            showClientPricing,
+            userRole
+        });
 
         // Get JWT token from localStorage or cookies
         function getAccessToken() {
@@ -494,15 +501,71 @@ table.dataTable tbody tr.hover {
         let filteredData = [];
 
         // Load data from API
+        // Detect client context for loading client-specific prices
+        function getClientIdFromContext() {
+            // Get clientId from URL if we're in client detail page
+            const pathSegments = window.location.pathname.split('/');
+            if (pathSegments.includes('clients') && pathSegments.length > pathSegments.indexOf('clients') + 1) {
+                return pathSegments[pathSegments.indexOf('clients') + 1];
+            }
+            
+            // Try to get from data attribute if available
+            const clientElement = document.querySelector('[data-client-id]');
+            if (clientElement) {
+                return clientElement.dataset.clientId;
+            }
+            
+            return null;
+        }
+
         function loadAllTours() {
             return new Promise((resolve, reject) => {
+                const clientId = getClientIdFromContext();
+                const url = new URL(apiEndpoint, window.location.origin);
+                
+                console.log('🔍 Debug context:', {
+                    pathname: window.location.pathname,
+                    clientIdFromPath: clientId,
+                    apiEndpoint: apiEndpoint,
+                    dataClientIdElement: document.querySelector('[data-client-id]'),
+                    dataClientIdValue: document.querySelector('[data-client-id]')?.dataset?.clientId
+                });
+                
+                // Add clientId parameter if we're in client context
+                if (clientId) {
+                    url.searchParams.append('clientId', clientId);
+                    console.log(`🎯 Loading tours with client-specific prices for client: ${clientId}`);
+                    console.log(`📡 Full API URL: ${url.toString()}`);
+                } else {
+                    console.log('📋 Loading tours without client-specific prices');
+                    console.log(`📡 API URL: ${url.toString()}`);
+                }
+                
                 $.ajax({
-                    url: apiEndpoint,
+                    url: url.toString(),
                     type: 'GET',
                     success: function(response) {
                         if (response.success && response.data) {
                             allToursData = response.data;
                             filteredData = allToursData; // Show all tours by default
+                            
+                            // Log client pricing info
+                            if (clientId) {
+                                const toursWithClientPrices = allToursData.filter(tour => tour.hasClientPrices);
+                                console.log(`✅ Loaded ${allToursData.length} tours, ${toursWithClientPrices.length} have client-specific prices`);
+                                
+                                // Debug specific tour
+                                const targetTour = allToursData.find(tour => tour.id === 'IkHiggPBAF');
+                                if (targetTour) {
+                                    console.log('🎯 Debug tour IkHiggPBAF data:', {
+                                        id: targetTour.id,
+                                        hasClientPrices: targetTour.hasClientPrices,
+                                        clientPrices: targetTour.clientPrices,
+                                        destination: targetTour.destinationPOI?.name
+                                    });
+                                }
+                            }
+                            
                             resolve(allToursData);
                         } else {
                             reject('Invalid response format');
@@ -647,27 +710,48 @@ table.dataTable tbody tr.hover {
                     className: 'text-center',
                     render: function(data) {
                         const tourId = data.objectId || data.id;
-                        const clientPrice = data.clientPrice || null; // This would come from a client-specific pricing table
+                        const hasClientPrices = data.hasClientPrices || false;
+                        const clientPrices = data.clientPrices || {};
                         
-                        if (clientPrice) {
+                        // Debug logging for tour IkHiggPBAF
+                        if (tourId === 'IkHiggPBAF') {
+                            console.log('🔍 Client Price Column Debug for IkHiggPBAF:', {
+                                tourId,
+                                hasClientPrices,
+                                clientPrices,
+                                clientPricesKeys: Object.keys(clientPrices),
+                                rawData: data
+                            });
+                        }
+                        
+                        if (hasClientPrices && Object.keys(clientPrices).length > 0) {
                             const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
                                 style: 'currency',
                                 currency: 'MXN'
                             }).format(amount);
                             
+                            // Get the first client price to show as example
+                            const firstPriceKey = Object.keys(clientPrices)[0];
+                            const firstPrice = clientPrices[firstPriceKey];
+                            const priceCount = Object.keys(clientPrices).length;
+                            
                             return `
                                 <div class="text-center">
-                                    <div class="fw-bold text-info mb-1">
-                                        ${formatMXN(clientPrice)}
+                                    <div class="fw-bold text-success mb-1">
+                                        ${formatMXN(firstPrice.price)}
                                     </div>
-                                    <button class="btn btn-sm btn-outline-primary configure-client-price-btn" data-tour-id="${tourId}">
-                                        <i class="ti ti-settings"></i> Editar
+                                    <small class="text-muted d-block mb-2">
+                                        ${priceCount === 1 ? '1 precio personalizado' : `${priceCount} precios personalizados`}
+                                    </small>
+                                    <button class="btn btn-sm btn-outline-success configure-client-price-btn" data-tour-id="${tourId}">
+                                        <i class="ti ti-settings"></i> Ver/Editar
                                     </button>
                                 </div>
                             `;
                         } else {
                             return `
                                 <div class="text-center">
+                                    <small class="text-muted d-block mb-2">Sin precios personalizados</small>
                                     <button class="btn btn-sm btn-primary configure-client-price-btn" data-tour-id="${tourId}">
                                         <i class="ti ti-plus"></i> Configurar
                                     </button>
@@ -772,6 +856,14 @@ table.dataTable tbody tr.hover {
                 }, 50);
             }
         });
+        
+        // Store DataTable instance globally for access from save functions
+        // Use a unique key based on the table ID to avoid conflicts
+        window[`toursDataTable_${tableId}`] = dataTable;
+        // Also store as generic toursDataTable if it's the main tours table
+        if (tableId === 'tours-table' || tableId === 'client-tours-table') {
+            window.toursDataTable = dataTable;
+        }
 
         // Initialize data and table
         async function initializeTable() {
@@ -790,6 +882,9 @@ table.dataTable tbody tr.hover {
                 showErrorAlert('Error al cargar los tours');
             }
         }
+        
+        // Store initializeTable function globally for refresh after save
+        window[`initializeToursTable_${tableId}`] = initializeTable;
 
         // Store transfer rate data globally
         let currentTransferRate = 0;
@@ -1218,10 +1313,19 @@ table.dataTable tbody tr.hover {
                 try {
                     console.log('Making API request to load tour prices for category:', selectedRate);
                     
+                    // Get clientId for client-specific pricing
+                    const clientId = getClientIdFromContext();
+                    const requestData = { rateId: selectedRate };
+                    
+                    if (clientId) {
+                        requestData.clientId = clientId;
+                        console.log(`Including clientId in request: ${clientId}`);
+                    }
+                    
                     const response = await $.ajax({
                         url: '/api/tours/with-rate-prices',
                         type: 'GET',
-                        data: { rateId: selectedRate },
+                        data: requestData,
                         beforeSend: function(xhr) {
                             const token = getAccessToken();
                             if (token) {
@@ -2160,15 +2264,431 @@ table.dataTable tbody tr.hover {
                 });
             }
             
-            // For now, show an alert with the tour information
-            // This should be replaced with a proper modal implementation
+            // Open the tour client pricing modal
+            openTourClientPricingModal(tourId, tourData);
+        }
+        
+        // Store original prices to track changes
+        let originalTourPrices = {};
+        
+        // Function to open the tour client pricing modal
+        function openTourClientPricingModal(tourId, tourData) {
+            // Reset original prices tracking
+            originalTourPrices = {};
+            
+            // Set tour ID
+            document.getElementById('modalTourId').value = tourId;
+            
+            // Set tour information
             if (tourData) {
                 const destination = tourData.destinationPOI?.name || 'Sin destino';
-                alert(`Configurar precio cliente para:\n\nTour: ${destination}\nID: ${tourId}\n\n(Funcionalidad de modal pendiente)`);
+                const duration = tourData.time || 0;
+                const hours = Math.floor(duration / 60);
+                const minutes = duration % 60;
+                const durationText = hours > 0 ? `${hours}h ${minutes}min` : `${minutes} minutos`;
+                
+                document.getElementById('tourDestinationName').innerHTML = `<strong>Destino:</strong> ${destination}`;
+                document.getElementById('tourDuration').innerHTML = `<strong>Duración:</strong> ${durationText}`;
             } else {
-                alert(`Configurar precio cliente para Tour ID: ${tourId}\n\n(Funcionalidad de modal pendiente)`);
+                document.getElementById('tourDestinationName').innerHTML = '<strong>Destino:</strong> <span class="text-muted">Cargando...</span>';
+                document.getElementById('tourDuration').innerHTML = '<strong>Duración:</strong> <span class="text-muted">Cargando...</span>';
+            }
+            
+            // Load rates and prices for this tour
+            loadTourRatesAndPrices(tourId, tourData);
+            
+            // Open modal
+            const modal = new bootstrap.Modal(document.getElementById('tourClientPricingModal'));
+            modal.show();
+        }
+        
+        // Function to load rates and their prices for the tour
+        async function loadTourRatesAndPrices(tourId, tourData) {
+            const container = document.getElementById('tourRatesAndPricesContainer');
+            container.innerHTML = `
+                <div class="text-center py-3">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando tarifas...</span>
+                    </div>
+                    <p class="text-muted mt-2">Cargando tarifas y precios...</p>
+                </div>
+            `;
+            
+            try {
+                // Get clientId from URL
+                let clientId = null;
+                const pathSegments = window.location.pathname.split('/');
+                if (pathSegments.includes('clients') && pathSegments.length > pathSegments.indexOf('clients') + 1) {
+                    clientId = pathSegments[pathSegments.indexOf('clients') + 1];
+                }
+                
+                if (!clientId) {
+                    const clientElement = document.querySelector('[data-client-id]');
+                    if (clientElement) {
+                        clientId = clientElement.dataset.clientId;
+                    }
+                }
+                
+                // Load rate prices with client-specific prices if available
+                const endpoint = clientId 
+                    ? `/api/tours/${tourId}/all-rate-prices-with-client-prices?clientId=${clientId}`
+                    : `/api/tours/${tourId}/all-prices`;
+                    
+                console.log('Loading tour prices from endpoint:', endpoint);
+                
+                const response = await fetch(endpoint, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Error al cargar las tarifas y precios');
+                }
+                
+                const data = await response.json();
+                const tourPrices = data.success ? data.data : [];
+                
+                // Build the rates and prices HTML
+                let ratesHtml = '';
+                
+                // Group tour prices by rate
+                const rateGroups = {};
+                tourPrices.forEach(tourPrice => {
+                    const rate = tourPrice.rate;
+                    if (!rate) return;
+                    
+                    const rateId = rate.id;
+                    if (!rateGroups[rateId]) {
+                        rateGroups[rateId] = {
+                            rate: rate,
+                            vehicles: []
+                        };
+                    }
+                    rateGroups[rateId].vehicles.push(tourPrice);
+                });
+                
+                // Generate HTML for each rate group
+                Object.keys(rateGroups).forEach(rateId => {
+                    const rateGroup = rateGroups[rateId];
+                    const rate = rateGroup.rate;
+                    
+                    ratesHtml += `
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">
+                                    <span class="badge" style="background-color: ${rate.color || '#6c757d'}">${rate.name}</span>
+                                </h5>
+                                <small class="text-muted">Configurar precios por tipo de vehículo</small>
+                            </div>
+                            <div class="card-body">
+                    `;
+                    
+                    // Generate HTML for each vehicle type in this rate
+                    rateGroup.vehicles.forEach(tourPrice => {
+                        const vehicleType = tourPrice.vehicleType;
+                        const currentPrice = tourPrice.price || 0;
+                        const basePrice = tourPrice.basePrice || currentPrice;
+                        const isClientPrice = tourPrice.isClientPrice || false;
+                        
+                        // Determine labels and styling based on whether this is a client price
+                        const basePriceLabel = 'Precio Base:';
+                        const clientPriceLabel = isClientPrice ? 'Precio Cliente (Actual):' : 'Precio Cliente:';
+                        const priceDisplayClass = isClientPrice ? 'text-success fw-bold' : 'text-muted';
+                        const clientPriceInputClass = isClientPrice ? 'border-success' : '';
+                        
+                        ratesHtml += `
+                            <div class="row mb-3 pb-3 border-bottom ${isClientPrice ? 'bg-light' : ''}">
+                                <div class="col-md-3">
+                                    <div class="d-flex align-items-center">
+                                        <i class="ti ti-car me-2 text-primary"></i>
+                                        <div>
+                                            <strong>${vehicleType?.name || 'Vehículo'}</strong>
+                                            ${isClientPrice ? '<span class="badge bg-success ms-2">Personalizado</span>' : ''}
+                                            <br>
+                                            <small class="text-muted">${vehicleType?.code || ''} - Capacidad: ${vehicleType?.defaultCapacity || 'N/A'} pax</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label mb-1">${basePriceLabel}</label>
+                                    <div class="fw-bold text-muted">
+                                        ${basePrice > 0 ? new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(basePrice) : 'Sin precio'}
+                                    </div>
+                                    ${isClientPrice ? `
+                                        <label class="form-label mb-1 mt-2">Precio Actual:</label>
+                                        <div class="${priceDisplayClass}">
+                                            ${new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(currentPrice)}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label" for="tourClientPrice_${rateId}_${vehicleType?.id}">${clientPriceLabel}</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">$</span>
+                                        <input type="number" 
+                                               class="form-control tour-client-price-input ${clientPriceInputClass}" 
+                                               id="tourClientPrice_${rateId}_${vehicleType?.id}"
+                                               data-rate-id="${rateId}"
+                                               data-vehicle-type-id="${vehicleType?.id}"
+                                               data-rate-name="${rate.name}"
+                                               data-vehicle-name="${vehicleType?.name}"
+                                               data-base-price="${basePrice}"
+                                               step="0.01" 
+                                               min="0" 
+                                               placeholder="0.00"
+                                               value="${currentPrice > 0 ? currentPrice.toFixed(2) : ''}"
+                                               data-original-value="${currentPrice > 0 ? currentPrice.toFixed(2) : ''}">
+                                        <span class="input-group-text">MXN</span>
+                                    </div>
+                                    ${isClientPrice ? '<small class="text-success">✓ Precio personalizado activo</small>' : '<small class="text-muted">Deja en blanco para usar precio base</small>'}
+                                </div>
+                            </div>
+                        `;
+                        
+                        // Store original price for change tracking
+                        const key = `${rateId}_${vehicleType?.id}`;
+                        originalTourPrices[key] = currentPrice > 0 ? currentPrice.toFixed(2) : '';
+                    });
+                    
+                    ratesHtml += `
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                if (tourPrices.length === 0) {
+                    ratesHtml = `
+                        <div class="text-center py-4">
+                            <i class="ti ti-info-circle" style="font-size: 2rem; color: #6c757d;"></i>
+                            <h6 class="mt-2 text-muted">No hay tarifas activas</h6>
+                            <p class="text-muted mb-0">No se encontraron tarifas activas para configurar.</p>
+                        </div>
+                    `;
+                }
+                
+                container.innerHTML = ratesHtml;
+                
+            } catch (error) {
+                console.error('Error loading tour rates and prices:', error);
+                container.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="ti ti-alert-circle" style="font-size: 2rem; color: #dc3545;"></i>
+                        <h6 class="mt-2 text-danger">Error al cargar</h6>
+                        <p class="text-muted mb-0">No se pudieron cargar las tarifas. Intenta de nuevo.</p>
+                        <small class="text-muted">${error.message}</small>
+                    </div>
+                `;
             }
         }
+        
+        // Function to save all tour client prices
+        async function saveAllTourClientPrices() {
+            const tourId = document.getElementById('modalTourId').value;
+            const clientPrices = [];
+            
+            // Get client ID from URL
+            let clientId = null;
+            const pathSegments = window.location.pathname.split('/');
+            if (pathSegments.includes('clients') && pathSegments.length > pathSegments.indexOf('clients') + 1) {
+                clientId = pathSegments[pathSegments.indexOf('clients') + 1];
+            }
+            
+            if (!clientId) {
+                const clientElement = document.querySelector('[data-client-id]');
+                if (clientElement) {
+                    clientId = clientElement.dataset.clientId;
+                }
+            }
+            
+            if (!clientId) {
+                console.error('Error: No se pudo identificar el cliente.');
+                if (window.showNotification) {
+                    window.showNotification('error', 'Error: No se pudo identificar el cliente. Por favor, recarga la página.');
+                }
+                return;
+            }
+            
+            // Collect only modified client prices from the form
+            document.querySelectorAll('.tour-client-price-input').forEach(input => {
+                const rateId = input.dataset.rateId;
+                const vehicleTypeId = input.dataset.vehicleTypeId;
+                const rateName = input.dataset.rateName;
+                const vehicleName = input.dataset.vehicleName;
+                const currentValue = input.value.trim();
+                const originalValue = input.dataset.originalValue || '';
+                const price = parseFloat(currentValue) || 0;
+                
+                // Get base price from data attribute
+                const basePrice = parseFloat(input.dataset.basePrice) || 0;
+                
+                // Only save if the price was actually changed by the user
+                const hasChanged = currentValue !== originalValue;
+                const isValidPrice = price > 0;
+                const isDifferentFromBase = price !== basePrice;
+                
+                if (hasChanged && isValidPrice && isDifferentFromBase) {
+                    clientPrices.push({
+                        ratePtr: rateId,
+                        vehiclePtr: vehicleTypeId,
+                        precio: price,
+                        basePrice: basePrice,
+                        rateName: rateName,
+                        vehicleName: vehicleName,
+                        originalValue: originalValue,
+                        newValue: currentValue
+                    });
+                    console.log(`💡 Price changed for ${vehicleName} (${rateName}): ${originalValue} → ${currentValue}`);
+                } else if (hasChanged) {
+                    console.log(`⚠️ Price changed but not valid for ${vehicleName} (${rateName}): ${originalValue} → ${currentValue} (valid: ${isValidPrice}, different from base: ${isDifferentFromBase})`);
+                }
+            });
+            
+            if (clientPrices.length === 0) {
+                console.warn('No se detectaron cambios en los precios. Modifica los precios para guardar.');
+                
+                if (window.showNotification) {
+                    window.showNotification('warning', 'No se detectaron cambios en los precios. Solo se guardan los precios que hayas modificado.');
+                }
+                
+                return;
+            }
+            
+            console.log(`💾 Saving ${clientPrices.length} modified tour client prices:`, {
+                clientId: clientId,
+                tourId: tourId,
+                modifiedPrices: clientPrices,
+                itemType: 'TOUR'
+            });
+            
+            // Show loading state
+            const saveButton = document.querySelector('#tourClientPricingModal .btn-primary');
+            const originalText = saveButton.innerHTML;
+            saveButton.disabled = true;
+            saveButton.innerHTML = '<i class="ti ti-loader-2 me-1 spinner-border spinner-border-sm"></i>Guardando...';
+            
+            try {
+                // Save client prices using the new tour-specific API endpoint
+                const response = await fetch('/api/tours/client-prices', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
+                    },
+                    body: JSON.stringify({
+                        clientId: clientId,
+                        tourId: tourId,
+                        prices: clientPrices
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error al guardar los precios');
+                }
+                
+                const result = await response.json();
+                
+                // Show success message
+                const totalPrices = clientPrices.length;
+                const itemType = result.itemType || 'TOUR';
+                
+                if (window.showNotification) {
+                    window.showNotification('success', result.message || `Se guardaron ${totalPrices} precio(s) personalizados para este tour (itemType: ${itemType}).`);
+                }
+                
+                console.log('✅ Tour client prices saved:', {
+                    message: result.message || 'Precios guardados exitosamente',
+                    itemType: itemType
+                });
+                
+                // Close modal
+                const modal = bootstrap.Modal.getInstance(document.getElementById('tourClientPricingModal'));
+                if (modal) {
+                    modal.hide();
+                }
+                
+                // Refresh the table to show updated prices
+                try {
+                    // Since the table uses client-side data, we need to reload the data
+                    // Find the correct table ID
+                    let currentTableId = 'client-tours-table'; // Default for client detail page
+                    
+                    // Check if we have a tours table element visible
+                    if (document.getElementById('client-tours-table')) {
+                        currentTableId = 'client-tours-table';
+                    } else if (document.getElementById('tours-table')) {
+                        currentTableId = 'tours-table';
+                    }
+                    
+                    // Try to use the stored initializeTable function to reload data
+                    const initFunction = window[`initializeToursTable_${currentTableId}`];
+                    if (initFunction && typeof initFunction === 'function') {
+                        console.log(`🔄 Reloading tours data for table: ${currentTableId}`);
+                        await initFunction();
+                        console.log(`✅ Tours table (${currentTableId}) data reloaded successfully.`);
+                    } else {
+                        // Fallback: Try to get the DataTable instance and refresh it
+                        let table = window[`toursDataTable_${currentTableId}`] || window.toursDataTable;
+                        
+                        if (!table && $.fn.DataTable && $.fn.DataTable.isDataTable(`#${currentTableId}`)) {
+                            table = $(`#${currentTableId}`).DataTable();
+                        }
+                        
+                        if (table) {
+                            // For client-side tables, we need to reload the data
+                            if (table.ajax && table.ajax.reload) {
+                                table.ajax.reload(null, false);
+                            } else {
+                                // Client-side table - need to manually reload
+                                console.log('⚠️ Client-side table detected. Manual refresh may be required.');
+                                // Try to trigger a page reload after a delay
+                                setTimeout(() => {
+                                    if (window.location.pathname.includes('/clients/')) {
+                                        window.location.reload();
+                                    }
+                                }, 1500);
+                            }
+                            console.log(`✅ Tours table (${currentTableId}) refreshed.`);
+                        } else {
+                            console.log('⚠️ DataTable instance not found. Prices saved successfully.');
+                            console.log('Page will reload to show updated prices...');
+                            // Reload the page after a short delay to show updated prices
+                            setTimeout(() => {
+                                if (window.location.pathname.includes('/clients/')) {
+                                    window.location.reload();
+                                }
+                            }, 1500);
+                        }
+                    }
+                } catch (refreshError) {
+                    console.warn('⚠️ Error refreshing table:', refreshError.message, '- Prices saved successfully.');
+                    // Reload page as fallback
+                    setTimeout(() => {
+                        if (window.location.pathname.includes('/clients/')) {
+                            window.location.reload();
+                        }
+                    }, 1500);
+                }
+                
+            } catch (error) {
+                console.error('Error saving tour client prices:', error);
+                
+                if (window.showNotification) {
+                    window.showNotification('error', 'Error al guardar los precios: ' + error.message);
+                }
+                
+                console.error('❌ Error saving tour prices:', error.message);
+            } finally {
+                // Restore button state
+                saveButton.disabled = false;
+                saveButton.innerHTML = originalText;
+            }
+        }
+        
+        // Store function in window scope for modal access
+        window._saveAllTourClientPrices = saveAllTourClientPrices;
     }
 
     // Initialize when DOM is ready
@@ -2177,8 +2697,82 @@ table.dataTable tbody tr.hover {
     } else {
         initWhenReady();
     }
+    
+    // Attach event listener for save button after DOM is ready
+    function attachSaveButtonListener() {
+        const saveBtn = document.getElementById('saveTourClientPricesBtn');
+        if (saveBtn && window._saveAllTourClientPrices) {
+            saveBtn.removeEventListener('click', window._saveAllTourClientPrices); // Remove any existing listener
+            saveBtn.addEventListener('click', window._saveAllTourClientPrices);
+            console.log('✅ Tour client prices save button listener attached');
+        } else {
+            console.warn('⚠️ Tour save button or function not found, retrying...');
+            setTimeout(attachSaveButtonListener, 500);
+        }
+    }
+    
+    // Attach listener when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(attachSaveButtonListener, 100);
+        });
+    } else {
+        setTimeout(attachSaveButtonListener, 100);
+    }
 })();
 </script>
+
+<!-- Tour Client Pricing Modal -->
+<div class="modal fade" id="tourClientPricingModal" tabindex="-1" aria-labelledby="tourClientPricingModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="tourClientPricingModalLabel">
+                    <i class="ti ti-currency-dollar me-2"></i>Configurar Precios Cliente - Tour
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Tour Info -->
+                <div class="mb-4">
+                    <div class="card bg-light">
+                        <div class="card-body py-3">
+                            <h6 class="card-title mb-2">
+                                <i class="ti ti-route me-1"></i>Información del Tour
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p class="mb-0" id="tourDestinationName"><strong>Destino:</strong> <span class="text-muted">Cargando...</span></p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p class="mb-0" id="tourDuration"><strong>Duración:</strong> <span class="text-muted">Cargando...</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Rates and Prices -->
+                <div class="mb-4">
+                    <h6 class="mb-3">
+                        <i class="ti ti-list me-1"></i>Precios por Tarifa
+                    </h6>
+                    <div id="tourRatesAndPricesContainer">
+                        <!-- Dynamic content will be loaded here -->
+                    </div>
+                </div>
+                <input type="hidden" id="modalTourId">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveTourClientPricesBtn">
+                    <i class="ti ti-device-floppy me-1"></i>Guardar Precios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Custom CSS for expandable prices -->
 <style>

@@ -71,6 +71,7 @@ router.get('/with-rate-prices', jwtMiddleware.requireRoleLevel(4), (req, res) =>
  *     summary: Get tours list
  *     description: |
  *       Get paginated list of tours with DataTables server-side processing support.
+ *       Optionally include client-specific prices if clientId is provided.
  *
  *       **Access:** Department Manager and above
  *       **Rate Limited:** 100 requests per 15 minutes
@@ -78,6 +79,11 @@ router.get('/with-rate-prices', jwtMiddleware.requireRoleLevel(4), (req, res) =>
  *       - bearerAuth: []
  *       - cookieAuth: []
  *     parameters:
+ *       - name: clientId
+ *         in: query
+ *         schema:
+ *           type: string
+ *         description: Client ID to include client-specific prices
  *       - name: draw
  *         in: query
  *         schema:
@@ -289,6 +295,115 @@ router.get('/:id', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursControl
  *         description: Tour not found
  */
 router.get('/:id/all-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getAllTourPrices(req, res));
+
+/**
+ * @swagger
+ * /api/tours/{id}/all-rate-prices-with-client-prices:
+ *   get:
+ *     tags:
+ *       - Tours
+ *     summary: Get tour prices with client overrides
+ *     description: |\
+ *       Get all prices from TourPrices table for a specific tour with client-specific price overrides.
+ *
+ *       **Access:** Department Manager and above
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tour object ID
+ *       - name: clientId
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Client object ID
+ *     responses:
+ *       200:
+ *         description: Tour prices with client overrides retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Tour not found
+ */
+router.get('/:id/all-rate-prices-with-client-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getAllRatePricesForTourWithClientPrices(req, res));
+
+/**
+ * @swagger
+ * /api/tours/client-prices:
+ *   post:
+ *     tags:
+ *       - Tours
+ *     summary: Save client-specific prices for a tour
+ *     description: |
+ *       Save client-specific prices for a tour in ClientPrices table with itemType=TOUR.
+ *
+ *       **Access:** Admin and SuperAdmin only
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - clientId
+ *               - tourId
+ *               - prices
+ *             properties:
+ *               clientId:
+ *                 type: string
+ *                 description: Client object ID
+ *               tourId:
+ *                 type: string
+ *                 description: Tour object ID
+ *               prices:
+ *                 type: array
+ *                 description: Array of price configurations
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     ratePtr:
+ *                       type: string
+ *                     vehiclePtr:
+ *                       type: string
+ *                     precio:
+ *                       type: number
+ *                     basePrice:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: Client prices saved successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ */
+router.post('/client-prices', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.saveTourClientPrices(req, res));
 
 /**
  * @swagger
