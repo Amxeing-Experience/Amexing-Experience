@@ -827,7 +827,11 @@ table.dataTable thead th:nth-child(2) select {
         // Initialize data and table
         async function initializeTable() {
             try {
-                await loadAllServices();
+                // Only load services if we don't have filtered data already
+                // (in case rate filter already loaded the data)
+                if (filteredData.length === 0) {
+                    await loadAllServices();
+                }
                 // Data loaded and filtered successfully
                 
                 // Clear existing data and add filtered data
@@ -992,9 +996,19 @@ table.dataTable thead th:nth-child(2) select {
             filteredData = filterServicesByType(currentFilter);
             
             // Update the table with the new data (which already includes rate-specific pricing)
-            dataTable.clear();
-            dataTable.rows.add(filteredData);
-            dataTable.draw();
+            if (dataTable) {
+                dataTable.clear();
+                dataTable.rows.add(filteredData);
+                dataTable.draw();
+            } else {
+                console.log('⚠️ DataTable not ready yet, data loaded for when table initializes');
+                // Initialize the table since data is now ready
+                setTimeout(() => {
+                    if (typeof initializeTable === 'function') {
+                        initializeTable();
+                    }
+                }, 100);
+            }
             
             // Clear the service prices map since we're using data directly from the main API
             servicePricesMap.clear();
@@ -1382,11 +1396,10 @@ table.dataTable thead th:nth-child(2) select {
                 // Load exchange rate
                 loadCurrentExchangeRate();
                 
-                // Load rates for the header filter
+                // Load rates for the header filter (this will auto-select and load data)
                 loadRatesForFilter();
                 
-                // Initialize table with data (with correct rates applied)
-                initializeTable();
+                // Note: initializeTable() will be called automatically by rate filter change event
                 
                 console.log('💼 Department manager table initialized with AgencyRate applied');
             });
@@ -1586,11 +1599,10 @@ table.dataTable thead th:nth-child(2) select {
             // Load POIs and VehicleTypes for dropdowns
             loadDropdownData();
         } else {
-            // For other users, proceed with normal initialization
-            // Load rates for the header filter
+            // For other users, proceed with optimized initialization
+            // Load rates for the header filter FIRST, then let it auto-select and load data
             loadRatesForFilter();
-            // Initialize table with data
-            initializeTable();
+            // Note: initializeTable() will be called automatically by rate filter change event
             // Load POIs and VehicleTypes for dropdowns
             loadDropdownData();
         }
