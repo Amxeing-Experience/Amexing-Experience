@@ -69,6 +69,9 @@ class ToursController {
       const sortColumnIndex = parseInt(req.query.order?.[0]?.column, 10) || 0;
       const sortDirection = req.query.order?.[0]?.dir || 'asc';
 
+      // Check for client ID to include client-specific prices
+      const { clientId } = req.query;
+
       // Extract additional filters (if provided) - removed since Tour table doesn't have rate field
 
       // Column mapping for sorting (matches frontend columns order)
@@ -129,9 +132,55 @@ class ToursController {
       // Execute query
       const tours = await filteredQuery.find({ useMasterKey: true });
 
+      // Load client-specific prices if clientId is provided
+      const clientPricesMap = new Map();
+      if (clientId) {
+        const clientPricesQuery = new Parse.Query('ClientPrices');
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        const clientPointer = new AmexingUser();
+        clientPointer.id = clientId;
+
+        clientPricesQuery.equalTo('clientPtr', clientPointer);
+        clientPricesQuery.equalTo('itemType', 'TOUR'); // CRITICAL: Filter by tour prices
+        clientPricesQuery.equalTo('exists', true);
+        clientPricesQuery.equalTo('active', true);
+        clientPricesQuery.doesNotExist('valid_until'); // Only active records
+        clientPricesQuery.include(['ratePtr', 'vehiclePtr']);
+
+        const clientPrices = await clientPricesQuery.find({ useMasterKey: true });
+
+        // Create map: tourId_rateId_vehicleId -> clientPrice
+        clientPrices.forEach((clientPrice) => {
+          const tourId = clientPrice.get('itemId');
+          const rateId = clientPrice.get('ratePtr')?.id;
+          const vehicleId = clientPrice.get('vehiclePtr')?.id;
+
+          if (tourId && rateId && vehicleId) {
+            const key = `${tourId}_${rateId}_${vehicleId}`;
+            clientPricesMap.set(key, {
+              price: clientPrice.get('precio') || 0,
+              basePrice: clientPrice.get('basePrice') || 0,
+              isClientPrice: true,
+            });
+          }
+        });
+      }
+
       // Transform results for DataTables
       const data = tours.map((tour) => {
         const destinationPOI = tour.get('destinationPOI');
+
+        // Add client pricing information if available
+        const tourClientPrices = {};
+        if (clientId && clientPricesMap.size > 0) {
+          // Find all client prices for this tour
+          for (const [key, priceInfo] of clientPricesMap.entries()) {
+            if (key.startsWith(`${tour.id}_`)) {
+              const [, rateId, vehicleId] = key.split('_');
+              tourClientPrices[`${rateId}_${vehicleId}`] = priceInfo;
+            }
+          }
+        }
 
         return {
           id: tour.id,
@@ -146,6 +195,9 @@ class ToursController {
           exists: tour.get('exists') || true,
           createdAt: tour.get('createdAt'),
           updatedAt: tour.get('updatedAt'),
+          // Include client pricing information
+          clientPrices: Object.keys(tourClientPrices).length > 0 ? tourClientPrices : {},
+          hasClientPrices: Object.keys(tourClientPrices).length > 0,
         };
       });
 
@@ -544,7 +596,7 @@ class ToursController {
    */
   async getToursWithRatePrices(req, res) {
     try {
-      const { rateId } = req.query;
+      const { rateId, clientId } = req.query;
 
       if (!rateId) {
         return res.status(400).json({
@@ -579,6 +631,42 @@ class ToursController {
 
       const tourPrices = await tourPricesQuery.find({ useMasterKey: true });
 
+      // Get client-specific prices if clientId is provided
+      const clientPricesMap = {};
+      if (clientId) {
+        const clientPricesQuery = new Parse.Query('ClientPrices');
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        const clientPointer = new AmexingUser();
+        clientPointer.id = clientId;
+
+        clientPricesQuery.equalTo('clientPtr', clientPointer);
+        clientPricesQuery.equalTo('itemType', 'TOUR');
+        clientPricesQuery.equalTo('active', true);
+        clientPricesQuery.equalTo('exists', true);
+        clientPricesQuery.include(['ratePtr', 'vehiclePtr']);
+
+        const clientPrices = await clientPricesQuery.find({ useMasterKey: true });
+
+        // Create a map of client prices by tour ID and vehicle ID
+        clientPrices.forEach((clientPrice) => {
+          const itemId = clientPrice.get('itemId'); // This is the tourId
+          const vehiclePtr = clientPrice.get('vehiclePtr');
+          const ratePtr = clientPrice.get('ratePtr');
+          const vehicleId = vehiclePtr?.id;
+          const rateIdValue = ratePtr?.id;
+
+          // Only include client prices for the selected rate
+          if (rateIdValue === rateId) {
+            const key = `${itemId}_${vehicleId}`;
+            clientPricesMap[key] = {
+              price: clientPrice.get('precio'),
+              basePrice: clientPrice.get('basePrice'),
+              isClientPrice: true,
+            };
+          }
+        });
+      }
+
       // Create a map of tour prices by tour ID
       const pricesMap = {};
       tourPrices.forEach((tourPrice) => {
@@ -592,7 +680,19 @@ class ToursController {
 
           const rate = tourPrice.get('ratePtr');
           const vehicleType = tourPrice.get('vehicleType');
-          const price = tourPrice.get('price') || 0;
+          const vehicleId = vehicleType?.id;
+          let price = tourPrice.get('price') || 0;
+          let isClientPrice = false;
+
+          // Check if there's a client price override for this tour and vehicle
+          if (clientId && vehicleId) {
+            const clientPriceKey = `${tourId}_${vehicleId}`;
+            if (clientPricesMap[clientPriceKey]) {
+              const { price: clientPrice } = clientPricesMap[clientPriceKey];
+              price = clientPrice;
+              isClientPrice = true;
+            }
+          }
 
           // Format price to MXN
           const formattedPrice = `$${Math.round(price).toLocaleString()} MXN`;
@@ -601,6 +701,7 @@ class ToursController {
             id: tourPrice.id,
             price,
             formattedPrice,
+            isClientPrice,
             rate: rate ? {
               id: rate.id,
               name: rate.get('name'),
@@ -622,6 +723,24 @@ class ToursController {
         const tourId = tour.id;
         const priceData = pricesMap[tourId] || [];
 
+        // Check if this tour has any client prices
+        const hasClientPrices = priceData.some((p) => p.isClientPrice);
+
+        // Build client prices object for compatibility with frontend
+        const clientPrices = {};
+        if (hasClientPrices) {
+          priceData.forEach((p) => {
+            if (p.isClientPrice && p.rate && p.vehicleType) {
+              const key = `${p.rate.id}_${p.vehicleType.id}`;
+              clientPrices[key] = {
+                price: p.price,
+                formattedPrice: p.formattedPrice,
+                isClientPrice: true,
+              };
+            }
+          });
+        }
+
         return {
           id: tour.id,
           objectId: tour.id,
@@ -637,6 +756,8 @@ class ToursController {
           createdAt: tour.get('createdAt'),
           updatedAt: tour.get('updatedAt'),
           priceData,
+          hasClientPrices,
+          clientPrices,
         };
       });
 
@@ -646,7 +767,7 @@ class ToursController {
         data: toursWithPrices,
       });
     } catch (error) {
-      console.error('Error al obtener tours con precios:', error.message);
+      logger.error('Error al obtener tours con precios:', error);
       return res.status(500).json({
         success: false,
         error: 'Error al obtener tours con precios',
@@ -736,12 +857,348 @@ class ToursController {
         data: formattedPrices,
       });
     } catch (error) {
-      console.error('Error al obtener precios del tour:', error.message);
+      logger.error('Error al obtener precios del tour:', error);
       return res.status(500).json({
         success: false,
         error: 'Error al obtener los precios del tour',
         timestamp: new Date().toISOString(),
       });
+    }
+  }
+
+  /**
+   * GET /api/tours/:id/all-rate-prices-with-client-prices - Get tour prices with client-specific overrides.
+   * Combines base tour prices from TourPrices with client-specific prices from ClientTourPrices.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async getAllRatePricesForTourWithClientPrices(req, res) {
+    try {
+      const tourId = req.params.id;
+      const { clientId } = req.query;
+
+      logger.info(`[getAllRatePricesForTourWithClientPrices] Called with tourId: ${tourId}, clientId: ${clientId}`);
+
+      if (!tourId) {
+        return res.status(400).json({
+          success: false,
+          error: 'ID del tour requerido',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      if (!clientId) {
+        return res.status(400).json({
+          success: false,
+          error: 'ID del cliente requerido',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Get the tour first
+      const tourQuery = new Parse.Query('Tour');
+      tourQuery.equalTo('exists', true);
+      const tour = await tourQuery.get(tourId, { useMasterKey: true });
+
+      if (!tour) {
+        return res.status(404).json({
+          success: false,
+          error: 'Tour no encontrado',
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      // Query TourPrices for base prices
+      const tourPricesQuery = new Parse.Query('TourPrices');
+      const tourPointer = {
+        __type: 'Pointer',
+        className: 'Tour',
+        objectId: tourId,
+      };
+      tourPricesQuery.equalTo('tourPtr', tourPointer);
+      tourPricesQuery.include(['ratePtr', 'vehicleType']);
+      tourPricesQuery.ascending('ratePtr.name');
+      tourPricesQuery.ascending('vehicleType.name');
+
+      const tourPrices = await tourPricesQuery.find({ useMasterKey: true });
+
+      // Query ClientPrices for client-specific overrides (using itemType='TOUR')
+      const clientPricesQuery = new Parse.Query('ClientPrices');
+      const AmexingUser = Parse.Object.extend('AmexingUser');
+      const clientPointer = new AmexingUser();
+      clientPointer.id = clientId;
+
+      clientPricesQuery.equalTo('clientPtr', clientPointer);
+      clientPricesQuery.equalTo('itemType', 'TOUR'); // CRITICAL: Use TOUR for tours
+      clientPricesQuery.equalTo('exists', true);
+      clientPricesQuery.equalTo('active', true);
+      clientPricesQuery.doesNotExist('valid_until'); // Only get active records
+      clientPricesQuery.include(['ratePtr', 'vehiclePtr']);
+
+      const allClientPrices = await clientPricesQuery.find({ useMasterKey: true });
+
+      // Debug: Log all client prices and their itemIds
+      logger.info(`[getAllRatePricesForTourWithClientPrices] Found ${allClientPrices.length} total TOUR client prices for client ${clientId}`);
+      allClientPrices.forEach((cp) => {
+        logger.info(`ClientPrice ID: ${cp.id}, ItemId: "${cp.get('itemId')}", Looking for tourId: "${tourId}"`);
+      });
+
+      // Filter client prices for this specific tour
+      const clientPrices = allClientPrices.filter((cp) => cp.get('itemId') === tourId);
+      logger.info(`[getAllRatePricesForTourWithClientPrices] After filtering for tour ${tourId}: ${clientPrices.length} prices found`);
+
+      // Create a map of client prices for easy lookup
+      const clientPriceMap = {};
+      clientPrices.forEach((clientPrice) => {
+        const rateId = clientPrice.get('ratePtr')?.id;
+        const vehicleId = clientPrice.get('vehiclePtr')?.id; // Note: ClientPrices uses vehiclePtr, not vehicleType
+        if (rateId && vehicleId) {
+          const key = `${rateId}_${vehicleId}`;
+          clientPriceMap[key] = clientPrice.get('precio') || 0;
+        }
+      });
+
+      // Create a set to track which rate_vehicle combinations we've processed
+      const processedKeys = new Set();
+
+      // Format the response data with client price overrides
+      const formattedPrices = tourPrices.map((tourPrice) => {
+        const rate = tourPrice.get('ratePtr');
+        const vehicleType = tourPrice.get('vehicleType');
+        const basePrice = tourPrice.get('price') || 0;
+
+        // Check for client-specific price
+        const key = `${rate?.id}_${vehicleType?.id}`;
+        const clientPrice = clientPriceMap[key];
+        const hasClientPrice = clientPrice !== undefined;
+        const finalPrice = hasClientPrice ? clientPrice : basePrice;
+
+        // Mark this key as processed
+        processedKeys.add(key);
+
+        return {
+          id: tourPrice.id,
+          price: finalPrice,
+          formattedPrice: `$${Math.round(finalPrice).toLocaleString()} MXN`,
+          basePrice,
+          isClientPrice: hasClientPrice,
+          rate: rate ? {
+            id: rate.id,
+            name: rate.get('name'),
+            color: rate.get('color') || '#6c757d',
+          } : null,
+          vehicleType: vehicleType ? {
+            id: vehicleType.id,
+            name: vehicleType.get('name'),
+            code: vehicleType.get('code') || '',
+            defaultCapacity: vehicleType.get('defaultCapacity') || 4,
+            trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+          } : null,
+        };
+      });
+
+      // Add client prices that don't have corresponding tour prices
+      clientPrices.forEach((clientPrice) => {
+        const ratePtr = clientPrice.get('ratePtr');
+        const vehiclePtr = clientPrice.get('vehiclePtr');
+        const rateId = ratePtr?.id;
+        const vehicleId = vehiclePtr?.id;
+
+        if (rateId && vehicleId) {
+          const key = `${rateId}_${vehicleId}`;
+
+          // Only add if we haven't already processed this combination
+          if (!processedKeys.has(key)) {
+            const clientPriceValue = clientPrice.get('precio') || 0;
+            formattedPrices.push({
+              id: `client_${clientPrice.id}`, // Use client price ID with prefix
+              price: clientPriceValue,
+              formattedPrice: `$${Math.round(clientPriceValue).toLocaleString()} MXN`,
+              basePrice: 0, // No base price since there's no TourPrice record
+              isClientPrice: true,
+              rate: ratePtr ? {
+                id: ratePtr.id,
+                name: ratePtr.get('name'),
+                color: ratePtr.get('color') || '#6c757d',
+              } : null,
+              vehicleType: vehiclePtr ? {
+                id: vehiclePtr.id,
+                name: vehiclePtr.get('name'),
+                code: vehiclePtr.get('code') || '',
+                defaultCapacity: vehiclePtr.get('defaultCapacity') || 4,
+                trunkCapacity: vehiclePtr.get('trunkCapacity') || 2,
+              } : null,
+            });
+          }
+        }
+      });
+
+      return res.json({
+        success: true,
+        message: 'Precios del tour con tarifas de cliente obtenidos exitosamente',
+        data: formattedPrices,
+      });
+    } catch (error) {
+      logger.error('Error al obtener precios del tour con cliente:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Error al obtener los precios del tour',
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
+   * POST /api/tours/client-prices - Save client-specific prices for a tour.
+   * IMPORTANT: Sets itemType='TOUR' in ClientPrices table to distinguish from service prices.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async saveTourClientPrices(req, res) {
+    try {
+      const { clientId, tourId, prices } = req.body;
+      const currentUser = req.user;
+
+      // Validate input
+      if (!clientId || !tourId || !prices || !Array.isArray(prices)) {
+        return this.sendError(res, 'Datos incompletos: clientId, tourId y prices son requeridos', 400);
+      }
+
+      // Process each price
+      const objectsToSave = [];
+      const ClientPricesClass = Parse.Object.extend('ClientPrices');
+
+      // First, find existing ACTIVE prices for this client and tour (valid_until IS NULL)
+      const existingQuery = new Parse.Query(ClientPricesClass);
+
+      const AmexingUser = Parse.Object.extend('AmexingUser');
+      const clientPointer = new AmexingUser();
+      clientPointer.id = clientId;
+
+      existingQuery.equalTo('clientPtr', clientPointer);
+      existingQuery.equalTo('itemType', 'TOUR'); // CRITICAL: Use TOUR for tours, not SERVICES
+      existingQuery.equalTo('itemId', tourId);
+      existingQuery.equalTo('exists', true);
+      // Only get active records (not versioned/historical ones)
+      existingQuery.doesNotExist('valid_until');
+
+      const existingPrices = await existingQuery.find({ useMasterKey: true });
+
+      // Create a map to track which prices to update vs create
+      const existingMap = new Map();
+      existingPrices.forEach((price) => {
+        const ratePtr = price.get('ratePtr');
+        const vehiclePtr = price.get('vehiclePtr');
+        if (ratePtr && vehiclePtr) {
+          const key = `${ratePtr.id}_${vehiclePtr.id}`;
+          existingMap.set(key, price);
+        }
+      });
+
+      // Process each new price
+      for (const priceData of prices) {
+        const key = `${priceData.ratePtr}_${priceData.vehiclePtr}`;
+        const existingPriceObject = existingMap.get(key);
+
+        if (existingPriceObject) {
+          // Frontend already filtered to only send modified prices, so this price changed
+          // VERSIONING: Don't update existing price, instead:
+          // 1. Mark existing price as historical (set valid_until to today)
+          existingPriceObject.set('valid_until', new Date());
+          existingPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
+          objectsToSave.push(existingPriceObject);
+
+          // 2. Create NEW price record with the updated price
+          const newPriceObject = new ClientPricesClass();
+
+          const Rate = Parse.Object.extend('Rate');
+          const ratePointer = new Rate();
+          ratePointer.id = priceData.ratePtr;
+
+          const VehicleType = Parse.Object.extend('VehicleType');
+          const vehiclePointer = new VehicleType();
+          vehiclePointer.id = priceData.vehiclePtr;
+
+          newPriceObject.set('clientPtr', clientPointer);
+          newPriceObject.set('ratePtr', ratePointer);
+          newPriceObject.set('vehiclePtr', vehiclePointer);
+          newPriceObject.set('itemType', 'TOUR'); // CRITICAL: Use TOUR for tours
+          newPriceObject.set('itemId', tourId);
+          newPriceObject.set('precio', priceData.precio);
+          newPriceObject.set('basePrice', priceData.basePrice || 0);
+          newPriceObject.set('currency', 'MXN');
+          newPriceObject.set('active', true);
+          newPriceObject.set('exists', true);
+          newPriceObject.set('createdBy', currentUser ? currentUser.id : null);
+          newPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
+          // valid_until remains null (active record)
+
+          objectsToSave.push(newPriceObject);
+        } else {
+          // Create completely new price (no existing record)
+          const newPriceObject = new ClientPricesClass();
+
+          const Rate = Parse.Object.extend('Rate');
+          const ratePointer = new Rate();
+          ratePointer.id = priceData.ratePtr;
+
+          const VehicleType = Parse.Object.extend('VehicleType');
+          const vehiclePointer = new VehicleType();
+          vehiclePointer.id = priceData.vehiclePtr;
+
+          newPriceObject.set('clientPtr', clientPointer);
+          newPriceObject.set('ratePtr', ratePointer);
+          newPriceObject.set('vehiclePtr', vehiclePointer);
+          newPriceObject.set('itemType', 'TOUR'); // CRITICAL: Use TOUR for tours
+          newPriceObject.set('itemId', tourId);
+          newPriceObject.set('precio', priceData.precio);
+          newPriceObject.set('basePrice', priceData.basePrice || 0);
+          newPriceObject.set('currency', 'MXN');
+          newPriceObject.set('active', true);
+          newPriceObject.set('exists', true);
+          newPriceObject.set('createdBy', currentUser ? currentUser.id : null);
+          newPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
+          // valid_until remains null (active record)
+
+          objectsToSave.push(newPriceObject);
+        }
+      }
+
+      // Note: We don't handle "removal" here because the frontend only sends modified prices,
+      // not the complete set of prices. Unmodified prices should remain unchanged.
+
+      // Save all objects
+      if (objectsToSave.length > 0) {
+        await Parse.Object.saveAll(objectsToSave, { useMasterKey: true });
+      }
+
+      // Log the action
+      logger.info('Tour client prices saved', {
+        clientId,
+        tourId,
+        savedCount: prices.length,
+        updatedCount: objectsToSave.length,
+        userId: currentUser ? currentUser.id : null,
+        itemType: 'TOUR', // Log to confirm correct type
+      });
+
+      return res.json({
+        success: true,
+        message: `Se guardaron ${prices.length} precio(s) personalizados para este tour`,
+        savedCount: prices.length,
+        itemType: 'TOUR', // Return to confirm correct type
+      });
+    } catch (error) {
+      logger.error('Error saving tour client prices:', {
+        error: error.message,
+        stack: error.stack,
+        body: req.body,
+      });
+      return this.sendError(res, 'Error al guardar los precios del cliente');
     }
   }
 
