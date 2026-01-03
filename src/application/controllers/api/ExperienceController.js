@@ -42,7 +42,11 @@ class ExperienceController {
   /**
    * GET /api/experiences - Get experiences with DataTables server-side processing.
    *
-   * Supports type filtering via query parameter: ?type=Experience or ?type=Provider.
+   * Supports filtering via query parameters:
+   * - ?type=Experience or ?type=Provider (type filter)
+   * - ?dayDate=YYYY-MM-DD (day-of-week availability filter).
+   *
+   * Day-of-week filtering improves performance by filtering on backend instead of client-side.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
@@ -60,13 +64,13 @@ class ExperienceController {
       const sortField = columns[params.sortColumnIndex] || 'updatedAt';
 
       // Get total records count
-      const totalQuery = this.buildBaseQuery(params.typeFilter, null);
+      const totalQuery = this.buildBaseQuery(params.typeFilter, null, null);
       const recordsTotal = await totalQuery.count({ useMasterKey: true });
 
-      // Build filtered query
+      // Build filtered query (with day-of-week filtering if dayDate provided)
       const filteredQuery = params.searchValue
-        ? this.buildSearchQuery(params.searchValue, params.typeFilter, params.excludeId)
-        : this.buildBaseQuery(params.typeFilter, params.excludeId);
+        ? this.buildSearchQuery(params.searchValue, params.typeFilter, params.excludeId, params.dayDate)
+        : this.buildBaseQuery(params.typeFilter, params.excludeId, params.dayDate);
 
       const recordsFiltered = await filteredQuery.count({ useMasterKey: true });
 
@@ -1190,6 +1194,7 @@ class ExperienceController {
       sortDirection: query.order?.[0]?.dir || 'asc',
       typeFilter: query.type,
       excludeId: query.excludeId,
+      dayDate: query.dayDate, // YYYY-MM-DD format for day-of-week filtering
     };
   }
 
@@ -1197,11 +1202,12 @@ class ExperienceController {
    * Build base query for experiences.
    * @param {string} typeFilter - Type filter (Experience/Provider).
    * @param {string} excludeId - ID to exclude.
+   * @param {string} dayDate - Date in YYYY-MM-DD format for day-of-week filtering.
    * @returns {Parse.Query} Base query.
    * @private
    * @example
    */
-  buildBaseQuery(typeFilter, excludeId) {
+  buildBaseQuery(typeFilter, excludeId, dayDate) {
     const query = new Parse.Query('Experience');
     query.equalTo('exists', true);
     if (typeFilter && ['Experience', 'Provider'].includes(typeFilter)) {
@@ -1210,6 +1216,18 @@ class ExperienceController {
     if (excludeId) {
       query.notEqualTo('objectId', excludeId);
     }
+
+    // Apply day-of-week filtering if dayDate provided
+    if (dayDate) {
+      const QuoteServiceHelper = require('../../services/QuoteServiceHelper');
+      const dayCode = QuoteServiceHelper.getDayOfWeekCode(dayDate);
+
+      if (dayCode !== null) {
+        // Filter by availability.day array containing dayCode
+        query.equalTo('availability.day', dayCode);
+      }
+    }
+
     return query;
   }
 
@@ -1218,11 +1236,12 @@ class ExperienceController {
    * @param {string} searchValue - Search term.
    * @param {string} typeFilter - Type filter (Experience/Provider).
    * @param {string} excludeId - ID to exclude.
+   * @param {string} dayDate - Date in YYYY-MM-DD format for day-of-week filtering.
    * @returns {Parse.Query} Filtered query.
    * @private
    * @example
    */
-  buildSearchQuery(searchValue, typeFilter, excludeId) {
+  buildSearchQuery(searchValue, typeFilter, excludeId, dayDate) {
     const nameQuery = new Parse.Query('Experience');
     nameQuery.equalTo('exists', true);
     if (typeFilter) nameQuery.equalTo('type', typeFilter);
@@ -1234,6 +1253,17 @@ class ExperienceController {
     if (typeFilter) descQuery.equalTo('type', typeFilter);
     if (excludeId) descQuery.notEqualTo('objectId', excludeId);
     descQuery.matches('description', searchValue, 'i');
+
+    // Apply day-of-week filtering to both queries
+    if (dayDate) {
+      const QuoteServiceHelper = require('../../services/QuoteServiceHelper');
+      const dayCode = QuoteServiceHelper.getDayOfWeekCode(dayDate);
+
+      if (dayCode !== null) {
+        nameQuery.equalTo('availability.day', dayCode);
+        descQuery.equalTo('availability.day', dayCode);
+      }
+    }
 
     return Parse.Query.or(nameQuery, descQuery);
   }
