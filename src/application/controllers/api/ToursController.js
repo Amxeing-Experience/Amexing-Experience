@@ -879,6 +879,8 @@ class ToursController {
       const tourId = req.params.id;
       const { clientId } = req.query;
 
+      logger.info(`[getAllRatePricesForTourWithClientPrices] Called with tourId: ${tourId}, clientId: ${clientId}`);
+
       if (!tourId) {
         return res.status(400).json({
           success: false,
@@ -930,13 +932,22 @@ class ToursController {
 
       clientPricesQuery.equalTo('clientPtr', clientPointer);
       clientPricesQuery.equalTo('itemType', 'TOUR'); // CRITICAL: Use TOUR for tours
-      clientPricesQuery.equalTo('itemId', tourId);
       clientPricesQuery.equalTo('exists', true);
       clientPricesQuery.equalTo('active', true);
       clientPricesQuery.doesNotExist('valid_until'); // Only get active records
       clientPricesQuery.include(['ratePtr', 'vehiclePtr']);
 
-      const clientPrices = await clientPricesQuery.find({ useMasterKey: true });
+      const allClientPrices = await clientPricesQuery.find({ useMasterKey: true });
+
+      // Debug: Log all client prices and their itemIds
+      logger.info(`[getAllRatePricesForTourWithClientPrices] Found ${allClientPrices.length} total TOUR client prices for client ${clientId}`);
+      allClientPrices.forEach((cp) => {
+        logger.info(`ClientPrice ID: ${cp.id}, ItemId: "${cp.get('itemId')}", Looking for tourId: "${tourId}"`);
+      });
+
+      // Filter client prices for this specific tour
+      const clientPrices = allClientPrices.filter((cp) => cp.get('itemId') === tourId);
+      logger.info(`[getAllRatePricesForTourWithClientPrices] After filtering for tour ${tourId}: ${clientPrices.length} prices found`);
 
       // Create a map of client prices for easy lookup
       const clientPriceMap = {};
@@ -948,6 +959,9 @@ class ToursController {
           clientPriceMap[key] = clientPrice.get('precio') || 0;
         }
       });
+
+      // Create a set to track which rate_vehicle combinations we've processed
+      const processedKeys = new Set();
 
       // Format the response data with client price overrides
       const formattedPrices = tourPrices.map((tourPrice) => {
@@ -961,9 +975,13 @@ class ToursController {
         const hasClientPrice = clientPrice !== undefined;
         const finalPrice = hasClientPrice ? clientPrice : basePrice;
 
+        // Mark this key as processed
+        processedKeys.add(key);
+
         return {
           id: tourPrice.id,
           price: finalPrice,
+          formattedPrice: `$${Math.round(finalPrice).toLocaleString()} MXN`,
           basePrice,
           isClientPrice: hasClientPrice,
           rate: rate ? {
@@ -979,6 +997,42 @@ class ToursController {
             trunkCapacity: vehicleType.get('trunkCapacity') || 2,
           } : null,
         };
+      });
+
+      // Add client prices that don't have corresponding tour prices
+      clientPrices.forEach((clientPrice) => {
+        const ratePtr = clientPrice.get('ratePtr');
+        const vehiclePtr = clientPrice.get('vehiclePtr');
+        const rateId = ratePtr?.id;
+        const vehicleId = vehiclePtr?.id;
+
+        if (rateId && vehicleId) {
+          const key = `${rateId}_${vehicleId}`;
+
+          // Only add if we haven't already processed this combination
+          if (!processedKeys.has(key)) {
+            const clientPriceValue = clientPrice.get('precio') || 0;
+            formattedPrices.push({
+              id: `client_${clientPrice.id}`, // Use client price ID with prefix
+              price: clientPriceValue,
+              formattedPrice: `$${Math.round(clientPriceValue).toLocaleString()} MXN`,
+              basePrice: 0, // No base price since there's no TourPrice record
+              isClientPrice: true,
+              rate: ratePtr ? {
+                id: ratePtr.id,
+                name: ratePtr.get('name'),
+                color: ratePtr.get('color') || '#6c757d',
+              } : null,
+              vehicleType: vehiclePtr ? {
+                id: vehiclePtr.id,
+                name: vehiclePtr.get('name'),
+                code: vehiclePtr.get('code') || '',
+                defaultCapacity: vehiclePtr.get('defaultCapacity') || 4,
+                trunkCapacity: vehiclePtr.get('trunkCapacity') || 2,
+              } : null,
+            });
+          }
+        }
       });
 
       return res.json({

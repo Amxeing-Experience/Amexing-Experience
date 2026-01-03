@@ -1393,9 +1393,17 @@ table.dataTable tbody tr.hover {
                 // Expand - load and show all prices for this tour
                 button.prop('disabled', true).html('<i class="ti ti-spinner ti-spin me-1"></i>Cargando...');
                 
+                // Get clientId for client-specific pricing in expanded rows
+                const clientId = getClientIdFromContext();
+                const endpoint = clientId 
+                    ? `/api/tours/${rowId}/all-rate-prices-with-client-prices?clientId=${clientId}`
+                    : `/api/tours/${rowId}/all-prices`;
+                
+                console.log('Loading expanded tour prices from endpoint:', endpoint);
+                
                 // Make API call to get TourPrices for this tour
                 $.ajax({
-                    url: '/api/tours/' + rowId + '/all-prices',
+                    url: endpoint,
                     type: 'GET',
                     beforeSend: function(xhr) {
                         const token = getAccessToken();
@@ -1526,7 +1534,7 @@ table.dataTable tbody tr.hover {
                         }
                     },
                     error: function(xhr, status, error) {
-                        console.error('❌ AJAX Error loading tour all-prices:', { xhr, status, error, url: '/api/tours/' + rowId + '/all-prices' });
+                        console.error('❌ AJAX Error loading tour all-prices:', { xhr, status, error, url: endpoint });
                         button.html('<i class="ti ti-chevron-down me-1"></i>Ver todos')
                               .prop('disabled', false);
                         showErrorAlert('Error al cargar precios de todas las tarifas');
