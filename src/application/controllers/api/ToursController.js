@@ -1105,6 +1105,7 @@ class ToursController {
         const existingPriceObject = existingMap.get(key);
 
         if (existingPriceObject) {
+          // Frontend already filtered to only send modified prices, so this price changed
           // VERSIONING: Don't update existing price, instead:
           // 1. Mark existing price as historical (set valid_until to today)
           existingPriceObject.set('valid_until', new Date());
@@ -1137,7 +1138,6 @@ class ToursController {
           // valid_until remains null (active record)
 
           objectsToSave.push(newPriceObject);
-          existingMap.delete(key);
         } else {
           // Create completely new price (no existing record)
           const newPriceObject = new ClientPricesClass();
@@ -1168,14 +1168,8 @@ class ToursController {
         }
       }
 
-      // Handle removal of prices not in the new list
-      // Mark them as historical (soft delete with versioning)
-      existingMap.forEach((priceToRemove) => {
-        priceToRemove.set('valid_until', new Date());
-        priceToRemove.set('active', false);
-        priceToRemove.set('lastModifiedBy', currentUser ? currentUser.id : null);
-        objectsToSave.push(priceToRemove);
-      });
+      // Note: We don't handle "removal" here because the frontend only sends modified prices,
+      // not the complete set of prices. Unmodified prices should remain unchanged.
 
       // Save all objects
       if (objectsToSave.length > 0) {

@@ -737,21 +737,14 @@ table.dataTable tbody tr.hover {
                             
                             return `
                                 <div class="text-center">
-                                    <div class="fw-bold text-success mb-1">
-                                        ${formatMXN(firstPrice.price)}
-                                    </div>
-                                    <small class="text-muted d-block mb-2">
-                                        ${priceCount === 1 ? '1 precio personalizado' : `${priceCount} precios personalizados`}
-                                    </small>
                                     <button class="btn btn-sm btn-outline-success configure-client-price-btn" data-tour-id="${tourId}">
-                                        <i class="ti ti-settings"></i> Ver/Editar
+                                        <i class="ti ti-settings"></i> Configurar
                                     </button>
                                 </div>
                             `;
                         } else {
                             return `
                                 <div class="text-center">
-                                    <small class="text-muted d-block mb-2">Sin precios personalizados</small>
                                     <button class="btn btn-sm btn-primary configure-client-price-btn" data-tour-id="${tourId}">
                                         <i class="ti ti-plus"></i> Configurar
                                     </button>
@@ -2617,9 +2610,8 @@ table.dataTable tbody tr.hover {
                     modal.hide();
                 }
                 
-                // Refresh the table to show updated prices
+                // Refresh the table to show updated prices by triggering rate filter
                 try {
-                    // Since the table uses client-side data, we need to reload the data
                     // Find the correct table ID
                     let currentTableId = 'client-tours-table'; // Default for client detail page
                     
@@ -2630,44 +2622,20 @@ table.dataTable tbody tr.hover {
                         currentTableId = 'tours-table';
                     }
                     
-                    // Try to use the stored initializeTable function to reload data
-                    const initFunction = window[`initializeToursTable_${currentTableId}`];
-                    if (initFunction && typeof initFunction === 'function') {
-                        console.log(`🔄 Reloading tours data for table: ${currentTableId}`);
-                        await initFunction();
-                        console.log(`✅ Tours table (${currentTableId}) data reloaded successfully.`);
+                    // Get the current rate selection and trigger refresh
+                    const headerRateFilter = $(`#headerRateFilter-${currentTableId}`);
+                    const currentSelectedRate = headerRateFilter.val();
+                    
+                    if (currentSelectedRate && currentSelectedRate !== '') {
+                        console.log(`🔄 Refreshing tours table by triggering rate filter for: ${currentSelectedRate}`);
+                        // Trigger the rate filter change to reload data with client prices
+                        headerRateFilter.trigger('change');
+                        console.log(`✅ Tours table refresh triggered for table: ${currentTableId}`);
                     } else {
-                        // Fallback: Try to get the DataTable instance and refresh it
-                        let table = window[`toursDataTable_${currentTableId}`] || window.toursDataTable;
-                        
-                        if (!table && $.fn.DataTable && $.fn.DataTable.isDataTable(`#${currentTableId}`)) {
-                            table = $(`#${currentTableId}`).DataTable();
-                        }
-                        
-                        if (table) {
-                            // For client-side tables, we need to reload the data
-                            if (table.ajax && table.ajax.reload) {
-                                table.ajax.reload(null, false);
-                            } else {
-                                // Client-side table - need to manually reload
-                                console.log('⚠️ Client-side table detected. Manual refresh may be required.');
-                                // Try to trigger a page reload after a delay
-                                setTimeout(() => {
-                                    if (window.location.pathname.includes('/clients/')) {
-                                        window.location.reload();
-                                    }
-                                }, 1500);
-                            }
-                            console.log(`✅ Tours table (${currentTableId}) refreshed.`);
-                        } else {
-                            console.log('⚠️ DataTable instance not found. Prices saved successfully.');
-                            console.log('Page will reload to show updated prices...');
-                            // Reload the page after a short delay to show updated prices
-                            setTimeout(() => {
-                                if (window.location.pathname.includes('/clients/')) {
-                                    window.location.reload();
-                                }
-                            }, 1500);
+                        console.log('⚠️ No rate selected in filter. Table data may not refresh automatically.');
+                        // If no rate is selected, try to show a message to user
+                        if (window.showNotification) {
+                            window.showNotification('info', 'Selecciona una categoría de tarifa para ver los precios actualizados.');
                         }
                     }
                 } catch (refreshError) {
