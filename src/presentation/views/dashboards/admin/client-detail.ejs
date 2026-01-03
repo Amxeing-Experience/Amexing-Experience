@@ -284,13 +284,16 @@ const tarifarioTabs = [
                                             </div>
                                         </div>
                                         <!-- Include Tours Table Organism -->
-                                        <%- include('../../organisms/datatable/tours-table', {
-                                            tableId: 'client-tours-table',
-                                            apiEndpoint: '/api/tours',
-                                            userRole: 'client',
-                                            showActions: false,
-                                            showClientPricing: true
-                                        }) %>
+                                        <div data-client-id="<%= clientId %>">
+                                            <%- include('../../organisms/datatable/tours-table', {
+                                                tableId: 'client-tours-table',
+                                                apiEndpoint: `/api/tours?clientId=${clientId}`,
+                                                userRole: 'client',
+                                                showActions: false,
+                                                showClientPricing: true,
+                                                clientId: clientId
+                                            }) %>
+                                        </div>
                                     <% } else if (tab.subsection === 'experiences') { %>
                                         <!-- Experiences Section -->
                                         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -709,7 +712,33 @@ const tarifarioTabs = [
 </style>
 
 <script>
+
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🌟 CLIENT DETAIL PAGE LOADED - JavaScript is executing!');
+    console.log('Current URL:', window.location.href);
+    console.log('Page title:', document.title);
+    
+    // Debug menu links to check if they're clickable
+    const menuLinks = document.querySelectorAll('.menu-item');
+    console.log('🔍 Found menu links:', menuLinks.length);
+    
+    menuLinks.forEach((link, index) => {
+        console.log(`Menu ${index}:`, {
+            href: link.href,
+            text: link.textContent.trim(),
+            disabled: link.hasAttribute('disabled'),
+            display: getComputedStyle(link).display,
+            pointerEvents: getComputedStyle(link).pointerEvents,
+            zIndex: getComputedStyle(link).zIndex
+        });
+        
+        // Add click event listener to debug
+        link.addEventListener('click', function(e) {
+            console.log(`🔗 Menu link clicked:`, this.href);
+            console.log('Event details:', { target: e.target, currentTarget: e.currentTarget });
+        });
+    });
+    
     const menuToggle = document.getElementById('menuToggle');
     const verticalMenu = document.querySelector('.vertical-menu');
     const menuColumn = document.getElementById('menuColumn');
