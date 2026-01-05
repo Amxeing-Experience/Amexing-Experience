@@ -241,4 +241,19 @@ router.post(
   (req, res) => ServicesController.saveClientPrices(req, res)
 );
 
+/**
+ * POST /:id/update-base-prices - Update base service prices (TourPrices).
+ * Route: POST /api/services/:id/update-base-prices
+ * Access: Admin and above
+ * Body: { prices: [{id, rateId, vehicleId, price}] }
+ * Returns: Success message with updated count.
+ */
+router.post(
+  '/:id/update-base-prices',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ServicesController.updateBasePrices(req, res)
+);
+
 module.exports = router;

@@ -253,6 +253,7 @@ class ToursController {
         objectId: tour.id,
         destinationPOI: destinationPOI
           ? {
+            id: destinationPOI.id,
             objectId: destinationPOI.id,
             name: destinationPOI.get('name'),
           }
@@ -1199,6 +1200,110 @@ class ToursController {
         body: req.body,
       });
       return this.sendError(res, 'Error al guardar los precios del cliente');
+    }
+  }
+
+  /**
+   * POST /:id/update-base-prices - Update base tour prices (TourPrices).
+   * Route: POST /api/tours/:id/update-base-prices
+   * Access: Admin and above
+   * Body: { prices: [{id, price}] }
+   * Returns: Success message with updated count.
+   * @param {object} req - Express request object with params.id and body.prices.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * POST /api/tours/abc123/update-base-prices
+   * Body: {
+   *   prices: [
+   *     { id: "tourPriceId1", price: 1500 },
+   *     { id: "tourPriceId2", price: 2000 }
+   *   ]
+   * }
+   */
+  async updateBasePrices(req, res) {
+    try {
+      const currentUser = req.user;
+      const tourId = req.params.id;
+      const { prices } = req.body;
+
+      // Validate user permissions
+      if (!currentUser) {
+        return this.sendError(res, 'Usuario no autenticado', 401);
+      }
+
+      // Validate input
+      if (!tourId) {
+        return this.sendError(res, 'ID del tour es requerido', 400);
+      }
+
+      if (!prices || !Array.isArray(prices) || prices.length === 0) {
+        return this.sendError(res, 'Lista de precios es requerida', 400);
+      }
+
+      // Verify tour exists
+      const TourClass = Parse.Object.extend('Tour');
+      const tourQuery = new Parse.Query(TourClass);
+      tourQuery.equalTo('objectId', tourId);
+      tourQuery.equalTo('exists', true);
+      const tour = await tourQuery.first({ useMasterKey: true });
+
+      if (!tour) {
+        return this.sendError(res, 'Tour no encontrado', 404);
+      }
+
+      // Get TourPrices class (Tours use TourPrices)
+      const TourPricesClass = Parse.Object.extend('TourPrices');
+      const objectsToSave = [];
+
+      // Process each price update
+      for (const priceData of prices) {
+        const { id, price } = priceData;
+
+        if (id && typeof price === 'number' && price >= 0) {
+          // Get the existing TourPrice record
+          const priceQuery = new Parse.Query(TourPricesClass);
+          priceQuery.equalTo('objectId', id);
+          const priceRecord = await priceQuery.first({ useMasterKey: true });
+
+          if (priceRecord) {
+            // Update the price
+            priceRecord.set('price', price);
+            priceRecord.set('lastModifiedBy', currentUser.id);
+            priceRecord.set('updatedAt', new Date());
+            objectsToSave.push(priceRecord);
+          }
+        }
+      }
+
+      // Save all updated prices
+      if (objectsToSave.length > 0) {
+        await Parse.Object.saveAll(objectsToSave, { useMasterKey: true });
+      }
+
+      // Log the action
+      logger.info('Tour base prices updated', {
+        tourId,
+        updatedPrices: objectsToSave.length,
+        userId: currentUser.id,
+        userEmail: currentUser.get('email'),
+        timestamp: new Date().toISOString(),
+      });
+
+      return res.json({
+        success: true,
+        message: `${objectsToSave.length} precios base actualizados exitosamente`,
+        updatedCount: objectsToSave.length,
+      });
+    } catch (error) {
+      logger.error('Error updating tour base prices', {
+        error: error.message,
+        stack: error.stack,
+        tourId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error interno del servidor al actualizar precios base', 500);
     }
   }
 

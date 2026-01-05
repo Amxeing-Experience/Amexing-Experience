@@ -1280,7 +1280,7 @@ class ServicesController {
           const destName = destPOI?.get('name') || '';
           const originName = originPOI?.get('name') || '';
           return destName.includes('Queretaro') || originName.includes('Queretaro')
-                 || destName.includes('Querétaro') || originName.includes('Querétaro');
+            || destName.includes('Querétaro') || originName.includes('Querétaro');
         });
 
         if (queretaroServices.length > 0) {
@@ -1554,6 +1554,7 @@ class ServicesController {
         const price = ratePrice.get('price') || 0;
 
         return {
+          id: ratePrice.id, // ✅ ADD THE RATEPRICES RECORD ID - THIS IS CRITICAL FOR UPDATES
           rate: rate ? {
             id: rate.id,
             name: rate.get('name'),
@@ -2103,24 +2104,25 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
+      // Check permissions - use req.userRole from JWT middleware instead of accessing user object directly
+      const { userRole } = req;
+
       if (!['superadmin', 'admin'].includes(userRole)) {
         return this.sendError(res, 'Permisos insuficientes', 403);
       }
 
       const { id } = req.params;
       const {
-        originPOI, destinationPOI, vehicleType, rate, note,
+        originPOI, destinationPOI, rate, note,
       } = req.body;
 
       if (!id) {
         return this.sendError(res, 'ID de servicio requerido', 400);
       }
 
-      // Validation
-      if (!destinationPOI || !vehicleType || !rate) {
-        return this.sendError(res, 'Destino, tipo de vehículo y tarifa son requeridos', 400);
+      // Validation - only destination is required for update (vehicle and rate are optional)
+      if (!destinationPOI) {
+        return this.sendError(res, 'Destino es requerido', 400);
       }
 
       if (originPOI === destinationPOI) {
@@ -2136,15 +2138,11 @@ class ServicesController {
         return this.sendError(res, 'Servicio no encontrado', 404);
       }
 
-      // Check if updated route would conflict with another service
-      const existingService = await Services.findByRoute(originPOI, destinationPOI, vehicleType);
-      if (existingService && existingService.id !== id && existingService.get('exists')) {
-        return this.sendError(res, 'Ya existe otro servicio con esta ruta y tipo de vehículo', 409);
-      }
+      // Note: Route conflict checking removed since vehicleType is no longer used in this simplified service model
 
-      // Update service
+      // Update service - only update fields that are provided (using standard Parse.Object set() method)
       if (originPOI) {
-        service.setOriginPOI({
+        service.set('originPOI', {
           __type: 'Pointer',
           className: 'POI',
           objectId: originPOI,
@@ -2152,22 +2150,22 @@ class ServicesController {
       } else {
         service.unset('originPOI');
       }
-      service.setDestinationPOI({
+      service.set('destinationPOI', {
         __type: 'Pointer',
         className: 'POI',
         objectId: destinationPOI,
       });
-      service.setVehicleType({
-        __type: 'Pointer',
-        className: 'VehicleType',
-        objectId: vehicleType,
-      });
-      service.setRate({
-        __type: 'Pointer',
-        className: 'Rate',
-        objectId: rate,
-      });
-      service.setNote(note || '');
+
+      // Only update rate if provided (vehicleType not supported in simplified Services model)
+      if (rate) {
+        service.set('rate', {
+          __type: 'Pointer',
+          className: 'Rate',
+          objectId: rate,
+        });
+      }
+
+      service.set('note', note || '');
 
       await service.save(null, { useMasterKey: true });
 
@@ -2870,6 +2868,111 @@ class ServicesController {
         userId: req.user?.id,
       });
       return this.sendError(res, `Error en debug ClientPrices: ${error.message}`, 500);
+    }
+  }
+
+  /**
+   * Update base prices for a service (TourPrices table).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @since 2024-12-30
+   * @example
+   * POST /api/services/abc123/update-base-prices
+   * Body: {
+   *   prices: [
+   *     {
+   *       id: "price123",
+   *       rateId: "rate456",
+   *       vehicleId: "vehicle789",
+   *       price: 1250.00
+   *     }
+   *   ]
+   * }
+   */
+  async updateBasePrices(req, res) {
+    try {
+      const currentUser = req.user;
+      const serviceId = req.params.id; // Get serviceId from the :id parameter
+      const { prices } = req.body;
+
+      // Validate user permissions
+      if (!currentUser) {
+        return this.sendError(res, 'Usuario no autenticado', 401);
+      }
+
+      // Validate input
+      if (!serviceId) {
+        return this.sendError(res, 'ID del servicio es requerido', 400);
+      }
+
+      if (!prices || !Array.isArray(prices) || prices.length === 0) {
+        return this.sendError(res, 'Lista de precios es requerida', 400);
+      }
+
+      // Verify service exists
+      const ServiceClass = Parse.Object.extend('Services');
+      const serviceQuery = new Parse.Query(ServiceClass);
+      serviceQuery.equalTo('objectId', serviceId);
+      serviceQuery.equalTo('exists', true);
+      const service = await serviceQuery.first({ useMasterKey: true });
+
+      if (!service) {
+        return this.sendError(res, 'Servicio no encontrado', 404);
+      }
+
+      // Get RatePrices class (Services use RatePrices, not TourPrices)
+      const RatePricesClass = Parse.Object.extend('RatePrices');
+      const objectsToSave = [];
+
+      // Process each price update
+      for (const priceData of prices) {
+        const { id, price } = priceData;
+
+        if (id && typeof price === 'number' && price >= 0) {
+          // Get the existing RatePrice record
+          const priceQuery = new Parse.Query(RatePricesClass);
+          priceQuery.equalTo('objectId', id);
+          const priceRecord = await priceQuery.first({ useMasterKey: true });
+
+          if (priceRecord) {
+            // Update the price
+            priceRecord.set('price', price);
+            priceRecord.set('lastModifiedBy', currentUser.id);
+            priceRecord.set('updatedAt', new Date());
+            objectsToSave.push(priceRecord);
+          }
+        }
+      }
+
+      // Save all updated prices
+      if (objectsToSave.length > 0) {
+        await Parse.Object.saveAll(objectsToSave, { useMasterKey: true });
+      }
+
+      // Log the action
+      logger.info('Service base prices updated', {
+        serviceId,
+        updatedPrices: objectsToSave.length,
+        userId: currentUser.id,
+        userEmail: currentUser.get('email'),
+        timestamp: new Date().toISOString(),
+      });
+
+      return res.json({
+        success: true,
+        message: `${objectsToSave.length} precios base actualizados exitosamente`,
+        updatedCount: objectsToSave.length,
+      });
+    } catch (error) {
+      logger.error('Error updating service base prices', {
+        error: error.message,
+        stack: error.stack,
+        serviceId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error interno del servidor al actualizar precios base', 500);
     }
   }
 
