@@ -1754,6 +1754,54 @@ table.dataTable thead th:nth-child(2) select {
             }
         }
 
+        // Function to update a specific service row in the table efficiently
+        async function updateServiceRow(serviceId) {
+            try {
+                console.log('Updating service row for ID:', serviceId);
+                
+                // Get the updated service data from API
+                const token = getAccessToken();
+                const response = await fetch(`${apiEndpoint}/${serviceId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (!result.success || !result.data) {
+                    throw new Error('Failed to get updated service data');
+                }
+
+                const updatedService = result.data;
+                console.log('Updated service data:', updatedService);
+
+                // Find the row in the DataTable and update it
+                const table = $(`#${tableId}`).DataTable();
+                const rowIndex = table.rows().indexes().filter(function (index) {
+                    const rowData = table.row(index).data();
+                    return rowData && rowData.id === serviceId;
+                });
+
+                if (rowIndex.length > 0) {
+                    // Update the row data
+                    const rowIdx = rowIndex[0];
+                    table.row(rowIdx).data(updatedService).draw(false);
+                    console.log('✅ Service row updated successfully');
+                    return true;
+                } else {
+                    console.log('⚠️ Service row not found, falling back to full table reload');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error updating service row:', error);
+                return false;
+            }
+        }
+
         async function loadServiceData(serviceId) {
             // Open modal first in edit mode (this will reset the form)
             await openServiceModal(true);
@@ -2011,9 +2059,68 @@ table.dataTable thead th:nth-child(2) select {
                             }
                             
                             $('#serviceModal').modal('hide');
-                            // Reload all data and refresh current filter
-                            initializeTable();
-                            showSuccessAlert(isEdit ? 'Traslado y precios actualizados exitosamente' : 'Traslado creado exitosamente');
+                            
+                            // Function to show loading indicator
+                            function showLoadingIndicator(message) {
+                                const container = document.getElementById('services-content');
+                                if (container) {
+                                    container.querySelectorAll('.alert').forEach(el => el.remove());
+                                    const alertHtml = `
+                                        <div class="alert alert-info alert-dismissible fade show loading-alert" role="alert">
+                                            <i class="ti ti-loader-2 spinner-border spinner-border-sm me-2"></i>
+                                            ${message}
+                                        </div>
+                                    `;
+                                    container.insertAdjacentHTML('afterbegin', alertHtml);
+                                }
+                            }
+                            
+                            // Function to hide loading indicator
+                            function hideLoadingIndicator() {
+                                document.querySelectorAll('.loading-alert').forEach(el => el.remove());
+                            }
+                            
+                            // For edits, try to update just the specific row for better performance
+                            if (isEdit && serviceId) {
+                                showLoadingIndicator('Actualizando fila...');
+                                
+                                try {
+                                    console.log('🔄 Starting row update for service:', serviceId);
+                                    const rowUpdated = await updateServiceRow(serviceId);
+                                    console.log('🔄 Row update result:', rowUpdated);
+                                    hideLoadingIndicator();
+                                    
+                                    if (rowUpdated) {
+                                        console.log('✅ Row updated successfully');
+                                        showSuccessAlert('Traslado y precios actualizados exitosamente');
+                                    } else {
+                                        console.log('⚠️ Row update failed, falling back to full reload');
+                                        // Row update failed, fall back to full reload
+                                        showLoadingIndicator('Actualizando tabla...');
+                                        await initializeTable();
+                                        hideLoadingIndicator();
+                                        showSuccessAlert('Traslado y precios actualizados exitosamente');
+                                    }
+                                } catch (error) {
+                                    console.error('❌ Error in row update process:', error);
+                                    hideLoadingIndicator();
+                                    showErrorAlert('Error al actualizar la tabla: ' + error.message);
+                                    console.error('Error refreshing table:', error);
+                                }
+                            } else {
+                                // For new services, reload the entire table
+                                showLoadingIndicator('Actualizando tabla...');
+                                
+                                try {
+                                    await initializeTable();
+                                    hideLoadingIndicator();
+                                    showSuccessAlert('Traslado creado exitosamente');
+                                } catch (error) {
+                                    hideLoadingIndicator();
+                                    showErrorAlert('Error al actualizar la tabla: ' + error.message);
+                                    console.error('Error refreshing table:', error);
+                                }
+                            }
                         }
                     },
                     error: function(xhr) {
