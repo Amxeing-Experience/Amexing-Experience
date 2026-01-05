@@ -278,32 +278,26 @@ table.dataTable thead th:nth-child(2) select {
                         </div>
                     </div>
 
-                    <!-- Sección: Información del Vehículo y Tarifa -->
-                    <div class="mb-4">
+
+                    <!-- Sección: Precios Base por Tarifa -->
+                    <div class="mb-4" id="basePricingSection" style="display: none;">
                         <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-car me-1"></i>
-                            Información del Vehículo y Tarifa
+                            <i class="ti ti-currency-dollar me-1"></i>
+                            Precios Base por Tarifa
                         </h6>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="vehicleType" class="form-label">Tipo de Vehículo <span class="text-danger">*</span></label>
-                                <select class="form-select" id="vehicleType" name="vehicleType" required>
-                                    <option value="">Seleccionar tipo de vehículo</option>
-                                </select>
-                                <div class="form-text">Tipo de vehículo asignado para esta ruta</div>
-                            </div>
-
-                            <div class="col-md-6 mb-3">
-                                <label for="rate" class="form-label">Tarifa <span class="text-danger">*</span></label>
-                                <select class="form-select" id="rate" name="rate" required>
-                                    <option value="">Seleccionar tarifa</option>
-                                </select>
-                                <div class="form-text">Tarifa aplicable a este traslado</div>
+                        
+                        <div class="alert alert-warning d-flex align-items-start mb-3" role="alert">
+                            <i class="ti ti-alert-triangle me-2 fs-5 mt-1"></i>
+                            <div>
+                                <strong>Importante:</strong>
+                                <p class="mb-0 mt-1">Estos son los precios base del servicio. Los cambios afectarán a todos los clientes que no tengan precios personalizados.</p>
                             </div>
                         </div>
-                    </div>
 
+                        <div id="basePricesContainer">
+                            <!-- Base prices will be dynamically loaded here -->
+                        </div>
+                    </div>
 
                     <!-- Sección: Notas Adicionales -->
                     <div class="mb-4">
@@ -370,24 +364,12 @@ table.dataTable thead th:nth-child(2) select {
         const canEditServices = <%= canEdit ? 'true' : 'false' %>;
         const canDeleteServices = <%= canDelete ? 'true' : 'false' %>;
         const userRole = '<%= dtUserRole %>';
+        const accessToken = '<%= accessToken || "" %>';
 
-        // Get JWT token from localStorage or cookies
+        // Get JWT token from server-side template context
         function getAccessToken() {
-            // First try localStorage (used by other parts of the app)
-            const tokenFromStorage = localStorage.getItem('accessToken');
-            if (tokenFromStorage) {
-                return tokenFromStorage;
-            }
-            
-            // Fallback to cookies (httpOnly cookies won't work, but try anyway)
-            const cookies = document.cookie.split(';');
-            for (let cookie of cookies) {
-                const [name, value] = cookie.trim().split('=');
-                if (name === 'accessToken') {
-                    return value;
-                }
-            }
-            return null;
+            // Return the token passed from server-side template context
+            return accessToken || null;
         }
 
         // Setup global AJAX configuration to include JWT token
@@ -1710,7 +1692,7 @@ table.dataTable thead th:nth-child(2) select {
                         const options = response.data.map(vt =>
                             `<option value="${vt.value}">${vt.label}</option>`
                         ).join('');
-                        $('#vehicleType').append(options);
+                        // Vehicle types loaded but not used in form anymore
                     }
                 },
                 error: function(xhr) {
@@ -1728,7 +1710,7 @@ table.dataTable thead th:nth-child(2) select {
                         const options = response.data.map(rate =>
                             `<option value="${rate.value}">${rate.label}</option>`
                         ).join('');
-                        $('#rate').append(options);
+                        // Rates loaded but not used in form anymore
                     }
                 },
                 error: function(xhr) {
@@ -1760,6 +1742,16 @@ table.dataTable thead th:nth-child(2) select {
             } catch (error) {
                 console.error('Error clearing Tom Select:', error);
             }
+            
+            // Hide pricing section for new services, show for editing
+            if (isEdit) {
+                // Pricing section will be shown when loadBasePricing is called
+                $('#basePricingSection').hide();
+            } else {
+                // Hide pricing section for new services
+                $('#basePricingSection').hide();
+                $('#basePricesContainer').empty();
+            }
         }
 
         async function loadServiceData(serviceId) {
@@ -1789,9 +1781,10 @@ table.dataTable thead th:nth-child(2) select {
                                 destTS.setValue(service.destinationPOI.id);
                             }
 
-                            $('#vehicleType').val(service.vehicleType?.id);
-                            $('#rate').val(service.rate?.id);
                             $('#note').val(service.note || '');
+                            
+                            // Load and display base pricing
+                            await loadBasePricing(serviceId);
                         } catch (error) {
                             console.error('Error setting Tom Select values:', error);
                         }
@@ -1805,6 +1798,156 @@ table.dataTable thead th:nth-child(2) select {
                     showModalError(errorMessage);
                 }
             });
+        }
+
+        // Base Pricing Functions
+        async function loadBasePricing(serviceId) {
+            try {
+                console.log('Loading base pricing for service:', serviceId);
+                
+                // Show the pricing section
+                $('#basePricingSection').show();
+                
+                // Get service base prices from API
+                const token = getAccessToken();
+                const response = await fetch(`/api/services/${serviceId}/all-rate-prices`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to load base pricing');
+                }
+                
+                const priceData = await response.json();
+                
+                if (priceData.success && priceData.data) {
+                    renderBasePricing(priceData.data);
+                } else {
+                    throw new Error('Invalid pricing data received');
+                }
+            } catch (error) {
+                console.error('Error loading base pricing:', error);
+                $('#basePricingSection').hide();
+                showModalError('Error al cargar los precios base: ' + error.message);
+            }
+        }
+
+        function renderBasePricing(priceData) {
+            const container = $('#basePricesContainer');
+            container.empty();
+            
+            // Group prices by rate
+            const pricesByRate = {};
+            priceData.forEach(item => {
+                const rateName = item.rate?.name || 'Sin tarifa';
+                const rateId = item.rate?.id || 'unknown';
+                if (!pricesByRate[rateId]) {
+                    pricesByRate[rateId] = {
+                        rateName,
+                        vehicleTypes: []
+                    };
+                }
+                pricesByRate[rateId].vehicleTypes.push(item);
+            });
+            
+            // Create pricing interface for each rate
+            Object.keys(pricesByRate).forEach(rateId => {
+                const rateData = pricesByRate[rateId];
+                
+                const rateCard = $(`
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0 fw-bold">${rateData.rateName}</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row" id="rate-${rateId}-prices">
+                                <!-- Vehicle type prices will be added here -->
+                            </div>
+                        </div>
+                    </div>
+                `);
+                
+                container.append(rateCard);
+                
+                // Add vehicle type price inputs
+                const vehiclesContainer = $(`#rate-${rateId}-prices`);
+                rateData.vehicleTypes.forEach(vehicle => {
+                    const vehicleInput = $(`
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">${vehicle.vehicleType?.name || 'Vehículo'}</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" 
+                                       class="form-control base-price-input" 
+                                       data-rate-id="${rateId}"
+                                       data-vehicle-id="${vehicle.vehicleType?.id}"
+                                       data-price-id="${vehicle.id}"
+                                       value="${vehicle.price || 0}"
+                                       step="0.01"
+                                       min="0">
+                                <span class="input-group-text">MXN</span>
+                            </div>
+                        </div>
+                    `);
+                    vehiclesContainer.append(vehicleInput);
+                });
+            });
+        }
+
+        async function saveBasePricing(serviceId) {
+            const basePrices = [];
+            
+            // Collect all base price inputs
+            $('.base-price-input').each(function() {
+                const input = $(this);
+                const price = parseFloat(input.val()) || 0;
+                const priceId = input.data('price-id');
+                const rateId = input.data('rate-id');
+                const vehicleId = input.data('vehicle-id');
+                
+                if (price > 0 && priceId) {
+                    basePrices.push({
+                        id: priceId,
+                        rateId: rateId,
+                        vehicleId: vehicleId,
+                        price: price
+                    });
+                }
+            });
+            
+            if (basePrices.length === 0) {
+                return; // No prices to save
+            }
+            
+            try {
+                const token = getAccessToken();
+                const response = await fetch(`/api/services/${serviceId}/update-base-prices`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        prices: basePrices
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save base pricing');
+                }
+                
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || 'Error saving base prices');
+                }
+                
+                console.log('Base pricing saved successfully');
+            } catch (error) {
+                console.error('Error saving base pricing:', error);
+                throw error;
+            }
         }
 
         async function saveService() {
@@ -1835,28 +1978,53 @@ table.dataTable thead th:nth-child(2) select {
                 const serviceData = {
                     originPOI: originPOI || null,
                     destinationPOI: destinationPOI,
-                    vehicleType: $('#vehicleType').val(),
-                    rate: $('#rate').val(),
                     note: $('#note').val().trim(),
                 };
 
                 const url = isEdit ? `${apiEndpoint}/${serviceId}` : apiEndpoint;
                 const method = isEdit ? 'PUT' : 'POST';
 
+                console.log('About to save service:', { url, method, serviceData, serviceId, isEdit });
+
                 $.ajax({
                     url,
                     type: method,
                     contentType: 'application/json',
                     data: JSON.stringify(serviceData),
-                    success: function(response) {
+                    beforeSend: function(xhr) {
+                        const token = getAccessToken();
+                        
+                        if (token) {
+                            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        }
+                    },
+                    success: async function(response) {
                         if (response.success) {
+                            // If editing and base pricing section is visible, save base pricing
+                            if (isEdit && $('#basePricingSection').is(':visible')) {
+                                try {
+                                    await saveBasePricing(serviceId);
+                                } catch (error) {
+                                    showModalError('Servicio guardado, pero error al actualizar precios base: ' + error.message);
+                                    return;
+                                }
+                            }
+                            
                             $('#serviceModal').modal('hide');
                             // Reload all data and refresh current filter
                             initializeTable();
-                            showSuccessAlert(isEdit ? 'Traslado actualizado exitosamente' : 'Traslado creado exitosamente');
+                            showSuccessAlert(isEdit ? 'Traslado y precios actualizados exitosamente' : 'Traslado creado exitosamente');
                         }
                     },
                     error: function(xhr) {
+                        console.log('=== ERROR RESPONSE DEBUG ===');
+                        console.log('Status:', xhr.status);
+                        console.log('Status Text:', xhr.statusText);
+                        console.log('Response Text:', xhr.responseText);
+                        console.log('Response Headers:', xhr.getAllResponseHeaders());
+                        console.log('Ready State:', xhr.readyState);
+                        console.error('AJAX Error:', { status: xhr.status, statusText: xhr.statusText, responseJSON: xhr.responseJSON });
+                        console.log('=== END ERROR DEBUG ===');
                         let errorMessage = 'Error al guardar el traslado';
 
                         if (xhr.responseJSON?.error) {

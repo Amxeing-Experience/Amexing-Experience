@@ -108,7 +108,10 @@ const authenticateToken = async (req, res, next) => {
     logger.debug('JWT Middleware - User attached:', {
       userId: req.userId,
       role: req.userRole,
+      roleLevel: req.roleObject?.getLevel(),
       organizationId: result.user?.organizationId,
+      method: req.method,
+      url: req.url,
     });
 
     next();
@@ -303,12 +306,23 @@ const requireRoleLevel = (minimumLevel) => async (req, res, next) => {
 
     const userLevel = req.roleObject.getLevel();
 
+    logger.debug('Role level check:', {
+      userId: req.userId,
+      userLevel,
+      requiredLevel: minimumLevel,
+      userRole: req.userRole,
+      method: req.method,
+      url: req.url,
+    });
+
     if (userLevel < minimumLevel) {
       logger.warn('Insufficient role level:', {
         userId: req.userId,
         userLevel,
         requiredLevel: minimumLevel,
         userRole: req.userRole,
+        method: req.method,
+        url: req.url,
       });
 
       return res.status(403).json({
