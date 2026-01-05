@@ -186,6 +186,7 @@ table.dataTable thead th:nth-child(2) select {
                     <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
                         <option value="efectivo" selected>Efectivo</option>
                         <option value="transferencia">Transferencia</option>
+                        <option value="tarjeta">Tarjeta Débito/Crédito</option>
                         <% if (!isDepartmentManager) { %>
                         <option value="transf_agencias">Transf. Agencias</option>
                         <% } %>
@@ -1221,7 +1222,7 @@ table.dataTable thead th:nth-child(2) select {
                     let finalPrice = originalPrice;
                     
                     // Apply appropriate rate based on payment type
-                    if (paymentType === 'transferencia') {
+                    if (paymentType === 'transferencia' || paymentType === 'tarjeta') {
                         finalPrice = applyCommissionRate(finalPrice);
                     } else if (paymentType === 'transf_agencias') {
                         finalPrice = applyAgencyRate(finalPrice);
@@ -1247,7 +1248,7 @@ table.dataTable thead th:nth-child(2) select {
                 let finalPrice = originalPrice;
                 
                 // Apply appropriate rate based on payment type
-                if (paymentType === 'transferencia') {
+                if (paymentType === 'transferencia' || paymentType === 'tarjeta') {
                     finalPrice = applyCommissionRate(finalPrice);
                 } else if (paymentType === 'transf_agencias') {
                     finalPrice = applyAgencyRate(finalPrice);
@@ -1266,7 +1267,7 @@ table.dataTable thead th:nth-child(2) select {
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             console.log('Payment type changed:', selectedPaymentType);
             
-            if (selectedPaymentType === 'transferencia') {
+            if (selectedPaymentType === 'transferencia' || selectedPaymentType === 'tarjeta') {
                 if (isDepartmentManager && currentAgencyRate <= 0) {
                     // Load agency rate for department managers
                     loadCurrentAgencyRate().then(() => {
