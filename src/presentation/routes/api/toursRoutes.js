@@ -545,4 +545,75 @@ router.delete('/:id', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursCont
  */
 router.patch('/:id/toggle-status', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.toggleTourStatus(req, res));
 
+/**
+ * @swagger
+ * /api/tours/{id}/update-base-prices:
+ *   post:
+ *     tags:
+ *       - Tours
+ *     summary: Update base tour prices
+ *     description: |
+ *       Update base prices for a tour (TourPrices table).
+ *
+ *       **Access:** Admin and above
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tour object ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - prices
+ *             properties:
+ *               prices:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - id
+ *                     - price
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       description: TourPrice record ID
+ *                     price:
+ *                       type: number
+ *                       description: New price value
+ *     responses:
+ *       200:
+ *         description: Tour base prices updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 updatedCount:
+ *                   type: number
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Tour not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/:id/update-base-prices', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.updateBasePrices(req, res));
+
 module.exports = router;

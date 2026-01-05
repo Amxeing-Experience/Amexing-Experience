@@ -355,6 +355,26 @@ table.dataTable tbody tr.hover {
                         </div>
                     </div>
 
+                    <!-- Base Pricing Section -->
+                    <div id="basePricingSection" style="display: none;" class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-currency-dollar me-1"></i>
+                            Precios Base
+                        </h6>
+                        <div class="alert alert-info d-flex align-items-start mb-3" role="alert">
+                            <i class="ti ti-info-circle me-2 fs-6 mt-1"></i>
+                            <div>
+                                <small>
+                                    <strong>Precios Base:</strong> Configure los precios por tarifa y vehículo para este tour.
+                                    Los precios se actualizarán automáticamente en la tabla después de guardar.
+                                </small>
+                            </div>
+                        </div>
+                        <div id="basePricesContainer">
+                            <!-- Base prices will be dynamically loaded here -->
+                        </div>
+                    </div>
+
                     <!-- Alert informativo -->
                     <div class="alert alert-info d-flex align-items-start" role="alert">
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
@@ -1823,6 +1843,16 @@ table.dataTable tbody tr.hover {
             $('#modalTitle').text(isEdit ? 'Editar Tour' : 'Crear Nuevo Tour');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Tour');
 
+            // Handle base pricing section visibility
+            if (isEdit) {
+                // Base pricing will be loaded when tour data is loaded
+                $('#basePricingSection').show();
+            } else {
+                // Hide pricing section for new tours
+                $('#basePricingSection').hide();
+                $('#basePricesContainer').empty();
+            }
+
             try {
                 // Wait for and clear Tom Select instances
                 const destTS = await waitForTomSelect('destinationPOI');
@@ -1837,6 +1867,224 @@ table.dataTable tbody tr.hover {
             const tourId = $(this).data('id');
             loadTourData(tourId);
         });
+
+        // Base Pricing Functions
+        async function loadBasePricing(tourId) {
+            try {
+                console.log('Loading base pricing for tour:', tourId);
+                
+                // Show the pricing section
+                $('#basePricingSection').show();
+                
+                // Get tour base prices from API
+                const token = getAccessToken();
+                const response = await fetch(`${apiEndpoint}/${tourId}/all-prices`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const priceData = await response.json();
+                
+                if (priceData.success && priceData.data) {
+                    renderBasePricing(priceData.data);
+                } else {
+                    throw new Error('Invalid pricing data received');
+                }
+            } catch (error) {
+                console.error('Error loading base pricing:', error);
+                $('#basePricingSection').hide();
+                showModalError('Error al cargar los precios base: ' + error.message);
+            }
+        }
+
+        function renderBasePricing(priceData) {
+            const container = $('#basePricesContainer');
+            container.empty();
+            
+            // Group prices by rate
+            const pricesByRate = {};
+            priceData.forEach(item => {
+                const rateName = item.rate?.name || 'Sin tarifa';
+                const rateId = item.rate?.id || 'unknown';
+                if (!pricesByRate[rateId]) {
+                    pricesByRate[rateId] = {
+                        rateName,
+                        vehicleTypes: []
+                    };
+                }
+                pricesByRate[rateId].vehicleTypes.push(item);
+            });
+            
+            // Create pricing interface for each rate
+            Object.keys(pricesByRate).forEach(rateId => {
+                const rateData = pricesByRate[rateId];
+                
+                const rateCard = $(`
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0 fw-bold">${rateData.rateName}</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row" id="rate-${rateId}-prices">
+                                <!-- Vehicle type prices will be added here -->
+                            </div>
+                        </div>
+                    </div>
+                `);
+                
+                container.append(rateCard);
+                
+                // Add vehicle type price inputs
+                const vehiclesContainer = $(`#rate-${rateId}-prices`);
+                rateData.vehicleTypes.forEach(vehicle => {
+                    const vehicleInput = $(`
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label fw-semibold">${vehicle.vehicleType?.name || 'Vehículo'}</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" 
+                                       class="form-control base-price-input" 
+                                       data-rate-id="${rateId}"
+                                       data-vehicle-id="${vehicle.vehicleType?.id}"
+                                       data-price-id="${vehicle.id}"
+                                       value="${vehicle.price || 0}"
+                                       step="0.01"
+                                       min="0">
+                                <span class="input-group-text">MXN</span>
+                            </div>
+                        </div>
+                    `);
+                    vehiclesContainer.append(vehicleInput);
+                });
+            });
+        }
+
+        async function saveBasePricing(tourId) {
+            const basePrices = [];
+            
+            // Collect all base price inputs
+            $('.base-price-input').each(function() {
+                const input = $(this);
+                const price = parseFloat(input.val()) || 0;
+                const priceId = input.data('price-id');
+                const rateId = input.data('rate-id');
+                const vehicleId = input.data('vehicle-id');
+                
+                if (price > 0 && priceId) {
+                    basePrices.push({
+                        id: priceId,
+                        rateId: rateId,
+                        vehicleId: vehicleId,
+                        price: price
+                    });
+                }
+            });
+            
+            if (basePrices.length === 0) {
+                return; // No prices to save
+            }
+            
+            try {
+                const token = getAccessToken();
+                const response = await fetch(`${apiEndpoint}/${tourId}/update-base-prices`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        prices: basePrices
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to save base pricing');
+                }
+                
+                const result = await response.json();
+                if (!result.success) {
+                    throw new Error(result.error || 'Error saving base prices');
+                }
+                
+                console.log('Base pricing saved successfully');
+            } catch (error) {
+                console.error('Error saving base pricing:', error);
+                throw error;
+            }
+        }
+
+        // Function to update a specific tour row in the table efficiently
+        async function updateTourRow(tourId) {
+            try {
+                console.log('Updating tour row for ID:', tourId);
+                
+                // Get the updated tour data from API
+                const token = getAccessToken();
+                const response = await fetch(`${apiEndpoint}/${tourId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                if (!result.success || !result.data) {
+                    throw new Error('Failed to get updated tour data');
+                }
+
+                const rawTour = result.data.tour;
+                console.log('Raw tour data:', rawTour);
+
+                // Format the data to match the table format
+                const updatedTour = {
+                    id: rawTour.id,
+                    objectId: rawTour.id,
+                    destinationPOI: {
+                        objectId: rawTour.destinationPOI?.id,
+                        name: rawTour.destinationPOI?.name || 'Sin destino',
+                    },
+                    time: rawTour.time || 0,
+                    availability: rawTour.availability || null,
+                    active: rawTour.active || false,
+                    exists: rawTour.exists || true,
+                    createdAt: rawTour.createdAt,
+                    updatedAt: rawTour.updatedAt,
+                    clientPrices: {},
+                    hasClientPrices: false,
+                };
+
+                console.log('Formatted tour data for table:', updatedTour);
+
+                // Find the row in the DataTable and update it
+                const table = $(`#${tableId}`).DataTable();
+                const rowIndex = table.rows().indexes().filter(function (index) {
+                    const rowData = table.row(index).data();
+                    return rowData && rowData.id === tourId;
+                });
+
+                if (rowIndex.length > 0) {
+                    // Update the row data
+                    const rowIdx = rowIndex[0];
+                    table.row(rowIdx).data(updatedTour).draw(false);
+                    console.log('✅ Tour row updated successfully');
+                    return true;
+                } else {
+                    console.log('⚠️ Tour row not found, falling back to full table reload');
+                    return false;
+                }
+            } catch (error) {
+                console.error('Error updating tour row:', error);
+                return false;
+            }
+        }
 
         async function loadTourData(tourId) {
             // Open modal first in edit mode (this will reset the form)
@@ -1885,6 +2133,9 @@ table.dataTable tbody tr.hover {
 
                                 updateNoDaysMessage();
                             }
+
+                            // Load base pricing for editing
+                            await loadBasePricing(tour.id);
 
                         } catch (error) {
                             console.error('Error setting Tom Select values:', error);
@@ -2013,12 +2264,81 @@ table.dataTable tbody tr.hover {
                     type: method,
                     contentType: 'application/json',
                     data: JSON.stringify(tourData),
-                    success: function(response) {
+                    success: async function(response) {
                         if (response.success) {
+                            // If editing and base pricing section is visible, save base pricing
+                            if (isEdit && $('#basePricingSection').is(':visible')) {
+                                try {
+                                    await saveBasePricing(tourId);
+                                } catch (error) {
+                                    showModalError('Tour guardado, pero error al actualizar precios base: ' + error.message);
+                                    return;
+                                }
+                            }
+                            
                             $('#tourModal').modal('hide');
-                            // Reload all data and refresh current filter
-                            initializeTable();
-                            showSuccessAlert(isEdit ? 'Tour actualizado exitosamente' : 'Tour creado exitosamente');
+                            
+                            // Function to show loading indicator
+                            function showLoadingIndicator(message) {
+                                const container = document.getElementById('tours-content');
+                                if (container) {
+                                    container.querySelectorAll('.alert').forEach(el => el.remove());
+                                    const alertHtml = `
+                                        <div class="alert alert-info alert-dismissible fade show loading-alert" role="alert">
+                                            <i class="ti ti-loader-2 spinner-border spinner-border-sm me-2"></i>
+                                            ${message}
+                                        </div>
+                                    `;
+                                    container.insertAdjacentHTML('afterbegin', alertHtml);
+                                }
+                            }
+                            
+                            // Function to hide loading indicator
+                            function hideLoadingIndicator() {
+                                document.querySelectorAll('.loading-alert').forEach(el => el.remove());
+                            }
+                            
+                            // For edits, try to update just the specific row for better performance
+                            if (isEdit && tourId) {
+                                showLoadingIndicator('Actualizando fila...');
+                                
+                                try {
+                                    console.log('🔄 Starting row update for tour:', tourId);
+                                    const rowUpdated = await updateTourRow(tourId);
+                                    console.log('🔄 Row update result:', rowUpdated);
+                                    hideLoadingIndicator();
+                                    
+                                    if (rowUpdated) {
+                                        console.log('✅ Row updated successfully');
+                                        showSuccessAlert('Tour y precios actualizados exitosamente');
+                                    } else {
+                                        console.log('⚠️ Row update failed, falling back to full reload');
+                                        // Row update failed, fall back to full reload
+                                        showLoadingIndicator('Actualizando tabla...');
+                                        await initializeTable();
+                                        hideLoadingIndicator();
+                                        showSuccessAlert('Tour y precios actualizados exitosamente');
+                                    }
+                                } catch (error) {
+                                    console.error('❌ Error in row update process:', error);
+                                    hideLoadingIndicator();
+                                    showErrorAlert('Error al actualizar la tabla: ' + error.message);
+                                    console.error('Error refreshing table:', error);
+                                }
+                            } else {
+                                // For new tours, reload the entire table
+                                showLoadingIndicator('Actualizando tabla...');
+                                
+                                try {
+                                    await initializeTable();
+                                    hideLoadingIndicator();
+                                    showSuccessAlert('Tour creado exitosamente');
+                                } catch (error) {
+                                    hideLoadingIndicator();
+                                    showErrorAlert('Error al actualizar la tabla: ' + error.message);
+                                    console.error('Error refreshing table:', error);
+                                }
+                            }
                         }
                     },
                     error: function(xhr) {
