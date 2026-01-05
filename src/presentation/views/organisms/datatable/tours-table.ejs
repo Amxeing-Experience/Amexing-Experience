@@ -2023,6 +2023,28 @@ table.dataTable tbody tr.hover {
             try {
                 console.log('Updating tour row for ID:', tourId);
                 
+                // Find the row in the DataTable first to check if it's expanded
+                const table = $(`#${tableId}`).DataTable();
+                const rowIndex = table.rows().indexes().filter(function (index) {
+                    const rowData = table.row(index).data();
+                    return rowData && rowData.id === tourId;
+                });
+
+                let wasExpanded = false;
+                if (rowIndex.length > 0) {
+                    const dtRow = table.row(rowIndex[0]);
+                    wasExpanded = dtRow.child.isShown();
+                    
+                    // If row was expanded, collapse it first for better UX
+                    if (wasExpanded) {
+                        dtRow.child.hide();
+                        // Also update the expand button state
+                        const expandBtn = $(dtRow.node()).find('.expand-prices-btn');
+                        expandBtn.html('<i class="ti ti-chevron-down me-1"></i>Ver todos').removeClass('expanded');
+                        console.log('Collapsed expanded row before update');
+                    }
+                }
+
                 // Get the updated tour data from API
                 const token = getAccessToken();
                 const response = await fetch(`${apiEndpoint}/${tourId}`, {
@@ -2043,6 +2065,45 @@ table.dataTable tbody tr.hover {
                 const rawTour = result.data.tour;
                 console.log('Raw tour data:', rawTour);
 
+                // Check if there's a selected rate to load pricing data
+                const selectedRate = $(`#headerRateFilter-${tableId}`).val();
+                let priceData = [];
+                
+                if (selectedRate) {
+                    console.log('Loading pricing data for selected rate:', selectedRate);
+                    try {
+                        // Get clientId for client-specific pricing
+                        const clientId = getClientIdFromContext();
+                        const requestData = { rateId: selectedRate };
+                        
+                        if (clientId) {
+                            requestData.clientId = clientId;
+                        }
+
+                        const priceResponse = await $.ajax({
+                            url: '/api/tours/with-rate-prices',
+                            type: 'GET',
+                            data: requestData,
+                            beforeSend: function(xhr) {
+                                if (token) {
+                                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                                }
+                            }
+                        });
+
+                        if (priceResponse.success && priceResponse.data) {
+                            // Find pricing data for this specific tour
+                            const tourPriceData = priceResponse.data.find(tour => tour.id === tourId);
+                            if (tourPriceData) {
+                                priceData = tourPriceData.priceData || [];
+                                console.log('Loaded pricing data for updated tour:', priceData);
+                            }
+                        }
+                    } catch (priceError) {
+                        console.warn('Failed to load pricing data for updated tour:', priceError);
+                    }
+                }
+
                 // Format the data to match the table format
                 const updatedTour = {
                     id: rawTour.id,
@@ -2057,18 +2118,12 @@ table.dataTable tbody tr.hover {
                     exists: rawTour.exists || true,
                     createdAt: rawTour.createdAt,
                     updatedAt: rawTour.updatedAt,
+                    priceData: priceData, // Include pricing data for the selected rate
                     clientPrices: {},
                     hasClientPrices: false,
                 };
 
                 console.log('Formatted tour data for table:', updatedTour);
-
-                // Find the row in the DataTable and update it
-                const table = $(`#${tableId}`).DataTable();
-                const rowIndex = table.rows().indexes().filter(function (index) {
-                    const rowData = table.row(index).data();
-                    return rowData && rowData.id === tourId;
-                });
 
                 if (rowIndex.length > 0) {
                     // Update the row data
