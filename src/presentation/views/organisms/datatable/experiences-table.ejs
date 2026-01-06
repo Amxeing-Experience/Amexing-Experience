@@ -2192,8 +2192,23 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                 success: function(response) {
                     if (response.success) {
                         $('#experienceModal').modal('hide');
-                        dataTable.ajax.reload();
-                        showSuccessAlert(isEdit ? 'Experiencia actualizada exitosamente' : 'Experiencia creada exitosamente');
+                        
+                        // Handle cost versioning case where a new experience ID is returned
+                        if (response.data && response.data.costChanged && response.data.id !== experienceId) {
+                            console.log('✅ Cost versioning completed:', {
+                                originalId: response.data.originalId || experienceId,
+                                newId: response.data.id,
+                                name: response.data.name
+                            });
+                            
+                            // For cost changes, reload the entire table to show the new experience
+                            dataTable.ajax.reload();
+                            showSuccessAlert('Experiencia y costo actualizados exitosamente (historial de precios creado)');
+                        } else {
+                            // For regular updates without cost changes
+                            dataTable.ajax.reload();
+                            showSuccessAlert(isEdit ? 'Experiencia actualizada exitosamente' : 'Experiencia creada exitosamente');
+                        }
                     }
                 },
                 error: function(xhr) {
