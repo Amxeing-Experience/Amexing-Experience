@@ -627,6 +627,10 @@ class ToursController {
       };
 
       tourPricesQuery.equalTo('ratePtr', ratePointer);
+      tourPricesQuery.equalTo('exists', true);
+      tourPricesQuery.equalTo('active', true);
+      // Only get active records (valid_until IS NULL) - price versioning
+      tourPricesQuery.doesNotExist('valid_until');
       tourPricesQuery.include(['tourPtr', 'vehicleType', 'ratePtr']);
       tourPricesQuery.ascending('vehicleType.name');
 
@@ -819,6 +823,10 @@ class ToursController {
       };
 
       tourPricesQuery.equalTo('tourPtr', tourPointer);
+      tourPricesQuery.equalTo('exists', true);
+      tourPricesQuery.equalTo('active', true);
+      // Only get active records (valid_until IS NULL) - price versioning
+      tourPricesQuery.doesNotExist('valid_until');
       tourPricesQuery.include(['ratePtr', 'vehicleType']);
       tourPricesQuery.ascending('ratePtr.name');
       tourPricesQuery.ascending('vehicleType.name');
@@ -919,6 +927,10 @@ class ToursController {
         objectId: tourId,
       };
       tourPricesQuery.equalTo('tourPtr', tourPointer);
+      tourPricesQuery.equalTo('exists', true);
+      tourPricesQuery.equalTo('active', true);
+      // Only get active records (valid_until IS NULL) - price versioning
+      tourPricesQuery.doesNotExist('valid_until');
       tourPricesQuery.include(['ratePtr', 'vehicleType']);
       tourPricesQuery.ascending('ratePtr.name');
       tourPricesQuery.ascending('vehicleType.name');
@@ -1256,22 +1268,80 @@ class ToursController {
       const TourPricesClass = Parse.Object.extend('TourPrices');
       const objectsToSave = [];
 
-      // Process each price update
+      logger.info('Starting tour price versioning update', {
+        tourId,
+        pricesCount: prices.length,
+        userId: currentUser.id,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Process each price update with VERSIONING
       for (const priceData of prices) {
         const { id, price } = priceData;
 
         if (id && typeof price === 'number' && price >= 0) {
+          logger.info('Processing price update for TourPrice', {
+            tourPriceId: id,
+            newPrice: price,
+          });
+
           // Get the existing TourPrice record
           const priceQuery = new Parse.Query(TourPricesClass);
           priceQuery.equalTo('objectId', id);
+          priceQuery.include('tourPtr');
+          priceQuery.include('ratePtr');
+          priceQuery.include('vehicleType');
           const priceRecord = await priceQuery.first({ useMasterKey: true });
 
           if (priceRecord) {
-            // Update the price
-            priceRecord.set('price', price);
-            priceRecord.set('lastModifiedBy', currentUser.id);
-            priceRecord.set('updatedAt', new Date());
-            objectsToSave.push(priceRecord);
+            const currentPrice = priceRecord.get('price');
+
+            if (currentPrice !== price) {
+              // Only version if price has changed
+              logger.info('Creating price version history', {
+                tourPriceId: id,
+                oldPrice: currentPrice,
+                newPrice: price,
+              });
+
+              // VERSIONING: Don't update existing price, instead:
+              // 1. Mark existing price as historical (set valid_until to today)
+              priceRecord.set('valid_until', new Date());
+              priceRecord.set('lastModifiedBy', currentUser.id);
+              objectsToSave.push(priceRecord);
+
+              // 2. Create NEW price record with the updated price
+              const newPriceRecord = new TourPricesClass();
+
+              // Copy all fields from original record
+              newPriceRecord.set('tourPtr', priceRecord.get('tourPtr'));
+              newPriceRecord.set('ratePtr', priceRecord.get('ratePtr'));
+              newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
+              newPriceRecord.set('price', price); // New price value
+              // valid_until remains null (active record)
+              newPriceRecord.set('active', true);
+              newPriceRecord.set('exists', true);
+              newPriceRecord.set('createdBy', currentUser.id);
+              newPriceRecord.set('lastModifiedBy', currentUser.id);
+
+              objectsToSave.push(newPriceRecord);
+
+              logger.info('Prepared versioning update', {
+                originalRecordId: id,
+                newRecordWillBeCreated: true,
+                historicalPrice: currentPrice,
+                newActivePrice: price,
+              });
+            } else {
+              logger.info('Price unchanged, skipping versioning', {
+                tourPriceId: id,
+                price,
+              });
+            }
+          } else {
+            logger.warn('TourPrice record not found', {
+              tourPriceId: id,
+            });
           }
         }
       }
