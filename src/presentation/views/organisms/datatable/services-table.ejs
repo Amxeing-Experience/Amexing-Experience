@@ -17,6 +17,7 @@ const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/s
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const dtShowClientPricing = typeof showClientPricing !== 'undefined' ? showClientPricing : false;
+const dtClientId = typeof clientId !== 'undefined' ? clientId : null;
 
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
@@ -366,6 +367,15 @@ table.dataTable thead th:nth-child(2) select {
         const canDeleteServices = <%= canDelete ? 'true' : 'false' %>;
         const userRole = '<%= dtUserRole %>';
         const accessToken = '<%= accessToken || "" %>';
+        const clientId = '<%= dtClientId || "" %>';
+        
+        // Debug: Log the clientId to verify it's being passed correctly
+        console.log('🔍 ClientId sources:', {
+            template: clientId,
+            url: new URLSearchParams(window.location.search).get('clientId'),
+            path: window.location.pathname.includes('/clients/') ? window.location.pathname.split('/clients/')[1]?.split('/')[0] : null,
+            currentPage: window.location.pathname
+        });
 
         // Get JWT token from server-side template context
         function getAccessToken() {
@@ -424,10 +434,56 @@ table.dataTable thead th:nth-child(2) select {
                     const separator = url.includes('?') ? '&' : '?';
                     url += `${separator}rateId=${selectedRate}`;
                     console.log('📡 Loading services with rate:', selectedRate);
-                    console.log('📡 Full URL:', url);
                 } else {
                     console.log('📡 Loading services without rate filter');
                 }
+                
+                // Add clientId parameter if available and not already in URL
+                let finalClientId = null;
+                
+                // Check if clientId is already in the apiEndpoint
+                const urlObj = new URL(url, window.location.origin);
+                const existingClientId = urlObj.searchParams.get('clientId');
+                
+                if (existingClientId) {
+                    console.log('📡 ClientId already in apiEndpoint:', existingClientId);
+                    finalClientId = existingClientId;
+                } else {
+                    // Priority 1: URL params (for admin viewing specific client)
+                    const pageUrlParams = new URLSearchParams(window.location.search);
+                    const urlClientId = pageUrlParams.get('clientId');
+                    
+                    // Priority 2: Path segments (for admin viewing client details)
+                    let pathClientId = null;
+                    const pathSegments = window.location.pathname.split('/');
+                    if (pathSegments.includes('clients') && pathSegments.length > pathSegments.indexOf('clients') + 1) {
+                        pathClientId = pathSegments[pathSegments.indexOf('clients') + 1];
+                    }
+                    
+                    // Priority 3: Template clientId (for Department Manager using their own ID)
+                    const templateClientId = clientId;
+                    
+                    // Use the first available clientId in priority order
+                    finalClientId = urlClientId || pathClientId || templateClientId;
+                    
+                    if (finalClientId) {
+                        const separator = url.includes('?') ? '&' : '?';
+                        url += `${separator}clientId=${finalClientId}`;
+                        console.log('📡 Adding clientId to URL:', finalClientId, '(source:', urlClientId ? 'URL' : pathClientId ? 'path' : templateClientId ? 'template' : 'none', ')');
+                    }
+                }
+                
+                console.log('📡 Final clientId used:', finalClientId);
+                console.log('📡 Priority breakdown:', {
+                    existingInEndpoint: existingClientId,
+                    pageUrl: new URLSearchParams(window.location.search).get('clientId'),
+                    pathSegment: window.location.pathname.includes('/clients/') ? window.location.pathname.split('/clients/')[1]?.split('/')[0] : null,
+                    template: clientId,
+                    final: finalClientId,
+                    currentUrl: window.location.href
+                });
+                
+                console.log('📡 Full URL:', url);
                 
                 $.ajax({
                     url: url,
@@ -1413,17 +1469,34 @@ table.dataTable thead th:nth-child(2) select {
                 
                 // Make API call to get prices for all rates for this service
                 // Check if we have a clientId to use the client prices endpoint
+                let expandClientId = null;
+                
+                // Priority 1: URL params (for admin viewing specific client)
                 const urlParams = new URLSearchParams(window.location.search);
-                let clientId = urlParams.get('clientId');
-                if (!clientId) {
-                    const clientElement = document.querySelector('[data-client-id]');
-                    if (clientElement) {
-                        clientId = clientElement.dataset.clientId;
-                    }
+                const urlClientId = urlParams.get('clientId');
+                
+                // Priority 2: Path segments (for admin viewing client details)
+                let pathClientId = null;
+                const pathSegments = window.location.pathname.split('/');
+                if (pathSegments.includes('clients') && pathSegments.length > pathSegments.indexOf('clients') + 1) {
+                    pathClientId = pathSegments[pathSegments.indexOf('clients') + 1];
                 }
                 
-                const expandEndpoint = clientId 
-                    ? `/api/services/${rowId}/all-rate-prices-with-client-prices?clientId=${clientId}`
+                // Priority 3: Data attributes
+                let dataClientId = null;
+                const clientElement = document.querySelector('[data-client-id]');
+                if (clientElement) {
+                    dataClientId = clientElement.dataset.clientId;
+                }
+                
+                // Priority 4: Template clientId (for Department Manager using their own ID)
+                const templateClientId = clientId;
+                
+                // Use the first available clientId in priority order
+                expandClientId = urlClientId || pathClientId || dataClientId || templateClientId;
+                
+                const expandEndpoint = expandClientId 
+                    ? `/api/services/${rowId}/all-rate-prices-with-client-prices?clientId=${expandClientId}`
                     : `/api/services/${rowId}/all-rate-prices`;
                 
                 
@@ -2422,25 +2495,35 @@ table.dataTable thead th:nth-child(2) select {
                 console.log('Service data for modal:', serviceData);
                 
                 // Get clientId for loading client-specific prices
-                let clientId = null;
+                let modalClientId = null;
                 
-                // Try to get client ID from URL
+                // Priority 1: URL params (for admin viewing specific client)
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlClientId = urlParams.get('clientId');
+                
+                // Priority 2: Path segments (for admin viewing client details)
+                let pathClientId = null;
                 const pathSegments = window.location.pathname.split('/');
                 if (pathSegments.includes('clients') && pathSegments.length > pathSegments.indexOf('clients') + 1) {
-                    clientId = pathSegments[pathSegments.indexOf('clients') + 1];
+                    pathClientId = pathSegments[pathSegments.indexOf('clients') + 1];
                 }
                 
-                // If not found in URL, try to get from a data attribute
-                if (!clientId) {
-                    const clientElement = document.querySelector('[data-client-id]');
-                    if (clientElement) {
-                        clientId = clientElement.dataset.clientId;
-                    }
+                // Priority 3: Data attributes
+                let dataClientId = null;
+                const clientElement = document.querySelector('[data-client-id]');
+                if (clientElement) {
+                    dataClientId = clientElement.dataset.clientId;
                 }
+                
+                // Priority 4: Template clientId (for Department Manager using their own ID)
+                const templateClientId = (typeof clientId !== 'undefined' && clientId) ? clientId : null;
+                
+                // Use the first available clientId in priority order
+                modalClientId = urlClientId || pathClientId || dataClientId || templateClientId;
 
                 // Load rate prices with client-specific prices if available
-                const endpoint = clientId 
-                    ? `/api/services/${serviceId}/all-rate-prices-with-client-prices?clientId=${clientId}`
+                const endpoint = modalClientId 
+                    ? `/api/services/${serviceId}/all-rate-prices-with-client-prices?clientId=${modalClientId}`
                     : `/api/services/${serviceId}/all-rate-prices`;
 
                 console.log('Loading prices from endpoint:', endpoint);
@@ -2598,25 +2681,34 @@ table.dataTable thead th:nth-child(2) select {
             const serviceId = document.getElementById('modalServiceId').value;
             const clientPrices = [];
 
-            // Get client ID from the page context (assuming it's available in the URL or as a data attribute)
-            let clientId = null;
+            // Get client ID from the page context
+            let saveClientId = null;
             
-            // Try to get client ID from URL
-            const urlParams = new URLSearchParams(window.location.pathname.split('/').slice(-1)[0]);
+            // Priority 1: URL params (for admin viewing specific client)
+            const urlParams = new URLSearchParams(window.location.search);
+            const urlClientId = urlParams.get('clientId');
+            
+            // Priority 2: Path segments (for admin viewing client details)
+            let pathClientId = null;
             const pathSegments = window.location.pathname.split('/');
             if (pathSegments.includes('clients') && pathSegments.length > pathSegments.indexOf('clients') + 1) {
-                clientId = pathSegments[pathSegments.indexOf('clients') + 1];
+                pathClientId = pathSegments[pathSegments.indexOf('clients') + 1];
             }
             
-            // If not found in URL, try to get from a data attribute (if available)
-            if (!clientId) {
-                const clientElement = document.querySelector('[data-client-id]');
-                if (clientElement) {
-                    clientId = clientElement.dataset.clientId;
-                }
+            // Priority 3: Data attributes
+            let dataClientId = null;
+            const clientElement = document.querySelector('[data-client-id]');
+            if (clientElement) {
+                dataClientId = clientElement.dataset.clientId;
             }
+            
+            // Priority 4: Template clientId (for Department Manager using their own ID)
+            const templateClientId = (typeof clientId !== 'undefined' && clientId) ? clientId : null;
+            
+            // Use the first available clientId in priority order
+            saveClientId = urlClientId || pathClientId || dataClientId || templateClientId;
 
-            if (!clientId) {
+            if (!saveClientId) {
                 console.error('Error: No se pudo identificar el cliente. Por favor, recarga la página.');
                 
                 // Show error notification if available
@@ -2671,7 +2763,7 @@ table.dataTable thead th:nth-child(2) select {
             }
 
             console.log('Saving client prices:', {
-                clientId: clientId,
+                clientId: saveClientId,
                 serviceId: serviceId,
                 prices: clientPrices
             });
@@ -2691,7 +2783,7 @@ table.dataTable thead th:nth-child(2) select {
                         'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
                     },
                     body: JSON.stringify({
-                        clientId: clientId,
+                        clientId: saveClientId,
                         serviceId: serviceId,
                         prices: clientPrices
                     })

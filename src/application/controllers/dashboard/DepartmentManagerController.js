@@ -280,9 +280,13 @@ class DepartmentManagerController extends RoleBasedController {
     try {
       const section = req.query.section || 'airport';
 
+      // Use the logged-in user's objectId as clientId for personalized pricing
+      const clientId = req.user?.id || null;
+
       await this.renderRoleView(req, res, 'services', {
         title: 'Traslados',
         section,
+        clientId, // Pass the user's objectId as clientId
         breadcrumb: {
           title: 'Traslados',
           items: [
