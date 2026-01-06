@@ -338,6 +338,70 @@ table.dataTable thead th:nth-child(2) select {
     </div>
 </div>
 
+<!-- Service Price History Modal -->
+<div class="modal fade" id="servicePriceHistoryModal" tabindex="-1" aria-labelledby="servicePriceHistoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title text-white" id="servicePriceHistoryModalLabel">
+                    <i class="ti ti-chart-line me-2"></i>Historial de Precios
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6 id="servicePriceHistoryServiceName" class="fw-semibold text-muted"></h6>
+                </div>
+                
+                <!-- Loading State -->
+                <div id="servicePriceHistoryLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando historial de precios...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Cargando historial de precios...</p>
+                </div>
+                
+                <!-- Error State -->
+                <div id="servicePriceHistoryError" class="alert alert-danger d-none" role="alert">
+                    <i class="ti ti-alert-triangle me-2"></i>
+                    <span id="servicePriceHistoryErrorMessage">Error al cargar el historial de precios</span>
+                </div>
+                
+                <!-- No Data State -->
+                <div id="servicePriceHistoryNoData" class="text-center py-4 d-none">
+                    <i class="ti ti-inbox display-4 text-muted"></i>
+                    <p class="mt-2 text-muted">No hay historial de precios disponible para este traslado</p>
+                </div>
+                
+                <!-- History Table -->
+                <div id="servicePriceHistoryContent" class="d-none">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Fecha de Vigencia</th>
+                                    <th>Precio</th>
+                                    <th>Tipo de Vehículo</th>
+                                    <th>Tarifa</th>
+                                    <th>Válido Hasta</th>
+                                    <th>Duración</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="servicePriceHistoryTableBody">
+                                <!-- Price history data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 (function() {
     // Wait for DOM and all dependencies to be ready
@@ -802,6 +866,17 @@ table.dataTable thead th:nth-child(2) select {
                                             data-bs-placement="top"
                                             title="Editar Traslado">
                                             <i class="ti ti-edit"></i>
+                                        </button>`;
+                            
+                            // Price history button (admin/superadmin can view price history)
+                            actions += `<button type="button"
+                                            class="btn btn-secondary view-price-history-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.originPOI?.name || ''} → ${data.destinationPOI?.name || ''}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Ver Historial de Precios">
+                                            <i class="ti ti-chart-line"></i>
                                         </button>`;
 
                             // Toggle status button - usar iconos más descriptivos
@@ -1700,6 +1775,14 @@ table.dataTable thead th:nth-child(2) select {
         $(`#${tableId}`).on('click', '.edit-service-btn', function() {
             const serviceId = $(this).data('id');
             loadServiceData(serviceId);
+        });
+
+        // Price history button
+        $(`#${tableId}`).on('click', '.view-price-history-btn', function() {
+            const serviceId = $(this).data('id');
+            const name = $(this).data('name');
+            console.log('Price history button clicked - serviceId:', serviceId, 'name:', name);
+            openServicePriceHistoryModal(serviceId, name);
         });
 
         // Toggle status
@@ -3019,6 +3102,140 @@ table.dataTable thead th:nth-child(2) select {
             }
         }, 500);
     }
+
+    // ========== SERVICE PRICE HISTORY MODAL MANAGEMENT ==========
+    /**
+     * Open service price history modal and load price history data
+     * @param {string} serviceId - ID of the service
+     * @param {string} serviceName - Name of the service
+     */
+    window.openServicePriceHistoryModal = function(serviceId, serviceName) {
+        // Set service name in modal
+        document.getElementById('servicePriceHistoryServiceName').textContent = `Traslado: ${serviceName}`;
+        
+        // Reset modal states
+        resetServicePriceHistoryModalStates();
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('servicePriceHistoryModal'));
+        modal.show();
+        
+        // Load price history data
+        loadServicePriceHistoryData(serviceId);
+    };
+
+    /**
+     * Reset all modal states to initial
+     */
+    function resetServicePriceHistoryModalStates() {
+        document.getElementById('servicePriceHistoryLoading').classList.remove('d-none');
+        document.getElementById('servicePriceHistoryError').classList.add('d-none');
+        document.getElementById('servicePriceHistoryNoData').classList.add('d-none');
+        document.getElementById('servicePriceHistoryContent').classList.add('d-none');
+        document.getElementById('servicePriceHistoryTableBody').innerHTML = '';
+    }
+
+    /**
+     * Load service price history data from API
+     * @param {string} serviceId - ID of the service
+     */
+    function loadServicePriceHistoryData(serviceId) {
+        // Use $.ajax to include JWT token from global setup
+        $.ajax({
+            url: `/api/services/${serviceId}/price-history`,
+            method: 'GET',
+            dataType: 'json'
+        })
+        .done(function(data) {
+            document.getElementById('servicePriceHistoryLoading').classList.add('d-none');
+            
+            if (data.success) {
+                if (data.data && data.data.length > 0) {
+                    populateServicePriceHistoryTable(data.data);
+                    document.getElementById('servicePriceHistoryContent').classList.remove('d-none');
+                } else {
+                    document.getElementById('servicePriceHistoryNoData').classList.remove('d-none');
+                }
+            } else {
+                showServicePriceHistoryError(data.error || 'Error al cargar el historial de precios');
+            }
+        })
+        .fail(function(xhr, status, error) {
+            document.getElementById('servicePriceHistoryLoading').classList.add('d-none');
+            
+            if (xhr.status === 401) {
+                showServicePriceHistoryError('No tienes permisos para ver el historial de precios');
+            } else if (xhr.status === 404) {
+                showServicePriceHistoryError('Servicio no encontrado');
+            } else {
+                showServicePriceHistoryError('Error de conexión al cargar el historial de precios');
+            }
+        });
+    }
+
+    /**
+     * Populate the service price history table with data
+     * @param {Array} historyData - Array of price history records
+     */
+    function populateServicePriceHistoryTable(historyData) {
+        const tbody = document.getElementById('servicePriceHistoryTableBody');
+        tbody.innerHTML = '';
+        
+        historyData.forEach(record => {
+            const row = document.createElement('tr');
+            
+            // Format dates
+            const validFrom = new Date(record.validFrom).toLocaleDateString('es-MX', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+            
+            const validUntil = record.validUntil 
+                ? new Date(record.validUntil).toLocaleDateString('es-MX', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  })
+                : 'Vigente';
+            
+            // Format price
+            const formattedPrice = parseFloat(record.price).toLocaleString('es-MX', {
+                style: 'currency',
+                currency: 'MXN'
+            });
+            
+            // Duration text
+            const durationText = record.duration ? `${record.duration} días` : 'N/A';
+            
+            // Status badge
+            const statusBadge = record.status === 'active' 
+                ? '<span class="badge bg-success">Activo</span>'
+                : '<span class="badge bg-secondary">Histórico</span>';
+            
+            row.innerHTML = `
+                <td>${validFrom}</td>
+                <td class="fw-semibold text-primary">${formattedPrice}</td>
+                <td>${record.vehicleTypeName || 'N/A'}</td>
+                <td>${record.rateName || 'N/A'}</td>
+                <td>${validUntil}</td>
+                <td>${durationText}</td>
+                <td>${statusBadge}</td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+    }
+
+    /**
+     * Show error message in service price history modal
+     * @param {string} message - Error message to display
+     */
+    function showServicePriceHistoryError(message) {
+        document.getElementById('servicePriceHistoryErrorMessage').textContent = message;
+        document.getElementById('servicePriceHistoryError').classList.remove('d-none');
+    }
+    // ========== END SERVICE PRICE HISTORY MODAL MANAGEMENT ==========
 })();
 </script>
 

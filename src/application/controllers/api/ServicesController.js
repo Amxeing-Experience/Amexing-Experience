@@ -3016,6 +3016,163 @@ class ServicesController {
   }
 
   /**
+   * Get price history for a service.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/services/:id/price-history
+   *
+   * Response:
+   * {
+   *   "success": true,
+   *   "data": [
+   *     {
+   *       "id": "abc123",
+   *       "price": "1250.00",
+   *       "validFrom": "2024-01-01T00:00:00.000Z",
+   *       "validUntil": "2024-02-01T00:00:00.000Z",
+   *       "status": "historical",
+   *       "duration": 31,
+   *       "vehicleTypeName": "Sedán",
+   *       "rateName": "Primera Clase",
+   *       "createdAt": "2024-01-01T00:00:00.000Z"
+   *     }
+   *   ],
+   *   "serviceName": "Aeropuerto de Querétaro → Querétaro Centro",
+   *   "totalRecords": 5
+   * }
+   */
+  async getPriceHistory(req, res) {
+    try {
+      const { id: serviceId } = req.params;
+      const currentUser = req.user;
+
+      if (!serviceId) {
+        return this.sendError(res, 'Service ID is required', 400);
+      }
+
+      // Get the current service to find the name
+      // Note: Table name is 'Services' (plural) in the database
+      const serviceQuery = new Parse.Query('Services');
+      serviceQuery.equalTo('objectId', serviceId);
+      serviceQuery.equalTo('exists', true);
+      serviceQuery.include(['originPOI', 'destinationPOI']);
+
+      const currentService = await serviceQuery.first({ useMasterKey: true });
+
+      if (!currentService) {
+        logger.error('Service not found for price history', {
+          serviceId,
+          userId: currentUser?.id,
+        });
+        return this.sendError(res, 'Service not found', 404);
+      }
+
+      // Build service name from origin and destination POIs
+      const originPOI = currentService.get('originPOI');
+      const destinationPOI = currentService.get('destinationPOI');
+      const serviceName = `${originPOI?.get('name') || 'Unknown'} → ${destinationPOI?.get('name') || 'Unknown'}`;
+
+      // Query all RatePrices for this service (current and historical)
+      const RatePricesClass = Parse.Object.extend('RatePrices');
+      const historyQuery = new Parse.Query(RatePricesClass);
+
+      // Create service pointer for query - NOTE: Use 'Services' (plural) as className
+      const servicePointer = new Parse.Object('Services');
+      servicePointer.id = serviceId;
+
+      // Filter by service reference
+      historyQuery.equalTo('service', servicePointer);
+      // Include related objects for complete data
+      historyQuery.include(['service', 'vehicleType', 'rate']);
+      historyQuery.equalTo('exists', true);
+      historyQuery.addDescending('createdAt');
+      historyQuery.limit(100); // Limit to last 100 price changes
+
+      logger.info('RatePrices query details', {
+        serviceId,
+        servicePointerClassName: servicePointer.className,
+        query: 'RatePrices with service pointer to Services table',
+      });
+
+      const priceHistory = await historyQuery.find({ useMasterKey: true });
+
+      logger.info('RatePrices query result', {
+        serviceId,
+        priceHistoryCount: priceHistory.length,
+      });
+
+      if (!priceHistory || priceHistory.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+          message: 'No price history found for this service',
+        });
+      }
+
+      // Process and format price history data
+      const formattedHistory = priceHistory.map((record) => {
+        const price = parseFloat(record.get('price') || 0);
+        const createdAt = record.get('createdAt');
+        const validUntil = record.get('valid_until');
+        const isActive = !validUntil; // No valid_until means it's the active record
+
+        // Get related object names
+        const vehicleType = record.get('vehicleType');
+        const rate = record.get('rate');
+        const vehicleTypeName = vehicleType ? vehicleType.get('name') : null;
+        const rateName = rate ? rate.get('name') : null;
+
+        // Calculate duration if there's a valid_until date
+        let duration = null;
+        if (validUntil) {
+          const diffMs = validUntil.getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Convert to days
+        } else {
+          // For active record, calculate days since creation
+          const diffMs = new Date().getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        }
+
+        return {
+          id: record.id,
+          price: price.toFixed(2),
+          validFrom: createdAt.toISOString(),
+          validUntil: validUntil ? validUntil.toISOString() : null,
+          status: isActive ? 'active' : 'historical',
+          duration,
+          vehicleTypeName,
+          rateName,
+          createdAt: createdAt.toISOString(),
+        };
+      });
+
+      logger.info('Service price history retrieved successfully', {
+        serviceId,
+        serviceName,
+        recordCount: formattedHistory.length,
+        userId: currentUser?.id,
+      });
+
+      return res.json({
+        success: true,
+        data: formattedHistory,
+        serviceName,
+        totalRecords: formattedHistory.length,
+      });
+    } catch (error) {
+      logger.error('Error getting service price history', {
+        serviceId: req.params.id,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
+      return this.sendError(res, 'Error retrieving price history', 500);
+    }
+  }
+
+  /**
    * Send error response.
    * @param {object} res - Express response object.
    * @param {string} message - Error message.
