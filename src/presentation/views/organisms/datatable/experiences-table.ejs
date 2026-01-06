@@ -173,6 +173,68 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
 
 <%- include('../modal/experience-images-modal.ejs') %>
 
+<!-- Price History Modal -->
+<div class="modal fade" id="priceHistoryModal" tabindex="-1" aria-labelledby="priceHistoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title text-white" id="priceHistoryModalLabel">
+                    <i class="ti ti-clock-history me-2"></i>Historial de Precios
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6 id="priceHistoryExperienceName" class="fw-semibold text-muted"></h6>
+                </div>
+                
+                <!-- Loading State -->
+                <div id="priceHistoryLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando historial de precios...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Cargando historial de precios...</p>
+                </div>
+                
+                <!-- Error State -->
+                <div id="priceHistoryError" class="alert alert-danger d-none" role="alert">
+                    <i class="ti ti-alert-triangle me-2"></i>
+                    <span id="priceHistoryErrorMessage">Error al cargar el historial de precios</span>
+                </div>
+                
+                <!-- No Data State -->
+                <div id="priceHistoryNoData" class="text-center py-4 d-none">
+                    <i class="ti ti-inbox display-4 text-muted"></i>
+                    <p class="mt-2 text-muted">No hay historial de precios disponible para esta experiencia</p>
+                </div>
+                
+                <!-- History Table -->
+                <div id="priceHistoryContent" class="d-none">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Fecha de Vigencia</th>
+                                    <th>Precio</th>
+                                    <th>Válido Hasta</th>
+                                    <th>Duración</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="priceHistoryTableBody">
+                                <!-- Price history data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Experience Modal -->
 <div class="modal fade" id="experienceModal" tabindex="-1" aria-labelledby="experienceModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
@@ -1127,6 +1189,17 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                                             title="Gestionar Imágenes">
                                             <i class="ti ti-photo"></i>
                                         </button>`;
+                            
+                            // Price history button (admin/superadmin can view price history)
+                            actions += `<button type="button"
+                                            class="btn btn-secondary view-price-history-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Ver Historial de Precios">
+                                            <i class="ti ti-chart-line"></i>
+                                        </button>`;
                         } else if (canViewImages && !canEdit) {
                             // View gallery button (department_manager can only view)
                             actions += `<button type="button"
@@ -1204,6 +1277,12 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             const experienceId = $(this).data('id');
             const name = $(this).data('name');
             window.openExperienceImagesModal(experienceId, name, true); // true for view-only mode
+        });
+
+        $(`#${tableId}`).on('click', '.view-price-history-btn', function() {
+            const experienceId = $(this).data('id');
+            const name = $(this).data('name');
+            openPriceHistoryModal(experienceId, name);
         });
         $(`#${tableId}`).on('click', '.toggle-experience-status-btn', function() {
             toggleExperienceStatus($(this).data('id'), $(this).data('current-status'), $(this).data('name'));
@@ -2662,6 +2741,130 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
         });
 
         // ========== END REAL-TIME VALIDATION SYSTEM ==========
+
+        // ========== PRICE HISTORY MODAL MANAGEMENT ==========
+
+        /**
+         * Open price history modal and load price history data
+         * @param {string} experienceId - ID of the experience
+         * @param {string} experienceName - Name of the experience
+         */
+        function openPriceHistoryModal(experienceId, experienceName) {
+            // Set experience name in modal
+            document.getElementById('priceHistoryExperienceName').textContent = `Experiencia: ${experienceName}`;
+            
+            // Reset modal states
+            resetPriceHistoryModalStates();
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('priceHistoryModal'));
+            modal.show();
+            
+            // Load price history data
+            loadPriceHistoryData(experienceId);
+        }
+
+        /**
+         * Reset all modal states to initial
+         */
+        function resetPriceHistoryModalStates() {
+            document.getElementById('priceHistoryLoading').classList.remove('d-none');
+            document.getElementById('priceHistoryError').classList.add('d-none');
+            document.getElementById('priceHistoryNoData').classList.add('d-none');
+            document.getElementById('priceHistoryContent').classList.add('d-none');
+            document.getElementById('priceHistoryTableBody').innerHTML = '';
+        }
+
+        /**
+         * Load price history data from API
+         * @param {string} experienceId - ID of the experience
+         */
+        function loadPriceHistoryData(experienceId) {
+            fetch(`/api/experiences/${experienceId}/price-history`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('priceHistoryLoading').classList.add('d-none');
+                    
+                    if (data.success) {
+                        if (data.data && data.data.length > 0) {
+                            populatePriceHistoryTable(data.data);
+                            document.getElementById('priceHistoryContent').classList.remove('d-none');
+                        } else {
+                            document.getElementById('priceHistoryNoData').classList.remove('d-none');
+                        }
+                    } else {
+                        showPriceHistoryError(data.error || 'Error al cargar el historial de precios');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading price history:', error);
+                    document.getElementById('priceHistoryLoading').classList.add('d-none');
+                    showPriceHistoryError('Error de conexión al cargar el historial de precios');
+                });
+        }
+
+        /**
+         * Populate the price history table with data
+         * @param {Array} historyData - Array of price history records
+         */
+        function populatePriceHistoryTable(historyData) {
+            const tbody = document.getElementById('priceHistoryTableBody');
+            tbody.innerHTML = '';
+
+            historyData.forEach(record => {
+                const row = document.createElement('tr');
+                
+                // Format dates
+                const validFrom = new Date(record.validFrom).toLocaleDateString('es-MX', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+                
+                const validUntil = record.validUntil 
+                    ? new Date(record.validUntil).toLocaleDateString('es-MX', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })
+                    : 'Vigente';
+
+                // Format price
+                const formattedPrice = parseFloat(record.cost).toLocaleString('es-MX', {
+                    style: 'currency',
+                    currency: 'MXN'
+                });
+
+                // Duration text
+                const durationText = record.duration ? `${record.duration} días` : 'N/A';
+
+                // Status badge
+                const statusBadge = record.status === 'active' 
+                    ? '<span class="badge bg-success">Activo</span>'
+                    : '<span class="badge bg-secondary">Histórico</span>';
+
+                row.innerHTML = `
+                    <td>${validFrom}</td>
+                    <td class="fw-semibold text-primary">${formattedPrice}</td>
+                    <td>${validUntil}</td>
+                    <td>${durationText}</td>
+                    <td>${statusBadge}</td>
+                `;
+
+                tbody.appendChild(row);
+            });
+        }
+
+        /**
+         * Show error message in price history modal
+         * @param {string} message - Error message to display
+         */
+        function showPriceHistoryError(message) {
+            document.getElementById('priceHistoryErrorMessage').textContent = message;
+            document.getElementById('priceHistoryError').classList.remove('d-none');
+        }
+
+        // ========== END PRICE HISTORY MODAL MANAGEMENT ==========
     }
 
     if (document.readyState === 'loading') {

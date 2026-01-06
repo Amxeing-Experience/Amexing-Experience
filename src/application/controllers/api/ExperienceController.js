@@ -734,11 +734,19 @@ class ExperienceController {
       // Store cost change info for versioning (will be returned to caller)
       const oldCost = experienceObj.get('cost');
       const newCost = parseFloat(cost);
-      experienceObj.set('cost', newCost);
+
+      // IMPORTANT: Do NOT modify the experience object here if cost changed
+      // The versioning logic in updateExperience will handle the cost change
+      const costChanged = oldCost !== newCost;
+
+      if (!costChanged) {
+        // If cost didn't change, it's safe to set it
+        experienceObj.set('cost', newCost);
+      }
 
       // Return cost change info to caller
       return {
-        costChanged: oldCost !== newCost,
+        costChanged,
         oldCost,
         newCost,
       };
@@ -1431,6 +1439,131 @@ class ExperienceController {
       createdAt: experience.createdAt,
       updatedAt: experience.updatedAt,
     };
+  }
+
+  /**
+   * GET /api/experiences/:id/price-history - Get price history for an experience.
+   *
+   * Retrieves all historical price records for a specific experience,
+   * including active and historical versions ordered by creation date.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {object} JSON response with price history data.
+   * @author Amexing Development Team
+   * @version 1.0.0
+   * @since 1.0.0
+   * @example
+   * GET /api/experiences/abcd1234/price-history
+   * Response: {
+   *   success: true,
+   *   data: [
+   *     {
+   *       cost: 1500.00,
+   *       validFrom: "2024-01-01T00:00:00Z",
+   *       validUntil: "2024-06-01T00:00:00Z",
+   *       status: "historical",
+   *       duration: 152
+   *     }
+   *   ]
+   * }
+   */
+  async getPriceHistory(req, res) {
+    try {
+      const { id: experienceId } = req.params;
+      const currentUser = req.user;
+
+      if (!experienceId) {
+        return this.sendError(res, 'Experience ID is required', 400);
+      }
+
+      logger.info('Getting experience price history', {
+        experienceId,
+        userId: currentUser?.id,
+      });
+
+      // Create query to get all experience records with the same name
+      // (including historical versions with valid_until set)
+      const experienceQuery = new Parse.Query('Experience');
+      experienceQuery.equalTo('objectId', experienceId);
+      experienceQuery.equalTo('exists', true);
+
+      const currentExperience = await experienceQuery.first({ useMasterKey: true });
+
+      if (!currentExperience) {
+        return this.sendError(res, 'Experience not found', 404);
+      }
+
+      const experienceName = currentExperience.get('name');
+
+      // Query all experiences with the same name (current and historical)
+      const historyQuery = new Parse.Query('Experience');
+      historyQuery.equalTo('name', experienceName);
+      historyQuery.equalTo('exists', true);
+      historyQuery.addDescending('createdAt');
+      historyQuery.limit(100); // Limit to last 100 price changes
+
+      const priceHistory = await historyQuery.find({ useMasterKey: true });
+
+      if (!priceHistory || priceHistory.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+          message: 'No price history found for this experience',
+        });
+      }
+
+      // Process and format price history data
+      const formattedHistory = priceHistory.map((record) => {
+        const cost = parseFloat(record.get('cost') || 0);
+        const createdAt = record.get('createdAt');
+        const validUntil = record.get('valid_until');
+        const isActive = !validUntil; // No valid_until means it's the active record
+
+        // Calculate duration if there's a valid_until date
+        let duration = null;
+        if (validUntil) {
+          const diffMs = validUntil.getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Convert to days
+        } else {
+          // For active record, calculate days since creation
+          const diffMs = new Date().getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        }
+
+        return {
+          id: record.id,
+          cost: cost.toFixed(2),
+          validFrom: createdAt.toISOString(),
+          validUntil: validUntil ? validUntil.toISOString() : null,
+          status: isActive ? 'active' : 'historical',
+          duration,
+          createdAt: createdAt.toISOString(),
+        };
+      });
+
+      logger.info('Price history retrieved successfully', {
+        experienceId,
+        experienceName,
+        recordCount: formattedHistory.length,
+        userId: currentUser?.id,
+      });
+
+      return res.json({
+        success: true,
+        data: formattedHistory,
+        experienceName,
+        totalRecords: formattedHistory.length,
+      });
+    } catch (error) {
+      logger.error('Error getting experience price history', {
+        experienceId: req.params.id,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error retrieving price history', 500);
+    }
   }
 
   /**
