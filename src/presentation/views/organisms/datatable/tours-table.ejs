@@ -946,7 +946,7 @@ table.dataTable tbody tr.hover {
                             actions += `<button type="button"
                                             class="btn btn-secondary view-price-history-btn"
                                             data-id="${data.objectId || data.id}"
-                                            data-name="${data.name}"
+                                            data-name="${data.destinationPOI?.name || 'Tour'}"
                                             data-bs-toggle="tooltip"
                                             data-bs-placement="top"
                                             title="Ver Historial de Precios">
