@@ -627,6 +627,10 @@ class ToursController {
       };
 
       tourPricesQuery.equalTo('ratePtr', ratePointer);
+      tourPricesQuery.equalTo('exists', true);
+      tourPricesQuery.equalTo('active', true);
+      // Only get active records (valid_until IS NULL) - price versioning
+      tourPricesQuery.doesNotExist('valid_until');
       tourPricesQuery.include(['tourPtr', 'vehicleType', 'ratePtr']);
       tourPricesQuery.ascending('vehicleType.name');
 
@@ -819,6 +823,10 @@ class ToursController {
       };
 
       tourPricesQuery.equalTo('tourPtr', tourPointer);
+      tourPricesQuery.equalTo('exists', true);
+      tourPricesQuery.equalTo('active', true);
+      // Only get active records (valid_until IS NULL) - price versioning
+      tourPricesQuery.doesNotExist('valid_until');
       tourPricesQuery.include(['ratePtr', 'vehicleType']);
       tourPricesQuery.ascending('ratePtr.name');
       tourPricesQuery.ascending('vehicleType.name');
@@ -919,6 +927,10 @@ class ToursController {
         objectId: tourId,
       };
       tourPricesQuery.equalTo('tourPtr', tourPointer);
+      tourPricesQuery.equalTo('exists', true);
+      tourPricesQuery.equalTo('active', true);
+      // Only get active records (valid_until IS NULL) - price versioning
+      tourPricesQuery.doesNotExist('valid_until');
       tourPricesQuery.include(['ratePtr', 'vehicleType']);
       tourPricesQuery.ascending('ratePtr.name');
       tourPricesQuery.ascending('vehicleType.name');
@@ -1256,22 +1268,80 @@ class ToursController {
       const TourPricesClass = Parse.Object.extend('TourPrices');
       const objectsToSave = [];
 
-      // Process each price update
+      logger.info('Starting tour price versioning update', {
+        tourId,
+        pricesCount: prices.length,
+        userId: currentUser.id,
+        timestamp: new Date().toISOString(),
+      });
+
+      // Process each price update with VERSIONING
       for (const priceData of prices) {
         const { id, price } = priceData;
 
         if (id && typeof price === 'number' && price >= 0) {
+          logger.info('Processing price update for TourPrice', {
+            tourPriceId: id,
+            newPrice: price,
+          });
+
           // Get the existing TourPrice record
           const priceQuery = new Parse.Query(TourPricesClass);
           priceQuery.equalTo('objectId', id);
+          priceQuery.include('tourPtr');
+          priceQuery.include('ratePtr');
+          priceQuery.include('vehicleType');
           const priceRecord = await priceQuery.first({ useMasterKey: true });
 
           if (priceRecord) {
-            // Update the price
-            priceRecord.set('price', price);
-            priceRecord.set('lastModifiedBy', currentUser.id);
-            priceRecord.set('updatedAt', new Date());
-            objectsToSave.push(priceRecord);
+            const currentPrice = priceRecord.get('price');
+
+            if (currentPrice !== price) {
+              // Only version if price has changed
+              logger.info('Creating price version history', {
+                tourPriceId: id,
+                oldPrice: currentPrice,
+                newPrice: price,
+              });
+
+              // VERSIONING: Don't update existing price, instead:
+              // 1. Mark existing price as historical (set valid_until to today)
+              priceRecord.set('valid_until', new Date());
+              priceRecord.set('lastModifiedBy', currentUser.id);
+              objectsToSave.push(priceRecord);
+
+              // 2. Create NEW price record with the updated price
+              const newPriceRecord = new TourPricesClass();
+
+              // Copy all fields from original record
+              newPriceRecord.set('tourPtr', priceRecord.get('tourPtr'));
+              newPriceRecord.set('ratePtr', priceRecord.get('ratePtr'));
+              newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
+              newPriceRecord.set('price', price); // New price value
+              // valid_until remains null (active record)
+              newPriceRecord.set('active', true);
+              newPriceRecord.set('exists', true);
+              newPriceRecord.set('createdBy', currentUser.id);
+              newPriceRecord.set('lastModifiedBy', currentUser.id);
+
+              objectsToSave.push(newPriceRecord);
+
+              logger.info('Prepared versioning update', {
+                originalRecordId: id,
+                newRecordWillBeCreated: true,
+                historicalPrice: currentPrice,
+                newActivePrice: price,
+              });
+            } else {
+              logger.info('Price unchanged, skipping versioning', {
+                tourPriceId: id,
+                price,
+              });
+            }
+          } else {
+            logger.warn('TourPrice record not found', {
+              tourPriceId: id,
+            });
           }
         }
       }
@@ -1304,6 +1374,151 @@ class ToursController {
       });
 
       return this.sendError(res, 'Error interno del servidor al actualizar precios base', 500);
+    }
+  }
+
+  /**
+   * GET /api/tours/:id/price-history - Get price history for a tour.
+   *
+   * Retrieves all historical price records for a specific tour,
+   * including active and historical versions ordered by creation date.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {object} JSON response with price history data.
+   * @author Amexing Development Team
+   * @version 1.0.0
+   * @since 1.0.0
+   * @example
+   * GET /api/tours/abcd1234/price-history
+   * Response: {
+   *   success: true,
+   *   data: [
+   *     {
+   *       price: 1500.00,
+   *       validFrom: "2024-01-01T00:00:00Z",
+   *       validUntil: "2024-06-01T00:00:00Z",
+   *       status: "historical",
+   *       duration: 152,
+   *       vehicleTypeName: "Sedan",
+   *       rateName: "Tarifa Base"
+   *     }
+   *   ]
+   * }
+   */
+  async getPriceHistory(req, res) {
+    try {
+      const { id: tourId } = req.params;
+      const currentUser = req.user;
+
+      if (!tourId) {
+        return this.sendError(res, 'Tour ID is required', 400);
+      }
+
+      logger.info('Getting tour price history', {
+        tourId,
+        userId: currentUser?.id,
+      });
+
+      // Get the current tour to find the name
+      const tourQuery = new Parse.Query('Tour');
+      tourQuery.equalTo('objectId', tourId);
+      tourQuery.equalTo('exists', true);
+      tourQuery.include(['destinationPOI']);
+
+      const currentTour = await tourQuery.first({ useMasterKey: true });
+
+      if (!currentTour) {
+        return this.sendError(res, 'Tour not found', 404);
+      }
+
+      const tourName = currentTour.get('name');
+
+      // Query all TourPrices for this tour (current and historical)
+      const TourPricesClass = Parse.Object.extend('TourPrices');
+      const historyQuery = new Parse.Query(TourPricesClass);
+
+      // Create tour pointer for query
+      const tourPointer = new Parse.Object('Tour');
+      tourPointer.id = tourId;
+
+      // Filter by tour reference (use correct field name: tourPtr)
+      historyQuery.equalTo('tourPtr', tourPointer);
+
+      // Include related objects for complete data (use correct field names)
+      historyQuery.include(['tourPtr', 'vehicleType', 'ratePtr']);
+      historyQuery.equalTo('exists', true);
+      historyQuery.addDescending('createdAt');
+      historyQuery.limit(100); // Limit to last 100 price changes
+
+      const priceHistory = await historyQuery.find({ useMasterKey: true });
+
+      if (!priceHistory || priceHistory.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+          message: 'No price history found for this tour',
+        });
+      }
+
+      // Process and format price history data
+      const formattedHistory = priceHistory.map((record) => {
+        const price = parseFloat(record.get('price') || 0);
+        const createdAt = record.get('createdAt');
+        const validUntil = record.get('valid_until');
+        const isActive = !validUntil; // No valid_until means it's the active record
+
+        // Get related object names (use correct field names)
+        const vehicleType = record.get('vehicleType');
+        const rate = record.get('ratePtr');
+        const vehicleTypeName = vehicleType ? vehicleType.get('name') : null;
+        const rateName = rate ? rate.get('name') : null;
+
+        // Calculate duration if there's a valid_until date
+        let duration = null;
+        if (validUntil) {
+          const diffMs = validUntil.getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Convert to days
+        } else {
+          // For active record, calculate days since creation
+          const diffMs = new Date().getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        }
+
+        return {
+          id: record.id,
+          price: price.toFixed(2),
+          validFrom: createdAt.toISOString(),
+          validUntil: validUntil ? validUntil.toISOString() : null,
+          status: isActive ? 'active' : 'historical',
+          duration,
+          vehicleTypeName,
+          rateName,
+          createdAt: createdAt.toISOString(),
+        };
+      });
+
+      logger.info('Tour price history retrieved successfully', {
+        tourId,
+        tourName,
+        recordCount: formattedHistory.length,
+        userId: currentUser?.id,
+      });
+
+      return res.json({
+        success: true,
+        data: formattedHistory,
+        tourName,
+        totalRecords: formattedHistory.length,
+      });
+    } catch (error) {
+      logger.error('Error getting tour price history', {
+        tourId: req.params.id,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error retrieving price history', 500);
     }
   }
 

@@ -236,6 +236,8 @@ class ExperienceController {
 
       const query = new Parse.Query('Experience');
       query.equalTo('exists', true);
+      // Only get active records (valid_until IS NULL) - price versioning
+      query.doesNotExist('valid_until');
       query.include('experiences');
       query.include('providerExperiences');
       query.include('tours');
@@ -389,6 +391,8 @@ class ExperienceController {
             const expQuery = new Parse.Query('Experience');
             expQuery.equalTo('objectId', expId);
             expQuery.equalTo('exists', true);
+            // Only get active records (valid_until IS NULL) - price versioning
+            expQuery.doesNotExist('valid_until');
             const exp = await expQuery.first({ useMasterKey: true });
             if (!exp) {
               logger.warn(`Experience ${expId} not found or inactive`);
@@ -727,7 +731,25 @@ class ExperienceController {
       if (cost < 0) {
         return { error: 'Cost must be greater than or equal to 0', status: 400 };
       }
-      experienceObj.set('cost', parseFloat(cost));
+      // Store cost change info for versioning (will be returned to caller)
+      const oldCost = experienceObj.get('cost');
+      const newCost = parseFloat(cost);
+
+      // IMPORTANT: Do NOT modify the experience object here if cost changed
+      // The versioning logic in updateExperience will handle the cost change
+      const costChanged = oldCost !== newCost;
+
+      if (!costChanged) {
+        // If cost didn't change, it's safe to set it
+        experienceObj.set('cost', newCost);
+      }
+
+      // Return cost change info to caller
+      return {
+        costChanged,
+        oldCost,
+        newCost,
+      };
     }
 
     if (duration !== undefined) {
@@ -814,6 +836,9 @@ class ExperienceController {
         for (const expId of experiences) {
           try {
             const expQuery = new Parse.Query('Experience');
+            expQuery.equalTo('exists', true);
+            // Only get active records (valid_until IS NULL) - price versioning
+            expQuery.doesNotExist('valid_until');
             const exp = await expQuery.get(expId, { useMasterKey: true });
             if (!exp) return { error: `Experience ${expId} not found`, status: 404 };
             experiencePointers.push(exp);
@@ -953,10 +978,13 @@ class ExperienceController {
       }
 
       // Validate and update all fields and relationships
-      const basicFieldsError = this.validateAndUpdateBasicFields(experienceObj, req.body);
-      if (basicFieldsError) {
-        return this.sendError(res, basicFieldsError.error, basicFieldsError.status);
+      const basicFieldsResult = this.validateAndUpdateBasicFields(experienceObj, req.body);
+      if (basicFieldsResult && basicFieldsResult.error) {
+        return this.sendError(res, basicFieldsResult.error, basicFieldsResult.status);
       }
+
+      // Extract cost change information if it exists
+      const costChangeInfo = basicFieldsResult && basicFieldsResult.costChanged ? basicFieldsResult : null;
 
       const relationshipsError = await this.updateExperienceRelationships(experienceObj, experienceId, req.body);
       if (relationshipsError) {
@@ -995,7 +1023,78 @@ class ExperienceController {
         }
       }
 
-      // Save and respond
+      // Handle cost versioning if cost was changed
+      if (costChangeInfo && costChangeInfo.costChanged) {
+        logger.info('Cost changed, implementing versioning', {
+          experienceId: experienceObj.id,
+          oldCost: costChangeInfo.oldCost,
+          newCost: costChangeInfo.newCost,
+        });
+
+        // VERSIONING: Instead of updating the existing experience, create a new version
+        const originalId = experienceObj.id;
+
+        // 1. Mark current experience as historical (set valid_until to today)
+        experienceObj.set('valid_until', new Date());
+        experienceObj.set('lastModifiedBy', currentUser.id);
+        await this.saveExperienceWithAudit(experienceObj, currentUser);
+
+        // 2. Create NEW experience record with the updated cost
+        const ExperienceClass = Parse.Object.extend('Experience');
+        const newExperience = new ExperienceClass();
+
+        // Copy all fields from original experience
+        const fieldsToExclude = ['objectId', 'createdAt', 'updatedAt', 'valid_until'];
+        const experienceJSON = experienceObj.toJSON();
+
+        Object.keys(experienceJSON).forEach((key) => {
+          if (!fieldsToExclude.includes(key)) {
+            if (key === 'cost') {
+              // Use the new cost
+              newExperience.set(key, costChangeInfo.newCost);
+            } else if (experienceJSON[key] && typeof experienceJSON[key] === 'object' && experienceJSON[key].className) {
+              // Handle Parse pointers
+              const PointerClass = Parse.Object.extend(experienceJSON[key].className);
+              const pointer = new PointerClass();
+              pointer.id = experienceJSON[key].objectId;
+              newExperience.set(key, pointer);
+            } else {
+              newExperience.set(key, experienceJSON[key]);
+            }
+          }
+        });
+
+        // Ensure the new experience is active and exists
+        newExperience.set('active', true);
+        newExperience.set('exists', true);
+        newExperience.set('createdBy', currentUser.id);
+        newExperience.set('lastModifiedBy', currentUser.id);
+        // valid_until remains null (active record)
+
+        // Save the new experience
+        await this.saveExperienceWithAudit(newExperience, currentUser);
+
+        logger.info('Experience versioning completed', {
+          originalId,
+          newId: newExperience.id,
+          historicalCost: costChangeInfo.oldCost,
+          newActiveCost: costChangeInfo.newCost,
+        });
+
+        // Return the new experience ID
+        return res.json({
+          success: true,
+          message: 'Experience updated successfully with cost history',
+          data: {
+            id: newExperience.id,
+            originalId,
+            name: newExperience.get('name'),
+            costChanged: true,
+          },
+        });
+      }
+
+      // Save and respond (for non-cost changes)
       await this.saveExperienceWithAudit(experienceObj, currentUser);
 
       logger.info('Experience updated successfully', {
@@ -1139,6 +1238,8 @@ class ExperienceController {
       // Find all experiences that include this experience in their experiences array
       const dependencyQuery = new Parse.Query('Experience');
       dependencyQuery.equalTo('exists', true);
+      // Only get active records (valid_until IS NULL) - price versioning
+      dependencyQuery.doesNotExist('valid_until');
       dependencyQuery.equalTo('experiences', targetExperience);
       dependencyQuery.select(['name', 'type']);
 
@@ -1210,6 +1311,8 @@ class ExperienceController {
   buildBaseQuery(typeFilter, excludeId, dayDate) {
     const query = new Parse.Query('Experience');
     query.equalTo('exists', true);
+    // Only get active records (valid_until IS NULL) - price versioning
+    query.doesNotExist('valid_until');
     if (typeFilter && ['Experience', 'Provider'].includes(typeFilter)) {
       query.equalTo('type', typeFilter);
     }
@@ -1244,12 +1347,16 @@ class ExperienceController {
   buildSearchQuery(searchValue, typeFilter, excludeId, dayDate) {
     const nameQuery = new Parse.Query('Experience');
     nameQuery.equalTo('exists', true);
+    // Only get active records (valid_until IS NULL) - price versioning
+    nameQuery.doesNotExist('valid_until');
     if (typeFilter) nameQuery.equalTo('type', typeFilter);
     if (excludeId) nameQuery.notEqualTo('objectId', excludeId);
     nameQuery.matches('name', searchValue, 'i');
 
     const descQuery = new Parse.Query('Experience');
     descQuery.equalTo('exists', true);
+    // Only get active records (valid_until IS NULL) - price versioning
+    descQuery.doesNotExist('valid_until');
     if (typeFilter) descQuery.equalTo('type', typeFilter);
     if (excludeId) descQuery.notEqualTo('objectId', excludeId);
     descQuery.matches('description', searchValue, 'i');
@@ -1332,6 +1439,131 @@ class ExperienceController {
       createdAt: experience.createdAt,
       updatedAt: experience.updatedAt,
     };
+  }
+
+  /**
+   * GET /api/experiences/:id/price-history - Get price history for an experience.
+   *
+   * Retrieves all historical price records for a specific experience,
+   * including active and historical versions ordered by creation date.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {object} JSON response with price history data.
+   * @author Amexing Development Team
+   * @version 1.0.0
+   * @since 1.0.0
+   * @example
+   * GET /api/experiences/abcd1234/price-history
+   * Response: {
+   *   success: true,
+   *   data: [
+   *     {
+   *       cost: 1500.00,
+   *       validFrom: "2024-01-01T00:00:00Z",
+   *       validUntil: "2024-06-01T00:00:00Z",
+   *       status: "historical",
+   *       duration: 152
+   *     }
+   *   ]
+   * }
+   */
+  async getPriceHistory(req, res) {
+    try {
+      const { id: experienceId } = req.params;
+      const currentUser = req.user;
+
+      if (!experienceId) {
+        return this.sendError(res, 'Experience ID is required', 400);
+      }
+
+      logger.info('Getting experience price history', {
+        experienceId,
+        userId: currentUser?.id,
+      });
+
+      // Create query to get all experience records with the same name
+      // (including historical versions with valid_until set)
+      const experienceQuery = new Parse.Query('Experience');
+      experienceQuery.equalTo('objectId', experienceId);
+      experienceQuery.equalTo('exists', true);
+
+      const currentExperience = await experienceQuery.first({ useMasterKey: true });
+
+      if (!currentExperience) {
+        return this.sendError(res, 'Experience not found', 404);
+      }
+
+      const experienceName = currentExperience.get('name');
+
+      // Query all experiences with the same name (current and historical)
+      const historyQuery = new Parse.Query('Experience');
+      historyQuery.equalTo('name', experienceName);
+      historyQuery.equalTo('exists', true);
+      historyQuery.addDescending('createdAt');
+      historyQuery.limit(100); // Limit to last 100 price changes
+
+      const priceHistory = await historyQuery.find({ useMasterKey: true });
+
+      if (!priceHistory || priceHistory.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+          message: 'No price history found for this experience',
+        });
+      }
+
+      // Process and format price history data
+      const formattedHistory = priceHistory.map((record) => {
+        const cost = parseFloat(record.get('cost') || 0);
+        const createdAt = record.get('createdAt');
+        const validUntil = record.get('valid_until');
+        const isActive = !validUntil; // No valid_until means it's the active record
+
+        // Calculate duration if there's a valid_until date
+        let duration = null;
+        if (validUntil) {
+          const diffMs = validUntil.getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Convert to days
+        } else {
+          // For active record, calculate days since creation
+          const diffMs = new Date().getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        }
+
+        return {
+          id: record.id,
+          cost: cost.toFixed(2),
+          validFrom: createdAt.toISOString(),
+          validUntil: validUntil ? validUntil.toISOString() : null,
+          status: isActive ? 'active' : 'historical',
+          duration,
+          createdAt: createdAt.toISOString(),
+        };
+      });
+
+      logger.info('Price history retrieved successfully', {
+        experienceId,
+        experienceName,
+        recordCount: formattedHistory.length,
+        userId: currentUser?.id,
+      });
+
+      return res.json({
+        success: true,
+        data: formattedHistory,
+        experienceName,
+        totalRecords: formattedHistory.length,
+      });
+    } catch (error) {
+      logger.error('Error getting experience price history', {
+        experienceId: req.params.id,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error retrieving price history', 500);
+    }
   }
 
   /**

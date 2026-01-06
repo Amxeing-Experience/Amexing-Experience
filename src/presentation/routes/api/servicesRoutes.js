@@ -151,6 +151,19 @@ router.get(
 );
 
 /**
+ * GET /api/services/:id/price-history - Get price history for a service.
+ *
+ * Access: Authenticated users (admin, superadmin)
+ * Returns: Price history data with current and historical prices.
+ */
+router.get(
+  '/:id/price-history',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ServicesController.getPriceHistory(req, res)
+);
+
+/**
  * GET /api/services/:id - Get single service by ID.
  *
  * Access: Authenticated users (admin, superadmin)

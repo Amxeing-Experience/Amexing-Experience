@@ -89,6 +89,21 @@ router.get(
 );
 
 /**
+ * GET /api/experiences/:id/price-history - Get price history for experience.
+ *
+ * Access: Admin (level 6+)
+ * Returns: Historical price records for the specified experience.
+ * Used for viewing price changes over time.
+ * NOTE: This route must be before /:id to avoid route conflicts.
+ */
+router.get(
+  '/:id/price-history',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ExperienceController.getPriceHistory(req, res)
+);
+
+/**
  * GET /api/experiences/:id - Get single experience by ID.
  *
  * Access: Admin (level 6+)
