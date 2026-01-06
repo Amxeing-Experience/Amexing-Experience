@@ -245,6 +245,70 @@ table.dataTable tbody tr.hover {
     </div>
 </div>
 
+<!-- Price History Modal -->
+<div class="modal fade" id="tourPriceHistoryModal" tabindex="-1" aria-labelledby="tourPriceHistoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title text-white" id="tourPriceHistoryModalLabel">
+                    <i class="ti ti-chart-line me-2"></i>Historial de Precios
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6 id="tourPriceHistoryTourName" class="fw-semibold text-muted"></h6>
+                </div>
+                
+                <!-- Loading State -->
+                <div id="tourPriceHistoryLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando historial de precios...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Cargando historial de precios...</p>
+                </div>
+                
+                <!-- Error State -->
+                <div id="tourPriceHistoryError" class="alert alert-danger d-none" role="alert">
+                    <i class="ti ti-alert-triangle me-2"></i>
+                    <span id="tourPriceHistoryErrorMessage">Error al cargar el historial de precios</span>
+                </div>
+                
+                <!-- No Data State -->
+                <div id="tourPriceHistoryNoData" class="text-center py-4 d-none">
+                    <i class="ti ti-inbox display-4 text-muted"></i>
+                    <p class="mt-2 text-muted">No hay historial de precios disponible para este tour</p>
+                </div>
+                
+                <!-- History Table -->
+                <div id="tourPriceHistoryContent" class="d-none">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Fecha de Vigencia</th>
+                                    <th>Precio</th>
+                                    <th>Tipo de Vehículo</th>
+                                    <th>Tarifa</th>
+                                    <th>Válido Hasta</th>
+                                    <th>Duración</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tourPriceHistoryTableBody">
+                                <!-- Price history data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Tour Modal -->
 <div class="modal fade" id="tourModal" tabindex="-1" aria-labelledby="tourModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-lg">
@@ -877,6 +941,17 @@ table.dataTable tbody tr.hover {
                                             title="Editar Tour">
                                             <i class="ti ti-edit"></i>
                                         </button>`;
+                            
+                            // Price history button (admin/superadmin can view price history)
+                            actions += `<button type="button"
+                                            class="btn btn-secondary view-price-history-btn"
+                                            data-id="${data.objectId || data.id}"
+                                            data-name="${data.name}"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Ver Historial de Precios">
+                                            <i class="ti ti-chart-line"></i>
+                                        </button>`;
 
                             // Toggle status button
                             const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
@@ -1402,10 +1477,23 @@ table.dataTable tbody tr.hover {
 
         // Handle rate filter change in header
         $(`#headerRateFilter-${tableId}`).on('change', async function() {
+            // Prevent multiple rapid triggers
+            if (window.isLoadingRateData) {
+                console.log('⚠️ Rate filter change ignored - already loading data');
+                return;
+            }
+            
             const selectedRate = $(this).val();
             const selectedRateText = $(this).find('option:selected').text();
             
-            console.log('Category filter changed:', { selectedRate, selectedRateText });
+            console.log('Category filter changed:', { 
+                selectedRate, 
+                selectedRateText,
+                isReloadingAfterPriceSave: window.isReloadingAfterPriceSave 
+            });
+            
+            // Set loading flag
+            window.isLoadingRateData = true;
             
             if (selectedRate) {
                 // Load tour prices for the selected category
@@ -1463,6 +1551,9 @@ table.dataTable tbody tr.hover {
                     dataTable.clear();
                     dataTable.rows.add(filteredData);
                     dataTable.draw();
+                } finally {
+                    // Reset loading flag
+                    window.isLoadingRateData = false;
                 }
             } else {
                 // No category selected, load all tours without prices
@@ -1471,6 +1562,9 @@ table.dataTable tbody tr.hover {
                 dataTable.clear();
                 dataTable.rows.add(filteredData);
                 dataTable.draw();
+                
+                // Reset loading flag
+                window.isLoadingRateData = false;
             }
         });
 
@@ -1954,6 +2048,13 @@ table.dataTable tbody tr.hover {
             loadTourData(tourId);
         });
 
+        // Price history button
+        $(`#${tableId}`).on('click', '.view-price-history-btn', function() {
+            const tourId = $(this).data('id');
+            const name = $(this).data('name');
+            openTourPriceHistoryModal(tourId, name);
+        });
+
         // Base Pricing Functions
         async function loadBasePricing(tourId) {
             try {
@@ -2098,6 +2199,31 @@ table.dataTable tbody tr.hover {
                 }
                 
                 console.log('Base pricing saved successfully');
+                
+                // Show success message with refresh suggestion
+                console.log('✅ Prices saved successfully - showing notification');
+                
+                // Show a notification that prices were saved successfully
+                if (window.showNotification) {
+                    window.showNotification('success', 'Precios actualizados exitosamente. La tabla se actualizará automáticamente en unos segundos.');
+                } else {
+                    console.log('💡 Prices saved successfully. Table will refresh automatically.');
+                }
+                
+                // Delay reload to let the database versioning complete properly
+                setTimeout(() => {
+                    console.log('🔄 Starting delayed refresh after price save...');
+                    const currentRateFilter = $(`#headerRateFilter-${tableId}`).val();
+                    
+                    if (currentRateFilter) {
+                        console.log('🎯 Triggering rate filter refresh for:', currentRateFilter);
+                        // Just trigger the filter without setting value (it's already set)
+                        $(`#headerRateFilter-${tableId}`).trigger('change');
+                    } else {
+                        console.log('🔄 No rate filter set, reloading basic tours');
+                        initializeTable();
+                    }
+                }, 1500); // Wait 1.5 seconds for database operations to complete
             } catch (error) {
                 console.error('Error saving base pricing:', error);
                 throw error;
@@ -3183,6 +3309,132 @@ table.dataTable tbody tr.hover {
         setTimeout(attachSaveButtonListener, 100);
     }
 })();
+
+// ========== TOUR PRICE HISTORY MODAL MANAGEMENT ==========
+
+/**
+ * Open tour price history modal and load price history data
+ * @param {string} tourId - ID of the tour
+ * @param {string} tourName - Name of the tour
+ */
+function openTourPriceHistoryModal(tourId, tourName) {
+    // Set tour name in modal
+    document.getElementById('tourPriceHistoryTourName').textContent = `Tour: ${tourName}`;
+    
+    // Reset modal states
+    resetTourPriceHistoryModalStates();
+    
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('tourPriceHistoryModal'));
+    modal.show();
+    
+    // Load price history data
+    loadTourPriceHistoryData(tourId);
+}
+
+/**
+ * Reset all modal states to initial
+ */
+function resetTourPriceHistoryModalStates() {
+    document.getElementById('tourPriceHistoryLoading').classList.remove('d-none');
+    document.getElementById('tourPriceHistoryError').classList.add('d-none');
+    document.getElementById('tourPriceHistoryNoData').classList.add('d-none');
+    document.getElementById('tourPriceHistoryContent').classList.add('d-none');
+    document.getElementById('tourPriceHistoryTableBody').innerHTML = '';
+}
+
+/**
+ * Load tour price history data from API
+ * @param {string} tourId - ID of the tour
+ */
+function loadTourPriceHistoryData(tourId) {
+    fetch(`/api/tours/${tourId}/price-history`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('tourPriceHistoryLoading').classList.add('d-none');
+            
+            if (data.success) {
+                if (data.data && data.data.length > 0) {
+                    populateTourPriceHistoryTable(data.data);
+                    document.getElementById('tourPriceHistoryContent').classList.remove('d-none');
+                } else {
+                    document.getElementById('tourPriceHistoryNoData').classList.remove('d-none');
+                }
+            } else {
+                showTourPriceHistoryError(data.error || 'Error al cargar el historial de precios');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading tour price history:', error);
+            document.getElementById('tourPriceHistoryLoading').classList.add('d-none');
+            showTourPriceHistoryError('Error de conexión al cargar el historial de precios');
+        });
+}
+
+/**
+ * Populate the tour price history table with data
+ * @param {Array} historyData - Array of price history records
+ */
+function populateTourPriceHistoryTable(historyData) {
+    const tbody = document.getElementById('tourPriceHistoryTableBody');
+    tbody.innerHTML = '';
+
+    historyData.forEach(record => {
+        const row = document.createElement('tr');
+        
+        // Format dates
+        const validFrom = new Date(record.validFrom).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+        
+        const validUntil = record.validUntil 
+            ? new Date(record.validUntil).toLocaleDateString('es-MX', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })
+            : 'Vigente';
+
+        // Format price
+        const formattedPrice = parseFloat(record.price).toLocaleString('es-MX', {
+            style: 'currency',
+            currency: 'MXN'
+        });
+
+        // Duration text
+        const durationText = record.duration ? `${record.duration} días` : 'N/A';
+
+        // Status badge
+        const statusBadge = record.status === 'active' 
+            ? '<span class="badge bg-success">Activo</span>'
+            : '<span class="badge bg-secondary">Histórico</span>';
+
+        row.innerHTML = `
+            <td>${validFrom}</td>
+            <td class="fw-semibold text-primary">${formattedPrice}</td>
+            <td>${record.vehicleTypeName || 'N/A'}</td>
+            <td>${record.rateName || 'N/A'}</td>
+            <td>${validUntil}</td>
+            <td>${durationText}</td>
+            <td>${statusBadge}</td>
+        `;
+
+        tbody.appendChild(row);
+    });
+}
+
+/**
+ * Show error message in tour price history modal
+ * @param {string} message - Error message to display
+ */
+function showTourPriceHistoryError(message) {
+    document.getElementById('tourPriceHistoryErrorMessage').textContent = message;
+    document.getElementById('tourPriceHistoryError').classList.remove('d-none');
+}
+
+// ========== END TOUR PRICE HISTORY MODAL MANAGEMENT ==========
 </script>
 
 <!-- Tour Client Pricing Modal -->

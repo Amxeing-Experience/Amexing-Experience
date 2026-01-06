@@ -350,6 +350,79 @@ router.get('/:id/all-rate-prices-with-client-prices', jwtMiddleware.requireRoleL
 
 /**
  * @swagger
+ * /api/tours/{id}/price-history:
+ *   get:
+ *     tags:
+ *       - Tours
+ *     summary: Get price history for tour
+ *     description: |
+ *       Retrieve historical price records for a specific tour showing all price changes over time.
+ *       Returns both active and historical prices with validity periods and related information.
+ *
+ *       **Access:** Admin and SuperAdmin only
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tour object ID
+ *     responses:
+ *       200:
+ *         description: Tour price history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       price:
+ *                         type: string
+ *                       validFrom:
+ *                         type: string
+ *                         format: date-time
+ *                       validUntil:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       status:
+ *                         type: string
+ *                         enum: [active, historical]
+ *                       duration:
+ *                         type: integer
+ *                         nullable: true
+ *                       vehicleTypeName:
+ *                         type: string
+ *                         nullable: true
+ *                       rateName:
+ *                         type: string
+ *                         nullable: true
+ *                 tourName:
+ *                   type: string
+ *                 totalRecords:
+ *                   type: integer
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Tour not found
+ */
+router.get('/:id/price-history', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.getPriceHistory(req, res));
+
+/**
+ * @swagger
  * /api/tours/client-prices:
  *   post:
  *     tags:
