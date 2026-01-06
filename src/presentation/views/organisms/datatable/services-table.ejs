@@ -483,19 +483,47 @@ table.dataTable thead th:nth-child(2) select {
                     currentUrl: window.location.href
                 });
                 
-                console.log('📡 Full URL:', url);
+                // Add aggressive cache-busting parameters to force fresh data
+                const separator = url.includes('?') ? '&' : '?';
+                const timestamp = Date.now();
+                const random = Math.random().toString(36).substr(2, 9);
+                url += `${separator}_t=${timestamp}&_r=${random}&_cb=${new Date().getTime()}`;
+                
+                console.log('📡 Full URL with aggressive cache-bust:', url);
+                console.log('⏰ Cache-busting params:', { timestamp, random, time: new Date().getTime() });
                 
                 $.ajax({
                     url: url,
                     type: 'GET',
+                    cache: false, // Disable jQuery cache
                     beforeSend: function(xhr) {
                         const token = getAccessToken();
                         if (token) {
                             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                         }
+                        // Add aggressive cache-busting headers
+                        xhr.setRequestHeader('Cache-Control', 'no-cache, no-store, must-revalidate, proxy-revalidate');
+                        xhr.setRequestHeader('Pragma', 'no-cache');
+                        xhr.setRequestHeader('Expires', '0');
+                        xhr.setRequestHeader('If-Modified-Since', 'Thu, 01 Jan 1970 00:00:00 GMT');
+                        xhr.setRequestHeader('If-None-Match', '*');
                     },
                     success: function(response) {
                         console.log('📡 AJAX success response:', response);
+                        console.log('🔄 Data refresh - received', response.data?.length || 0, 'services');
+                        
+                        // Debug: Check if we got updated price data for specific services
+                        if (response.data && response.data.length > 0) {
+                            const sampleService = response.data.find(s => s.id === '6p4zqx7YCf'); // Querétaro Airport
+                            if (sampleService) {
+                                console.log('🔍 Debug - Querétaro service data:', {
+                                    id: sampleService.id,
+                                    priceData: sampleService.priceData,
+                                    timestamp: new Date().toISOString()
+                                });
+                            }
+                        }
+                        
                         if (response.success && response.data) {
                             allServicesData = response.data;
                             
@@ -1828,16 +1856,42 @@ table.dataTable thead th:nth-child(2) select {
             }
         }
 
-        // Function to update a specific service row in the table efficiently
-        async function updateServiceRow(serviceId) {
+        // Function to update a specific service row with fresh price data
+        async function updateServiceRowWithPrices(serviceId) {
             try {
-                console.log('Updating service row for ID:', serviceId);
+                console.log('🔄 Updating service row with prices for ID:', serviceId);
                 
-                // Get the updated service data from API
+                // Get the current rate filter to ensure we fetch pricing data
+                const selectedRate = $(`#headerRateFilter-${tableId}`).val();
                 const token = getAccessToken();
-                const response = await fetch(`${apiEndpoint}/${serviceId}`, {
+                
+                // Use the main services endpoint with filtering to get full price data
+                // The single service endpoint doesn't include priceData array
+                let apiUrl = apiEndpoint; // Use main services endpoint
+                let params = [];
+                
+                if (selectedRate) {
+                    params.push(`rateId=${encodeURIComponent(selectedRate)}`);
+                }
+                
+                // Add cache-busting parameters
+                params.push(`_t=${Date.now()}`);
+                params.push(`_r=${Math.random()}`);
+                params.push(`_cb=${new Date().getTime()}`);
+                
+                if (params.length > 0) {
+                    apiUrl += `?${params.join('&')}`;
+                }
+                
+                console.log('📡 Fetching updated services data from main endpoint:', apiUrl);
+                
+                const response = await fetch(apiUrl, {
                     headers: {
-                        'Authorization': `Bearer ${token}`
+                        'Authorization': `Bearer ${token}`,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache',
+                        'Expires': '0',
+                        'If-Modified-Since': 'Thu, 01 Jan 1970 00:00:00 GMT'
                     }
                 });
 
@@ -1847,31 +1901,85 @@ table.dataTable thead th:nth-child(2) select {
 
                 const result = await response.json();
                 if (!result.success || !result.data) {
-                    throw new Error('Failed to get updated service data');
+                    throw new Error('Failed to get updated services data');
                 }
 
-                const updatedService = result.data;
-                console.log('Updated service data:', updatedService);
-
-                // Find the row in the DataTable and update it
-                const table = $(`#${tableId}`).DataTable();
-                const rowIndex = table.rows().indexes().filter(function (index) {
-                    const rowData = table.row(index).data();
-                    return rowData && rowData.id === serviceId;
+                // Find the specific service in the response
+                const updatedService = result.data.find(service => 
+                    service.id === serviceId || service.objectId === serviceId
+                );
+                
+                if (!updatedService) {
+                    throw new Error(`Service with ID ${serviceId} not found in response`);
+                }
+                
+                console.log('📊 Found updated service data with prices:', {
+                    id: updatedService.id,
+                    hasPriceData: !!updatedService.priceData,
+                    priceCount: updatedService.priceData?.length || 0,
+                    priceData: updatedService.priceData,
+                    fetchedAt: new Date().toISOString()
                 });
 
-                if (rowIndex.length > 0) {
-                    // Update the row data
-                    const rowIdx = rowIndex[0];
-                    table.row(rowIdx).data(updatedService).draw(false);
-                    console.log('✅ Service row updated successfully');
+                // Find the row in the DataTable
+                const table = dataTable; // Use the global dataTable instance
+                let targetRowIndex = -1;
+                
+                // Find the row index by comparing service IDs
+                table.rows().every(function(index) {
+                    const rowData = this.data();
+                    if (rowData && (rowData.id === serviceId || rowData.objectId === serviceId)) {
+                        targetRowIndex = index;
+                        return false; // Break the loop
+                    }
+                    return true; // Continue
+                });
+
+                if (targetRowIndex !== -1) {
+                    console.log('🎯 Found target row at index:', targetRowIndex);
+                    
+                    // Update the row data with fresh service data including prices
+                    table.row(targetRowIndex).data(updatedService).draw(false);
+                    
+                    // Update the services data arrays to keep them in sync
+                    const serviceIndex = allServicesData.findIndex(s => s.id === serviceId || s.objectId === serviceId);
+                    if (serviceIndex !== -1) {
+                        allServicesData[serviceIndex] = updatedService;
+                    }
+                    
+                    const filteredIndex = filteredData.findIndex(s => s.id === serviceId || s.objectId === serviceId);
+                    if (filteredIndex !== -1) {
+                        filteredData[filteredIndex] = updatedService;
+                    }
+                    
+                    // Update service prices map if we have price data
+                    if (updatedService.priceData && updatedService.priceData.length > 0) {
+                        updatedService.priceData.forEach(priceItem => {
+                            const key = `${serviceId}_${priceItem.vehicleCode || priceItem.vehicleType?.code}`;
+                            servicePricesMap.set(key, {
+                                service: updatedService,
+                                vehicleType: priceItem.vehicleType || { name: priceItem.vehicleType, code: priceItem.vehicleCode },
+                                price: priceItem.price,
+                                formattedPrice: priceItem.formattedPrice
+                            });
+                        });
+                        console.log('🗺️ Updated servicePricesMap with', updatedService.priceData.length, 'price entries');
+                    }
+                    
+                    // Force redraw of the specific row to ensure price updates are visible
+                    setTimeout(() => {
+                        console.log('🎨 Forcing row redraw...');
+                        table.row(targetRowIndex).invalidate().draw(false);
+                    }, 100);
+                    
+                    console.log('✅ Service row updated successfully with fresh price data');
                     return true;
                 } else {
-                    console.log('⚠️ Service row not found, falling back to full table reload');
+                    console.log('⚠️ Service row not found in DataTable');
                     return false;
                 }
             } catch (error) {
-                console.error('Error updating service row:', error);
+                console.error('❌ Error updating service row with prices:', error);
                 return false;
             }
         }
@@ -2125,8 +2233,11 @@ table.dataTable thead th:nth-child(2) select {
                             // If editing and base pricing section is visible, save base pricing
                             if (isEdit && $('#basePricingSection').is(':visible')) {
                                 try {
+                                    console.log('💾 Saving base pricing for service:', serviceId);
                                     await saveBasePricing(serviceId);
+                                    console.log('✅ Base pricing saved successfully');
                                 } catch (error) {
+                                    console.error('❌ Error saving base pricing:', error);
                                     showModalError('Servicio guardado, pero error al actualizar precios base: ' + error.message);
                                     return;
                                 }
@@ -2154,32 +2265,47 @@ table.dataTable thead th:nth-child(2) select {
                                 document.querySelectorAll('.loading-alert').forEach(el => el.remove());
                             }
                             
-                            // For edits, try to update just the specific row for better performance
+                            // For edits with price updates, try targeted row update first
                             if (isEdit && serviceId) {
                                 showLoadingIndicator('Actualizando fila...');
                                 
                                 try {
-                                    console.log('🔄 Starting row update for service:', serviceId);
-                                    const rowUpdated = await updateServiceRow(serviceId);
-                                    console.log('🔄 Row update result:', rowUpdated);
+                                    // If we saved pricing, wait a bit for the versioning to complete on the backend
+                                    if ($('#basePricingSection').is(':visible')) {
+                                        console.log('⏳ Waiting for price versioning to complete...');
+                                        await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second
+                                    }
+                                    
+                                    console.log('🔄 Starting targeted row update for service:', serviceId);
+                                    const rowUpdated = await updateServiceRowWithPrices(serviceId);
+                                    
                                     hideLoadingIndicator();
                                     
                                     if (rowUpdated) {
-                                        console.log('✅ Row updated successfully');
-                                        showSuccessAlert('Traslado y precios actualizados exitosamente');
+                                        const successMessage = $('#basePricingSection').is(':visible') 
+                                            ? 'Traslado y precios actualizados exitosamente' 
+                                            : 'Traslado actualizado exitosamente';
+                                        showSuccessAlert(successMessage);
+                                        console.log('✅ Targeted row update completed successfully');
                                     } else {
-                                        console.log('⚠️ Row update failed, falling back to full reload');
-                                        // Row update failed, fall back to full reload
+                                        console.log('⚠️ Targeted row update failed, falling back to full table reload');
                                         showLoadingIndicator('Actualizando tabla...');
                                         await initializeTable();
                                         hideLoadingIndicator();
                                         showSuccessAlert('Traslado y precios actualizados exitosamente');
                                     }
                                 } catch (error) {
-                                    console.error('❌ Error in row update process:', error);
+                                    console.error('❌ Error in targeted row update, falling back to full reload:', error);
                                     hideLoadingIndicator();
-                                    showErrorAlert('Error al actualizar la tabla: ' + error.message);
-                                    console.error('Error refreshing table:', error);
+                                    showLoadingIndicator('Actualizando tabla...');
+                                    try {
+                                        await initializeTable();
+                                        hideLoadingIndicator();
+                                        showSuccessAlert('Traslado y precios actualizados exitosamente');
+                                    } catch (fallbackError) {
+                                        hideLoadingIndicator();
+                                        showErrorAlert('Error al actualizar la tabla: ' + fallbackError.message);
+                                    }
                                 }
                             } else {
                                 // For new services, reload the entire table
@@ -2192,7 +2318,6 @@ table.dataTable thead th:nth-child(2) select {
                                 } catch (error) {
                                     hideLoadingIndicator();
                                     showErrorAlert('Error al actualizar la tabla: ' + error.message);
-                                    console.error('Error refreshing table:', error);
                                 }
                             }
                         }

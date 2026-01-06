@@ -76,6 +76,7 @@ class ServicesController {
       });
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
       ratePricesQuery.include(['rate', 'vehicleType', 'service']);
 
       // If specific rate requested, filter by it
@@ -109,6 +110,7 @@ class ServicesController {
           });
           fallbackRatePricesQuery.equalTo('exists', true);
           fallbackRatePricesQuery.equalTo('active', true);
+          fallbackRatePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
           fallbackRatePricesQuery.include(['rate', 'vehicleType', 'service']);
           fallbackRatePricesQuery.ascending('rate'); // Get consistent ordering
 
@@ -566,6 +568,7 @@ class ServicesController {
           })));
           ratePricesQuery.equalTo('exists', true);
           ratePricesQuery.equalTo('active', true);
+          ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
           ratePricesQuery.include('rate');
           ratePricesQuery.include('service');
           ratePricesQuery.include('vehicleType');
@@ -707,6 +710,7 @@ class ServicesController {
                 const ratePriceQuery = new Parse.Query('RatePrices');
                 ratePriceQuery.equalTo('active', true);
                 ratePriceQuery.equalTo('exists', true);
+                ratePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
                 ratePriceQuery.include(['rate', 'vehicleType', 'service']);
 
                 if (rateId) {
@@ -796,6 +800,7 @@ class ServicesController {
                 });
                 fallbackRatePriceQuery.equalTo('active', true);
                 fallbackRatePriceQuery.equalTo('exists', true);
+                fallbackRatePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
                 fallbackRatePriceQuery.include(['rate', 'vehicleType']);
 
                 const fallbackRatePrice = await fallbackRatePriceQuery.first({ useMasterKey: true });
@@ -834,6 +839,7 @@ class ServicesController {
                     });
                     fallback3Query.equalTo('active', true);
                     fallback3Query.equalTo('exists', true);
+                    fallback3Query.doesNotExist('valid_until'); // Only show active prices (versioning)
                     fallback3Query.include(['rate', 'vehicleType']);
                     fallback3Query.ascending('rate'); // Sort by rate to get a consistent first option
 
@@ -884,6 +890,7 @@ class ServicesController {
                 });
                 fallbackAnyRatePriceQuery.equalTo('active', true);
                 fallbackAnyRatePriceQuery.equalTo('exists', true);
+                fallbackAnyRatePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
                 fallbackAnyRatePriceQuery.include(['rate', 'vehicleType']);
                 fallbackAnyRatePriceQuery.ascending('rate'); // Sort by rate to get a consistent first option
 
@@ -1167,6 +1174,7 @@ class ServicesController {
           ratePriceQuery.equalTo('rate', service.get('rate'));
           ratePriceQuery.equalTo('exists', true);
           ratePriceQuery.equalTo('active', true);
+          ratePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
 
           const ratePrice = await ratePriceQuery.first({ useMasterKey: true });
           price = ratePrice?.get('price') || 0;
@@ -1291,6 +1299,7 @@ class ServicesController {
             ratePricesQuery.equalTo('servicePtr', service);
             ratePricesQuery.equalTo('active', true);
             ratePricesQuery.equalTo('exists', true);
+            ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
 
             await ratePricesQuery.find({ useMasterKey: true });
             // Rate prices retrieved for debugging purposes
@@ -1309,6 +1318,7 @@ class ServicesController {
       });
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
       ratePricesQuery.include(['service', 'service.originPOI', 'service.destinationPOI', 'service.rate', 'vehicleType']);
       ratePricesQuery.limit(1000);
 
@@ -1541,6 +1551,7 @@ class ServicesController {
       });
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
       ratePricesQuery.include(['rate', 'vehicleType', 'service']);
       ratePricesQuery.limit(1000);
 
@@ -1633,6 +1644,7 @@ class ServicesController {
       });
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
       ratePricesQuery.include(['rate', 'vehicleType', 'service']);
       ratePricesQuery.limit(1000);
 
@@ -2583,6 +2595,7 @@ class ServicesController {
 
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
       ratePricesQuery.include('rate');
       ratePricesQuery.include('service');
       ratePricesQuery.include('vehicleType');
@@ -2892,9 +2905,18 @@ class ServicesController {
    */
   async updateBasePrices(req, res) {
     try {
+      console.log('🔧 updateBasePrices called - serviceId:', req.params.id);
+      console.log('🔧 updateBasePrices called - body:', JSON.stringify(req.body, null, 2));
+
       const currentUser = req.user;
       const serviceId = req.params.id; // Get serviceId from the :id parameter
       const { prices } = req.body;
+
+      logger.info('ServicesController.updateBasePrices called', {
+        userId: currentUser?.id,
+        serviceId,
+        pricesCount: prices?.length || 0,
+      });
 
       // Validate user permissions
       if (!currentUser) {
@@ -2936,11 +2958,28 @@ class ServicesController {
           const priceRecord = await priceQuery.first({ useMasterKey: true });
 
           if (priceRecord) {
-            // Update the price
-            priceRecord.set('price', price);
+            // VERSIONING: Don't update existing price, instead:
+            // 1. Mark existing price as historical (set valid_until to today)
+            priceRecord.set('valid_until', new Date());
             priceRecord.set('lastModifiedBy', currentUser.id);
-            priceRecord.set('updatedAt', new Date());
             objectsToSave.push(priceRecord);
+
+            // 2. Create NEW price record with the updated price
+            const newPriceRecord = new RatePricesClass();
+
+            // Copy all fields from the original record
+            newPriceRecord.set('service', priceRecord.get('service'));
+            newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
+            newPriceRecord.set('rate', priceRecord.get('rate'));
+            newPriceRecord.set('price', price); // New price value
+            newPriceRecord.set('currency', priceRecord.get('currency') || 'MXN');
+            newPriceRecord.set('active', priceRecord.get('active'));
+            newPriceRecord.set('exists', priceRecord.get('exists'));
+            newPriceRecord.set('createdBy', priceRecord.get('createdBy'));
+            newPriceRecord.set('lastModifiedBy', currentUser.id);
+            // valid_until remains null (active record)
+
+            objectsToSave.push(newPriceRecord);
           }
         }
       }
