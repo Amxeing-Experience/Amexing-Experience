@@ -366,8 +366,12 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async tours(req, res) {
     try {
+      // Use the logged-in user's objectId as clientId for personalized pricing
+      const clientId = req.user?.id || null;
+
       await this.renderRoleView(req, res, 'tours', {
         title: 'Tours',
+        clientId, // Pass the user's objectId as clientId
         breadcrumb: {
           title: 'Tours',
           items: [

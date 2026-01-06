@@ -46,7 +46,8 @@ const currentPath = '/dashboard/department_manager/tours';
             apiEndpoint: '/api/tours',
             userRole: currentUserRole,
             showActions: false,
-            showClientPricing: false
+            showClientPricing: false,
+            clientId: typeof clientId !== 'undefined' ? clientId : null
         }) %>
     </div>
 </div>
