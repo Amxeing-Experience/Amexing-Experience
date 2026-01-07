@@ -54,7 +54,7 @@ async function createTestData() {
     console.log('\n🔗 Finding required relationships...');
     
     // Get first available Rate
-    const Rates = Parse.Object.extend('Rates');
+    const Rates = Parse.Object.extend('Rate');
     const rateQuery = new Parse.Query(Rates);
     rateQuery.equalTo('active', true);
     rateQuery.equalTo('exists', true);
@@ -74,7 +74,7 @@ async function createTestData() {
     console.log(`  ✓ Using rate: ${rate.get('name')}`);
     
     // Get first available VehicleType
-    const VehicleTypes = Parse.Object.extend('VehicleTypes');
+    const VehicleTypes = Parse.Object.extend('VehicleType');
     const vehicleQuery = new Parse.Query(VehicleTypes);
     vehicleQuery.equalTo('active', true);
     vehicleQuery.equalTo('exists', true);
@@ -93,7 +93,7 @@ async function createTestData() {
     console.log(`  ✓ Using vehicle type: ${vehicleType.get('name')}`);
     
     // Get first available Service (only for RatePrices)
-    const Services = Parse.Object.extend('Service');
+    const Services = Parse.Object.extend('Services');
     const serviceQuery = new Parse.Query(Services);
     serviceQuery.equalTo('active', true);
     serviceQuery.equalTo('exists', true);
@@ -110,32 +110,68 @@ async function createTestData() {
       await service.save(null, { useMasterKey: true });
     }
     console.log(`  ✓ Using service: ${service.get('name')}`)
+    
+    // Get first available Tour for TourPrices
+    const Tours = Parse.Object.extend('Tour');
+    const tourQuery = new Parse.Query(Tours);
+    tourQuery.equalTo('active', true);
+    tourQuery.equalTo('exists', true);
+    let tour = await tourQuery.first({ useMasterKey: true });
+    
+    if (!tour) {
+      // Create a default tour if none exists
+      console.log('  Creating default tour...');
+      tour = new Tours();
+      tour.set('name', 'Standard Tour');
+      tour.set('description', 'Standard tour offering');
+      tour.set('active', true);
+      tour.set('exists', true);
+      await tour.save(null, { useMasterKey: true });
+    }
+    console.log(`  ✓ Using tour: ${tour.get('name')}`)
+    
+    // Get first available Client for ClientPrices
+    const Clients = Parse.Object.extend('Client');
+    const clientQuery = new Parse.Query(Clients);
+    clientQuery.equalTo('active', true);
+    clientQuery.equalTo('exists', true);
+    let client = await clientQuery.first({ useMasterKey: true });
+    
+    if (!client) {
+      // Create a default client if none exists
+      console.log('  Creating default client...');
+      client = new Clients();
+      client.set('name', 'Standard Client');
+      client.set('description', 'Standard client for pricing');
+      client.set('active', true);
+      client.set('exists', true);
+      await client.save(null, { useMasterKey: true });
+    }
+    console.log(`  ✓ Using client: ${client.get('name')}`)
 
     // Create RatePrices test data
     console.log('\n📊 Creating RatePrices test data...');
     const RatePrices = Parse.Object.extend('RatePrices');
     
     const ratePricesData = [
-      { name: 'Standard Rate - Hourly', price: 100.00, description: 'Standard hourly rate', type: 'hourly' },
-      { name: 'Premium Rate - Daily', price: 500.00, description: 'Premium daily rate', type: 'daily' },
-      { name: 'Budget Rate - Weekly', price: 2000.00, description: 'Budget weekly rate', type: 'weekly' },
-      { name: 'Executive Rate - Monthly', price: 8000.00, description: 'Executive monthly rate', type: 'monthly' },
-      { name: 'Special Event Rate', price: 1500.00, description: 'Special event pricing', type: 'event' }
+      { price: 100.00, currency: 'MXN' },
+      { price: 500.00, currency: 'MXN' },
+      { price: 2000.00, currency: 'MXN' },
+      { price: 8000.00, currency: 'MXN' },
+      { price: 1500.00, currency: 'MXN' }
     ];
 
     const ratePrices = [];
     for (const data of ratePricesData) {
       const ratePrice = new RatePrices();
-      ratePrice.set('name', data.name);
       ratePrice.set('price', data.price);
-      ratePrice.set('description', data.description);
-      ratePrice.set('type', data.type);
+      ratePrice.set('currency', data.currency);
       ratePrice.set('active', true);
       ratePrice.set('exists', true);
-      // Set required relationships
-      ratePrice.set('Service', service);
-      ratePrice.set('Rates', rate);
-      ratePrice.set('VehicleTypes', vehicleType);
+      // Set required relationships using correct field names
+      ratePrice.set('service', service);
+      ratePrice.set('rate', rate);
+      ratePrice.set('vehicleType', vehicleType);
       ratePrices.push(ratePrice);
     }
     
@@ -147,27 +183,29 @@ async function createTestData() {
     const ClientPrices = Parse.Object.extend('ClientPrices');
     
     const clientPricesData = [
-      { clientName: 'Acme Corp', precio: 150.00, basePrice: 120.00, description: 'Corporate client pricing' },
-      { clientName: 'Tech Solutions', precio: 200.00, basePrice: 180.00, description: 'Technology partner pricing' },
-      { clientName: 'Global Industries', precio: 300.00, basePrice: 250.00, description: 'Enterprise client pricing' },
-      { clientName: 'Small Business LLC', precio: 100.00, basePrice: 80.00, description: 'Small business pricing' },
-      { clientName: 'Startup Inc', precio: 75.00, basePrice: 60.00, description: 'Startup special pricing' },
-      { clientName: 'Premium Partners', precio: 450.00, basePrice: 400.00, description: 'Premium partner rates' }
+      { precio: 150.00, basePrice: 120.00, itemType: 'SERVICE', itemId: 'SVC001' },
+      { precio: 200.00, basePrice: 180.00, itemType: 'SERVICE', itemId: 'SVC002' },
+      { precio: 300.00, basePrice: 250.00, itemType: 'SERVICE', itemId: 'SVC003' },
+      { precio: 100.00, basePrice: 80.00, itemType: 'TRANSFER', itemId: 'TRS001' },
+      { precio: 75.00, basePrice: 60.00, itemType: 'TRANSFER', itemId: 'TRS002' },
+      { precio: 450.00, basePrice: 400.00, itemType: 'PREMIUM', itemId: 'PRM001' }
     ];
 
     const clientPrices = [];
     for (const data of clientPricesData) {
-      const client = new ClientPrices();
-      client.set('clientName', data.clientName);
-      client.set('precio', data.precio);
-      client.set('basePrice', data.basePrice);
-      client.set('description', data.description);
-      client.set('active', true);
-      client.set('exists', true);
-      // Set required relationships (ClientPrices doesn't need Service)
-      client.set('Rates', rate);
-      client.set('VehicleTypes', vehicleType);
-      clientPrices.push(client);
+      const clientPrice = new ClientPrices();
+      clientPrice.set('precio', data.precio);
+      clientPrice.set('basePrice', data.basePrice);
+      clientPrice.set('itemType', data.itemType);
+      clientPrice.set('itemId', data.itemId);
+      clientPrice.set('currency', 'MXN');
+      clientPrice.set('active', true);
+      clientPrice.set('exists', true);
+      // Set required relationships using correct field names
+      clientPrice.set('ratePtr', rate);
+      clientPrice.set('vehiclePtr', vehicleType);
+      clientPrice.set('clientPtr', client);
+      clientPrices.push(clientPrice);
     }
     
     await Parse.Object.saveAll(clientPrices, { useMasterKey: true });
@@ -189,17 +227,16 @@ async function createTestData() {
 
     const tourPrices = [];
     for (const data of tourPricesData) {
-      const tour = new TourPrices();
-      tour.set('tourName', data.tourName);
-      tour.set('price', data.price);
-      tour.set('duration', data.duration);
-      tour.set('description', data.description);
-      tour.set('active', true);
-      tour.set('exists', true);
-      // Set required relationships (TourPrices doesn't need Service)
-      tour.set('Rates', rate);
-      tour.set('VehicleTypes', vehicleType);
-      tourPrices.push(tour);
+      const tourPrice = new TourPrices();
+      tourPrice.set('price', data.price);
+      tourPrice.set('currency', 'MXN');
+      tourPrice.set('active', true);
+      tourPrice.set('exists', true);
+      // Set required relationships using correct field names
+      tourPrice.set('ratePtr', rate);
+      tourPrice.set('vehicleType', vehicleType);
+      tourPrice.set('tourPtr', tour);
+      tourPrices.push(tourPrice);
     }
     
     await Parse.Object.saveAll(tourPrices, { useMasterKey: true });
