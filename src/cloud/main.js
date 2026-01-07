@@ -1053,7 +1053,7 @@ function registerCloudFunctions() {
         }
 
         // Process each class with correct table names - TESTING: RatePrices + TourPrices
-        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices']; // All three price tables
+        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices', 'Experience']; // All price tables plus Experience
 
         for (const className of classesToProcess) {
           try {
@@ -1065,15 +1065,17 @@ function registerCloudFunctions() {
             query.equalTo('active', true);
             query.equalTo('exists', true);
             query.doesNotExist('valid_until'); // Don't process historical records
-            query.doesNotExist('inflation_batch_id'); // Don't process already inflated records
+            // Removed: query.doesNotExist('inflation_batch_id') - Allow re-inflation of current records
 
             // Include required relations based on table type
             if (className === 'RatePrices') {
               query.include(['service', 'rate', 'vehicleType']);
             } else if (className === 'TourPrices') {
-              query.include(['ratePtr', 'vehicleType']);
+              query.include(['ratePtr', 'vehicleType', 'tourPtr']);
             } else if (className === 'ClientPrices') {
-              query.include(['ratePtr', 'vehiclePtr']);
+              query.include(['ratePtr', 'vehiclePtr', 'clientPtr']);
+            } else if (className === 'Experience') {
+              query.include(['experiences', 'tours', 'vehicleType']);
             }
             // Note: Cannot use limit() with eachBatch()
             // query.limit(100);
@@ -1110,9 +1112,9 @@ function registerCloudFunctions() {
                       vehicleType;
 
                     if (className === 'RatePrices') {
-                      service = record.get('Service');
-                      rate = record.get('Rates');
-                      vehicleType = record.get('VehicleTypes');
+                      service = record.get('service');
+                      rate = record.get('rate');
+                      vehicleType = record.get('vehicleType');
 
                       // Validate required relationships for RatePrices
                       if (!service || !rate || !vehicleType) {
@@ -1127,10 +1129,10 @@ function registerCloudFunctions() {
                         continue; // eslint-disable-line no-continue
                       }
                     } else if (className === 'TourPrices') {
-                      // TourPrices uses same field names as others
-                      rate = record.get('Rates');
-                      vehicleType = record.get('VehicleTypes');
-                      service = null; // TourPrices doesn't have service relationship
+                      // TourPrices uses different field names
+                      rate = record.get('ratePtr');
+                      vehicleType = record.get('vehicleType');
+                      service = record.get('tourPtr');
 
                       // Validate required relationships for TourPrices
                       if (!rate || !vehicleType) {
@@ -1144,10 +1146,10 @@ function registerCloudFunctions() {
                         continue; // eslint-disable-line no-continue
                       }
                     } else if (className === 'ClientPrices') {
-                      // ClientPrices uses same field names as others
-                      rate = record.get('Rates');
-                      vehicleType = record.get('VehicleTypes');
-                      service = null; // ClientPrices doesn't have service relationship
+                      // ClientPrices uses different field names
+                      rate = record.get('ratePtr');
+                      vehicleType = record.get('vehiclePtr');
+                      service = record.get('clientPtr');
 
                       // Validate required relationships for ClientPrices
                       if (!rate || !vehicleType) {
@@ -1160,6 +1162,12 @@ function registerCloudFunctions() {
                         totalSkipped++;
                         continue; // eslint-disable-line no-continue
                       }
+                    } else if (className === 'Experience') {
+                      // Experience table doesn't require relationship validation
+                      // It has name, cost, type, etc. as standalone fields
+                      rate = null;
+                      vehicleType = null;
+                      service = null;
                     }
 
                     logger.info(`Processing ${className} record with relationships`, {
@@ -1176,15 +1184,21 @@ function registerCloudFunctions() {
 
                     // Add field constraints based on table type
                     if (className === 'RatePrices') {
-                      if (service) duplicateQuery.equalTo('Service', service);
-                      if (rate) duplicateQuery.equalTo('Rates', rate);
-                      if (vehicleType) duplicateQuery.equalTo('VehicleTypes', vehicleType);
+                      if (service) duplicateQuery.equalTo('service', service);
+                      if (rate) duplicateQuery.equalTo('rate', rate);
+                      if (vehicleType) duplicateQuery.equalTo('vehicleType', vehicleType);
                     } else if (className === 'TourPrices') {
-                      if (rate) duplicateQuery.equalTo('Rates', rate);
-                      if (vehicleType) duplicateQuery.equalTo('VehicleTypes', vehicleType);
+                      if (rate) duplicateQuery.equalTo('ratePtr', rate);
+                      if (vehicleType) duplicateQuery.equalTo('vehicleType', vehicleType);
+                      if (service) duplicateQuery.equalTo('tourPtr', service);
                     } else if (className === 'ClientPrices') {
-                      if (rate) duplicateQuery.equalTo('Rates', rate);
-                      if (vehicleType) duplicateQuery.equalTo('VehicleTypes', vehicleType);
+                      if (rate) duplicateQuery.equalTo('ratePtr', rate);
+                      if (vehicleType) duplicateQuery.equalTo('vehiclePtr', vehicleType);
+                      if (service) duplicateQuery.equalTo('clientPtr', service);
+                    } else if (className === 'Experience') {
+                      // For Experience, use name and type as unique identifiers
+                      duplicateQuery.equalTo('name', record.get('name'));
+                      duplicateQuery.equalTo('type', record.get('type'));
                     }
 
                     duplicateQuery.equalTo('active', true);
@@ -1222,6 +1236,13 @@ function registerCloudFunctions() {
                       }
                       if (basePrice > 0) {
                         priceFields.push({ fieldName: 'basePrice', currentValue: basePrice });
+                        hasValidPrice = true;
+                      }
+                    } else if (className === 'Experience') {
+                      // For Experience, inflate cost field
+                      const cost = record.get('cost') || 0;
+                      if (cost > 0) {
+                        priceFields.push({ fieldName: 'cost', currentValue: cost });
                         hasValidPrice = true;
                       }
                     } else {
@@ -1573,7 +1594,7 @@ function registerCloudFunctions() {
         let totalReverted = 0;
 
         // Process each class
-        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices'];
+        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices', 'Experience'];
 
         for (const className of classesToProcess) {
           const ClassObj = Parse.Object.extend(className);
