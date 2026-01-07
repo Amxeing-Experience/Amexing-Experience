@@ -1053,7 +1053,7 @@ function registerCloudFunctions() {
         }
 
         // Process each class with correct table names - TESTING: RatePrices + TourPrices
-        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices']; // All three price tables
+        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices', 'Experience']; // All price tables plus Experience
 
         for (const className of classesToProcess) {
           try {
@@ -1074,6 +1074,8 @@ function registerCloudFunctions() {
               query.include(['ratePtr', 'vehicleType', 'tourPtr']);
             } else if (className === 'ClientPrices') {
               query.include(['ratePtr', 'vehiclePtr', 'clientPtr']);
+            } else if (className === 'Experience') {
+              query.include(['experiences', 'tours', 'vehicleType']);
             }
             // Note: Cannot use limit() with eachBatch()
             // query.limit(100);
@@ -1160,6 +1162,12 @@ function registerCloudFunctions() {
                         totalSkipped++;
                         continue; // eslint-disable-line no-continue
                       }
+                    } else if (className === 'Experience') {
+                      // Experience table doesn't require relationship validation
+                      // It has name, cost, type, etc. as standalone fields
+                      rate = null;
+                      vehicleType = null;
+                      service = null;
                     }
 
                     logger.info(`Processing ${className} record with relationships`, {
@@ -1187,6 +1195,10 @@ function registerCloudFunctions() {
                       if (rate) duplicateQuery.equalTo('ratePtr', rate);
                       if (vehicleType) duplicateQuery.equalTo('vehiclePtr', vehicleType);
                       if (service) duplicateQuery.equalTo('clientPtr', service);
+                    } else if (className === 'Experience') {
+                      // For Experience, use name and type as unique identifiers
+                      duplicateQuery.equalTo('name', record.get('name'));
+                      duplicateQuery.equalTo('type', record.get('type'));
                     }
 
                     duplicateQuery.equalTo('active', true);
@@ -1224,6 +1236,13 @@ function registerCloudFunctions() {
                       }
                       if (basePrice > 0) {
                         priceFields.push({ fieldName: 'basePrice', currentValue: basePrice });
+                        hasValidPrice = true;
+                      }
+                    } else if (className === 'Experience') {
+                      // For Experience, inflate cost field
+                      const cost = record.get('cost') || 0;
+                      if (cost > 0) {
+                        priceFields.push({ fieldName: 'cost', currentValue: cost });
                         hasValidPrice = true;
                       }
                     } else {
@@ -1575,7 +1594,7 @@ function registerCloudFunctions() {
         let totalReverted = 0;
 
         // Process each class
-        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices'];
+        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices', 'Experience'];
 
         for (const className of classesToProcess) {
           const ClassObj = Parse.Object.extend(className);
