@@ -809,6 +809,103 @@ class ClientsController {
   }
 
   /**
+   * POST /api/clients/:id/reset-password - Reset client password.
+   * Only SuperAdmin and Admin can reset client passwords.
+   * Generates a secure new password and logs the action for audit.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * POST /api/clients/abc123/reset-password
+   * Response: { success: true, password: 'newSecurePassword123!' }
+   */
+  async resetClientPassword(req, res) {
+    try {
+      const currentUser = req.user;
+      const clientId = req.params.id;
+
+      if (!currentUser) {
+        return this.sendError(res, 'Authentication required', 401);
+      }
+
+      if (!clientId) {
+        return this.sendError(res, 'Client ID is required', 400);
+      }
+
+      // Validate user role (only superadmin and admin can reset passwords)
+      const currentUserRole = req.userRole || currentUser.role || currentUser.get?.('role');
+      if (!['superadmin', 'admin'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can reset client passwords.', 403);
+      }
+
+      // Generate new secure password
+      const newPassword = this.generateSecurePassword();
+
+      // Reset password using direct bcrypt hashing (like authController does)
+      const bcrypt = require('bcrypt');
+      const Parse = require('parse/node');
+
+      // Hash the password with bcrypt
+      const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+      const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Query AmexingUser to get the user object
+      const userQuery = new Parse.Query('AmexingUser');
+      const user = await userQuery.get(clientId, { useMasterKey: true });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Update password fields directly (same way AmexingUser.setPassword does)
+      user.set('password', hashedPassword);
+      user.set('passwordHash', hashedPassword);
+      user.set('passwordChangedAt', new Date());
+      user.set('mustChangePassword', false);
+      user.set('loginAttempts', 0);
+      user.set('lockedUntil', null);
+
+      // Create proper Parse Pointer for modifiedBy
+      const modifiedByPointer = {
+        __type: 'Pointer',
+        className: 'AmexingUser',
+        objectId: currentUser.id,
+      };
+      user.set('modifiedBy', modifiedByPointer);
+
+      // Save the user with master key
+      await user.save(null, { useMasterKey: true });
+
+      // Security logging for password reset action
+      logger.info('Client password reset by admin', {
+        clientId,
+        adminId: currentUser.id,
+        adminRole: currentUserRole,
+        timestamp: new Date().toISOString(),
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
+
+      // Return the new password securely
+      res.status(200).json({
+        success: true,
+        password: newPassword,
+        message: 'Password reset successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('Error in ClientsController.resetClientPassword', {
+        error: error.message,
+        stack: error.stack,
+        clientId: req.params.id,
+        currentUser: req.user?.id,
+      });
+
+      this.sendError(res, error.message, 500);
+    }
+  }
+
+  /**
    * Helper method to process address data for client updates.
    * @param {object} addressData - The address data to process.
    * @returns {object} - Processed address data.
