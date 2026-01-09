@@ -1003,6 +1003,7 @@ function registerCloudFunctions() {
      * @function aplicarInflacionJob
      * @param {object} request - Job request containing params and message functions.
      * @returns {Promise<object>} - Job result with processing statistics.
+     * @example
      */
     const aplicarInflacionJob = async function (request) {
       const { params, message } = request;

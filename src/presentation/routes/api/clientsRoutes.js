@@ -607,6 +607,78 @@ router.patch('/:id/toggle-status', writeOperationsLimiter, async (req, res) => {
   await clientsController.toggleClientStatus(req, res);
 });
 
+/**
+ * @swagger
+ * /api/clients/{id}/reset-password:
+ *   post:
+ *     tags:
+ *       - Client Management
+ *     summary: Reset client password
+ *     description: |
+ *       Generate a new secure password for the client user.
+ *
+ *       **Security Features:**
+ *       - Generates cryptographically secure 12-character password
+ *       - Comprehensive audit logging with user context
+ *       - Password meets Parse Server validation requirements
+ *       - Rate limited for security
+ *
+ *       **Access:** Requires SuperAdmin or Admin role only
+ *       **Rate Limited:** 30 requests per 15 minutes
+ *
+ *       **PCI DSS Compliance:**
+ *       - Requirement 8.2.3: Password complexity enforced
+ *       - Requirement 10.2.1: Password reset actions logged
+ *       - Requirement 8.1.6: Admin-only password reset capability
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Client User ObjectId
+ *         example: "abc123def456"
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 password:
+ *                   type: string
+ *                   description: The new generated password (returned securely)
+ *                   example: "aB3$xY9#mK2!"
+ *                 message:
+ *                   type: string
+ *                   example: "Password reset successfully"
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2024-01-15T10:30:00.000Z"
+ *       400:
+ *         description: Client ID is required
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         description: Access denied - Only SuperAdmin or Admin can reset passwords
+ *       404:
+ *         $ref: '#/components/responses/NotFoundError'
+ *       429:
+ *         $ref: '#/components/responses/RateLimitError'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
+router.post('/:id/reset-password', writeOperationsLimiter, async (req, res) => {
+  await clientsController.resetClientPassword(req, res);
+});
+
 // ===== NESTED ROUTES: CLIENT EMPLOYEES =====
 
 /**
