@@ -817,7 +817,7 @@ class ClientsController {
    * @returns {Promise<void>}
    * @example
    * POST /api/clients/abc123/reset-password
-   * Response: { success: true, password: 'newSecurePassword123!' }
+   * Response: { success: true, password: '[generated_password]' }
    */
   async resetClientPassword(req, res) {
     try {
