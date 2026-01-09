@@ -486,6 +486,9 @@ class UserManagementService {
         'mustChangePassword',
         'oauthAccounts',
         'primaryOAuthProvider',
+        'phone',
+        'address',
+        'contextualData',
       ];
 
       allowedUpdateFields.forEach((field) => {
@@ -1518,6 +1521,8 @@ class UserManagementService {
       clientId,
       departmentId,
       contextualData, // Include full contextual data object
+      address: user.get('address'), // Include address data for client details
+      phone: user.get('phone'), // Include phone number
     };
   }
 

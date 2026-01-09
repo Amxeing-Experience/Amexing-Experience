@@ -127,6 +127,13 @@ class AdminController extends RoleBasedController {
         accessedBy: currentUser.id,
       });
 
+      // Debug: Log the raw client data
+      console.log('🔵 RAW CLIENT DATA FROM DATABASE:', {
+        id: client.id || client.objectId,
+        address: client.address || client.get?.('address'),
+        contextualData: client.contextualData || client.get?.('contextualData'),
+      });
+
       // Transform Parse object to plain object if needed
       const clientData = {
         id: client.id || client.objectId,

@@ -87,6 +87,9 @@ const tarifarioTabs = [
                 <% } else { %>
                     <span class="badge bg-danger fs-6"><i class="ti ti-x-circle me-1"></i>Inactivo</span>
                 <% } %>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editClientModal">
+                    <i class="ti ti-edit me-1"></i>Editar
+                </button>
                 <a href="/dashboard/admin/clients" class="btn btn-sm btn-outline-secondary">
                     <i class="ti ti-arrow-left me-1"></i>Volver
                 </a>
@@ -132,7 +135,7 @@ const tarifarioTabs = [
                     <div class="mb-4">
                         <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-building me-1"></i>Información de la Empresa</h6>
                         <div class="row">
-                            <div class="col-md-12 mb-3"><label class="form-label text-muted small">Nombre</label><p class="fw-semibold mb-0"><%= clientData.companyName %></p></div>
+                            <div class="col-md-12 mb-3"><label class="form-label text-muted small">Nombre de la Empresa</label><p class="fw-semibold mb-0"><%= clientData.companyName || 'N/A' %></p></div>
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">RFC</label><p class="mb-0"><%= clientData.taxId || 'N/A' %></p></div>
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">Sitio Web</label><p class="mb-0"><% if (clientData.website) { %><a href="<%= clientData.website %>" target="_blank"><i class="ti ti-external-link me-1"></i><%= clientData.website %></a><% } else { %>N/A<% } %></p></div>
                         </div>
@@ -708,6 +711,70 @@ const tarifarioTabs = [
 @media (max-width: 991.98px) {
     .vertical-menu { position: static; }
     #menuToggle { display: none; }
+}
+
+/* Live Validation Styles */
+.form-control.is-valid {
+    border-color: #198754;
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+}
+
+.form-control.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+.valid-feedback {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #198754;
+}
+
+.invalid-feedback {
+    display: block;
+    width: 100%;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: #dc3545;
+}
+
+.valid-feedback i,
+.invalid-feedback i {
+    font-size: 0.875rem;
+}
+
+/* Button state transitions */
+#saveClientChanges {
+    transition: all 0.3s ease;
+}
+
+#saveClientChanges:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+/* Form field animations */
+.form-control {
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* Validation feedback animations */
+.valid-feedback,
+.invalid-feedback {
+    animation: fadeInUp 0.3s ease;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 </style>
 
@@ -2064,5 +2131,570 @@ function setupExperienceFilters() {
     // Initialize create employee modal on DOM ready
     document.addEventListener('DOMContentLoaded', function() {
         initializeCreateEmployeeModal();
+        
+        // Initialize live validation when edit modal is shown
+        const editModal = document.getElementById('editClientModal');
+        if (editModal) {
+            editModal.addEventListener('shown.bs.modal', function() {
+                setupLiveValidation();
+                updateSaveButtonState(); // Initial button state check
+                
+                // Add click event listener to save button
+                const saveButton = document.getElementById('saveClientChanges');
+                if (saveButton) {
+                    // Remove any existing listeners to prevent duplicates
+                    saveButton.removeEventListener('click', updateClient);
+                    saveButton.addEventListener('click', updateClient);
+                }
+            });
+            
+            // Reset validation when modal is hidden
+            editModal.addEventListener('hidden.bs.modal', function() {
+                const form = document.getElementById('editClientForm');
+                if (form) {
+                    // Remove all validation classes and feedback
+                    form.querySelectorAll('.is-valid, .is-invalid').forEach(field => {
+                        field.classList.remove('is-valid', 'is-invalid');
+                    });
+                    form.querySelectorAll('.invalid-feedback, .valid-feedback').forEach(feedback => {
+                        feedback.remove();
+                    });
+                }
+                
+                // Reset save button
+                const saveButton = document.getElementById('saveClientChanges');
+                if (saveButton) {
+                    saveButton.disabled = false;
+                    saveButton.classList.remove('btn-secondary');
+                    saveButton.classList.add('btn-primary');
+                    
+                    // Remove event listener when modal is hidden
+                    saveButton.removeEventListener('click', updateClient);
+                }
+            });
+        }
     });
+    
+    // ========================================================================
+    // UPDATE CLIENT FUNCTIONALITY
+    // ========================================================================
+    
+    /**
+     * Live validation functions
+     */
+    
+    // Real-time validation rules
+    const validationRules = {
+        firstName: {
+            required: true,
+            minLength: 2,
+            maxLength: 50,
+            pattern: /^[a-zA-ZÀ-ÿ\u00f1\u00d1\s'-]+$/,
+            message: 'El nombre debe tener entre 2-50 caracteres y solo contener letras'
+        },
+        lastName: {
+            required: true,
+            minLength: 2,
+            maxLength: 50,
+            pattern: /^[a-zA-ZÀ-ÿ\u00f1\u00d1\s'-]+$/,
+            message: 'El apellido debe tener entre 2-50 caracteres y solo contener letras'
+        },
+        companyName: {
+            required: true,
+            minLength: 2,
+            maxLength: 100,
+            message: 'El nombre de la empresa debe tener entre 2-100 caracteres'
+        },
+        phone: {
+            required: false,
+            pattern: /^[+]?[\d\s()-]{10,15}$/,
+            message: 'Formato de teléfono inválido (ej: +52 999 123 4567)'
+        },
+        taxId: {
+            required: false,
+            pattern: /^[A-Z&Ñ]{3}[0-9]{2}(0[1-9]|1[012])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{3}$|^[A-Z&Ñ]{4}[0-9]{2}(0[1-9]|1[012])(0[1-9]|[12][0-9]|3[01])[A-Z0-9]{3}$/,
+            message: 'Formato de RFC inválido. Personas Morales: 12 chars (ej: ABC123456789), Personas Físicas: 13 chars (ej: MALJ850101ABC)'
+        },
+        website: {
+            required: false,
+            pattern: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/,
+            message: 'URL inválida (debe comenzar con http:// o https://)'
+        },
+        zipCode: {
+            required: false,
+            pattern: /^[0-9]{5}$/,
+            message: 'Código postal debe tener 5 dígitos'
+        }
+    };
+
+    /**
+     * Validate a single field
+     */
+    function validateField(fieldName, value) {
+        const rules = validationRules[fieldName];
+        if (!rules) return { isValid: true };
+
+        const trimmedValue = (value || '').trim();
+        
+        // Required field validation
+        if (rules.required && !trimmedValue) {
+            return {
+                isValid: false,
+                message: `Este campo es obligatorio`
+            };
+        }
+
+        // Skip other validations if field is empty and not required
+        if (!trimmedValue && !rules.required) {
+            return { isValid: true };
+        }
+
+        // Length validation
+        if (rules.minLength && trimmedValue.length < rules.minLength) {
+            return {
+                isValid: false,
+                message: rules.message || `Debe tener al menos ${rules.minLength} caracteres`
+            };
+        }
+
+        if (rules.maxLength && trimmedValue.length > rules.maxLength) {
+            return {
+                isValid: false,
+                message: rules.message || `No puede exceder ${rules.maxLength} caracteres`
+            };
+        }
+
+        // Pattern validation
+        if (rules.pattern && !rules.pattern.test(trimmedValue)) {
+            return {
+                isValid: false,
+                message: rules.message
+            };
+        }
+
+        return { isValid: true };
+    }
+
+    /**
+     * Show validation feedback for a field
+     */
+    function showFieldValidation(fieldId, validation) {
+        const field = document.getElementById(fieldId);
+        const container = field.closest('.mb-3');
+        
+        // Remove existing validation classes and messages
+        field.classList.remove('is-valid', 'is-invalid');
+        const existingFeedback = container.querySelector('.invalid-feedback, .valid-feedback');
+        if (existingFeedback) {
+            existingFeedback.remove();
+        }
+
+        if (!validation.isValid) {
+            // Show error state
+            field.classList.add('is-invalid');
+            const feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback';
+            feedback.innerHTML = `<i class="ti ti-alert-circle me-1"></i>${validation.message}`;
+            container.appendChild(feedback);
+        } else if (field.value.trim()) {
+            // Show success state for non-empty valid fields
+            field.classList.add('is-valid');
+            const feedback = document.createElement('div');
+            feedback.className = 'valid-feedback';
+            feedback.innerHTML = `<i class="ti ti-check me-1"></i>Válido`;
+            container.appendChild(feedback);
+        }
+    }
+
+    /**
+     * Setup live validation for the edit form
+     */
+    function setupLiveValidation() {
+        const form = document.getElementById('editClientForm');
+        if (!form) return;
+
+        // Fields to validate
+        const fieldsToValidate = [
+            'editFirstName',
+            'editLastName', 
+            'editCompanyName',
+            'editPhone',
+            'editTaxId',
+            'editWebsite',
+            'editZipCode'
+        ];
+
+        fieldsToValidate.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (!field) return;
+
+            // Map field IDs to validation rule names
+            const ruleMap = {
+                'editFirstName': 'firstName',
+                'editLastName': 'lastName',
+                'editCompanyName': 'companyName',
+                'editPhone': 'phone',
+                'editTaxId': 'taxId',
+                'editWebsite': 'website',
+                'editZipCode': 'zipCode'
+            };
+
+            const ruleName = ruleMap[fieldId];
+
+            // Add event listeners for real-time validation
+            field.addEventListener('input', debounce((e) => {
+                const validation = validateField(ruleName, e.target.value);
+                showFieldValidation(fieldId, validation);
+                updateSaveButtonState();
+            }, 300));
+
+            field.addEventListener('blur', (e) => {
+                const validation = validateField(ruleName, e.target.value);
+                showFieldValidation(fieldId, validation);
+                updateSaveButtonState();
+            });
+        });
+    }
+
+    /**
+     * Check if form is valid and update save button state
+     */
+    function updateSaveButtonState() {
+        const saveButton = document.getElementById('saveClientChanges');
+        if (!saveButton) return;
+
+        const form = document.getElementById('editClientForm');
+        const invalidFields = form.querySelectorAll('.is-invalid');
+        const requiredFields = ['editFirstName', 'editLastName', 'editCompanyName'];
+        
+        // Check if all required fields have values
+        const requiredFieldsValid = requiredFields.every(fieldId => {
+            const field = document.getElementById(fieldId);
+            return field && field.value.trim();
+        });
+
+        // Enable button if no invalid fields and required fields are filled
+        const isFormValid = invalidFields.length === 0 && requiredFieldsValid;
+        
+        saveButton.disabled = !isFormValid;
+        
+        if (isFormValid) {
+            saveButton.classList.remove('btn-secondary');
+            saveButton.classList.add('btn-primary');
+        } else {
+            saveButton.classList.remove('btn-primary');
+            saveButton.classList.add('btn-secondary');
+        }
+    }
+
+    /**
+     * Debounce function to limit API calls
+     */
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    /**
+     * Update client information via API
+     */
+    async function updateClient() {
+        console.log('🔄 updateClient function called');
+        
+        const form = document.getElementById('editClientForm');
+        const saveButton = document.getElementById('saveClientChanges');
+        
+        if (!form || !saveButton) {
+            console.error('❌ Form or save button not found');
+            return;
+        }
+        
+        console.log('✅ Form and button found');
+        
+        // Basic validation
+        if (!form.checkValidity()) {
+            console.warn('⚠️ Form validation failed');
+            form.reportValidity();
+            return;
+        }
+        
+        console.log('✅ Form validation passed');
+        
+        // Disable button and show loading state
+        saveButton.disabled = true;
+        const originalContent = saveButton.innerHTML;
+        saveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Guardando...';
+        
+        // Gather form data (excluding email which cannot be changed)
+        const formData = {
+            firstName: document.getElementById('editFirstName').value.trim(),
+            lastName: document.getElementById('editLastName').value.trim(),
+            // email is excluded - it cannot be changed for security reasons
+            phone: document.getElementById('editPhone').value.trim() || undefined,
+            companyName: document.getElementById('editCompanyName').value.trim(),
+            taxId: document.getElementById('editTaxId').value.trim() || undefined,
+            website: document.getElementById('editWebsite').value.trim() || undefined,
+            address: {
+                street: document.getElementById('editStreet').value.trim() || undefined,
+                city: document.getElementById('editCity').value.trim() || undefined,
+                state: document.getElementById('editState').value.trim() || undefined,
+                zipCode: document.getElementById('editZipCode').value.trim() || undefined,
+                country: document.getElementById('editCountry').value.trim() || undefined
+            },
+            notes: document.getElementById('editNotes').value.trim() || undefined,
+            active: document.getElementById('editActive').value === 'true'
+        };
+        
+        // Get client ID
+        const clientId = document.getElementById('editClientId').value;
+        
+        console.log('📋 Form data prepared:', formData);
+        console.log('🆔 Client ID:', clientId);
+        
+        try {
+            console.log('🌐 Making API request to:', `/api/clients/${clientId}`);
+            const response = await fetch(`/api/clients/${clientId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                credentials: 'include',
+                body: JSON.stringify(formData)
+            });
+            
+            console.log('📡 Response status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ API Error Response:', errorText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            console.log('✅ API Response:', result);
+            
+            if (!result.success) {
+                throw new Error(result.error || 'Error al actualizar el cliente');
+            }
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editClientModal'));
+            modal.hide();
+            
+            // Show success message
+            showSuccessMessage('Cliente actualizado exitosamente');
+            
+            // Reload page after a short delay to show updated data
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Error updating client:', error);
+            showErrorMessage(error.message || 'Error al actualizar el cliente. Por favor, intenta nuevamente.');
+        } finally {
+            // Restore button state
+            saveButton.disabled = false;
+            saveButton.innerHTML = originalContent;
+        }
+    }
+    
+    /**
+     * Show success message
+     * @param {string} message - Success message to display
+     */
+    function showSuccessMessage(message) {
+        // Remove existing alerts
+        document.querySelectorAll('.floating-alert').forEach(el => el.remove());
+        
+        const alertHtml = `
+            <div class="alert alert-success alert-dismissible fade show floating-alert" role="alert" 
+                 style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                <i class="ti ti-check-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', alertHtml);
+        
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            const alert = document.querySelector('.floating-alert');
+            if (alert) {
+                alert.classList.remove('show');
+                setTimeout(() => alert.remove(), 150);
+            }
+        }, 5000);
+    }
+    
+    /**
+     * Show error message
+     * @param {string} message - Error message to display
+     */
+    function showErrorMessage(message) {
+        // Remove existing alerts
+        document.querySelectorAll('.floating-alert').forEach(el => el.remove());
+        
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show floating-alert" role="alert" 
+                 style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        `;
+        
+        document.body.insertAdjacentHTML('beforeend', alertHtml);
+    }
 </script>
+
+<!-- Edit Client Modal -->
+<div class="modal fade" id="editClientModal" tabindex="-1" aria-labelledby="editClientModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="editClientModalLabel">
+                    <i class="ti ti-edit me-2"></i>Editar Cliente
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editClientForm">
+                    <!-- Personal Information Section -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-user me-1"></i>Datos del Representante
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="editFirstName" class="form-label">Nombre <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editFirstName" name="firstName" 
+                                       value="<%= clientData.firstName %>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editLastName" class="form-label">Apellido <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editLastName" name="lastName" 
+                                       value="<%= clientData.lastName %>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editEmail" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="editEmail" name="email" 
+                                       value="<%= clientData.email %>" readonly 
+                                       style="background-color: #f8f9fa; cursor: not-allowed;">
+                                <div class="form-text text-warning">
+                                    <i class="ti ti-lock me-1"></i>El email no puede ser modificado ya que es usado para el acceso al sistema. 
+                                    Contacte al soporte para cambios de email.
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editPhone" class="form-label">Teléfono</label>
+                                <input type="tel" class="form-control" id="editPhone" name="phone" 
+                                       value="<%= clientData.phone %>">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Company Information Section -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-building me-1"></i>Información de la Empresa
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="editCompanyName" class="form-label">Nombre de la Empresa <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="editCompanyName" name="companyName" 
+                                       value="<%= clientData.companyName %>" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editTaxId" class="form-label">RFC</label>
+                                <input type="text" class="form-control" id="editTaxId" name="taxId" 
+                                       value="<%= clientData.taxId %>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editWebsite" class="form-label">Sitio Web</label>
+                                <input type="url" class="form-control" id="editWebsite" name="website" 
+                                       value="<%= clientData.website %>" placeholder="https://ejemplo.com">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fiscal Address Section -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-map-pin me-1"></i>Dirección Fiscal
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="editStreet" class="form-label">Calle</label>
+                                <input type="text" class="form-control" id="editStreet" name="addressStreet" 
+                                       value="<%= clientData.addressStreet %>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editCity" class="form-label">Ciudad</label>
+                                <input type="text" class="form-control" id="editCity" name="addressCity" 
+                                       value="<%= clientData.addressCity %>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editState" class="form-label">Estado</label>
+                                <input type="text" class="form-control" id="editState" name="addressState" 
+                                       value="<%= clientData.addressState %>">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editZipCode" class="form-label">Código Postal</label>
+                                <input type="text" class="form-control" id="editZipCode" name="addressZipCode" 
+                                       value="<%= clientData.addressZipCode %>" pattern="[0-9]{5}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="editCountry" class="form-label">País</label>
+                                <input type="text" class="form-control" id="editCountry" name="addressCountry" 
+                                       value="<%= clientData.addressCountry %>" placeholder="México">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Additional Information Section -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-notes me-1"></i>Información Adicional
+                        </h6>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="editNotes" class="form-label">Notas</label>
+                                <textarea class="form-control" id="editNotes" name="notes" rows="3" 
+                                          placeholder="Información adicional sobre el cliente..."><%= clientData.notes %></textarea>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label for="editActive" class="form-label">Estado</label>
+                                <select class="form-select" id="editActive" name="active">
+                                    <option value="true" <%= clientData.active === true ? 'selected' : '' %>>Activo</option>
+                                    <option value="false" <%= clientData.active === false ? 'selected' : '' %>>Inactivo</option>
+                                </select>
+                                <div class="form-text">Cambiar a inactivo deshabilitará el acceso del cliente al sistema</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hidden input for client ID -->
+                    <input type="hidden" id="editClientId" name="clientId" value="<%= clientData.id %>">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveClientChanges">
+                    <i class="ti ti-device-floppy me-1"></i>Guardar Cambios
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

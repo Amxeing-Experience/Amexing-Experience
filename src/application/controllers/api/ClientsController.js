@@ -339,8 +339,66 @@ class ClientsController {
         return this.sendError(res, `Cannot change client role. Must be ${this.clientRole}`, 400);
       }
 
+      // Log incoming data for debugging
+      logger.info('Client update request received', {
+        clientId,
+        updateData: JSON.stringify(updateData, null, 2),
+        currentUser: currentUser.id,
+      });
+
+      // Prepare the update data structure
+      const preparedUpdateData = {
+        ...updateData,
+      };
+
+      // Handle address data if provided
+      if (updateData.address) {
+        const processedAddress = this.processAddressData(updateData.address);
+        if (processedAddress) {
+          preparedUpdateData.address = processedAddress;
+        }
+      }
+
+      // Handle contextualData fields
+      if (updateData.companyName !== undefined || updateData.taxId !== undefined
+          || updateData.website !== undefined || updateData.notes !== undefined) {
+        // Get the existing user to preserve existing contextualData
+        const Parse = require('parse/node');
+        const query = new Parse.Query('AmexingUser');
+        const existingUser = await query.get(clientId, { useMasterKey: true });
+        const existingContextualData = existingUser.get('contextualData') || {};
+
+        preparedUpdateData.contextualData = {
+          ...existingContextualData,
+          companyName: updateData.companyName !== undefined
+            ? updateData.companyName
+            : existingContextualData.companyName,
+          taxId: updateData.taxId !== undefined
+            ? updateData.taxId
+            : existingContextualData.taxId,
+          website: updateData.website !== undefined
+            ? updateData.website
+            : existingContextualData.website,
+          notes: updateData.notes !== undefined
+            ? updateData.notes
+            : existingContextualData.notes,
+        };
+
+        // Remove individual fields that are now in contextualData
+        delete preparedUpdateData.companyName;
+        delete preparedUpdateData.taxId;
+        delete preparedUpdateData.website;
+        delete preparedUpdateData.notes;
+      }
+
+      // Log prepared data before sending to service
+      logger.info('Prepared update data for UserManagementService', {
+        clientId,
+        preparedUpdateData: JSON.stringify(preparedUpdateData, null, 2),
+      });
+
       // Update user using service
-      const result = await this.userService.updateUser(clientId, updateData, currentUser);
+      const result = await this.userService.updateUser(clientId, preparedUpdateData, currentUser);
 
       this.sendSuccess(res, result, 'Client updated successfully');
     } catch (error) {
@@ -761,6 +819,32 @@ class ClientsController {
         500
       );
     }
+  }
+
+  /**
+   * Helper method to process address data for client updates.
+   * @param {object} addressData - The address data to process.
+   * @returns {object} - Processed address data.
+   * @example
+   * const address = { calle: '123 Main St', ciudad: 'Mexico City' };
+   * const processed = this.processAddressData(address);
+   * // Returns: { calle: '123 Main St', ciudad: 'Mexico City' }
+   */
+  processAddressData(addressData) {
+    if (!addressData || typeof addressData !== 'object') {
+      return null;
+    }
+
+    const processedAddress = {};
+    const addressFields = ['calle', 'ciudad', 'estado', 'codigoPostal', 'pais'];
+
+    addressFields.forEach((field) => {
+      if (addressData[field] && addressData[field].trim()) {
+        processedAddress[field] = addressData[field].trim();
+      }
+    });
+
+    return Object.keys(processedAddress).length > 0 ? processedAddress : null;
   }
 }
 
