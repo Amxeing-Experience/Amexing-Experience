@@ -138,6 +138,14 @@ const currentPath = '/dashboard/admin/clients';
                                     required
                                 >
                                 <button 
+                                    class="btn btn-outline-primary" 
+                                    type="button" 
+                                    id="generatePassword"
+                                    title="Generar contraseña segura"
+                                >
+                                    <i class="ti ti-key" id="generateIcon"></i>
+                                </button>
+                                <button 
                                     class="btn btn-outline-secondary" 
                                     type="button" 
                                     id="togglePasswordVisibility"
@@ -393,6 +401,44 @@ const currentPath = '/dashboard/admin/clients';
 <!-- Page-specific JavaScript -->
 <script>
     // ========================================================================
+    // PASSWORD GENERATION UTILITY
+    // ========================================================================
+    
+    /**
+     * Generate a secure random password meeting complexity requirements
+     * @returns {string} - Secure random password
+     */
+    function generateSecurePassword() {
+        // Character sets for password generation
+        const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+        const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const numbers = '0123456789';
+        // Using only safe special characters
+        const specialChars = '!@#$%^&*';
+        const allChars = lowercase + uppercase + numbers + specialChars;
+
+        // Ensure at least one character from each category
+        let password = '';
+        password += lowercase[Math.floor(Math.random() * lowercase.length)];
+        password += uppercase[Math.floor(Math.random() * uppercase.length)];
+        password += numbers[Math.floor(Math.random() * numbers.length)];
+        password += specialChars[Math.floor(Math.random() * specialChars.length)];
+
+        // Fill remaining characters (12 total - 4 already added = 8 more)
+        for (let i = 0; i < 8; i += 1) {
+            password += allChars[Math.floor(Math.random() * allChars.length)];
+        }
+
+        // Shuffle the password to avoid predictable patterns
+        password = password
+            .split('')
+            .sort(() => Math.random() - 0.5)
+            .join('');
+
+        return password;
+    }
+
+    // ========================================================================
     // CREATE CLIENT MODAL FUNCTIONS
     // ========================================================================
 
@@ -588,6 +634,48 @@ const currentPath = '/dashboard/admin/clients';
                     console.error('Error copying to clipboard:', err);
                     showModalAlert('Error al copiar la contraseña', 'error');
                 }
+            });
+        }
+
+        // Generate password functionality
+        const generateBtn = document.getElementById('generatePassword');
+        const generateIcon = document.getElementById('generateIcon');
+
+        if (passwordInput && generateBtn && generateIcon) {
+            generateBtn.addEventListener('click', function() {
+                // Generate secure password
+                const newPassword = generateSecurePassword();
+                passwordInput.value = newPassword;
+                
+                // Trigger validation
+                validatePasswordRequirements(newPassword);
+                
+                // Visual feedback
+                const originalIcon = generateIcon.className;
+                generateIcon.className = 'ti ti-check';
+                generateBtn.classList.remove('btn-outline-primary');
+                generateBtn.classList.add('btn-success');
+                
+                setTimeout(() => {
+                    generateIcon.className = originalIcon;
+                    generateBtn.classList.remove('btn-success');
+                    generateBtn.classList.add('btn-outline-primary');
+                }, 1500);
+                
+                // Show success message
+                showModalAlert('Nueva contraseña generada exitosamente', 'success');
+                
+                // Show the password for easy verification
+                passwordInput.type = 'text';
+                toggleIcon.className = 'ti ti-eye-off';
+                toggleBtn.title = 'Ocultar contraseña';
+                
+                // Hide password again after 3 seconds
+                setTimeout(() => {
+                    passwordInput.type = 'password';
+                    toggleIcon.className = 'ti ti-eye';
+                    toggleBtn.title = 'Mostrar contraseña';
+                }, 3000);
             });
         }
 
