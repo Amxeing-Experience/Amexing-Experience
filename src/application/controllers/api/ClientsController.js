@@ -339,13 +339,6 @@ class ClientsController {
         return this.sendError(res, `Cannot change client role. Must be ${this.clientRole}`, 400);
       }
 
-      // Log incoming data for debugging
-      logger.info('Client update request received', {
-        clientId,
-        updateData: JSON.stringify(updateData, null, 2),
-        currentUser: currentUser.id,
-      });
-
       // Prepare the update data structure
       const preparedUpdateData = {
         ...updateData,
@@ -390,12 +383,6 @@ class ClientsController {
         delete preparedUpdateData.website;
         delete preparedUpdateData.notes;
       }
-
-      // Log prepared data before sending to service
-      logger.info('Prepared update data for UserManagementService', {
-        clientId,
-        preparedUpdateData: JSON.stringify(preparedUpdateData, null, 2),
-      });
 
       // Update user using service
       const result = await this.userService.updateUser(clientId, preparedUpdateData, currentUser);
