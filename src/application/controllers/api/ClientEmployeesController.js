@@ -219,6 +219,7 @@ class ClientEmployeesController {
       if (!employeeData.firstName?.toString().trim()) missingFields.push('firstName');
       if (!employeeData.lastName?.toString().trim()) missingFields.push('lastName');
       if (!employeeData.email?.toString().trim()) missingFields.push('email');
+      if (!employeeData.password?.toString().trim()) missingFields.push('password');
       if (!employeeData.role?.toString().trim()) missingFields.push('role');
 
       if (missingFields.length > 0) {
@@ -234,6 +235,22 @@ class ClientEmployeesController {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(employeeData.email)) {
         return this.sendError(res, 'Formato de email inválido', 400);
+      }
+
+      // Password validation
+      const password = employeeData.password.toString().trim();
+      if (password.length < 12) {
+        return this.sendError(res, 'La contraseña debe tener al menos 12 caracteres', 400);
+      }
+
+      // Check password complexity
+      const hasUppercase = /[A-Z]/.test(password);
+      const hasLowercase = /[a-z]/.test(password);
+      const hasNumbers = /\d/.test(password);
+      const hasSpecialChars = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
+
+      if (!hasUppercase || !hasLowercase || !hasNumbers || !hasSpecialChars) {
+        return this.sendError(res, 'La contraseña debe incluir mayúsculas, minúsculas, números y caracteres especiales', 400);
       }
 
       // Validate client exists and is active (after all input validations)
@@ -263,9 +280,9 @@ class ClientEmployeesController {
       // Set roleId as Pointer to Role object
       employeeData.roleId = roleObject.id;
 
-      // Generate secure random password
-      employeeData.password = this.generateSecurePassword();
-      employeeData.mustChangePassword = true;
+      // Use the password provided by the frontend (already validated as required)
+      // Keep the password as-is since it comes from the frontend form
+      employeeData.mustChangePassword = false; // User knows the password they set
 
       // Store additional info in contextualData
       employeeData.contextualData = {
@@ -295,7 +312,7 @@ class ClientEmployeesController {
         res,
         {
           employee: result.user,
-          message: 'Empleado creado exitosamente. Se ha generado una contraseña temporal.',
+          message: 'Empleado creado exitosamente. Puede acceder al sistema con la contraseña proporcionada.',
         },
         'Empleado creado exitosamente',
         201

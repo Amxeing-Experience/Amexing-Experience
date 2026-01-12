@@ -1759,6 +1759,73 @@ function setupExperienceFilters() {
                             helpText: 'Email del empleado para acceso al sistema',
                             inputAttributes: { maxlength: '255' }
                         }) %>
+
+                        <!-- Password Field with Generation -->
+                        <div class="mb-3">
+                            <label for="employeePassword" class="form-label fw-semibold">
+                                Contraseña <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input 
+                                    type="password" 
+                                    class="form-control" 
+                                    id="employeePassword" 
+                                    name="password" 
+                                    placeholder="Contraseña segura"
+                                    minlength="12"
+                                    maxlength="100"
+                                    autocomplete="new-password"
+                                    required
+                                >
+                                <button 
+                                    class="btn btn-outline-primary" 
+                                    type="button" 
+                                    id="generateEmployeePassword"
+                                    title="Generar contraseña segura"
+                                >
+                                    <i class="ti ti-key" id="generateEmployeeIcon"></i>
+                                </button>
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="toggleEmployeePasswordVisibility"
+                                    title="Mostrar/Ocultar contraseña"
+                                >
+                                    <i class="ti ti-eye" id="employeePasswordToggleIcon"></i>
+                                </button>
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="copyEmployeePassword"
+                                    title="Copiar contraseña"
+                                >
+                                    <i class="ti ti-copy" id="copyEmployeeIcon"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Mínimo 12 caracteres, incluir mayúsculas, minúsculas, números y caracteres especiales
+                            </div>
+                            <!-- Password validation feedback -->
+                            <div id="employeePasswordValidationFeedback" class="invalid-feedback" style="display: none;">
+                                <ul class="mb-0" id="employeePasswordValidationList">
+                                    <li id="employeeLengthRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Mínimo 12 caracteres
+                                    </li>
+                                    <li id="employeeUppercaseRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos una letra mayúscula
+                                    </li>
+                                    <li id="employeeLowercaseRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos una letra minúscula
+                                    </li>
+                                    <li id="employeeNumberRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos un número
+                                    </li>
+                                    <li id="employeeSpecialCharRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos un carácter especial (!@#$%^&*...)
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Sección: Asignación de Rol -->
@@ -1823,7 +1890,7 @@ function setupExperienceFilters() {
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                         <div>
                             <strong>Acceso al sistema:</strong>
-                            <p class="mb-0 mt-1">Se generará una contraseña temporal automáticamente. El empleado recibirá instrucciones para configurar una nueva contraseña en su primer acceso.</p>
+                            <p class="mb-0 mt-1">El empleado podrá acceder al sistema con su email corporativo y la contraseña proporcionada. Podrá cambiar su contraseña desde su perfil.</p>
                         </div>
                     </div>
                 </form>
@@ -1855,6 +1922,44 @@ function setupExperienceFilters() {
 
 <!-- Employee Management JavaScript -->
 <script>
+    // ========================================================================
+    // PASSWORD GENERATION UTILITY
+    // ========================================================================
+    
+    /**
+     * Generate a secure random password meeting complexity requirements
+     * @returns {string} - Secure random password
+     */
+    function generateSecurePassword() {
+        // Character sets for password generation
+        const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+        const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const numbers = '0123456789';
+        // Using only safe special characters
+        const specialChars = '!@#$%^&*';
+        const allChars = lowercase + uppercase + numbers + specialChars;
+
+        // Ensure at least one character from each category
+        let password = '';
+        password += lowercase[Math.floor(Math.random() * lowercase.length)];
+        password += uppercase[Math.floor(Math.random() * uppercase.length)];
+        password += numbers[Math.floor(Math.random() * numbers.length)];
+        password += specialChars[Math.floor(Math.random() * specialChars.length)];
+
+        // Fill remaining characters (12 total - 4 already added = 8 more)
+        for (let i = 0; i < 8; i += 1) {
+            password += allChars[Math.floor(Math.random() * allChars.length)];
+        }
+
+        // Shuffle the password to avoid predictable patterns
+        password = password
+            .split('')
+            .sort(() => Math.random() - 0.5)
+            .join('');
+
+        return password;
+    }
+
     // ========================================================================
     // CREATE EMPLOYEE MODAL FUNCTIONS
     // ========================================================================
@@ -1888,6 +1993,166 @@ function setupExperienceFilters() {
                     charCounter.classList.remove('text-warning', 'text-danger');
                     charCounter.classList.add('text-muted');
                 }
+            });
+        }
+
+        // Password functionality for employee modal
+        const employeePasswordInput = document.getElementById('employeePassword');
+        const employeeToggleBtn = document.getElementById('toggleEmployeePasswordVisibility');
+        const employeeToggleIcon = document.getElementById('employeePasswordToggleIcon');
+
+        if (employeePasswordInput && employeeToggleBtn && employeeToggleIcon) {
+            employeeToggleBtn.addEventListener('click', function() {
+                const isPassword = employeePasswordInput.type === 'password';
+                employeePasswordInput.type = isPassword ? 'text' : 'password';
+                employeeToggleIcon.className = isPassword ? 'ti ti-eye-off' : 'ti ti-eye';
+                employeeToggleBtn.title = isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña';
+            });
+        }
+
+        // Employee password real-time validation
+        const employeePasswordValidationFeedback = document.getElementById('employeePasswordValidationFeedback');
+        const employeeLengthReq = document.getElementById('employeeLengthRequirement');
+        const employeeUppercaseReq = document.getElementById('employeeUppercaseRequirement');
+        const employeeLowercaseReq = document.getElementById('employeeLowercaseRequirement');
+        const employeeNumberReq = document.getElementById('employeeNumberRequirement');
+        const employeeSpecialCharReq = document.getElementById('employeeSpecialCharRequirement');
+
+        function validateEmployeePasswordRequirements(password) {
+            const requirements = {
+                length: password.length >= 12,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                number: /\d/.test(password),
+                specialChar: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
+            };
+
+            // Update visual feedback for each requirement
+            updateEmployeeRequirement(employeeLengthReq, requirements.length);
+            updateEmployeeRequirement(employeeUppercaseReq, requirements.uppercase);
+            updateEmployeeRequirement(employeeLowercaseReq, requirements.lowercase);
+            updateEmployeeRequirement(employeeNumberReq, requirements.number);
+            updateEmployeeRequirement(employeeSpecialCharReq, requirements.specialChar);
+
+            // Show/hide validation feedback and update input styling
+            const allValid = Object.values(requirements).every(req => req);
+            const hasValue = password.length > 0;
+
+            if (hasValue && !allValid) {
+                employeePasswordValidationFeedback.style.display = 'block';
+                employeePasswordInput.classList.add('is-invalid');
+                employeePasswordInput.classList.remove('is-valid');
+            } else if (hasValue && allValid) {
+                employeePasswordValidationFeedback.style.display = 'none';
+                employeePasswordInput.classList.remove('is-invalid');
+                employeePasswordInput.classList.add('is-valid');
+            } else {
+                employeePasswordValidationFeedback.style.display = 'none';
+                employeePasswordInput.classList.remove('is-invalid', 'is-valid');
+            }
+
+            return allValid;
+        }
+
+        function updateEmployeeRequirement(element, isValid) {
+            const icon = element.querySelector('i');
+            if (isValid) {
+                element.classList.remove('text-danger');
+                element.classList.add('text-success');
+                icon.className = 'ti ti-check-circle me-1';
+            } else {
+                element.classList.remove('text-success');
+                element.classList.add('text-danger');
+                icon.className = 'ti ti-x-circle me-1';
+            }
+        }
+
+        if (employeePasswordInput) {
+            employeePasswordInput.addEventListener('input', function() {
+                validateEmployeePasswordRequirements(this.value);
+            });
+
+            // Also validate on paste
+            employeePasswordInput.addEventListener('paste', function() {
+                setTimeout(() => {
+                    validateEmployeePasswordRequirements(this.value);
+                }, 10);
+            });
+        }
+
+        // Copy employee password to clipboard
+        const employeeCopyBtn = document.getElementById('copyEmployeePassword');
+        const employeeCopyIcon = document.getElementById('copyEmployeeIcon');
+
+        if (employeePasswordInput && employeeCopyBtn && employeeCopyIcon) {
+            employeeCopyBtn.addEventListener('click', async function() {
+                if (!employeePasswordInput.value.trim()) {
+                    showAlert('No hay contraseña para copiar', 'warning');
+                    return;
+                }
+
+                try {
+                    await navigator.clipboard.writeText(employeePasswordInput.value);
+                    
+                    // Visual feedback
+                    const originalIcon = employeeCopyIcon.className;
+                    employeeCopyIcon.className = 'ti ti-check';
+                    employeeCopyBtn.classList.remove('btn-outline-secondary');
+                    employeeCopyBtn.classList.add('btn-success');
+                    
+                    setTimeout(() => {
+                        employeeCopyIcon.className = originalIcon;
+                        employeeCopyBtn.classList.remove('btn-success');
+                        employeeCopyBtn.classList.add('btn-outline-secondary');
+                    }, 1500);
+                    
+                    showSuccessAlert('Contraseña copiada al portapapeles');
+                } catch (err) {
+                    console.error('Error copying to clipboard:', err);
+                    showErrorAlert('Error al copiar la contraseña');
+                }
+            });
+        }
+
+        // Generate employee password functionality
+        const employeeGenerateBtn = document.getElementById('generateEmployeePassword');
+        const employeeGenerateIcon = document.getElementById('generateEmployeeIcon');
+
+        if (employeePasswordInput && employeeGenerateBtn && employeeGenerateIcon) {
+            employeeGenerateBtn.addEventListener('click', function() {
+                // Generate secure password
+                const newPassword = generateSecurePassword();
+                employeePasswordInput.value = newPassword;
+                
+                // Trigger validation
+                validateEmployeePasswordRequirements(newPassword);
+                
+                // Visual feedback
+                const originalIcon = employeeGenerateIcon.className;
+                employeeGenerateIcon.className = 'ti ti-check';
+                employeeGenerateBtn.classList.remove('btn-outline-primary');
+                employeeGenerateBtn.classList.add('btn-success');
+                
+                setTimeout(() => {
+                    employeeGenerateIcon.className = originalIcon;
+                    employeeGenerateBtn.classList.remove('btn-success');
+                    employeeGenerateBtn.classList.add('btn-outline-primary');
+                }, 1500);
+                
+                // Show success message
+                showSuccessAlert('Nueva contraseña generada exitosamente');
+                
+                // Show the password for easy verification
+                employeePasswordInput.type = 'text';
+                employeeToggleIcon.className = 'ti ti-eye-off';
+                employeeToggleBtn.title = 'Ocultar contraseña';
+                
+                // Hide password again after 3 seconds
+                setTimeout(() => {
+                    employeePasswordInput.type = 'password';
+                    employeeToggleIcon.className = 'ti ti-eye';
+                    employeeToggleBtn.title = 'Mostrar contraseña';
+                }, 3000);
             });
         }
 
@@ -1929,6 +2194,14 @@ function setupExperienceFilters() {
                         isValid = false;
                     }
                 }
+
+                // Password validation
+                if (field.type === 'password' && value) {
+                    const passwordValid = validateEmployeePasswordRequirements(value);
+                    if (!passwordValid) {
+                        isValid = false;
+                    }
+                }
             });
 
             submitBtn.disabled = !isValid;
@@ -1948,6 +2221,7 @@ function setupExperienceFilters() {
                 firstName: document.getElementById('employeeFirstName').value.trim(),
                 lastName: document.getElementById('employeeLastName').value.trim(),
                 email: document.getElementById('employeeEmail').value.trim(),
+                password: document.getElementById('employeePassword').value.trim(),
                 role: document.getElementById('employeeRole').value.trim(),
                 phone: document.getElementById('employeePhone').value.trim() || undefined,
                 notes: document.getElementById('employeeNotes').value.trim() || ''
@@ -1977,9 +2251,22 @@ function setupExperienceFilters() {
             // Hide role descriptions
             document.querySelectorAll('.role-description').forEach(el => el.classList.add('d-none'));
 
+            // Reset password validation feedback
+            if (employeePasswordValidationFeedback) {
+                employeePasswordValidationFeedback.style.display = 'none';
+            }
+
             // Clear validation states
-            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid', 'is-valid'));
+            form.querySelectorAll('.is-valid').forEach(el => el.classList.remove('is-valid'));
             form.querySelectorAll('.invalid-feedback').forEach(el => el.style.display = 'none');
+            form.querySelectorAll('.valid-feedback').forEach(el => el.style.display = 'none');
+            
+            // Specifically clear phone input validation
+            const phoneInput = document.getElementById('employeePhone');
+            if (phoneInput) {
+                phoneInput.classList.remove('is-invalid', 'is-valid');
+            }
         });
     }
 
