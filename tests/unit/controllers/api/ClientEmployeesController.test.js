@@ -252,6 +252,7 @@ describe('ClientEmployeesController', () => {
       lastName: 'Agent',
       email: 'newagent@company.com',
       role: 'client',
+      password: 'TestPassword123!',
       phone: '+52 999 123 4567',
       notes: 'Agency representative',
     };
