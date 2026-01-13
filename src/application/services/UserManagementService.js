@@ -394,9 +394,20 @@ class UserManagementService {
       // Create user using AmexingUser model (follows BaseModel patterns)
       const user = AmexingUser.create(userDataWithDefaults);
 
-      // Set password securely
+      // Set password securely with bcrypt hashing
       if (userData.password) {
-        await user.setPassword(userData.password);
+        // Hash the password using bcrypt before saving
+        const bcrypt = require('bcrypt');
+        const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+        const hashedPassword = await bcrypt.hash(userData.password, saltRounds);
+
+        // Save hash in both fields for compatibility
+        user.set('password', hashedPassword);
+        user.set('passwordHash', hashedPassword);
+        user.set('passwordChangedAt', new Date());
+        user.set('mustChangePassword', false);
+        user.set('loginAttempts', 0);
+        user.set('lockedUntil', null);
       }
 
       // Save with user context for proper audit trail
