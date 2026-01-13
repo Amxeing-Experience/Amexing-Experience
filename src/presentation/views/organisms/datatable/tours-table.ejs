@@ -1099,7 +1099,29 @@ table.dataTable tbody tr.hover {
             });
         }
 
+        // Function to apply transfer rate to price (used for Transferencia and Trans. Agencias)
+        function applyTransferRate(priceString) {
+            if (currentTransferRate <= 0) return priceString;
+            
+            // Extract numeric value from price string (e.g., "$1,234.50" -> 1234.50)
+            const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
+            if (isNaN(numericValue)) return priceString;
+            
+            // Apply transfer rate percentage
+            const newValue = numericValue * (1 + currentTransferRate / 100);
+            
+            console.log(`Applying transfer rate ${currentTransferRate}% to $${numericValue} = $${newValue.toFixed(2)}`);
+            
+            // Format back to currency string
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2
+            }).format(newValue);
+        }
+
         // Function to apply rate to price (transfer rate for regular users, agency rate for department managers)
+        // This is kept for backwards compatibility but not used in the new logic
         function applyCommissionRate(priceString) {
             const rateToUse = isDepartmentManager ? currentAgencyRate : currentTransferRate;
             const rateName = isDepartmentManager ? 'agency rate' : 'transfer rate';
@@ -1223,9 +1245,11 @@ table.dataTable tbody tr.hover {
                     let finalPrice = originalPrice;
                     
                     // Apply appropriate rate based on payment type
-                    if (paymentType === 'transferencia' || paymentType === 'tarjeta') {
-                        finalPrice = applyCommissionRate(finalPrice);
-                    } else if (paymentType === 'transf_agencias') {
+                    if (paymentType === 'transferencia' || paymentType === 'transf_agencias') {
+                        // Both Transferencia and Trans. Agencias use transfer rate
+                        finalPrice = applyTransferRate(finalPrice);
+                    } else if (paymentType === 'tarjeta') {
+                        // Tarjeta Débito/Crédito uses agency rate
                         finalPrice = applyAgencyRate(finalPrice);
                     }
                     
@@ -1249,9 +1273,11 @@ table.dataTable tbody tr.hover {
                 let finalPrice = originalPrice;
                 
                 // Apply appropriate rate based on payment type
-                if (paymentType === 'transferencia' || paymentType === 'tarjeta') {
-                    finalPrice = applyCommissionRate(finalPrice);
-                } else if (paymentType === 'transf_agencias') {
+                if (paymentType === 'transferencia' || paymentType === 'transf_agencias') {
+                    // Both Transferencia and Trans. Agencias use transfer rate
+                    finalPrice = applyTransferRate(finalPrice);
+                } else if (paymentType === 'tarjeta') {
+                    // Tarjeta Débito/Crédito uses agency rate
                     finalPrice = applyAgencyRate(finalPrice);
                 }
                 
@@ -1267,19 +1293,17 @@ table.dataTable tbody tr.hover {
             const selectedPaymentType = $(this).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             
-            if (selectedPaymentType === 'transferencia' || selectedPaymentType === 'tarjeta') {
-                if (isDepartmentManager && currentAgencyRate <= 0) {
-                    loadCurrentAgencyRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
-                    });
-                } else if (!isDepartmentManager && currentTransferRate <= 0) {
+            if (selectedPaymentType === 'transferencia' || selectedPaymentType === 'transf_agencias') {
+                // Both Transferencia and Trans. Agencias use transfer rate
+                if (currentTransferRate <= 0) {
                     loadCurrentTransferRate().then(() => {
                         updatePricesForFilters(selectedPaymentType, selectedCurrency);
                     });
                 } else {
                     updatePricesForFilters(selectedPaymentType, selectedCurrency);
                 }
-            } else if (selectedPaymentType === 'transf_agencias') {
+            } else if (selectedPaymentType === 'tarjeta') {
+                // Tarjeta uses agency rate
                 if (currentAgencyRate <= 0) {
                     loadCurrentAgencyRate().then(() => {
                         updatePricesForFilters(selectedPaymentType, selectedCurrency);

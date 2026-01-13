@@ -142,6 +142,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                     <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
                         <option value="efectivo" selected>Efectivo</option>
                         <option value="transferencia">Transferencia</option>
+                        <option value="tarjeta">Tarjeta Débito/Crédito</option>
                         <option value="transf_agencias">Transf. Agencias</option>
                     </select>
                 </div>
@@ -868,6 +869,91 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             let currentAgencyRate = 0;
             let currentExchangeRate = 0;
             
+            // Function to get access token
+            function getAccessToken() {
+                return document.cookie.split('; ')
+                    .find(row => row.startsWith('accessToken='))
+                    ?.split('=')[1];
+            }
+            
+            // Function to load current transfer rate
+            function loadCurrentTransferRate() {
+                return fetch('/api/transfer-rate/current', {
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        currentTransferRate = data.data.value || 3;
+                        console.log('Transfer rate loaded:', currentTransferRate);
+                    } else {
+                        currentTransferRate = 3; // Default 3%
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading transfer rate:', error);
+                    currentTransferRate = 3; // Default 3%
+                });
+            }
+            
+            // Function to load current agency rate
+            function loadCurrentAgencyRate() {
+                return fetch('/api/agency-rate/current', {
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        currentAgencyRate = data.data.value || 15;
+                        console.log('Agency rate loaded:', currentAgencyRate);
+                    } else {
+                        currentAgencyRate = 15; // Default 15%
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading agency rate:', error);
+                    currentAgencyRate = 15; // Default 15%
+                });
+            }
+            
+            // Function to load current exchange rate
+            function loadCurrentExchangeRate() {
+                return fetch('/api/exchange-rate/current', {
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        currentExchangeRate = data.data.value || 18.50;
+                        console.log('Exchange rate loaded:', currentExchangeRate);
+                    } else {
+                        currentExchangeRate = 18.50; // Default rate
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading exchange rate:', error);
+                    currentExchangeRate = 18.50; // Default rate
+                });
+            }
+            
+            // Function to apply transfer rate to price (used for Transferencia and Trans. Agencias)
+            function applyTransferRate(price) {
+                if (currentTransferRate <= 0) return price;
+                return price * (1 + currentTransferRate / 100);
+            }
+            
+            // Function to apply agency rate to price (used for Tarjeta Débito/Crédito)
+            function applyAgencyRate(price) {
+                if (currentAgencyRate <= 0) return price;
+                return price * (1 + currentAgencyRate / 100);
+            }
+            
             // Function to apply USD rounding rules
             function applyUSDRoundingRules(value) {
                 // Find the base (nearest multiple of 5 below or equal)
@@ -919,16 +1005,18 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         
                         let finalPrice = originalPrice;
                         
-                        // Apply payment type rates
-                        if (paymentType === 'transferencia') {
-                            finalPrice = finalPrice * 1.035; // 3.5% transfer rate
-                        } else if (paymentType === 'transf_agencias') {
-                            finalPrice = finalPrice * 1.05; // 5% agency rate
+                        // Apply payment type rates based on new logic
+                        if (paymentType === 'transferencia' || paymentType === 'transf_agencias') {
+                            // Both Transferencia and Trans. Agencias use transfer rate
+                            finalPrice = applyTransferRate(finalPrice);
+                        } else if (paymentType === 'tarjeta') {
+                            // Tarjeta Débito/Crédito uses agency rate
+                            finalPrice = applyAgencyRate(finalPrice);
                         }
                         
                         // Apply currency conversion
                         if (currency === 'USD') {
-                            finalPrice = finalPrice / 17.5; // Example exchange rate
+                            finalPrice = finalPrice / currentExchangeRate;
                             finalPrice = applyUSDRoundingRules(finalPrice);
                             
                             // Format as USD
@@ -971,14 +1059,51 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             $(`#currencyFilter-${tableId}`).on('change', function() {
                 const selectedCurrency = $(this).val();
                 const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
-                updatePrices(selectedPaymentType, selectedCurrency);
+                
+                if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
+                    loadCurrentExchangeRate().then(() => {
+                        updatePrices(selectedPaymentType, selectedCurrency);
+                    });
+                } else {
+                    updatePrices(selectedPaymentType, selectedCurrency);
+                }
             });
             
             // Payment type filter change handler
             $(`#paymentTypeFilter-${tableId}`).on('change', function() {
                 const selectedPaymentType = $(this).val();
                 const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
-                updatePrices(selectedPaymentType, selectedCurrency);
+                
+                if (selectedPaymentType === 'transferencia' || selectedPaymentType === 'transf_agencias') {
+                    // Both Transferencia and Trans. Agencias use transfer rate
+                    if (currentTransferRate <= 0) {
+                        loadCurrentTransferRate().then(() => {
+                            updatePrices(selectedPaymentType, selectedCurrency);
+                        });
+                    } else {
+                        updatePrices(selectedPaymentType, selectedCurrency);
+                    }
+                } else if (selectedPaymentType === 'tarjeta') {
+                    // Tarjeta uses agency rate
+                    if (currentAgencyRate <= 0) {
+                        loadCurrentAgencyRate().then(() => {
+                            updatePrices(selectedPaymentType, selectedCurrency);
+                        });
+                    } else {
+                        updatePrices(selectedPaymentType, selectedCurrency);
+                    }
+                } else {
+                    updatePrices(selectedPaymentType, selectedCurrency);
+                }
+            });
+            
+            // Load initial rates
+            Promise.all([
+                loadCurrentTransferRate(),
+                loadCurrentAgencyRate(),
+                loadCurrentExchangeRate()
+            ]).then(() => {
+                console.log('All rates loaded for experiences table');
             });
         }
 

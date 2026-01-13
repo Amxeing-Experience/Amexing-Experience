@@ -17,7 +17,7 @@ const activeSection = typeof section !== 'undefined' ? section : 'exchange-rate'
 const menuItems = [
     { label: 'Tipo de Cambio', icon: 'currency-dollar', section: 'exchange-rate', href: '/dashboard/admin/price-settings' },
     { label: '% de Inflación', icon: 'trending-up', section: 'inflation', href: '/dashboard/admin/price-settings?section=inflation' },
-    { label: '% de Agencia', icon: 'percentage', section: 'agency', href: '/dashboard/admin/price-settings?section=agency' },
+    { label: '% Tarjetas', icon: 'percentage', section: 'agency', href: '/dashboard/admin/price-settings?section=agency' },
     { label: '% Transferencia', icon: 'credit-card', section: 'transfer', href: '/dashboard/admin/price-settings?section=transfer' }
 ];
 
@@ -25,7 +25,7 @@ const menuItems = [
 const sectionNames = {
     'exchange-rate': 'Tipo de Cambio (USD a MXN)',
     'inflation': 'Porcentaje de Inflación',
-    'agency': 'Porcentaje de Agencia',
+    'agency': 'Porcentaje de Tarjetas',
     'transfer': 'Porcentaje de Transferencia'
 };
 
@@ -264,7 +264,7 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                             <% if (typeof currentAgencyRate !== 'undefined' && currentAgencyRate.value) { %>
                             <div id="currentValueDisplay" class="text-center py-3">
                                 <div class="display-3 fw-bold text-primary"><%= currentAgencyRate.formatted %>%</div>
-                                <div class="text-muted">Porcentaje de Agencia</div>
+                                <div class="text-muted">Porcentaje de Tarjetas</div>
                             </div>
 
                             <div id="currentValueDetails" class="mt-3">
@@ -293,7 +293,7 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                             <% } else { %>
                             <div id="currentValueDisplay" class="text-center py-3">
                                 <div class="display-3 fw-bold text-primary">15.0%</div>
-                                <div class="text-muted">Porcentaje de Agencia (Valor por defecto)</div>
+                                <div class="text-muted">Porcentaje de Tarjetas (Valor por defecto)</div>
                             </div>
 
                             <div id="currentValueDetails" class="mt-3">
