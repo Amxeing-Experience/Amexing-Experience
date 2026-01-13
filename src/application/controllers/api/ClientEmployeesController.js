@@ -139,8 +139,12 @@ class ClientEmployeesController {
       // Validate client exists
       await this.validateClientExists(clientId);
 
+      // Add role to currentUser object for service validation
+      const currentUserRole = req.userRole;
+      const userWithRole = { ...currentUser, role: currentUserRole };
+
       // Get employee from service
-      const employee = await this.userService.getUserById(currentUser, employeeId);
+      const employee = await this.userService.getUserById(userWithRole, employeeId);
 
       if (!employee) {
         return this.sendError(res, 'Employee not found', 404);
@@ -370,15 +374,23 @@ class ClientEmployeesController {
       // Validate client exists
       await this.validateClientExists(clientId);
 
-      // Get employee to verify it belongs to client
-      const employee = await this.userService.getUserById(currentUser, employeeId);
+      // Add role to currentUser object for service validation BEFORE calling getUserById
+      const userWithRole = { ...currentUser, role: currentUserRole };
+
+      // Get employee directly using query that includes inactive users for editing
+      // We need to use queryExisting instead of getUserById which only gets active users
+      const BaseModel = require('../../../domain/models/BaseModel');
+      const employeeQuery = BaseModel.queryExisting('AmexingUser');
+      employeeQuery.equalTo('objectId', employeeId);
+
+      const employee = await employeeQuery.first({ useMasterKey: true });
 
       if (!employee) {
         return this.sendError(res, 'Employee not found', 404);
       }
 
       // Validate employee belongs to this client
-      const employeeClientId = employee.clientId || employee.get?.('clientId') || employee.organizationId || employee.get?.('organizationId');
+      const employeeClientId = employee.get('clientId') || employee.get('organizationId');
 
       if (employeeClientId !== clientId) {
         return this.sendError(res, 'Employee does not belong to specified client', 403);
@@ -392,10 +404,6 @@ class ClientEmployeesController {
           400
         );
       }
-
-      // Add role to currentUser object for service validation
-      const userWithRole = currentUser;
-      userWithRole.role = currentUserRole;
 
       // Update user using service
       const result = await this.userService.updateUser(employeeId, updateData, userWithRole);
@@ -448,8 +456,7 @@ class ClientEmployeesController {
       await this.validateClientExists(clientId);
 
       // Add role to currentUser object BEFORE calling service methods
-      const userWithRole = currentUser;
-      userWithRole.role = currentUserRole;
+      const userWithRole = { ...currentUser, role: currentUserRole };
 
       // Get employee directly using query that includes inactive users
       // We need to use queryExisting instead of getUserById which only gets active users
@@ -536,8 +543,7 @@ class ClientEmployeesController {
       await this.validateClientExists(clientId);
 
       // Add role to currentUser object BEFORE calling service methods
-      const userWithRole = currentUser;
-      userWithRole.role = currentUserRole;
+      const userWithRole = { ...currentUser, role: currentUserRole };
 
       // Get employee to verify it belongs to client
       const employee = await this.userService.getUserById(userWithRole, employeeId);

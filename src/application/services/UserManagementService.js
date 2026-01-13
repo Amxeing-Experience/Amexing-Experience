@@ -386,9 +386,9 @@ class UserManagementService {
         emailVerified: false,
         loginAttempts: 0,
         // Only set createdBy/modifiedBy if not already provided in userData
-        // This allows callers to pass user ID strings that will be converted to Pointers
-        createdBy: userData.createdBy || createdBy,
-        modifiedBy: userData.modifiedBy || createdBy,
+        // Pass only the user ID if createdBy has an id property
+        createdBy: userData.createdBy || (createdBy && createdBy.id ? createdBy.id : createdBy),
+        modifiedBy: userData.modifiedBy || (createdBy && createdBy.id ? createdBy.id : createdBy),
       };
 
       // Create user using AmexingUser model (follows BaseModel patterns)
@@ -451,7 +451,8 @@ class UserManagementService {
   async updateUser(userId, updates, modifiedBy) {
     try {
       // Get existing user using AI agent compliant query
-      const query = BaseModel.queryActive(this.className);
+      // Use queryExisting instead of queryActive to allow updating inactive users
+      const query = BaseModel.queryExisting(this.className);
       const user = await query.get(userId, {
         useMasterKey: true,
         context: extractUserContext(modifiedBy),
@@ -508,14 +509,38 @@ class UserManagementService {
         }
       });
 
-      // Update modification tracking - Pass User object directly for Pointer creation
-      user.set('modifiedBy', modifiedBy);
+      // Update modification tracking - Create a Pointer to the AmexingUser
+      // modifiedBy should be a Pointer to the user who is making the modification
+      if (modifiedBy && modifiedBy.id) {
+        // Create a Pointer to the AmexingUser object
+        const modifiedByPointer = {
+          __type: 'Pointer',
+          className: 'AmexingUser',
+          objectId: modifiedBy.id,
+        };
+        user.set('modifiedBy', modifiedByPointer);
+      } else if (modifiedBy) {
+        // If modifiedBy is already a Parse User or Pointer object, use it directly
+        user.set('modifiedBy', modifiedBy);
+      }
       user.set('updatedAt', new Date());
 
       // Handle password update separately if provided
       if (updates.password) {
-        await user.setPassword(updates.password);
+        // Hash the password using bcrypt before saving
+        const bcrypt = require('bcrypt');
+        const saltRounds = parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+        const hashedPassword = await bcrypt.hash(updates.password, saltRounds);
+
+        // Save hash in both fields for compatibility
+        // 'password' is used by authentication system
+        // 'passwordHash' kept for backwards compatibility
+        user.set('password', hashedPassword);
+        user.set('passwordHash', hashedPassword);
         user.set('passwordChangedAt', new Date());
+        user.set('mustChangePassword', false);
+        user.set('loginAttempts', 0);
+        user.set('lockedUntil', null);
       }
 
       // Save changes with user context for proper audit trail
@@ -594,8 +619,14 @@ class UserManagementService {
       user.set('exists', false);
       user.set('deletedAt', new Date());
       user.set('updatedAt', new Date());
-      user.set('modifiedBy', deactivatedBy);
-      user.set('deletedBy', deactivatedBy);
+      // Pass only the user ID or Parse User object
+      if (deactivatedBy && deactivatedBy.id) {
+        user.set('modifiedBy', deactivatedBy.id);
+        user.set('deletedBy', deactivatedBy.id);
+      } else if (deactivatedBy) {
+        user.set('modifiedBy', deactivatedBy);
+        user.set('deletedBy', deactivatedBy);
+      }
 
       await user.save(null, {
         useMasterKey: true,
@@ -668,7 +699,12 @@ class UserManagementService {
       user.set('active', true);
       user.set('exists', true);
       user.set('updatedAt', new Date());
-      user.set('modifiedBy', reactivatedBy);
+      // Pass only the user ID or Parse User object
+      if (reactivatedBy && reactivatedBy.id) {
+        user.set('modifiedBy', reactivatedBy.id);
+      } else if (reactivatedBy) {
+        user.set('modifiedBy', reactivatedBy);
+      }
 
       await user.save(null, {
         useMasterKey: true,
