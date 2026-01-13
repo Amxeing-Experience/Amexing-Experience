@@ -1759,6 +1759,73 @@ function setupExperienceFilters() {
                             helpText: 'Email del empleado para acceso al sistema',
                             inputAttributes: { maxlength: '255' }
                         }) %>
+
+                        <!-- Password Field with Generation -->
+                        <div class="mb-3">
+                            <label for="employeePassword" class="form-label fw-semibold">
+                                Contraseña <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input 
+                                    type="password" 
+                                    class="form-control" 
+                                    id="employeePassword" 
+                                    name="password" 
+                                    placeholder="Contraseña segura"
+                                    minlength="12"
+                                    maxlength="100"
+                                    autocomplete="new-password"
+                                    required
+                                >
+                                <button 
+                                    class="btn btn-outline-primary" 
+                                    type="button" 
+                                    id="generateEmployeePassword"
+                                    title="Generar contraseña segura"
+                                >
+                                    <i class="ti ti-key" id="generateEmployeeIcon"></i>
+                                </button>
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="toggleEmployeePasswordVisibility"
+                                    title="Mostrar/Ocultar contraseña"
+                                >
+                                    <i class="ti ti-eye" id="employeePasswordToggleIcon"></i>
+                                </button>
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="copyEmployeePassword"
+                                    title="Copiar contraseña"
+                                >
+                                    <i class="ti ti-copy" id="copyEmployeeIcon"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Mínimo 12 caracteres, incluir mayúsculas, minúsculas, números y caracteres especiales
+                            </div>
+                            <!-- Password validation feedback -->
+                            <div id="employeePasswordValidationFeedback" class="invalid-feedback" style="display: none;">
+                                <ul class="mb-0" id="employeePasswordValidationList">
+                                    <li id="employeeLengthRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Mínimo 12 caracteres
+                                    </li>
+                                    <li id="employeeUppercaseRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos una letra mayúscula
+                                    </li>
+                                    <li id="employeeLowercaseRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos una letra minúscula
+                                    </li>
+                                    <li id="employeeNumberRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos un número
+                                    </li>
+                                    <li id="employeeSpecialCharRequirement" class="text-danger">
+                                        <i class="ti ti-x-circle me-1"></i>Al menos un carácter especial (!@#$%^&*...)
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Sección: Asignación de Rol -->
@@ -1823,7 +1890,7 @@ function setupExperienceFilters() {
                         <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
                         <div>
                             <strong>Acceso al sistema:</strong>
-                            <p class="mb-0 mt-1">Se generará una contraseña temporal automáticamente. El empleado recibirá instrucciones para configurar una nueva contraseña en su primer acceso.</p>
+                            <p class="mb-0 mt-1">El empleado podrá acceder al sistema con su email corporativo y la contraseña proporcionada. Podrá cambiar su contraseña desde su perfil.</p>
                         </div>
                     </div>
                 </form>
@@ -1853,8 +1920,283 @@ function setupExperienceFilters() {
     </div>
 </div>
 
+<!-- Edit Employee Modal -->
+<div class="modal fade" id="editEmployeeModal" tabindex="-1" aria-labelledby="editEmployeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="editEmployeeModalLabel">
+                    <i class="ti ti-edit me-2"></i>Editar Empleado
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <form id="editEmployeeForm">
+                    <!-- Hidden field for employee ID -->
+                    <input type="hidden" id="editEmployeeId" name="id">
+
+                    <!-- Sección: Información Personal -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-user me-1"></i>
+                            Información Personal
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'firstName',
+                                    id: 'editEmployeeFirstName',
+                                    label: 'Nombre',
+                                    required: true,
+                                    placeholder: 'Ej: Juan',
+                                    helpText: 'Nombre del empleado',
+                                    inputAttributes: { maxlength: '100' }
+                                }) %>
+                            </div>
+                            <div class="col-md-6">
+                                <%- include('../../molecules/common/form-field', {
+                                    type: 'text',
+                                    name: 'lastName',
+                                    id: 'editEmployeeLastName',
+                                    label: 'Apellido',
+                                    required: true,
+                                    placeholder: 'Ej: Pérez García',
+                                    inputAttributes: { maxlength: '100' }
+                                }) %>
+                            </div>
+                        </div>
+
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'email',
+                            name: 'email',
+                            id: 'editEmployeeEmail',
+                            label: 'Email Corporativo',
+                            required: true,
+                            placeholder: 'empleado@empresa.com',
+                            helpText: 'El email no puede ser modificado por seguridad',
+                            inputAttributes: { maxlength: '255', readonly: 'readonly' }
+                        }) %>
+                    </div>
+
+                    <!-- Sección: Configuración de Rol -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-shield me-1"></i>
+                            Configuración de Rol
+                        </h6>
+                        
+                        <div class="mb-3">
+                            <label for="editEmployeeRole" class="form-label fw-semibold">
+                                Rol del Empleado <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="editEmployeeRole" name="role" required>
+                                <option value="">Seleccionar rol...</option>
+                                <option value="client">Agent (Representante de agencia con capacidades de gestión)</option>
+                                <option value="employee">Employee (Empleado estándar)</option>
+                            </select>
+                            <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
+                        </div>
+
+                        <!-- Role descriptions -->
+                        <div class="alert alert-info role-description d-none" id="editRoleDescriptionClient">
+                            <strong><i class="ti ti-briefcase me-1"></i>Agent:</strong>
+                            Representante de la agencia con capacidades de gestión. Puede gestionar empleados y cotizaciones.
+                        </div>
+                        <div class="alert alert-secondary role-description d-none" id="editRoleDescriptionEmployee">
+                            <strong><i class="ti ti-user me-1"></i>Employee:</strong>
+                            Empleado estándar con acceso a funcionalidades básicas.
+                        </div>
+                    </div>
+
+                    <!-- Sección: Información de Contacto -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-phone me-1"></i>
+                            Información de Contacto
+                        </h6>
+                        
+                        <%- include('../../atoms/common/phone-input', {
+                            name: 'phone',
+                            id: 'editEmployeePhone',
+                            label: 'Teléfono de Contacto',
+                            required: false,
+                            helpText: 'Número de contacto del empleado',
+                            countryCode: 'MX'
+                        }) %>
+
+                        <%- include('../../molecules/common/form-field', {
+                            type: 'textarea',
+                            name: 'notes',
+                            id: 'editEmployeeNotes',
+                            label: 'Notas Adicionales',
+                            required: false,
+                            placeholder: 'Información relevante sobre el empleado...',
+                            helpText: 'Máximo 500 caracteres',
+                            inputAttributes: { maxlength: '500', rows: '3' }
+                        }) %>
+                        <small id="editNotesCharCountEmployee" class="text-muted float-end">0/500</small>
+                    </div>
+
+                    <!-- Sección: Cambio de Contraseña -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-lock me-1"></i>
+                            Cambio de Contraseña (Opcional)
+                        </h6>
+                        
+                        <div class="alert alert-info mb-3">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Deja este campo vacío si no deseas cambiar la contraseña del empleado
+                        </div>
+
+                        <!-- Password Field with Generation (matching Create modal design) -->
+                        <div class="mb-3">
+                            <label for="editEmployeePassword" class="form-label fw-semibold">
+                                Nueva Contraseña
+                            </label>
+                            <div class="input-group">
+                                <input 
+                                    type="password" 
+                                    class="form-control" 
+                                    id="editEmployeePassword" 
+                                    name="password" 
+                                    placeholder="Contraseña segura"
+                                    minlength="12"
+                                    maxlength="100"
+                                    autocomplete="new-password"
+                                >
+                                <button 
+                                    class="btn btn-outline-primary" 
+                                    type="button" 
+                                    id="generatePasswordEditBtn"
+                                    title="Generar contraseña segura"
+                                >
+                                    <i class="ti ti-key" id="generateEditPasswordIcon"></i>
+                                </button>
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="toggleEditPasswordVisibility"
+                                    title="Mostrar/Ocultar contraseña"
+                                >
+                                    <i class="ti ti-eye" id="editPasswordToggleIcon"></i>
+                                </button>
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="copyEditPassword"
+                                    title="Copiar contraseña"
+                                >
+                                    <i class="ti ti-copy" id="copyEditPasswordIcon"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Mínimo 12 caracteres, incluir mayúsculas, minúsculas, números y caracteres especiales
+                            </div>
+                            <!-- Password validation feedback -->
+                            <div id="editPasswordValidationFeedback" class="invalid-feedback" style="display: none;">
+                                <ul class="mb-0" id="editPasswordValidationList">
+                                    <li id="editLengthRequirement" class="text-danger">
+                                        <i class="ti ti-x me-1"></i>Mínimo 12 caracteres
+                                    </li>
+                                    <li id="editUppercaseRequirement" class="text-danger">
+                                        <i class="ti ti-x me-1"></i>Al menos una letra mayúscula
+                                    </li>
+                                    <li id="editLowercaseRequirement" class="text-danger">
+                                        <i class="ti ti-x me-1"></i>Al menos una letra minúscula
+                                    </li>
+                                    <li id="editNumberRequirement" class="text-danger">
+                                        <i class="ti ti-x me-1"></i>Al menos un número
+                                    </li>
+                                    <li id="editSpecialCharRequirement" class="text-danger">
+                                        <i class="ti ti-x me-1"></i>Al menos un carácter especial (!@#$%^&*...)
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status toggle -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="editEmployeeActive" name="active">
+                            <label class="form-check-label fw-semibold" for="editEmployeeActive">
+                                <i class="ti ti-toggle-left me-1"></i>
+                                Empleado Activo
+                            </label>
+                            <div class="form-text">Desactiva esta opción para suspender temporalmente el acceso del empleado</div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <%- include('../../atoms/common/button', {
+                    type: 'button',
+                    variant: 'secondary',
+                    text: 'Cancelar',
+                    icon: 'x',
+                    attributes: { 'data-bs-dismiss': 'modal' }
+                }) %>
+
+                <%- include('../../atoms/common/button', {
+                    type: 'button',
+                    variant: 'primary',
+                    text: 'Actualizar Empleado',
+                    icon: 'check',
+                    attributes: {
+                        'id': 'submitEditEmployee',
+                        'disabled': 'true'
+                    }
+                }) %>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Employee Management JavaScript -->
 <script>
+    // ========================================================================
+    // PASSWORD GENERATION UTILITY
+    // ========================================================================
+    
+    /**
+     * Generate a secure random password meeting complexity requirements
+     * @returns {string} - Secure random password
+     */
+    function generateSecurePassword() {
+        // Character sets for password generation
+        const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+        const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const numbers = '0123456789';
+        // Using only safe special characters
+        const specialChars = '!@#$%^&*';
+        const allChars = lowercase + uppercase + numbers + specialChars;
+
+        // Ensure at least one character from each category
+        let password = '';
+        password += lowercase[Math.floor(Math.random() * lowercase.length)];
+        password += uppercase[Math.floor(Math.random() * uppercase.length)];
+        password += numbers[Math.floor(Math.random() * numbers.length)];
+        password += specialChars[Math.floor(Math.random() * specialChars.length)];
+
+        // Fill remaining characters (12 total - 4 already added = 8 more)
+        for (let i = 0; i < 8; i += 1) {
+            password += allChars[Math.floor(Math.random() * allChars.length)];
+        }
+
+        // Shuffle the password to avoid predictable patterns
+        password = password
+            .split('')
+            .sort(() => Math.random() - 0.5)
+            .join('');
+
+        return password;
+    }
+
     // ========================================================================
     // CREATE EMPLOYEE MODAL FUNCTIONS
     // ========================================================================
@@ -1888,6 +2230,166 @@ function setupExperienceFilters() {
                     charCounter.classList.remove('text-warning', 'text-danger');
                     charCounter.classList.add('text-muted');
                 }
+            });
+        }
+
+        // Password functionality for employee modal
+        const employeePasswordInput = document.getElementById('employeePassword');
+        const employeeToggleBtn = document.getElementById('toggleEmployeePasswordVisibility');
+        const employeeToggleIcon = document.getElementById('employeePasswordToggleIcon');
+
+        if (employeePasswordInput && employeeToggleBtn && employeeToggleIcon) {
+            employeeToggleBtn.addEventListener('click', function() {
+                const isPassword = employeePasswordInput.type === 'password';
+                employeePasswordInput.type = isPassword ? 'text' : 'password';
+                employeeToggleIcon.className = isPassword ? 'ti ti-eye-off' : 'ti ti-eye';
+                employeeToggleBtn.title = isPassword ? 'Ocultar contraseña' : 'Mostrar contraseña';
+            });
+        }
+
+        // Employee password real-time validation
+        const employeePasswordValidationFeedback = document.getElementById('employeePasswordValidationFeedback');
+        const employeeLengthReq = document.getElementById('employeeLengthRequirement');
+        const employeeUppercaseReq = document.getElementById('employeeUppercaseRequirement');
+        const employeeLowercaseReq = document.getElementById('employeeLowercaseRequirement');
+        const employeeNumberReq = document.getElementById('employeeNumberRequirement');
+        const employeeSpecialCharReq = document.getElementById('employeeSpecialCharRequirement');
+
+        function validateEmployeePasswordRequirements(password) {
+            const requirements = {
+                length: password.length >= 12,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                number: /\d/.test(password),
+                specialChar: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
+            };
+
+            // Update visual feedback for each requirement
+            updateEmployeeRequirement(employeeLengthReq, requirements.length);
+            updateEmployeeRequirement(employeeUppercaseReq, requirements.uppercase);
+            updateEmployeeRequirement(employeeLowercaseReq, requirements.lowercase);
+            updateEmployeeRequirement(employeeNumberReq, requirements.number);
+            updateEmployeeRequirement(employeeSpecialCharReq, requirements.specialChar);
+
+            // Show/hide validation feedback and update input styling
+            const allValid = Object.values(requirements).every(req => req);
+            const hasValue = password.length > 0;
+
+            if (hasValue && !allValid) {
+                employeePasswordValidationFeedback.style.display = 'block';
+                employeePasswordInput.classList.add('is-invalid');
+                employeePasswordInput.classList.remove('is-valid');
+            } else if (hasValue && allValid) {
+                employeePasswordValidationFeedback.style.display = 'none';
+                employeePasswordInput.classList.remove('is-invalid');
+                employeePasswordInput.classList.add('is-valid');
+            } else {
+                employeePasswordValidationFeedback.style.display = 'none';
+                employeePasswordInput.classList.remove('is-invalid', 'is-valid');
+            }
+
+            return allValid;
+        }
+
+        function updateEmployeeRequirement(element, isValid) {
+            const icon = element.querySelector('i');
+            if (isValid) {
+                element.classList.remove('text-danger');
+                element.classList.add('text-success');
+                icon.className = 'ti ti-check-circle me-1';
+            } else {
+                element.classList.remove('text-success');
+                element.classList.add('text-danger');
+                icon.className = 'ti ti-x-circle me-1';
+            }
+        }
+
+        if (employeePasswordInput) {
+            employeePasswordInput.addEventListener('input', function() {
+                validateEmployeePasswordRequirements(this.value);
+            });
+
+            // Also validate on paste
+            employeePasswordInput.addEventListener('paste', function() {
+                setTimeout(() => {
+                    validateEmployeePasswordRequirements(this.value);
+                }, 10);
+            });
+        }
+
+        // Copy employee password to clipboard
+        const employeeCopyBtn = document.getElementById('copyEmployeePassword');
+        const employeeCopyIcon = document.getElementById('copyEmployeeIcon');
+
+        if (employeePasswordInput && employeeCopyBtn && employeeCopyIcon) {
+            employeeCopyBtn.addEventListener('click', async function() {
+                if (!employeePasswordInput.value.trim()) {
+                    showAlert('No hay contraseña para copiar', 'warning');
+                    return;
+                }
+
+                try {
+                    await navigator.clipboard.writeText(employeePasswordInput.value);
+                    
+                    // Visual feedback
+                    const originalIcon = employeeCopyIcon.className;
+                    employeeCopyIcon.className = 'ti ti-check';
+                    employeeCopyBtn.classList.remove('btn-outline-secondary');
+                    employeeCopyBtn.classList.add('btn-success');
+                    
+                    setTimeout(() => {
+                        employeeCopyIcon.className = originalIcon;
+                        employeeCopyBtn.classList.remove('btn-success');
+                        employeeCopyBtn.classList.add('btn-outline-secondary');
+                    }, 1500);
+                    
+                    showSuccessAlert('Contraseña copiada al portapapeles');
+                } catch (err) {
+                    console.error('Error copying to clipboard:', err);
+                    showErrorAlert('Error al copiar la contraseña');
+                }
+            });
+        }
+
+        // Generate employee password functionality
+        const employeeGenerateBtn = document.getElementById('generateEmployeePassword');
+        const employeeGenerateIcon = document.getElementById('generateEmployeeIcon');
+
+        if (employeePasswordInput && employeeGenerateBtn && employeeGenerateIcon) {
+            employeeGenerateBtn.addEventListener('click', function() {
+                // Generate secure password
+                const newPassword = generateSecurePassword();
+                employeePasswordInput.value = newPassword;
+                
+                // Trigger validation
+                validateEmployeePasswordRequirements(newPassword);
+                
+                // Visual feedback
+                const originalIcon = employeeGenerateIcon.className;
+                employeeGenerateIcon.className = 'ti ti-check';
+                employeeGenerateBtn.classList.remove('btn-outline-primary');
+                employeeGenerateBtn.classList.add('btn-success');
+                
+                setTimeout(() => {
+                    employeeGenerateIcon.className = originalIcon;
+                    employeeGenerateBtn.classList.remove('btn-success');
+                    employeeGenerateBtn.classList.add('btn-outline-primary');
+                }, 1500);
+                
+                // Show success message
+                showSuccessAlert('Nueva contraseña generada exitosamente');
+                
+                // Show the password for easy verification
+                employeePasswordInput.type = 'text';
+                employeeToggleIcon.className = 'ti ti-eye-off';
+                employeeToggleBtn.title = 'Ocultar contraseña';
+                
+                // Hide password again after 3 seconds
+                setTimeout(() => {
+                    employeePasswordInput.type = 'password';
+                    employeeToggleIcon.className = 'ti ti-eye';
+                    employeeToggleBtn.title = 'Mostrar contraseña';
+                }, 3000);
             });
         }
 
@@ -1929,6 +2431,14 @@ function setupExperienceFilters() {
                         isValid = false;
                     }
                 }
+
+                // Password validation
+                if (field.type === 'password' && value) {
+                    const passwordValid = validateEmployeePasswordRequirements(value);
+                    if (!passwordValid) {
+                        isValid = false;
+                    }
+                }
             });
 
             submitBtn.disabled = !isValid;
@@ -1939,6 +2449,87 @@ function setupExperienceFilters() {
         form.addEventListener('input', validateForm);
         form.addEventListener('change', validateForm);
 
+        // Live email validation
+        const employeeEmailInput = document.getElementById('employeeEmail');
+        if (employeeEmailInput) {
+            function validateEmployeeEmailField(email) {
+                const trimmedEmail = (email || '').trim();
+                
+                // If empty, just remove validation classes
+                if (!trimmedEmail) {
+                    return { isValid: true, showFeedback: false };
+                }
+
+                // Email format validation
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(trimmedEmail)) {
+                    return {
+                        isValid: false,
+                        message: 'Por favor, ingresa un email válido (ej: usuario@empresa.com)',
+                        showFeedback: true
+                    };
+                }
+
+                return { isValid: true, showFeedback: true };
+            }
+
+            function showEmployeeEmailValidation(validation) {
+                const container = employeeEmailInput.closest('.mb-3');
+                
+                // Remove existing validation classes and feedback
+                employeeEmailInput.classList.remove('is-valid', 'is-invalid');
+                const existingFeedback = container.querySelector('.invalid-feedback, .valid-feedback');
+                if (existingFeedback) {
+                    existingFeedback.remove();
+                }
+
+                if (!validation.showFeedback) {
+                    return; // Don't show any feedback for empty field
+                }
+
+                if (!validation.isValid) {
+                    // Show error state
+                    employeeEmailInput.classList.add('is-invalid');
+                    const feedback = document.createElement('div');
+                    feedback.className = 'invalid-feedback';
+                    feedback.innerHTML = `<i class="ti ti-alert-circle me-1"></i>${validation.message}`;
+                    container.appendChild(feedback);
+                } else {
+                    // Show success state for valid email
+                    employeeEmailInput.classList.add('is-valid');
+                    const feedback = document.createElement('div');
+                    feedback.className = 'valid-feedback';
+                    feedback.innerHTML = `<i class="ti ti-check me-1"></i>Email válido`;
+                    container.appendChild(feedback);
+                }
+            }
+
+            // Add debounced input validation
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+
+            // Real-time email validation on input
+            employeeEmailInput.addEventListener('input', debounce((e) => {
+                const validation = validateEmployeeEmailField(e.target.value);
+                showEmployeeEmailValidation(validation);
+            }, 300));
+
+            // Immediate validation on blur
+            employeeEmailInput.addEventListener('blur', (e) => {
+                const validation = validateEmployeeEmailField(e.target.value);
+                showEmployeeEmailValidation(validation);
+            });
+        }
+
         // Handle form submission
         submitBtn.addEventListener('click', async function() {
             if (!validateForm()) return;
@@ -1948,6 +2539,7 @@ function setupExperienceFilters() {
                 firstName: document.getElementById('employeeFirstName').value.trim(),
                 lastName: document.getElementById('employeeLastName').value.trim(),
                 email: document.getElementById('employeeEmail').value.trim(),
+                password: document.getElementById('employeePassword').value.trim(),
                 role: document.getElementById('employeeRole').value.trim(),
                 phone: document.getElementById('employeePhone').value.trim() || undefined,
                 notes: document.getElementById('employeeNotes').value.trim() || ''
@@ -1977,9 +2569,22 @@ function setupExperienceFilters() {
             // Hide role descriptions
             document.querySelectorAll('.role-description').forEach(el => el.classList.add('d-none'));
 
+            // Reset password validation feedback
+            if (employeePasswordValidationFeedback) {
+                employeePasswordValidationFeedback.style.display = 'none';
+            }
+
             // Clear validation states
-            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid', 'is-valid'));
+            form.querySelectorAll('.is-valid').forEach(el => el.classList.remove('is-valid'));
             form.querySelectorAll('.invalid-feedback').forEach(el => el.style.display = 'none');
+            form.querySelectorAll('.valid-feedback').forEach(el => el.style.display = 'none');
+            
+            // Specifically clear phone input validation
+            const phoneInput = document.getElementById('employeePhone');
+            if (phoneInput) {
+                phoneInput.classList.remove('is-invalid', 'is-valid');
+            }
         });
     }
 
@@ -2094,9 +2699,442 @@ function setupExperienceFilters() {
         }
     }
 
+    // ========================================================================
+    // EDIT EMPLOYEE MODAL FUNCTIONS
+    // ========================================================================
+    
+    /**
+     * Initialize edit employee modal with validation and event handlers
+     */
+    function initializeEditEmployeeModal() {
+        const modal = document.getElementById('editEmployeeModal');
+        const form = document.getElementById('editEmployeeForm');
+        const submitBtn = document.getElementById('submitEditEmployee');
+
+        if (!modal || !form || !submitBtn) return;
+
+        // Character counter for notes
+        const notesTextarea = document.getElementById('editEmployeeNotes');
+        const charCounter = document.getElementById('editNotesCharCountEmployee');
+
+        if (notesTextarea && charCounter) {
+            notesTextarea.addEventListener('input', function() {
+                const length = this.value.length;
+                charCounter.textContent = `${length}/500`;
+
+                if (length > 450) {
+                    charCounter.classList.add('text-warning');
+                    charCounter.classList.remove('text-muted');
+                } else if (length === 500) {
+                    charCounter.classList.add('text-danger');
+                    charCounter.classList.remove('text-warning', 'text-muted');
+                } else {
+                    charCounter.classList.remove('text-warning', 'text-danger');
+                    charCounter.classList.add('text-muted');
+                }
+            });
+        }
+
+        // Role change handler for edit modal
+        const editRoleSelect = document.getElementById('editEmployeeRole');
+        if (editRoleSelect) {
+            editRoleSelect.addEventListener('change', function() {
+                // Hide all role descriptions
+                document.querySelectorAll('#editEmployeeModal .role-description').forEach(el => el.classList.add('d-none'));
+                
+                // Show selected role description
+                if (this.value === 'client') {
+                    document.getElementById('editRoleDescriptionClient')?.classList.remove('d-none');
+                } else if (this.value === 'employee') {
+                    document.getElementById('editRoleDescriptionEmployee')?.classList.remove('d-none');
+                }
+            });
+        }
+
+        // Form validation
+        const requiredFields = form.querySelectorAll('[required]');
+        function validateEditForm() {
+            let isValid = true;
+            requiredFields.forEach(field => {
+                const value = field.value.trim();
+                if (!value) {
+                    isValid = false;
+                    return;
+                }
+                
+                // Email validation
+                if (field.type === 'email' && value) {
+                    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                    if (!emailRegex.test(value)) {
+                        isValid = false;
+                    }
+                }
+            });
+            submitBtn.disabled = !isValid;
+            return isValid;
+        }
+
+        // Email field is read-only for security - no validation needed
+        
+        // Password generation and validation for edit modal
+        const editPasswordInput = document.getElementById('editEmployeePassword');
+        const generatePasswordEditBtn = document.getElementById('generatePasswordEditBtn');
+        const toggleEditPasswordBtn = document.getElementById('toggleEditPasswordVisibility');
+        const copyEditPasswordBtn = document.getElementById('copyEditPassword');
+        const editPasswordValidationFeedback = document.getElementById('editPasswordValidationFeedback');
+
+        // Password validation function for edit modal
+        function validateEditPasswordRequirements(password) {
+            const requirements = {
+                length: password.length >= 12,
+                uppercase: /[A-Z]/.test(password),
+                lowercase: /[a-z]/.test(password),
+                number: /\d/.test(password),
+                special: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)
+            };
+
+            // Update UI for each requirement
+            const updateRequirement = (id, met) => {
+                const element = document.getElementById(id);
+                if (element) {
+                    const icon = element.querySelector('i');
+                    if (met) {
+                        element.classList.remove('text-danger');
+                        element.classList.add('text-success');
+                        icon.classList.remove('ti-x');
+                        icon.classList.add('ti-check');
+                    } else {
+                        element.classList.remove('text-success');
+                        element.classList.add('text-danger');
+                        icon.classList.remove('ti-check');
+                        icon.classList.add('ti-x');
+                    }
+                }
+            };
+
+            updateRequirement('editLengthRequirement', requirements.length);
+            updateRequirement('editUppercaseRequirement', requirements.uppercase);
+            updateRequirement('editLowercaseRequirement', requirements.lowercase);
+            updateRequirement('editNumberRequirement', requirements.number);
+            updateRequirement('editSpecialCharRequirement', requirements.special);
+
+            // Return true if all requirements are met
+            return Object.values(requirements).every(v => v === true);
+        }
+
+        // Password visibility toggle
+        if (toggleEditPasswordBtn) {
+            toggleEditPasswordBtn.addEventListener('click', function() {
+                const icon = document.getElementById('editPasswordToggleIcon');
+                if (editPasswordInput.type === 'password') {
+                    editPasswordInput.type = 'text';
+                    icon.classList.remove('ti-eye');
+                    icon.classList.add('ti-eye-off');
+                } else {
+                    editPasswordInput.type = 'password';
+                    icon.classList.remove('ti-eye-off');
+                    icon.classList.add('ti-eye');
+                }
+            });
+        }
+
+        // Copy password button
+        if (copyEditPasswordBtn) {
+            copyEditPasswordBtn.addEventListener('click', function() {
+                if (editPasswordInput && editPasswordInput.value) {
+                    // Temporarily show password to copy
+                    const originalType = editPasswordInput.type;
+                    editPasswordInput.type = 'text';
+                    editPasswordInput.select();
+                    document.execCommand('copy');
+                    editPasswordInput.type = originalType;
+                    
+                    // Visual feedback
+                    const icon = document.getElementById('copyEditPasswordIcon');
+                    icon.classList.remove('ti-copy');
+                    icon.classList.add('ti-check');
+                    setTimeout(() => {
+                        icon.classList.remove('ti-check');
+                        icon.classList.add('ti-copy');
+                    }, 2000);
+                    
+                    // Show alert
+                    showSuccessAlert('Contraseña copiada al portapapeles');
+                }
+            });
+        }
+
+        // Generate password button
+        if (generatePasswordEditBtn) {
+            generatePasswordEditBtn.addEventListener('click', function() {
+                const newPassword = generateSecurePassword();
+                if (editPasswordInput) {
+                    editPasswordInput.value = newPassword;
+                    
+                    // Show password automatically when generated
+                    editPasswordInput.type = 'text';
+                    const toggleIcon = document.getElementById('editPasswordToggleIcon');
+                    if (toggleIcon) {
+                        toggleIcon.classList.remove('ti-eye');
+                        toggleIcon.classList.add('ti-eye-off');
+                    }
+                    
+                    // Validate and show feedback
+                    editPasswordValidationFeedback.style.display = 'block';
+                    const isValid = validateEditPasswordRequirements(newPassword);
+                    
+                    if (isValid) {
+                        editPasswordInput.classList.remove('is-invalid');
+                        editPasswordInput.classList.add('is-valid');
+                    }
+                    
+                    // Animate the generate button
+                    const icon = document.getElementById('generateEditPasswordIcon');
+                    icon.classList.add('ti-spin');
+                    setTimeout(() => {
+                        icon.classList.remove('ti-spin');
+                    }, 500);
+                    
+                    // Trigger validation
+                    validateEditForm();
+                }
+            });
+        }
+
+        // Password input validation
+        if (editPasswordInput) {
+            editPasswordInput.addEventListener('input', function() {
+                const password = this.value;
+                
+                if (password) {
+                    // Show validation feedback
+                    editPasswordValidationFeedback.style.display = 'block';
+                    const isValid = validateEditPasswordRequirements(password);
+                    
+                    // Update input styling
+                    if (isValid) {
+                        this.classList.remove('is-invalid');
+                        this.classList.add('is-valid');
+                    } else {
+                        this.classList.remove('is-valid');
+                        this.classList.add('is-invalid');
+                    }
+                } else {
+                    // Hide validation feedback when empty
+                    editPasswordValidationFeedback.style.display = 'none';
+                    this.classList.remove('is-invalid', 'is-valid');
+                }
+                
+                validateEditForm();
+            });
+            
+            // Show validation on focus
+            editPasswordInput.addEventListener('focus', function() {
+                if (this.value) {
+                    editPasswordValidationFeedback.style.display = 'block';
+                }
+            });
+        }
+
+        // Validate on input for all form fields
+        form.addEventListener('input', validateEditForm);
+        form.addEventListener('change', validateEditForm);
+
+        // Handle form submission
+        submitBtn.addEventListener('click', async function() {
+            if (!validateEditForm()) return;
+
+            const formData = {
+                firstName: document.getElementById('editEmployeeFirstName').value.trim(),
+                lastName: document.getElementById('editEmployeeLastName').value.trim(),
+                // Email is not included for security - it's read-only
+                role: document.getElementById('editEmployeeRole').value.trim(),
+                phone: document.getElementById('editEmployeePhone').value.trim() || undefined,
+                notes: document.getElementById('editEmployeeNotes').value.trim() || '',
+                active: document.getElementById('editEmployeeActive').checked
+            };
+            
+            // Include password only if a new password was entered
+            const newPassword = document.getElementById('editEmployeePassword').value.trim();
+            if (newPassword) {
+                formData.password = newPassword;
+            }
+
+            // Remove undefined values
+            Object.keys(formData).forEach(key => {
+                if (formData[key] === undefined) {
+                    delete formData[key];
+                }
+            });
+
+            const employeeId = document.getElementById('editEmployeeId').value;
+            await executeUpdateEmployee(employeeId, formData);
+        });
+
+        // Reset form on modal hide
+        modal.addEventListener('hidden.bs.modal', function() {
+            form.reset();
+            submitBtn.disabled = true;
+            if (charCounter) {
+                charCounter.textContent = '0/500';
+                charCounter.classList.remove('text-warning', 'text-danger');
+                charCounter.classList.add('text-muted');
+            }
+            
+            // Hide role descriptions
+            document.querySelectorAll('#editEmployeeModal .role-description').forEach(el => el.classList.add('d-none'));
+            
+            // Clear validation states
+            form.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid', 'is-valid'));
+            form.querySelectorAll('.is-valid').forEach(el => el.classList.remove('is-valid'));
+            form.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+            form.querySelectorAll('.valid-feedback').forEach(el => el.remove());
+            
+            // Clear password field and reset visibility
+            const passwordField = document.getElementById('editEmployeePassword');
+            if (passwordField) {
+                passwordField.value = '';
+                passwordField.type = 'password';
+                passwordField.classList.remove('is-invalid', 'is-valid');
+            }
+            
+            // Reset password toggle icon
+            const toggleIcon = document.getElementById('editPasswordToggleIcon');
+            if (toggleIcon) {
+                toggleIcon.classList.remove('ti-eye-off');
+                toggleIcon.classList.add('ti-eye');
+            }
+            
+            // Hide and reset password validation feedback
+            const passwordValidation = document.getElementById('editPasswordValidationFeedback');
+            if (passwordValidation) {
+                passwordValidation.style.display = 'none';
+                // Reset all requirement indicators
+                ['editLengthRequirement', 'editUppercaseRequirement', 'editLowercaseRequirement', 
+                 'editNumberRequirement', 'editSpecialCharRequirement'].forEach(id => {
+                    const element = document.getElementById(id);
+                    if (element) {
+                        element.classList.remove('text-success');
+                        element.classList.add('text-danger');
+                        const icon = element.querySelector('i');
+                        if (icon) {
+                            icon.classList.remove('ti-check');
+                            icon.classList.add('ti-x');
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Populate edit employee modal with data
+     */
+    function populateEditEmployeeModal(employeeData) {
+        // Populate form fields
+        document.getElementById('editEmployeeId').value = employeeData.id || '';
+        document.getElementById('editEmployeeFirstName').value = employeeData.firstName || '';
+        document.getElementById('editEmployeeLastName').value = employeeData.lastName || '';
+        document.getElementById('editEmployeeEmail').value = employeeData.email || '';
+        document.getElementById('editEmployeeRole').value = employeeData.role || employeeData.roleId?.name || '';
+        document.getElementById('editEmployeePhone').value = employeeData.phone || '';
+        document.getElementById('editEmployeeNotes').value = employeeData.notes || '';
+        document.getElementById('editEmployeeActive').checked = employeeData.active === true;
+
+        // Update character counter
+        const notesValue = employeeData.notes || '';
+        const charCounter = document.getElementById('editNotesCharCountEmployee');
+        if (charCounter) {
+            charCounter.textContent = `${notesValue.length}/500`;
+        }
+
+        // Show appropriate role description
+        const role = employeeData.role || employeeData.roleId?.name || '';
+        document.querySelectorAll('#editEmployeeModal .role-description').forEach(el => el.classList.add('d-none'));
+        if (role === 'client') {
+            document.getElementById('editRoleDescriptionClient')?.classList.remove('d-none');
+        } else if (role === 'employee') {
+            document.getElementById('editRoleDescriptionEmployee')?.classList.remove('d-none');
+        }
+
+        // Enable submit button initially if form is valid
+        setTimeout(() => {
+            const form = document.getElementById('editEmployeeForm');
+            if (form) {
+                const event = new Event('input', { bubbles: true });
+                form.dispatchEvent(event);
+            }
+        }, 100);
+    }
+
+    /**
+     * Execute update employee API call
+     */
+    async function executeUpdateEmployee(employeeId, formData) {
+        const submitBtn = document.getElementById('submitEditEmployee');
+        const originalContent = submitBtn.innerHTML;
+
+        try {
+            // Show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Actualizando...';
+
+            const clientId = '<%= clientId %>';
+            const response = await fetch(`/api/clients/${clientId}/employees/${employeeId}`, {
+                method: 'PUT',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const result = await response.json();
+            if (!response.ok || !result.success) {
+                throw new Error(result.error || 'Error al actualizar el empleado');
+            }
+
+            // Success - restore button before hiding modal
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+
+            // Hide modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editEmployeeModal'));
+            modal.hide();
+
+            showSuccessAlert(`Empleado "${formData.firstName} ${formData.lastName}" actualizado exitosamente`);
+            
+            // Reload table
+            if (window.employeesTable) {
+                window.employeesTable.ajax.reload(null, false);
+            }
+        } catch (error) {
+            console.error('Error updating employee:', error);
+            showErrorAlert(error.message || 'Error al actualizar el empleado. Por favor, intenta nuevamente.');
+            
+            // Restore button
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalContent;
+        }
+    }
+
+    // Listen for edit employee events from the data table
+    document.addEventListener('editEmployee', function(event) {
+        const { employeeId, employeeData } = event.detail;
+        
+        // Populate the modal with employee data
+        populateEditEmployeeModal(employeeData);
+        
+        // Show the modal
+        const editModal = new bootstrap.Modal(document.getElementById('editEmployeeModal'));
+        editModal.show();
+    });
+
     // Initialize create employee modal on DOM ready
     document.addEventListener('DOMContentLoaded', function() {
         initializeCreateEmployeeModal();
+        initializeEditEmployeeModal();
         
         // Initialize live validation when edit modal is shown
         const editModal = document.getElementById('editClientModal');

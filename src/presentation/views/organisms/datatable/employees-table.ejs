@@ -289,6 +289,18 @@ function initializeEmployeesDataTable() {
                     let actions = '<div class="btn-group btn-group-sm" role="group">';
 
                     <% if (canEdit) { %>
+                    /* Edit button */
+                    const employeeName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'Empleado';
+                    actions += `<button type="button"
+                                class="btn btn-primary btn-edit-employee"
+                                data-employee-id="${row.id}"
+                                data-employee-data="${encodeURIComponent(JSON.stringify(row))}"
+                                data-bs-toggle="tooltip"
+                                data-bs-placement="top"
+                                title="Editar ${employeeName}">
+                                <i class="ti ti-edit"></i>
+                            </button>`;
+
                     /* Toggle status button */
                     const statusIcon = row.active ? 'ti-user-off' : 'ti-user-check';
                     const statusTitle = row.active ? 'Desactivar' : 'Activar';
@@ -307,11 +319,11 @@ function initializeEmployeesDataTable() {
 
                     <% if (canDelete) { %>
                     /* Delete button */
-                    const employeeName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'este empleado';
+                    const employeeNameForDelete = `${row.firstName || ''} ${row.lastName || ''}`.trim() || 'este empleado';
                     actions += `<button type="button"
                                 class="btn btn-danger btn-delete-employee"
                                 data-employee-id="${row.id}"
-                                data-employee-name="${employeeName}"
+                                data-employee-name="${employeeNameForDelete}"
                                 data-bs-toggle="tooltip"
                                 data-bs-placement="top"
                                 title="Eliminar">
@@ -427,6 +439,22 @@ function showErrorAlert(message) {
 // ============================================================================
 // 4. EMPLOYEE ACTION FUNCTIONS
 // ============================================================================
+
+/**
+ * Edit employee data
+ * @param {string} employeeId - Employee ID
+ * @param {object} employeeData - Current employee data
+ */
+function editEmployee(employeeId, employeeData) {
+    // Trigger custom event that the parent page can listen to
+    const editEvent = new CustomEvent('editEmployee', {
+        detail: {
+            employeeId: employeeId,
+            employeeData: employeeData
+        }
+    });
+    document.dispatchEvent(editEvent);
+}
 
 /**
  * Toggle employee active status
@@ -602,6 +630,14 @@ function setupEventDelegation() {
         const target = e.target.closest('button');
 
         if (!target) return;
+
+        // Edit button
+        if (target.classList.contains('btn-edit-employee')) {
+            const employeeId = target.getAttribute('data-employee-id');
+            const employeeData = JSON.parse(decodeURIComponent(target.getAttribute('data-employee-data')));
+            editEmployee(employeeId, employeeData);
+            return;
+        }
 
         // Toggle status button
         if (target.classList.contains('btn-toggle-employee-status')) {
