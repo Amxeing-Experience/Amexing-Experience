@@ -1229,13 +1229,24 @@ table.dataTable thead th:nth-child(2) select {
                     if (response.success && response.data) {
                         currentTransferRate = response.data.value || 0;
                         console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
+                        if (currentTransferRate > 0) {
+                            console.log('💰 Transfer rate will be applied to "Transferencia" payments');
+                        } else {
+                            console.warn('⚠️ Transfer rate is 0% - no price difference will be visible');
+                        }
                     } else {
-                        console.warn('⚠️ No active transfer rate found');
+                        console.warn('⚠️ No active transfer rate found - prices won\'t change for "Transferencia"');
+                        console.info('🔧 To fix: Go to Admin > Configuración de Precios > Transfer to set a transfer rate');
                         currentTransferRate = 0;
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('❌ Error loading transfer rate:', error);
+                    if (xhr.status === 404) {
+                        console.info('🔧 No transfer rate configured. Go to Admin > Configuración de Precios > Transfer to create one');
+                    } else if (xhr.status === 401 || xhr.status === 403) {
+                        console.warn('🔐 Authentication issue loading transfer rate');
+                    }
                     currentTransferRate = 0;
                 }
             });
@@ -1560,12 +1571,17 @@ table.dataTable thead th:nth-child(2) select {
                 // Load exchange rate
                 loadCurrentExchangeRate();
                 
+                // FIXED: Also load transfer rate for department managers
+                // They need it when switching to "Transferencia" payment type
+                loadCurrentTransferRate();
+                console.log('💼 Loading transfer rate for department manager transferencia option');
+                
                 // Load rates for the header filter (this will auto-select and load data)
                 loadRatesForFilter();
                 
                 // Note: initializeTable() will be called automatically by rate filter change event
                 
-                console.log('💼 Department manager table initialized with AgencyRate applied');
+                console.log('💼 Department manager table initialized with AgencyRate and TransferRate loaded');
             });
         } else {
             // Load transfer rate for other users

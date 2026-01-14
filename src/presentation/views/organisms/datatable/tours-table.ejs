@@ -1396,10 +1396,15 @@ table.dataTable tbody tr.hover {
                 // Load exchange rate
                 loadCurrentExchangeRate();
                 
+                // FIXED: Also load transfer rate for department managers
+                // They need it when switching to "Transferencia" payment type
+                loadCurrentTransferRate();
+                console.log('💼 Loading transfer rate for department manager transferencia option');
+                
                 // Initialize table with data (with correct rates applied)
                 initializeTable();
                 
-                console.log('💼 Department manager table initialized with AgencyRate applied');
+                console.log('💼 Department manager table initialized with AgencyRate and TransferRate loaded');
             });
         } else {
             // Load transfer rate for other users
