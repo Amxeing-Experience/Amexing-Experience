@@ -142,7 +142,10 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                     <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
                         <option value="efectivo" selected>Efectivo</option>
                         <option value="transferencia">Transferencia</option>
+                        <option value="tarjeta">Tarjeta Débito/Crédito</option>
+                        <% if (dtUserRole !== 'department_manager') { %>
                         <option value="transf_agencias">Transf. Agencias</option>
+                        <% } %>
                     </select>
                 </div>
             </div>
@@ -550,6 +553,9 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
         const canDelete = <%= canDelete %>;
         const canViewImages = <%= canViewImages %>;
         const userRole = '<%= dtUserRole %>';
+        
+        // Department manager role detection  
+        const isDepartmentManager = (userRole === 'department_manager');
 
         // Variables globales para almacenar datos con costos
         let experiencesDataMap = {};
@@ -868,6 +874,91 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             let currentAgencyRate = 0;
             let currentExchangeRate = 0;
             
+            // Function to get access token
+            function getAccessToken() {
+                return document.cookie.split('; ')
+                    .find(row => row.startsWith('accessToken='))
+                    ?.split('=')[1];
+            }
+            
+            // Function to load current transfer rate
+            function loadCurrentTransferRate() {
+                return fetch('/api/transfer-rate/current', {
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        currentTransferRate = data.data.value || 3;
+                        console.log('Transfer rate loaded:', currentTransferRate);
+                    } else {
+                        currentTransferRate = 3; // Default 3%
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading transfer rate:', error);
+                    currentTransferRate = 3; // Default 3%
+                });
+            }
+            
+            // Function to load current agency rate
+            function loadCurrentAgencyRate() {
+                return fetch('/api/agency-rate/current', {
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        currentAgencyRate = data.data.value || 15;
+                        console.log('Agency rate loaded:', currentAgencyRate);
+                    } else {
+                        currentAgencyRate = 15; // Default 15%
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading agency rate:', error);
+                    currentAgencyRate = 15; // Default 15%
+                });
+            }
+            
+            // Function to load current exchange rate
+            function loadCurrentExchangeRate() {
+                return fetch('/api/exchange-rate/current', {
+                    headers: {
+                        'Authorization': `Bearer ${getAccessToken()}`
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        currentExchangeRate = data.data.value || 18.50;
+                        console.log('Exchange rate loaded:', currentExchangeRate);
+                    } else {
+                        currentExchangeRate = 18.50; // Default rate
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading exchange rate:', error);
+                    currentExchangeRate = 18.50; // Default rate
+                });
+            }
+            
+            // Function to apply transfer rate to price (used for Transferencia and Trans. Agencias)
+            function applyTransferRate(price) {
+                if (currentTransferRate <= 0) return price;
+                return price * (1 + currentTransferRate / 100);
+            }
+            
+            // Function to apply agency rate to price (used for Tarjeta Débito/Crédito)
+            function applyAgencyRate(price) {
+                if (currentAgencyRate <= 0) return price;
+                return price * (1 + currentAgencyRate / 100);
+            }
+            
             // Function to apply USD rounding rules
             function applyUSDRoundingRules(value) {
                 // Find the base (nearest multiple of 5 below or equal)
@@ -894,41 +985,65 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             
             // Function to update displayed prices
             function updatePrices(paymentType, currency) {
+                console.log('updatePrices called with:', paymentType, currency);
                 const table = $(`#${tableId}`);
-                if (!table.length) return;
+                if (!table.length) {
+                    console.log('Table not found');
+                    return;
+                }
                 
-                // Update price cell (column 6 - Precio)
+                console.log('Found table rows:', table.find('tbody tr').length);
+                
+                // Update price cell - column index depends on user role
+                // For department_manager: column 5 (0-indexed: name, description, duration, min_people, price)
+                // For others: column 6 (0-indexed: name, description, contenido, duration, min_people, price)
+                const priceColumnIndex = isDepartmentManager ? 5 : 6;
+                
                 table.find('tbody tr').each(function() {
                     const row = $(this);
-                    const priceCell = row.find('td:nth-child(6)'); // Precio column only
+                    const priceCell = row.find(`td:nth-child(${priceColumnIndex})`); // Precio column
                     
                     priceCell.each(function() {
                         const cell = $(this);
-                        let originalPrice = cell.attr('data-original-price');
+                        const priceDiv = cell.find('div[data-original-price]');
+                        
+                        console.log('Price cell HTML:', cell.html());
+                        console.log('PriceDiv found:', priceDiv.length > 0);
+                        
+                        let originalPrice = priceDiv.attr('data-original-price');
                         
                         if (!originalPrice) {
                             // Extract numeric value from current display
                             const currentText = cell.text().replace(/[^0-9.]/g, '');
                             originalPrice = parseFloat(currentText) || 0;
-                            cell.attr('data-original-price', originalPrice);
+                            console.log('Extracted price from text:', originalPrice);
+                            if (priceDiv.length > 0) {
+                                priceDiv.attr('data-original-price', originalPrice);
+                            }
                         } else {
                             originalPrice = parseFloat(originalPrice);
+                            console.log('Found original price:', originalPrice);
                         }
                         
-                        if (originalPrice === 0) return;
+                        if (originalPrice === 0) {
+                            console.log('Original price is 0, skipping');
+                            return;
+                        }
                         
                         let finalPrice = originalPrice;
                         
-                        // Apply payment type rates
-                        if (paymentType === 'transferencia') {
-                            finalPrice = finalPrice * 1.035; // 3.5% transfer rate
-                        } else if (paymentType === 'transf_agencias') {
-                            finalPrice = finalPrice * 1.05; // 5% agency rate
+                        // Apply payment type rates based on new logic
+                        if (paymentType === 'transferencia' || paymentType === 'transf_agencias') {
+                            // Both Transferencia and Trans. Agencias use transfer rate
+                            finalPrice = applyTransferRate(finalPrice);
+                        } else if (paymentType === 'tarjeta') {
+                            // Tarjeta Débito/Crédito uses agency rate
+                            finalPrice = applyAgencyRate(finalPrice);
                         }
                         
                         // Apply currency conversion
                         if (currency === 'USD') {
-                            finalPrice = finalPrice / 17.5; // Example exchange rate
+                            finalPrice = finalPrice / currentExchangeRate;
                             finalPrice = applyUSDRoundingRules(finalPrice);
                             
                             // Format as USD
@@ -941,7 +1056,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             
                             // Update cell HTML structure
                             cell.html(`
-                                <div class="text-center">
+                                <div class="text-center" data-original-price="${originalPrice}">
                                     <div class="fw-bold text-primary" style="font-size: 1rem;">
                                         ${formatted}
                                     </div>
@@ -956,7 +1071,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                             
                             // Update cell HTML structure
                             cell.html(`
-                                <div class="text-center">
+                                <div class="text-center" data-original-price="${originalPrice}">
                                     <div class="fw-bold text-primary" style="font-size: 1rem;">
                                         ${formatted}
                                     </div>
@@ -971,14 +1086,81 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
             $(`#currencyFilter-${tableId}`).on('change', function() {
                 const selectedCurrency = $(this).val();
                 const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
-                updatePrices(selectedPaymentType, selectedCurrency);
+                
+                if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
+                    loadCurrentExchangeRate().then(() => {
+                        updatePrices(selectedPaymentType, selectedCurrency);
+                    });
+                } else {
+                    updatePrices(selectedPaymentType, selectedCurrency);
+                }
             });
             
             // Payment type filter change handler
             $(`#paymentTypeFilter-${tableId}`).on('change', function() {
                 const selectedPaymentType = $(this).val();
                 const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
-                updatePrices(selectedPaymentType, selectedCurrency);
+                
+                console.log('Payment type changed to:', selectedPaymentType);
+                console.log('Current rates - Transfer:', currentTransferRate, 'Agency:', currentAgencyRate);
+                
+                if (selectedPaymentType === 'transferencia' || selectedPaymentType === 'transf_agencias') {
+                    // Both Transferencia and Trans. Agencias use transfer rate
+                    if (currentTransferRate <= 0) {
+                        loadCurrentTransferRate().then(() => {
+                            console.log('Transfer rate loaded:', currentTransferRate);
+                            updatePrices(selectedPaymentType, selectedCurrency);
+                        });
+                    } else {
+                        updatePrices(selectedPaymentType, selectedCurrency);
+                    }
+                } else if (selectedPaymentType === 'tarjeta') {
+                    // Tarjeta uses agency rate
+                    if (currentAgencyRate <= 0) {
+                        loadCurrentAgencyRate().then(() => {
+                            console.log('Agency rate loaded:', currentAgencyRate);
+                            updatePrices(selectedPaymentType, selectedCurrency);
+                        });
+                    } else {
+                        updatePrices(selectedPaymentType, selectedCurrency);
+                    }
+                } else {
+                    updatePrices(selectedPaymentType, selectedCurrency);
+                }
+            });
+            
+            // Make updatePrices available for drawCallback
+            window.updatePricesAfterDraw = function() {
+                const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
+                if (selectedPaymentType && selectedCurrency) {
+                    updatePrices(selectedPaymentType, selectedCurrency);
+                }
+            };
+            
+            // Load initial rates
+            Promise.all([
+                loadCurrentTransferRate(),
+                loadCurrentAgencyRate(),
+                loadCurrentExchangeRate()
+            ]).then(() => {
+                console.log('All rates loaded for experiences table');
+                
+                // Department manager specific initialization
+                if (isDepartmentManager) {
+                    console.log('Initializing experiences table for department manager');
+                    
+                    // Set default payment type to "transferencia" for department managers
+                    const paymentTypeFilter = $(`#paymentTypeFilter-${tableId}`);
+                    if (paymentTypeFilter.length > 0) {
+                        paymentTypeFilter.val('transferencia');
+                        
+                        // Trigger change event to update prices
+                        const selectedCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
+                        paymentTypeFilter.trigger('change');
+                        console.log('Default payment type set to transferencia for department manager');
+                    }
+                }
             });
         }
 
@@ -1135,7 +1317,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                         }).format(amount);
 
                         return `
-                            <div class="text-center">
+                            <div class="text-center" data-original-price="${baseCost}">
                                 <div class="fw-bold text-primary" style="font-size: 1rem;">
                                     ${formatMXN(baseCost)}
                                 </div>
@@ -1260,6 +1442,11 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                 tooltipTriggerList.map(function (tooltipTriggerEl) {
                     return new bootstrap.Tooltip(tooltipTriggerEl);
                 });
+                
+                // Update prices after table redraw
+                if (typeof updatePricesAfterDraw === 'function') {
+                    updatePricesAfterDraw();
+                }
             }
         });
 
@@ -2821,13 +3008,16 @@ const canViewImages = ['superadmin', 'admin', 'department_manager'].includes(dtU
                     day: 'numeric'
                 });
                 
+                // Get the year from validFrom date for "Vigente" text
+                const validFromYear = new Date(record.validFrom).getFullYear();
+                
                 const validUntil = record.validUntil 
                     ? new Date(record.validUntil).toLocaleDateString('es-MX', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric'
                       })
-                    : 'Vigente';
+                    : `Vigente al 31 de diciembre del ${validFromYear}`;
 
                 // Format price
                 const formattedPrice = parseFloat(record.cost).toLocaleString('es-MX', {

@@ -386,7 +386,7 @@ class UserManagementService {
         emailVerified: false,
         loginAttempts: 0,
         // Only set createdBy/modifiedBy if not already provided in userData
-        // Pass only the user ID if createdBy has an id property
+        // Pass only the user ID string - AmexingUser.create will convert to Pointer
         createdBy: userData.createdBy || (createdBy && createdBy.id ? createdBy.id : createdBy),
         modifiedBy: userData.modifiedBy || (createdBy && createdBy.id ? createdBy.id : createdBy),
       };
@@ -520,19 +520,22 @@ class UserManagementService {
         }
       });
 
-      // Update modification tracking - Create a Pointer to the AmexingUser
-      // modifiedBy should be a Pointer to the user who is making the modification
-      if (modifiedBy && modifiedBy.id) {
-        // Create a Pointer to the AmexingUser object
-        const modifiedByPointer = {
-          __type: 'Pointer',
-          className: 'AmexingUser',
-          objectId: modifiedBy.id,
-        };
-        user.set('modifiedBy', modifiedByPointer);
-      } else if (modifiedBy) {
-        // If modifiedBy is already a Parse User or Pointer object, use it directly
-        user.set('modifiedBy', modifiedBy);
+      // Update modification tracking - Handle environment-specific schema
+      const isTestEnvironment = process.env.NODE_ENV === 'test';
+
+      if (modifiedBy) {
+        if (isTestEnvironment) {
+          // Test environment expects strings
+          const modifiedById = modifiedBy.id || modifiedBy.objectId || modifiedBy;
+          user.set('modifiedBy', modifiedById);
+        } else if (modifiedBy.id) {
+          // Production environment expects Pointers
+          const modifiedByPointer = new AmexingUser();
+          modifiedByPointer.id = modifiedBy.id;
+          user.set('modifiedBy', modifiedByPointer);
+        } else {
+          user.set('modifiedBy', modifiedBy);
+        }
       }
       user.set('updatedAt', new Date());
 

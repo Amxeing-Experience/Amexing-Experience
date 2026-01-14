@@ -1229,19 +1229,52 @@ table.dataTable thead th:nth-child(2) select {
                     if (response.success && response.data) {
                         currentTransferRate = response.data.value || 0;
                         console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
+                        if (currentTransferRate > 0) {
+                            console.log('💰 Transfer rate will be applied to "Transferencia" payments');
+                        } else {
+                            console.warn('⚠️ Transfer rate is 0% - no price difference will be visible');
+                        }
                     } else {
-                        console.warn('⚠️ No active transfer rate found');
+                        console.warn('⚠️ No active transfer rate found - prices won\'t change for "Transferencia"');
+                        console.info('🔧 To fix: Go to Admin > Configuración de Precios > Transfer to set a transfer rate');
                         currentTransferRate = 0;
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('❌ Error loading transfer rate:', error);
+                    if (xhr.status === 404) {
+                        console.info('🔧 No transfer rate configured. Go to Admin > Configuración de Precios > Transfer to create one');
+                    } else if (xhr.status === 401 || xhr.status === 403) {
+                        console.warn('🔐 Authentication issue loading transfer rate');
+                    }
                     currentTransferRate = 0;
                 }
             });
         }
 
+        // Function to apply transfer rate to price (used for Transferencia and Trans. Agencias)
+        function applyTransferRate(priceString) {
+            if (currentTransferRate <= 0) return priceString;
+            
+            // Extract numeric value from price string (e.g., "$1,234.50" -> 1234.50)
+            const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
+            if (isNaN(numericValue)) return priceString;
+            
+            // Apply transfer rate percentage
+            const newValue = numericValue * (1 + currentTransferRate / 100);
+            
+            console.log(`Applying transfer rate ${currentTransferRate}% to $${numericValue} = $${newValue.toFixed(2)}`);
+            
+            // Format back to currency string
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD',
+                minimumFractionDigits: 2
+            }).format(newValue);
+        }
+
         // Function to apply rate to price (transfer rate for regular users, agency rate for department managers)
+        // This is kept for backwards compatibility but not used in the new logic
         function applyCommissionRate(priceString) {
             const rateToUse = isDepartmentManager ? currentAgencyRate : currentTransferRate;
             const rateName = isDepartmentManager ? 'agency rate' : 'transfer rate';
@@ -1381,9 +1414,11 @@ table.dataTable thead th:nth-child(2) select {
                     let finalPrice = originalPrice;
                     
                     // Apply appropriate rate based on payment type
-                    if (paymentType === 'transferencia' || paymentType === 'tarjeta') {
-                        finalPrice = applyCommissionRate(finalPrice);
-                    } else if (paymentType === 'transf_agencias') {
+                    if (paymentType === 'transferencia' || paymentType === 'transf_agencias') {
+                        // Both Transferencia and Trans. Agencias use transfer rate
+                        finalPrice = applyTransferRate(finalPrice);
+                    } else if (paymentType === 'tarjeta') {
+                        // Tarjeta Débito/Crédito uses agency rate
                         finalPrice = applyAgencyRate(finalPrice);
                     }
                     
@@ -1407,9 +1442,11 @@ table.dataTable thead th:nth-child(2) select {
                 let finalPrice = originalPrice;
                 
                 // Apply appropriate rate based on payment type
-                if (paymentType === 'transferencia' || paymentType === 'tarjeta') {
-                    finalPrice = applyCommissionRate(finalPrice);
-                } else if (paymentType === 'transf_agencias') {
+                if (paymentType === 'transferencia' || paymentType === 'transf_agencias') {
+                    // Both Transferencia and Trans. Agencias use transfer rate
+                    finalPrice = applyTransferRate(finalPrice);
+                } else if (paymentType === 'tarjeta') {
+                    // Tarjeta Débito/Crédito uses agency rate
                     finalPrice = applyAgencyRate(finalPrice);
                 }
                 
@@ -1426,22 +1463,18 @@ table.dataTable thead th:nth-child(2) select {
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             console.log('Payment type changed:', selectedPaymentType);
             
-            if (selectedPaymentType === 'transferencia' || selectedPaymentType === 'tarjeta') {
-                if (isDepartmentManager && currentAgencyRate <= 0) {
-                    // Load agency rate for department managers
-                    loadCurrentAgencyRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
-                    });
-                } else if (!isDepartmentManager && currentTransferRate <= 0) {
-                    // Load transfer rate for other users
+            if (selectedPaymentType === 'transferencia' || selectedPaymentType === 'transf_agencias') {
+                // Both Transferencia and Trans. Agencias use transfer rate
+                if (currentTransferRate <= 0) {
+                    // Load transfer rate
                     loadCurrentTransferRate().then(() => {
                         updatePricesForFilters(selectedPaymentType, selectedCurrency);
                     });
                 } else {
                     updatePricesForFilters(selectedPaymentType, selectedCurrency);
                 }
-            } else if (selectedPaymentType === 'transf_agencias') {
-                // Load agency rate for admin "Transf. Agencias" option
+            } else if (selectedPaymentType === 'tarjeta') {
+                // Tarjeta uses agency rate
                 if (currentAgencyRate <= 0) {
                     loadCurrentAgencyRate().then(() => {
                         updatePricesForFilters(selectedPaymentType, selectedCurrency);
@@ -1538,12 +1571,17 @@ table.dataTable thead th:nth-child(2) select {
                 // Load exchange rate
                 loadCurrentExchangeRate();
                 
+                // FIXED: Also load transfer rate for department managers
+                // They need it when switching to "Transferencia" payment type
+                loadCurrentTransferRate();
+                console.log('💼 Loading transfer rate for department manager transferencia option');
+                
                 // Load rates for the header filter (this will auto-select and load data)
                 loadRatesForFilter();
                 
                 // Note: initializeTable() will be called automatically by rate filter change event
                 
-                console.log('💼 Department manager table initialized with AgencyRate applied');
+                console.log('💼 Department manager table initialized with AgencyRate and TransferRate loaded');
             });
         } else {
             // Load transfer rate for other users
@@ -3191,13 +3229,16 @@ table.dataTable thead th:nth-child(2) select {
                 day: 'numeric'
             });
             
+            // Get the year from validFrom date for "Vigente" text
+            const validFromYear = new Date(record.validFrom).getFullYear();
+            
             const validUntil = record.validUntil 
                 ? new Date(record.validUntil).toLocaleDateString('es-MX', {
                     year: 'numeric',
                     month: 'short',
                     day: 'numeric'
                   })
-                : 'Vigente';
+                : `Vigente al 31 de diciembre del ${validFromYear}`;
             
             // Format price
             const formattedPrice = parseFloat(record.price).toLocaleString('es-MX', {
