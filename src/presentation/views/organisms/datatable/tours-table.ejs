@@ -3413,13 +3413,16 @@ function populateTourPriceHistoryTable(historyData) {
             day: 'numeric'
         });
         
+        // Get the year from validFrom date for "Vigente" text
+        const validFromYear = new Date(record.validFrom).getFullYear();
+        
         const validUntil = record.validUntil 
             ? new Date(record.validUntil).toLocaleDateString('es-MX', {
                 year: 'numeric',
                 month: 'short',
                 day: 'numeric'
               })
-            : 'Vigente';
+            : `Vigente al 31 de diciembre del ${validFromYear}`;
 
         // Format price
         const formattedPrice = parseFloat(record.price).toLocaleString('es-MX', {
