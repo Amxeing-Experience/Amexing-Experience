@@ -280,8 +280,9 @@ class DepartmentManagerController extends RoleBasedController {
     try {
       const section = req.query.section || 'airport';
 
-      // Use the logged-in user's objectId as clientId for personalized pricing
-      const clientId = req.user?.id || null;
+      // For department manager role, use user's objectId as clientId (not clientId field)
+      const { user } = req;
+      const clientId = user?.id;
 
       await this.renderRoleView(req, res, 'services', {
         title: 'Traslados',
@@ -366,8 +367,9 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async tours(req, res) {
     try {
-      // Use the logged-in user's objectId as clientId for personalized pricing
-      const clientId = req.user?.id || null;
+      // For department manager role, use user's objectId as clientId (not clientId field)
+      const { user } = req;
+      const clientId = user?.id;
 
       await this.renderRoleView(req, res, 'tours', {
         title: 'Tours',

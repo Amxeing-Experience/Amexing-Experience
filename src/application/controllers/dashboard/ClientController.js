@@ -221,8 +221,22 @@ class ClientController extends RoleBasedController {
     try {
       const section = req.query.section || 'airport';
 
-      // Use the logged-in user's objectId as clientId for personalized pricing
-      const clientId = req.user?.id || null;
+      // Get clientId from user: for client role, use clientId field (not user objectId)
+      const { user } = req;
+      const userId = user?.id;
+
+      // Extract clientId with priority: clientId field > organizationId field > user ID fallback
+      let clientId;
+      const userClientIdField = user?.get?.('clientId') || user?.attributes?.clientId || user?.clientId;
+      const userOrgIdField = user?.get?.('organizationId') || user?.attributes?.organizationId || user?.organizationId;
+
+      if (userClientIdField && userClientIdField.trim() !== '') {
+        clientId = userClientIdField;
+      } else if (userOrgIdField && userOrgIdField.trim() !== '') {
+        clientId = userOrgIdField;
+      } else {
+        clientId = userId;
+      }
 
       await this.renderRoleView(req, res, 'services', {
         title: 'Traslados',
@@ -307,8 +321,10 @@ class ClientController extends RoleBasedController {
    */
   async tours(req, res) {
     try {
-      // Use the logged-in user's objectId as clientId for personalized pricing
-      const clientId = req.user?.id || null;
+      // Get clientId from user: for client role, use clientId field (not user objectId)
+      // req.user is a Parse User object, so we need to use .get() to access fields
+      const { user } = req;
+      const clientId = user?.get?.('clientId') || user?.get?.('organizationId') || user?.id || null;
 
       await this.renderRoleView(req, res, 'tours', {
         title: 'Tours',
