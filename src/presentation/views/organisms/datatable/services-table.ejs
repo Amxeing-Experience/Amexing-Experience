@@ -23,6 +23,7 @@ const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 const isDepartmentManager = dtUserRole === 'department_manager';
+const isClient = dtUserRole === 'client';
 %>
 
 <style>
@@ -188,7 +189,7 @@ table.dataTable thead th:nth-child(2) select {
                         <option value="efectivo" selected>Efectivo</option>
                         <option value="transferencia">Transferencia</option>
                         <option value="tarjeta">Tarjeta Débito/Crédito</option>
-                        <% if (!isDepartmentManager) { %>
+                        <% if (!isDepartmentManager && !isClient) { %>
                         <option value="transf_agencias">Transf. Agencias</option>
                         <% } %>
                     </select>
@@ -986,9 +987,11 @@ table.dataTable thead th:nth-child(2) select {
                     const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                     const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                     
-                    // For department managers, ensure transferencia is applied
-                    if (isDepartmentManager && currentPaymentType === 'transferencia') {
-                        console.log('💼 Applying department manager defaults: Transferencia with Agency Rate');
+                    // Log which rate is being applied based on payment type
+                    if (currentPaymentType === 'transferencia') {
+                        console.log('💰 Applying Transfer Rate for Transferencia payment type');
+                    } else if (currentPaymentType === 'tarjeta') {
+                        console.log('💳 Applying Agency Rate for Tarjeta payment type');
                     }
                     
                     updatePricesForFilters(currentPaymentType, currentCurrency);
@@ -1211,8 +1214,9 @@ table.dataTable thead th:nth-child(2) select {
         // Store exchange rate data globally
         let currentExchangeRate = 0;
         
-        // Check if current user is department manager
+        // Check if current user is department manager or client
         const isDepartmentManager = (typeof userRole !== 'undefined' && userRole === 'department_manager');
+        const isClient = (typeof userRole !== 'undefined' && userRole === 'client');
 
         // Load current transfer rate from API
         function loadCurrentTransferRate() {
@@ -1241,21 +1245,22 @@ table.dataTable thead th:nth-child(2) select {
             });
         }
 
-        // Function to apply rate to price (transfer rate for regular users, agency rate for department managers)
-        function applyCommissionRate(priceString) {
-            const rateToUse = isDepartmentManager ? currentAgencyRate : currentTransferRate;
-            const rateName = isDepartmentManager ? 'agency rate' : 'transfer rate';
-            
-            if (rateToUse <= 0) return priceString;
+        // Function to apply transfer rate to price
+        function applyTransferRate(priceString) {
+            console.log('🎯 applyTransferRate CALLED with:', priceString, 'Rate:', currentTransferRate);
+            if (currentTransferRate <= 0) {
+                console.log('⚠️ Transfer rate is 0 or less, returning original price');
+                return priceString;
+            }
             
             // Extract numeric value from price string (e.g., "$1,234.50" -> 1234.50)
             const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
             if (isNaN(numericValue)) return priceString;
             
-            // Apply rate percentage
-            const newValue = numericValue * (1 + rateToUse / 100);
+            // Apply transfer rate percentage
+            const newValue = numericValue * (1 + currentTransferRate / 100);
             
-            console.log(`Applying ${rateName} ${rateToUse}% to $${numericValue} = $${newValue.toFixed(2)}`);
+            console.log(`Applying transfer rate ${currentTransferRate}% to $${numericValue} = $${newValue.toFixed(2)}`);
             
             // Format back to currency string
             return new Intl.NumberFormat('en-US', {
@@ -1267,7 +1272,11 @@ table.dataTable thead th:nth-child(2) select {
 
         // Function to apply agency rate to price (for admin "Transf. Agencias" option)
         function applyAgencyRate(priceString) {
-            if (currentAgencyRate <= 0) return priceString;
+            console.log('🎯 applyAgencyRate CALLED with:', priceString, 'Rate:', currentAgencyRate);
+            if (currentAgencyRate <= 0) {
+                console.log('⚠️ Agency rate is 0 or less, returning original price');
+                return priceString;
+            }
             
             // Extract numeric value from price string (e.g., "$1,234.50" -> 1234.50)
             const numericValue = parseFloat(priceString.replace(/[^0-9.]/g, ''));
@@ -1362,6 +1371,13 @@ table.dataTable thead th:nth-child(2) select {
 
         // Function to update all displayed prices based on payment type and currency
         function updatePricesForFilters(paymentType, currency) {
+            console.log('🔄 updatePricesForFilters called with:', { 
+                paymentType, 
+                currency,
+                currentTransferRate,
+                currentAgencyRate
+            });
+            
             // Update main price column
             $('.price-container').each(function() {
                 const container = $(this);
@@ -1381,9 +1397,15 @@ table.dataTable thead th:nth-child(2) select {
                     let finalPrice = originalPrice;
                     
                     // Apply appropriate rate based on payment type
-                    if (paymentType === 'transferencia' || paymentType === 'tarjeta') {
-                        finalPrice = applyCommissionRate(finalPrice);
+                    console.log('🔍 Checking payment type:', paymentType, '(type:', typeof paymentType, ')');
+                    if (paymentType === 'transferencia') {
+                        console.log('📌 Applying Transfer Rate for transferencia, rate value:', currentTransferRate);
+                        finalPrice = applyTransferRate(finalPrice);
+                    } else if (paymentType === 'tarjeta') {
+                        console.log('💳 Applying Agency Rate for tarjeta');
+                        finalPrice = applyAgencyRate(finalPrice);
                     } else if (paymentType === 'transf_agencias') {
+                        console.log('🏢 Applying Agency Rate for transf_agencias');
                         finalPrice = applyAgencyRate(finalPrice);
                     }
                     
@@ -1407,9 +1429,15 @@ table.dataTable thead th:nth-child(2) select {
                 let finalPrice = originalPrice;
                 
                 // Apply appropriate rate based on payment type
-                if (paymentType === 'transferencia' || paymentType === 'tarjeta') {
-                    finalPrice = applyCommissionRate(finalPrice);
+                console.log('🔍 [Expanded View] Checking payment type:', paymentType, '(type:', typeof paymentType, ')');
+                if (paymentType === 'transferencia') {
+                    console.log('📌 [Expanded View] Applying Transfer Rate for transferencia, rate value:', currentTransferRate);
+                    finalPrice = applyTransferRate(finalPrice);
+                } else if (paymentType === 'tarjeta') {
+                    console.log('💳 [Expanded View] Applying Agency Rate for tarjeta');
+                    finalPrice = applyAgencyRate(finalPrice);
                 } else if (paymentType === 'transf_agencias') {
+                    console.log('🏢 [Expanded View] Applying Agency Rate for transf_agencias');
                     finalPrice = applyAgencyRate(finalPrice);
                 }
                 
@@ -1426,15 +1454,19 @@ table.dataTable thead th:nth-child(2) select {
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             console.log('Payment type changed:', selectedPaymentType);
             
-            if (selectedPaymentType === 'transferencia' || selectedPaymentType === 'tarjeta') {
-                if (isDepartmentManager && currentAgencyRate <= 0) {
-                    // Load agency rate for department managers
-                    loadCurrentAgencyRate().then(() => {
+            if (selectedPaymentType === 'transferencia') {
+                // Transferencia always uses Transfer Rate
+                if (currentTransferRate <= 0) {
+                    loadCurrentTransferRate().then(() => {
                         updatePricesForFilters(selectedPaymentType, selectedCurrency);
                     });
-                } else if (!isDepartmentManager && currentTransferRate <= 0) {
-                    // Load transfer rate for other users
-                    loadCurrentTransferRate().then(() => {
+                } else {
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                }
+            } else if (selectedPaymentType === 'tarjeta') {
+                // Tarjeta always uses Agency Rate
+                if (currentAgencyRate <= 0) {
+                    loadCurrentAgencyRate().then(() => {
                         updatePricesForFilters(selectedPaymentType, selectedCurrency);
                     });
                 } else {
@@ -1526,31 +1558,25 @@ table.dataTable thead th:nth-child(2) select {
             });
         }
 
-        // Load rates on initialization based on user role
-        if (isDepartmentManager) {
-            // Load agency rate for department managers BEFORE initializing table
-            console.log('💼 Department manager detected - loading Agency Rate first');
-            loadCurrentAgencyRate().then(() => {
-                // Set default payment type to transferencia AFTER agency rate is loaded
-                $(`#paymentTypeFilter-${tableId}`).val('transferencia');
-                console.log('💼 Agency rate loaded, setting default to Transferencia');
-                
-                // Load exchange rate
-                loadCurrentExchangeRate();
-                
-                // Load rates for the header filter (this will auto-select and load data)
-                loadRatesForFilter();
-                
-                // Note: initializeTable() will be called automatically by rate filter change event
-                
-                console.log('💼 Department manager table initialized with AgencyRate applied');
-            });
-        } else {
-            // Load transfer rate for other users
-            loadCurrentTransferRate();
-            // Load exchange rate on initialization
+        // Load rates on initialization - BOTH rates needed for all users now
+        // Load both transfer and agency rates for ALL users
+        console.log('💰 Loading both Transfer and Agency rates for all users');
+        
+        // Load Transfer Rate
+        loadCurrentTransferRate();
+        
+        // Load Agency Rate
+        loadCurrentAgencyRate().then(() => {
+            // Load exchange rate
             loadCurrentExchangeRate();
-        }
+            
+            // Load rates for the header filter (this will auto-select and load data)
+            loadRatesForFilter();
+            
+            // Note: initializeTable() will be called automatically by rate filter change event
+            
+            console.log('💰 Both rates loaded, table initialized');
+        });
 
         // Handle expand/collapse prices functionality
         $(document).on('click', '.expand-services-prices-btn', function(e) {
@@ -1750,21 +1776,9 @@ table.dataTable thead th:nth-child(2) select {
             }
         });
 
-        // Initialize based on user role
-        if (isDepartmentManager) {
-            // For department managers, initialization is handled in the loadCurrentAgencyRate() promise above
-            // This ensures AgencyRate is loaded and payment type is set before table initialization
-            console.log('💼 Department manager initialization deferred to agency rate loading');
-            // Load POIs and VehicleTypes for dropdowns
-            loadDropdownData();
-        } else {
-            // For other users, proceed with optimized initialization
-            // Load rates for the header filter FIRST, then let it auto-select and load data
-            loadRatesForFilter();
-            // Note: initializeTable() will be called automatically by rate filter change event
-            // Load POIs and VehicleTypes for dropdowns
-            loadDropdownData();
-        }
+        // Initialize for all users - both rates are loaded above
+        // Load POIs and VehicleTypes for dropdowns
+        loadDropdownData();
 
         // Event Handlers
         $('#createServiceBtn').on('click', function() {

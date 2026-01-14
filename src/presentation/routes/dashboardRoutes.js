@@ -81,6 +81,10 @@ router.get('/client/reports', dashboardAuth.requireRole('client'), (req, res) =>
 router.get('/client/policies', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
 router.get('/client/permissions', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
 router.get('/client/settings', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
+router.get('/client/vehicles', dashboardAuth.requireRole('client'), (req, res) => clientController.vehicles(req, res));
+router.get('/client/services', dashboardAuth.requireRole('client'), (req, res) => clientController.services(req, res));
+router.get('/client/experiences', dashboardAuth.requireRole('client'), (req, res) => clientController.experiences(req, res));
+router.get('/client/tours', dashboardAuth.requireRole('client'), (req, res) => clientController.tours(req, res));
 
 // Department Manager Routes
 router.get('/department_manager', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.index(req, res));
