@@ -322,13 +322,25 @@ class ClientController extends RoleBasedController {
   async tours(req, res) {
     try {
       // Get clientId from user: for client role, use clientId field (not user objectId)
-      // req.user is a Parse User object, so we need to use .get() to access fields
       const { user } = req;
-      const clientId = user?.get?.('clientId') || user?.get?.('organizationId') || user?.id || null;
+
+      // Extract clientId with priority: clientId field > organizationId field > user ID fallback
+      const userClientIdField = user?.clientId;
+      const userOrgIdField = user?.organizationId;
+      const userId = user?.id;
+
+      let clientId;
+      if (userClientIdField && typeof userClientIdField === 'string' && userClientIdField.trim() !== '') {
+        clientId = userClientIdField.trim();
+      } else if (userOrgIdField && typeof userOrgIdField === 'string' && userOrgIdField.trim() !== '') {
+        clientId = userOrgIdField.trim();
+      } else {
+        clientId = userId;
+      }
 
       await this.renderRoleView(req, res, 'tours', {
         title: 'Tours',
-        clientId, // Pass the user's objectId as clientId
+        clientId, // Pass the extracted clientId
         breadcrumb: {
           title: 'Tours',
           items: [

@@ -537,8 +537,14 @@ table.dataTable tbody tr.hover {
             apiEndpoint,
             showClientPricing,
             userRole,
-            clientId
+            clientId,
+            showActions
         });
+        
+        // Debug: Log the number of columns in HTML table
+        const htmlColumnCount = $(`#${tableId} thead tr th`).length;
+        console.log('🔍 HTML table has', htmlColumnCount, 'columns');
+        console.log('🔍 Expected JS columns:', showClientPricing ? 'with client pricing' : 'without client pricing');
 
         // Get JWT token from localStorage or cookies
         function getAccessToken() {
@@ -699,11 +705,18 @@ table.dataTable tbody tr.hover {
             processing: true,
             serverSide: false, // Changed to client-side
             data: [], // Will be populated after data loads
-            columns: [
+            deferRender: true, // Only render visible rows
+                columns: [
                 // 1. Tour (Destination)
                 {
                     data: null,
+                    defaultContent: '',
                     render: function(data, type, row) {
+                        // Handle empty/undefined row data gracefully
+                        if (!row || typeof row !== 'object') {
+                            return 'Cargando...';
+                        }
+                        
                         const destination = row.destinationPOI?.name || 'Tour';
                         
                         if (type === 'filter' || type === 'sort') {
@@ -722,6 +735,7 @@ table.dataTable tbody tr.hover {
                 // 2. Tiempo
                 {
                     data: 'time',
+                    defaultContent: '-',
                     render: function(data, type, row) {
                         if (!data) return '-';
                         const hours = Math.floor(data / 60);
@@ -743,13 +757,28 @@ table.dataTable tbody tr.hover {
                 // 3. Precios & Vehículos (based on selected rate from header dropdown)
                 {
                     data: null,
+                    defaultContent: '',
                     render: function(data, type, row) {
+                        // Handle empty/undefined row data gracefully
+                        if (!row || typeof row !== 'object' || Object.keys(row).length === 0) {
+                            return '<div class="text-muted small">Cargando...</div>';
+                        }
+                        
                         const selectedRate = $(`#headerRateFilter-${tableId}`).val();
                         const selectedRateText = $(`#headerRateFilter-${tableId} option:selected`).text();
                         
                         
+                        // Generate expand button (always present)
+                        const expandButton = `
+                            <button class="btn btn-link btn-sm p-0 mt-1 expand-prices-btn" 
+                                    data-row-id="${row.id || row.objectId}"
+                                    style="font-size: 0.75rem; text-decoration: none;">
+                                <i class="ti ti-chevron-down me-1"></i>
+                                Ver todos
+                            </button>`;
+                        
                         // Check if we have price data for the selected rate OR client prices available
-                        if ((row.priceData && row.priceData.length > 0) || (selectedRate && row.hasClientPrices && row.clientPrices)) {
+                        if ((row.priceData && row.priceData.length > 0) || (selectedRate && row.hasClientPrices && row.clientPrices) || (selectedRate && row.clientPrices)) {
                             // Priority 1: Use priceData if available (from rate-specific API call)
                             if (row.priceData && row.priceData.length > 0) {
                             // Show vehicle types for selected rate (sorted by price low to high)
@@ -846,6 +875,12 @@ table.dataTable tbody tr.hover {
                                             </div>`;
                                 }
                             }
+                            
+                            // Fallback: if no client prices found for the selected rate, show placeholder
+                            return `<div class="price-container" data-row-id="${row.id || row.objectId}">
+                                        <div class="text-muted small">Selecciona una categoría</div>
+                                        ${expandButton}
+                                    </div>`;
                         } else {
                             // Show placeholder when no rate selected or no data available
                             const expandButton = `
@@ -868,6 +903,7 @@ table.dataTable tbody tr.hover {
                 // 4. Estado
                 {
                     data: 'active',
+                    defaultContent: '<span class="badge bg-secondary">-</span>',
                     render: function(data) {
                         return data
                             ? '<span class="badge bg-success">Activo</span>'
@@ -1039,7 +1075,6 @@ table.dataTable tbody tr.hover {
         if (tableId === 'tours-table' || tableId === 'client-tours-table') {
             window.toursDataTable = dataTable;
         }
-
         // Initialize data and table
         async function initializeTable() {
             try {
