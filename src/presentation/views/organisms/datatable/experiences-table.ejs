@@ -21,6 +21,10 @@ const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 const canViewImages = ['superadmin', 'admin', 'department_manager', 'client'].includes(dtUserRole);
+
+// Role-specific variables for conditional rendering
+const isDepartmentManager = dtUserRole === 'department_manager';
+const isClient = dtUserRole === 'client';
 %>
 
 <style>
