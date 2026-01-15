@@ -342,7 +342,6 @@ const tarifarioTabs = [
                                                             <option value="efectivo" selected>Efectivo</option>
                                                             <option value="transferencia">Transferencia</option>
                                                             <option value="tarjeta">Tarjeta Débito/Crédito</option>
-                                                            <option value="transf_agencias">Transf. Agencias</option>
                                                         </select>
                                                     </div>
                                                 </div>
@@ -1517,74 +1516,104 @@ function setupExperienceFilters() {
         });
     }
     
-    // Function to get access token
+    // Get access token for API calls
     function getAccessToken() {
         return document.cookie.split('; ')
             .find(row => row.startsWith('accessToken='))
-            ?.split('=')[1];
+            ?.split('=')[1] || null;
     }
-    
-    // Load current rates from API
+
+    // Load current transfer rate from API
+    function loadCurrentTransferRate() {
+        return $.ajax({
+            url: '/api/transfer-rate/current',
+            type: 'GET',
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            },
+            success: function(response) {
+                if (response.success && response.data) {
+                    currentTransferRate = response.data.value || 0;
+                    console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
+                } else {
+                    console.warn('⚠️ No active transfer rate found');
+                    currentTransferRate = 0;
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('❌ Error loading transfer rate:', error);
+                currentTransferRate = 0;
+            }
+        });
+    }
+
+    // Load current agency rate from API
+    function loadCurrentAgencyRate() {
+        return $.ajax({
+            url: '/api/agency-rate/current',
+            type: 'GET',
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            },
+            success: function(response) {
+                if (response.success && response.data) {
+                    currentAgencyRate = response.data.value || 0;
+                    console.log('✅ Current agency rate loaded:', currentAgencyRate + '%');
+                } else {
+                    console.warn('⚠️ No active agency rate found');
+                    currentAgencyRate = 0;
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('❌ Error loading agency rate:', error);
+                currentAgencyRate = 0;
+            }
+        });
+    }
+
+    // Load current exchange rate from API
+    function loadCurrentExchangeRate() {
+        return $.ajax({
+            url: '/api/exchange-rate/current',
+            type: 'GET',
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            },
+            success: function(response) {
+                if (response.success && response.data) {
+                    currentExchangeRate = response.data.value || 0;
+                    console.log('✅ Current exchange rate loaded:', currentExchangeRate, 'MXN per USD');
+                } else {
+                    console.warn('⚠️ No active exchange rate found');
+                    currentExchangeRate = 0;
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('❌ Error loading exchange rate:', error);
+                currentExchangeRate = 0;
+            }
+        });
+    }
+
+    // Load all rates from database
     function loadRates() {
         // Load transfer rate
-        fetch('/api/transfer-rate/current', {
-            headers: {
-                'Authorization': `Bearer ${getAccessToken()}`
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.data) {
-                currentTransferRate = data.data.value || 3;
-                console.log('Transfer rate loaded:', currentTransferRate);
-            } else {
-                currentTransferRate = 3; // Default 3%
-            }
-        })
-        .catch(error => {
-            console.error('Error loading transfer rate:', error);
-            currentTransferRate = 3; // Default 3%
-        });
+        loadCurrentTransferRate();
         
         // Load agency rate
-        fetch('/api/agency-rate/current', {
-            headers: {
-                'Authorization': `Bearer ${getAccessToken()}`
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.data) {
-                currentAgencyRate = data.data.value || 15;
-                console.log('Agency rate loaded:', currentAgencyRate);
-            } else {
-                currentAgencyRate = 15; // Default 15%
-            }
-        })
-        .catch(error => {
-            console.error('Error loading agency rate:', error);
-            currentAgencyRate = 15; // Default 15%
-        });
+        loadCurrentAgencyRate();
         
         // Load exchange rate
-        fetch('/api/exchange-rate/current', {
-            headers: {
-                'Authorization': `Bearer ${getAccessToken()}`
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.data) {
-                currentExchangeRate = data.data.value || 18.50;
-                console.log('Exchange rate loaded:', currentExchangeRate);
-            } else {
-                currentExchangeRate = 18.50; // Default rate
-            }
-        })
-        .catch(error => {
-            console.error('Error loading exchange rate:', error);
-            currentExchangeRate = 18.50; // Default rate
-        });
+        loadCurrentExchangeRate();
     }
     
     // Debounce function to prevent excessive requests
@@ -1611,10 +1640,12 @@ function setupExperienceFilters() {
         const selectedPaymentType = document.getElementById('experiencesPaymentTypeFilter').value;
         
         if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
-            loadRates(); // Load exchange rate if needed
+            loadCurrentExchangeRate().then(() => {
+                debouncedUpdatePrices(selectedPaymentType, selectedCurrency);
+            });
+        } else {
+            debouncedUpdatePrices(selectedPaymentType, selectedCurrency);
         }
-        
-        debouncedUpdatePrices(selectedPaymentType, selectedCurrency);
     });
 
     // Payment type filter change handler
@@ -1622,13 +1653,27 @@ function setupExperienceFilters() {
         const selectedPaymentType = this.value;
         const selectedCurrency = document.getElementById('experiencesCurrencyFilter').value;
         
-        if ((selectedPaymentType === 'transferencia' || selectedPaymentType === 'transf_agencias') && currentTransferRate <= 0) {
-            loadRates(); // Load transfer rate if needed
-        } else if (selectedPaymentType === 'tarjeta' && currentAgencyRate <= 0) {
-            loadRates(); // Load agency rate if needed
+        if (selectedPaymentType === 'transferencia') {
+            // Transferencia uses Transfer Rate
+            if (currentTransferRate <= 0) {
+                loadCurrentTransferRate().then(() => {
+                    debouncedUpdatePrices(selectedPaymentType, selectedCurrency);
+                });
+            } else {
+                debouncedUpdatePrices(selectedPaymentType, selectedCurrency);
+            }
+        } else if (selectedPaymentType === 'tarjeta') {
+            // Tarjeta uses Agency Rate
+            if (currentAgencyRate <= 0) {
+                loadCurrentAgencyRate().then(() => {
+                    debouncedUpdatePrices(selectedPaymentType, selectedCurrency);
+                });
+            } else {
+                debouncedUpdatePrices(selectedPaymentType, selectedCurrency);
+            }
+        } else {
+            debouncedUpdatePrices(selectedPaymentType, selectedCurrency);
         }
-        
-        debouncedUpdatePrices(selectedPaymentType, selectedCurrency);
     });
     
     // Load initial rates

@@ -161,6 +161,210 @@ class ClientController extends RoleBasedController {
   }
 
   /**
+   * Renders the client vehicles page for viewing vehicle fleet.
+   * Clients can view vehicle types available for their services.
+   * Supports sections: 'vehicles' and 'types' for vehicle type management.
+   * @function vehicles
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the vehicles view.
+   * @returns {Promise<void>} - Renders the client vehicles view or handles errors.
+   * @example
+   * // GET /dashboard/client/vehicles
+   * // GET /dashboard/client/vehicles?section=types
+   * await clientController.vehicles(req, res);
+   */
+  async vehicles(req, res) {
+    try {
+      const section = req.query.section || 'types'; // Default to types
+
+      await this.renderRoleView(req, res, 'vehicles', {
+        title: 'Vehículos',
+        section,
+        breadcrumb: {
+          title: 'Vehículos',
+          items: [
+            { name: 'Servicios', url: '#' },
+            { name: 'Vehículos', active: true },
+          ],
+        },
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Renders the client services page for viewing transport services.
+   * Clients can view services/transfers available for their business.
+   * Supports sections: 'airport' (default), 'p2p' (punto a punto), and 'local' for service type management.
+   * @function services
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the services view.
+   * @returns {Promise<void>} - Renders the client services view or handles errors.
+   * @example
+   * // GET /dashboard/client/services
+   * // GET /dashboard/client/services?section=p2p
+   * // GET /dashboard/client/services?section=local
+   * await clientController.services(req, res);
+   */
+  async services(req, res) {
+    try {
+      const section = req.query.section || 'airport';
+
+      // Get clientId from user: for client role, use clientId field (not user objectId)
+      const { user } = req;
+      const userId = user?.id;
+
+      // Extract clientId with priority: clientId field > organizationId field > user ID fallback
+      let clientId;
+      const userClientIdField = user?.get?.('clientId') || user?.attributes?.clientId || user?.clientId;
+      const userOrgIdField = user?.get?.('organizationId') || user?.attributes?.organizationId || user?.organizationId;
+
+      if (userClientIdField && userClientIdField.trim() !== '') {
+        clientId = userClientIdField;
+      } else if (userOrgIdField && userOrgIdField.trim() !== '') {
+        clientId = userOrgIdField;
+      } else {
+        clientId = userId;
+      }
+
+      await this.renderRoleView(req, res, 'services', {
+        title: 'Traslados',
+        section,
+        clientId, // Pass the user's objectId as clientId
+        breadcrumb: {
+          title: 'Traslados',
+          items: [
+            { name: 'Servicios', url: '#' },
+            { name: 'Traslados', active: true },
+          ],
+        },
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Renders the client experiences page for viewing experiences.
+   * Clients can view experiences available for their events.
+   * Supports sections: 'experiences' (default) and 'providers' for experience providers management.
+   * @function experiences
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the experiences view.
+   * @returns {Promise<void>} - Renders the client experiences view or handles errors.
+   * @example
+   * // GET /dashboard/client/experiences
+   * // GET /dashboard/client/experiences?section=providers
+   * await clientController.experiences(req, res);
+   */
+  async experiences(req, res) {
+    try {
+      const section = req.query.section || 'experiences';
+
+      await this.renderRoleView(req, res, 'experiences', {
+        title: 'Experiencias',
+        section,
+        breadcrumb: {
+          title: 'Experiencias',
+          items: [
+            { name: 'Servicios', url: '#' },
+            { name: 'Experiencias', active: true },
+          ],
+        },
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Renders the client tours page for viewing tour packages.
+   * Clients can view tours available for their events.
+   * @function tours
+   * @param {object} req - Express request object containing user session and authentication data.
+   * @param {object} res - Express response object for rendering the tours view.
+   * @returns {Promise<void>} - Renders the client tours view or handles errors.
+   * @example
+   * // GET /dashboard/client/tours
+   * await clientController.tours(req, res);
+   */
+  async tours(req, res) {
+    try {
+      // Get clientId from user: for client role, use clientId field (not user objectId)
+      const { user } = req;
+
+      // Extract clientId with priority: clientId field > organizationId field > user ID fallback
+      const userClientIdField = user?.clientId;
+      const userOrgIdField = user?.organizationId;
+      const userId = user?.id;
+
+      let clientId;
+      if (userClientIdField && typeof userClientIdField === 'string' && userClientIdField.trim() !== '') {
+        clientId = userClientIdField.trim();
+      } else if (userOrgIdField && typeof userOrgIdField === 'string' && userOrgIdField.trim() !== '') {
+        clientId = userOrgIdField.trim();
+      } else {
+        clientId = userId;
+      }
+
+      await this.renderRoleView(req, res, 'tours', {
+        title: 'Tours',
+        clientId, // Pass the extracted clientId
+        breadcrumb: {
+          title: 'Tours',
+          items: [
+            { name: 'Servicios', url: '#' },
+            { name: 'Tours', active: true },
+          ],
+        },
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Get client statistics.
    * @function getClientStats
    * @example

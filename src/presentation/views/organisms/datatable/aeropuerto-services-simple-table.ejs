@@ -151,8 +151,13 @@ table.dataTable tbody tr.hover {
                 <div class="d-flex align-items-center gap-1">
                     <label for="paymentTypeFilter" class="form-label mb-0 text-muted">Pago:</label>
                     <select class="form-select" id="paymentTypeFilter" style="min-width: 140px;">
-                        <option value="efectivo" selected>Efectivo</option>
-                        <option value="transferencia">Transferencia</option>
+                        <% if (dtUserRole === 'department_manager' || dtUserRole === 'client') { %>
+                            <option value="efectivo">Efectivo</option>
+                            <option value="transferencia" selected>Transferencia</option>
+                        <% } else { %>
+                            <option value="efectivo" selected>Efectivo</option>
+                            <option value="transferencia">Transferencia</option>
+                        <% } %>
                     </select>
                 </div>
             </div>

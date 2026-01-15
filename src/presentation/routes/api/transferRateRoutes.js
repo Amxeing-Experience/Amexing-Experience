@@ -222,7 +222,7 @@ router.get(
 router.get(
   '/current',
   readRateLimit,
-  jwtMiddleware.requireRoleLevel(4), // Allow department managers to read current transfer rate
+  jwtMiddleware.requireRoleLevel(2), // Allow driver and above (includes client, department_manager, admin, superadmin)
   (req, res) => transferRateController.getCurrent(req, res)
 );
 
