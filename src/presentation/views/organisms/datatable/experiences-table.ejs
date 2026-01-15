@@ -554,6 +554,9 @@ const canViewImages = ['superadmin', 'admin', 'department_manager', 'client'].in
         const canDelete = <%= canDelete %>;
         const canViewImages = <%= canViewImages %>;
         const userRole = '<%= dtUserRole %>';
+        
+        // Department manager role detection  
+        const isDepartmentManager = (userRole === 'department_manager');
 
         // Variables globales para almacenar datos con costos
         let experiencesDataMap = {};
@@ -1017,7 +1020,12 @@ const canViewImages = ['superadmin', 'admin', 'department_manager', 'client'].in
                     
                     priceCell.each(function() {
                         const cell = $(this);
-                        let originalPrice = cell.attr('data-original-price');
+                        const priceDiv = cell.find('div[data-original-price]');
+                        
+                        console.log('Price cell HTML:', cell.html());
+                        console.log('PriceDiv found:', priceDiv.length > 0);
+                        
+                        let originalPrice = priceDiv.attr('data-original-price');
                         
                         console.log('💰 Cell content:', cell.html());
                         console.log('💾 Stored original price:', originalPrice);
@@ -1030,6 +1038,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager', 'client'].in
                             console.log('🏷️ Extracted and stored price:', originalPrice);
                         } else {
                             originalPrice = parseFloat(originalPrice);
+                            console.log('Found original price:', originalPrice);
                         }
                         
                         if (originalPrice === 0) {
@@ -1084,7 +1093,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager', 'client'].in
                             
                             // Update cell HTML structure
                             cell.html(`
-                                <div class="text-center">
+                                <div class="text-center" data-original-price="${originalPrice}">
                                     <div class="fw-bold text-primary" style="font-size: 1rem;">
                                         ${formatted}
                                     </div>
@@ -1103,7 +1112,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager', 'client'].in
                             
                             // Update cell HTML structure
                             cell.html(`
-                                <div class="text-center">
+                                <div class="text-center" data-original-price="${originalPrice}">
                                     <div class="fw-bold text-primary" style="font-size: 1rem;">
                                         ${formatted}
                                     </div>
@@ -1285,7 +1294,7 @@ const canViewImages = ['superadmin', 'admin', 'department_manager', 'client'].in
                         }).format(amount);
 
                         return `
-                            <div class="text-center">
+                            <div class="text-center" data-original-price="${baseCost}">
                                 <div class="fw-bold text-primary" style="font-size: 1rem;">
                                     ${formatMXN(baseCost)}
                                 </div>
@@ -1403,6 +1412,11 @@ const canViewImages = ['superadmin', 'admin', 'department_manager', 'client'].in
                 tooltipTriggerList.map(function (tooltipTriggerEl) {
                     return new bootstrap.Tooltip(tooltipTriggerEl);
                 });
+                
+                // Update prices after table redraw
+                if (typeof updatePricesAfterDraw === 'function') {
+                    updatePricesAfterDraw();
+                }
             }
         });
 
@@ -2964,13 +2978,16 @@ const canViewImages = ['superadmin', 'admin', 'department_manager', 'client'].in
                     day: 'numeric'
                 });
                 
+                // Get the year from validFrom date for "Vigente" text
+                const validFromYear = new Date(record.validFrom).getFullYear();
+                
                 const validUntil = record.validUntil 
                     ? new Date(record.validUntil).toLocaleDateString('es-MX', {
                         year: 'numeric',
                         month: 'short',
                         day: 'numeric'
                       })
-                    : 'Vigente';
+                    : `Vigente al 31 de diciembre del ${validFromYear}`;
 
                 // Format price
                 const formattedPrice = parseFloat(record.cost).toLocaleString('es-MX', {

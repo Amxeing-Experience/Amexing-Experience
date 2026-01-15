@@ -341,7 +341,7 @@ const tarifarioTabs = [
                                                         <select class="form-select" id="experiencesPaymentTypeFilter" style="min-width: 140px;">
                                                             <option value="efectivo" selected>Efectivo</option>
                                                             <option value="transferencia">Transferencia</option>
-                                                            <option value="tarjeta">Tarjeta Credito Debito</option>
+                                                            <option value="tarjeta">Tarjeta Débito/Crédito</option>
                                                         </select>
                                                     </div>
                                                 </div>
@@ -1501,9 +1501,11 @@ function setupExperienceFilters() {
             let finalPrice = originalPrice;
             
             // Apply appropriate rate based on payment type
-            if (paymentType === 'transferencia') {
+            if (paymentType === 'transferencia' || paymentType === 'transf_agencias') {
+                // Both Transferencia and Trans. Agencias use transfer rate
                 finalPrice = applyTransferRate(finalPrice);
             } else if (paymentType === 'tarjeta') {
+                // Tarjeta Débito/Crédito uses agency rate
                 finalPrice = applyAgencyRate(finalPrice);
             }
             

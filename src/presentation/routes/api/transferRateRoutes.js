@@ -195,6 +195,7 @@ router.get(
  * /api/transfer-rates/current:
  *   get:
  *     summary: Get current active transfer rate
+ *     description: Accessible to department managers and above for pricing calculations
  *     tags: [Transfer Rates]
  *     security:
  *       - bearerAuth: []
@@ -214,7 +215,7 @@ router.get(
  *       404:
  *         description: No active transfer rate found
  *       401:
- *         description: Unauthorized - insufficient permissions
+ *         description: Unauthorized - insufficient permissions (requires level 4+)
  *       429:
  *         description: Too many requests
  */
