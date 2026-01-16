@@ -327,7 +327,7 @@ const errorHandler = (err, req, res, _next) => {
   res.status(status);
 
   if (req.path.startsWith('/api') || req.path.startsWith('/parse')) {
-    return res.json({
+    const response = {
       error: true,
       message: finalMessage,
       status,
@@ -335,6 +335,23 @@ const errorHandler = (err, req, res, _next) => {
         stack: err.stack,
         details: err,
       }),
+    };
+
+    // Add retry-after header for 429 errors
+    if (status === 429 && err.retryAfter) {
+      res.set('Retry-After', err.retryAfter.toString());
+      response.retryAfter = err.retryAfter;
+    }
+
+    return res.json(response);
+  }
+
+  // Handle specific error pages
+  if (status === 429) {
+    return res.render('errors/429', {
+      title: 'Too Many Requests',
+      message: finalMessage,
+      retryAfter: err.retryAfter,
     });
   }
 

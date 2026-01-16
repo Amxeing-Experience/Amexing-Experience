@@ -183,13 +183,12 @@ class SecurityMiddleware {
       standardHeaders: true,
       legacyHeaders: false,
       skipSuccessfulRequests: process.env.RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS === 'true',
-      handler: (req, res) => {
+      handler: (req, res, next) => {
         winston.warn(`Rate limit exceeded for IP: ${req.ip}`);
-        res.status(429).json({
-          error: 'Too many requests',
-          message: 'Rate limit exceeded. Please try again later.',
-          retryAfter: Math.ceil(req.rateLimit.resetTime / 1000),
-        });
+        const error = new Error('Rate limit exceeded. Please try again later.');
+        error.status = 429;
+        error.retryAfter = Math.ceil(req.rateLimit.resetTime / 1000);
+        next(error);
       },
     });
   }
@@ -210,6 +209,13 @@ class SecurityMiddleware {
       max: this.isDevelopment ? 5000 : 5, // Increased to 5000 for development
       message: 'Too many attempts. Please try again later.',
       skipSuccessfulRequests: false,
+      handler: (req, res, next) => {
+        winston.warn(`Strict rate limit exceeded for IP: ${req.ip}`);
+        const error = new Error('Too many attempts. Please try again later.');
+        error.status = 429;
+        error.retryAfter = Math.ceil((req.rateLimit.resetTime || Date.now() + 900000) / 1000);
+        next(error);
+      },
     });
   }
 
@@ -230,6 +236,13 @@ class SecurityMiddleware {
       message: 'API rate limit exceeded.',
       standardHeaders: true,
       legacyHeaders: false,
+      handler: (req, res, next) => {
+        winston.warn(`API rate limit exceeded for IP: ${req.ip}`);
+        const error = new Error('API rate limit exceeded.');
+        error.status = 429;
+        error.retryAfter = Math.ceil((req.rateLimit.resetTime || Date.now() + 60000) / 1000);
+        next(error);
+      },
     });
   }
 
