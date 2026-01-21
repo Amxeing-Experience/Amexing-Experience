@@ -277,6 +277,7 @@ class AuthenticationServiceCore {
       email: user.get('email'),
       role: roleName,
       roleId: roleObjectId,
+      clientId: user.get('clientId'),
       organizationId: user.get('organizationId'),
       iat: Math.floor(Date.now() / 1000),
     };

@@ -274,6 +274,7 @@ router.post('/login', async (req, res) => {
           email: parseUser.get('email'),
           role: roleName,
           roleId: rolePointer,
+          clientId: parseUser.get('clientId'),
           organizationId: parseUser.get('organizationId'),
           name: parseUser.get('displayName') || parseUser.get('username'),
         };
@@ -438,6 +439,7 @@ router.post('/login', async (req, res) => {
           email: user.get('email'),
           role: roleName,
           roleId: rolePointer,
+          clientId: user.get('clientId'),
           organizationId: user.get('organizationId'),
           name:
             typeof user.getDisplayName === 'function'
@@ -473,6 +475,7 @@ router.post('/login', async (req, res) => {
           email: authenticatedUser.email,
           role: authenticatedUser.role,
           roleId: authenticatedUser.roleId,
+          clientId: authenticatedUser.clientId,
           organizationId: authenticatedUser.organizationId,
           name: authenticatedUser.name,
           iat: Math.floor(Date.now() / 1000),

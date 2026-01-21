@@ -56,13 +56,35 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async team(req, res) {
     try {
+      // For department manager role, use user's objectId as clientId (same pattern as other methods)
+      const { user } = req;
+      const clientId = user?.id;
+      const departmentId = user?.departmentId || user?.organizationId || '';
+      const departmentName = user?.departmentName || 'Department';
+
       await this.renderRoleView(req, res, 'team', {
-        title: 'Team Management',
+        title: 'My Team',
+        departmentId,
+        departmentName,
+        clientId,
         team: [],
         breadcrumb: {
           title: 'My Team',
-          items: [{ name: 'Team', active: true }],
+          items: [
+            { name: 'Dashboard', url: '/dashboard/department_manager' },
+            { name: 'My Team', active: true },
+          ],
         },
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
       });
     } catch (error) {
       this.handleError(res, error);

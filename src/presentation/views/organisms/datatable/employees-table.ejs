@@ -36,9 +36,9 @@ const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 
 // Role-Based Permission Checks
-const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
-const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
-const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+const canEdit = ['superadmin', 'admin', 'client', 'department_manager'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin', 'client', 'department_manager'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin', 'client', 'department_manager'].includes(dtUserRole);
 
 // Role translations
 const roleLabels = {
@@ -180,13 +180,32 @@ function initializeEmployeesDataTable() {
                 params.append('search', data.search.value);
             }
 
+            // Get access token from cookies
+            const getAccessToken = () => {
+                const cookies = document.cookie.split(';');
+                for (let cookie of cookies) {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name === 'accessToken') {
+                        return value;
+                    }
+                }
+                return null;
+            };
+            
+            const token = getAccessToken();
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
             fetch(`<%= dtApiEndpoint %>?${params.toString()}`, {
                 method: 'GET',
                 credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                }
+                headers: headers
             })
             .then(response => {
                 if (!response.ok) {
@@ -511,13 +530,32 @@ function toggleEmployeeStatus(employeeId, currentStatus) {
  */
 async function executeToggleEmployeeStatus(employeeId, newStatus) {
     try {
+        // Get access token
+        const getAccessToken = () => {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        };
+        
+        const token = getAccessToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+        
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         const response = await fetch(`<%= dtApiEndpoint %>/${employeeId}/toggle-status`, {
             method: 'PATCH',
             credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            },
+            headers: headers,
             body: JSON.stringify({ active: newStatus })
         });
 
@@ -588,13 +626,32 @@ function deleteEmployee(employeeId, employeeName) {
  */
 async function executeDeleteEmployee(employeeId, employeeName) {
     try {
+        // Get access token
+        const getAccessToken = () => {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        };
+        
+        const token = getAccessToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        };
+        
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         const response = await fetch(`<%= dtApiEndpoint %>/${employeeId}`, {
             method: 'DELETE',
             credentials: 'include',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-            }
+            headers: headers
         });
 
         const result = await response.json();

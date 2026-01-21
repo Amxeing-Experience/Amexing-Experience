@@ -69,6 +69,16 @@ async function validateClientAccess(req, res, next) {
     const { user } = req;
     const { userRole } = req;
 
+    // Debug logging
+    logger.info('validateClientAccess called', {
+      hasUser: !!user,
+      hasUserRole: !!userRole,
+      userRole,
+      endpoint: req.originalUrl,
+      method: req.method,
+      params: req.params,
+    });
+
     if (!user || !userRole) {
       return res.status(401).json({
         success: false,
@@ -85,6 +95,48 @@ async function validateClientAccess(req, res, next) {
         endpoint: req.originalUrl,
       });
       return next();
+    }
+
+    // Client and department_manager can access their own employees
+    if (['client', 'department_manager'].includes(userRole)) {
+      // For employees endpoints, allow access to their own client
+      if (req.originalUrl.includes('/employees')) {
+        const requestedClientId = req.params.clientId;
+
+        let userClientId = null;
+
+        if (userRole === 'client') {
+          // For client role users, get their clientId field
+          // This is the ID of the client organization they belong to
+          userClientId = user.get ? user.get('clientId') : (user.clientId || null);
+        } else if (userRole === 'department_manager') {
+          // For department_manager, get their clientId field
+          userClientId = user.get ? user.get('clientId') : (user.clientId || null);
+        }
+
+        // Check if user is accessing their own client's employees
+        if (requestedClientId && userClientId && requestedClientId === userClientId) {
+          logger.info('Client access granted (own client employees)', {
+            userId: user.id || user.get('objectId'),
+            userRole,
+            clientId: requestedClientId,
+            userClientId,
+            endpoint: req.originalUrl,
+          });
+          return next();
+        }
+
+        // Log why access was denied for debugging
+        logger.warn('Client access denied - client ID mismatch', {
+          userId: user.id || user.get('objectId'),
+          userRole,
+          requestedClientId,
+          userClientId,
+          hasGetMethod: !!(user.get && typeof user.get === 'function'),
+          userObjectKeys: user ? Object.keys(user) : 'no user',
+          endpoint: req.originalUrl,
+        });
+      }
     }
 
     // employee_amexing requires specific permission
@@ -150,7 +202,6 @@ async function validateClientAccess(req, res, next) {
 // Apply rate limiting and authentication to all routes
 router.use(clientApiLimiter);
 router.use(jwtMiddleware.authenticateToken);
-router.use(validateClientAccess);
 
 /**
  * @swagger
@@ -731,7 +782,7 @@ router.post('/:id/reset-password', writeOperationsLimiter, async (req, res) => {
  *       404:
  *         description: Client not found
  */
-router.get('/:clientId/employees', async (req, res) => {
+router.get('/:clientId/employees', validateClientAccess, async (req, res) => {
   await clientEmployeesController.getEmployees(req, res);
 });
 
@@ -764,7 +815,7 @@ router.get('/:clientId/employees', async (req, res) => {
  *       404:
  *         description: Employee not found
  */
-router.get('/:clientId/employees/:id', async (req, res) => {
+router.get('/:clientId/employees/:id', validateClientAccess, async (req, res) => {
   await clientEmployeesController.getEmployeeById(req, res);
 });
 
@@ -835,7 +886,7 @@ router.get('/:clientId/employees/:id', async (req, res) => {
  *       404:
  *         description: Client not found
  */
-router.post('/:clientId/employees', writeOperationsLimiter, async (req, res) => {
+router.post('/:clientId/employees', validateClientAccess, writeOperationsLimiter, async (req, res) => {
   await clientEmployeesController.createEmployee(req, res);
 });
 
@@ -891,7 +942,7 @@ router.post('/:clientId/employees', writeOperationsLimiter, async (req, res) => 
  *       404:
  *         description: Employee not found
  */
-router.put('/:clientId/employees/:id', writeOperationsLimiter, async (req, res) => {
+router.put('/:clientId/employees/:id', validateClientAccess, writeOperationsLimiter, async (req, res) => {
   await clientEmployeesController.updateEmployee(req, res);
 });
 
@@ -929,7 +980,7 @@ router.put('/:clientId/employees/:id', writeOperationsLimiter, async (req, res) 
  *       404:
  *         description: Employee not found
  */
-router.delete('/:clientId/employees/:id', writeOperationsLimiter, async (req, res) => {
+router.delete('/:clientId/employees/:id', validateClientAccess, writeOperationsLimiter, async (req, res) => {
   await clientEmployeesController.deactivateEmployee(req, res);
 });
 
@@ -977,7 +1028,7 @@ router.delete('/:clientId/employees/:id', writeOperationsLimiter, async (req, re
  *       404:
  *         description: Employee not found
  */
-router.patch('/:clientId/employees/:id/toggle-status', writeOperationsLimiter, async (req, res) => {
+router.patch('/:clientId/employees/:id/toggle-status', validateClientAccess, writeOperationsLimiter, async (req, res) => {
   await clientEmployeesController.toggleEmployeeStatus(req, res);
 });
 

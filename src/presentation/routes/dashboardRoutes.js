@@ -71,6 +71,7 @@ router.get('/client/profile', dashboardAuth.requireRole('client'), (req, res) =>
 router.get('/client/change-password', dashboardAuth.requireRole('client'), (req, res) => clientController.changePassword(req, res));
 router.get('/client/departments', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
 router.get('/client/employees', dashboardAuth.requireRole('client'), (req, res) => clientController.employees(req, res));
+router.get('/client/team', dashboardAuth.requireRole('client'), (req, res) => clientController.team(req, res));
 router.get('/client/managers', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
 router.get('/client/bookings', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
 router.get('/client/schedules', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
