@@ -230,19 +230,23 @@ class ClientEmployeesController {
         let userClientId = null;
 
         if (currentUserRole === 'client') {
-          // For client role, the user IS the client, so use their ID
+          // For client role, get their clientId field (not their user ID)
+          if (currentUser.get && typeof currentUser.get === 'function') {
+            userClientId = currentUser.get('clientId');
+          } else {
+            userClientId = currentUser.clientId;
+          }
+
+          // Fallback: if no clientId field, treat user as the client
+          if (!userClientId) {
+            userClientId = currentUser.get ? (currentUser.get('objectId') || currentUser.id) : (currentUser.id || currentUser.objectId);
+          }
+        } else if (currentUserRole === 'department_manager') {
+          // For department_manager, the user IS the client, so use their own ID
           if (currentUser.get && typeof currentUser.get === 'function') {
             userClientId = currentUser.get('objectId') || currentUser.id;
           } else {
             userClientId = currentUser.id || currentUser.objectId;
-          }
-        } else if (currentUserRole === 'department_manager') {
-          // For department_manager, get their client ID
-          if (currentUser.get && typeof currentUser.get === 'function') {
-            const clientPointer = currentUser.get('client');
-            userClientId = clientPointer?.id || currentUser.get('clientId');
-          } else {
-            userClientId = currentUser.clientId || currentUser.client?.objectId || currentUser.client?.id;
           }
         }
 
@@ -328,9 +332,8 @@ class ClientEmployeesController {
         parentClient: clientId,
       };
 
-      // Add role to currentUser object for service validation
-      const userWithRole = currentUser;
-      userWithRole.role = currentUserRole;
+      // Add role to currentUser object for service validation - create a proper copy
+      const userWithRole = { ...currentUser, role: currentUserRole };
 
       // Create employee via UserManagementService
       const result = await this.userService.createUser(employeeData, userWithRole);
@@ -419,12 +422,11 @@ class ClientEmployeesController {
             userClientId = currentUser.id || currentUser.objectId;
           }
         } else if (currentUserRole === 'department_manager') {
-          // For department_manager, get their client ID
+          // For department_manager, the user IS the client, so use their own ID
           if (currentUser.get && typeof currentUser.get === 'function') {
-            const clientPointer = currentUser.get('client');
-            userClientId = clientPointer?.id || currentUser.get('clientId');
+            userClientId = currentUser.get('objectId') || currentUser.id;
           } else {
-            userClientId = currentUser.clientId || currentUser.client?.objectId || currentUser.client?.id;
+            userClientId = currentUser.id || currentUser.objectId;
           }
         }
 
@@ -533,12 +535,11 @@ class ClientEmployeesController {
             userClientId = currentUser.id || currentUser.objectId;
           }
         } else if (currentUserRole === 'department_manager') {
-          // For department_manager, get their client ID
+          // For department_manager, the user IS the client, so use their own ID
           if (currentUser.get && typeof currentUser.get === 'function') {
-            const clientPointer = currentUser.get('client');
-            userClientId = clientPointer?.id || currentUser.get('clientId');
+            userClientId = currentUser.get('objectId') || currentUser.id;
           } else {
-            userClientId = currentUser.clientId || currentUser.client?.objectId || currentUser.client?.id;
+            userClientId = currentUser.id || currentUser.objectId;
           }
         }
 

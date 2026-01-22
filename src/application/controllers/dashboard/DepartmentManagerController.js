@@ -56,7 +56,7 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async team(req, res) {
     try {
-      // For department manager role, use user's objectId as clientId (same pattern as other methods)
+      // For department manager role, the user IS the client, so use their own ID
       const { user } = req;
       const clientId = user?.id;
       const departmentId = user?.departmentId || user?.organizationId || '';

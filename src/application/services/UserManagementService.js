@@ -54,8 +54,8 @@ class UserManagementService {
     this.roleHierarchy = {
       superadmin: 7,
       admin: 6,
-      client: 5,
-      department_manager: 4,
+      department_manager: 5,
+      client: 4,
       employee: 3,
       employee_amexing: 3,
       driver: 2,
@@ -1642,18 +1642,15 @@ class UserManagementService {
   async checkExistingUser(email) {
     try {
       const normalizedEmail = email.toLowerCase().trim();
-      console.log('[DEBUG] checkExistingUser - Checking email:', normalizedEmail);
 
       const query = BaseModel.queryExisting(this.className);
       query.equalTo('email', normalizedEmail);
       query.limit(1);
 
       const existingUser = await query.first({ useMasterKey: true });
-      console.log('[DEBUG] checkExistingUser - Found existing user:', existingUser ? existingUser.id : 'null');
 
       return existingUser || null;
     } catch (error) {
-      console.log('[DEBUG] checkExistingUser - Error:', error.message);
       // If error, assume no existing user to proceed safely
       return null;
     }
@@ -1735,25 +1732,35 @@ class UserManagementService {
    * @returns {*} - Operation result.
    */
   canCreateUser(currentUser, targetRole) {
-    // Get role from currentUser - prioritize direct property 'role' (set by controller)
-    let currentRole = currentUser?.role;
-    if (!currentRole && typeof currentUser?.get === 'function') {
+    // Get role from currentUser - try multiple methods
+    let currentRole = null;
+
+    // Method 1: Direct property access (set by controller)
+    if (currentUser?.role) {
+      currentRole = currentUser.role;
+    } else if (typeof currentUser?.get === 'function') {
+      // Method 2: Parse object get method
       currentRole = currentUser.get('role');
+
+      // Method 3: Try to get from roleId pointer if it's a fetched Parse object and role is empty
+      if (!currentRole && currentUser.get('roleId')) {
+        const rolePointer = currentUser.get('roleId');
+        if (rolePointer && typeof rolePointer.get === 'function') {
+          currentRole = rolePointer.get('name');
+        }
+      }
     }
 
     const currentLevel = this.roleHierarchy[currentRole] || 0;
     const targetLevel = this.roleHierarchy[targetRole] || 0;
 
-    // Debug logging
+    // Debug logging - role hierarchy validation
     logger.info('canCreateUser validation', {
-      currentUserId: currentUser?.id || currentUser?.objectId,
       currentRole,
       currentLevel,
       targetRole,
       targetLevel,
       canCreate: currentLevel >= targetLevel,
-      hasGetMethod: typeof currentUser?.get === 'function',
-      hasRoleProperty: !!currentUser?.role,
     });
 
     // Can only create users with lower or equal role level
@@ -1765,6 +1772,14 @@ class UserManagementService {
         currentLevel,
         targetRole,
         targetLevel,
+        roleHierarchy: this.roleHierarchy,
+        calculation: `${currentLevel} >= ${targetLevel} = ${canCreate}`,
+        debugInfo: {
+          currentUserType: typeof currentUser,
+          hasRoleProperty: !!currentUser?.role,
+          rolePropertyValue: currentUser?.role,
+          hasGetMethod: typeof currentUser?.get === 'function',
+        },
       });
     }
 
