@@ -87,28 +87,14 @@ const navigationItems = {
         ]}
     ],
     client: [
-        // System Management Section - Only Dashboard
-        { section: 'System Management', icon: 'ti-settings', items: [
-            { name: 'Dashboard Client', icon: 'user', path: '/dashboard/client', id: 'dashboard',
-              dropdown: dashboards
-            }
-        ]},
         { section: 'My Business', icon: 'ti-building', items: [
-            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/client', id: 'dashboard' },
-            { name: 'My Team', icon: 'users', path: '/dashboard/client/team', id: 'team' },
-            { name: 'My Events', icon: 'calendar-event', path: '/dashboard/client/events', id: 'events' },
-            { name: 'Landing Pages', icon: 'world', path: '/dashboard/client/landing-pages', id: 'landing-pages' },
-            { name: 'My Bookings', icon: 'car', path: '/dashboard/client/bookings', id: 'bookings' }
+            { name: 'My Team', icon: 'users', path: '/dashboard/client/team', id: 'team' }
         ]},
         { section: 'Servicios', icon: 'ti-briefcase', items: [
             { name: 'Vehículos', icon: 'car', path: '/dashboard/client/vehicles', id: 'vehicles' },
             { name: 'Traslados', icon: 'briefcase', path: '/dashboard/client/services', id: 'services' },
             { name: 'Experiencias', icon: 'star', path: '/dashboard/client/experiences', id: 'experiences' },
             { name: 'Tours', icon: 'map', path: '/dashboard/client/tours', id: 'tours' }
-        ]},
-        { section: 'Services & Billing', icon: 'ti-credit-card', items: [
-            { name: 'Services', icon: 'list', path: '/dashboard/client/services', id: 'services' },
-            { name: 'Billing & Payments', icon: 'receipt', path: '/dashboard/client/billing', id: 'billing' }
         ]}
     ],
     department_manager: [

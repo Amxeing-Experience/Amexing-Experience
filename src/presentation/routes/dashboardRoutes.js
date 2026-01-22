@@ -65,8 +65,8 @@ router.get('/admin/reports', dashboardAuth.requireRole('admin'), (req, res) => a
 router.get('/admin/settings', dashboardAuth.requireRole('admin'), (req, res) => adminController.settings(req, res));
 router.get('/admin/notifications', dashboardAuth.requireRole('admin'), (req, res) => adminController.notifications(req, res));
 
-// Client Routes
-router.get('/client', dashboardAuth.requireRole('client'), (req, res) => clientController.index(req, res));
+// Client Routes - Redirect to vehicles (first item in Servicios)
+router.get('/client', dashboardAuth.requireRole('client'), (req, res) => res.redirect('/dashboard/client/vehicles'));
 router.get('/client/profile', dashboardAuth.requireRole('client'), (req, res) => clientController.profile(req, res));
 router.get('/client/change-password', dashboardAuth.requireRole('client'), (req, res) => clientController.changePassword(req, res));
 router.get('/client/departments', dashboardAuth.requireRole('client'), (req, res) => clientController.departments(req, res));
