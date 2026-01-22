@@ -37,9 +37,10 @@ const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const dtAccessToken = typeof accessToken !== 'undefined' ? accessToken : '';
 
 // Role-Based Permission Checks
-const canEdit = ['superadmin', 'admin', 'client', 'department_manager'].includes(dtUserRole);
-const canDelete = ['superadmin', 'admin', 'client', 'department_manager'].includes(dtUserRole);
+const canEdit = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
 const canCreate = ['superadmin', 'admin', 'client', 'department_manager'].includes(dtUserRole);
+const showActionsColumn = dtShowActions && (canEdit || canDelete) && dtUserRole !== 'client';
 
 // Role translations
 const roleLabels = {
@@ -80,7 +81,7 @@ const roleLabels = {
                         <th>Rol</th>
                         <th>Estado</th>
                         <th>Registro</th>
-                        <% if (dtShowActions && (canEdit || canDelete)) { %>
+                        <% if (showActionsColumn) { %>
                             <th>Acciones</th>
                         <% } %>
                     </tr>
@@ -95,7 +96,7 @@ const roleLabels = {
                         <th>Rol</th>
                         <th>Estado</th>
                         <th>Registro</th>
-                        <% if (dtShowActions && (canEdit || canDelete)) { %>
+                        <% if (showActionsColumn) { %>
                             <th>Acciones</th>
                         <% } %>
                     </tr>
@@ -301,7 +302,7 @@ function initializeEmployeesDataTable() {
                     });
                 }
             },
-            <% if (dtShowActions && (canEdit || canDelete)) { %>
+            <% if (showActionsColumn) { %>
             {
                 data: null,
                 orderable: false,
