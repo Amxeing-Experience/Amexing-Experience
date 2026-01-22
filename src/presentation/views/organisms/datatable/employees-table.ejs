@@ -34,6 +34,7 @@ const dtClientId = typeof clientId !== 'undefined' ? clientId : '';
 const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : `/api/clients/${dtClientId}/employees`;
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const dtAccessToken = typeof accessToken !== 'undefined' ? accessToken : '';
 
 // Role-Based Permission Checks
 const canEdit = ['superadmin', 'admin', 'client', 'department_manager'].includes(dtUserRole);
@@ -180,8 +181,9 @@ function initializeEmployeesDataTable() {
                 params.append('search', data.search.value);
             }
 
-            // Get access token from cookies
-            const getAccessToken = () => {
+            // Use the access token from server
+            const token = '<%= dtAccessToken %>' || (() => {
+                // Fallback: try to get from cookies if not passed from server
                 const cookies = document.cookie.split(';');
                 for (let cookie of cookies) {
                     const [name, value] = cookie.trim().split('=');
@@ -190,9 +192,8 @@ function initializeEmployeesDataTable() {
                     }
                 }
                 return null;
-            };
+            })();
             
-            const token = getAccessToken();
             const headers = {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',

@@ -200,6 +200,7 @@ class AuthenticationServiceCore {
    */
   async findUserById(userId) {
     const query = new Parse.Query(AmexingUser);
+    query.equalTo('exists', true);
     return query.get(userId, { useMasterKey: true });
   }
 

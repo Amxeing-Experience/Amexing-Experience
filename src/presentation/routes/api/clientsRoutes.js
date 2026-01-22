@@ -69,16 +69,6 @@ async function validateClientAccess(req, res, next) {
     const { user } = req;
     const { userRole } = req;
 
-    // Debug logging
-    logger.info('validateClientAccess called', {
-      hasUser: !!user,
-      hasUserRole: !!userRole,
-      userRole,
-      endpoint: req.originalUrl,
-      method: req.method,
-      params: req.params,
-    });
-
     if (!user || !userRole) {
       return res.status(401).json({
         success: false,
@@ -110,8 +100,8 @@ async function validateClientAccess(req, res, next) {
           // This is the ID of the client organization they belong to
           userClientId = user.get ? user.get('clientId') : (user.clientId || null);
         } else if (userRole === 'department_manager') {
-          // For department_manager, get their clientId field
-          userClientId = user.get ? user.get('clientId') : (user.clientId || null);
+          // For department_manager, their objectId IS the clientId
+          userClientId = user.id || (user.get ? user.get('objectId') : user.objectId);
         }
 
         // Check if user is accessing their own client's employees
@@ -126,15 +116,20 @@ async function validateClientAccess(req, res, next) {
           return next();
         }
 
-        // Log why access was denied for debugging
+        // Log access denial
         logger.warn('Client access denied - client ID mismatch', {
           userId: user.id || user.get('objectId'),
           userRole,
           requestedClientId,
           userClientId,
-          hasGetMethod: !!(user.get && typeof user.get === 'function'),
-          userObjectKeys: user ? Object.keys(user) : 'no user',
           endpoint: req.originalUrl,
+        });
+
+        // Return 403 error for client ID mismatch
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied. You can only access your own client data.',
+          timestamp: new Date().toISOString(),
         });
       }
     }

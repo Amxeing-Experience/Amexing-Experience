@@ -53,7 +53,8 @@ const clientId = locals.clientId || '';
           apiEndpoint: `/api/clients/${finalClientId}/employees`,
           userRole: 'department_manager',
           showActions: true,
-          clientId: finalClientId
+          clientId: finalClientId,
+          accessToken: locals.accessToken || ''
         }) %>
       </div>
     </div>

@@ -48,7 +48,8 @@ const companyName = locals.companyName || 'Company';
           apiEndpoint: `/api/clients/${clientId}/employees`,
           userRole: 'client',
           showActions: true,
-          clientId: clientId
+          clientId: clientId,
+          accessToken: locals.accessToken || ''
         }) %>
       </div>
     </div>
