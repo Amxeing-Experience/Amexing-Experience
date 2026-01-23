@@ -9,29 +9,22 @@ class DepartmentManagerController extends RoleBasedController {
   }
 
   /**
-   * Renders the department manager dashboard index page with statistics and overview.
-   * Displays key metrics including team members, budget information, and pending approvals.
+   * Redirects the department manager to the vehicles page as the default dashboard view.
+   * Department managers are automatically directed to the vehicle fleet page upon login.
    * @function index
    * @param {object} req - Express request object containing user session and authentication data.
-   * @param {object} res - Express response object for rendering the dashboard view.
-   * @returns {Promise<void>} - Renders the department manager index view or handles errors.
+   * @param {object} res - Express response object for redirecting to vehicles page.
+   * @returns {Promise<void>} - Redirects to vehicles page or handles errors.
    * @example
    * // GET /dashboard/department_manager
    * // Authenticated request from department manager
    * await departmentManagerController.index(req, res);
-   * // Renders dashboard with:
-   * // - Team member count
-   * // - Budget allocation and usage
-   * // - Pending approval notifications
-   * // - Active booking statistics
+   * // Redirects to: /dashboard/department_manager/vehicles
    */
   async index(req, res) {
     try {
-      await this.renderRoleView(req, res, 'index', {
-        title: 'Department Manager Dashboard',
-        stats: await this.getDepartmentStats(),
-        breadcrumb: null,
-      });
+      // Redirect department managers to vehicles page as default
+      res.redirect('/dashboard/department_manager/vehicles');
     } catch (error) {
       this.handleError(res, error);
     }
@@ -256,7 +249,7 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async vehicles(req, res) {
     try {
-      const section = req.query.section || 'types'; // Default to types since vehicles is hidden for department_manager
+      const section = req.query.section || 'vehicles'; // Default to vehicles page
 
       await this.renderRoleView(req, res, 'vehicles', {
         title: 'Vehículos',

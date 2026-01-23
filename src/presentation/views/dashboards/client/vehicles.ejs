@@ -111,6 +111,82 @@ const activeSection = typeof section !== 'undefined' ? section : 'vehicles';
     </div>
 </div>
 
+<!-- Vehicle Images Gallery Modal -->
+<div class="modal fade" id="vehicleImagesGalleryModal" tabindex="-1" aria-labelledby="vehicleImagesGalleryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <!-- Modal Header -->
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="vehicleImagesGalleryModalLabel">
+                    <i class="ti ti-photo me-2"></i>
+                    Imágenes del Vehículo - <span id="gallery-vehicle-name">Vehículo</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="modal-body">
+                <!-- Alert Container -->
+                <div id="gallery-alerts"></div>
+
+                <!-- Loading State -->
+                <div id="gallery-loading" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando imágenes...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Cargando imágenes del vehículo...</p>
+                </div>
+
+                <!-- Images Gallery -->
+                <div id="gallery-content" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="fw-bold text-primary mb-0">
+                            <i class="ti ti-photo-scan me-1"></i>
+                            Galería de Imágenes
+                        </h6>
+                        <span class="badge bg-info" id="gallery-count-badge">0 imágenes</span>
+                    </div>
+
+                    <!-- Images Grid -->
+                    <div class="row g-3" id="gallery-images-grid">
+                        <!-- Dynamic image cards will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div id="gallery-empty-state" class="text-center py-5" style="display: none;">
+                    <i class="ti ti-photo-off" style="font-size: 4rem; color: #cbd5e1;"></i>
+                    <p class="text-muted mt-3 mb-0">No hay imágenes para este vehículo</p>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Viewer Modal (for full-size viewing) -->
+<div class="modal fade" id="imageViewerModal" tabindex="-1" aria-labelledby="imageViewerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content bg-transparent border-0">
+            <div class="modal-body p-0 position-relative">
+                <button type="button" class="btn btn-light position-absolute top-0 end-0 m-3" data-bs-dismiss="modal" style="z-index: 10;">
+                    <i class="ti ti-x"></i>
+                </button>
+                <img id="viewer-image" src="" alt="" class="img-fluid w-100" style="max-height: 90vh; object-fit: contain;">
+                <div class="position-absolute bottom-0 start-0 end-0 text-center p-3" style="background: linear-gradient(transparent, rgba(0,0,0,0.7));">
+                    <p id="viewer-image-title" class="text-white mb-0"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Vehicle Card Styles -->
 <style>
 /* Vehicle Card Styles */
@@ -211,6 +287,41 @@ const activeSection = typeof section !== 'undefined' ? section : 'vehicles';
     color: white;
     font-weight: 500;
 }
+
+/* Image Gallery Modal Styles */
+#gallery-images-grid .gallery-image-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+
+#gallery-images-grid .gallery-image-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+#gallery-images-grid .gallery-image-card img {
+    height: 100%;
+    object-fit: cover;
+    border-radius: 0.375rem;
+}
+
+.gallery-primary-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 5;
+}
+
+/* Image Viewer Modal Styles */
+#imageViewerModal .modal-content {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+#imageViewerModal .modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.9);
+}
 </style>
 
 <script>
@@ -219,17 +330,58 @@ document.addEventListener('DOMContentLoaded', function() {
     let allVehicles = [];
     let filteredVehicles = [];
 
+    // Get JWT token for API calls
+    async function getAccessToken() {
+        // First try localStorage
+        let token = localStorage.getItem('accessToken') || localStorage.getItem('token');
+        if (token) {
+            console.log('Found token in localStorage:', token.substring(0, 20) + '...');
+            return token;
+        }
+        
+        // Try to get token from cookies directly
+        const cookieToken = getCookie('accessToken');
+        if (cookieToken) {
+            console.log('Found token in cookies, storing in localStorage');
+            localStorage.setItem('accessToken', cookieToken);
+            return cookieToken;
+        }
+        
+        console.log('No token found in localStorage or cookies');
+        return '';
+    }
+    
+    // Helper function to get cookie value
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+            const cookieValue = parts.pop().split(';').shift();
+            return cookieValue;
+        }
+        return null;
+    }
+
     // Load vehicles from API
     async function loadVehicles() {
         try {
+            const token = await getAccessToken();
+            console.log('Using token for vehicles API:', token ? token.substring(0, 20) + '...' : 'NO TOKEN');
+            
             const response = await fetch('/api/vehicles', {
+                method: 'GET',
                 headers: {
-                    'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
                 }
             });
 
+            console.log('Vehicles API response status:', response.status);
+
             if (!response.ok) {
-                throw new Error('Error al cargar vehículos');
+                const errorText = await response.text();
+                console.error('Vehicles API error:', response.status, errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
             }
 
             const data = await response.json();
@@ -332,6 +484,15 @@ document.addEventListener('DOMContentLoaded', function() {
                                         ${luggageCount} piezas
                                     </span>
                                 </div>
+                                ${imageUrl ? `
+                                <div class="vehicle-info-row border-0 pt-3">
+                                    <button class="btn btn-outline-primary btn-sm w-100 view-images-btn" 
+                                            data-vehicle-id="${vehicle.id || vehicle.objectId}" 
+                                            data-vehicle-name="${vehicle.brand} ${vehicle.model}">
+                                        <i class="ti ti-photo me-1"></i>Ver Imágenes
+                                    </button>
+                                </div>
+                                ` : ''}
                             </div>
                         </div>
                     </div>
@@ -375,6 +536,126 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('filterRate').addEventListener('change', filterVehicles);
     document.getElementById('filterType').addEventListener('change', filterVehicles);
     document.getElementById('searchVehicle').addEventListener('input', filterVehicles);
+
+    // Set up event listener for view images buttons
+    document.addEventListener('click', function(e) {
+        if (e.target.closest('.view-images-btn')) {
+            const button = e.target.closest('.view-images-btn');
+            const vehicleId = button.dataset.vehicleId;
+            const vehicleName = button.dataset.vehicleName;
+            openVehicleImagesGallery(vehicleId, vehicleName);
+        }
+    });
+
+    // Vehicle Images Gallery Functions
+    async function openVehicleImagesGallery(vehicleId, vehicleName) {
+        // Set vehicle name in modal title
+        document.getElementById('gallery-vehicle-name').textContent = vehicleName;
+        
+        // Reset modal state
+        document.getElementById('gallery-loading').style.display = 'block';
+        document.getElementById('gallery-content').style.display = 'none';
+        document.getElementById('gallery-empty-state').style.display = 'none';
+        document.getElementById('gallery-alerts').innerHTML = '';
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('vehicleImagesGalleryModal'));
+        modal.show();
+        
+        // Load vehicle images
+        try {
+            const token = await getAccessToken();
+            console.log('Loading images for vehicle:', vehicleId);
+            
+            const response = await fetch(`/api/vehicles/${vehicleId}/images`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+
+            const data = await response.json();
+            console.log('Images data received:', data);
+            
+            if (data.success && data.data && data.data.length > 0) {
+                displayVehicleImagesGallery(data.data, data.count || data.data.length);
+            } else {
+                showGalleryEmptyState();
+            }
+            
+        } catch (error) {
+            console.error('Error loading vehicle images:', error);
+            showGalleryError('Error al cargar las imágenes del vehículo: ' + error.message);
+        } finally {
+            document.getElementById('gallery-loading').style.display = 'none';
+        }
+    }
+
+    function displayVehicleImagesGallery(images, count) {
+        const grid = document.getElementById('gallery-images-grid');
+        const countBadge = document.getElementById('gallery-count-badge');
+        
+        // Update count badge
+        countBadge.textContent = `${count} ${count === 1 ? 'imagen' : 'imágenes'}`;
+        
+        // Build images grid
+        grid.innerHTML = images.map(image => `
+            <div class="col-md-6 col-lg-4 col-xl-3">
+                <div class="gallery-image-card card h-100 shadow-sm position-relative" 
+                     data-image-url="${image.url}" 
+                     data-image-title="${image.fileName || 'Imagen'}">
+                    ${image.isPrimary ? '<span class="badge bg-success gallery-primary-badge">Principal</span>' : ''}
+                    <img src="${image.url}" 
+                         alt="${image.fileName || 'Imagen del vehículo'}" 
+                         class="w-100 h-100"
+                         style="object-fit: cover; border-radius: 0.375rem;"
+                         loading="lazy">
+                </div>
+            </div>
+        `).join('');
+        
+        // Add click event listeners for full-size viewing
+        grid.querySelectorAll('.gallery-image-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const imageUrl = this.dataset.imageUrl;
+                const imageTitle = this.dataset.imageTitle;
+                openImageViewer(imageUrl, imageTitle);
+            });
+        });
+        
+        // Show gallery content
+        document.getElementById('gallery-content').style.display = 'block';
+    }
+
+    function showGalleryEmptyState() {
+        document.getElementById('gallery-count-badge').textContent = '0 imágenes';
+        document.getElementById('gallery-empty-state').style.display = 'block';
+    }
+
+    function showGalleryError(message) {
+        const alertHtml = `
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="ti ti-alert-circle me-2"></i>
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `;
+        document.getElementById('gallery-alerts').innerHTML = alertHtml;
+        showGalleryEmptyState();
+    }
+
+    function openImageViewer(imageUrl, imageTitle) {
+        document.getElementById('viewer-image').src = imageUrl;
+        document.getElementById('viewer-image-title').textContent = imageTitle;
+        
+        const imageViewerModal = new bootstrap.Modal(document.getElementById('imageViewerModal'));
+        imageViewerModal.show();
+    }
 
     // Load vehicles on page load
     loadVehicles();
