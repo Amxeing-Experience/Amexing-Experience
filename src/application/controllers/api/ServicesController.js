@@ -76,6 +76,7 @@ class ServicesController {
       });
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
       ratePricesQuery.include(['rate', 'vehicleType', 'service']);
 
       // If specific rate requested, filter by it
@@ -109,6 +110,7 @@ class ServicesController {
           });
           fallbackRatePricesQuery.equalTo('exists', true);
           fallbackRatePricesQuery.equalTo('active', true);
+          fallbackRatePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
           fallbackRatePricesQuery.include(['rate', 'vehicleType', 'service']);
           fallbackRatePricesQuery.ascending('rate'); // Get consistent ordering
 
@@ -566,6 +568,7 @@ class ServicesController {
           })));
           ratePricesQuery.equalTo('exists', true);
           ratePricesQuery.equalTo('active', true);
+          ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
           ratePricesQuery.include('rate');
           ratePricesQuery.include('service');
           ratePricesQuery.include('vehicleType');
@@ -707,6 +710,7 @@ class ServicesController {
                 const ratePriceQuery = new Parse.Query('RatePrices');
                 ratePriceQuery.equalTo('active', true);
                 ratePriceQuery.equalTo('exists', true);
+                ratePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
                 ratePriceQuery.include(['rate', 'vehicleType', 'service']);
 
                 if (rateId) {
@@ -796,6 +800,7 @@ class ServicesController {
                 });
                 fallbackRatePriceQuery.equalTo('active', true);
                 fallbackRatePriceQuery.equalTo('exists', true);
+                fallbackRatePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
                 fallbackRatePriceQuery.include(['rate', 'vehicleType']);
 
                 const fallbackRatePrice = await fallbackRatePriceQuery.first({ useMasterKey: true });
@@ -834,6 +839,7 @@ class ServicesController {
                     });
                     fallback3Query.equalTo('active', true);
                     fallback3Query.equalTo('exists', true);
+                    fallback3Query.doesNotExist('valid_until'); // Only show active prices (versioning)
                     fallback3Query.include(['rate', 'vehicleType']);
                     fallback3Query.ascending('rate'); // Sort by rate to get a consistent first option
 
@@ -884,6 +890,7 @@ class ServicesController {
                 });
                 fallbackAnyRatePriceQuery.equalTo('active', true);
                 fallbackAnyRatePriceQuery.equalTo('exists', true);
+                fallbackAnyRatePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
                 fallbackAnyRatePriceQuery.include(['rate', 'vehicleType']);
                 fallbackAnyRatePriceQuery.ascending('rate'); // Sort by rate to get a consistent first option
 
@@ -1167,6 +1174,7 @@ class ServicesController {
           ratePriceQuery.equalTo('rate', service.get('rate'));
           ratePriceQuery.equalTo('exists', true);
           ratePriceQuery.equalTo('active', true);
+          ratePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
 
           const ratePrice = await ratePriceQuery.first({ useMasterKey: true });
           price = ratePrice?.get('price') || 0;
@@ -1280,7 +1288,7 @@ class ServicesController {
           const destName = destPOI?.get('name') || '';
           const originName = originPOI?.get('name') || '';
           return destName.includes('Queretaro') || originName.includes('Queretaro')
-                 || destName.includes('Querétaro') || originName.includes('Querétaro');
+            || destName.includes('Querétaro') || originName.includes('Querétaro');
         });
 
         if (queretaroServices.length > 0) {
@@ -1291,6 +1299,7 @@ class ServicesController {
             ratePricesQuery.equalTo('servicePtr', service);
             ratePricesQuery.equalTo('active', true);
             ratePricesQuery.equalTo('exists', true);
+            ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
 
             await ratePricesQuery.find({ useMasterKey: true });
             // Rate prices retrieved for debugging purposes
@@ -1309,6 +1318,7 @@ class ServicesController {
       });
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
       ratePricesQuery.include(['service', 'service.originPOI', 'service.destinationPOI', 'service.rate', 'vehicleType']);
       ratePricesQuery.limit(1000);
 
@@ -1541,6 +1551,7 @@ class ServicesController {
       });
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
       ratePricesQuery.include(['rate', 'vehicleType', 'service']);
       ratePricesQuery.limit(1000);
 
@@ -1554,6 +1565,7 @@ class ServicesController {
         const price = ratePrice.get('price') || 0;
 
         return {
+          id: ratePrice.id, // ✅ ADD THE RATEPRICES RECORD ID - THIS IS CRITICAL FOR UPDATES
           rate: rate ? {
             id: rate.id,
             name: rate.get('name'),
@@ -1632,6 +1644,7 @@ class ServicesController {
       });
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
       ratePricesQuery.include(['rate', 'vehicleType', 'service']);
       ratePricesQuery.limit(1000);
 
@@ -2103,24 +2116,25 @@ class ServicesController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
+      // Check permissions - use req.userRole from JWT middleware instead of accessing user object directly
+      const { userRole } = req;
+
       if (!['superadmin', 'admin'].includes(userRole)) {
         return this.sendError(res, 'Permisos insuficientes', 403);
       }
 
       const { id } = req.params;
       const {
-        originPOI, destinationPOI, vehicleType, rate, note,
+        originPOI, destinationPOI, rate, note,
       } = req.body;
 
       if (!id) {
         return this.sendError(res, 'ID de servicio requerido', 400);
       }
 
-      // Validation
-      if (!destinationPOI || !vehicleType || !rate) {
-        return this.sendError(res, 'Destino, tipo de vehículo y tarifa son requeridos', 400);
+      // Validation - only destination is required for update (vehicle and rate are optional)
+      if (!destinationPOI) {
+        return this.sendError(res, 'Destino es requerido', 400);
       }
 
       if (originPOI === destinationPOI) {
@@ -2136,15 +2150,11 @@ class ServicesController {
         return this.sendError(res, 'Servicio no encontrado', 404);
       }
 
-      // Check if updated route would conflict with another service
-      const existingService = await Services.findByRoute(originPOI, destinationPOI, vehicleType);
-      if (existingService && existingService.id !== id && existingService.get('exists')) {
-        return this.sendError(res, 'Ya existe otro servicio con esta ruta y tipo de vehículo', 409);
-      }
+      // Note: Route conflict checking removed since vehicleType is no longer used in this simplified service model
 
-      // Update service
+      // Update service - only update fields that are provided (using standard Parse.Object set() method)
       if (originPOI) {
-        service.setOriginPOI({
+        service.set('originPOI', {
           __type: 'Pointer',
           className: 'POI',
           objectId: originPOI,
@@ -2152,22 +2162,22 @@ class ServicesController {
       } else {
         service.unset('originPOI');
       }
-      service.setDestinationPOI({
+      service.set('destinationPOI', {
         __type: 'Pointer',
         className: 'POI',
         objectId: destinationPOI,
       });
-      service.setVehicleType({
-        __type: 'Pointer',
-        className: 'VehicleType',
-        objectId: vehicleType,
-      });
-      service.setRate({
-        __type: 'Pointer',
-        className: 'Rate',
-        objectId: rate,
-      });
-      service.setNote(note || '');
+
+      // Only update rate if provided (vehicleType not supported in simplified Services model)
+      if (rate) {
+        service.set('rate', {
+          __type: 'Pointer',
+          className: 'Rate',
+          objectId: rate,
+        });
+      }
+
+      service.set('note', note || '');
 
       await service.save(null, { useMasterKey: true });
 
@@ -2585,6 +2595,7 @@ class ServicesController {
 
       ratePricesQuery.equalTo('exists', true);
       ratePricesQuery.equalTo('active', true);
+      ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
       ratePricesQuery.include('rate');
       ratePricesQuery.include('service');
       ratePricesQuery.include('vehicleType');
@@ -2870,6 +2881,294 @@ class ServicesController {
         userId: req.user?.id,
       });
       return this.sendError(res, `Error en debug ClientPrices: ${error.message}`, 500);
+    }
+  }
+
+  /**
+   * Update base prices for a service (TourPrices table).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @since 2024-12-30
+   * @example
+   * POST /api/services/abc123/update-base-prices
+   * Body: {
+   *   prices: [
+   *     {
+   *       id: "price123",
+   *       rateId: "rate456",
+   *       vehicleId: "vehicle789",
+   *       price: 1250.00
+   *     }
+   *   ]
+   * }
+   */
+  async updateBasePrices(req, res) {
+    try {
+      console.log('🔧 updateBasePrices called - serviceId:', req.params.id);
+      console.log('🔧 updateBasePrices called - body:', JSON.stringify(req.body, null, 2));
+
+      const currentUser = req.user;
+      const serviceId = req.params.id; // Get serviceId from the :id parameter
+      const { prices } = req.body;
+
+      logger.info('ServicesController.updateBasePrices called', {
+        userId: currentUser?.id,
+        serviceId,
+        pricesCount: prices?.length || 0,
+      });
+
+      // Validate user permissions
+      if (!currentUser) {
+        return this.sendError(res, 'Usuario no autenticado', 401);
+      }
+
+      // Validate input
+      if (!serviceId) {
+        return this.sendError(res, 'ID del servicio es requerido', 400);
+      }
+
+      if (!prices || !Array.isArray(prices) || prices.length === 0) {
+        return this.sendError(res, 'Lista de precios es requerida', 400);
+      }
+
+      // Verify service exists
+      const ServiceClass = Parse.Object.extend('Services');
+      const serviceQuery = new Parse.Query(ServiceClass);
+      serviceQuery.equalTo('objectId', serviceId);
+      serviceQuery.equalTo('exists', true);
+      const service = await serviceQuery.first({ useMasterKey: true });
+
+      if (!service) {
+        return this.sendError(res, 'Servicio no encontrado', 404);
+      }
+
+      // Get RatePrices class (Services use RatePrices, not TourPrices)
+      const RatePricesClass = Parse.Object.extend('RatePrices');
+      const objectsToSave = [];
+
+      // Process each price update
+      for (const priceData of prices) {
+        const { id, price } = priceData;
+
+        if (id && typeof price === 'number' && price >= 0) {
+          // Get the existing RatePrice record
+          const priceQuery = new Parse.Query(RatePricesClass);
+          priceQuery.equalTo('objectId', id);
+          const priceRecord = await priceQuery.first({ useMasterKey: true });
+
+          if (priceRecord) {
+            // VERSIONING: Don't update existing price, instead:
+            // 1. Mark existing price as historical (set valid_until to today)
+            priceRecord.set('valid_until', new Date());
+            priceRecord.set('lastModifiedBy', currentUser.id);
+            objectsToSave.push(priceRecord);
+
+            // 2. Create NEW price record with the updated price
+            const newPriceRecord = new RatePricesClass();
+
+            // Copy all fields from the original record
+            newPriceRecord.set('service', priceRecord.get('service'));
+            newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
+            newPriceRecord.set('rate', priceRecord.get('rate'));
+            newPriceRecord.set('price', price); // New price value
+            newPriceRecord.set('currency', priceRecord.get('currency') || 'MXN');
+            newPriceRecord.set('active', priceRecord.get('active'));
+            newPriceRecord.set('exists', priceRecord.get('exists'));
+            newPriceRecord.set('createdBy', priceRecord.get('createdBy'));
+            newPriceRecord.set('lastModifiedBy', currentUser.id);
+            // valid_until remains null (active record)
+
+            objectsToSave.push(newPriceRecord);
+          }
+        }
+      }
+
+      // Save all updated prices
+      if (objectsToSave.length > 0) {
+        await Parse.Object.saveAll(objectsToSave, { useMasterKey: true });
+      }
+
+      // Log the action
+      logger.info('Service base prices updated', {
+        serviceId,
+        updatedPrices: objectsToSave.length,
+        userId: currentUser.id,
+        userEmail: currentUser.get('email'),
+        timestamp: new Date().toISOString(),
+      });
+
+      return res.json({
+        success: true,
+        message: `${objectsToSave.length} precios base actualizados exitosamente`,
+        updatedCount: objectsToSave.length,
+      });
+    } catch (error) {
+      logger.error('Error updating service base prices', {
+        error: error.message,
+        stack: error.stack,
+        serviceId: req.params.id,
+        userId: req.user?.id,
+      });
+
+      return this.sendError(res, 'Error interno del servidor al actualizar precios base', 500);
+    }
+  }
+
+  /**
+   * Get price history for a service.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/services/:id/price-history
+   *
+   * Response:
+   * {
+   *   "success": true,
+   *   "data": [
+   *     {
+   *       "id": "abc123",
+   *       "price": "1250.00",
+   *       "validFrom": "2024-01-01T00:00:00.000Z",
+   *       "validUntil": "2024-02-01T00:00:00.000Z",
+   *       "status": "historical",
+   *       "duration": 31,
+   *       "vehicleTypeName": "Sedán",
+   *       "rateName": "Primera Clase",
+   *       "createdAt": "2024-01-01T00:00:00.000Z"
+   *     }
+   *   ],
+   *   "serviceName": "Aeropuerto de Querétaro → Querétaro Centro",
+   *   "totalRecords": 5
+   * }
+   */
+  async getPriceHistory(req, res) {
+    try {
+      const { id: serviceId } = req.params;
+      const currentUser = req.user;
+
+      if (!serviceId) {
+        return this.sendError(res, 'Service ID is required', 400);
+      }
+
+      // Get the current service to find the name
+      // Note: Table name is 'Services' (plural) in the database
+      const serviceQuery = new Parse.Query('Services');
+      serviceQuery.equalTo('objectId', serviceId);
+      serviceQuery.equalTo('exists', true);
+      serviceQuery.include(['originPOI', 'destinationPOI']);
+
+      const currentService = await serviceQuery.first({ useMasterKey: true });
+
+      if (!currentService) {
+        logger.error('Service not found for price history', {
+          serviceId,
+          userId: currentUser?.id,
+        });
+        return this.sendError(res, 'Service not found', 404);
+      }
+
+      // Build service name from origin and destination POIs
+      const originPOI = currentService.get('originPOI');
+      const destinationPOI = currentService.get('destinationPOI');
+      const serviceName = `${originPOI?.get('name') || 'Unknown'} → ${destinationPOI?.get('name') || 'Unknown'}`;
+
+      // Query all RatePrices for this service (current and historical)
+      const RatePricesClass = Parse.Object.extend('RatePrices');
+      const historyQuery = new Parse.Query(RatePricesClass);
+
+      // Create service pointer for query - NOTE: Use 'Services' (plural) as className
+      const servicePointer = new Parse.Object('Services');
+      servicePointer.id = serviceId;
+
+      // Filter by service reference
+      historyQuery.equalTo('service', servicePointer);
+      // Include related objects for complete data
+      historyQuery.include(['service', 'vehicleType', 'rate']);
+      historyQuery.equalTo('exists', true);
+      historyQuery.addDescending('createdAt');
+      historyQuery.limit(100); // Limit to last 100 price changes
+
+      logger.info('RatePrices query details', {
+        serviceId,
+        servicePointerClassName: servicePointer.className,
+        query: 'RatePrices with service pointer to Services table',
+      });
+
+      const priceHistory = await historyQuery.find({ useMasterKey: true });
+
+      logger.info('RatePrices query result', {
+        serviceId,
+        priceHistoryCount: priceHistory.length,
+      });
+
+      if (!priceHistory || priceHistory.length === 0) {
+        return res.json({
+          success: true,
+          data: [],
+          message: 'No price history found for this service',
+        });
+      }
+
+      // Process and format price history data
+      const formattedHistory = priceHistory.map((record) => {
+        const price = parseFloat(record.get('price') || 0);
+        const createdAt = record.get('createdAt');
+        const validUntil = record.get('valid_until');
+        const isActive = !validUntil; // No valid_until means it's the active record
+
+        // Get related object names
+        const vehicleType = record.get('vehicleType');
+        const rate = record.get('rate');
+        const vehicleTypeName = vehicleType ? vehicleType.get('name') : null;
+        const rateName = rate ? rate.get('name') : null;
+
+        // Calculate duration if there's a valid_until date
+        let duration = null;
+        if (validUntil) {
+          const diffMs = validUntil.getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Convert to days
+        } else {
+          // For active record, calculate days since creation
+          const diffMs = new Date().getTime() - createdAt.getTime();
+          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        }
+
+        return {
+          id: record.id,
+          price: price.toFixed(2),
+          validFrom: createdAt.toISOString(),
+          validUntil: validUntil ? validUntil.toISOString() : null,
+          status: isActive ? 'active' : 'historical',
+          duration,
+          vehicleTypeName,
+          rateName,
+          createdAt: createdAt.toISOString(),
+        };
+      });
+
+      logger.info('Service price history retrieved successfully', {
+        serviceId,
+        serviceName,
+        recordCount: formattedHistory.length,
+        userId: currentUser?.id,
+      });
+
+      return res.json({
+        success: true,
+        data: formattedHistory,
+        serviceName,
+        totalRecords: formattedHistory.length,
+      });
+    } catch (error) {
+      logger.error('Error getting service price history', {
+        serviceId: req.params.id,
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
+      return this.sendError(res, 'Error retrieving price history', 500);
     }
   }
 

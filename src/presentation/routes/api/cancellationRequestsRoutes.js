@@ -166,7 +166,7 @@ router.get(
 // =============================================================================
 
 // Handle 404 for undefined routes
-router.use('*', (req, res) => {
+router.use((req, res) => {
   res.status(404).json({
     success: false,
     error: 'Cancellation requests endpoint not found',

@@ -992,6 +992,894 @@ function registerCloudFunctions() {
       }
     });
 
+    // =================
+    // INFLATION MANAGEMENT SYSTEM
+    // =================
+
+    // Extract job logic into a separate function for direct calling
+    /**
+     * Background job to apply inflation to price records.
+     * Processes RatePrices, TourPrices, and ClientPrices records in batches.
+     * @function aplicarInflacionJob
+     * @param {object} request - Job request containing params and message functions.
+     * @returns {Promise<object>} - Job result with processing statistics.
+     * @example
+     */
+    const aplicarInflacionJob = async function (request) {
+      const { params, message } = request;
+      const { percentage, batchId } = params;
+
+      logger.info('Inflation job started', { percentage, batchId });
+
+      if (!percentage || !batchId) {
+        throw new Error('Missing required parameters: percentage and batchId');
+      }
+
+      message(`Starting inflation application: ${percentage}% (Batch: ${batchId})`);
+      logger.info('Inflation job started', { percentage, batchId });
+
+      let totalProcessed = 0;
+      let totalErrors = 0;
+      let totalSkipped = 0;
+      const now = new Date();
+
+      try {
+        // Update InflationHistory status to RUNNING
+        const InflationHistory = Parse.Object.extend('InflationHistory');
+        const historyQuery = new Parse.Query(InflationHistory);
+        historyQuery.equalTo('batch_id', batchId);
+        const historyRecord = await historyQuery.first({ useMasterKey: true });
+
+        if (!historyRecord) {
+          throw new Error(`InflationHistory record not found for batchId: ${batchId}`);
+        }
+
+        historyRecord.set('status', 'RUNNING');
+        historyRecord.set('startedAt', now);
+        await historyRecord.save(null, { useMasterKey: true });
+
+        // IMPROVEMENT 1: Check for existing inflation processes
+        logger.info('Checking for existing inflation processes...', { batchId });
+
+        // Check if there are any other running inflation processes
+        const runningInflationQuery = new Parse.Query(InflationHistory);
+        runningInflationQuery.equalTo('status', 'RUNNING');
+        runningInflationQuery.notEqualTo('batch_id', batchId);
+        const runningProcesses = await runningInflationQuery.find({ useMasterKey: true });
+
+        if (runningProcesses.length > 0) {
+          const errorMessage = `Cannot start inflation: ${runningProcesses.length} other process(es) still running`;
+          logger.error(errorMessage, { batchId, runningBatches: runningProcesses.map((p) => p.get('batch_id')) });
+          throw new Error(errorMessage);
+        }
+
+        // Process each class with correct table names - TESTING: RatePrices + TourPrices
+        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices', 'Experience']; // All price tables plus Experience
+
+        for (const className of classesToProcess) {
+          try {
+            message(`Processing ${className} records...`);
+            logger.info(`Inflation job: Starting processing for ${className}`, { batchId, percentage });
+
+            const ClassObj = Parse.Object.extend(className);
+            const query = new Parse.Query(ClassObj);
+            query.equalTo('active', true);
+            query.equalTo('exists', true);
+            query.doesNotExist('valid_until'); // Don't process historical records
+            // Removed: query.doesNotExist('inflation_batch_id') - Allow re-inflation of current records
+
+            // Include required relations based on table type
+            if (className === 'RatePrices') {
+              query.include(['service', 'rate', 'vehicleType']);
+            } else if (className === 'TourPrices') {
+              query.include(['ratePtr', 'vehicleType', 'tourPtr']);
+            } else if (className === 'ClientPrices') {
+              query.include(['ratePtr', 'vehiclePtr', 'clientPtr']);
+            } else if (className === 'Experience') {
+              query.include(['experiences', 'tours', 'vehicleType']);
+            }
+            // Note: Cannot use limit() with eachBatch()
+            // query.limit(100);
+
+            // Debug: Check how many records match the query
+            const totalMatchingRecords = await query.count({ useMasterKey: true });
+            message(`Found ${totalMatchingRecords} ${className} records ready for inflation`);
+            logger.info(`Inflation job: Query found ${totalMatchingRecords} records for ${className}`, { batchId, className });
+
+            if (totalMatchingRecords === 0) {
+              message(`No records found for ${className} - skipping`);
+              continue; // eslint-disable-line no-continue
+            }
+
+            let batchCount = 0;
+
+            // Process batches with proper error handling
+            try {
+              console.log(`🔍 STARTING eachBatch for ${className} - about to process batches`);
+              await query.eachBatch(async (records) => { // eslint-disable-line no-loop-func
+                console.log(`🎯 eachBatch callback triggered for ${className} with ${records.length} records`);
+                batchCount++;
+                logger.info(`Processing ${className} batch ${batchCount} with ${records.length} records`, { batchId });
+                message(`Processing ${className} batch ${batchCount} (${records.length} records)`);
+
+                const recordsToSave = [];
+                const recordsToUpdate = [];
+
+                // Process each record in the batch
+                for (const record of records) {
+                  try {
+                    // Extract relationships based on table type
+                    let service; let rate; let
+                      vehicleType;
+
+                    if (className === 'RatePrices') {
+                      service = record.get('service');
+                      rate = record.get('rate');
+                      vehicleType = record.get('vehicleType');
+
+                      // Validate required relationships for RatePrices
+                      if (!service || !rate || !vehicleType) {
+                        logger.warn(`Skipping ${className} record with missing relationships`, {
+                          recordId: record.id,
+                          className,
+                          hasService: !!service,
+                          hasRate: !!rate,
+                          hasVehicleType: !!vehicleType,
+                        });
+                        totalSkipped++;
+                        continue; // eslint-disable-line no-continue
+                      }
+                    } else if (className === 'TourPrices') {
+                      // TourPrices uses different field names
+                      rate = record.get('ratePtr');
+                      vehicleType = record.get('vehicleType');
+                      service = record.get('tourPtr');
+
+                      // Validate required relationships for TourPrices
+                      if (!rate || !vehicleType) {
+                        logger.warn(`Skipping ${className} record with missing relationships`, {
+                          recordId: record.id,
+                          className,
+                          hasRate: !!rate,
+                          hasVehicleType: !!vehicleType,
+                        });
+                        totalSkipped++;
+                        continue; // eslint-disable-line no-continue
+                      }
+                    } else if (className === 'ClientPrices') {
+                      // ClientPrices uses different field names
+                      rate = record.get('ratePtr');
+                      vehicleType = record.get('vehiclePtr');
+                      service = record.get('clientPtr');
+
+                      // Validate required relationships for ClientPrices
+                      if (!rate || !vehicleType) {
+                        logger.warn(`Skipping ${className} record with missing relationships`, {
+                          recordId: record.id,
+                          className,
+                          hasRate: !!rate,
+                          hasVehicleType: !!vehicleType,
+                        });
+                        totalSkipped++;
+                        continue; // eslint-disable-line no-continue
+                      }
+                    } else if (className === 'Experience') {
+                      // Experience table doesn't require relationship validation
+                      // It has name, cost, type, etc. as standalone fields
+                      rate = null;
+                      vehicleType = null;
+                      service = null;
+                    }
+
+                    logger.info(`Processing ${className} record with relationships`, {
+                      recordId: record.id,
+                      className,
+                      serviceId: service ? service.id : null,
+                      rateId: rate ? rate.id : null,
+                      vehicleTypeId: vehicleType ? vehicleType.id : null,
+                      batchId,
+                    });
+
+                    // Check for duplicates based on table-specific fields
+                    const duplicateQuery = new Parse.Query(ClassObj);
+
+                    // Add field constraints based on table type
+                    if (className === 'RatePrices') {
+                      if (service) duplicateQuery.equalTo('service', service);
+                      if (rate) duplicateQuery.equalTo('rate', rate);
+                      if (vehicleType) duplicateQuery.equalTo('vehicleType', vehicleType);
+                    } else if (className === 'TourPrices') {
+                      if (rate) duplicateQuery.equalTo('ratePtr', rate);
+                      if (vehicleType) duplicateQuery.equalTo('vehicleType', vehicleType);
+                      if (service) duplicateQuery.equalTo('tourPtr', service);
+                    } else if (className === 'ClientPrices') {
+                      if (rate) duplicateQuery.equalTo('ratePtr', rate);
+                      if (vehicleType) duplicateQuery.equalTo('vehiclePtr', vehicleType);
+                      if (service) duplicateQuery.equalTo('clientPtr', service);
+                    } else if (className === 'Experience') {
+                      // For Experience, use name and type as unique identifiers
+                      duplicateQuery.equalTo('name', record.get('name'));
+                      duplicateQuery.equalTo('type', record.get('type'));
+                    }
+
+                    duplicateQuery.equalTo('active', true);
+                    duplicateQuery.equalTo('exists', true);
+                    duplicateQuery.equalTo('inflation_batch_id', batchId);
+                    duplicateQuery.notEqualTo('objectId', record.id);
+
+                    const existingInflated = await duplicateQuery.first({ useMasterKey: true });
+
+                    if (existingInflated) {
+                      logger.info(`Skipping duplicate ${className} record - already inflated in this batch`, {
+                        recordId: record.id,
+                        className,
+                        serviceId: service.id,
+                        rateId: rate.id,
+                        vehicleTypeId: vehicleType.id,
+                        existingRecordId: existingInflated.id,
+                      });
+                      totalSkipped++;
+                      continue; // eslint-disable-line no-continue
+                    }
+
+                    // Get price fields based on table name
+                    const priceFields = [];
+                    let hasValidPrice = false;
+
+                    if (className === 'ClientPrices') {
+                      // For ClientPrices, inflate both precio and basePrice
+                      const precio = record.get('precio') || 0;
+                      const basePrice = record.get('basePrice') || 0;
+
+                      if (precio > 0) {
+                        priceFields.push({ fieldName: 'precio', currentValue: precio });
+                        hasValidPrice = true;
+                      }
+                      if (basePrice > 0) {
+                        priceFields.push({ fieldName: 'basePrice', currentValue: basePrice });
+                        hasValidPrice = true;
+                      }
+                    } else if (className === 'Experience') {
+                      // For Experience, inflate cost field
+                      const cost = record.get('cost') || 0;
+                      if (cost > 0) {
+                        priceFields.push({ fieldName: 'cost', currentValue: cost });
+                        hasValidPrice = true;
+                      }
+                    } else {
+                      // For RatePrices and TourPrices, only inflate price field
+                      const price = record.get('price') || 0;
+                      if (price > 0) {
+                        priceFields.push({ fieldName: 'price', currentValue: price });
+                        hasValidPrice = true;
+                      }
+                    }
+
+                    if (!hasValidPrice) {
+                      logger.warn('Skipping record with invalid prices', {
+                        recordId: record.id,
+                        className,
+                        priceFields: priceFields.map((p) => `${p.fieldName}=${p.currentValue}`),
+                      });
+                      totalSkipped++;
+                      continue; // eslint-disable-line no-continue
+                    }
+
+                    // Mark current record as historical
+                    record.set('valid_until', now);
+                    record.set('active', false);
+                    recordsToUpdate.push(record);
+
+                    // Create new record with inflated prices
+                    const newRecord = new ClassObj();
+
+                    // Copy all relevant fields except excluded ones
+                    const fieldsToExclude = ['objectId', 'createdAt', 'updatedAt', 'valid_until', 'inflation_batch_id'];
+                    const attrs = record.attributes;
+
+                    for (const key in attrs) {
+                      if (!fieldsToExclude.includes(key)) {
+                        newRecord.set(key, attrs[key]);
+                      }
+                    }
+
+                    // Apply inflation to all price fields and store previous values
+                    const inflatedPrices = {};
+                    const previousPrices = {};
+
+                    priceFields.forEach((priceField) => {
+                      const newPrice = Math.round(priceField.currentValue * (1 + percentage / 100));
+                      newRecord.set(priceField.fieldName, newPrice);
+                      inflatedPrices[priceField.fieldName] = newPrice;
+                      previousPrices[priceField.fieldName] = priceField.currentValue;
+                    });
+
+                    // Set inflation metadata
+                    newRecord.set('active', true);
+                    newRecord.set('exists', true);
+                    newRecord.set('inflation_batch_id', batchId);
+                    newRecord.set('inflation_percentage', percentage);
+                    newRecord.set('previous_prices', previousPrices); // Store all previous prices
+                    newRecord.set('inflated_prices', inflatedPrices); // Store all new prices
+                    newRecord.set('inflation_applied_at', now);
+
+                    recordsToSave.push(newRecord);
+                    totalProcessed++;
+                  } catch (recordError) {
+                    totalErrors++;
+                    logger.error(`Error processing ${className} record`, {
+                      recordId: record.id,
+                      error: recordError.message,
+                      batchId,
+                    });
+                  }
+                }
+
+                // IMPROVEMENT 3: Atomic batch processing with better error handling
+                message(`Saving batch: ${recordsToUpdate.length} updates, ${recordsToSave.length} new records`);
+
+                try {
+                  // Save in specific order to maintain consistency:
+                  // 1. First mark old records as historical
+                  if (recordsToUpdate.length > 0) {
+                    logger.info(`Updating ${recordsToUpdate.length} historical records for ${className}`, { batchId });
+                    await Parse.Object.saveAll(recordsToUpdate, { useMasterKey: true });
+                  }
+
+                  // 2. Then create new inflated records
+                  if (recordsToSave.length > 0) {
+                    logger.info(`Creating ${recordsToSave.length} inflated records for ${className}`, { batchId });
+                    await Parse.Object.saveAll(recordsToSave, { useMasterKey: true });
+                  }
+
+                  // 3. Update progress only after successful save
+                  historyRecord.set('processed_count', totalProcessed);
+                  historyRecord.set('skipped_count', totalSkipped);
+                  historyRecord.set('error_count', totalErrors);
+                  await historyRecord.save(null, { useMasterKey: true });
+
+                  message(`${className} batch saved successfully: processed=${totalProcessed}, skipped=${totalSkipped}, errors=${totalErrors}`);
+                } catch (batchError) {
+                  // If batch save fails, log detailed error and continue with next batch
+                  logger.error(`Failed to save ${className} batch`, {
+                    batchId,
+                    className,
+                    updateCount: recordsToUpdate.length,
+                    saveCount: recordsToSave.length,
+                    error: batchError.message,
+                    stack: batchError.stack,
+                  });
+
+                  // Try to recover: mark the batch as having errors but continue
+                  totalErrors += recordsToUpdate.length + recordsToSave.length;
+                  historyRecord.set('error_count', totalErrors);
+                  await historyRecord.save(null, { useMasterKey: true });
+
+                  message(`${className} batch failed - continuing with next batch`);
+
+                  // Don't re-throw - continue processing other batches
+                }
+              }, { useMasterKey: true });
+            } catch (eachBatchError) {
+              // Handle error in eachBatch processing with detailed logging
+              console.error(`❌ DETAILED EACHBATCH ERROR for ${className}:`, eachBatchError);
+              console.error('❌ ERROR MESSAGE:', eachBatchError.message);
+              console.error('❌ ERROR STACK:', eachBatchError.stack);
+              logger.error(`Failed to process batches for ${className}`, {
+                batchId,
+                className,
+                error: eachBatchError.message,
+                stack: eachBatchError.stack,
+                fullError: String(eachBatchError),
+              });
+              totalErrors++;
+              message(`${className} batch processing failed - continuing with next class`);
+            }
+          } catch (classError) {
+            // Handle error in processing this class
+            logger.error(`Error processing class ${className}`, {
+              batchId,
+              className,
+              error: classError.message,
+              stack: classError.stack,
+            });
+            totalErrors++;
+            message(`Error processing ${className} - continuing with next class`);
+          }
+        }
+
+        // Mark job as completed
+        historyRecord.set('status', 'COMPLETED');
+        historyRecord.set('completedAt', new Date());
+        historyRecord.set('processed_count', totalProcessed);
+        historyRecord.set('skipped_count', totalSkipped);
+        historyRecord.set('error_count', totalErrors);
+        await historyRecord.save(null, { useMasterKey: true });
+
+        // Generate appropriate completion message based on results
+        let completionMessage;
+        if (totalProcessed === 0 && totalSkipped === 0 && totalErrors === 0) {
+          completionMessage = 'Proceso de inflación completado exitosamente. 0 registros procesados - No hay precios actuales disponibles para inflación. Los precios ya han sido inflados o no existen registros elegibles.';
+        } else if (totalProcessed === 0 && totalSkipped > 0) {
+          completionMessage = `Proceso de inflación completado exitosamente. 0 registros procesados - ${totalSkipped} registros omitidos por datos incompletos o ya inflados.`;
+        } else if (totalProcessed === 0) {
+          completionMessage = 'Proceso de inflación completado exitosamente. 0 registros procesados - No hay registros elegibles para inflación.';
+        } else {
+          completionMessage = `Proceso de inflación completado exitosamente. ${totalProcessed} registros procesados.${totalSkipped > 0 ? ` ${totalSkipped} registros omitidos.` : ''}${totalErrors > 0 ? ` ${totalErrors} errores.` : ''}`;
+        }
+
+        message(completionMessage);
+        logger.info('Inflation job completed', {
+          batchId,
+          percentage,
+          totalProcessed,
+          totalSkipped,
+          totalErrors,
+        });
+
+        return {
+          success: true,
+          batchId,
+          totalProcessed,
+          totalSkipped,
+          totalErrors,
+        };
+
+        // End of main try block
+      } catch (error) {
+      // Mark job as failed
+        try {
+          const InflationHistory = Parse.Object.extend('InflationHistory');
+          const historyQuery = new Parse.Query(InflationHistory);
+          historyQuery.equalTo('batch_id', batchId);
+          const historyRecord = await historyQuery.first({ useMasterKey: true });
+
+          if (historyRecord) {
+            historyRecord.set('status', 'FAILED');
+            historyRecord.set('error_message', error.message);
+            historyRecord.set('completedAt', new Date());
+            await historyRecord.save(null, { useMasterKey: true });
+          }
+        } catch (updateError) {
+          logger.error('Error updating history record on failure', {
+            batchId,
+            error: updateError.message,
+          });
+        }
+
+        logger.error('Inflation job failed', { batchId, error: error.message, stack: error.stack });
+        throw error;
+      }
+    };
+
+    // Register the job with Parse Cloud
+    Parse.Cloud.job('aplicarInflacion', aplicarInflacionJob);
+
+    /**
+     * Cloud function to initiate inflation process.
+     * Creates InflationHistory record and starts background job.
+     * @function iniciarProcesoInflacion
+     * @param {Parse.Cloud.FunctionRequest} request - Function request with percentage parameter.
+     * @returns {Promise<object>} - Immediate response with batchId for tracking.
+     */
+    Parse.Cloud.define('iniciarProcesoInflacion', async (request) => {
+      const { percentage } = request.params;
+      const { user } = request;
+      const isMasterKey = request.master;
+
+      if (!user && !isMasterKey) {
+        throw new Error('Authentication required');
+      }
+
+      if (!percentage || typeof percentage !== 'number') {
+        throw new Error('Valid percentage parameter is required');
+      }
+
+      let historyRecord;
+      try {
+        // Generate unique batch ID
+        const batchId = `INFLATION_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        // Create InflationHistory record
+        const InflationHistory = Parse.Object.extend('InflationHistory');
+        historyRecord = new InflationHistory();
+        historyRecord.set('batch_id', batchId);
+        historyRecord.set('percentage', percentage);
+        historyRecord.set('status', 'PENDING');
+        historyRecord.set('createdAt', new Date());
+        historyRecord.set('createdBy', user ? user.id : 'SYSTEM');
+        historyRecord.set('processed_count', 0);
+        historyRecord.set('error_count', 0);
+
+        await historyRecord.save(null, { useMasterKey: true });
+
+        // WORKAROUND: Call job function directly since Parse.Cloud.startJob doesn't work in development
+        // Start background job
+        try {
+          logger.info('Starting inflation job directly (development mode)', { percentage, batchId });
+
+          // Create a mock request object like Parse.Cloud.job would receive
+          const mockRequest = {
+            params: { percentage, batchId },
+            message: (msg) => {
+              logger.info('Inflation job message:', msg);
+            },
+          };
+
+          // Call the job function directly
+          setTimeout(async () => {
+            try {
+              await aplicarInflacionJob(mockRequest);
+            } catch (jobError) {
+              logger.error('Direct inflation job failed', {
+                error: jobError.message,
+                stack: jobError.stack,
+              });
+            }
+          }, 100); // Small delay to allow response to be sent
+        } catch (directJobError) {
+          logger.error('Failed to start direct inflation job', {
+            error: directJobError.message,
+          });
+        }
+
+        logger.info('Inflation process initiated', {
+          batchId,
+          percentage,
+          userId: user ? user.id : 'SYSTEM',
+        });
+
+        return {
+          success: true,
+          batchId,
+          message: 'Inflation process started in background',
+        };
+      } catch (error) {
+        // Update history record with error if it was created
+        try {
+          if (typeof historyRecord !== 'undefined' && historyRecord) {
+            historyRecord.set('status', 'FAILED');
+            historyRecord.set('error_message', error.message);
+            historyRecord.set('completedAt', new Date());
+            await historyRecord.save(null, { useMasterKey: true });
+          }
+        } catch (updateError) {
+          console.error('Error updating history record:', updateError.message);
+        }
+
+        logger.error('Error initiating inflation process', {
+          percentage,
+          userId: user ? user.id : 'SYSTEM',
+          error: error.message,
+        });
+        throw error;
+      }
+    });
+
+    /**
+     * Cloud function to revert inflation by batch ID.
+     * Removes inflation records and reactivates original prices.
+     * @function revertirInflacion
+     * @param {Parse.Cloud.FunctionRequest} request - Function request with batchId parameter.
+     * @returns {Promise<object>} - Result with count of reverted records.
+     */
+    Parse.Cloud.define('revertirInflacion', async (request) => {
+      let { batchId } = request.params || {};
+      const { user } = request;
+      const isMasterKey = request.master;
+
+      if (!user && !isMasterKey) {
+        throw new Error('Authentication required');
+      }
+
+      try {
+        // If no batchId provided, find the most recent successful inflation with records processed
+        if (!batchId) {
+          const InflationHistory = Parse.Object.extend('InflationHistory');
+          const historyQuery = new Parse.Query(InflationHistory);
+          historyQuery.equalTo('status', 'COMPLETED');
+          historyQuery.greaterThan('processed_count', 0); // Only batches that actually processed records
+          historyQuery.descending('createdAt');
+          historyQuery.limit(1);
+
+          const lastInflation = await historyQuery.first({ useMasterKey: true });
+          if (!lastInflation) {
+            throw new Error('No inflation history found to revert. No completed inflation processes have records to revert.');
+          }
+
+          batchId = lastInflation.get('batch_id');
+          const processedCount = lastInflation.get('processed_count');
+          console.log(`Reverting most recent inflation batch with records: ${batchId} (${processedCount} records)`);
+        }
+
+        let totalReverted = 0;
+
+        // Process each class
+        const classesToProcess = ['RatePrices', 'TourPrices', 'ClientPrices', 'Experience'];
+
+        for (const className of classesToProcess) {
+          const ClassObj = Parse.Object.extend(className);
+
+          // Find inflation records to delete
+          const inflationQuery = new Parse.Query(ClassObj);
+          inflationQuery.equalTo('inflation_batch_id', batchId);
+          inflationQuery.limit(1000);
+
+          const inflationRecords = await inflationQuery.find({ useMasterKey: true });
+
+          if (inflationRecords.length > 0) {
+            // Delete inflation records
+            await Parse.Object.destroyAll(inflationRecords, { useMasterKey: true });
+
+            // Reactivate original records (set valid_until back to null)
+            const originalQuery = new Parse.Query(ClassObj);
+            originalQuery.exists('valid_until');
+
+            // Find records that were made historical during this inflation batch
+            if (!batchId || typeof batchId !== 'string' || !batchId.includes('_')) {
+              logger.warn(`Invalid batchId format: ${batchId} - skipping historical record reactivation`);
+              continue; // eslint-disable-line no-continue
+            }
+            const validUntilTime = new Date(parseInt(batchId.split('_')[1])); // Extract timestamp from batchId
+            originalQuery.greaterThanOrEqualTo('valid_until', new Date(validUntilTime.getTime() - 1000));
+            originalQuery.lessThanOrEqualTo('valid_until', new Date(validUntilTime.getTime() + 1000));
+            originalQuery.limit(1000);
+
+            const originalRecords = await originalQuery.find({ useMasterKey: true });
+
+            // Reactivate original records
+            for (const record of originalRecords) {
+              record.unset('valid_until');
+              record.set('active', true); // Reactivate the record
+            }
+
+            if (originalRecords.length > 0) {
+              await Parse.Object.saveAll(originalRecords, { useMasterKey: true });
+            }
+
+            totalReverted += inflationRecords.length;
+          }
+        }
+
+        // Update InflationHistory record
+        const InflationHistory = Parse.Object.extend('InflationHistory');
+        const historyQuery = new Parse.Query(InflationHistory);
+        historyQuery.equalTo('batch_id', batchId);
+        const historyRecord = await historyQuery.first({ useMasterKey: true });
+
+        if (historyRecord) {
+          historyRecord.set('status', 'REVERTED');
+          historyRecord.set('revertedAt', new Date());
+          historyRecord.set('revertedBy', user ? user.id : 'SYSTEM');
+          await historyRecord.save(null, { useMasterKey: true });
+        }
+
+        logger.info('Inflation reverted successfully', {
+          batchId,
+          totalReverted,
+          userId: user ? user.id : 'SYSTEM',
+        });
+
+        return {
+          success: true,
+          batchId,
+          totalReverted,
+          message: `Successfully reverted ${totalReverted} price records`,
+        };
+      } catch (error) {
+        logger.error('Error reverting inflation', {
+          batchId,
+          userId: user?.id,
+          error: error.message,
+        });
+        throw error;
+      }
+    });
+
+    /**
+     * Cloud function to get inflation process status.
+     * @function obtenerEstadoInflacion
+     * @param {Parse.Cloud.FunctionRequest} request - Function request with batchId parameter.
+     * @returns {Promise<object>} - Current status and progress of inflation process.
+     */
+    Parse.Cloud.define('obtenerEstadoInflacion', async (request) => {
+      const { batchId } = request.params;
+
+      if (!batchId) {
+        throw new Error('batchId parameter is required');
+      }
+
+      try {
+        const InflationHistory = Parse.Object.extend('InflationHistory');
+        const query = new Parse.Query(InflationHistory);
+        query.equalTo('batch_id', batchId);
+
+        const historyRecord = await query.first({ useMasterKey: true });
+
+        if (!historyRecord) {
+          return {
+            success: false,
+            error: 'Inflation process not found',
+          };
+        }
+
+        const processedCount = historyRecord.get('processed_count') || 0;
+        const errorCount = historyRecord.get('error_count') || 0;
+        const skippedCount = historyRecord.get('skipped_count') || 0;
+        const status = historyRecord.get('status');
+
+        // Generate descriptive message based on results
+        let descriptiveMessage;
+        if (status === 'COMPLETED') {
+          if (processedCount === 0 && skippedCount === 0 && errorCount === 0) {
+            descriptiveMessage = 'No hay precios actuales disponibles para inflación. Los precios ya han sido inflados o no existen registros elegibles.';
+          } else if (processedCount === 0 && skippedCount > 0) {
+            descriptiveMessage = `${skippedCount} registros omitidos por datos incompletos o ya inflados.`;
+          } else if (processedCount === 0) {
+            descriptiveMessage = 'No hay registros elegibles para inflación.';
+          } else {
+            descriptiveMessage = `${processedCount} registros procesados exitosamente.${skippedCount > 0 ? ` ${skippedCount} registros omitidos.` : ''}${errorCount > 0 ? ` ${errorCount} errores.` : ''}`;
+          }
+        } else if (status === 'FAILED') {
+          descriptiveMessage = 'El proceso de inflación falló. Revise los logs para más detalles.';
+        } else {
+          descriptiveMessage = 'Proceso en curso...';
+        }
+
+        return {
+          success: true,
+          batchId,
+          status,
+          percentage: historyRecord.get('percentage'),
+          processed_count: processedCount,
+          error_count: errorCount,
+          skipped_count: skippedCount,
+          createdAt: historyRecord.get('createdAt'),
+          startedAt: historyRecord.get('startedAt'),
+          completedAt: historyRecord.get('completedAt'),
+          error_message: historyRecord.get('error_message'),
+          descriptive_message: descriptiveMessage,
+        };
+      } catch (error) {
+        logger.error('Error getting inflation status', {
+          batchId,
+          error: error.message,
+        });
+        throw error;
+      }
+    });
+
+    // =================
+    // DIAGNOSTIC FUNCTIONS
+    // =================
+
+    /**
+     * Test function to verify background job system is working.
+     * @function testBackgroundJobDefinition
+     * @returns {Promise<object>} - Simple test result.
+     */
+    Parse.Cloud.define('testBackgroundJobDefinition', async (request) => {
+      try {
+        return { success: true, message: 'Background job definition endpoint is working', timestamp: new Date().toISOString() };
+      } catch (error) {
+        logger.error('Test background job definition failed', { error: error.message });
+        throw error;
+      }
+    });
+
+    /**
+     * Test function to get Parse Server configuration details.
+     * @function getParseServerConfig
+     * @returns {Promise<object>} - Configuration information.
+     */
+    Parse.Cloud.define('getParseServerConfig', async (request) => {
+      try {
+        const result = {
+          success: true,
+          serverURL: process.env.PARSE_SERVER_URL,
+          appId: process.env.PARSE_APP_ID,
+          hasJobsSupport: typeof Parse.Cloud.startJob === 'function',
+          hasJobDefine: typeof Parse.Cloud.job === 'function',
+          timestamp: new Date().toISOString(),
+        };
+
+        return result;
+      } catch (error) {
+        logger.error('Get Parse Server config failed', { error: error.message });
+        throw error;
+      }
+    });
+
+    /**
+     * Cloud function to get available inflation batches that can be reverted.
+     * @function obtenerBatchesDisponibles
+     * @returns {Promise<object>} - List of available batches for revert.
+     */
+    Parse.Cloud.define('obtenerBatchesDisponibles', async (request) => {
+      try {
+        const InflationHistory = Parse.Object.extend('InflationHistory');
+        const query = new Parse.Query(InflationHistory);
+
+        // Only get COMPLETED batches (not REVERTED)
+        query.equalTo('status', 'COMPLETED');
+        query.greaterThan('processed_count', 0); // Only batches that actually processed records
+        query.descending('createdAt'); // Most recent first
+        query.limit(20); // Limit to last 20 batches
+
+        const batches = await query.find({ useMasterKey: true });
+
+        const availableBatches = batches.map((batch) => ({
+          batchId: batch.get('batch_id'),
+          percentage: batch.get('percentage'),
+          processedCount: batch.get('processed_count'),
+          createdAt: batch.get('createdAt'),
+          completedAt: batch.get('completedAt'),
+          descriptiveMessage: batch.get('descriptive_message') || `${batch.get('processed_count')} registros procesados`,
+        }));
+
+        return {
+          success: true,
+          batches: availableBatches,
+          total: availableBatches.length,
+        };
+      } catch (error) {
+        logger.error('Error getting available batches:', error);
+        throw new Error(`Error getting available batches: ${error.message}`);
+      }
+    });
+
+    /**
+     * Test minimal background job to verify job execution.
+     * @function testMinimalJob
+     */
+    Parse.Cloud.job('testMinimalJob', async (request) => {
+      const { params, message } = request;
+
+      try {
+        message('Starting minimal test job...');
+
+        // Create a test record to verify job is running
+        const TestLog = Parse.Object.extend('TestJobLog');
+        const testLog = new TestLog();
+        testLog.set('jobName', 'testMinimalJob');
+        testLog.set('status', 'RUNNING');
+        testLog.set('message', 'Test job executed successfully');
+        testLog.set('timestamp', new Date());
+
+        await testLog.save(null, { useMasterKey: true });
+
+        message('Test job completed successfully');
+
+        return { success: true, message: 'Minimal test job completed' };
+      } catch (error) {
+        logger.error('Minimal test job failed', { error: error.message });
+        throw error;
+      }
+    });
+
+    /**
+     * Cloud function to test minimal background job execution.
+     * @function testMinimalBackgroundJob
+     * @returns {Promise<object>} - Test job initiation result.
+     */
+    Parse.Cloud.define('testMinimalBackgroundJob', async (request) => {
+      try {
+        // Start the test job
+        Parse.Cloud.startJob('testMinimalJob', {
+          testParam: 'minimal test',
+        });
+
+        return {
+          success: true,
+          message: 'Minimal test job started',
+          timestamp: new Date().toISOString(),
+        };
+      } catch (error) {
+        logger.error('Test minimal background job failed', { error: error.message });
+        throw error;
+      }
+    });
+
     // Security audit job
     /**
      * Scheduled job that performs security audits on user accounts.

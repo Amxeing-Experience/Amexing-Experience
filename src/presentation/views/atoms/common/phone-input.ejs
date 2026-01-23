@@ -132,11 +132,11 @@ const selectedCountry = countries[inputCountryCode] || countries.MX;
                value="">
 
         <!-- Validation Feedback -->
-        <div class="invalid-feedback">
+        <div class="invalid-feedback" style="display: none;">
             Por favor proporciona un número de teléfono válido
         </div>
 
-        <div class="valid-feedback">
+        <div class="valid-feedback" style="display: none;">
             Número de teléfono válido
         </div>
     </div>
@@ -248,6 +248,20 @@ const selectedCountry = countries[inputCountryCode] || countries.MX;
     .phone-input-wrapper .phone-number-input.is-valid {
         border-color: #198754;
     }
+    
+    /* Ensure validation messages only show when appropriate */
+    .phone-input-wrapper .invalid-feedback,
+    .phone-input-wrapper .valid-feedback {
+        display: none !important;
+    }
+    
+    .phone-input-wrapper .phone-number-input.is-invalid ~ .invalid-feedback {
+        display: block !important;
+    }
+    
+    .phone-input-wrapper .phone-number-input.is-valid ~ .valid-feedback {
+        display: block !important;
+    }
 </style>
 
 <script>
@@ -326,19 +340,13 @@ const selectedCountry = countries[inputCountryCode] || countries.MX;
             const value = phoneInput.value.replace(/\D/g, ''); // Remove non-digits
             const country = countries[currentCountry];
 
-            if (!value && !<%= inputRequired %>) {
-                // Optional field, empty is valid
+            if (!value) {
+                // Empty field - remove all validation states
                 phoneInput.classList.remove('is-invalid', 'is-valid');
                 fullNumberInput.value = '';
-                return true;
-            }
-
-            if (!value && <%= inputRequired %>) {
-                // Required field, empty is invalid
-                phoneInput.classList.add('is-invalid');
-                phoneInput.classList.remove('is-valid');
-                fullNumberInput.value = '';
-                return false;
+                
+                // Return false only if required, true if optional
+                return !<%= inputRequired %>;
             }
 
             // Validate length
@@ -435,6 +443,9 @@ const selectedCountry = countries[inputCountryCode] || countries.MX;
                 const digitsOnly = this.value.replace(/\D/g, '');
                 this.value = digitsOnly;
                 validatePhone();
+            } else {
+                // Empty field - remove validation states
+                phoneInput.classList.remove('is-invalid', 'is-valid');
             }
         });
 

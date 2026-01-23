@@ -101,22 +101,22 @@ jobs:
             if ! semgrep --config=p/default --error src/ 2>/dev/null; then
               echo "⚠️ Online rulesets unavailable (503 errors), using local minimal rules..."
               # Create minimal local config as ultimate fallback
-              cat > /tmp/semgrep-fallback.yml <<'EOF'
-rules:
-  - id: hardcoded-password
-    pattern-either:
-      - pattern: password = "..."
-      - pattern: secret = "..."
-    message: Potential hardcoded password detected
-    languages: [javascript]
-    severity: ERROR
-  - id: sql-injection
-    pattern: |
-      $DB.query($SQL)
-    message: Potential SQL injection
-    languages: [javascript]
-    severity: ERROR
-EOF
+              cat > /tmp/semgrep-fallback.yml << 'SEMGREP_EOF'
+          rules:
+            - id: hardcoded-password
+              pattern-either:
+                - pattern: password = "..."
+                - pattern: secret = "..."
+              message: Potential hardcoded password detected
+              languages: [javascript]
+              severity: ERROR
+            - id: sql-injection
+              pattern: |
+                $DB.query($SQL)
+              message: Potential SQL injection
+              languages: [javascript]
+              severity: ERROR
+          SEMGREP_EOF
               semgrep --config=/tmp/semgrep-fallback.yml src/ || echo "⚠️ Semgrep analysis degraded, manual review recommended"
             fi
           fi

@@ -184,6 +184,22 @@ if (process.env.NODE_ENV !== 'production') {
     res.setHeader('Content-Type', 'application/json');
     res.send(swaggerSpec);
   });
+
+  // Test endpoint for 429 error (Development/Test only)
+  app.get('/test/429', (req, res, next) => {
+    const error = new Error('Too many requests from this IP, please try again later.');
+    error.status = 429;
+    error.retryAfter = 60; // Retry after 60 seconds
+    next(error);
+  });
+
+  // Test endpoint for 429 API error (Development/Test only)
+  app.get('/api/test/429', (req, res, next) => {
+    const error = new Error('API rate limit exceeded');
+    error.status = 429;
+    error.retryAfter = 30; // Retry after 30 seconds
+    next(error);
+  });
 } else {
   // In production, return 404 for documentation endpoints
   app.use('/api-docs', (req, res) => {

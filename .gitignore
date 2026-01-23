@@ -52,6 +52,9 @@ coverage/
 dist/
 build/
 
+# Exception: Dashboard library dist files (needed for static serving)
+!public/dashboard/libs/*/dist/
+
 # Parse Server
 parse-db/
 .parse.local

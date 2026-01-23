@@ -62,16 +62,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <thead class="table-light">
                     <tr>
                         <th>Vehículo</th>
-                        <th>Tipo</th>
-                        <th>Placa</th>
-                        <th>VIN</th>
-                        <th>ID Veh.</th>
+                        <% if (dtUserRole !== 'department_manager') { %>
+                            <th>Tipo</th>
+                            <th>Placa</th>
+                            <th>VIN</th>
+                            <th>ID Veh.</th>
+                        <% } %>
                         <th>Tarifa</th>
                         <th>Capacidad</th>
-                        <th>Mantenimiento</th>
-                        <th>Seguro</th>
-                        <th>Última Act.</th>
-                        <th>Estado</th>
+                        <% if (dtUserRole !== 'department_manager') { %>
+                            <th>Mantenimiento</th>
+                            <th>Seguro</th>
+                            <th>Última Act.</th>
+                            <th>Estado</th>
+                        <% } %>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
                         <% } %>
@@ -303,48 +307,78 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     console.error('Error loading vehicles:', error);
                 }
             },
-            columns: [
-                {
-                    data: null,
-                    render: function(data) {
-                        return `<div>
-                                    <div class="fw-semibold">${data.brand} ${data.model}</div>
-                                    <small class="text-muted">${data.year}</small>
-                                </div>`;
-                    }
-                },
-                {
-                    data: null,
-                    render: function(data) {
-                        const typeName = data.vehicleTypeId?.name || '-';
-                        return `<span class="badge bg-info">${typeName}</span>`;
-                    }
-                },
-                {
-                    data: 'licensePlate',
-                    render: function(data) {
-                        return `<code class="badge bg-dark">${data || '-'}</code>`;
-                    }
-                },
-                {
-                    data: 'vin',
-                    render: function(data) {
-                        if (data && data.trim()) {
-                            return `<small class="text-muted font-monospace">${data}</small>`;
+            columns: (function() {
+                // Build columns array dynamically based on role
+                const cols = [];
+                const isDeptManager = '<%= dtUserRole %>' === 'department_manager';
+                
+                // Vehículo column - different rendering based on role
+                if (isDeptManager) {
+                    // For department_manager: show type above brand/model
+                    cols.push({
+                        data: null,
+                        render: function(data) {
+                            const typeName = data.vehicleTypeId?.name || '-';
+                            return `<div>
+                                        <div class="text-muted">${typeName}</div>
+                                        <div class="fw-semibold">${data.brand} ${data.model}</div>
+                                    </div>`;
                         }
-                        return '<small class="text-muted">-</small>';
-                    }
-                },
-                {
-                    data: 'vehicleId',
-                    render: function(data) {
-                        if (data && data.trim()) {
-                            return `<span class="badge bg-info text-dark">${data}</span>`;
+                    });
+                } else {
+                    // For other roles: show brand, model, and year
+                    cols.push({
+                        data: null,
+                        render: function(data) {
+                            return `<div>
+                                        <div class="fw-semibold">${data.brand} ${data.model}</div>
+                                        <small class="text-muted">${data.year}</small>
+                                    </div>`;
                         }
-                        return '<small class="text-muted">-</small>';
-                    }
-                },
-                {
+                    });
+                    
+                    // Tipo column - only for non-department_manager roles
+                    cols.push({
+                        data: null,
+                        render: function(data) {
+                            const typeName = data.vehicleTypeId?.name || '-';
+                            return `<span class="badge bg-info">${typeName}</span>`;
+                        }
+                    });
+                }
+                
+                // Conditionally show: Placa, VIN, ID Veh (hide for department_manager)
+                if (!isDeptManager) {
+                    cols.push({
+                        data: 'licensePlate',
+                        render: function(data) {
+                            return `<code class="badge bg-dark">${data || '-'}</code>`;
+                        }
+                    });
+                    
+                    cols.push({
+                        data: 'vin',
+                        render: function(data) {
+                            if (data && data.trim()) {
+                                return `<small class="text-muted font-monospace">${data}</small>`;
+                            }
+                            return '<small class="text-muted">-</small>';
+                        }
+                    });
+                    
+                    cols.push({
+                        data: 'vehicleId',
+                        render: function(data) {
+                            if (data && data.trim()) {
+                                return `<span class="badge bg-info text-dark">${data}</span>`;
+                            }
+                            return '<small class="text-muted">-</small>';
+                        }
+                    });
+                }
+                
+                // Always show: Tarifa
+                cols.push({
                     data: null,
                     render: function(data) {
                         if (!data.rateId) {
@@ -354,8 +388,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         const rateName = data.rateId.name || '-';
                         return `<span class="badge" style="background-color: ${rateColor}; color: white;">${rateName}</span>`;
                     }
-                },
-                {
+                });
+                
+                // Always show: Capacidad
+                cols.push({
                     data: 'capacity',
                     className: 'text-center',
                     render: function(data, type, row) {
@@ -365,65 +401,75 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             <br><small class="text-muted">${luggageCapacity} maletas</small>
                         </div>`;
                     }
-                },
-                {
-                    data: 'maintenanceStatus',
-                    render: function(data) {
-                        const statuses = {
-                            operational: '<span class="badge bg-success">Operacional</span>',
-                            maintenance: '<span class="badge bg-warning text-dark">Mantenimiento</span>',
-                            repair: '<span class="badge bg-danger">Reparación</span>',
-                            out_of_service: '<span class="badge bg-secondary">Fuera de Servicio</span>'
-                        };
-                        return statuses[data] || '-';
-                    }
-                },
-                {
-                    data: null,
-                    render: function(data) {
-                        // Sin fecha de seguro asignada (vehículo nuevo o sin configurar)
-                        if (!data.insuranceExpiry) {
-                            return '<span class="badge bg-warning text-dark"><i class="ti ti-alert-triangle me-1"></i>Sin Seguro</span>';
+                });
+                
+                // Conditionally show: Mantenimiento, Seguro, Última Act., Estado (hide for department_manager)
+                if (!isDeptManager) {
+                    cols.push({
+                        data: 'maintenanceStatus',
+                        render: function(data) {
+                            const statuses = {
+                                operational: '<span class="badge bg-success">Operacional</span>',
+                                maintenance: '<span class="badge bg-warning text-dark">Mantenimiento</span>',
+                                repair: '<span class="badge bg-danger">Reparación</span>',
+                                out_of_service: '<span class="badge bg-secondary">Fuera de Servicio</span>'
+                            };
+                            return statuses[data] || '-';
                         }
+                    });
+                    
+                    cols.push({
+                        data: null,
+                        render: function(data) {
+                            // Sin fecha de seguro asignada (vehículo nuevo o sin configurar)
+                            if (!data.insuranceExpiry) {
+                                return '<span class="badge bg-warning text-dark"><i class="ti ti-alert-triangle me-1"></i>Sin Seguro</span>';
+                            }
 
-                        // Calcular días hasta vencimiento
-                        const expiry = new Date(data.insuranceExpiry);
-                        const now = new Date();
-                        // Normalize both dates to midnight for fair comparison
-                        expiry.setHours(0, 0, 0, 0);
-                        now.setHours(0, 0, 0, 0);
-                        const daysUntil = Math.round((expiry - now) / (1000 * 60 * 60 * 24));
+                            // Calcular días hasta vencimiento
+                            const expiry = new Date(data.insuranceExpiry);
+                            const now = new Date();
+                            // Normalize both dates to midnight for fair comparison
+                            expiry.setHours(0, 0, 0, 0);
+                            now.setHours(0, 0, 0, 0);
+                            const daysUntil = Math.round((expiry - now) / (1000 * 60 * 60 * 24));
 
-                        // Seguro vencido (necesita renovación urgente)
-                        if (daysUntil < 0) {
-                            return `<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Seguro Vencido</span>`;
+                            // Seguro vencido (necesita renovación urgente)
+                            if (daysUntil < 0) {
+                                return `<span class="badge bg-danger"><i class="ti ti-x me-1"></i>Seguro Vencido</span>`;
+                            }
+                            // Por vencer pronto (alerta)
+                            else if (daysUntil <= 30) {
+                                return `<span class="badge bg-warning text-dark"><i class="ti ti-clock me-1"></i>${daysUntil}d</span>`;
+                            }
+                            // Vigente
+                            else {
+                                return '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Vigente</span>';
+                            }
                         }
-                        // Por vencer pronto (alerta)
-                        else if (daysUntil <= 30) {
-                            return `<span class="badge bg-warning text-dark"><i class="ti ti-clock me-1"></i>${daysUntil}d</span>`;
+                    });
+                    
+                    cols.push({
+                        data: 'updatedAt',
+                        render: function(data) {
+                            const date = new Date(data);
+                            return `<small>${date.toLocaleDateString('es-MX')}</small>`;
                         }
-                        // Vigente
-                        else {
-                            return '<span class="badge bg-success"><i class="ti ti-check me-1"></i>Vigente</span>';
+                    });
+                    
+                    cols.push({
+                        data: 'active',
+                        render: function(data) {
+                            return data
+                                ? '<span class="badge bg-success">Activo</span>'
+                                : '<span class="badge bg-secondary">Inactivo</span>';
                         }
-                    }
-                },
-                {
-                    data: 'updatedAt',
-                    render: function(data) {
-                        const date = new Date(data);
-                        return `<small>${date.toLocaleDateString('es-MX')}</small>`;
-                    }
-                },
-                {
-                    data: 'active',
-                    render: function(data) {
-                        return data
-                            ? '<span class="badge bg-success">Activo</span>'
-                            : '<span class="badge bg-secondary">Inactivo</span>';
-                    }
-                },
-                ...(showActions ? [{
+                    });
+                }
+                
+                // Add actions column if needed
+                return cols;
+            })().concat(showActions ? [{
                     data: null,
                     orderable: false,
                     searchable: false,
@@ -484,13 +530,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         actions += '</div>';
                         return actions;
                     }
-                }] : [])
-            ],
+                }] : []),
             language: {
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando vehículos...'
             },
-            order: [[7, 'desc']], // Changed from 6 to 7 (updatedAt column index)
+            order: [[0, 'asc']], // Sort by vehicle name by default
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',

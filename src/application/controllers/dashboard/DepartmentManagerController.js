@@ -9,29 +9,22 @@ class DepartmentManagerController extends RoleBasedController {
   }
 
   /**
-   * Renders the department manager dashboard index page with statistics and overview.
-   * Displays key metrics including team members, budget information, and pending approvals.
+   * Redirects the department manager to the vehicles page as the default dashboard view.
+   * Department managers are automatically directed to the vehicle fleet page upon login.
    * @function index
    * @param {object} req - Express request object containing user session and authentication data.
-   * @param {object} res - Express response object for rendering the dashboard view.
-   * @returns {Promise<void>} - Renders the department manager index view or handles errors.
+   * @param {object} res - Express response object for redirecting to vehicles page.
+   * @returns {Promise<void>} - Redirects to vehicles page or handles errors.
    * @example
    * // GET /dashboard/department_manager
    * // Authenticated request from department manager
    * await departmentManagerController.index(req, res);
-   * // Renders dashboard with:
-   * // - Team member count
-   * // - Budget allocation and usage
-   * // - Pending approval notifications
-   * // - Active booking statistics
+   * // Redirects to: /dashboard/department_manager/vehicles
    */
   async index(req, res) {
     try {
-      await this.renderRoleView(req, res, 'index', {
-        title: 'Department Manager Dashboard',
-        stats: await this.getDepartmentStats(),
-        breadcrumb: null,
-      });
+      // Redirect department managers to vehicles page as default
+      res.redirect('/dashboard/department_manager/vehicles');
     } catch (error) {
       this.handleError(res, error);
     }
@@ -56,13 +49,35 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async team(req, res) {
     try {
+      // For department manager role, the user IS the client, so use their own ID
+      const { user } = req;
+      const clientId = user?.id;
+      const departmentId = user?.departmentId || user?.organizationId || '';
+      const departmentName = user?.departmentName || 'Department';
+
       await this.renderRoleView(req, res, 'team', {
-        title: 'Team Management',
+        title: 'My Team',
+        departmentId,
+        departmentName,
+        clientId,
         team: [],
         breadcrumb: {
           title: 'My Team',
-          items: [{ name: 'Team', active: true }],
+          items: [
+            { name: 'Dashboard', url: '/dashboard/department_manager' },
+            { name: 'My Team', active: true },
+          ],
         },
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
       });
     } catch (error) {
       this.handleError(res, error);
@@ -234,7 +249,7 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async vehicles(req, res) {
     try {
-      const section = req.query.section || 'types'; // Default to types since vehicles is hidden for department_manager
+      const section = req.query.section || 'vehicles'; // Default to vehicles page
 
       await this.renderRoleView(req, res, 'vehicles', {
         title: 'Vehículos',
@@ -280,9 +295,14 @@ class DepartmentManagerController extends RoleBasedController {
     try {
       const section = req.query.section || 'airport';
 
+      // For department manager role, use user's objectId as clientId (not clientId field)
+      const { user } = req;
+      const clientId = user?.id;
+
       await this.renderRoleView(req, res, 'services', {
         title: 'Traslados',
         section,
+        clientId, // Pass the user's objectId as clientId
         breadcrumb: {
           title: 'Traslados',
           items: [
@@ -362,8 +382,13 @@ class DepartmentManagerController extends RoleBasedController {
    */
   async tours(req, res) {
     try {
+      // For department manager role, use user's objectId as clientId (not clientId field)
+      const { user } = req;
+      const clientId = user?.id;
+
       await this.renderRoleView(req, res, 'tours', {
         title: 'Tours',
+        clientId, // Pass the user's objectId as clientId
         breadcrumb: {
           title: 'Tours',
           items: [

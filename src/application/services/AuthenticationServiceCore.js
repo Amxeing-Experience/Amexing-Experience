@@ -200,6 +200,7 @@ class AuthenticationServiceCore {
    */
   async findUserById(userId) {
     const query = new Parse.Query(AmexingUser);
+    query.equalTo('exists', true);
     return query.get(userId, { useMasterKey: true });
   }
 
@@ -277,6 +278,7 @@ class AuthenticationServiceCore {
       email: user.get('email'),
       role: roleName,
       roleId: roleObjectId,
+      clientId: user.get('clientId'),
       organizationId: user.get('organizationId'),
       iat: Math.floor(Date.now() / 1000),
     };

@@ -47,7 +47,7 @@ router.use(jwtMiddleware.authenticateToken);
 router.get(
   '/current',
   readRateLimit,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager level and above
+  jwtMiddleware.requireRoleLevel(2), // Driver level and above (includes client, department_manager, admin, superadmin)
   (req, res) => exchangeRateController.getCurrent(req, res)
 );
 

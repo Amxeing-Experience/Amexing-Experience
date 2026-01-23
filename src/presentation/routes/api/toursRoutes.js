@@ -71,6 +71,7 @@ router.get('/with-rate-prices', jwtMiddleware.requireRoleLevel(4), (req, res) =>
  *     summary: Get tours list
  *     description: |
  *       Get paginated list of tours with DataTables server-side processing support.
+ *       Optionally include client-specific prices if clientId is provided.
  *
  *       **Access:** Department Manager and above
  *       **Rate Limited:** 100 requests per 15 minutes
@@ -78,6 +79,11 @@ router.get('/with-rate-prices', jwtMiddleware.requireRoleLevel(4), (req, res) =>
  *       - bearerAuth: []
  *       - cookieAuth: []
  *     parameters:
+ *       - name: clientId
+ *         in: query
+ *         schema:
+ *           type: string
+ *         description: Client ID to include client-specific prices
  *       - name: draw
  *         in: query
  *         schema:
@@ -292,6 +298,188 @@ router.get('/:id/all-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => T
 
 /**
  * @swagger
+ * /api/tours/{id}/all-rate-prices-with-client-prices:
+ *   get:
+ *     tags:
+ *       - Tours
+ *     summary: Get tour prices with client overrides
+ *     description: |\
+ *       Get all prices from TourPrices table for a specific tour with client-specific price overrides.
+ *
+ *       **Access:** Department Manager and above
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tour object ID
+ *       - name: clientId
+ *         in: query
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Client object ID
+ *     responses:
+ *       200:
+ *         description: Tour prices with client overrides retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Tour not found
+ */
+router.get('/:id/all-rate-prices-with-client-prices', jwtMiddleware.requireRoleLevel(4), (req, res) => ToursController.getAllRatePricesForTourWithClientPrices(req, res));
+
+/**
+ * @swagger
+ * /api/tours/{id}/price-history:
+ *   get:
+ *     tags:
+ *       - Tours
+ *     summary: Get price history for tour
+ *     description: |
+ *       Retrieve historical price records for a specific tour showing all price changes over time.
+ *       Returns both active and historical prices with validity periods and related information.
+ *
+ *       **Access:** Admin and SuperAdmin only
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tour object ID
+ *     responses:
+ *       200:
+ *         description: Tour price history retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       price:
+ *                         type: string
+ *                       validFrom:
+ *                         type: string
+ *                         format: date-time
+ *                       validUntil:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       status:
+ *                         type: string
+ *                         enum: [active, historical]
+ *                       duration:
+ *                         type: integer
+ *                         nullable: true
+ *                       vehicleTypeName:
+ *                         type: string
+ *                         nullable: true
+ *                       rateName:
+ *                         type: string
+ *                         nullable: true
+ *                 tourName:
+ *                   type: string
+ *                 totalRecords:
+ *                   type: integer
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Tour not found
+ */
+router.get('/:id/price-history', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.getPriceHistory(req, res));
+
+/**
+ * @swagger
+ * /api/tours/client-prices:
+ *   post:
+ *     tags:
+ *       - Tours
+ *     summary: Save client-specific prices for a tour
+ *     description: |
+ *       Save client-specific prices for a tour in ClientPrices table with itemType=TOUR.
+ *
+ *       **Access:** Admin and SuperAdmin only
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - clientId
+ *               - tourId
+ *               - prices
+ *             properties:
+ *               clientId:
+ *                 type: string
+ *                 description: Client object ID
+ *               tourId:
+ *                 type: string
+ *                 description: Tour object ID
+ *               prices:
+ *                 type: array
+ *                 description: Array of price configurations
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     ratePtr:
+ *                       type: string
+ *                     vehiclePtr:
+ *                       type: string
+ *                     precio:
+ *                       type: number
+ *                     basePrice:
+ *                       type: number
+ *     responses:
+ *       200:
+ *         description: Client prices saved successfully
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ */
+router.post('/client-prices', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.saveTourClientPrices(req, res));
+
+/**
+ * @swagger
  * /api/tours/{id}:
  *   put:
  *     tags:
@@ -429,5 +617,76 @@ router.delete('/:id', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursCont
  *         description: Tour not found
  */
 router.patch('/:id/toggle-status', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.toggleTourStatus(req, res));
+
+/**
+ * @swagger
+ * /api/tours/{id}/update-base-prices:
+ *   post:
+ *     tags:
+ *       - Tours
+ *     summary: Update base tour prices
+ *     description: |
+ *       Update base prices for a tour (TourPrices table).
+ *
+ *       **Access:** Admin and above
+ *     security:
+ *       - bearerAuth: []
+ *       - cookieAuth: []
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Tour object ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - prices
+ *             properties:
+ *               prices:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - id
+ *                     - price
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       description: TourPrice record ID
+ *                     price:
+ *                       type: number
+ *                       description: New price value
+ *     responses:
+ *       200:
+ *         description: Tour base prices updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 updatedCount:
+ *                   type: number
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         $ref: '#/components/responses/UnauthorizedError'
+ *       403:
+ *         $ref: '#/components/responses/ForbiddenError'
+ *       404:
+ *         description: Tour not found
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/:id/update-base-prices', jwtMiddleware.requireRoleLevel(6), (req, res) => ToursController.updateBasePrices(req, res));
 
 module.exports = router;

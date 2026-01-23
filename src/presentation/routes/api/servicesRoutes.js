@@ -151,6 +151,19 @@ router.get(
 );
 
 /**
+ * GET /api/services/:id/price-history - Get price history for a service.
+ *
+ * Access: Authenticated users (admin, superadmin)
+ * Returns: Price history data with current and historical prices.
+ */
+router.get(
+  '/:id/price-history',
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ServicesController.getPriceHistory(req, res)
+);
+
+/**
  * GET /api/services/:id - Get single service by ID.
  *
  * Access: Authenticated users (admin, superadmin)
@@ -239,6 +252,21 @@ router.post(
   jwtMiddleware.authenticateToken,
   jwtMiddleware.requireRoleLevel(6), // Admin and above
   (req, res) => ServicesController.saveClientPrices(req, res)
+);
+
+/**
+ * POST /:id/update-base-prices - Update base service prices (TourPrices).
+ * Route: POST /api/services/:id/update-base-prices
+ * Access: Admin and above
+ * Body: { prices: [{id, rateId, vehicleId, price}] }
+ * Returns: Success message with updated count.
+ */
+router.post(
+  '/:id/update-base-prices',
+  writeOperationsLimiter,
+  jwtMiddleware.authenticateToken,
+  jwtMiddleware.requireRoleLevel(6), // Admin and above
+  (req, res) => ServicesController.updateBasePrices(req, res)
 );
 
 module.exports = router;

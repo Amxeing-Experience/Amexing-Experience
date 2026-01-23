@@ -109,13 +109,21 @@ router.get('/logs', (req, res) => auditController.getAuditLogs(req, res));
 router.get('/user/:userId', (req, res) => auditController.getUserAuditLogs(req, res));
 
 /**
- * GET /api/audit/entity/:entityType/:entityId? - Get audit logs for specific entity.
+ * GET /api/audit/entity/:entityType/:entityId - Get audit logs for specific entity.
  * @param {string} entityType - Entity type (Client, Employee, etc.).
- * @param {string} entityId - Optional entity ID.
+ * @param {string} entityId - Entity ID.
  * Query parameters:
  * - limit {number} - Items limit (default: 50, max: 1000).
  */
-router.get('/entity/:entityType/:entityId?', (req, res) => auditController.getEntityAuditLogs(req, res));
+router.get('/entity/:entityType/:entityId', (req, res) => auditController.getEntityAuditLogs(req, res));
+
+/**
+ * GET /api/audit/entity/:entityType - Get audit logs for entity type.
+ * @param {string} entityType - Entity type (Client, Employee, etc.).
+ * Query parameters:
+ * - limit {number} - Items limit (default: 50, max: 1000).
+ */
+router.get('/entity/:entityType', (req, res) => auditController.getEntityAuditLogs(req, res));
 
 /**
  * GET /api/audit/statistics - Get audit log statistics.
