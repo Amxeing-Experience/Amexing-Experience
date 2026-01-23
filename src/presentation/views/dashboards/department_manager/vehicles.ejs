@@ -228,7 +228,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch('/api/vehicles', {
                 headers: {
-                    'Authorization': 'Bearer ' + localStorage.getItem('token')
+                    'Authorization': 'Bearer ' + (localStorage.getItem('accessToken') || localStorage.getItem('token') || '')
                 }
             });
 
