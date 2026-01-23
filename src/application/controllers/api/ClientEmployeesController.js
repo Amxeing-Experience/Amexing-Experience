@@ -212,10 +212,47 @@ class ClientEmployeesController {
         return this.sendError(res, 'Client ID is required', 400);
       }
 
-      // Validate user role (only superadmin and admin can create employees)
+      // Validate user role and permissions
       const currentUserRole = req.userRole;
-      if (!currentUserRole || !['superadmin', 'admin'].includes(currentUserRole)) {
-        return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can create employees.', 403);
+      if (!currentUserRole) {
+        return this.sendError(res, 'Access denied. User role not found.', 403);
+      }
+
+      // Allow superadmin and admin full access
+      // Allow client and department_manager to create employees for their own client
+      if (!['superadmin', 'admin', 'client', 'department_manager'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Insufficient permissions to create employees.', 403);
+      }
+
+      // For client and department_manager, verify they're creating employees for their own client
+      if (['client', 'department_manager'].includes(currentUserRole)) {
+        // Get clientId from Parse user object - try multiple ways
+        let userClientId = null;
+
+        if (currentUserRole === 'client') {
+          // For client role, get their clientId field (not their user ID)
+          if (currentUser.get && typeof currentUser.get === 'function') {
+            userClientId = currentUser.get('clientId');
+          } else {
+            userClientId = currentUser.clientId;
+          }
+
+          // Fallback: if no clientId field, treat user as the client
+          if (!userClientId) {
+            userClientId = currentUser.get ? (currentUser.get('objectId') || currentUser.id) : (currentUser.id || currentUser.objectId);
+          }
+        } else if (currentUserRole === 'department_manager') {
+          // For department_manager, the user IS the client, so use their own ID
+          if (currentUser.get && typeof currentUser.get === 'function') {
+            userClientId = currentUser.get('objectId') || currentUser.id;
+          } else {
+            userClientId = currentUser.id || currentUser.objectId;
+          }
+        }
+
+        if (!userClientId || userClientId !== clientId) {
+          return this.sendError(res, 'Access denied. You can only manage employees for your own organization.', 403);
+        }
       }
 
       // Validate required fields FIRST (before database queries)
@@ -295,9 +332,8 @@ class ClientEmployeesController {
         parentClient: clientId,
       };
 
-      // Add role to currentUser object for service validation
-      const userWithRole = currentUser;
-      userWithRole.role = currentUserRole;
+      // Add role to currentUser object for service validation - create a proper copy
+      const userWithRole = { ...currentUser, role: currentUserRole };
 
       // Create employee via UserManagementService
       const result = await this.userService.createUser(employeeData, userWithRole);
@@ -367,8 +403,36 @@ class ClientEmployeesController {
 
       // Validate user role (only superadmin and admin can update employees)
       const currentUserRole = req.userRole;
-      if (!currentUserRole || !['superadmin', 'admin'].includes(currentUserRole)) {
-        return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can modify employees.', 403);
+      // Allow superadmin and admin full access
+      // Allow client and department_manager to toggle employees for their own client
+      if (!currentUserRole || !['superadmin', 'admin', 'client', 'department_manager'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Insufficient permissions to modify employees.', 403);
+      }
+
+      // For client and department_manager, verify they're modifying employees for their own client
+      if (['client', 'department_manager'].includes(currentUserRole)) {
+        // Get clientId from Parse user object - try multiple ways
+        let userClientId = null;
+
+        if (currentUserRole === 'client') {
+          // For client role, the user IS the client, so use their ID
+          if (currentUser.get && typeof currentUser.get === 'function') {
+            userClientId = currentUser.get('objectId') || currentUser.id;
+          } else {
+            userClientId = currentUser.id || currentUser.objectId;
+          }
+        } else if (currentUserRole === 'department_manager') {
+          // For department_manager, the user IS the client, so use their own ID
+          if (currentUser.get && typeof currentUser.get === 'function') {
+            userClientId = currentUser.get('objectId') || currentUser.id;
+          } else {
+            userClientId = currentUser.id || currentUser.objectId;
+          }
+        }
+
+        if (!userClientId || userClientId !== clientId) {
+          return this.sendError(res, 'Access denied. You can only manage employees for your own organization.', 403);
+        }
       }
 
       // Validate client exists
@@ -446,10 +510,42 @@ class ClientEmployeesController {
         return this.sendError(res, 'Client ID and Employee ID are required', 400);
       }
 
-      // Validate user role (only superadmin and admin can delete employees)
+      // Validate user role and permissions
       const currentUserRole = req.userRole;
-      if (!currentUserRole || !['superadmin', 'admin'].includes(currentUserRole)) {
-        return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can delete employees.', 403);
+      if (!currentUserRole) {
+        return this.sendError(res, 'Access denied. User role not found.', 403);
+      }
+
+      // Allow superadmin and admin full access
+      // Allow client and department_manager to delete employees for their own client
+      if (!['superadmin', 'admin', 'client', 'department_manager'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Insufficient permissions to delete employees.', 403);
+      }
+
+      // For client and department_manager, verify they're deleting employees for their own client
+      if (['client', 'department_manager'].includes(currentUserRole)) {
+        // Get clientId from Parse user object - try multiple ways
+        let userClientId = null;
+
+        if (currentUserRole === 'client') {
+          // For client role, the user IS the client, so use their ID
+          if (currentUser.get && typeof currentUser.get === 'function') {
+            userClientId = currentUser.get('objectId') || currentUser.id;
+          } else {
+            userClientId = currentUser.id || currentUser.objectId;
+          }
+        } else if (currentUserRole === 'department_manager') {
+          // For department_manager, the user IS the client, so use their own ID
+          if (currentUser.get && typeof currentUser.get === 'function') {
+            userClientId = currentUser.get('objectId') || currentUser.id;
+          } else {
+            userClientId = currentUser.id || currentUser.objectId;
+          }
+        }
+
+        if (!userClientId || userClientId !== clientId) {
+          return this.sendError(res, 'Access denied. You can only manage employees for your own organization.', 403);
+        }
       }
 
       // Validate client exists
@@ -535,8 +631,8 @@ class ClientEmployeesController {
         return this.sendError(res, 'User role information not available', 500);
       }
 
-      if (!['superadmin', 'admin'].includes(currentUserRole)) {
-        return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can modify employee status.', 403);
+      if (!['superadmin', 'admin', 'department_manager'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Only SuperAdmin, Admin, or Department Manager can modify employee status.', 403);
       }
 
       // Validate client exists
@@ -545,8 +641,8 @@ class ClientEmployeesController {
       // Add role to currentUser object BEFORE calling service methods
       const userWithRole = { ...currentUser, role: currentUserRole };
 
-      // Get employee to verify it belongs to client
-      const employee = await this.userService.getUserById(userWithRole, employeeId);
+      // Get employee to verify it belongs to client (include inactive for status toggle)
+      const employee = await this.userService.getUserById(userWithRole, employeeId, true);
 
       if (!employee) {
         return this.sendError(res, 'Employee not found', 404);
@@ -609,7 +705,7 @@ class ClientEmployeesController {
       throw new Error('Client not found or inactive');
     }
 
-    // Verify it's actually a client (department_manager role)
+    // Verify it's actually a client (department_manager or client role)
     // Get the role - it could be a string or a Pointer
     const clientRoleId = client.get('roleId');
     let roleToCheck = null;
@@ -621,25 +717,26 @@ class ClientEmployeesController {
     } else {
       // Fallback to string role field
       const roleString = client.get('role');
-      if (roleString === 'department_manager') {
+      if (roleString === 'department_manager' || roleString === 'client') {
         return client; // Valid client
       }
     }
 
-    // If we have a roleId, validate it's department_manager
+    // If we have a roleId, validate it's either department_manager or client
     if (roleToCheck) {
       const roleQuery = new Parse.Query('Role');
-      roleQuery.equalTo('name', 'department_manager');
+      roleQuery.containedIn('name', ['department_manager', 'client']);
       roleQuery.equalTo('active', true);
       roleQuery.equalTo('exists', true);
-      const clientRole = await roleQuery.first({ useMasterKey: true });
+      const validRoles = await roleQuery.find({ useMasterKey: true });
 
-      if (!clientRole) {
-        throw new Error('department_manager role not found in system');
+      if (validRoles.length === 0) {
+        throw new Error('department_manager or client role not found in system');
       }
 
-      if (roleToCheck !== clientRole.id) {
-        throw new Error('Specified user is not a client (department_manager)');
+      const validRoleIds = validRoles.map((role) => role.id);
+      if (!validRoleIds.includes(roleToCheck)) {
+        throw new Error('Specified user is not a client (must be department_manager or client role)');
       }
     }
 

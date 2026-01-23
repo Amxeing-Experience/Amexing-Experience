@@ -99,6 +99,55 @@ class ClientController extends RoleBasedController {
   }
 
   /**
+   * Team management page.
+   * @function team
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   * @example
+   */
+  async team(req, res) {
+    try {
+      // Get client ID from user session
+      const { user } = req;
+      let clientId = '';
+      let companyName = 'Company';
+
+      if (user) {
+        // The user object from dashboardAuthMiddleware is a plain object, not a Parse.User
+        // So we access properties directly
+        clientId = user.clientId || '';
+        companyName = user.companyName || user.organizationId || 'Company';
+      }
+
+      await this.renderRoleView(req, res, 'team', {
+        title: 'My Team',
+        clientId,
+        companyName,
+        breadcrumb: {
+          title: 'My Team',
+          items: [
+            { name: 'Dashboard', url: '/dashboard/client' },
+            { name: 'My Team', active: true },
+          ],
+        },
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Budgets page.
    * @function budgets
    * @param {object} req - Express request object.
@@ -221,22 +270,11 @@ class ClientController extends RoleBasedController {
     try {
       const section = req.query.section || 'airport';
 
-      // Get clientId from user: for client role, use clientId field (not user objectId)
+      // Get clientId from user - use the clientId attribute from database
       const { user } = req;
-      const userId = user?.id;
 
-      // Extract clientId with priority: clientId field > organizationId field > user ID fallback
-      let clientId;
-      const userClientIdField = user?.get?.('clientId') || user?.attributes?.clientId || user?.clientId;
-      const userOrgIdField = user?.get?.('organizationId') || user?.attributes?.organizationId || user?.organizationId;
-
-      if (userClientIdField && userClientIdField.trim() !== '') {
-        clientId = userClientIdField;
-      } else if (userOrgIdField && userOrgIdField.trim() !== '') {
-        clientId = userOrgIdField;
-      } else {
-        clientId = userId;
-      }
+      // req.user is a Parse Object, so use .get() to access the clientId field
+      const clientId = user?.get ? user.get('clientId') : (user?.clientId || '');
 
       await this.renderRoleView(req, res, 'services', {
         title: 'Traslados',
@@ -321,22 +359,11 @@ class ClientController extends RoleBasedController {
    */
   async tours(req, res) {
     try {
-      // Get clientId from user: for client role, use clientId field (not user objectId)
+      // Get clientId from user - use the clientId attribute from database
       const { user } = req;
 
-      // Extract clientId with priority: clientId field > organizationId field > user ID fallback
-      const userClientIdField = user?.clientId;
-      const userOrgIdField = user?.organizationId;
-      const userId = user?.id;
-
-      let clientId;
-      if (userClientIdField && typeof userClientIdField === 'string' && userClientIdField.trim() !== '') {
-        clientId = userClientIdField.trim();
-      } else if (userOrgIdField && typeof userOrgIdField === 'string' && userOrgIdField.trim() !== '') {
-        clientId = userOrgIdField.trim();
-      } else {
-        clientId = userId;
-      }
+      // req.user is a Parse Object, so use .get() to access the clientId field
+      const clientId = user?.get ? user.get('clientId') : (user?.clientId || '');
 
       await this.renderRoleView(req, res, 'tours', {
         title: 'Tours',
