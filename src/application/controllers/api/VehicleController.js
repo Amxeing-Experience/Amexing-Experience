@@ -25,6 +25,7 @@ const Parse = require('parse/node');
 const Vehicle = require('../../../domain/models/Vehicle');
 const VehicleType = require('../../../domain/models/VehicleType');
 const VehicleImage = require('../../../domain/models/VehicleImage');
+const FileStorageService = require('../../services/FileStorageService');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -34,6 +35,14 @@ class VehicleController {
   constructor() {
     this.maxPageSize = 100;
     this.defaultPageSize = 25;
+
+    // Initialize FileStorageService for S3 presigned URLs (same config as VehicleImageController)
+    this.fileStorageService = new FileStorageService({
+      baseFolder: 'vehicles',
+      isPublic: false, // Use presigned URLs with IAM role credentials
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    });
   }
 
   /**
@@ -184,27 +193,32 @@ class VehicleController {
           try {
             const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
             if (primaryImage) {
-              // Try Parse.File first
+              // Use same logic as VehicleImageController for consistency
+              const s3Key = primaryImage.get('s3Key');
               const imageFile = primaryImage.get('imageFile');
-              if (imageFile) {
-                imageUrl = imageFile.url(); // S3 presigned URL
-              } else {
-                // Check for S3 metadata fields
-                const s3Key = primaryImage.get('s3Key');
-                const s3Bucket = primaryImage.get('s3Bucket');
-                const s3Region = primaryImage.get('s3Region');
 
-                if (s3Key && s3Bucket && s3Region) {
-                  imageUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;
-                } else {
-                  // Fallback to legacy URL field
-                  imageUrl = primaryImage.get('url') || '';
-                }
+              // Generate presigned URL from s3Key, or fallback to legacy imageFile or url
+              if (s3Key) {
+                imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              } else if (imageFile) {
+                imageUrl = imageFile.url(); // Legacy Parse.File
+              } else {
+                imageUrl = primaryImage.get('url') || ''; // Legacy URL field
+              }
+
+              let method;
+              if (s3Key) {
+                method = 's3Key (presigned)';
+              } else if (imageFile) {
+                method = 'imageFile (legacy)';
+              } else {
+                method = 'url (legacy)';
               }
 
               logger.debug('Found primary image for vehicle', {
                 vehicleId: vehicle.id,
                 imageUrl,
+                method,
               });
             } else {
               logger.debug('No primary image found for vehicle', {
@@ -303,22 +317,17 @@ class VehicleController {
       try {
         const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
         if (primaryImage) {
-          // Try Parse.File first
+          // Use same logic as VehicleImageController for consistency
+          const s3Key = primaryImage.get('s3Key');
           const imageFile = primaryImage.get('imageFile');
-          if (imageFile) {
-            imageUrl = imageFile.url(); // S3 presigned URL
-          } else {
-            // Check for S3 metadata fields
-            const s3Key = primaryImage.get('s3Key');
-            const s3Bucket = primaryImage.get('s3Bucket');
-            const s3Region = primaryImage.get('s3Region');
 
-            if (s3Key && s3Bucket && s3Region) {
-              imageUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;
-            } else {
-              // Fallback to legacy URL field
-              imageUrl = primaryImage.get('url') || '';
-            }
+          // Generate presigned URL from s3Key, or fallback to legacy imageFile or url
+          if (s3Key) {
+            imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+          } else if (imageFile) {
+            imageUrl = imageFile.url(); // Legacy Parse.File
+          } else {
+            imageUrl = primaryImage.get('url') || ''; // Legacy URL field
           }
         }
       } catch (error) {
