@@ -631,8 +631,8 @@ class ClientEmployeesController {
         return this.sendError(res, 'User role information not available', 500);
       }
 
-      if (!['superadmin', 'admin'].includes(currentUserRole)) {
-        return this.sendError(res, 'Access denied. Only SuperAdmin or Admin can modify employee status.', 403);
+      if (!['superadmin', 'admin', 'department_manager'].includes(currentUserRole)) {
+        return this.sendError(res, 'Access denied. Only SuperAdmin, Admin, or Department Manager can modify employee status.', 403);
       }
 
       // Validate client exists
@@ -641,8 +641,8 @@ class ClientEmployeesController {
       // Add role to currentUser object BEFORE calling service methods
       const userWithRole = { ...currentUser, role: currentUserRole };
 
-      // Get employee to verify it belongs to client
-      const employee = await this.userService.getUserById(userWithRole, employeeId);
+      // Get employee to verify it belongs to client (include inactive for status toggle)
+      const employee = await this.userService.getUserById(userWithRole, employeeId, true);
 
       if (!employee) {
         return this.sendError(res, 'Employee not found', 404);

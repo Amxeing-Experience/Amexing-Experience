@@ -93,43 +93,29 @@ const navigationItems = {
         { section: 'Servicios', icon: 'ti-briefcase', items: [
             { name: 'Vehículos', icon: 'car', path: '/dashboard/client/vehicles', id: 'vehicles' },
             { name: 'Traslados', icon: 'briefcase', path: '/dashboard/client/services', id: 'services' },
-            { name: 'Experiencias', icon: 'star', path: '/dashboard/client/experiences', id: 'experiences' },
+            { name: 'Experiencias', icon: 'star', path: '/dashboard/client/experiences', id: 'experiences', hidden: true },
             { name: 'Tours', icon: 'map', path: '/dashboard/client/tours', id: 'tours' }
         ]}
     ],
     department_manager: [
-        // System Management Section - Only Dashboard
-        { section: 'System Management', icon: 'ti-settings', items: [
-            { name: 'Dashboard Department Manager', icon: 'screen-share', path: '/dashboard/department_manager', id: 'dashboard',
-              dropdown: dashboards
-            }
-        ]},
         { section: 'Team Management', icon: 'ti-users', items: [
-            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/department_manager', id: 'dashboard' },
             { name: 'My Team', icon: 'users', path: '/dashboard/department_manager/team', id: 'team' },
-            { name: 'Team Bookings', icon: 'car', path: '/dashboard/department_manager/bookings', id: 'bookings' },
             { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/department_manager/quotes', id: 'quotes' },
             { name: 'Facturas', icon: 'receipt', path: '/dashboard/department_manager/invoices', id: 'invoices' }
         ]},
         { section: 'Servicios', icon: 'ti-briefcase', items: [
             { name: 'Vehículos', icon: 'car', path: '/dashboard/department_manager/vehicles', id: 'vehicles' },
             { name: 'Traslados', icon: 'briefcase', path: '/dashboard/department_manager/services', id: 'services' },
-            { name: 'Experiencias', icon: 'star', path: '/dashboard/department_manager/experiences', id: 'experiences' },
+            { name: 'Experiencias', icon: 'star', path: '/dashboard/department_manager/experiences', id: 'experiences', hidden: true },
             { name: 'Tours', icon: 'map', path: '/dashboard/department_manager/tours', id: 'tours' }
         ]}
     ],
     employee: [
-        // System Management Section - Only Dashboard
-        { section: 'System Management', icon: 'ti-settings', items: [
-            { name: 'Dashboard Employee', icon: 'building', path: '/dashboard/employee', id: 'dashboard',
-              dropdown: dashboards
-            }
-        ]},
-        { section: 'My Services', icon: 'ti-user', items: [
-            { name: 'Dashboard', icon: 'dashboard', path: '/dashboard/employee', id: 'dashboard' },
-            { name: 'My Bookings', icon: 'car', path: '/dashboard/employee/bookings', id: 'bookings' },
-            { name: 'Available Services', icon: 'list', path: '/dashboard/employee/services', id: 'services' },
-            { name: 'My Profile', icon: 'user', path: '/dashboard/employee/profile', id: 'profile' }
+        { section: 'Servicios', icon: 'ti-briefcase', items: [
+            { name: 'Vehículos', icon: 'car', path: '/dashboard/employee/vehicles', id: 'vehicles' },
+            { name: 'Traslados', icon: 'briefcase', path: '/dashboard/employee/services', id: 'services' },
+            { name: 'Experiencias', icon: 'star', path: '/dashboard/employee/experiences', id: 'experiences', hidden: true },
+            { name: 'Tours', icon: 'map', path: '/dashboard/employee/tours', id: 'tours' }
         ]}
     ],
     driver: [
@@ -173,6 +159,7 @@ const menuSections = navigationItems[userRole] || navigationItems.guest;
 
   <!-- Section Items -->
   <% section.items.forEach(function(item, itemIndex) { %>
+  <% if (!item.hidden) { %>
   <% const isActive = isActiveMenuItem(item.path, currentPath); %>
 
   <%- include('../../../molecules/dashboard/nav-item', {
@@ -186,6 +173,7 @@ const menuSections = navigationItems[userRole] || navigationItems.guest;
                 external: item.external,
                 dropdown: item.dropdown ? item.dropdown : [],
             }) %>
+  <% } %>
   <% }); %>
   <% }); %>
 

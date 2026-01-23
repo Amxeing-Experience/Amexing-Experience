@@ -137,6 +137,187 @@ const clientId = locals.clientId || '';
   </div>
 </div>
 
+<!-- Edit Employee Modal -->
+<div class="modal fade" id="editEmployeeModal" tabindex="-1" aria-labelledby="editEmployeeModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="editEmployeeModalLabel">
+                    <i class="ti ti-edit me-2"></i>Editar Empleado
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <form id="editEmployeeForm">
+                    <!-- Hidden field for employee ID -->
+                    <input type="hidden" id="editEmployeeId" name="id">
+
+                    <!-- Sección: Información Personal -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-user me-1"></i>
+                            Información Personal
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="editEmployeeFirstName" class="form-label fw-semibold">Nombre <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="editEmployeeFirstName" name="firstName" placeholder="Ej: Juan" maxlength="100" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="editEmployeeLastName" class="form-label fw-semibold">Apellido <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="editEmployeeLastName" name="lastName" placeholder="Ej: Pérez García" maxlength="100" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="editEmployeeEmail" class="form-label fw-semibold">Email Corporativo <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="editEmployeeEmail" name="email" placeholder="empleado@empresa.com" maxlength="255" readonly required>
+                            <div class="form-text">El email no puede ser modificado por seguridad</div>
+                        </div>
+                    </div>
+
+                    <!-- Sección: Configuración de Rol -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-shield me-1"></i>
+                            Configuración de Rol
+                        </h6>
+                        
+                        <div class="mb-3">
+                            <label for="editEmployeeRole" class="form-label fw-semibold">
+                                Rol del Empleado <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-select" id="editEmployeeRole" name="role" required>
+                                <option value="">Seleccionar rol...</option>
+                                <option value="client">Agent (Representante de agencia con capacidades de gestión)</option>
+                                <option value="employee">Employee (Empleado estándar)</option>
+                            </select>
+                            <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
+                        </div>
+
+                        <!-- Role descriptions -->
+                        <div class="alert alert-info role-description d-none" id="editRoleDescriptionClient">
+                            <strong><i class="ti ti-briefcase me-1"></i>Agent:</strong>
+                            Representante de la agencia con capacidades de gestión. Puede gestionar empleados y cotizaciones.
+                        </div>
+                        <div class="alert alert-secondary role-description d-none" id="editRoleDescriptionEmployee">
+                            <strong><i class="ti ti-user me-1"></i>Employee:</strong>
+                            Empleado estándar con acceso a funcionalidades básicas.
+                        </div>
+                    </div>
+
+                    <!-- Sección: Información de Contacto -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-phone me-1"></i>
+                            Información de Contacto
+                        </h6>
+                        
+                        <div class="mb-3">
+                            <label for="editEmployeePhone" class="form-label fw-semibold">Teléfono de Contacto</label>
+                            <input type="tel" class="form-control" id="editEmployeePhone" name="phone" placeholder="+52 999 123 4567">
+                            <div class="form-text">Número de contacto del empleado</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="editEmployeeNotes" class="form-label fw-semibold">Notas Adicionales</label>
+                            <textarea class="form-control" id="editEmployeeNotes" name="notes" placeholder="Información relevante sobre el empleado..." maxlength="500" rows="3"></textarea>
+                            <div class="form-text">Máximo 500 caracteres</div>
+                        </div>
+                        <small id="editNotesCharCountEmployee" class="text-muted float-end">0/500</small>
+                    </div>
+
+                    <!-- Sección: Cambio de Contraseña -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-lock me-1"></i>
+                            Cambio de Contraseña (Opcional)
+                        </h6>
+                        
+                        <div class="alert alert-info mb-3">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Deja este campo vacío si no deseas cambiar la contraseña del empleado
+                        </div>
+
+                        <!-- Password Field with Generation -->
+                        <div class="mb-3">
+                            <label for="editEmployeePassword" class="form-label fw-semibold">
+                                Nueva Contraseña
+                            </label>
+                            <div class="input-group">
+                                <input 
+                                    type="password" 
+                                    class="form-control" 
+                                    id="editEmployeePassword" 
+                                    name="password" 
+                                    placeholder="Contraseña segura"
+                                    minlength="12"
+                                    maxlength="100"
+                                    autocomplete="new-password"
+                                >
+                                <button 
+                                    class="btn btn-outline-primary" 
+                                    type="button" 
+                                    id="generatePasswordEditBtn"
+                                    title="Generar contraseña segura"
+                                >
+                                    <i class="ti ti-key" id="generateEditPasswordIcon"></i>
+                                </button>
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="toggleEditPasswordVisibility"
+                                    title="Mostrar/Ocultar contraseña"
+                                >
+                                    <i class="ti ti-eye" id="editPasswordToggleIcon"></i>
+                                </button>
+                                <button 
+                                    class="btn btn-outline-secondary" 
+                                    type="button" 
+                                    id="copyEditPassword"
+                                    title="Copiar contraseña"
+                                >
+                                    <i class="ti ti-copy" id="copyEditPasswordIcon"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Mínimo 12 caracteres, incluir mayúsculas, minúsculas, números y caracteres especiales
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status toggle -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="editEmployeeActive" name="active">
+                            <label class="form-check-label fw-semibold" for="editEmployeeActive">
+                                <i class="ti ti-toggle-left me-1"></i>
+                                Empleado Activo
+                            </label>
+                            <div class="form-text">Desactiva esta opción para suspender temporalmente el acceso del empleado</div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-2"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="submitEditEmployee">
+                    <i class="ti ti-check me-2"></i>Actualizar Empleado
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     // Initialize all modal functionality when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
@@ -263,7 +444,151 @@ const clientId = locals.clientId || '';
           }
         });
       }
+
+      // Edit modal password field functionality
+      setupEditPasswordFunctionality();
+      
+      // Character counter for edit modal notes
+      const editNotesTextarea = document.getElementById('editEmployeeNotes');
+      const editCharCounter = document.getElementById('editNotesCharCountEmployee');
+      
+      if (editNotesTextarea && editCharCounter) {
+        editNotesTextarea.addEventListener('input', function() {
+          editCharCounter.textContent = `${this.value.length}/500`;
+        });
+      }
+      
+      // Role selection change handler for edit modal
+      const editRoleSelect = document.getElementById('editEmployeeRole');
+      if (editRoleSelect) {
+        editRoleSelect.addEventListener('change', function() {
+          // Hide all role descriptions
+          document.querySelectorAll('#editEmployeeModal .role-description').forEach(el => el.classList.add('d-none'));
+          
+          // Show selected role description
+          const selectedRole = this.value;
+          if (selectedRole) {
+            const roleDesc = document.getElementById(`editRoleDescription${selectedRole.charAt(0).toUpperCase()}${selectedRole.slice(1)}`);
+            if (roleDesc) {
+              roleDesc.classList.remove('d-none');
+            }
+          }
+        });
+      }
+
+      // Edit employee submit button event listener
+      const submitEditBtn = document.getElementById('submitEditEmployee');
+      if (submitEditBtn) {
+        submitEditBtn.addEventListener('click', function() {
+          submitEditEmployee();
+        });
+      }
     });
+
+    // Setup edit modal password functionality
+    function setupEditPasswordFunctionality() {
+      const passwordInput = document.getElementById('editEmployeePassword');
+      const toggleBtn = document.getElementById('toggleEditPasswordVisibility');
+      const toggleIcon = document.getElementById('editPasswordToggleIcon');
+      const generateBtn = document.getElementById('generatePasswordEditBtn');
+      const generateIcon = document.getElementById('generateEditPasswordIcon');
+      const copyBtn = document.getElementById('copyEditPassword');
+      const copyIcon = document.getElementById('copyEditPasswordIcon');
+      
+      // Toggle password visibility
+      if (toggleBtn && passwordInput && toggleIcon) {
+        toggleBtn.addEventListener('click', function() {
+          if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            toggleIcon.classList.remove('ti-eye');
+            toggleIcon.classList.add('ti-eye-off');
+          } else {
+            passwordInput.type = 'password';
+            toggleIcon.classList.remove('ti-eye-off');
+            toggleIcon.classList.add('ti-eye');
+          }
+        });
+      }
+      
+      // Generate secure password
+      if (generateBtn && passwordInput && generateIcon) {
+        generateBtn.addEventListener('click', function() {
+          const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+          const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+          const numbers = '0123456789';
+          const specialChars = '!@#$%^&*()_+-=[]{}|;:,.<>?';
+          
+          let password = '';
+          
+          // Ensure at least one character from each required set
+          password += uppercase[Math.floor(Math.random() * uppercase.length)];
+          password += lowercase[Math.floor(Math.random() * lowercase.length)];
+          password += numbers[Math.floor(Math.random() * numbers.length)];
+          password += specialChars[Math.floor(Math.random() * specialChars.length)];
+          
+          // Fill remaining 8 characters (12 total - 4 required = 8 more)
+          const allChars = uppercase + lowercase + numbers + specialChars;
+          for (let i = 0; i < 8; i++) {
+            password += allChars[Math.floor(Math.random() * allChars.length)];
+          }
+          
+          // Shuffle the password to avoid predictable patterns
+          password = password.split('').sort(() => Math.random() - 0.5).join('');
+          passwordInput.value = password;
+          
+          // Show password temporarily
+          passwordInput.type = 'text';
+          toggleIcon.classList.remove('ti-eye');
+          toggleIcon.classList.add('ti-eye-off');
+          
+          // Visual feedback
+          generateIcon.classList.remove('ti-key');
+          generateIcon.classList.add('ti-check');
+          generateBtn.classList.remove('btn-outline-primary');
+          generateBtn.classList.add('btn-success');
+          
+          setTimeout(() => {
+            generateIcon.classList.remove('ti-check');
+            generateIcon.classList.add('ti-key');
+            generateBtn.classList.remove('btn-success');
+            generateBtn.classList.add('btn-outline-primary');
+          }, 1500);
+          
+          showAlert('success', 'Contraseña generada exitosamente');
+        });
+      }
+      
+      // Copy password to clipboard
+      if (copyBtn && passwordInput && copyIcon) {
+        copyBtn.addEventListener('click', async function() {
+          if (!passwordInput.value.trim()) {
+            showAlert('warning', 'No hay contraseña para copiar');
+            return;
+          }
+          
+          try {
+            await navigator.clipboard.writeText(passwordInput.value);
+            
+            // Visual feedback
+            copyIcon.classList.remove('ti-copy');
+            copyIcon.classList.add('ti-check');
+            copyBtn.classList.remove('btn-outline-secondary');
+            copyBtn.classList.add('btn-success');
+            
+            setTimeout(() => {
+              copyIcon.classList.remove('ti-check');
+              copyIcon.classList.add('ti-copy');
+              copyBtn.classList.remove('btn-success');
+              copyBtn.classList.add('btn-outline-secondary');
+            }, 1500);
+            
+            showAlert('success', 'Contraseña copiada al portapapeles');
+          } catch (error) {
+            showAlert('error', 'Error al copiar la contraseña');
+          }
+        });
+      }
+    }
     
 
     // Function to save team member
@@ -356,5 +681,139 @@ const clientId = locals.clientId || '';
         modalContainer.style.display = 'none';
         modalContainer.innerHTML = '';
       }, 5000);
+    }
+
+    // ========================================================================
+    // EDIT EMPLOYEE FUNCTIONALITY
+    // ========================================================================
+
+    // Listen for edit employee events from the DataTable
+    document.addEventListener('editEmployee', function(event) {
+      const { employeeData } = event.detail;
+      console.log('Edit employee event received:', employeeData);
+      
+      // Populate edit modal with employee data
+      populateEditEmployeeModal(employeeData);
+      
+      // Show the edit modal
+      const editModal = new bootstrap.Modal(document.getElementById('editEmployeeModal'));
+      editModal.show();
+    });
+
+    /**
+     * Populate the edit employee modal with data
+     */
+    function populateEditEmployeeModal(employeeData) {
+      document.getElementById('editEmployeeId').value = employeeData.id || '';
+      document.getElementById('editEmployeeFirstName').value = employeeData.firstName || '';
+      document.getElementById('editEmployeeLastName').value = employeeData.lastName || '';
+      document.getElementById('editEmployeeEmail').value = employeeData.email || '';
+      document.getElementById('editEmployeeRole').value = employeeData.role || employeeData.roleId?.name || '';
+      document.getElementById('editEmployeePhone').value = employeeData.phone || '';
+      document.getElementById('editEmployeeNotes').value = employeeData.notes || '';
+      document.getElementById('editEmployeeActive').checked = employeeData.active === true;
+
+      // Clear password field
+      document.getElementById('editEmployeePassword').value = '';
+
+      // Update notes character count
+      const notesTextarea = document.getElementById('editEmployeeNotes');
+      const charCountElement = document.getElementById('editNotesCharCountEmployee');
+      if (charCountElement && notesTextarea) {
+        charCountElement.textContent = `${notesTextarea.value.length}/500`;
+      }
+
+      // Hide role descriptions initially
+      document.querySelectorAll('#editEmployeeModal .role-description').forEach(el => el.classList.add('d-none'));
+
+      // Show relevant role description
+      const selectedRole = employeeData.role || employeeData.roleId?.name || '';
+      if (selectedRole) {
+        const roleDesc = document.getElementById(`editRoleDescription${selectedRole.charAt(0).toUpperCase()}${selectedRole.slice(1)}`);
+        if (roleDesc) {
+          roleDesc.classList.remove('d-none');
+        }
+      }
+    }
+
+    /**
+     * Handle edit employee form submission
+     */
+    async function submitEditEmployee() {
+      try {
+        const form = document.getElementById('editEmployeeForm');
+        
+        if (!form.checkValidity()) {
+          form.classList.add('was-validated');
+          showAlert('error', 'Por favor completa todos los campos requeridos');
+          return;
+        }
+
+        // Get form data
+        const formData = {
+          firstName: document.getElementById('editEmployeeFirstName').value.trim(),
+          lastName: document.getElementById('editEmployeeLastName').value.trim(),
+          email: document.getElementById('editEmployeeEmail').value.trim(),
+          role: document.getElementById('editEmployeeRole').value.trim(),
+          phone: document.getElementById('editEmployeePhone').value.trim() || undefined,
+          notes: document.getElementById('editEmployeeNotes').value.trim() || '',
+          active: document.getElementById('editEmployeeActive').checked
+        };
+
+        // Include password only if provided
+        const newPassword = document.getElementById('editEmployeePassword').value.trim();
+        if (newPassword) {
+          formData.password = newPassword;
+        }
+
+        const employeeId = document.getElementById('editEmployeeId').value;
+        
+        // Get current user's client ID (this should match how it's done in create employee)
+        const currentUserId = '<%= user.id || user.objectId %>';
+        
+        // Submit to API
+        const response = await fetch(`/api/clients/${currentUserId}/employees/${employeeId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${document.cookie.split(';').find(row => row.startsWith('accessToken='))?.split('=')[1] || ''}`
+          },
+          body: JSON.stringify(formData)
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Error al actualizar empleado');
+        }
+
+        // Hide role descriptions
+        document.querySelectorAll('#editEmployeeModal .role-description').forEach(el => el.classList.add('d-none'));
+        
+        // Clear password field for security
+        const passwordField = document.getElementById('editEmployeePassword');
+        if (passwordField) {
+          passwordField.value = '';
+        }
+
+        // Clear form validation
+        form.classList.remove('was-validated');
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editEmployeeModal'));
+        modal.hide();
+
+        // Show success message
+        showAlert('success', 'Empleado actualizado exitosamente');
+
+        // Reload DataTable
+        if (window.employeesTable) {
+          window.employeesTable.ajax.reload(null, false);
+        }
+
+      } catch (error) {
+        console.error('Error updating employee:', error);
+        showAlert('error', error.message || 'Error al actualizar empleado. Por favor, intenta nuevamente.');
+      }
     }
 </script>
