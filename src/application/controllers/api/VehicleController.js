@@ -24,6 +24,7 @@
 const Parse = require('parse/node');
 const Vehicle = require('../../../domain/models/Vehicle');
 const VehicleType = require('../../../domain/models/VehicleType');
+const VehicleImage = require('../../../domain/models/VehicleImage');
 const logger = require('../../../infrastructure/logger');
 
 /**
@@ -178,6 +179,20 @@ class VehicleController {
             };
           }
 
+          // Get primary image for vehicle
+          let imageUrl = '';
+          try {
+            const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
+            if (primaryImage) {
+              imageUrl = primaryImage.getUrl();
+            }
+          } catch (error) {
+            logger.warn('Failed to get primary image for vehicle', {
+              vehicleId: vehicle.id,
+              error: error.message,
+            });
+          }
+
           return {
             id: vehicle.id,
             objectId: vehicle.id,
@@ -195,6 +210,7 @@ class VehicleController {
             maintenanceStatus: vehicle.get('maintenanceStatus'),
             insuranceExpiry: vehicle.get('insuranceExpiry')?.toISOString(),
             active: vehicle.get('active'),
+            image: imageUrl,
             createdAt: vehicle.createdAt,
             updatedAt: vehicle.updatedAt,
           };
@@ -257,6 +273,20 @@ class VehicleController {
         return this.sendError(res, 'Vehicle not found', 404);
       }
 
+      // Get primary image for vehicle
+      let imageUrl = '';
+      try {
+        const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
+        if (primaryImage) {
+          imageUrl = primaryImage.getUrl();
+        }
+      } catch (error) {
+        logger.warn('Failed to get primary image for vehicle', {
+          vehicleId: vehicle.id,
+          error: error.message,
+        });
+      }
+
       const data = {
         id: vehicle.id,
         brand: vehicle.get('brand'),
@@ -273,6 +303,7 @@ class VehicleController {
         maintenanceStatus: vehicle.get('maintenanceStatus'),
         insuranceExpiry: vehicle.get('insuranceExpiry')?.toISOString().split('T')[0], // Format for input[type=date]
         active: vehicle.get('active'),
+        image: imageUrl,
         createdAt: vehicle.createdAt,
         updatedAt: vehicle.updatedAt,
       };
