@@ -70,7 +70,7 @@ const navigationItems = {
             { name: 'Tablero', icon: 'dashboard', path: '/dashboard/admin', id: 'dashboard' },
             { name: 'Clientes', icon: 'users', path: '/dashboard/admin/clients', id: 'clients' },
             { name: 'Reservaciones', icon: 'clipboard-list', path: '/dashboard/admin/bookings', id: 'bookings' },
-            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/admin/quotes', id: 'quotes' },
+            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/admin/quotes', id: 'quotes', badge: { text: 'Beta', color: 'info' } },
             { name: 'Ajustes de Precio', icon: 'settings', path: '/dashboard/admin/price-settings', id: 'price-settings' }
         ]},
         { section: 'Tarifario', icon: 'ti-receipt-2', items: [
@@ -100,7 +100,7 @@ const navigationItems = {
     department_manager: [
         { section: 'Team Management', icon: 'ti-users', items: [
             { name: 'My Team', icon: 'users', path: '/dashboard/department_manager/team', id: 'team' },
-            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/department_manager/quotes', id: 'quotes' },
+            { name: 'Cotizaciones', icon: 'file-invoice', path: '/dashboard/department_manager/quotes', id: 'quotes', badge: { text: 'Beta', color: 'info' } },
             { name: 'Facturas', icon: 'receipt', path: '/dashboard/department_manager/invoices', id: 'invoices' }
         ]},
         { section: 'Servicios', icon: 'ti-briefcase', items: [
