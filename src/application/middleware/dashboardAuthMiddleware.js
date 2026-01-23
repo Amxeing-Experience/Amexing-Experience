@@ -78,6 +78,8 @@ class DashboardAuthMiddleware {
           username: decoded.username || 'unknown',
           role: decoded.role || 'guest',
           name: decoded.username || 'Unknown User',
+          clientId: decoded.clientId,
+          organizationId: decoded.organizationId,
           isActive: true,
         };
       } catch (error) {
@@ -91,6 +93,8 @@ class DashboardAuthMiddleware {
         role: req.session.user.role || 'guest',
         name: req.session.user.name || req.session.user.username || 'Unknown User',
         email: req.session.user.email,
+        clientId: req.session.user.clientId,
+        organizationId: req.session.user.organizationId,
         isActive: true,
       };
     }

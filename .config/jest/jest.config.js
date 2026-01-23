@@ -71,7 +71,7 @@ module.exports = {
   forceExit: true,
 
   // Detect open handles
-  detectOpenHandles: true,
+  detectOpenHandles: false,
 
   // Run tests serially to avoid port conflicts
   maxWorkers: 1,

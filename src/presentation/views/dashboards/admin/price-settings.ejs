@@ -17,7 +17,7 @@ const activeSection = typeof section !== 'undefined' ? section : 'exchange-rate'
 const menuItems = [
     { label: 'Tipo de Cambio', icon: 'currency-dollar', section: 'exchange-rate', href: '/dashboard/admin/price-settings' },
     { label: '% de Inflación', icon: 'trending-up', section: 'inflation', href: '/dashboard/admin/price-settings?section=inflation' },
-    { label: '% de Agencia', icon: 'percentage', section: 'agency', href: '/dashboard/admin/price-settings?section=agency' },
+    { label: '% Tarjetas', icon: 'percentage', section: 'agency', href: '/dashboard/admin/price-settings?section=agency' },
     { label: '% Transferencia', icon: 'credit-card', section: 'transfer', href: '/dashboard/admin/price-settings?section=transfer' }
 ];
 
@@ -25,7 +25,7 @@ const menuItems = [
 const sectionNames = {
     'exchange-rate': 'Tipo de Cambio (USD a MXN)',
     'inflation': 'Porcentaje de Inflación',
-    'agency': 'Porcentaje de Agencia',
+    'agency': 'Porcentaje de Tarjetas',
     'transfer': 'Porcentaje de Transferencia'
 };
 
@@ -177,7 +177,21 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                             <% if (typeof currentInflationRate !== 'undefined' && currentInflationRate.value) { %>
                             <div id="currentValueDisplay" class="text-center py-3">
                                 <div class="display-3 fw-bold text-primary"><%= currentInflationRate.formatted %>%</div>
-                                <div class="text-muted">Tasa de Inflación Anual</div>
+                                <div class="text-muted mb-3">Tasa de Inflación Anual</div>
+                                
+                                <!-- Inflation action buttons -->
+                                <div class="row g-2 px-3">
+                                    <div class="col-12 col-sm-6">
+                                        <button type="button" class="btn btn-warning w-100" id="applyInflationBtn">
+                                            <i class="ti ti-trending-up me-1"></i>Aplicar inflación tarifario
+                                        </button>
+                                    </div>
+                                    <div class="col-12 col-sm-6">
+                                        <button type="button" class="btn btn-danger w-100" id="revertInflationBtn">
+                                            <i class="ti ti-trending-down me-1"></i>Revertir inflación tarifario
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             <div id="currentValueDetails" class="mt-3">
@@ -206,7 +220,21 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                             <% } else { %>
                             <div id="currentValueDisplay" class="text-center py-3">
                                 <div class="display-3 fw-bold text-primary">5.25%</div>
-                                <div class="text-muted">Tasa de Inflación (Valor por defecto)</div>
+                                <div class="text-muted mb-3">Tasa de Inflación (Valor por defecto)</div>
+                                
+                                <!-- Inflation action buttons -->
+                                <div class="row g-2 px-3">
+                                    <div class="col-12 col-sm-6">
+                                        <button type="button" class="btn btn-warning w-100" id="applyInflationBtn">
+                                            <i class="ti ti-trending-up me-1"></i>Aplicar inflación tarifario
+                                        </button>
+                                    </div>
+                                    <div class="col-12 col-sm-6">
+                                        <button type="button" class="btn btn-danger w-100" id="revertInflationBtn">
+                                            <i class="ti ti-trending-down me-1"></i>Revertir inflación tarifario
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             <div id="currentValueDetails" class="mt-3">
@@ -236,7 +264,7 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                             <% if (typeof currentAgencyRate !== 'undefined' && currentAgencyRate.value) { %>
                             <div id="currentValueDisplay" class="text-center py-3">
                                 <div class="display-3 fw-bold text-primary"><%= currentAgencyRate.formatted %>%</div>
-                                <div class="text-muted">Porcentaje de Agencia</div>
+                                <div class="text-muted">Porcentaje de Tarjetas</div>
                             </div>
 
                             <div id="currentValueDetails" class="mt-3">
@@ -265,7 +293,7 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                             <% } else { %>
                             <div id="currentValueDisplay" class="text-center py-3">
                                 <div class="display-3 fw-bold text-primary">15.0%</div>
-                                <div class="text-muted">Porcentaje de Agencia (Valor por defecto)</div>
+                                <div class="text-muted">Porcentaje de Tarjetas (Valor por defecto)</div>
                             </div>
 
                             <div id="currentValueDetails" class="mt-3">
@@ -595,6 +623,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Set default datetime
     setDefaultDateTime();
+    
+    // Initialize inflation buttons
+    initializeInflationButton();
+    initializeRevertInflationButton();
 });
 
 function initializeMenuToggle() {
@@ -1128,5 +1160,200 @@ function showAlert(type, message) {
             bootstrap.Alert.getOrCreateInstance(alertElement).close();
         }
     }, 5000);
+}
+
+function initializeInflationButton() {
+    const inflationBtn = document.getElementById('applyInflationBtn');
+    if (!inflationBtn) return;
+    
+    inflationBtn.addEventListener('click', async function() {
+        // Get current inflation percentage from the display
+        const percentageElement = document.querySelector('#currentValueDisplay .display-3.fw-bold.text-primary');
+        const percentageText = percentageElement?.textContent || '0';
+        const currentPercentage = parseFloat(percentageText.replace('%', ''));
+        
+        if (currentPercentage <= 0) {
+            showAlert('warning', 'No se puede aplicar inflación. El porcentaje debe ser mayor a 0.');
+            return;
+        }
+        
+        // Show confirmation dialog
+        if (!confirm(`¿Estás seguro de que deseas aplicar una inflación del ${currentPercentage}% al tarifario? Esta acción actualizará los precios de todos los servicios.`)) {
+            return;
+        }
+        
+        // Disable button and show loading state
+        const originalText = this.innerHTML;
+        this.disabled = true;
+        this.innerHTML = '<i class="ti ti-loader ti-spin me-2"></i>Aplicando...';
+        
+        try {
+            // Call the API endpoint to start inflation process
+            const response = await $.ajax({
+                url: '/api/inflation-rate/apply',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    percentage: currentPercentage
+                })
+            });
+            
+            if (response.success) {
+                showAlert('success', `Proceso de inflación iniciado exitosamente. ID: ${response.batchId}\nEste proceso se ejecutará en segundo plano.`);
+                
+                // Optional: Start polling for status updates
+                pollInflationStatus(response.batchId);
+            } else {
+                throw new Error(response.error || 'Error desconocido');
+            }
+            
+        } catch (error) {
+            console.error('Error applying inflation:', error);
+            const errorMessage = error.responseJSON?.error || error.message || 'Error desconocido';
+            showAlert('danger', 'Error al aplicar inflación: ' + errorMessage);
+        } finally {
+            // Re-enable button
+            this.disabled = false;
+            this.innerHTML = originalText;
+        }
+    });
+}
+
+function initializeRevertInflationButton() {
+    const revertBtn = document.getElementById('revertInflationBtn');
+    if (!revertBtn) return;
+    
+    revertBtn.addEventListener('click', async function() {
+        const originalText = this.innerHTML;
+        
+        try {
+            // First, get available inflation batches
+            const batchesResponse = await $.ajax({
+                url: '/api/inflation-rate/available-batches',
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`
+                }
+            });
+            
+            if (!batchesResponse.success || !batchesResponse.batches || batchesResponse.batches.length === 0) {
+                showAlert('warning', 'No hay procesos de inflación disponibles para revertir.');
+                return;
+            }
+            
+            // Create selection options
+            let options = '';
+            batchesResponse.batches.forEach((batch, index) => {
+                const date = new Date(batch.createdAt).toLocaleString('es-MX');
+                const message = batch.descriptiveMessage || `${batch.processedCount} registros procesados`;
+                options += `${index + 1}. ${date} - ${batch.percentage}% - ${message}\n`;
+            });
+            
+            // Show selection prompt
+            const selectedIndex = prompt(`Selecciona el proceso de inflación que deseas revertir:\n\n${options}\nIngresa el número (1-${batchesResponse.batches.length}) o cancela:`);
+            
+            if (!selectedIndex || selectedIndex.trim() === '') {
+                return; // User cancelled
+            }
+            
+            const batchIndex = parseInt(selectedIndex) - 1;
+            if (batchIndex < 0 || batchIndex >= batchesResponse.batches.length) {
+                showAlert('danger', 'Selección inválida. Por favor, selecciona un número válido.');
+                return;
+            }
+            
+            const selectedBatch = batchesResponse.batches[batchIndex];
+            const date = new Date(selectedBatch.createdAt).toLocaleString('es-MX');
+            
+            // Show confirmation dialog
+            if (!confirm(`¿Estás seguro de que deseas revertir esta inflación?\n\nFecha: ${date}\nPorcentaje: ${selectedBatch.percentage}%\nRegistros: ${selectedBatch.processedCount}\n\nEsta acción restaurará los precios anteriores y no se puede deshacer fácilmente.`)) {
+                return;
+            }
+            
+            // Disable button and show loading
+            this.disabled = true;
+            this.innerHTML = '<i class="ti ti-loader ti-spin me-2"></i>Revirtiendo...';
+            
+            // Call revert with specific batch ID
+            const response = await $.ajax({
+                url: '/api/inflation-rate/revert',
+                method: 'POST',
+                contentType: 'application/json',
+                headers: {
+                    'Authorization': `Bearer ${getAccessToken()}`
+                },
+                data: JSON.stringify({
+                    batchId: selectedBatch.batchId
+                })
+            });
+            
+            if (response.success) {
+                const totalReverted = response.totalReverted || 0;
+                showAlert('success', `Reversión de inflación completada exitosamente. ${totalReverted} registros procesados.`);
+                
+                // Refresh the page to show updated prices
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                throw new Error(response.error || 'Error desconocido');
+            }
+            
+        } catch (error) {
+            console.error('Error reverting inflation:', error);
+            const errorMessage = error.responseJSON?.error || error.message || 'Error desconocido';
+            showAlert('danger', 'Error al revertir inflación: ' + errorMessage);
+        } finally {
+            // Re-enable button
+            this.disabled = false;
+            this.innerHTML = originalText;
+        }
+    });
+}
+
+// Function to poll inflation status for background job monitoring
+function pollInflationStatus(batchId) {
+    const pollInterval = setInterval(async () => {
+        try {
+            const response = await $.ajax({
+                url: `/api/inflation-rate/status/${batchId}`,
+                method: 'GET'
+            });
+            
+            if (response.success) {
+                const status = response.status;
+                const processed = response.processed_count || 0;
+                
+                // Update UI with progress if needed
+                console.log(`Inflation status: ${status} - Processed: ${processed} records`);
+                
+                // Stop polling if completed or failed
+                if (status === 'COMPLETED' || status === 'FAILED') {
+                    clearInterval(pollInterval);
+                    
+                    if (status === 'COMPLETED') {
+                        const message = response.descriptive_message || `${processed} registros procesados.`;
+                        showAlert('success', `Proceso de inflación completado exitosamente. ${message}`);
+                    } else if (status === 'FAILED') {
+                        showAlert('danger', `Error en el proceso de inflación: ${response.error_message || 'Error desconocido'}`);
+                    }
+                    
+                    // Optionally refresh the page to show updated prices
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 3000);
+                }
+            }
+        } catch (error) {
+            console.error('Error polling inflation status:', error);
+            clearInterval(pollInterval);
+        }
+    }, 5000); // Poll every 5 seconds
+    
+    // Stop polling after 5 minutes to prevent infinite polling
+    setTimeout(() => {
+        clearInterval(pollInterval);
+        console.log('Inflation status polling stopped after 5 minutes');
+    }, 300000);
 }
 </script>

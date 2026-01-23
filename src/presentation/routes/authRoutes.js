@@ -274,6 +274,7 @@ router.post('/login', async (req, res) => {
           email: parseUser.get('email'),
           role: roleName,
           roleId: rolePointer,
+          clientId: parseUser.get('clientId'),
           organizationId: parseUser.get('organizationId'),
           name: parseUser.get('displayName') || parseUser.get('username'),
         };
@@ -289,9 +290,11 @@ router.post('/login', async (req, res) => {
       const AmexingUser = require('../../domain/models/AmexingUser');
 
       try {
-        // Query AmexingUser using Parse SDK - email only lookup
+        // Query AmexingUser using Parse SDK - email lookup with active/exists filter
         const query = new Parse.Query(AmexingUser);
         query.equalTo('email', identifier.toLowerCase().trim());
+        query.equalTo('active', true);
+        query.equalTo('exists', true);
         const user = await query.first({ useMasterKey: true });
 
         // Check if user was not found
@@ -436,6 +439,7 @@ router.post('/login', async (req, res) => {
           email: user.get('email'),
           role: roleName,
           roleId: rolePointer,
+          clientId: user.get('clientId'),
           organizationId: user.get('organizationId'),
           name:
             typeof user.getDisplayName === 'function'
@@ -471,6 +475,7 @@ router.post('/login', async (req, res) => {
           email: authenticatedUser.email,
           role: authenticatedUser.role,
           roleId: authenticatedUser.roleId,
+          clientId: authenticatedUser.clientId,
           organizationId: authenticatedUser.organizationId,
           name: authenticatedUser.name,
           iat: Math.floor(Date.now() / 1000),

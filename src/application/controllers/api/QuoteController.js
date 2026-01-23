@@ -1522,14 +1522,17 @@ class QuoteController {
 
   /**
    * Get unique tour destinations for a specific rate (Step 2 of 3-step tour selection).
-   * GET /api/quotes/tours/destinations-by-rate/:rateId.
+   * GET /api/quotes/tours/destinations-by-rate/:rateId?dayDate=YYYY-MM-DD.
    *
    * Returns list of unique destinations that have tours available for the specified rate.
+   * Supports day-of-week filtering via optional dayDate query parameter.
    * This is the second step in the tour selection flow: Rate → Destination → Vehicle.
    * @param {object} req - Express request object with rateId in params.
+   * @param {string} [req.query.dayDate] - Optional date in YYYY-MM-DD format for day-of-week filtering.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
+   * GET /api/quotes/tours/destinations-by-rate/ABC123?dayDate=2024-12-25
    * Response: {
    *   success: true,
    *   data: [
@@ -1546,8 +1549,10 @@ class QuoteController {
         return this.sendError(res, 'Autenticación requerida', 401);
       }
 
-      // 2. Get rate ID from params
+      // 2. Get rate ID from params and optional dayDate from query
       const { rateId } = req.params;
+      const { dayDate } = req.query;
+
       if (!rateId) {
         return this.sendError(res, 'El ID de la tarifa es requerido', 400);
       }
@@ -1568,7 +1573,28 @@ class QuoteController {
       toursQuery.include('destinationPOI');
       toursQuery.limit(1000);
 
-      const tours = await toursQuery.find({ useMasterKey: true });
+      let tours = await toursQuery.find({ useMasterKey: true });
+
+      // Apply day-of-week filtering if dayDate provided (client-side filtering)
+      // Note: We filter client-side because not all tours have availability field defined
+      if (dayDate && tours.length > 0) {
+        const QuoteServiceHelper = require('../../services/QuoteServiceHelper');
+        const dayCode = QuoteServiceHelper.getDayOfWeekCode(dayDate);
+
+        if (dayCode !== null) {
+          tours = tours.filter((tour) => {
+            const availability = tour.get('availability');
+
+            // If no availability field, include the tour (available all days)
+            if (!availability || !Array.isArray(availability)) {
+              return true;
+            }
+
+            // Check if tour is available on the specified day
+            return availability.some((avail) => avail.day === dayCode);
+          });
+        }
+      }
 
       // 5. Extract unique destinations
       const destinationMap = new Map();
@@ -1616,18 +1642,19 @@ class QuoteController {
 
   /**
    * Get available vehicles for a specific rate and destination (Step 3 of 3-step tour selection).
-   * GET /api/quotes/tours/vehicles-by-rate-destination/:rateId/:destinationId?numberOfPeople=X.
+   * GET /api/quotes/tours/vehicles-by-rate-destination/:rateId/:destinationId?numberOfPeople=X&dayDate=YYYY-MM-DD.
    *
    * Returns list of vehicle types available for the specified rate + destination combination.
    * Each vehicle includes tour details (tourId, price, duration, capacity, trunk capacity).
-   * Filters vehicles by capacity if numberOfPeople query parameter is provided.
+   * Supports filtering by capacity and day-of-week availability.
    * This is the third step in the tour selection flow: Rate → Destination → Vehicle.
    * @param {object} req - Express request object with rateId and destinationId in params.
    * @param {number} [req.query.numberOfPeople] - Optional number of people for capacity filtering.
+   * @param {string} [req.query.dayDate] - Optional date in YYYY-MM-DD format for day-of-week filtering.
    * @param {object} res - Express response object.
    * @returns {Promise<void>}
    * @example
-   * GET /api/quotes/tours/vehicles-by-rate-destination/ABC123/POI456?numberOfPeople=10
+   * GET /api/quotes/tours/vehicles-by-rate-destination/ABC123/POI456?numberOfPeople=10&dayDate=2024-12-25
    * Response: {
    *   success: true,
    *   data: [
@@ -1658,8 +1685,7 @@ class QuoteController {
       // 2. Get rate ID, destination ID from params, and optional numberOfPeople and dayDate from query
       const { rateId, destinationId } = req.params;
       const quoteNumberOfPeople = parseInt(req.query.numberOfPeople) || 0;
-      // TODO: Implement day-of-week filtering if needed
-      // const { dayDate } = req.query;
+      const { dayDate } = req.query;
 
       if (!rateId || !destinationId) {
         return this.sendError(res, 'El ID de la tarifa y destino son requeridos', 400);
@@ -1690,14 +1716,76 @@ class QuoteController {
       toursQuery.include('vehicleType');
       toursQuery.limit(1000);
 
-      const tours = await toursQuery.find({ useMasterKey: true });
+      let tours = await toursQuery.find({ useMasterKey: true });
+
+      logger.info('[DEBUG] Tours found before filtering', {
+        count: tours.length,
+        rateId,
+        destinationId,
+        dayDate,
+        numberOfPeople: quoteNumberOfPeople,
+      });
+
+      // Apply day-of-week filtering if dayDate provided (client-side filtering)
+      // Note: We filter client-side because not all tours have availability field defined
+      if (dayDate && tours.length > 0) {
+        const QuoteServiceHelper = require('../../services/QuoteServiceHelper');
+        const dayCode = QuoteServiceHelper.getDayOfWeekCode(dayDate);
+
+        logger.info('[DEBUG] Day filtering', {
+          dayDate,
+          dayCode,
+          toursBeforeFilter: tours.length,
+        });
+
+        if (dayCode !== null) {
+          tours = tours.filter((tour) => {
+            const availability = tour.get('availability');
+
+            // If no availability field, include the tour (available all days)
+            if (!availability || !Array.isArray(availability)) {
+              logger.info('[DEBUG] Tour included - no availability field', {
+                tourId: tour.id,
+                vehicleType: tour.get('vehicleType')?.get('name'),
+              });
+              return true;
+            }
+
+            // Check if tour is available on the specified day
+            const isAvailable = availability.some((avail) => avail.day === dayCode);
+            logger.info('[DEBUG] Tour availability check', {
+              tourId: tour.id,
+              vehicleType: tour.get('vehicleType')?.get('name'),
+              availability: availability.map((a) => a.day),
+              dayCode,
+              isAvailable,
+            });
+            return isAvailable;
+          });
+
+          logger.info('[DEBUG] After day filtering', {
+            toursAfterFilter: tours.length,
+          });
+        }
+      }
 
       if (tours.length === 0) {
+        logger.warn('[DEBUG] No tours found after filtering', {
+          rateId,
+          destinationId,
+          dayDate,
+          numberOfPeople: quoteNumberOfPeople,
+        });
         return this.sendResponse(res, []);
       }
 
       // 6. Build vehicle list with pricing
       const vehicles = [];
+
+      logger.info('[DEBUG] Building vehicle list', {
+        toursCount: tours.length,
+        numberOfPeople: quoteNumberOfPeople,
+      });
 
       for (const tour of tours) {
         const vehicleType = tour.get('vehicleType');
@@ -1707,9 +1795,24 @@ class QuoteController {
           const vehicleCapacity = vehicleType ? vehicleType.get('defaultCapacity') || 4 : 4;
           const trunkCapacity = vehicleType ? vehicleType.get('trunkCapacity') || 0 : 0;
 
-          // Filter by capacity if quoteNumberOfPeople is provided
-          // Only add vehicle if it meets capacity requirements
-          if (!(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople)) {
+          // Check if vehicle has sufficient capacity
+          const hasSufficientCapacity = !(quoteNumberOfPeople > 0 && vehicleCapacity < quoteNumberOfPeople);
+
+          logger.info('[DEBUG] Checking vehicle capacity', {
+            tourId: tour.id,
+            vehicleType: vehicleType.get('name'),
+            vehicleCapacity,
+            quoteNumberOfPeople,
+            hasSufficientCapacity,
+            willInclude: true, // Always include for now, show warning in frontend
+          });
+
+          // CAPACITY WARNING IMPLEMENTATION (Option B):
+          // All vehicles are included in the response, regardless of capacity.
+          // The 'hasSufficientCapacity' flag is sent to frontend for warning display.
+          // Frontend shows visual warnings (red text + alert) when capacity is insufficient.
+          // This allows users to select any vehicle but be informed of capacity limitations.
+          if (true) { // Include all vehicles
             // Get price breakdown with surcharge
             const basePrice = tour.get('price') || 0;
             const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
@@ -1724,6 +1827,7 @@ class QuoteController {
               vehicleTypeId: vehicleType ? vehicleType.id : null,
               capacity: vehicleCapacity,
               trunkCapacity,
+              hasSufficientCapacity, // Flag to show warnings in frontend
               basePrice: priceBreakdown.basePrice,
               price: priceBreakdown.totalPrice,
               surcharge: priceBreakdown.surcharge,
@@ -1737,6 +1841,15 @@ class QuoteController {
           }
         }
       }
+
+      logger.info('[DEBUG] Final vehicles list', {
+        vehiclesCount: vehicles.length,
+        vehicles: vehicles.map((v) => ({
+          vehicleType: v.vehicleType,
+          capacity: v.capacity,
+          price: v.price,
+        })),
+      });
 
       logger.info('Tour vehicles fetched for rate and destination', {
         rateId,

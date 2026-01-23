@@ -1,3 +1,4 @@
+const Parse = require('parse/node');
 const InflationRate = require('../../../domain/models/InflationRate');
 const logger = require('../../../infrastructure/logger');
 
@@ -245,6 +246,164 @@ class InflationRateController {
       res.status(500).json({
         success: false,
         error: 'Error retrieving inflation rate',
+      });
+    }
+  }
+
+  /**
+   * Apply inflation to all prices using current inflation rate.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Express response with inflation result.
+   * @example
+   */
+  async applyInflation(req, res) {
+    try {
+      const { percentage } = req.body;
+      const { user } = req;
+
+      console.log('🔥 INFLATION CONTROLLER CALLED!', { percentage, userId: user?.id });
+
+      if (!percentage || typeof percentage !== 'number') {
+        return res.status(400).json({
+          success: false,
+          error: 'Valid percentage parameter is required',
+        });
+      }
+
+      // Call the cloud function
+      const result = await Parse.Cloud.run('iniciarProcesoInflacion', {
+        percentage,
+      }, {
+        useMasterKey: true,
+        sessionToken: user.sessionToken,
+      });
+
+      if (result.success) {
+        logger.info(`Inflation process initiated: ${percentage}%`, {
+          userId: user.id,
+          batchId: result.batchId,
+        });
+
+        return res.json({
+          success: true,
+          batchId: result.batchId,
+          message: `Inflation process initiated successfully with ${percentage}%`,
+        });
+      }
+      throw new Error(result.error || 'Unknown error');
+    } catch (error) {
+      logger.error('Error applying inflation:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error applying inflation',
+      });
+    }
+  }
+
+  /**
+   * Revert the most recent inflation application.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Express response with revert result.
+   * @example
+   */
+  async revertInflation(req, res) {
+    try {
+      const { batchId } = req.body;
+      const { user } = req;
+
+      // Validate batchId is provided
+      if (!batchId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Batch ID is required for revert operation',
+        });
+      }
+
+      // Call the cloud function
+      const result = await Parse.Cloud.run('revertirInflacion', {
+        batchId,
+      }, {
+        useMasterKey: true,
+        sessionToken: user.sessionToken,
+      });
+
+      if (result.success) {
+        logger.info('Inflation reverted successfully', {
+          userId: user.id,
+          batchId: result.batchId,
+          totalReverted: result.totalReverted,
+        });
+
+        return res.json({
+          success: true,
+          batchId: result.batchId,
+          totalReverted: result.totalReverted,
+          message: result.message || 'Inflation reverted successfully',
+        });
+      }
+      throw new Error(result.error || 'Unknown error');
+    } catch (error) {
+      logger.error('Error reverting inflation:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error reverting inflation',
+      });
+    }
+  }
+
+  /**
+   * Get status of inflation process.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Express response with status.
+   * @example
+   */
+  async getInflationStatus(req, res) {
+    try {
+      const { batchId } = req.params;
+
+      if (!batchId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Batch ID is required',
+        });
+      }
+
+      // Call the cloud function
+      const result = await Parse.Cloud.run('obtenerEstadoInflacion', {
+        batchId,
+      }, { useMasterKey: true });
+
+      res.json(result);
+    } catch (error) {
+      logger.error('Error getting inflation status:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error getting inflation status',
+      });
+    }
+  }
+
+  /**
+   * Get available inflation batches that can be reverted.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Express response with available batches.
+   * @example
+   */
+  async getAvailableBatches(req, res) {
+    try {
+      // Call the cloud function to get available batches
+      const result = await Parse.Cloud.run('obtenerBatchesDisponibles', {}, { useMasterKey: true });
+
+      res.json(result);
+    } catch (error) {
+      logger.error('Error getting available batches:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error getting available batches',
       });
     }
   }

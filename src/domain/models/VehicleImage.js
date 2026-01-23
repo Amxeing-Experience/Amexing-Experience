@@ -96,9 +96,10 @@ class VehicleImage extends BaseModel {
    *
    * Priority:
    * 1. If imageFile exists (S3): Returns presigned URL
-   * 2. If url exists (legacy): Returns local path
-   * 3. Otherwise: Returns empty string.
-   * @returns {string} Image URL (S3 presigned URL or local path).
+   * 2. If S3 metadata exists (s3Key, s3Bucket, s3Region): Constructs S3 URL
+   * 3. If url exists (legacy): Returns local path
+   * 4. Otherwise: Returns empty string.
+   * @returns {string} Image URL (S3 URL or local path).
    * @example
    * const url = vehicleImage.getUrl();
    * // S3: 'https://amexing-bucket.s3.us-east-2.amazonaws.com/...'
@@ -109,6 +110,16 @@ class VehicleImage extends BaseModel {
     if (imageFile) {
       return imageFile.url(); // S3 presigned URL
     }
+
+    // Check for S3 metadata fields
+    const s3Key = this.get('s3Key');
+    const s3Bucket = this.get('s3Bucket');
+    const s3Region = this.get('s3Region');
+
+    if (s3Key && s3Bucket && s3Region) {
+      return `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;
+    }
+
     return this.get('url') || ''; // Legacy local path
   }
 

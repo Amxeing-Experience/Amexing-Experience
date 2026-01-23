@@ -1,3 +1,19 @@
+# [0.6.0](https://github.com/M4u2002/Amexing-Experience/compare/v0.4.0...v0.6.0) (2025-12-31)
+
+
+### Bug Fixes
+
+* **services:** fix some missing js ([dc5589b](https://github.com/M4u2002/Amexing-Experience/commit/dc5589beafc54ce104b1b6b93e042939ed5d9129))
+* **test:** fix test in general ([86faee9](https://github.com/M4u2002/Amexing-Experience/commit/86faee9f08dd0317d034c49f07c1d9fabeb361c2))
+* **test:** fix test in general ([5c639be](https://github.com/M4u2002/Amexing-Experience/commit/5c639bea01242ea60342dc470925351c3b58ddfb))
+
+
+### Features
+
+* **seed:** seed tarifarios ([a0b553f](https://github.com/M4u2002/Amexing-Experience/commit/a0b553fc20f15f122626d6be68f439c0ddae16e9))
+
+
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
