@@ -182,9 +182,9 @@ function initializeEmployeesDataTable() {
                 params.append('search', data.search.value);
             }
 
-            // Use the access token from server
-            const token = '<%= dtAccessToken %>' || (() => {
-                // Fallback: try to get from cookies if not passed from server
+            // Get token from localStorage (secure client-side storage)
+            const token = localStorage.getItem('token') || (() => {
+                // Fallback: try to get from cookies
                 const cookies = document.cookie.split(';');
                 for (let cookie of cookies) {
                     const [name, value] = cookie.trim().split('=');
