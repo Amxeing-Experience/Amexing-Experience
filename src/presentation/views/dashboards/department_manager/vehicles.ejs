@@ -14,12 +14,11 @@
 
 // Page configuration
 const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'department_manager';
-const activeSection = typeof section !== 'undefined' ? section : 'types'; // Default to types since vehicles is hidden
+const activeSection = typeof section !== 'undefined' ? section : 'vehicles'; // Default to vehicles
 
-// Menu items configuration - Hide vehicles section for department_manager
+// Menu items configuration - Only show vehicles for department_manager
 const menuItems = [
-    // { label: 'Vehículos', icon: 'car', section: 'vehicles', href: '/dashboard/department_manager/vehicles' }, // Hidden for department_manager
-    { label: 'Tipos de Vehículo', icon: 'list', section: 'types', href: '/dashboard/department_manager/vehicles?section=types' }
+    { label: 'Vehículos', icon: 'car', section: 'vehicles', href: '/dashboard/department_manager/vehicles' }
 ];
 %>
 
@@ -67,25 +66,13 @@ const menuItems = [
     </div>
 
     <div class="col-lg-9" id="contentColumn">
-        <% if (activeSection === 'vehicles') { %>
-            <!-- Vehicles Management Section -->
-            <%- include('../../organisms/datatable/vehicles-table', {
-                tableId: 'vehicles-table',
-                apiEndpoint: '/api/vehicles',
-                userRole: currentUserRole,
-                showActions: false
-            }) %>
-
-        <% } else if (activeSection === 'types') { %>
-            <!-- Vehicle Types Management Section -->
-            <%- include('../../organisms/datatable/vehicle-types-table', {
-                tableId: 'vehicle-types-table',
-                apiEndpoint: '/api/vehicle-types?active=true',
-                userRole: currentUserRole,
-                showActions: false
-            }) %>
-
-        <% } %>
+        <!-- Vehicles Management Section -->
+        <%- include('../../organisms/datatable/vehicles-table', {
+            tableId: 'vehicles-table',
+            apiEndpoint: '/api/vehicles',
+            userRole: currentUserRole,
+            showActions: false
+        }) %>
     </div>
 </div>
 
