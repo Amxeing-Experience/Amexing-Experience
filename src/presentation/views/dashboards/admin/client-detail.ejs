@@ -3315,6 +3315,11 @@ function setupExperienceFilters() {
             pattern: /^[a-zA-ZÀ-ÿ\u00f1\u00d1\s'-]+$/,
             message: 'El apellido debe tener entre 2-50 caracteres y solo contener letras'
         },
+        email: {
+            required: true,
+            pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+            message: 'Debe ingresar un email válido'
+        },
         companyName: {
             required: true,
             minLength: 2,
@@ -3432,7 +3437,8 @@ function setupExperienceFilters() {
         // Fields to validate
         const fieldsToValidate = [
             'editFirstName',
-            'editLastName', 
+            'editLastName',
+            'editEmail',
             'editCompanyName',
             'editPhone',
             'editTaxId',
@@ -3481,7 +3487,7 @@ function setupExperienceFilters() {
 
         const form = document.getElementById('editClientForm');
         const invalidFields = form.querySelectorAll('.is-invalid');
-        const requiredFields = ['editFirstName', 'editLastName', 'editCompanyName'];
+        const requiredFields = ['editFirstName', 'editLastName', 'editEmail', 'editCompanyName'];
         
         // Check if all required fields have values
         const requiredFieldsValid = requiredFields.every(fieldId => {
@@ -3545,11 +3551,11 @@ function setupExperienceFilters() {
         const originalContent = saveButton.innerHTML;
         saveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Guardando...';
         
-        // Gather form data (excluding email which cannot be changed)
+        // Gather form data
         const formData = {
             firstName: document.getElementById('editFirstName').value.trim(),
             lastName: document.getElementById('editLastName').value.trim(),
-            // email is excluded - it cannot be changed for security reasons
+            email: document.getElementById('editEmail').value.trim(),
             phone: document.getElementById('editPhone').value.trim() || undefined,
             companyName: document.getElementById('editCompanyName').value.trim(),
             taxId: document.getElementById('editTaxId').value.trim() || undefined,
@@ -3795,14 +3801,9 @@ function setupExperienceFilters() {
                                        value="<%= clientData.lastName %>" required>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="editEmail" class="form-label">Email</label>
+                                <label for="editEmail" class="form-label">Email <span class="text-danger">*</span></label>
                                 <input type="email" class="form-control" id="editEmail" name="email" 
-                                       value="<%= clientData.email %>" readonly 
-                                       style="background-color: #f8f9fa; cursor: not-allowed;">
-                                <div class="form-text text-warning">
-                                    <i class="ti ti-lock me-1"></i>El email no puede ser modificado ya que es usado para el acceso al sistema. 
-                                    Contacte al soporte para cambios de email.
-                                </div>
+                                       value="<%= clientData.email %>" required>
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="editPhone" class="form-label">Teléfono</label>
