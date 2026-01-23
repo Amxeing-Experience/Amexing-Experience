@@ -184,7 +184,32 @@ class VehicleController {
           try {
             const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
             if (primaryImage) {
-              imageUrl = primaryImage.getUrl();
+              // Try Parse.File first
+              const imageFile = primaryImage.get('imageFile');
+              if (imageFile) {
+                imageUrl = imageFile.url(); // S3 presigned URL
+              } else {
+                // Check for S3 metadata fields
+                const s3Key = primaryImage.get('s3Key');
+                const s3Bucket = primaryImage.get('s3Bucket');
+                const s3Region = primaryImage.get('s3Region');
+
+                if (s3Key && s3Bucket && s3Region) {
+                  imageUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;
+                } else {
+                  // Fallback to legacy URL field
+                  imageUrl = primaryImage.get('url') || '';
+                }
+              }
+
+              logger.debug('Found primary image for vehicle', {
+                vehicleId: vehicle.id,
+                imageUrl,
+              });
+            } else {
+              logger.debug('No primary image found for vehicle', {
+                vehicleId: vehicle.id,
+              });
             }
           } catch (error) {
             logger.warn('Failed to get primary image for vehicle', {
@@ -278,7 +303,23 @@ class VehicleController {
       try {
         const primaryImage = await VehicleImage.getPrimaryImage(vehicle.id);
         if (primaryImage) {
-          imageUrl = primaryImage.getUrl();
+          // Try Parse.File first
+          const imageFile = primaryImage.get('imageFile');
+          if (imageFile) {
+            imageUrl = imageFile.url(); // S3 presigned URL
+          } else {
+            // Check for S3 metadata fields
+            const s3Key = primaryImage.get('s3Key');
+            const s3Bucket = primaryImage.get('s3Bucket');
+            const s3Region = primaryImage.get('s3Region');
+
+            if (s3Key && s3Bucket && s3Region) {
+              imageUrl = `https://${s3Bucket}.s3.${s3Region}.amazonaws.com/${s3Key}`;
+            } else {
+              // Fallback to legacy URL field
+              imageUrl = primaryImage.get('url') || '';
+            }
+          }
         }
       } catch (error) {
         logger.warn('Failed to get primary image for vehicle', {
