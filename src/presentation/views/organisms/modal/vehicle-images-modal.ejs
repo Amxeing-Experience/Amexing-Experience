@@ -405,7 +405,8 @@ Features:
             dictInvalidFileType: 'No puedes subir archivos de este tipo.',
             dictMaxFilesExceeded: 'No puedes subir más archivos.',
             headers: {
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
             }
         });
 
