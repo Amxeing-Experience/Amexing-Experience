@@ -2087,8 +2087,8 @@ function setupExperienceFilters() {
                             label: 'Email Corporativo',
                             required: true,
                             placeholder: 'empleado@empresa.com',
-                            helpText: 'El email no puede ser modificado por seguridad',
-                            inputAttributes: { maxlength: '255', readonly: 'readonly' }
+                            helpText: 'Email corporativo del empleado para acceso al sistema',
+                            inputAttributes: { maxlength: '255' }
                         }) %>
                     </div>
 
@@ -3058,7 +3058,7 @@ function setupExperienceFilters() {
             const formData = {
                 firstName: document.getElementById('editEmployeeFirstName').value.trim(),
                 lastName: document.getElementById('editEmployeeLastName').value.trim(),
-                // Email is not included for security - it's read-only
+                email: document.getElementById('editEmployeeEmail').value.trim(),
                 role: document.getElementById('editEmployeeRole').value.trim(),
                 phone: document.getElementById('editEmployeePhone').value.trim() || undefined,
                 notes: document.getElementById('editEmployeeNotes').value.trim() || '',

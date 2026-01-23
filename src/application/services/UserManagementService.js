@@ -491,6 +491,8 @@ class UserManagementService {
       const allowedUpdateFields = [
         'firstName',
         'lastName',
+        'email',
+        'username',
         'role',
         'roleId',
         'displayRole',
@@ -517,6 +519,14 @@ class UserManagementService {
               objectId: updates[field],
             };
             user.set(field, rolePointer);
+          } else if (field === 'email' && updates[field]) {
+            // Update email field with normalization
+            const newEmail = updates[field].toLowerCase().trim();
+            user.set('email', newEmail);
+          } else if (field === 'username' && updates[field]) {
+            // Update username field with normalization
+            const newUsername = updates[field].toLowerCase().trim();
+            user.set('username', newUsername);
           } else {
             user.set(field, updates[field]);
           }
