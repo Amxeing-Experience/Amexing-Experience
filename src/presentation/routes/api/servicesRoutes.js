@@ -27,8 +27,8 @@ const router = express.Router();
 
 // Rate limiting for service operations
 const serviceApiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // Higher limit for read-heavy operations
+  windowMs: parseInt(process.env.SERVICES_RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000, // 15 minutes
+  max: parseInt(process.env.SERVICES_RATE_LIMIT_MAX_REQUESTS, 10) || 200, // Higher limit for read-heavy operations
   message: {
     success: false,
     error: 'Too many requests from this IP, please try again later.',
