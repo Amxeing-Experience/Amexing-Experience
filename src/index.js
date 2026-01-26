@@ -59,8 +59,8 @@ const { parseContextMiddleware } = require('./infrastructure/parseContext');
 const app = express();
 const PORT = process.env.PORT || 1337;
 
-// Trust proxy in production
-if (process.env.NODE_ENV === 'production') {
+// Trust proxy for production and staging (behind Nginx)
+if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
   app.set('trust proxy', 1);
 }
 
