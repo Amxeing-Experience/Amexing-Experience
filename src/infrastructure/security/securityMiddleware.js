@@ -445,8 +445,7 @@ class SecurityMiddleware {
     // development: Relaxed settings for development
 
     // CRITICAL FIX: Check if running on localhost (regardless of NODE_ENV)
-    const isLocalhost = process.env.PARSE_PUBLIC_SERVER_URL?.includes('localhost')
-                       || process.env.PARSE_SERVER_URL?.includes('localhost');
+    const isLocalhost = process.env.PARSE_PUBLIC_SERVER_URL?.includes('localhost') || process.env.PARSE_SERVER_URL?.includes('localhost');
 
     let cookieSecure;
     if (isLocalhost) {

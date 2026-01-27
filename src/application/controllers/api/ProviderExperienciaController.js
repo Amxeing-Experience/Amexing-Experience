@@ -67,11 +67,13 @@ class ProviderExperienciaController {
         max_people: exp.get('max_people'),
         availability: exp.get('availability') || null,
         active: exp.get('active'),
-        provider: exp.get('provider') ? {
-          id: exp.get('provider').id,
-          name: exp.get('provider').get('name'),
-          type: exp.get('provider').get('type'),
-        } : null,
+        provider: exp.get('provider')
+          ? {
+            id: exp.get('provider').id,
+            name: exp.get('provider').get('name'),
+            type: exp.get('provider').get('type'),
+          }
+          : null,
         createdAt: exp.createdAt,
         updatedAt: exp.updatedAt,
       }));

@@ -316,9 +316,7 @@ class UserManagementService {
   async getUserById(currentUser, userId, includeInactive = false) {
     try {
       // AI Agent Rule: Use queryActive for business operations, queryExisting for updates
-      const query = includeInactive
-        ? BaseModel.queryExisting(this.className)
-        : BaseModel.queryActive(this.className);
+      const query = includeInactive ? BaseModel.queryExisting(this.className) : BaseModel.queryActive(this.className);
       query.include('roleId'); // Include role data
 
       // Pass user context for audit trail

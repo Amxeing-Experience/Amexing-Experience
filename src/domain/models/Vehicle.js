@@ -490,7 +490,9 @@ class Vehicle extends BaseModel {
     }
 
     if (vin && vin.length === 17 && !/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) {
-      errors.push(`VIN contains invalid characters. Found: ${vin}. Only A-H, J-N, P-R, Z, 0-9 are allowed (no I, O, Q)`);
+      errors.push(
+        `VIN contains invalid characters. Found: ${vin}. Only A-H, J-N, P-R, Z, 0-9 are allowed (no I, O, Q)`
+      );
     }
 
     return {

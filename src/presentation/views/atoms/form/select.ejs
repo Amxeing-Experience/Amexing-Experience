@@ -1,0 +1,75 @@
+<%
+/**
+ * Select Dropdown Atom
+ * Dropdown selection field with options
+ *
+ * @param {string} id - Field ID
+ * @param {string} name - Field name attribute
+ * @param {string} label - Field label text
+ * @param {string} value - Currently selected value
+ * @param {array} options - Array of {value, label} objects
+ * @param {string} placeholder - Placeholder text (first option)
+ * @param {boolean} required - Whether field is required
+ * @param {boolean} disabled - Whether field is disabled
+ * @param {boolean} multiple - Allow multiple selections
+ * @param {string} helpText - Help text to display below field
+ * @param {string} errorText - Error message to display
+ * @param {string} className - Additional CSS classes
+ * @param {string} size - Field size: 'sm' | 'md' | 'lg'
+ */
+
+const fieldId = typeof id !== 'undefined' ? id : `select_${Math.random().toString(36).substr(2, 9)}`;
+const fieldName = typeof name !== 'undefined' ? name : fieldId;
+const fieldLabel = typeof label !== 'undefined' ? label : '';
+const fieldValue = typeof value !== 'undefined' ? value : '';
+const fieldOptions = typeof options !== 'undefined' ? options : [];
+const fieldPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'Seleccione una opción';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const isDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const isMultiple = typeof multiple !== 'undefined' ? multiple : false;
+const fieldHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const fieldErrorText = typeof errorText !== 'undefined' ? errorText : '';
+const fieldClassName = typeof className !== 'undefined' ? className : '';
+const fieldSize = typeof size !== 'undefined' ? size : 'md';
+
+// Size classes mapping
+const sizeClasses = {
+    'sm': 'form-select-sm',
+    'md': '',
+    'lg': 'form-select-lg'
+};
+
+const selectClass = `form-select ${sizeClasses[fieldSize]} ${fieldErrorText ? 'is-invalid' : ''} ${fieldClassName}`;
+
+// Prepare field content
+const fieldContent = `
+    <select 
+        id="${fieldId}" 
+        name="${fieldName}${isMultiple ? '[]' : ''}" 
+        class="${selectClass}"
+        ${isRequired ? 'required' : ''}
+        ${isDisabled ? 'disabled' : ''}
+        ${isMultiple ? 'multiple' : ''}
+    >
+        ${!isRequired && !isMultiple ? `<option value="">${fieldPlaceholder}</option>` : ''}
+        ${fieldOptions.map(opt => {
+            const isSelected = isMultiple 
+                ? (Array.isArray(fieldValue) && fieldValue.includes(opt.value))
+                : (opt.value === fieldValue);
+            return `<option value="${opt.value}" ${isSelected ? 'selected' : ''}>${opt.label}</option>`;
+        }).join('')}
+    </select>
+`;
+%>
+
+<%- include('_field-wrapper', {
+    id: fieldId,
+    name: fieldName,
+    label: fieldLabel,
+    required: isRequired,
+    helpText: fieldHelpText,
+    errorText: fieldErrorText,
+    className: '',
+    size: fieldSize,
+    fieldContent: fieldContent
+}) %>

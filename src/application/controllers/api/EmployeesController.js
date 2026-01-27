@@ -183,7 +183,7 @@ class EmployeesController {
       if (!employeeData.email?.toString().trim()) missingFields.push('email');
       // Check if roles array or single role is provided
       const hasRoles = (employeeData.roles && Array.isArray(employeeData.roles) && employeeData.roles.length > 0)
-                       || employeeData.role?.toString().trim();
+        || employeeData.role?.toString().trim();
       if (!hasRoles) missingFields.push('roles');
 
       if (missingFields.length > 0) {
@@ -203,7 +203,11 @@ class EmployeesController {
       // Check all selected roles are valid
       const invalidRoles = selectedRoles.filter((role) => !allowedRoles.includes(role));
       if (invalidRoles.length > 0) {
-        return this.sendError(res, `Roles inválidos: ${invalidRoles.join(', ')}. Los roles permitidos son: ${allowedRoles.join(', ')}`, 400);
+        return this.sendError(
+          res,
+          `Roles inválidos: ${invalidRoles.join(', ')}. Los roles permitidos son: ${allowedRoles.join(', ')}`,
+          400
+        );
       }
 
       // Email format validation
@@ -240,9 +244,7 @@ class EmployeesController {
       const roleObject = await roleQuery.first({ useMasterKey: true });
 
       if (!roleObject) {
-        throw new Error(
-          `Role '${actualRole}' not found in database. Please ensure roles are properly configured.`
-        );
+        throw new Error(`Role '${actualRole}' not found in database. Please ensure roles are properly configured.`);
       }
 
       // Set roleId as Pointer to Role object (always driver for new employee types)

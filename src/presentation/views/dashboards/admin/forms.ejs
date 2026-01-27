@@ -1,0 +1,667 @@
+<%
+/**
+ * Admin Forms Builder Page
+ * Dynamic form builder for creating and editing forms
+ *
+ * Layout Structure:
+ * - Left sidebar: Form templates list
+ * - Center canvas: Drag-drop form builder
+ * - Right sidebar: Components and properties
+ * - Top toolbar: Save, preview, and test controls
+ */
+
+// Page configuration
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-1 fw-bold">Constructor de Formularios</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0 small">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a>
+                        </li>
+                        <li class="breadcrumb-item active">
+                            <i class="ti ti-file-text me-1"></i>Formularios
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            <!-- Top Toolbar -->
+            <div class="d-flex align-items-center gap-2">
+                <button id="undoBtn" class="btn btn-sm btn-outline-secondary" disabled>
+                    <i class="ti ti-arrow-back-up"></i> Deshacer
+                </button>
+                <button id="redoBtn" class="btn btn-sm btn-outline-secondary" disabled>
+                    <i class="ti ti-arrow-forward-up"></i> Rehacer
+                </button>
+                <div class="vr"></div>
+                <button id="saveBtn" class="btn btn-sm btn-primary">
+                    <i class="ti ti-device-floppy"></i> Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Container -->
+<div class="form-builder-container">
+    <div class="row g-0 h-100">
+        <!-- Left Sidebar - Form Templates -->
+        <div class="col-auto form-builder-sidebar-left">
+            <div class="card h-100 rounded-0 rounded-start">
+                <div class="card-header bg-light border-bottom">
+                    <h5 class="mb-0 fw-semibold">Formularios</h5>
+                </div>
+                <div class="card-body p-0">
+                    <!-- Loading indicator -->
+                    <div class="text-center py-3" id="templatesLoading">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Cargando formularios...</span>
+                        </div>
+                        <div class="small text-muted mt-2">Cargando formularios...</div>
+                    </div>
+                    <!-- Templates list (populated dynamically) -->
+                    <div class="list-group list-group-flush" id="formTemplatesList" style="display: none;">
+                        <!-- Templates will be loaded dynamically here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center Canvas - Form Builder -->
+        <div class="col form-builder-canvas">
+            <div class="card h-100 rounded-0 border-start-0 border-end-0">
+                <div class="card-header bg-white border-bottom">
+                    <div class="flex-grow-1">
+                        <input type="text" class="form-control form-control-lg border-0 p-0 w-100" 
+                               value="Formulario de Experiencias" id="formTitle" 
+                               style="font-weight: 600;">
+                        <input type="text" class="form-control form-control-sm border-0 p-0 text-muted w-100" 
+                               value="Formulario para crear y editar experiencias turísticas" 
+                               id="formDescription">
+                    </div>
+                </div>
+                <div class="card-body p-4" style="background-color: #f8f9fa;">
+                    <div class="form-builder-dropzone" id="formCanvas">
+                        <!-- Drop Zone for form elements -->
+                        <div class="form-section mb-4" data-section-id="basic-info">
+                            <h5 class="section-title mb-3">Información Básica</h5>
+                            <div class="sortable-fields">
+                                <!-- Sample field -->
+                                <div class="form-field-wrapper mb-3" data-field-id="field-1">
+                                    <div class="form-field-container">
+                                        <label class="form-label">Nombre de la Experiencia <span class="text-danger">*</span></label>
+                                        <input type="text" class="form-control" placeholder="Ingrese el nombre de la experiencia">
+                                        <small class="form-text text-muted">Este será el título principal de la experiencia</small>
+                                    </div>
+                                    <div class="field-actions">
+                                        <button class="btn btn-sm btn-light"><i class="ti ti-settings"></i></button>
+                                        <button class="btn btn-sm btn-light"><i class="ti ti-copy"></i></button>
+                                        <button class="btn btn-sm btn-light text-danger"><i class="ti ti-trash"></i></button>
+                                    </div>
+                                </div>
+                                
+                                <div class="form-field-wrapper mb-3" data-field-id="field-2">
+                                    <div class="form-field-container">
+                                        <label class="form-label">Descripción</label>
+                                        <textarea class="form-control" rows="3" placeholder="Describa la experiencia"></textarea>
+                                    </div>
+                                    <div class="field-actions">
+                                        <button class="btn btn-sm btn-light"><i class="ti ti-settings"></i></button>
+                                        <button class="btn btn-sm btn-light"><i class="ti ti-copy"></i></button>
+                                        <button class="btn btn-sm btn-light text-danger"><i class="ti ti-trash"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Empty state when no fields -->
+                        <div class="empty-state text-center py-5 d-none">
+                            <i class="ti ti-drag-drop display-1 text-muted"></i>
+                            <h5 class="mt-3 text-muted">Arrastra componentes aquí</h5>
+                            <p class="text-muted">Comienza agregando campos desde el panel derecho</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar - Components & Properties -->
+        <div class="col-auto form-builder-sidebar-right">
+            <div class="card h-100 rounded-0 rounded-end">
+                <div class="card-header bg-light border-bottom">
+                    <!-- Tabs for Components and Properties -->
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#componentsTab" type="button">
+                                Componentes
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#propertiesTab" type="button">
+                                Propiedades
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body p-0">
+                    <div class="tab-content h-100">
+                        <!-- Components Tab -->
+                        <div class="tab-pane fade show active h-100" id="componentsTab">
+                            <div class="p-3">
+                                <!-- Basic Fields -->
+                                <h6 class="text-muted text-uppercase small mb-3">Campos Básicos</h6>
+                                <div class="components-grid mb-4">
+                                    <div class="component-item" draggable="true" data-component-type="text">
+                                        <i class="ti ti-text-caption"></i>
+                                        <span>Texto</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="number">
+                                        <i class="ti ti-hash"></i>
+                                        <span>Número</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="email">
+                                        <i class="ti ti-at"></i>
+                                        <span>Email</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="password">
+                                        <i class="ti ti-lock"></i>
+                                        <span>Contraseña</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="textarea">
+                                        <i class="ti ti-text-wrap"></i>
+                                        <span>Área de Texto</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="phone">
+                                        <i class="ti ti-phone"></i>
+                                        <span>Teléfono</span>
+                                    </div>
+                                </div>
+
+                                <!-- Selection Fields -->
+                                <h6 class="text-muted text-uppercase small mb-3">Campos de Selección</h6>
+                                <div class="components-grid mb-4">
+                                    <div class="component-item" draggable="true" data-component-type="select">
+                                        <i class="ti ti-chevron-down"></i>
+                                        <span>Dropdown</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="radio">
+                                        <i class="ti ti-circle-dot"></i>
+                                        <span>Radio</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="checkbox">
+                                        <i class="ti ti-checkbox"></i>
+                                        <span>Checkbox</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="toggle">
+                                        <i class="ti ti-toggle-left"></i>
+                                        <span>Toggle</span>
+                                    </div>
+                                </div>
+
+                                <!-- Date & Time Fields -->
+                                <h6 class="text-muted text-uppercase small mb-3">Fecha y Hora</h6>
+                                <div class="components-grid mb-4">
+                                    <div class="component-item" draggable="true" data-component-type="date">
+                                        <i class="ti ti-calendar"></i>
+                                        <span>Fecha</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="time">
+                                        <i class="ti ti-clock"></i>
+                                        <span>Hora</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="datetime">
+                                        <i class="ti ti-calendar-time"></i>
+                                        <span>Fecha y Hora</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="daterange">
+                                        <i class="ti ti-calendar-stats"></i>
+                                        <span>Rango Fecha</span>
+                                    </div>
+                                </div>
+
+                                <!-- Advanced Fields -->
+                                <h6 class="text-muted text-uppercase small mb-3">Campos Avanzados</h6>
+                                <div class="components-grid mb-4">
+                                    <div class="component-item" draggable="true" data-component-type="file">
+                                        <i class="ti ti-paperclip"></i>
+                                        <span>Archivo</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="image">
+                                        <i class="ti ti-photo"></i>
+                                        <span>Imagen</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="signature">
+                                        <i class="ti ti-signature"></i>
+                                        <span>Firma</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="location">
+                                        <i class="ti ti-map-pin"></i>
+                                        <span>Ubicación</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="rating">
+                                        <i class="ti ti-star"></i>
+                                        <span>Calificación</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="richtext">
+                                        <i class="ti ti-text-size"></i>
+                                        <span>Texto Rico</span>
+                                    </div>
+                                </div>
+
+                                <!-- Layout Elements -->
+                                <h6 class="text-muted text-uppercase small mb-3">Elementos de Diseño</h6>
+                                <div class="components-grid">
+                                    <div class="component-item" draggable="true" data-component-type="section">
+                                        <i class="ti ti-layout-navbar"></i>
+                                        <span>Sección</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="divider">
+                                        <i class="ti ti-separator"></i>
+                                        <span>Separador</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="heading">
+                                        <i class="ti ti-h-1"></i>
+                                        <span>Título</span>
+                                    </div>
+                                    <div class="component-item" draggable="true" data-component-type="paragraph">
+                                        <i class="ti ti-text"></i>
+                                        <span>Párrafo</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Properties Tab -->
+                        <div class="tab-pane fade h-100" id="propertiesTab">
+                            <div class="p-3">
+                                <div class="no-selection text-center py-5">
+                                    <i class="ti ti-click display-3 text-muted"></i>
+                                    <p class="text-muted mt-3">Selecciona un campo para editar sus propiedades</p>
+                                </div>
+
+                                <!-- Properties form (hidden by default) -->
+                                <div class="properties-form d-none">
+                                    <h6 class="mb-3">Propiedades del Campo</h6>
+                                    
+                                    <!-- Basic Properties -->
+                                    <div class="mb-3">
+                                        <label class="form-label small">Etiqueta</label>
+                                        <input type="text" class="form-control form-control-sm" id="propLabel">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label small">Nombre del Campo</label>
+                                        <input type="text" class="form-control form-control-sm" id="propName">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label small">Placeholder</label>
+                                        <input type="text" class="form-control form-control-sm" id="propPlaceholder">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label small">Texto de Ayuda</label>
+                                        <input type="text" class="form-control form-control-sm" id="propHelpText">
+                                    </div>
+
+                                    <!-- Validation -->
+                                    <h6 class="mt-4 mb-3">Validación</h6>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="propRequired">
+                                        <label class="form-check-label small" for="propRequired">
+                                            Campo Requerido
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label small">Longitud Mínima</label>
+                                        <input type="number" class="form-control form-control-sm" id="propMinLength">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label small">Longitud Máxima</label>
+                                        <input type="number" class="form-control form-control-sm" id="propMaxLength">
+                                    </div>
+
+                                    <!-- Advanced -->
+                                    <h6 class="mt-4 mb-3">Avanzado</h6>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label small">Valor por Defecto</label>
+                                        <input type="text" class="form-control form-control-sm" id="propDefaultValue">
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="propReadOnly">
+                                        <label class="form-check-label small" for="propReadOnly">
+                                            Solo Lectura
+                                        </label>
+                                    </div>
+                                    
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="propDisabled">
+                                        <label class="form-check-label small" for="propDisabled">
+                                            Deshabilitado
+                                        </label>
+                                    </div>
+
+                                    <!-- Apply Button -->
+                                    <div class="mt-4">
+                                        <button class="btn btn-primary btn-sm w-100" id="applyProperties">
+                                            Aplicar Cambios
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-builder-container {
+    height: calc(100vh - 200px);
+    min-height: 600px;
+}
+
+.form-builder-sidebar-left {
+    width: 280px;
+}
+
+.form-builder-sidebar-right {
+    width: 320px;
+}
+
+.form-builder-canvas {
+    background-color: #f0f2f5;
+}
+
+.form-builder-dropzone {
+    min-height: 400px;
+    background: white;
+    border-radius: 8px;
+    padding: 20px;
+    position: relative;
+}
+
+.form-field-wrapper {
+    background: white;
+    border: 2px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 15px;
+    position: relative;
+    transition: all 0.2s ease;
+    cursor: move;
+}
+
+.form-field-wrapper:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.form-field-wrapper.selected {
+    border-color: #3b82f6;
+    background-color: #eff6ff;
+}
+
+.field-actions {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: none;
+    gap: 5px;
+}
+
+.form-field-wrapper:hover .field-actions,
+.form-field-wrapper.selected .field-actions {
+    display: flex;
+}
+
+.components-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+}
+
+.component-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 8px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    cursor: grab;
+    transition: all 0.2s ease;
+    font-size: 0.75rem;
+    text-align: center;
+}
+
+.component-item:hover {
+    background: #e9ecef;
+    border-color: #adb5bd;
+    transform: translateY(-2px);
+}
+
+.component-item:active {
+    cursor: grabbing;
+}
+
+.component-item i {
+    font-size: 1.25rem;
+    margin-bottom: 4px;
+}
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 8px;
+}
+
+.empty-state {
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    background-color: #f8f9fa;
+}
+
+.sortable-ghost {
+    opacity: 0.4;
+}
+
+.sortable-drag {
+    opacity: 1 !important;
+}
+
+.drop-indicator {
+    height: 3px;
+    background-color: #3b82f6;
+    margin: 10px 0;
+    border-radius: 2px;
+}
+
+/* Scrollable sidebars */
+.form-builder-sidebar-left .card-body,
+.form-builder-sidebar-right .tab-content {
+    overflow-y: auto;
+    max-height: calc(100vh - 280px);
+}
+
+/* Form template list item styles */
+#formTemplatesList .list-group-item.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+#formTemplatesList .list-group-item.active .form-template-title {
+    color: white !important;
+}
+
+#formTemplatesList .list-group-item.active .form-template-subtitle {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+#formTemplatesList .list-group-item:not(.active) .form-template-subtitle {
+    color: #6c757d;
+}
+</style>
+
+<!-- Load Component Registry, Factory and Form Builder -->
+<script src="/js/ComponentRegistry.js"></script>
+<script src="/js/FormComponentFactory.js"></script>
+<script src="/js/form-builder.js"></script>
+
+<!-- Form Builder Session Authentication -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // The form builder now uses session authentication (cookies)
+    // No need for JWT tokens or localStorage
+    console.log('Form builder using session authentication');
+    
+    // Optional: Add a test button to verify authentication
+    const toolbar = document.querySelector('.d-flex.align-items-center.gap-2');
+    if (toolbar && false) { // Disabled by default, set to true for debugging
+        const testBtn = document.createElement('button');
+        testBtn.id = 'testAuthBtn';
+        testBtn.className = 'btn btn-sm btn-info';
+        testBtn.innerHTML = '<i class="ti ti-shield-check"></i> Test Auth';
+        testBtn.onclick = async function() {
+            try {
+                const response = await fetch('/api/forms/templates', {
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    alert('✅ Authentication working!\nYou can save forms.');
+                } else {
+                    alert('❌ Authentication failed:\n' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('❌ Connection error:\n' + error.message);
+            }
+        };
+        
+        const saveBtn = document.getElementById('saveBtn');
+        if (saveBtn) {
+            toolbar.insertBefore(testBtn, saveBtn);
+            const separator = document.createElement('div');
+            separator.className = 'vr';
+            toolbar.insertBefore(separator, saveBtn);
+        }
+    }
+    
+    // Load form templates dynamically
+    async function loadFormTemplates() {
+        const templatesContainer = document.getElementById('formTemplatesList');
+        const loadingIndicator = document.getElementById('templatesLoading');
+        
+        try {
+            console.log('Loading form templates...');
+            const response = await fetch('/api/forms/templates', {
+                credentials: 'include'
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.data) {
+                console.log('Templates loaded:', data.data);
+                
+                // Clear existing content
+                templatesContainer.innerHTML = '';
+                
+                // Create template items
+                data.data.forEach((template, index) => {
+                    const templateItem = document.createElement('a');
+                    templateItem.href = '#';
+                    templateItem.className = 'list-group-item list-group-item-action';
+                    templateItem.setAttribute('data-form-id', template.formId || template.id);
+                    
+                    // Set first template as active
+                    if (index === 0) {
+                        templateItem.classList.add('active');
+                    }
+                    
+                    // Use the fieldCount from API or calculate from fields array
+                    const fieldCount = template.fieldCount || (template.fields ? template.fields.length : 0);
+                    
+                    // Clean up title by removing "Formulario de" and "Formulario para"
+                    let cleanTitle = template.title;
+                    cleanTitle = cleanTitle.replace(/^Formulario de\s*/i, '');
+                    cleanTitle = cleanTitle.replace(/^Formulario para\s*/i, '');
+                    
+                    templateItem.innerHTML = `
+                        <div>
+                            <h6 class="mb-1 form-template-title">${cleanTitle}</h6>
+                            <small class="form-template-subtitle">${fieldCount} campos</small>
+                        </div>
+                    `;
+                    
+                    // Add click event listener
+                    templateItem.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        
+                        // Remove active class from all templates
+                        templatesContainer.querySelectorAll('.list-group-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        
+                        // Add active class to clicked template
+                        templateItem.classList.add('active');
+                        
+                        // Load the template (if form builder is available)
+                        if (window.formBuilder && window.formBuilder.loadFormTemplate) {
+                            window.formBuilder.loadFormTemplate(template.formId || template.id);
+                        } else {
+                            console.log('Selected template:', template.formId || template.id);
+                        }
+                    });
+                    
+                    templatesContainer.appendChild(templateItem);
+                });
+                
+                // Show templates list and hide loading
+                templatesContainer.style.display = 'block';
+                loadingIndicator.style.display = 'none';
+                
+                console.log(`✅ ${data.data.length} templates loaded successfully`);
+                
+                // Automatically load the first template if available
+                if (data.data.length > 0 && window.formBuilder && window.formBuilder.loadFormTemplate) {
+                    const firstTemplate = data.data[0];
+                    console.log('Auto-loading first template:', firstTemplate.formId || firstTemplate.id);
+                    window.formBuilder.loadFormTemplate(firstTemplate.formId || firstTemplate.id);
+                }
+            } else {
+                throw new Error(data.error || 'No templates data received');
+            }
+        } catch (error) {
+            console.error('Error loading templates:', error);
+            
+            // Show error message
+            templatesContainer.innerHTML = `
+                <div class="text-center py-3 text-muted">
+                    <i class="ti ti-alert-circle fs-4 mb-2"></i>
+                    <div class="small">Error cargando formularios</div>
+                    <div class="small text-danger">${error.message}</div>
+                </div>
+            `;
+            templatesContainer.style.display = 'block';
+            loadingIndicator.style.display = 'none';
+        }
+    }
+    
+    // Load templates when page loads
+    loadFormTemplates();
+});
+</script>

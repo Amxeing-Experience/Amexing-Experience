@@ -1,0 +1,59 @@
+<%
+/**
+ * Field Wrapper Atom
+ * Provides consistent wrapper for all form fields with label, help text, and error handling
+ *
+ * @param {string} id - Field ID
+ * @param {string} name - Field name attribute
+ * @param {string} label - Field label text
+ * @param {boolean} required - Whether field is required
+ * @param {string} helpText - Help text to display below field
+ * @param {string} errorText - Error message to display
+ * @param {string} className - Additional CSS classes
+ * @param {string} size - Field size: 'sm' | 'md' | 'lg' (default: 'md')
+ * @param {string} fieldContent - The actual field HTML content
+ */
+
+const fieldId = typeof id !== 'undefined' ? id : `field_${Math.random().toString(36).substr(2, 9)}`;
+const fieldName = typeof name !== 'undefined' ? name : fieldId;
+const fieldLabel = typeof label !== 'undefined' ? label : '';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const fieldHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const fieldErrorText = typeof errorText !== 'undefined' ? errorText : '';
+const fieldClassName = typeof className !== 'undefined' ? className : '';
+const fieldSize = typeof size !== 'undefined' ? size : 'md';
+
+// Size classes mapping
+const sizeClasses = {
+    'sm': 'mb-2',
+    'md': 'mb-3',
+    'lg': 'mb-4'
+};
+
+const wrapperClass = `form-field-wrapper ${sizeClasses[fieldSize]} ${fieldClassName}`;
+%>
+
+<div class="<%= wrapperClass %>" data-field-id="<%= fieldId %>" data-field-name="<%= fieldName %>">
+    <% if (fieldLabel) { %>
+    <label for="<%= fieldId %>" class="form-label">
+        <%= fieldLabel %>
+        <% if (isRequired) { %>
+        <span class="text-danger">*</span>
+        <% } %>
+    </label>
+    <% } %>
+    
+    <%- fieldContent %>
+    
+    <% if (fieldHelpText && !fieldErrorText) { %>
+    <small class="form-text text-muted">
+        <%= fieldHelpText %>
+    </small>
+    <% } %>
+    
+    <% if (fieldErrorText) { %>
+    <small class="form-text text-danger">
+        <%= fieldErrorText %>
+    </small>
+    <% } %>
+</div>

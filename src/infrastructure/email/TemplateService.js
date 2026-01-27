@@ -289,9 +289,7 @@ class TemplateService {
       const foundPlaceholders = placeholderMatches.map((match) => match.replace(/\{\{|\}\}/g, ''));
 
       // Check for missing required placeholders
-      const missing = requiredPlaceholders.filter(
-        (required) => !foundPlaceholders.includes(required)
-      );
+      const missing = requiredPlaceholders.filter((required) => !foundPlaceholders.includes(required));
 
       const valid = missing.length === 0;
 
@@ -308,9 +306,7 @@ class TemplateService {
         found: foundPlaceholders,
         required: requiredPlaceholders,
         missing,
-        extra: foundPlaceholders.filter(
-          (found) => !requiredPlaceholders.includes(found)
-        ),
+        extra: foundPlaceholders.filter((found) => !requiredPlaceholders.includes(found)),
       };
     } catch (error) {
       logger.error('[TemplateService] Error validating template', {
@@ -342,11 +338,13 @@ class TemplateService {
       const files = fs.readdirSync(instance.templatesPath);
 
       // Get unique template names (without extensions)
-      const templates = [...new Set(
-        files
-          .filter((file) => file.endsWith('.html') || file.endsWith('.txt'))
-          .map((file) => file.replace(/\.(html|txt)$/, ''))
-      )];
+      const templates = [
+        ...new Set(
+          files
+            .filter((file) => file.endsWith('.html') || file.endsWith('.txt'))
+            .map((file) => file.replace(/\.(html|txt)$/, ''))
+        ),
+      ];
 
       logger.debug('[TemplateService] Listed templates', {
         count: templates.length,
@@ -396,7 +394,8 @@ class TemplateService {
       AVISO_PRIVACIDAD: 'https://www.amexingexperience.com/privacidad',
       INSTAGRAM: 'https://www.instagram.com/amexingexperience/',
       FACEBOOK: 'https://www.facebook.com/amexingexperience/',
-      TRIPADVISOR: 'https://www.tripadvisor.com.mx/Attraction_Review-g151932-d19425238-Reviews-Amexing_Experience_by_Angelica_Tours-San_Miguel_de_Allende_Central_Mexico_and_Gu.html',
+      TRIPADVISOR:
+        'https://www.tripadvisor.com.mx/Attraction_Review-g151932-d19425238-Reviews-Amexing_Experience_by_Angelica_Tours-San_Miguel_de_Allende_Central_Mexico_and_Gu.html',
       TAGLINE: 'Elevamos la experiencia de viaje en San Miguel de Allende',
       NOMBRE_EMPRESA: 'Amexing Experience',
       UBICACION: 'San Miguel de Allende, Guanajuato',

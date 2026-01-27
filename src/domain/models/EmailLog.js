@@ -411,9 +411,7 @@ class EmailLog extends BaseModel {
     const [localPart, domain] = email.split('@');
     if (!domain) return '***';
 
-    const maskedLocal = localPart.length > 2
-      ? `${localPart[0]}**${localPart[localPart.length - 1]}`
-      : '***';
+    const maskedLocal = localPart.length > 2 ? `${localPart[0]}**${localPart[localPart.length - 1]}` : '***';
 
     return `${maskedLocal}@${domain}`;
   }

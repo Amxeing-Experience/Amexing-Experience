@@ -279,6 +279,11 @@ router.get('/session/metrics', (req, res) => {
   }
 });
 
+// Form Builder API routes (before JWT middleware to allow public endpoints)
+const formRoutes = require('./api/formRoutes');
+
+router.use('/forms', formRoutes);
+
 // Protected API endpoints - use JWT authentication for API routes
 router.use(jwtMiddleware.authenticateToken);
 
@@ -385,7 +390,8 @@ router.post('/emails/send-test', jwtMiddleware.requireRoleLevel(7), async (req, 
     if (!emailService.isAvailable()) {
       return res.status(503).json({
         success: false,
-        error: 'El servicio de email no está configurado. Por favor verifica las variables de entorno MAILERSEND_API_TOKEN y EMAIL_FROM.',
+        error:
+          'El servicio de email no está configurado. Por favor verifica las variables de entorno MAILERSEND_API_TOKEN y EMAIL_FROM.',
       });
     }
 
