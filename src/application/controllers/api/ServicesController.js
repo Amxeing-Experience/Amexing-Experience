@@ -312,6 +312,16 @@ class ServicesController {
       // Client ID for client-specific pricing and rate ID for consistent pricing
       const { clientId, rateId } = req.query;
 
+      // Debug logging for client pricing investigation
+      console.log('🔍 ServicesController.getServices - Request Info:', {
+        userId: currentUser.id,
+        userRole: currentUser.get ? currentUser.get('role') : 'unknown',
+        userClientId: currentUser.get ? currentUser.get('clientId') : 'N/A',
+        requestClientId: clientId,
+        requestRateId: rateId,
+        fullQuery: req.query,
+      });
+
       logger.info('ServicesController.getServices called', {
         userId: currentUser.id,
         query: req.query,
@@ -646,14 +656,30 @@ class ServicesController {
             return isOurClient && isServices && isActive && exists && isCurrent;
           });
 
-          // Create the pricing map
+          // Create the pricing map - FIXED: Use vehiclePtr ID instead of ratePtr ID for consistency
           relevantClientPrices.forEach((cp) => {
             const clientServiceId = cp.itemId;
             const clientRateId = cp.ratePtr?.objectId;
-            if (clientServiceId && clientRateId) {
+            const clientVehicleId = cp.vehiclePtr?.objectId;
+            if (clientServiceId) {
               const price = cp.precio || 0;
-              const key = `${clientServiceId}_${clientRateId}`;
-              clientPricesMap[key] = price;
+
+              // Store by both rate and vehicle for flexibility in lookups
+              if (clientRateId) {
+                const keyByRate = `${clientServiceId}_RATE_${clientRateId}`;
+                clientPricesMap[keyByRate] = price;
+              }
+
+              if (clientVehicleId) {
+                const keyByVehicle = `${clientServiceId}_${clientVehicleId}`;
+                clientPricesMap[keyByVehicle] = price;
+              }
+
+              // Store by rate+vehicle combo for precise matching
+              if (clientRateId && clientVehicleId) {
+                const keyByBoth = `${clientServiceId}_${clientRateId}_${clientVehicleId}`;
+                clientPricesMap[keyByBoth] = price;
+              }
             }
           });
         } catch (error) {
@@ -701,6 +727,28 @@ class ServicesController {
             let pricingData = null;
             if (serviceId) {
               pricingData = await this.getServiceVehicleTypeAndPrice(serviceId, clientId, rateId);
+
+              // DEBUG: Check if we have client price overrides available
+              if (clientId && clientPricesMap && Object.keys(clientPricesMap).length > 0) {
+                // Check all possible key formats for this service
+                const possibleKeys = [
+                  `${serviceId}_RATE_${rateId}`,
+                  `${serviceId}_${pricingData?.vehicleType?.id}`,
+                  `${serviceId}_${rateId}_${pricingData?.vehicleType?.id}`,
+                ];
+
+                for (const key of possibleKeys) {
+                  if (clientPricesMap[key]) {
+                    console.log(`🔍 Found client price override for service ${serviceId}: ${clientPricesMap[key]} MXN (key: ${key})`);
+                    // Override the price from the helper with the client-specific price
+                    if (pricingData) {
+                      pricingData.finalPrice = clientPricesMap[key];
+                      pricingData.isClientPrice = true;
+                    }
+                    break;
+                  }
+                }
+              }
             }
 
             // If helper failed but we have rateId, provide a fallback using RatePrices directly
