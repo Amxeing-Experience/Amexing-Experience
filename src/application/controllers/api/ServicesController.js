@@ -737,9 +737,19 @@ class ServicesController {
                   `${serviceId}_${rateId}_${pricingData?.vehicleType?.id}`,
                 ];
 
+                console.log(`🔍 Checking for client price overrides for service ${serviceId}:`, {
+                  serviceId,
+                  clientId,
+                  rateId,
+                  vehicleId: pricingData?.vehicleType?.id,
+                  possibleKeys,
+                  availableKeys: Object.keys(clientPricesMap).filter((k) => k.includes(serviceId)),
+                  originalPrice: pricingData?.finalPrice,
+                });
+
                 for (const key of possibleKeys) {
                   if (clientPricesMap[key]) {
-                    console.log(`🔍 Found client price override for service ${serviceId}: ${clientPricesMap[key]} MXN (key: ${key})`);
+                    console.log(`✅ Found client price override for service ${serviceId}: ${clientPricesMap[key]} MXN (key: ${key})`);
                     // Override the price from the helper with the client-specific price
                     if (pricingData) {
                       pricingData.finalPrice = clientPricesMap[key];
@@ -747,6 +757,10 @@ class ServicesController {
                     }
                     break;
                   }
+                }
+
+                if (!pricingData?.isClientPrice) {
+                  console.log(`⚠️ No client price override found for service ${serviceId}, using base price: ${pricingData?.finalPrice} MXN`);
                 }
               }
             }
@@ -799,7 +813,8 @@ class ServicesController {
               const { vehicleType, rate, finalPrice: pricingFinalPrice } = pricingData;
               vehicleTypeToUse = vehicleType;
               rateToUse = rate;
-              finalPrice = pricingFinalPrice;
+              // IMPORTANT: Use the updated finalPrice from pricingData (which may have been overridden with client price)
+              finalPrice = pricingData.finalPrice || pricingFinalPrice;
 
               // Check if we have multiple vehicle options from the helper method
               if (pricingData.allVehicleOptions && pricingData.allVehicleOptions.length > 1) {
@@ -813,6 +828,7 @@ class ServicesController {
                   },
                   price: option.finalPrice,
                   formattedPrice: `$${option.finalPrice.toLocaleString()} MXN`,
+                  isClientPrice: option.isClientPrice || false,
                 }));
                 Object.assign(service, { priceData: priceDataForMultiple });
               } else {
@@ -824,8 +840,9 @@ class ServicesController {
                     defaultCapacity: vehicleTypeToUse?.get('defaultCapacity'),
                     trunkCapacity: vehicleTypeToUse?.get('trunkCapacity'),
                   },
-                  price: finalPrice,
+                  price: finalPrice, // This will now use the correct updated price
                   formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
+                  isClientPrice: pricingData.isClientPrice || false,
                 }];
                 Object.assign(service, { priceData: priceDataForSingle });
               }
