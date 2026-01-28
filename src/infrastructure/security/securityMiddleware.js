@@ -231,8 +231,8 @@ class SecurityMiddleware {
    */
   getApiRateLimiter() {
     return rateLimit({
-      windowMs: 1 * 60 * 1000, // 1 minute
-      max: this.isDevelopment ? 100000 : 120, // Increased to 100000 for development workflows
+      windowMs: parseInt(process.env.API_RATE_LIMIT_WINDOW_MS, 10) || 1 * 60 * 1000, // 1 minute default
+      max: parseInt(process.env.API_RATE_LIMIT_MAX_REQUESTS, 10) || (this.isDevelopment ? 100000 : 120), // Configurable via env
       message: 'API rate limit exceeded.',
       standardHeaders: true,
       legacyHeaders: false,

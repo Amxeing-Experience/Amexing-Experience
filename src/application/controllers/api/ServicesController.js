@@ -312,6 +312,16 @@ class ServicesController {
       // Client ID for client-specific pricing and rate ID for consistent pricing
       const { clientId, rateId } = req.query;
 
+      // Debug logging for client pricing investigation
+      console.log('🔍 ServicesController.getServices - Request Info:', {
+        userId: currentUser.id,
+        userRole: currentUser.get ? currentUser.get('role') : 'unknown',
+        userClientId: currentUser.get ? currentUser.get('clientId') : 'N/A',
+        requestClientId: clientId,
+        requestRateId: rateId,
+        fullQuery: req.query,
+      });
+
       logger.info('ServicesController.getServices called', {
         userId: currentUser.id,
         query: req.query,
@@ -649,14 +659,30 @@ class ServicesController {
             return isOurClient && isServices && isActive && exists && isCurrent;
           });
 
-          // Create the pricing map
+          // Create the pricing map - FIXED: Use vehiclePtr ID instead of ratePtr ID for consistency
           relevantClientPrices.forEach((cp) => {
             const clientServiceId = cp.itemId;
             const clientRateId = cp.ratePtr?.objectId;
-            if (clientServiceId && clientRateId) {
+            const clientVehicleId = cp.vehiclePtr?.objectId;
+            if (clientServiceId) {
               const price = cp.precio || 0;
-              const key = `${clientServiceId}_${clientRateId}`;
-              clientPricesMap[key] = price;
+
+              // Store by both rate and vehicle for flexibility in lookups
+              if (clientRateId) {
+                const keyByRate = `${clientServiceId}_RATE_${clientRateId}`;
+                clientPricesMap[keyByRate] = price;
+              }
+
+              if (clientVehicleId) {
+                const keyByVehicle = `${clientServiceId}_${clientVehicleId}`;
+                clientPricesMap[keyByVehicle] = price;
+              }
+
+              // Store by rate+vehicle combo for precise matching
+              if (clientRateId && clientVehicleId) {
+                const keyByBoth = `${clientServiceId}_${clientRateId}_${clientVehicleId}`;
+                clientPricesMap[keyByBoth] = price;
+              }
             }
           });
         } catch (error) {
@@ -684,11 +710,6 @@ class ServicesController {
             let rateToUse = null; // ✅ Will come from RatePrices/ClientPrices via single source of truth
             let vehicleTypeToUse = null; // ✅ Force to null - must come from RatePrices/ClientPrices
 
-            // Debug logging for Queretaro service to track the vehicle type assignment
-            if (service.id === '6p4zqx7YCf') {
-              // Specific service processing
-            }
-
             // Simple pricing: Use the helper method for consistency
             // Call helper when we have either clientId OR rateId (to get rate-specific pricing)
             // Use service.id or service.objectId (both should be the same in Parse)
@@ -705,59 +726,67 @@ class ServicesController {
               let pricingData = null;
               if (serviceId) {
                 pricingData = await this.getServiceVehicleTypeAndPrice(serviceId, clientId, rateId);
+
+                // DEBUG: Check if we have client price overrides available
+                if (clientId && clientPricesMap && Object.keys(clientPricesMap).length > 0) {
+                  // Check all possible key formats for this service
+                  const possibleKeys = [
+                    `${serviceId}_RATE_${rateId}`,
+                    `${serviceId}_${pricingData?.vehicleType?.id}`,
+                    `${serviceId}_${rateId}_${pricingData?.vehicleType?.id}`,
+                  ];
+
+                  console.log(`🔍 Checking for client price overrides for service ${serviceId}:`, {
+                    serviceId,
+                    clientId,
+                    rateId,
+                    vehicleId: pricingData?.vehicleType?.id,
+                    possibleKeys,
+                    availableKeys: Object.keys(clientPricesMap).filter((k) => k.includes(serviceId)),
+                    originalPrice: pricingData?.finalPrice,
+                  });
+
+                  for (const key of possibleKeys) {
+                    if (clientPricesMap[key]) {
+                      console.log(`✅ Found client price override for service ${serviceId}: ${clientPricesMap[key]} MXN (key: ${key})`);
+                      // Override the price from the helper with the client-specific price
+                      if (pricingData) {
+                        pricingData.finalPrice = clientPricesMap[key];
+                        pricingData.isClientPrice = true;
+                      }
+                      break;
+                    }
+                  }
+
+                  if (!pricingData?.isClientPrice) {
+                    console.log(`⚠️ No client price override found for service ${serviceId}, using base price: ${pricingData?.finalPrice} MXN`);
+                  }
+                }
               }
 
-              // If helper failed but we have rateId, provide a fallback using RatePrices directly
-              if (!pricingData && rateId && service.get('destinationPOI')) {
-                try {
-                  // Get the first available rate price for this service and rate
-                  const ratePriceQuery = new Parse.Query('RatePrices');
-                  ratePriceQuery.equalTo('active', true);
-                  ratePriceQuery.equalTo('exists', true);
-                  ratePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
-                  ratePriceQuery.include(['rate', 'vehicleType', 'service']);
+              // Simple pricing: Use the helper method for consistency
+              // Call helper when we have either clientId OR rateId (to get rate-specific pricing)
+              // Use service.id or service.objectId (both should be the same in Parse)
+              let serviceId = service.id || service.objectId || service.get('objectId');
 
-                  if (rateId) {
-                    const ratePointer = new Parse.Object('Rates');
-                    ratePointer.id = rateId;
-                    ratePriceQuery.equalTo('rate', ratePointer);
-                  }
+              // If we have rateId but no serviceId, try alternative ways to get the ID
+              if (!serviceId && rateId && service.attributes && service.attributes.objectId) {
+                serviceId = service.attributes.objectId;
+              }
 
-                  const ratePrices = await ratePriceQuery.find({ useMasterKey: true });
-
-                  if (ratePrices.length > 0) {
-                    const firstRatePrice = ratePrices[0];
-                    const rate = firstRatePrice.get('rate');
-                    const vehicleType = firstRatePrice.get('vehicleType');
-                    const price = firstRatePrice.get('price') || 0;
-
-                    vehicleTypeToUse = vehicleType;
-                    rateToUse = rate;
-                    finalPrice = price;
-
-                    // Assign pricing data without modifying parameter
-                    const priceDataForFallback = [
-                      {
-                        vehicleType: {
-                          name: vehicleType?.get('name'),
-                          code: vehicleType?.get('code'),
-                          defaultCapacity: vehicleType?.get('defaultCapacity'),
-                          trunkCapacity: vehicleType?.get('trunkCapacity'),
-                        },
-                        price,
-                        formattedPrice: `$${price.toLocaleString()} MXN`,
-                      },
-                    ];
-                    Object.assign(service, { priceData: priceDataForFallback });
-                  }
-                } catch (fallbackError) {
-                  // Fallback pricing failed - continue with no pricing
+              // Always try to get pricing when we have a rateId, even if serviceId is problematic
+              if ((serviceId && (clientId || rateId)) || rateId) {
+                // Try to call the helper if we have a serviceId
+                let pricingData = null;
+                if (serviceId) {
+                  pricingData = await this.getServiceVehicleTypeAndPrice(serviceId, clientId, rateId);
                 }
               } else if (pricingData) {
                 const { vehicleType, rate, finalPrice: pricingFinalPrice } = pricingData;
                 vehicleTypeToUse = vehicleType;
                 rateToUse = rate;
-                finalPrice = pricingFinalPrice;
+                // IMPORTANT: Use the updated finalPrice from pricingData (which may have been overridden with client price)
+                finalPrice = pricingData.finalPrice || pricingFinalPrice;
 
                 // Check if we have multiple vehicle options from the helper method
                 if (pricingData.allVehicleOptions && pricingData.allVehicleOptions.length > 1) {
@@ -771,321 +800,397 @@ class ServicesController {
                     },
                     price: option.finalPrice,
                     formattedPrice: `$${option.finalPrice.toLocaleString()} MXN`,
+                    isClientPrice: option.isClientPrice || false,
                   }));
                   Object.assign(service, { priceData: priceDataForMultiple });
                 } else {
                   // Fallback to single vehicle (backward compatibility)
-                  const priceDataForSingle = [
-                    {
-                      vehicleType: {
-                        name: vehicleTypeToUse?.get('name'),
-                        code: vehicleTypeToUse?.get('code'),
-                        defaultCapacity: vehicleTypeToUse?.get('defaultCapacity'),
-                        trunkCapacity: vehicleTypeToUse?.get('trunkCapacity'),
-                      },
-                      price: finalPrice,
-                      formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
+                  const priceDataForSingle = [{
+                    vehicleType: {
+                      name: vehicleTypeToUse?.get('name'),
+                      code: vehicleTypeToUse?.get('code'),
+                      defaultCapacity: vehicleTypeToUse?.get('defaultCapacity'),
+                      trunkCapacity: vehicleTypeToUse?.get('trunkCapacity'),
                     },
-                  ];
+                    price: finalPrice, // This will now use the correct updated price
+                    formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
+                    isClientPrice: pricingData.isClientPrice || false,
+                  }];
                   Object.assign(service, { priceData: priceDataForSingle });
                 }
               } else if (clientId && rateId) {
                 // FALLBACK: If no pricing data found but we have clientId and rateId,
                 // try to get base pricing for this rate to show something instead of "Sin precios"
 
-                try {
-                  // Get any RatePrice for this service and rate combination
-                  const fallbackRatePriceQuery = new Parse.Query('RatePrices');
-                  fallbackRatePriceQuery.equalTo('service', {
-                    __type: 'Pointer',
-                    className: 'Services',
-                    objectId: serviceId,
-                  });
-                  fallbackRatePriceQuery.equalTo('rate', {
-                    __type: 'Pointer',
-                    className: 'Rate',
-                    objectId: rateId,
-                  });
-                  fallbackRatePriceQuery.equalTo('active', true);
-                  fallbackRatePriceQuery.equalTo('exists', true);
-                  fallbackRatePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
-                  fallbackRatePriceQuery.include(['rate', 'vehicleType']);
+                if (rateId) {
+                  const ratePointer = new Parse.Object('Rates');
+                  ratePointer.id = rateId;
+                  ratePriceQuery.equalTo('rate', ratePointer);
+                }
 
-                  const fallbackRatePrice = await fallbackRatePriceQuery.first({ useMasterKey: true });
+                const ratePrices = await ratePriceQuery.find({ useMasterKey: true });
 
-                  if (fallbackRatePrice) {
-                    const fallbackVehicleType = fallbackRatePrice.get('vehicleType');
-                    const fallbackRate = fallbackRatePrice.get('rate');
-                    const fallbackPrice = fallbackRatePrice.get('price') || 0;
+                if (ratePrices.length > 0) {
+                  const firstRatePrice = ratePrices[0];
+                  const rate = firstRatePrice.get('rate');
+                  const vehicleType = firstRatePrice.get('vehicleType');
+                  const price = firstRatePrice.get('price') || 0;
 
-                    vehicleTypeToUse = fallbackVehicleType;
-                    rateToUse = fallbackRate;
-                    finalPrice = fallbackPrice;
+                  vehicleTypeToUse = vehicleType;
+                  rateToUse = rate;
+                  finalPrice = price;
 
-                    // Add fallback priceData
-                    const fallbackPriceData = [
-                      {
-                        vehicleType: {
-                          name: fallbackVehicleType?.get('name'),
-                          code: fallbackVehicleType?.get('code'),
-                          defaultCapacity: fallbackVehicleType?.get('defaultCapacity'),
-                          trunkCapacity: fallbackVehicleType?.get('trunkCapacity'),
-                        },
-                        price: fallbackPrice,
-                        formattedPrice: `$${fallbackPrice.toLocaleString()} MXN`,
+                  // Assign pricing data without modifying parameter
+                  const priceDataForFallback = [
+                    {
+                      vehicleType: {
+                        name: vehicleType?.get('name'),
+                        code: vehicleType?.get('code'),
+                        defaultCapacity: vehicleType?.get('defaultCapacity'),
+                        trunkCapacity: vehicleType?.get('trunkCapacity'),
                       },
-                    ];
-                    Object.assign(service, { priceData: fallbackPriceData });
-                  } else {
-                    // FALLBACK 3: If FALLBACK 1 failed, try to get ANY available pricing for this service
-                    // (similar to FALLBACK 2 logic but for the clientId + rateId scenario)
+                      price,
+                      formattedPrice: `$${price.toLocaleString()} MXN`,
+                    },
+                  ];
+                  Object.assign(service, { priceData: priceDataForFallback });
+                }
+              } catch (fallbackError) {
+                // Fallback pricing failed - continue with no pricing
+              }
+            } else if (pricingData) {
+              const { vehicleType, rate, finalPrice: pricingFinalPrice } = pricingData;
+              vehicleTypeToUse = vehicleType;
+              rateToUse = rate;
+              finalPrice = pricingFinalPrice;
 
-                    try {
-                      const fallback3Query = new Parse.Query('RatePrices');
-                      fallback3Query.equalTo('service', {
-                        __type: 'Pointer',
-                        className: 'Services',
-                        objectId: serviceId,
-                      });
-                      fallback3Query.equalTo('active', true);
-                      fallback3Query.equalTo('exists', true);
-                      fallback3Query.doesNotExist('valid_until'); // Only show active prices (versioning)
-                      fallback3Query.include(['rate', 'vehicleType']);
-                      fallback3Query.ascending('rate'); // Sort by rate to get a consistent first option
+              // Check if we have multiple vehicle options from the helper method
+              if (pricingData.allVehicleOptions && pricingData.allVehicleOptions.length > 1) {
+                // Add ALL vehicle types to priceData
+                const priceDataForMultiple = pricingData.allVehicleOptions.map((option) => ({
+                  vehicleType: {
+                    name: option.vehicleType?.get('name'),
+                    code: option.vehicleType?.get('code'),
+                    defaultCapacity: option.vehicleType?.get('defaultCapacity'),
+                    trunkCapacity: option.vehicleType?.get('trunkCapacity'),
+                  },
+                  price: option.finalPrice,
+                  formattedPrice: `$${option.finalPrice.toLocaleString()} MXN`,
+                }));
+                Object.assign(service, { priceData: priceDataForMultiple });
+              } else {
+                // Fallback to single vehicle (backward compatibility)
+                const priceDataForSingle = [
+                  {
+                    vehicleType: {
+                      name: vehicleTypeToUse?.get('name'),
+                      code: vehicleTypeToUse?.get('code'),
+                      defaultCapacity: vehicleTypeToUse?.get('defaultCapacity'),
+                      trunkCapacity: vehicleTypeToUse?.get('trunkCapacity'),
+                    },
+                    price: finalPrice,
+                    formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
+                  },
+                ];
+                Object.assign(service, { priceData: priceDataForSingle });
+              }
+            } else if (clientId && rateId) {
+              // FALLBACK: If no pricing data found but we have clientId and rateId,
+              // try to get base pricing for this rate to show something instead of "Sin precios"
 
-                      const fallback3RatePrice = await fallback3Query.first({ useMasterKey: true });
+              try {
+                // Get any RatePrice for this service and rate combination
+                const fallbackRatePriceQuery = new Parse.Query('RatePrices');
+                fallbackRatePriceQuery.equalTo('service', {
+                  __type: 'Pointer',
+                  className: 'Services',
+                  objectId: serviceId,
+                });
+                fallbackRatePriceQuery.equalTo('rate', {
+                  __type: 'Pointer',
+                  className: 'Rate',
+                  objectId: rateId,
+                });
+                fallbackRatePriceQuery.equalTo('active', true);
+                fallbackRatePriceQuery.equalTo('exists', true);
+                fallbackRatePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
+                fallbackRatePriceQuery.include(['rate', 'vehicleType']);
 
-                      if (fallback3RatePrice) {
-                        const fallback3VehicleType = fallback3RatePrice.get('vehicleType');
-                        const fallback3Rate = fallback3RatePrice.get('rate');
-                        const fallback3Price = fallback3RatePrice.get('price') || 0;
+                const fallbackRatePrice = await fallbackRatePriceQuery.first({ useMasterKey: true });
 
-                        vehicleTypeToUse = fallback3VehicleType;
-                        rateToUse = fallback3Rate;
-                        finalPrice = fallback3Price;
+                if (fallbackRatePrice) {
+                  const fallbackVehicleType = fallbackRatePrice.get('vehicleType');
+                  const fallbackRate = fallbackRatePrice.get('rate');
+                  const fallbackPrice = fallbackRatePrice.get('price') || 0;
 
-                        // Add fallback3 priceData
-                        const fallback3PriceData = [
-                          {
-                            vehicleType: {
-                              name: fallback3VehicleType?.get('name'),
-                              code: fallback3VehicleType?.get('code'),
-                              defaultCapacity: fallback3VehicleType?.get('defaultCapacity'),
-                              trunkCapacity: fallback3VehicleType?.get('trunkCapacity'),
-                            },
-                            price: fallback3Price,
-                            formattedPrice: `$${fallback3Price.toLocaleString()} MXN`,
+                  vehicleTypeToUse = fallbackVehicleType;
+                  rateToUse = fallbackRate;
+                  finalPrice = fallbackPrice;
+
+                  // Add fallback priceData
+                  const fallbackPriceData = [
+                    {
+                      vehicleType: {
+                        name: fallbackVehicleType?.get('name'),
+                        code: fallbackVehicleType?.get('code'),
+                        defaultCapacity: fallbackVehicleType?.get('defaultCapacity'),
+                        trunkCapacity: fallbackVehicleType?.get('trunkCapacity'),
+                      },
+                      price: fallbackPrice,
+                      formattedPrice: `$${fallbackPrice.toLocaleString()} MXN`,
+                    },
+                  ];
+                  Object.assign(service, { priceData: fallbackPriceData });
+                } else {
+                  // FALLBACK 3: If FALLBACK 1 failed, try to get ANY available pricing for this service
+                  // (similar to FALLBACK 2 logic but for the clientId + rateId scenario)
+
+                  try {
+                    const fallback3Query = new Parse.Query('RatePrices');
+                    fallback3Query.equalTo('service', {
+                      __type: 'Pointer',
+                      className: 'Services',
+                      objectId: serviceId,
+                    });
+                    fallback3Query.equalTo('active', true);
+                    fallback3Query.equalTo('exists', true);
+                    fallback3Query.doesNotExist('valid_until'); // Only show active prices (versioning)
+                    fallback3Query.include(['rate', 'vehicleType']);
+                    fallback3Query.ascending('rate'); // Sort by rate to get a consistent first option
+
+                    const fallback3RatePrice = await fallback3Query.first({ useMasterKey: true });
+
+                    if (fallback3RatePrice) {
+                      const fallback3VehicleType = fallback3RatePrice.get('vehicleType');
+                      const fallback3Rate = fallback3RatePrice.get('rate');
+                      const fallback3Price = fallback3RatePrice.get('price') || 0;
+
+                      vehicleTypeToUse = fallback3VehicleType;
+                      rateToUse = fallback3Rate;
+                      finalPrice = fallback3Price;
+
+                      // Add fallback3 priceData
+                      const fallback3PriceData = [
+                        {
+                          vehicleType: {
+                            name: fallback3VehicleType?.get('name'),
+                            code: fallback3VehicleType?.get('code'),
+                            defaultCapacity: fallback3VehicleType?.get('defaultCapacity'),
+                            trunkCapacity: fallback3VehicleType?.get('trunkCapacity'),
                           },
-                        ];
-                        Object.assign(service, { priceData: fallback3PriceData });
-                      } else {
-                        // No fallback pricing found
-                      }
-                    } catch (fallback3Error) {
-                      console.error('❌ FALLBACK 3 ERROR:', fallback3Error.message);
-                    }
-                  }
-                } catch (fallbackError) {
-                  console.error('❌ FALLBACK ERROR:', fallbackError.message);
-                }
-              } else if (clientId && !rateId) {
-                // FALLBACK 2: If we have clientId but no rateId (initial load),
-                // get any available pricing for this service to show something
-
-                try {
-                  // Get any RatePrice for this service (prefer Economic rate if available)
-                  const fallbackAnyRatePriceQuery = new Parse.Query('RatePrices');
-                  fallbackAnyRatePriceQuery.equalTo('service', {
-                    __type: 'Pointer',
-                    className: 'Services',
-                    objectId: serviceId,
-                  });
-                  fallbackAnyRatePriceQuery.equalTo('active', true);
-                  fallbackAnyRatePriceQuery.equalTo('exists', true);
-                  fallbackAnyRatePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
-                  fallbackAnyRatePriceQuery.include(['rate', 'vehicleType']);
-                  fallbackAnyRatePriceQuery.ascending('rate'); // Sort by rate to get a consistent first option
-
-                  const fallbackAnyRatePrice = await fallbackAnyRatePriceQuery.first({ useMasterKey: true });
-
-                  if (fallbackAnyRatePrice) {
-                    const fallbackVehicleType = fallbackAnyRatePrice.get('vehicleType');
-                    const fallbackRate = fallbackAnyRatePrice.get('rate');
-                    const fallbackPrice = fallbackAnyRatePrice.get('price') || 0;
-
-                    vehicleTypeToUse = fallbackVehicleType;
-                    rateToUse = fallbackRate;
-                    finalPrice = fallbackPrice;
-
-                    // Add fallback priceData for initial load
-                    const fallback2PriceData = [
-                      {
-                        vehicleType: {
-                          name: fallbackVehicleType?.get('name'),
-                          code: fallbackVehicleType?.get('code'),
-                          defaultCapacity: fallbackVehicleType?.get('defaultCapacity'),
-                          trunkCapacity: fallbackVehicleType?.get('trunkCapacity'),
+                          price: fallback3Price,
+                          formattedPrice: `$${fallback3Price.toLocaleString()} MXN`,
                         },
-                        price: fallbackPrice,
-                        formattedPrice: `$${fallbackPrice.toLocaleString()} MXN`,
-                      },
-                    ];
-                    Object.assign(service, { priceData: fallback2PriceData });
-                  } else {
-                    // No fallback pricing available
+                      ];
+                      Object.assign(service, { priceData: fallback3PriceData });
+                    } else {
+                      // No fallback pricing found
+                    }
+                  } catch (fallback3Error) {
+                    console.error('❌ FALLBACK 3 ERROR:', fallback3Error.message);
                   }
-                } catch (fallbackError) {
-                  console.error('❌ FALLBACK 2 ERROR:', fallbackError.message);
                 }
+              } catch (fallbackError) {
+                console.error('❌ FALLBACK ERROR:', fallbackError.message);
+              }
+            } else if (clientId && !rateId) {
+              // FALLBACK 2: If we have clientId but no rateId (initial load),
+              // get any available pricing for this service to show something
+
+              try {
+                // Get any RatePrice for this service (prefer Economic rate if available)
+                const fallbackAnyRatePriceQuery = new Parse.Query('RatePrices');
+                fallbackAnyRatePriceQuery.equalTo('service', {
+                  __type: 'Pointer',
+                  className: 'Services',
+                  objectId: serviceId,
+                });
+                fallbackAnyRatePriceQuery.equalTo('active', true);
+                fallbackAnyRatePriceQuery.equalTo('exists', true);
+                fallbackAnyRatePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
+                fallbackAnyRatePriceQuery.include(['rate', 'vehicleType']);
+                fallbackAnyRatePriceQuery.ascending('rate'); // Sort by rate to get a consistent first option
+
+                const fallbackAnyRatePrice = await fallbackAnyRatePriceQuery.first({ useMasterKey: true });
+
+                if (fallbackAnyRatePrice) {
+                  const fallbackVehicleType = fallbackAnyRatePrice.get('vehicleType');
+                  const fallbackRate = fallbackAnyRatePrice.get('rate');
+                  const fallbackPrice = fallbackAnyRatePrice.get('price') || 0;
+
+                  vehicleTypeToUse = fallbackVehicleType;
+                  rateToUse = fallbackRate;
+                  finalPrice = fallbackPrice;
+
+                  // Add fallback priceData for initial load
+                  const fallback2PriceData = [
+                    {
+                      vehicleType: {
+                        name: fallbackVehicleType?.get('name'),
+                        code: fallbackVehicleType?.get('code'),
+                        defaultCapacity: fallbackVehicleType?.get('defaultCapacity'),
+                        trunkCapacity: fallbackVehicleType?.get('trunkCapacity'),
+                      },
+                      price: fallbackPrice,
+                      formattedPrice: `$${fallbackPrice.toLocaleString()} MXN`,
+                    },
+                  ];
+                  Object.assign(service, { priceData: fallback2PriceData });
+                } else {
+                  // No fallback pricing available
+                }
+              } catch (fallbackError) {
+                console.error('❌ FALLBACK 2 ERROR:', fallbackError.message);
               }
             }
-
-            // Debug logging for Queretaro service after vehicle type assignment
-            if (service.id === '6p4zqx7YCf') {
-              // Queretaro service specific logging would go here
-            }
-
-            return {
-              id: serviceId,
-              objectId: serviceId,
-              originPOI: originPOI
-                ? {
-                  id: originPOI.id,
-                  name: originPOI.get('name') || '-',
-                  serviceType: originPOI.get('serviceType')
-                    ? {
-                      id: originPOI.get('serviceType').id,
-                      name: originPOI.get('serviceType').get('name') || '-',
-                    }
-                    : null,
-                }
-                : {
-                  id: null,
-                  name: 'Sin origen',
-                  serviceType: null,
-                },
-              destinationPOI: destinationPOI
-                ? {
-                  id: destinationPOI.id,
-                  name: destinationPOI.get('name') || '-',
-                  serviceType: destinationPOI.get('serviceType')
-                    ? {
-                      id: destinationPOI.get('serviceType').id,
-                      name: destinationPOI.get('serviceType').get('name') || '-',
-                    }
-                    : null,
-                }
-                : {
-                  id: null,
-                  name: '-',
-                  serviceType: null,
-                },
-              vehicleType: vehicleTypeToUse
-                ? {
-                  id: vehicleTypeToUse.id,
-                  name: vehicleTypeToUse.get('name') || '-',
-                }
-                : { id: null, name: '-' },
-              rate: rateToUse
-                ? {
-                  id: rateToUse.id,
-                  name: rateToUse.get('name') || '-',
-                  percentage: rateToUse.get('percentage') || 0,
-                  color: rateToUse.get('color') || '#6366F1',
-                }
-                : null,
-              price: finalPrice,
-              note: service.get('note') || '',
-              active: service.get('active') === true,
-              exists: service.get('exists') === true,
-              createdAt: service.get('createdAt'),
-              updatedAt: service.get('updatedAt'),
-              priceData: service.priceData || null,
-            };
-          } catch (error) {
-            logger.error('Error formatting service data', {
-              serviceId: service.id,
-              error: error.message,
-            });
-            // Return a safe default object
-            const serviceId = service.id || service.objectId;
-            return {
-              id: serviceId,
-              objectId: serviceId,
-              originPOI: { id: null, name: 'Sin origen' },
-              destinationPOI: { id: null, name: '-' },
-              vehicleType: { id: null, name: '-' },
-              rate: null,
-              price: 0,
-              note: '',
-              active: false,
-              exists: true,
-              createdAt: service.get('createdAt'),
-              updatedAt: service.get('updatedAt'),
-              priceData: null,
-            };
           }
-        })
+
+              // Debug logging for Queretaro service after vehicle type assignment
+              if (service.id === '6p4zqx7YCf') {
+            // Queretaro service specific logging would go here
+          }
+
+          return {
+            id: serviceId,
+            objectId: serviceId,
+            originPOI: originPOI
+              ? {
+                id: originPOI.id,
+                name: originPOI.get('name') || '-',
+                serviceType: originPOI.get('serviceType')
+                  ? {
+                    id: originPOI.get('serviceType').id,
+                    name: originPOI.get('serviceType').get('name') || '-',
+                  }
+                  : null,
+              }
+              : {
+                id: null,
+                name: 'Sin origen',
+                serviceType: null,
+              },
+            destinationPOI: destinationPOI
+              ? {
+                id: destinationPOI.id,
+                name: destinationPOI.get('name') || '-',
+                serviceType: destinationPOI.get('serviceType')
+                  ? {
+                    id: destinationPOI.get('serviceType').id,
+                    name: destinationPOI.get('serviceType').get('name') || '-',
+                  }
+                  : null,
+              }
+              : {
+                id: null,
+                name: '-',
+                serviceType: null,
+              },
+            vehicleType: vehicleTypeToUse
+              ? {
+                id: vehicleTypeToUse.id,
+                name: vehicleTypeToUse.get('name') || '-',
+              }
+              : { id: null, name: '-' },
+            rate: rateToUse
+              ? {
+                id: rateToUse.id,
+                name: rateToUse.get('name') || '-',
+                percentage: rateToUse.get('percentage') || 0,
+                color: rateToUse.get('color') || '#6366F1',
+              }
+              : null,
+            price: finalPrice,
+            note: service.get('note') || '',
+            active: service.get('active') === true,
+            exists: service.get('exists') === true,
+            createdAt: service.get('createdAt'),
+            updatedAt: service.get('updatedAt'),
+            priceData: service.priceData || null,
+          };
+        } catch (error) {
+          logger.error('Error formatting service data', {
+            serviceId: service.id,
+            error: error.message,
+          });
+          // Return a safe default object
+          const serviceId = service.id || service.objectId;
+          return {
+            id: serviceId,
+            objectId: serviceId,
+            originPOI: { id: null, name: 'Sin origen' },
+            destinationPOI: { id: null, name: '-' },
+            vehicleType: { id: null, name: '-' },
+            rate: null,
+            price: 0,
+            note: '',
+            active: false,
+            exists: true,
+            createdAt: service.get('createdAt'),
+            updatedAt: service.get('updatedAt'),
+            priceData: null,
+          };
+        }
+    })
       );
 
-      // Log successful query for audit
-      logger.info('Services query executed successfully', {
-        userId: currentUser.id,
-        userRole: currentUser.role || 'unknown',
-        resultCount: data.length,
-        totalRecords: recordsTotal,
-        filteredRecords: recordsFiltered,
-        searchValue: searchValue || null,
-        filterAeropuerto,
-        activeFilter: activeFilter || null,
-      });
+    // Log successful query for audit
+    logger.info('Services query executed successfully', {
+      userId: currentUser.id,
+      userRole: currentUser.role || 'unknown',
+      resultCount: data.length,
+      totalRecords: recordsTotal,
+      filteredRecords: recordsFiltered,
+      searchValue: searchValue || null,
+      filterAeropuerto,
+      activeFilter: activeFilter || null,
+    });
 
-      // Add cache-busting headers to ensure fresh pricing data
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-        Expires: '0',
-        'Last-Modified': new Date().toUTCString(),
-        ETag: `"${Date.now()}"`, // Dynamic ETag based on timestamp
-      });
+    // Add cache-busting headers to ensure fresh pricing data
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+      'Last-Modified': new Date().toUTCString(),
+      ETag: `"${Date.now()}"`, // Dynamic ETag based on timestamp
+    });
 
-      // Debug log the final data before sending response
+    // Debug log the final data before sending response
 
-      // Check for specific Queretaro service in response for debugging
-      // const queretaroService = data.find((item) => item.id === '6p4zqx7YCf');
+    // Check for specific Queretaro service in response for debugging
+    // const queretaroService = data.find((item) => item.id === '6p4zqx7YCf');
 
-      // Check if this is a simple client-side request (no draw parameter)
-      // If no draw parameter, return simple format for client-side processing
-      if (!req.query.draw) {
-        return res.json({
-          success: true,
-          data,
-          timestamp: Date.now(), // Add timestamp for cache busting
-        });
-      }
-
-      // Return DataTables server-side format
+    // Check if this is a simple client-side request (no draw parameter)
+    // If no draw parameter, return simple format for client-side processing
+    if (!req.query.draw) {
       return res.json({
-        draw,
-        recordsTotal,
-        recordsFiltered,
+        success: true,
         data,
         timestamp: Date.now(), // Add timestamp for cache busting
       });
-    } catch (error) {
-      logger.error('Error in getServices - DETAILED ERROR LOGGING', {
-        error: error.message,
-        stack: error.stack,
-        userId: req.user?.id,
-        query: req.query,
-        filterAeropuerto: req.query.filterAeropuerto,
-        errorName: error.name,
-        errorCode: error.code,
-        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
-      });
-      return this.sendError(res, 'Error al obtener servicios', 500);
     }
+
+    // Return DataTables server-side format
+    return res.json({
+      draw,
+      recordsTotal,
+      recordsFiltered,
+      data,
+      timestamp: Date.now(), // Add timestamp for cache busting
+    });
+  } catch(error) {
+    logger.error('Error in getServices - DETAILED ERROR LOGGING', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+      query: req.query,
+      filterAeropuerto: req.query.filterAeropuerto,
+      errorName: error.name,
+      errorCode: error.code,
+      fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+    });
+    return this.sendError(res, 'Error al obtener servicios', 500);
   }
+}
 
   /**
    * GET /api/services/active - Get active services for dropdowns.
@@ -1097,58 +1202,58 @@ class ServicesController {
    * Returns: Simple array of {value, label} for select options
    */
   async getActiveServices(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      logger.info('ServicesController.getActiveServices called', {
-        userId: currentUser.id,
-      });
-
-      // Get all active services
-      const query = new Parse.Query('Services');
-      query.equalTo('exists', true);
-      query.equalTo('active', true);
-      query.include('originPOI');
-      query.include('destinationPOI');
-      query.include('vehicleType');
-      query.include('rate');
-      query.ascending('destinationPOI'); // Sort by destination for better UX
-
-      const services = await query.find({ useMasterKey: true });
-
-      // Format for dropdown usage
-      const formattedServices = services.map((service) => {
-        const origin = service.get('originPOI')?.get('name') || 'Sin origen';
-        const destination = service.get('destinationPOI')?.get('name') || '-';
-        const vehicleType = service.get('vehicleType')?.get('name') || '-';
-        const rate = service.get('rate')?.get('name') || '-';
-
-        return {
-          value: service.id,
-          label: `${origin} → ${destination} (${vehicleType}, ${rate})`,
-        };
-      });
-
-      logger.info('Active services retrieved successfully', {
-        userId: currentUser.id,
-        serviceCount: formattedServices.length,
-      });
-
-      return res.json({
-        success: true,
-        data: formattedServices,
-      });
-    } catch (error) {
-      logger.error('Error in getActiveServices', {
-        error: error.message,
-        userId: req.user?.id,
-      });
-      return this.sendError(res, 'Error al obtener servicios activos', 500);
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
     }
+
+    logger.info('ServicesController.getActiveServices called', {
+      userId: currentUser.id,
+    });
+
+    // Get all active services
+    const query = new Parse.Query('Services');
+    query.equalTo('exists', true);
+    query.equalTo('active', true);
+    query.include('originPOI');
+    query.include('destinationPOI');
+    query.include('vehicleType');
+    query.include('rate');
+    query.ascending('destinationPOI'); // Sort by destination for better UX
+
+    const services = await query.find({ useMasterKey: true });
+
+    // Format for dropdown usage
+    const formattedServices = services.map((service) => {
+      const origin = service.get('originPOI')?.get('name') || 'Sin origen';
+      const destination = service.get('destinationPOI')?.get('name') || '-';
+      const vehicleType = service.get('vehicleType')?.get('name') || '-';
+      const rate = service.get('rate')?.get('name') || '-';
+
+      return {
+        value: service.id,
+        label: `${origin} → ${destination} (${vehicleType}, ${rate})`,
+      };
+    });
+
+    logger.info('Active services retrieved successfully', {
+      userId: currentUser.id,
+      serviceCount: formattedServices.length,
+    });
+
+    return res.json({
+      success: true,
+      data: formattedServices,
+    });
+  } catch (error) {
+    logger.error('Error in getActiveServices', {
+      error: error.message,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, 'Error al obtener servicios activos', 500);
   }
+}
 
   /**
    * GET /api/services/:id - Get single service by ID.
@@ -1159,116 +1264,116 @@ class ServicesController {
    * // Usage example documented above
    */
   async getServiceById(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      const { id } = req.params;
-      if (!id) {
-        return this.sendError(res, 'ID de servicio requerido', 400);
-      }
-
-      const query = new Parse.Query('Services');
-      query.equalTo('exists', true);
-      query.include('originPOI');
-      query.include('originPOI.serviceType');
-      query.include('destinationPOI');
-      query.include('destinationPOI.serviceType');
-      query.include('vehicleType');
-      query.include('rate');
-
-      const service = await query.get(id, { useMasterKey: true });
-
-      if (!service) {
-        return this.sendError(res, 'Servicio no encontrado', 404);
-      }
-
-      const originPOI = service.get('originPOI');
-      const destinationPOI = service.get('destinationPOI');
-
-      // Get price from RatePrices if needed
-      let price = 0;
-      if (service.get('rate')?.id) {
-        try {
-          const ratePriceQuery = new Parse.Query('RatePrices');
-          ratePriceQuery.equalTo('service', {
-            __type: 'Pointer',
-            className: 'Services',
-            objectId: service.id,
-          });
-          ratePriceQuery.equalTo('rate', service.get('rate'));
-          ratePriceQuery.equalTo('exists', true);
-          ratePriceQuery.equalTo('active', true);
-          ratePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
-
-          const ratePrice = await ratePriceQuery.first({ useMasterKey: true });
-          price = ratePrice?.get('price') || 0;
-        } catch (error) {
-          logger.warn('Error loading price for service', {
-            serviceId: service.id,
-            error: error.message,
-          });
-        }
-      }
-
-      const data = {
-        id: service.id,
-        originPOI: originPOI
-          ? {
-            id: originPOI.id,
-            name: originPOI.get('name'),
-            serviceType: originPOI.get('serviceType')
-              ? {
-                id: originPOI.get('serviceType').id,
-                name: originPOI.get('serviceType').get('name'),
-              }
-              : null,
-          }
-          : null,
-        destinationPOI: destinationPOI
-          ? {
-            id: destinationPOI.id,
-            name: destinationPOI.get('name'),
-            serviceType: destinationPOI.get('serviceType')
-              ? {
-                id: destinationPOI.get('serviceType').id,
-                name: destinationPOI.get('serviceType').get('name'),
-              }
-              : null,
-          }
-          : null,
-        vehicleType: {
-          id: service.get('vehicleType')?.id,
-          name: service.get('vehicleType')?.get('name'),
-        },
-        rate: {
-          id: service.get('rate')?.id,
-          name: service.get('rate')?.get('name'),
-          color: service.get('rate')?.get('color') || '#6366F1',
-        },
-        price,
-        note: service.get('note') || '',
-        active: service.get('active'),
-        exists: service.get('exists'),
-        createdAt: service.get('createdAt'),
-        updatedAt: service.get('updatedAt'),
-      };
-
-      return res.json({
-        success: true,
-        data,
-      });
-    } catch (error) {
-      logger.error('Error in getServiceById', {
-        error: error.message,
-        serviceId: req.params.id,
-        userId: req.user?.id,
-      });
-      return this.sendError(res, 'Error al obtener servicio', 500);
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
     }
+
+    const { id } = req.params;
+    if (!id) {
+      return this.sendError(res, 'ID de servicio requerido', 400);
+    }
+
+    const query = new Parse.Query('Services');
+    query.equalTo('exists', true);
+    query.include('originPOI');
+    query.include('originPOI.serviceType');
+    query.include('destinationPOI');
+    query.include('destinationPOI.serviceType');
+    query.include('vehicleType');
+    query.include('rate');
+
+    const service = await query.get(id, { useMasterKey: true });
+
+    if (!service) {
+      return this.sendError(res, 'Servicio no encontrado', 404);
+    }
+
+    const originPOI = service.get('originPOI');
+    const destinationPOI = service.get('destinationPOI');
+
+    // Get price from RatePrices if needed
+    let price = 0;
+    if (service.get('rate')?.id) {
+      try {
+        const ratePriceQuery = new Parse.Query('RatePrices');
+        ratePriceQuery.equalTo('service', {
+          __type: 'Pointer',
+          className: 'Services',
+          objectId: service.id,
+        });
+        ratePriceQuery.equalTo('rate', service.get('rate'));
+        ratePriceQuery.equalTo('exists', true);
+        ratePriceQuery.equalTo('active', true);
+        ratePriceQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
+
+        const ratePrice = await ratePriceQuery.first({ useMasterKey: true });
+        price = ratePrice?.get('price') || 0;
+      } catch (error) {
+        logger.warn('Error loading price for service', {
+          serviceId: service.id,
+          error: error.message,
+        });
+      }
+    }
+
+    const data = {
+      id: service.id,
+      originPOI: originPOI
+        ? {
+          id: originPOI.id,
+          name: originPOI.get('name'),
+          serviceType: originPOI.get('serviceType')
+            ? {
+              id: originPOI.get('serviceType').id,
+              name: originPOI.get('serviceType').get('name'),
+            }
+            : null,
+        }
+        : null,
+      destinationPOI: destinationPOI
+        ? {
+          id: destinationPOI.id,
+          name: destinationPOI.get('name'),
+          serviceType: destinationPOI.get('serviceType')
+            ? {
+              id: destinationPOI.get('serviceType').id,
+              name: destinationPOI.get('serviceType').get('name'),
+            }
+            : null,
+        }
+        : null,
+      vehicleType: {
+        id: service.get('vehicleType')?.id,
+        name: service.get('vehicleType')?.get('name'),
+      },
+      rate: {
+        id: service.get('rate')?.id,
+        name: service.get('rate')?.get('name'),
+        color: service.get('rate')?.get('color') || '#6366F1',
+      },
+      price,
+      note: service.get('note') || '',
+      active: service.get('active'),
+      exists: service.get('exists'),
+      createdAt: service.get('createdAt'),
+      updatedAt: service.get('updatedAt'),
+    };
+
+    return res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    logger.error('Error in getServiceById', {
+      error: error.message,
+      serviceId: req.params.id,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, 'Error al obtener servicio', 500);
   }
+}
 
   /**
    * GET /api/services/with-rate-prices?rateId=xxx - Get all services with their prices for a specific rate.
@@ -1290,1523 +1395,91 @@ class ServicesController {
    * }
    */
   async getServicesWithRatePrices(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    const { rateId, clientId } = req.query;
+    if (!rateId) {
+      return this.sendError(res, 'ID de tarifa requerido', 400);
+    }
+
+    logger.info('ServicesController.getServicesWithRatePrices called', {
+      userId: currentUser.id,
+      rateId,
+      clientId: clientId || 'none',
+    });
+
+    // 🔍 SPECIAL DEBUGGING FOR QUERETARO DATA
+
+    // Let's examine what data we're working with specifically for Queretaro
+    const debugServicesQuery = new Parse.Query('Services');
+    debugServicesQuery.include(['originPOI', 'destinationPOI', 'vehicleType', 'rate']);
+    debugServicesQuery.equalTo('active', true);
+    debugServicesQuery.equalTo('exists', true);
+
     try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      const { rateId, clientId } = req.query;
-      if (!rateId) {
-        return this.sendError(res, 'ID de tarifa requerido', 400);
-      }
-
-      logger.info('ServicesController.getServicesWithRatePrices called', {
-        userId: currentUser.id,
-        rateId,
-        clientId: clientId || 'none',
+      const allDebugServices = await debugServicesQuery.find({ useMasterKey: true });
+      const queretaroServices = allDebugServices.filter((service) => {
+        const destPOI = service.get('destinationPOI');
+        const originPOI = service.get('originPOI');
+        const destName = destPOI?.get('name') || '';
+        const originName = originPOI?.get('name') || '';
+        return (
+          destName.includes('Queretaro')
+          || originName.includes('Queretaro')
+          || destName.includes('Querétaro')
+          || originName.includes('Querétaro')
+        );
       });
 
-      // 🔍 SPECIAL DEBUGGING FOR QUERETARO DATA
+      if (queretaroServices.length > 0) {
+        for (const service of queretaroServices.slice(0, 2)) {
+          // Limit to first 2 for brevity
+          // Get RatePrices for this service
+          const ratePricesQuery = new Parse.Query('RatePrices');
+          ratePricesQuery.include(['servicePtr', 'ratePtr', 'vehiclePtr']);
+          ratePricesQuery.equalTo('servicePtr', service);
+          ratePricesQuery.equalTo('active', true);
+          ratePricesQuery.equalTo('exists', true);
+          ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
 
-      // Let's examine what data we're working with specifically for Queretaro
-      const debugServicesQuery = new Parse.Query('Services');
-      debugServicesQuery.include(['originPOI', 'destinationPOI', 'vehicleType', 'rate']);
-      debugServicesQuery.equalTo('active', true);
-      debugServicesQuery.equalTo('exists', true);
+          await ratePricesQuery.find({ useMasterKey: true });
+          // Rate prices retrieved for debugging purposes
+        }
+      }
+    } catch (debugError) {
+      console.error('🔍 DEBUG ERROR:', debugError);
+    }
 
+    // Get all rate prices for the specific rate
+    const ratePricesQuery = new Parse.Query('RatePrices');
+    ratePricesQuery.equalTo('rate', {
+      __type: 'Pointer',
+      className: 'Rate',
+      objectId: rateId,
+    });
+    ratePricesQuery.equalTo('exists', true);
+    ratePricesQuery.equalTo('active', true);
+    ratePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
+    ratePricesQuery.include([
+      'service',
+      'service.originPOI',
+      'service.destinationPOI',
+      'service.rate',
+      'vehicleType',
+    ]);
+    ratePricesQuery.limit(1000);
+
+    const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
+
+    // Get client-specific prices if clientId is provided
+    const clientPricesMap = {};
+    if (clientId && ratePrices.length > 0) {
       try {
-        const allDebugServices = await debugServicesQuery.find({ useMasterKey: true });
-        const queretaroServices = allDebugServices.filter((service) => {
-          const destPOI = service.get('destinationPOI');
-          const originPOI = service.get('originPOI');
-          const destName = destPOI?.get('name') || '';
-          const originName = originPOI?.get('name') || '';
-          return (
-            destName.includes('Queretaro')
-            || originName.includes('Queretaro')
-            || destName.includes('Querétaro')
-            || originName.includes('Querétaro')
-          );
-        });
-
-        if (queretaroServices.length > 0) {
-          for (const service of queretaroServices.slice(0, 2)) {
-            // Limit to first 2 for brevity
-            // Get RatePrices for this service
-            const ratePricesQuery = new Parse.Query('RatePrices');
-            ratePricesQuery.include(['servicePtr', 'ratePtr', 'vehiclePtr']);
-            ratePricesQuery.equalTo('servicePtr', service);
-            ratePricesQuery.equalTo('active', true);
-            ratePricesQuery.equalTo('exists', true);
-            ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
-
-            await ratePricesQuery.find({ useMasterKey: true });
-            // Rate prices retrieved for debugging purposes
-          }
-        }
-      } catch (debugError) {
-        console.error('🔍 DEBUG ERROR:', debugError);
-      }
-
-      // Get all rate prices for the specific rate
-      const ratePricesQuery = new Parse.Query('RatePrices');
-      ratePricesQuery.equalTo('rate', {
-        __type: 'Pointer',
-        className: 'Rate',
-        objectId: rateId,
-      });
-      ratePricesQuery.equalTo('exists', true);
-      ratePricesQuery.equalTo('active', true);
-      ratePricesQuery.doesNotExist('valid_until'); // Only active (non-historical) prices
-      ratePricesQuery.include([
-        'service',
-        'service.originPOI',
-        'service.destinationPOI',
-        'service.rate',
-        'vehicleType',
-      ]);
-      ratePricesQuery.limit(1000);
-
-      const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
-
-      // Get client-specific prices if clientId is provided
-      const clientPricesMap = {};
-      if (clientId && ratePrices.length > 0) {
-        try {
-          // Since Parse SDK queries fail with "Service Unavailable", use a direct HTTP approach
-          const http = require('http');
-          const options = {
-            hostname: 'localhost',
-            port: 1337,
-            path: '/parse/classes/ClientPrices',
-            method: 'GET',
-            headers: {
-              'X-Parse-Application-Id': process.env.PARSE_APP_ID,
-              'X-Parse-Master-Key': process.env.PARSE_MASTER_KEY,
-            },
-          };
-
-          const clientPricesData = await new Promise((resolve, reject) => {
-            const httpReq = http.request(options, (httpRes) => {
-              let data = '';
-              httpRes.on('data', (chunk) => {
-                data += chunk;
-              });
-              httpRes.on('end', () => {
-                try {
-                  const parsed = JSON.parse(data);
-                  resolve(parsed);
-                } catch (error) {
-                  reject(new Error(`JSON parse error: ${error.message}`));
-                }
-              });
-            });
-
-            httpReq.on('error', (error) => {
-              reject(new Error(`HTTP request error: ${error.message}`));
-            });
-
-            httpReq.end();
-          });
-
-          // Filter for our client and services
-          const relevantClientPrices = (clientPricesData.results || []).filter((cp) => {
-            const isOurClient = cp.clientPtr && cp.clientPtr.objectId === clientId;
-            const isServices = cp.itemType === 'SERVICES';
-            const isActive = cp.active === true;
-            const exists = cp.exists === true;
-            // Remove rate filtering to match main table behavior (uses ANY client price)
-            return isOurClient && isServices && isActive && exists;
-          });
-
-          // Create the pricing map using both ID and vehicle code for better matching
-          relevantClientPrices.forEach((cp) => {
-            const serviceId = cp.itemId;
-            const vehicleId = cp.vehiclePtr?.objectId;
-            const vehicleCode = cp.vehiclePtr?.code; // e.g., "VAN", "SEDAN"
-            if (serviceId && vehicleId) {
-              const price = cp.precio || 0;
-              // Store by vehicle ID
-              const keyById = `${serviceId}_${vehicleId}`;
-              clientPricesMap[keyById] = price;
-
-              // Also store by vehicle code for cross-table matching
-              if (vehicleCode) {
-                const keyByCode = `${serviceId}_CODE_${vehicleCode}`;
-                clientPricesMap[keyByCode] = price;
-              }
-            }
-          });
-        } catch (error) {
-          logger.error('Error loading client prices for getServicesWithRatePrices', {
-            clientId,
-            rateId,
-            error: error.message,
-            errorCode: error.code,
-            errorStack: error.stack,
-          });
-        }
-      }
-
-      // 🎯 ULTIMATE SIMPLIFICATION: Just call the single source of truth for each RatePrice record
-      // This ensures 100% consistency with the main table since we use the EXACT same method
-      const data = await Promise.all(
-        ratePrices.map(async (ratePrice) => {
-          const service = ratePrice.get('service');
-          const vehicleType = ratePrice.get('vehicleType');
-          const basePrice = ratePrice.get('price') || 0;
-
-          // 🎯 SIMPLE LOGIC: Check if THIS specific service + rate + vehicle has client pricing override
-          let finalPrice = basePrice;
-          let isClientPrice = false;
-
-          // Check for client price override for this exact combination
-          const clientPriceKey = `${service?.id}_${vehicleType?.id}`;
-          const clientPriceOverride = clientPricesMap[clientPriceKey];
-
-          if (clientPriceOverride) {
-            finalPrice = clientPriceOverride;
-            isClientPrice = true;
-          } else {
-            // Use base rate price when no client override exists
-          }
-
-          // Debug logging for service 6p4zqx7YCf
-          if (service?.id === '6p4zqx7YCf') {
-            // Specific service debugging would go here
-          }
-
-          // Create dual price display object for frontend
-          let priceDisplay;
-          if (clientId && isClientPrice) {
-            priceDisplay = {
-              basePrice,
-              clientPrice: finalPrice,
-              formattedBasePrice: `$${basePrice.toLocaleString()} MXN`,
-              formattedClientPrice: `$${finalPrice.toLocaleString()} MXN`,
-              showBoth: true,
-            };
-          }
-
-          return {
-            service: {
-              id: service?.id,
-              originPOI: service?.get('originPOI')
-                ? {
-                  id: service.get('originPOI').id,
-                  name: service.get('originPOI').get('name'),
-                }
-                : null,
-              destinationPOI: service?.get('destinationPOI')
-                ? {
-                  id: service.get('destinationPOI').id,
-                  name: service.get('destinationPOI').get('name'),
-                }
-                : null,
-              rate: ratePrice.get('rate')
-                ? {
-                  id: ratePrice.get('rate').id,
-                  name: ratePrice.get('rate').get('name'),
-                }
-                : null,
-            },
-            vehicleType: vehicleType
-              ? {
-                id: vehicleType.id, // 🔥 Keep ORIGINAL vehicle from RatePrice
-                name: vehicleType.get('name'),
-                code: vehicleType.get('code'),
-                defaultCapacity: vehicleType.get('defaultCapacity') || 4,
-                trunkCapacity: vehicleType.get('trunkCapacity') || 2,
-              }
-              : null,
-            price: finalPrice,
-            formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
-            currency: 'MXN',
-            priceDisplay,
-          };
-        })
-      );
-
-      logger.info('Services with rate prices retrieved successfully', {
-        userId: currentUser.id,
-        rateId,
-        clientId: clientId || 'none',
-        resultCount: data.length,
-        clientPricesCount: Object.keys(clientPricesMap).length,
-      });
-
-      // Add cache-busting headers to ensure fresh pricing data
-      res.set({
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        Pragma: 'no-cache',
-        Expires: '0',
-        'Last-Modified': new Date().toUTCString(),
-        ETag: `"${Date.now()}"`,
-      });
-
-      return res.json({
-        success: true,
-        data,
-        timestamp: Date.now(), // Add timestamp for cache busting
-      });
-    } catch (error) {
-      logger.error('Error in getServicesWithRatePrices', {
-        error: error.message,
-        rateId: req.query?.rateId,
-        clientId: req.query?.clientId,
-        userId: req.user?.id,
-      });
-      return this.sendError(res, 'Error al obtener servicios con precios', 500);
-    }
-  }
-
-  /**
-   * GET /api/services/:id/all-rate-prices - Get all rate prices for a specific service.
-   * Returns pricing information for ALL rates available for this service.
-   * @param {object} req - Express request object with params.id.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   * GET /api/services/abc123/all-rate-prices
-   * Returns: {
-   *   success: true,
-   *   data: [
-   *     {
-   *       rate: { id: 'rate1', name: 'Premium' },
-   *       vehicleType: { id: 'vt1', name: 'Sedan', code: 'SEDAN' },
-   *       price: 1500,
-   *       formattedPrice: '$1,500.00 MXN'
-   *     }
-   *   ]
-   * }
-   */
-  async getAllRatePricesForService(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      const { id: serviceId } = req.params;
-      if (!serviceId) {
-        return this.sendError(res, 'ID de servicio requerido', 400);
-      }
-
-      logger.info('ServicesController.getAllRatePricesForService called', {
-        userId: currentUser.id,
-        serviceId,
-      });
-
-      // Get all rate prices for the specific service
-      const ratePricesQuery = new Parse.Query('RatePrices');
-      ratePricesQuery.equalTo('service', {
-        __type: 'Pointer',
-        className: 'Services',
-        objectId: serviceId,
-      });
-      ratePricesQuery.equalTo('exists', true);
-      ratePricesQuery.equalTo('active', true);
-      ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
-      ratePricesQuery.include(['rate', 'vehicleType', 'service']);
-      ratePricesQuery.limit(1000);
-
-      const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
-
-      // Format the data
-      const data = ratePrices.map((ratePrice) => {
-        const rate = ratePrice.get('rate');
-        const vehicleType = ratePrice.get('vehicleType');
-        const service = ratePrice.get('service');
-        const price = ratePrice.get('price') || 0;
-
-        return {
-          id: ratePrice.id, // ✅ ADD THE RATEPRICES RECORD ID - THIS IS CRITICAL FOR UPDATES
-          rate: rate
-            ? {
-              id: rate.id,
-              name: rate.get('name'),
-              color: rate.get('color') || '#6c757d',
-            }
-            : null,
-          vehicleType: vehicleType
-            ? {
-              id: vehicleType.id,
-              name: vehicleType.get('name'),
-              code: vehicleType.get('code'),
-              defaultCapacity: vehicleType.get('defaultCapacity') || 4,
-              trunkCapacity: vehicleType.get('trunkCapacity') || 2,
-            }
-            : null,
-          service: service
-            ? {
-              id: service.id,
-            }
-            : null,
-          price,
-          formattedPrice: `$${price.toLocaleString()} MXN`,
-          currency: 'MXN',
-        };
-      });
-
-      logger.info('All rate prices for service retrieved successfully', {
-        userId: currentUser.id,
-        serviceId,
-        resultCount: data.length,
-      });
-
-      return res.json({
-        success: true,
-        data,
-      });
-    } catch (error) {
-      logger.error('Error in getAllRatePricesForService', {
-        error: error.message,
-        serviceId: req.params?.id,
-        userId: req.user?.id,
-      });
-      return this.sendError(res, 'Error al obtener precios de todas las tarifas', 500);
-    }
-  }
-
-  /**
-   * GET /api/services/:id/all-rate-prices-with-client-prices?clientId=xxx - Get service pricing data with client-specific overrides.
-   * Returns pricing information for all rates available for this service, with client-specific prices taking precedence.
-   * @param {object} req - Express request object with params.id and query.clientId.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   */
-  async getAllRatePricesForServiceWithClientPrices(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      const { id: serviceId } = req.params;
-      const { clientId } = req.query;
-
-      if (!serviceId) {
-        return this.sendError(res, 'ID de servicio requerido', 400);
-      }
-
-      logger.info('ServicesController.getAllRatePricesForServiceWithClientPrices called', {
-        userId: currentUser.id,
-        serviceId,
-        clientId,
-      });
-
-      // Get all rate prices for the specific service
-      const ratePricesQuery = new Parse.Query('RatePrices');
-      ratePricesQuery.equalTo('service', {
-        __type: 'Pointer',
-        className: 'Services',
-        objectId: serviceId,
-      });
-      ratePricesQuery.equalTo('exists', true);
-      ratePricesQuery.equalTo('active', true);
-      ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
-      ratePricesQuery.include(['rate', 'vehicleType', 'service']);
-      ratePricesQuery.limit(1000);
-
-      const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
-
-      // Get client-specific prices if clientId is provided
-      let clientPrices = [];
-      if (clientId) {
-        const clientPricesQuery = new Parse.Query('ClientPrices');
-        const AmexingUser = Parse.Object.extend('AmexingUser');
-        const clientPointer = new AmexingUser();
-        clientPointer.id = clientId;
-
-        clientPricesQuery.equalTo('clientPtr', clientPointer);
-        clientPricesQuery.equalTo('itemType', 'SERVICES');
-        clientPricesQuery.equalTo('itemId', serviceId);
-        clientPricesQuery.equalTo('exists', true);
-        clientPricesQuery.equalTo('active', true);
-        // Only get active records (valid_until IS NULL)
-        clientPricesQuery.doesNotExist('valid_until');
-        clientPricesQuery.include(['ratePtr', 'vehiclePtr']);
-        clientPricesQuery.limit(1000);
-
-        clientPrices = await clientPricesQuery.find({ useMasterKey: true });
-      }
-
-      // Create a map of client prices for quick lookup
-      const clientPricesMap = new Map();
-      clientPrices.forEach((clientPrice) => {
-        const rateId = clientPrice.get('ratePtr')?.id;
-        const vehicleTypeId = clientPrice.get('vehiclePtr')?.id;
-        if (rateId && vehicleTypeId) {
-          const key = `${rateId}_${vehicleTypeId}`;
-          clientPricesMap.set(key, {
-            precio: clientPrice.get('precio'),
-            basePrice: clientPrice.get('basePrice'),
-            isClientPrice: true,
-          });
-        }
-      });
-
-      // Format the data, using client prices when available
-      const data = ratePrices.map((ratePrice) => {
-        const rate = ratePrice.get('rate');
-        const vehicleType = ratePrice.get('vehicleType');
-        const service = ratePrice.get('service');
-        const basePrice = ratePrice.get('price') || 0;
-
-        // Check if there's a client-specific price for this rate/vehicle combination
-        // Try both vehicleType from RatePrices and from ClientPrices to find matching client price
-        let clientPriceData = null;
-
-        // First try: exact match with RatePrices vehicle type
-        const exactKey = `${rate?.id}_${vehicleType?.id}`;
-        clientPriceData = clientPricesMap.get(exactKey);
-
-        // Second try: find by rate and vehicle name (in case different vehicle IDs for same type)
-        if (!clientPriceData && rate && vehicleType) {
-          for (const [key, priceData] of clientPricesMap.entries()) {
-            const [clientRateId] = key.split('_');
-            if (clientRateId === rate.id) {
-              // Find matching client price by rate, regardless of exact vehicle ID
-              const matchingClientPrice = clientPrices.find(
-                (cp) => cp.get('ratePtr')?.id === rate.id
-                  && cp.get('vehiclePtr')?.get('name')?.toLowerCase() === vehicleType.get('name')?.toLowerCase()
-              );
-              if (matchingClientPrice) {
-                clientPriceData = priceData;
-                break;
-              }
-            }
-          }
-        }
-
-        // Use client price if available, otherwise use base price
-        const finalPrice = clientPriceData ? clientPriceData.precio : basePrice;
-
-        // Debug logging for VAN vehicles to track the discrepancy issue
-        if (
-          vehicleType?.get('name')?.toLowerCase().includes('van')
-          && rate?.get('name')?.toLowerCase().includes('económico')
-        ) {
-          if (clientPriceData) {
-            // VAN vehicle with client price override
-          }
-        }
-
-        // Create dual price display object for frontend
-        let priceDisplay;
-        if (clientPriceData) {
-          // Show both base and client price
-          priceDisplay = {
-            basePrice,
-            clientPrice: clientPriceData.precio,
-            formattedBasePrice: `$${basePrice.toLocaleString()} MXN`,
-            formattedClientPrice: `$${clientPriceData.precio.toLocaleString()} MXN`,
-            showBoth: true,
-          };
-        } else {
-          // Show only base price
-          priceDisplay = {
-            basePrice,
-            clientPrice: null,
-            formattedBasePrice: `$${basePrice.toLocaleString()} MXN`,
-            formattedClientPrice: null,
-            showBoth: false,
-          };
-        }
-
-        return {
-          rate: rate
-            ? {
-              id: rate.id,
-              name: rate.get('name'),
-              color: rate.get('color') || '#6c757d',
-            }
-            : null,
-          vehicleType: vehicleType
-            ? {
-              id: vehicleType.id,
-              name: vehicleType.get('name'),
-              code: vehicleType.get('code'),
-              defaultCapacity: vehicleType.get('defaultCapacity') || 4,
-              trunkCapacity: vehicleType.get('trunkCapacity') || 2,
-            }
-            : null,
-          service: service
-            ? {
-              id: service.id,
-            }
-            : null,
-          price: finalPrice,
-          basePrice, // Always include base price for reference
-          formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
-          priceDisplay, // Include dual price display object
-          currency: 'MXN',
-          isClientPrice: !!clientPriceData, // Flag to indicate if this is a custom price
-        };
-      });
-
-      logger.info('Rate prices with client overrides retrieved successfully', {
-        userId: currentUser.id,
-        serviceId,
-        clientId,
-        totalPrices: data.length,
-        clientOverrides: clientPricesMap.size,
-      });
-
-      return res.json({
-        success: true,
-        data,
-        meta: {
-          totalPrices: data.length,
-          clientOverrides: clientPricesMap.size,
-          hasClientPrices: clientPricesMap.size > 0,
-        },
-      });
-    } catch (error) {
-      logger.error('Error in getAllRatePricesForServiceWithClientPrices', {
-        error: error.message,
-        serviceId: req.params?.id,
-        clientId: req.query?.clientId,
-        userId: req.user?.id,
-      });
-      return this.sendError(res, 'Error al obtener precios con tarifas personalizadas', 500);
-    }
-  }
-
-  /**
-   * GET /api/services/:id/prices - Get service pricing data by service ID.
-   * Returns pricing information for all rates available for this service.
-   * @param {object} req - Express request object with params.id.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   * GET /api/services/abc123/prices
-   * Returns: {
-   *   success: true,
-   *   data: [
-   *     {
-   *       rate: { id: "rate1", name: "Económico", percentage: 0 },
-   *       price: 2500.00,
-   *       formattedPrice: "$2,500.00",
-   *       currency: "MXN"
-   *     }
-   *   ]
-   * }
-   */
-  async getServicePrices(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      const { id } = req.params;
-      if (!id) {
-        return this.sendError(res, 'ID de servicio requerido', 400);
-      }
-
-      // Validate service ID format - Parse ObjectIds should be 10 character strings
-      if (id === 'undefined' || id === 'null' || !id || id.length !== 10) {
-        logger.warn('Invalid service ID format received in getServicePrices', {
-          receivedId: id,
-          idLength: id ? id.length : 'null',
-          userId: currentUser.id,
-        });
-        return this.sendError(res, 'Formato de ID de servicio inválido', 400);
-      }
-
-      logger.info('ServicesController.getServicePrices called', {
-        userId: currentUser.id,
-        serviceId: id,
-      });
-
-      // Verify service exists
-      let service;
-      try {
-        const serviceQuery = new Parse.Query('Services');
-        serviceQuery.equalTo('exists', true);
-        service = await serviceQuery.get(id, { useMasterKey: true });
-      } catch (parseError) {
-        logger.error('Error querying service in getServicePrices', {
-          error: parseError.message,
-          serviceId: id,
-          userId: currentUser.id,
-          parseErrorCode: parseError.code,
-        });
-        return this.sendError(res, 'Error al verificar el servicio', 500);
-      }
-
-      if (!service) {
-        return this.sendError(res, 'Servicio no encontrado', 404);
-      }
-
-      // Get all rate prices for this service
-      let ratePrices;
-      try {
-        logger.info('Attempting to call RatePrices.getRatePricesByService', {
-          serviceId: id,
-          ratePricesClass: typeof RatePrices,
-          ratePricesMethod: typeof RatePrices.getRatePricesByService,
-        });
-        ratePrices = await RatePrices.getRatePricesByService(id);
-        logger.info('RatePrices.getRatePricesByService completed successfully', {
-          serviceId: id,
-          resultCount: ratePrices ? ratePrices.length : 0,
-        });
-      } catch (ratePricesError) {
-        logger.error('Error fetching RatePrices in getServicePrices', {
-          error: ratePricesError.message,
-          errorType: ratePricesError.constructor.name,
-          serviceId: id,
-          userId: currentUser.id,
-          stack: ratePricesError.stack,
-        });
-        return this.sendError(res, 'Error al obtener precios por tarifas', 500);
-      }
-
-      // Format the pricing data
-      let formattedPrices;
-      try {
-        logger.info('Starting to format pricing data', {
-          serviceId: id,
-          ratePricesCount: ratePrices.length,
-          ratePricesType: typeof ratePrices,
-          firstRatePrice:
-            ratePrices.length > 0
-              ? {
-                hasGetMethod: typeof ratePrices[0].get,
-                ratePtrValue: ratePrices[0].get ? ratePrices[0].get('ratePtr') : 'no-get-method',
-              }
-              : 'no-rate-prices',
-        });
-
-        formattedPrices = ratePrices.map((ratePrice, index) => {
-          try {
-            logger.info(`Processing rate price ${index}`, {
-              serviceId: id,
-              ratePriceType: typeof ratePrice,
-              ratePriceClassName: ratePrice.className,
-              hasGetMethod: typeof ratePrice.get,
-            });
-
-            // Check if rate is properly included
-            const rate = ratePrice.get('rate');
-            logger.info(`Rate object extracted for index ${index}`, {
-              serviceId: id,
-              rateExists: !!rate,
-              rateType: typeof rate,
-              rateId: rate?.id || 'no-id',
-              rateName: rate?.get ? rate.get('name') : 'no-get-method',
-            });
-
-            // Try to call methods safely
-            let price;
-            let formattedPrice;
-            let currency;
-            try {
-              price = ratePrice.getPrice();
-              formattedPrice = ratePrice.getFormattedPrice();
-              currency = ratePrice.getCurrency();
-            } catch (methodError) {
-              logger.error(`Error calling RatePrice methods for index ${index}`, {
-                serviceId: id,
-                methodError: methodError.message,
-              });
-              price = 0;
-              formattedPrice = '$0.00';
-              currency = 'MXN';
-            }
-
-            return {
-              rate: {
-                id: rate?.id || null,
-                name: rate?.get ? rate.get('name') : 'Sin tarifa',
-                percentage: rate?.get ? rate.get('percentage') : 0,
-              },
-              price,
-              formattedPrice,
-              currency,
-            };
-          } catch (itemError) {
-            logger.error(`Error formatting rate price item ${index}`, {
-              serviceId: id,
-              itemError: itemError.message,
-              itemStack: itemError.stack,
-            });
-            // Return safe default object
-            return {
-              rate: {
-                id: null,
-                name: 'Error en tarifa',
-                percentage: 0,
-              },
-              price: 0,
-              formattedPrice: '$0.00',
-              currency: 'MXN',
-            };
-          }
-        });
-
-        logger.info('Pricing data formatting completed', {
-          serviceId: id,
-          formattedCount: formattedPrices.length,
-        });
-      } catch (formatError) {
-        logger.error('Error in pricing data formatting main block', {
-          serviceId: id,
-          formatError: formatError.message,
-          formatStack: formatError.stack,
-        });
-        // Return empty array as fallback
-        formattedPrices = [];
-      }
-
-      logger.info('Service pricing data retrieved successfully', {
-        userId: currentUser.id,
-        serviceId: id,
-        priceCount: formattedPrices.length,
-      });
-
-      return res.json({
-        success: true,
-        data: formattedPrices,
-      });
-    } catch (error) {
-      logger.error('Error in getServicePrices - MAIN CATCH', {
-        error: error.message,
-        errorType: error.constructor.name,
-        serviceId: req.params?.id,
-        userId: req.user?.id,
-        stack: error.stack,
-        errorString: error.toString(),
-      });
-      return this.sendError(res, 'Error al obtener precios del servicio', 500);
-    }
-  }
-
-  /**
-   * POST /api/services - Create new service.
-   * @param {object} req - Express request object.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   * // Usage example documented above
-   */
-  async createService(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
-
-      const {
-        originPOI, destinationPOI, vehicleType, rate, note,
-      } = req.body;
-
-      // Validation
-      if (!destinationPOI || !vehicleType || !rate) {
-        return this.sendError(res, 'Destino, tipo de vehículo y tarifa son requeridos', 400);
-      }
-
-      if (originPOI === destinationPOI) {
-        return this.sendError(res, 'El origen y destino deben ser diferentes', 400);
-      }
-
-      // Check if service already exists
-      const existingService = await Services.findByRoute(originPOI, destinationPOI, vehicleType);
-      if (existingService && existingService.get('exists')) {
-        return this.sendError(res, 'Ya existe un servicio con esta ruta, tipo de vehículo y tarifa', 409);
-      }
-
-      // Create service
-      const service = new Services();
-      if (originPOI) {
-        service.setOriginPOI({
-          __type: 'Pointer',
-          className: 'POI',
-          objectId: originPOI,
-        });
-      }
-      service.setDestinationPOI({
-        __type: 'Pointer',
-        className: 'POI',
-        objectId: destinationPOI,
-      });
-      service.setVehicleType({
-        __type: 'Pointer',
-        className: 'VehicleType',
-        objectId: vehicleType,
-      });
-      service.setRate({
-        __type: 'Pointer',
-        className: 'Rate',
-        objectId: rate,
-      });
-      service.setNote(note || '');
-      service.set('active', true);
-      service.set('exists', true);
-
-      await service.save(null, { useMasterKey: true });
-
-      logger.info('Service created successfully', {
-        serviceId: service.id,
-        userId: currentUser.id,
-        userRole,
-      });
-
-      return res.status(201).json({
-        success: true,
-        data: { id: service.id },
-        message: 'Servicio creado exitosamente',
-      });
-    } catch (error) {
-      logger.error('Error in createService', {
-        error: error.message,
-        stack: error.stack,
-        userId: req.user?.id,
-        requestBody: req.body,
-      });
-      return this.sendError(res, 'Error al crear servicio', 500);
-    }
-  }
-
-  /**
-   * PUT /api/services/:id - Update existing service.
-   * @param {object} req - Express request object.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   * // Usage example documented above
-   */
-  async updateService(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      // Check permissions - use req.userRole from JWT middleware instead of accessing user object directly
-      const { userRole } = req;
-
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
-
-      const { id } = req.params;
-      const {
-        originPOI, destinationPOI, rate, note,
-      } = req.body;
-
-      if (!id) {
-        return this.sendError(res, 'ID de servicio requerido', 400);
-      }
-
-      // Validation - only destination is required for update (vehicle and rate are optional)
-      if (!destinationPOI) {
-        return this.sendError(res, 'Destino es requerido', 400);
-      }
-
-      if (originPOI === destinationPOI) {
-        return this.sendError(res, 'El origen y destino deben ser diferentes', 400);
-      }
-
-      // Get existing service
-      const query = new Parse.Query('Services');
-      query.equalTo('exists', true);
-      const service = await query.get(id, { useMasterKey: true });
-
-      if (!service) {
-        return this.sendError(res, 'Servicio no encontrado', 404);
-      }
-
-      // Note: Route conflict checking removed since vehicleType is no longer used in this simplified service model
-
-      // Update service - only update fields that are provided (using standard Parse.Object set() method)
-      if (originPOI) {
-        service.set('originPOI', {
-          __type: 'Pointer',
-          className: 'POI',
-          objectId: originPOI,
-        });
-      } else {
-        service.unset('originPOI');
-      }
-      service.set('destinationPOI', {
-        __type: 'Pointer',
-        className: 'POI',
-        objectId: destinationPOI,
-      });
-
-      // Only update rate if provided (vehicleType not supported in simplified Services model)
-      if (rate) {
-        service.set('rate', {
-          __type: 'Pointer',
-          className: 'Rate',
-          objectId: rate,
-        });
-      }
-
-      service.set('note', note || '');
-
-      await service.save(null, { useMasterKey: true });
-
-      logger.info('Service updated successfully', {
-        serviceId: service.id,
-        userId: currentUser.id,
-        userRole,
-      });
-
-      return res.json({
-        success: true,
-        message: 'Servicio actualizado exitosamente',
-      });
-    } catch (error) {
-      logger.error('Error in updateService', {
-        error: error.message,
-        serviceId: req.params.id,
-        userId: req.user?.id,
-        requestBody: req.body,
-      });
-      return this.sendError(res, 'Error al actualizar servicio', 500);
-    }
-  }
-
-  /**
-   * PATCH /api/services/:id/toggle-status - Toggle service active status.
-   * @param {object} req - Express request object.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   * // Usage example documented above
-   */
-  async toggleServiceStatus(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
-
-      const { id } = req.params;
-      const { active } = req.body;
-
-      if (!id) {
-        return this.sendError(res, 'ID de servicio requerido', 400);
-      }
-
-      if (typeof active !== 'boolean') {
-        return this.sendError(res, 'Estado activo debe ser verdadero o falso', 400);
-      }
-
-      // Get existing service
-      const query = new Parse.Query('Services');
-      query.equalTo('exists', true);
-      const service = await query.get(id, { useMasterKey: true });
-
-      if (!service) {
-        return this.sendError(res, 'Servicio no encontrado', 404);
-      }
-
-      // Update status
-      service.set('active', active);
-      await service.save(null, { useMasterKey: true });
-
-      logger.info('Service status toggled', {
-        serviceId: service.id,
-        newStatus: active,
-        userId: currentUser.id,
-        userRole,
-      });
-
-      return res.json({
-        success: true,
-        message: `Servicio ${active ? 'activado' : 'desactivado'} exitosamente`,
-      });
-    } catch (error) {
-      logger.error('Error in toggleServiceStatus', {
-        error: error.message,
-        serviceId: req.params.id,
-        userId: req.user?.id,
-      });
-      return this.sendError(res, 'Error al cambiar estado del servicio', 500);
-    }
-  }
-
-  /**
-   * DELETE /api/services/:id - Soft delete service.
-   * @param {object} req - Express request object.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   * // Usage example documented above
-   */
-  async deleteService(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
-
-      const { id } = req.params;
-      if (!id) {
-        return this.sendError(res, 'ID de servicio requerido', 400);
-      }
-
-      // Get existing service
-      const query = new Parse.Query('Services');
-      query.equalTo('exists', true);
-      const service = await query.get(id, { useMasterKey: true });
-
-      if (!service) {
-        return this.sendError(res, 'Servicio no encontrado', 404);
-      }
-
-      // Soft delete
-      service.set('exists', false);
-      service.set('active', false);
-      await service.save(null, { useMasterKey: true });
-
-      logger.info('Service deleted successfully', {
-        serviceId: service.id,
-        userId: currentUser.id,
-        userRole,
-      });
-
-      return res.json({
-        success: true,
-        message: 'Servicio eliminado exitosamente',
-      });
-    } catch (error) {
-      logger.error('Error in deleteService', {
-        error: error.message,
-        serviceId: req.params.id,
-        userId: req.user?.id,
-      });
-      return this.sendError(res, 'Error al eliminar servicio', 500);
-    }
-  }
-
-  /**
-   * PATCH /api/services/:id/rate - Update service rate.
-   * @param {object} req - Express request object.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   * // Update service rate
-   * PATCH /api/services/abc123/rate
-   * Body: { rateId: "def456" }
-   */
-  async updateServiceRate(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      // Check permissions
-      const userRole = currentUser.get?.('role') || currentUser.role;
-      if (!['superadmin', 'admin'].includes(userRole)) {
-        return this.sendError(res, 'Permisos insuficientes', 403);
-      }
-
-      const { id } = req.params;
-      const { rateId } = req.body;
-
-      if (!id) {
-        return this.sendError(res, 'ID de servicio requerido', 400);
-      }
-
-      if (!rateId) {
-        return this.sendError(res, 'ID de tarifa requerido', 400);
-      }
-
-      // Get existing service
-      const query = new Parse.Query('Services');
-      query.equalTo('exists', true);
-      query.include('rate');
-      const service = await query.get(id, { useMasterKey: true });
-
-      if (!service) {
-        return this.sendError(res, 'Servicio no encontrado', 404);
-      }
-
-      // Update rate
-      service.setRate({
-        __type: 'Pointer',
-        className: 'Rate',
-        objectId: rateId,
-      });
-
-      await service.save(null, { useMasterKey: true });
-
-      logger.info('Service rate updated successfully', {
-        serviceId: service.id,
-        rateId,
-        userId: currentUser.id,
-        userRole,
-      });
-
-      return res.json({
-        success: true,
-        message: 'Tarifa asignada exitosamente',
-      });
-    } catch (error) {
-      logger.error('Error in updateServiceRate', {
-        error: error.message,
-        serviceId: req.params?.id,
-        rateId: req.body?.rateId,
-        userId: req.user?.id,
-      });
-
-      const message = error.code === 101 ? 'Servicio no encontrado' : 'Error al actualizar la tarifa';
-      return this.sendError(res, message, error.code === 101 ? 404 : 500);
-    }
-  }
-
-  /**
-   * Save client-specific prices for a service.
-   * @param {object} req - Express request object.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   */
-  async saveClientPrices(req, res) {
-    try {
-      const { clientId, serviceId, prices } = req.body;
-      const currentUser = req.user;
-
-      // Validate input
-      if (!clientId || !serviceId || !prices || !Array.isArray(prices)) {
-        return this.sendError(res, 'Datos incompletos', 400);
-      }
-
-      // Process each price
-      const objectsToSave = [];
-      const ClientPricesClass = Parse.Object.extend('ClientPrices');
-
-      // First, find existing ACTIVE prices for this client and service (valid_until IS NULL)
-      const existingQuery = new Parse.Query(ClientPricesClass);
-      const AmexingUser = Parse.Object.extend('AmexingUser');
-      const clientPointer = new AmexingUser();
-      clientPointer.id = clientId;
-
-      existingQuery.equalTo('clientPtr', clientPointer);
-      existingQuery.equalTo('itemType', 'SERVICES');
-      existingQuery.equalTo('itemId', serviceId);
-      existingQuery.equalTo('exists', true);
-      // Only get active records (not versioned/historical ones)
-      existingQuery.doesNotExist('valid_until');
-
-      const existingPrices = await existingQuery.find({ useMasterKey: true });
-
-      // Create a map to track which prices to update vs create
-      const existingMap = new Map();
-      existingPrices.forEach((price) => {
-        const key = `${price.get('ratePtr').id}_${price.get('vehiclePtr').id}`;
-        existingMap.set(key, price);
-      });
-
-      // Process each new price
-      for (const priceData of prices) {
-        const key = `${priceData.ratePtr}_${priceData.vehiclePtr}`;
-        const existingPriceObject = existingMap.get(key);
-
-        if (existingPriceObject) {
-          // VERSIONING: Don't update existing price, instead:
-          // 1. Mark existing price as historical (set valid_until to today)
-          existingPriceObject.set('valid_until', new Date());
-          existingPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
-          objectsToSave.push(existingPriceObject);
-
-          // 2. Create NEW price record with the updated price
-          const newPriceObject = new ClientPricesClass();
-
-          const Rate = Parse.Object.extend('Rate');
-          const ratePointer = new Rate();
-          ratePointer.id = priceData.ratePtr;
-
-          const VehicleType = Parse.Object.extend('VehicleType');
-          const vehiclePointer = new VehicleType();
-          vehiclePointer.id = priceData.vehiclePtr;
-
-          newPriceObject.set('clientPtr', clientPointer);
-          newPriceObject.set('ratePtr', ratePointer);
-          newPriceObject.set('vehiclePtr', vehiclePointer);
-          newPriceObject.set('itemType', 'SERVICES');
-          newPriceObject.set('itemId', serviceId);
-          newPriceObject.set('precio', priceData.precio);
-          newPriceObject.set('basePrice', priceData.basePrice || 0);
-          newPriceObject.set('currency', 'MXN');
-          newPriceObject.set('active', true);
-          newPriceObject.set('exists', true);
-          newPriceObject.set('createdBy', currentUser ? currentUser.id : null);
-          newPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
-          // valid_until remains null (active record)
-
-          objectsToSave.push(newPriceObject);
-          existingMap.delete(key);
-        } else {
-          // Create completely new price (no existing record)
-          const newPriceObject = new ClientPricesClass();
-
-          const Rate = Parse.Object.extend('Rate');
-          const ratePointer = new Rate();
-          ratePointer.id = priceData.ratePtr;
-
-          const VehicleType = Parse.Object.extend('VehicleType');
-          const vehiclePointer = new VehicleType();
-          vehiclePointer.id = priceData.vehiclePtr;
-
-          newPriceObject.set('clientPtr', clientPointer);
-          newPriceObject.set('ratePtr', ratePointer);
-          newPriceObject.set('vehiclePtr', vehiclePointer);
-          newPriceObject.set('itemType', 'SERVICES');
-          newPriceObject.set('itemId', serviceId);
-          newPriceObject.set('precio', priceData.precio);
-          newPriceObject.set('basePrice', priceData.basePrice || 0);
-          newPriceObject.set('currency', 'MXN');
-          newPriceObject.set('active', true);
-          newPriceObject.set('exists', true);
-          newPriceObject.set('createdBy', currentUser ? currentUser.id : null);
-          newPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
-          // valid_until remains null (active record)
-
-          objectsToSave.push(newPriceObject);
-        }
-      }
-
-      // Mark remaining existing prices as historical (prices that were removed)
-      existingMap.forEach((price) => {
-        // Set valid_until to today instead of marking as deleted
-        price.set('valid_until', new Date());
-        price.set('active', false);
-        price.set('lastModifiedBy', currentUser ? currentUser.id : null);
-        objectsToSave.push(price);
-      });
-
-      // Save all objects
-      if (objectsToSave.length > 0) {
-        await Parse.Object.saveAll(objectsToSave, { useMasterKey: true });
-      }
-
-      logger.info('Client prices saved successfully', {
-        clientId,
-        serviceId,
-        priceCount: prices.length,
-        userId: currentUser?.id,
-      });
-
-      return res.json({
-        success: true,
-        message: `Se guardaron ${prices.length} precio(s) personalizados`,
-        data: {
-          saved: prices.length,
-          clientId,
-          serviceId,
-        },
-      });
-    } catch (error) {
-      logger.error('Error saving client prices', {
-        error: error.message,
-        stack: error.stack,
-        clientId: req.body?.clientId,
-        serviceId: req.body?.serviceId,
-        userId: req.user?.id,
-      });
-
-      return this.sendError(res, `Error al guardar los precios: ${error.message}`, 500);
-    }
-  }
-
-  /**
-   * GET /api/services/debug-rate-prices - Debug endpoint to examine RatePrices data.
-   * @param {object} req - Express request object.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   */
-  async debugRatePrices(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      const { clientId, serviceId } = req.query;
-
-      logger.info('🔧 DEBUG: Starting debugRatePrices', {
-        userId: currentUser.id,
-        clientId,
-        serviceId,
-      });
-
-      // Get rate prices with detailed information
-      const ratePricesQuery = new Parse.Query('RatePrices');
-
-      if (serviceId) {
-        ratePricesQuery.equalTo('service', {
-          __type: 'Pointer',
-          className: 'Services',
-          objectId: serviceId,
-        });
-      }
-
-      ratePricesQuery.equalTo('exists', true);
-      ratePricesQuery.equalTo('active', true);
-      ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
-      ratePricesQuery.include('rate');
-      ratePricesQuery.include('service');
-      ratePricesQuery.include('vehicleType');
-      ratePricesQuery.limit(100);
-
-      const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
-
-      // Format debug data
-      const debugData = ratePrices.map((rp) => {
-        const service = rp.get('service');
-        const rate = rp.get('rate');
-        const vehicleType = rp.get('vehicleType');
-
-        return {
-          id: rp.id,
-          serviceId: service?.id,
-          serviceName: service
-            ? `${service.get('originPOI')?.get('name') || 'N/A'} → ${service.get('destinationPOI')?.get('name') || 'N/A'}`
-            : 'N/A',
-          rateId: rate?.id,
-          rateName: rate?.get('name'),
-          vehicleTypeId: vehicleType?.id,
-          vehicleTypeName: vehicleType?.get('name'),
-          price: rp.get('price'),
-          formattedPrice: `$${(rp.get('price') || 0).toLocaleString()} MXN`,
-          active: rp.get('active'),
-          exists: rp.get('exists'),
-          createdAt: rp.get('createdAt'),
-          updatedAt: rp.get('updatedAt'),
-        };
-      });
-
-      // Statistics
-      const stats = {
-        totalRatePrices: ratePrices.length,
-        uniqueServices: [...new Set(debugData.map((d) => d.serviceId))].length,
-        uniqueRates: [...new Set(debugData.map((d) => d.rateId))].length,
-        uniqueVehicleTypes: [...new Set(debugData.map((d) => d.vehicleTypeId))].length,
-        priceRange: {
-          min: Math.min(...debugData.map((d) => d.price || 0)),
-          max: Math.max(...debugData.map((d) => d.price || 0)),
-          average: debugData.reduce((sum, d) => sum + (d.price || 0), 0) / debugData.length,
-        },
-      };
-
-      logger.info('🔧 DEBUG: RatePrices data retrieved', stats);
-
-      return res.json({
-        success: true,
-        debug: 'RatePrices',
-        data: debugData,
-        stats,
-        meta: {
-          query: {
-            clientId: clientId || null,
-            serviceId: serviceId || null,
-          },
-          timestamp: new Date().toISOString(),
-        },
-      });
-    } catch (error) {
-      logger.error('🔧 DEBUG: Error in debugRatePrices', {
-        error: error.message,
-        stack: error.stack,
-        userId: req.user?.id,
-      });
-      return this.sendError(res, `Error en debug RatePrices: ${error.message}`, 500);
-    }
-  }
-
-  /**
-   * GET /api/services/debug-client-prices - Debug endpoint to examine ClientPrices data.
-   * @param {object} req - Express request object.
-   * @param {object} res - Express response object.
-   * @returns {Promise<void>}
-   * @example
-   */
-  async debugClientPrices(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return this.sendError(res, 'Autenticación requerida', 401);
-      }
-
-      const { clientId, serviceId } = req.query;
-
-      logger.info('🔧 DEBUG: Starting debugClientPrices', {
-        userId: currentUser.id,
-        clientId,
-        serviceId,
-      });
-
-      // Method 1: Try Parse SDK first
-      let clientPricesViaParse = [];
-      let parseError = null;
-      try {
-        const clientPricesQuery = new Parse.Query('ClientPrices');
-
-        if (clientId) {
-          const AmexingUser = Parse.Object.extend('AmexingUser');
-          const clientPointer = new AmexingUser();
-          clientPointer.id = clientId;
-          clientPricesQuery.equalTo('clientPtr', clientPointer);
-        }
-
-        if (serviceId) {
-          clientPricesQuery.equalTo('itemId', serviceId);
-        }
-
-        clientPricesQuery.equalTo('itemType', 'SERVICES');
-        clientPricesQuery.equalTo('exists', true);
-        clientPricesQuery.equalTo('active', true);
-        // Only get active records (valid_until IS NULL)
-        clientPricesQuery.doesNotExist('valid_until');
-        clientPricesQuery.include('ratePtr');
-        clientPricesQuery.include('vehiclePtr');
-        clientPricesQuery.include('clientPtr');
-        clientPricesQuery.limit(100);
-
-        clientPricesViaParse = await clientPricesQuery.find({ useMasterKey: true });
-        logger.info('🔧 DEBUG: Parse SDK query successful', {
-          count: clientPricesViaParse.length,
-        });
-      } catch (error) {
-        parseError = error;
-        logger.warn('🔧 DEBUG: Parse SDK query failed', {
-          error: error.message,
-        });
-      }
-
-      // Method 2: Direct HTTP approach (our workaround)
-      let clientPricesViaHTTP = [];
-      let httpError = null;
-      try {
+        // Since Parse SDK queries fail with "Service Unavailable", use a direct HTTP approach
         const http = require('http');
         const options = {
           hostname: 'localhost',
@@ -2842,126 +1515,1558 @@ class ServicesController {
           httpReq.end();
         });
 
-        clientPricesViaHTTP = clientPricesData.results || [];
-        logger.info('🔧 DEBUG: HTTP query successful', {
-          count: clientPricesViaHTTP.length,
-        });
-      } catch (error) {
-        httpError = error;
-        logger.warn('🔧 DEBUG: HTTP query failed', {
-          error: error.message,
-        });
-      }
-
-      // Filter HTTP results if needed
-      let filteredClientPrices = clientPricesViaHTTP;
-      if (clientId || serviceId) {
-        filteredClientPrices = clientPricesViaHTTP.filter((cp) => {
-          const matchesClient = !clientId || (cp.clientPtr && cp.clientPtr.objectId === clientId);
-          const matchesService = !serviceId || cp.itemId === serviceId;
+        // Filter for our client and services
+        const relevantClientPrices = (clientPricesData.results || []).filter((cp) => {
+          const isOurClient = cp.clientPtr && cp.clientPtr.objectId === clientId;
           const isServices = cp.itemType === 'SERVICES';
           const isActive = cp.active === true;
           const exists = cp.exists === true;
-          return matchesClient && matchesService && isServices && isActive && exists;
+          // Remove rate filtering to match main table behavior (uses ANY client price)
+          return isOurClient && isServices && isActive && exists;
+        });
+
+        // Create the pricing map using both ID and vehicle code for better matching
+        relevantClientPrices.forEach((cp) => {
+          const serviceId = cp.itemId;
+          const vehicleId = cp.vehiclePtr?.objectId;
+          const vehicleCode = cp.vehiclePtr?.code; // e.g., "VAN", "SEDAN"
+          if (serviceId && vehicleId) {
+            const price = cp.precio || 0;
+            // Store by vehicle ID
+            const keyById = `${serviceId}_${vehicleId}`;
+            clientPricesMap[keyById] = price;
+
+            // Also store by vehicle code for cross-table matching
+            if (vehicleCode) {
+              const keyByCode = `${serviceId}_CODE_${vehicleCode}`;
+              clientPricesMap[keyByCode] = price;
+            }
+          }
+        });
+      } catch (error) {
+        logger.error('Error loading client prices for getServicesWithRatePrices', {
+          clientId,
+          rateId,
+          error: error.message,
+          errorCode: error.code,
+          errorStack: error.stack,
         });
       }
+    }
 
-      // Format debug data from Parse SDK
-      const parseDebugData = clientPricesViaParse.map((cp) => {
-        const client = cp.get('clientPtr');
-        const rate = cp.get('ratePtr');
-        const vehicle = cp.get('vehiclePtr');
+    // 🎯 ULTIMATE SIMPLIFICATION: Just call the single source of truth for each RatePrice record
+    // This ensures 100% consistency with the main table since we use the EXACT same method
+    const data = await Promise.all(
+      ratePrices.map(async (ratePrice) => {
+        const service = ratePrice.get('service');
+        const vehicleType = ratePrice.get('vehicleType');
+        const basePrice = ratePrice.get('price') || 0;
+
+        // 🎯 SIMPLE LOGIC: Check if THIS specific service + rate + vehicle has client pricing override
+        let finalPrice = basePrice;
+        let isClientPrice = false;
+
+        // Check for client price override for this exact combination
+        const clientPriceKey = `${service?.id}_${vehicleType?.id}`;
+        const clientPriceOverride = clientPricesMap[clientPriceKey];
+
+        if (clientPriceOverride) {
+          finalPrice = clientPriceOverride;
+          isClientPrice = true;
+        } else {
+          // Use base rate price when no client override exists
+        }
+
+        // Debug logging for service 6p4zqx7YCf
+        if (service?.id === '6p4zqx7YCf') {
+          // Specific service debugging would go here
+        }
+
+        // Create dual price display object for frontend
+        let priceDisplay;
+        if (clientId && isClientPrice) {
+          priceDisplay = {
+            basePrice,
+            clientPrice: finalPrice,
+            formattedBasePrice: `$${basePrice.toLocaleString()} MXN`,
+            formattedClientPrice: `$${finalPrice.toLocaleString()} MXN`,
+            showBoth: true,
+          };
+        }
 
         return {
-          id: cp.id,
-          clientId: client?.id,
-          clientEmail: client?.get('email'),
-          rateId: rate?.id,
-          rateName: rate?.get('name'),
-          vehicleId: vehicle?.id,
-          vehicleName: vehicle?.get('name'),
-          serviceId: cp.get('itemId'),
-          itemType: cp.get('itemType'),
-          precio: cp.get('precio'),
-          basePrice: cp.get('basePrice'),
-          currency: cp.get('currency'),
-          active: cp.get('active'),
-          exists: cp.get('exists'),
-          createdAt: cp.get('createdAt'),
-          updatedAt: cp.get('updatedAt'),
+          service: {
+            id: service?.id,
+            originPOI: service?.get('originPOI')
+              ? {
+                id: service.get('originPOI').id,
+                name: service.get('originPOI').get('name'),
+              }
+              : null,
+            destinationPOI: service?.get('destinationPOI')
+              ? {
+                id: service.get('destinationPOI').id,
+                name: service.get('destinationPOI').get('name'),
+              }
+              : null,
+            rate: ratePrice.get('rate')
+              ? {
+                id: ratePrice.get('rate').id,
+                name: ratePrice.get('rate').get('name'),
+              }
+              : null,
+          },
+          vehicleType: vehicleType
+            ? {
+              id: vehicleType.id, // 🔥 Keep ORIGINAL vehicle from RatePrice
+              name: vehicleType.get('name'),
+              code: vehicleType.get('code'),
+              defaultCapacity: vehicleType.get('defaultCapacity') || 4,
+              trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+            }
+            : null,
+          price: finalPrice,
+          formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
+          currency: 'MXN',
+          priceDisplay,
         };
+      })
+    );
+
+    logger.info('Services with rate prices retrieved successfully', {
+      userId: currentUser.id,
+      rateId,
+      clientId: clientId || 'none',
+      resultCount: data.length,
+      clientPricesCount: Object.keys(clientPricesMap).length,
+    });
+
+    // Add cache-busting headers to ensure fresh pricing data
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+      'Last-Modified': new Date().toUTCString(),
+      ETag: `"${Date.now()}"`,
+    });
+
+    return res.json({
+      success: true,
+      data,
+      timestamp: Date.now(), // Add timestamp for cache busting
+    });
+  } catch (error) {
+    logger.error('Error in getServicesWithRatePrices', {
+      error: error.message,
+      rateId: req.query?.rateId,
+      clientId: req.query?.clientId,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, 'Error al obtener servicios con precios', 500);
+  }
+}
+
+  /**
+   * GET /api/services/:id/all-rate-prices - Get all rate prices for a specific service.
+   * Returns pricing information for ALL rates available for this service.
+   * @param {object} req - Express request object with params.id.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/services/abc123/all-rate-prices
+   * Returns: {
+   *   success: true,
+   *   data: [
+   *     {
+   *       rate: { id: 'rate1', name: 'Premium' },
+   *       vehicleType: { id: 'vt1', name: 'Sedan', code: 'SEDAN' },
+   *       price: 1500,
+   *       formattedPrice: '$1,500.00 MXN'
+   *     }
+   *   ]
+   * }
+   */
+  async getAllRatePricesForService(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    const { id: serviceId } = req.params;
+    if (!serviceId) {
+      return this.sendError(res, 'ID de servicio requerido', 400);
+    }
+
+    logger.info('ServicesController.getAllRatePricesForService called', {
+      userId: currentUser.id,
+      serviceId,
+    });
+
+    // Get all rate prices for the specific service
+    const ratePricesQuery = new Parse.Query('RatePrices');
+    ratePricesQuery.equalTo('service', {
+      __type: 'Pointer',
+      className: 'Services',
+      objectId: serviceId,
+    });
+    ratePricesQuery.equalTo('exists', true);
+    ratePricesQuery.equalTo('active', true);
+    ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
+    ratePricesQuery.include(['rate', 'vehicleType', 'service']);
+    ratePricesQuery.limit(1000);
+
+    const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
+
+    // Format the data
+    const data = ratePrices.map((ratePrice) => {
+      const rate = ratePrice.get('rate');
+      const vehicleType = ratePrice.get('vehicleType');
+      const service = ratePrice.get('service');
+      const price = ratePrice.get('price') || 0;
+
+      return {
+        id: ratePrice.id, // ✅ ADD THE RATEPRICES RECORD ID - THIS IS CRITICAL FOR UPDATES
+        rate: rate
+          ? {
+            id: rate.id,
+            name: rate.get('name'),
+            color: rate.get('color') || '#6c757d',
+          }
+          : null,
+        vehicleType: vehicleType
+          ? {
+            id: vehicleType.id,
+            name: vehicleType.get('name'),
+            code: vehicleType.get('code'),
+            defaultCapacity: vehicleType.get('defaultCapacity') || 4,
+            trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+          }
+          : null,
+        service: service
+          ? {
+            id: service.id,
+          }
+          : null,
+        price,
+        formattedPrice: `$${price.toLocaleString()} MXN`,
+        currency: 'MXN',
+      };
+    });
+
+    logger.info('All rate prices for service retrieved successfully', {
+      userId: currentUser.id,
+      serviceId,
+      resultCount: data.length,
+    });
+
+    return res.json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    logger.error('Error in getAllRatePricesForService', {
+      error: error.message,
+      serviceId: req.params?.id,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, 'Error al obtener precios de todas las tarifas', 500);
+  }
+}
+
+  /**
+   * GET /api/services/:id/all-rate-prices-with-client-prices?clientId=xxx - Get service pricing data with client-specific overrides.
+   * Returns pricing information for all rates available for this service, with client-specific prices taking precedence.
+   * @param {object} req - Express request object with params.id and query.clientId.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async getAllRatePricesForServiceWithClientPrices(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    const { id: serviceId } = req.params;
+    const { clientId } = req.query;
+
+    if (!serviceId) {
+      return this.sendError(res, 'ID de servicio requerido', 400);
+    }
+
+    logger.info('ServicesController.getAllRatePricesForServiceWithClientPrices called', {
+      userId: currentUser.id,
+      serviceId,
+      clientId,
+    });
+
+    // Get all rate prices for the specific service
+    const ratePricesQuery = new Parse.Query('RatePrices');
+    ratePricesQuery.equalTo('service', {
+      __type: 'Pointer',
+      className: 'Services',
+      objectId: serviceId,
+    });
+    ratePricesQuery.equalTo('exists', true);
+    ratePricesQuery.equalTo('active', true);
+    ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
+    ratePricesQuery.include(['rate', 'vehicleType', 'service']);
+    ratePricesQuery.limit(1000);
+
+    const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
+
+    // Get client-specific prices if clientId is provided
+    let clientPrices = [];
+    if (clientId) {
+      const clientPricesQuery = new Parse.Query('ClientPrices');
+      const AmexingUser = Parse.Object.extend('AmexingUser');
+      const clientPointer = new AmexingUser();
+      clientPointer.id = clientId;
+
+      clientPricesQuery.equalTo('clientPtr', clientPointer);
+      clientPricesQuery.equalTo('itemType', 'SERVICES');
+      clientPricesQuery.equalTo('itemId', serviceId);
+      clientPricesQuery.equalTo('exists', true);
+      clientPricesQuery.equalTo('active', true);
+      // Only get active records (valid_until IS NULL)
+      clientPricesQuery.doesNotExist('valid_until');
+      clientPricesQuery.include(['ratePtr', 'vehiclePtr']);
+      clientPricesQuery.limit(1000);
+
+      clientPrices = await clientPricesQuery.find({ useMasterKey: true });
+    }
+
+    // Create a map of client prices for quick lookup
+    const clientPricesMap = new Map();
+    clientPrices.forEach((clientPrice) => {
+      const rateId = clientPrice.get('ratePtr')?.id;
+      const vehicleTypeId = clientPrice.get('vehiclePtr')?.id;
+      if (rateId && vehicleTypeId) {
+        const key = `${rateId}_${vehicleTypeId}`;
+        clientPricesMap.set(key, {
+          precio: clientPrice.get('precio'),
+          basePrice: clientPrice.get('basePrice'),
+          isClientPrice: true,
+        });
+      }
+    });
+
+    // Format the data, using client prices when available
+    const data = ratePrices.map((ratePrice) => {
+      const rate = ratePrice.get('rate');
+      const vehicleType = ratePrice.get('vehicleType');
+      const service = ratePrice.get('service');
+      const basePrice = ratePrice.get('price') || 0;
+
+      // Check if there's a client-specific price for this rate/vehicle combination
+      // Try both vehicleType from RatePrices and from ClientPrices to find matching client price
+      let clientPriceData = null;
+
+      // First try: exact match with RatePrices vehicle type
+      const exactKey = `${rate?.id}_${vehicleType?.id}`;
+      clientPriceData = clientPricesMap.get(exactKey);
+
+      // Second try: find by rate and vehicle name (in case different vehicle IDs for same type)
+      if (!clientPriceData && rate && vehicleType) {
+        for (const [key, priceData] of clientPricesMap.entries()) {
+          const [clientRateId] = key.split('_');
+          if (clientRateId === rate.id) {
+            // Find matching client price by rate, regardless of exact vehicle ID
+            const matchingClientPrice = clientPrices.find(
+              (cp) => cp.get('ratePtr')?.id === rate.id
+                && cp.get('vehiclePtr')?.get('name')?.toLowerCase() === vehicleType.get('name')?.toLowerCase()
+            );
+            if (matchingClientPrice) {
+              clientPriceData = priceData;
+              break;
+            }
+          }
+        }
+      }
+
+      // Use client price if available, otherwise use base price
+      const finalPrice = clientPriceData ? clientPriceData.precio : basePrice;
+
+      // Debug logging for VAN vehicles to track the discrepancy issue
+      if (
+        vehicleType?.get('name')?.toLowerCase().includes('van')
+        && rate?.get('name')?.toLowerCase().includes('económico')
+      ) {
+        if (clientPriceData) {
+          // VAN vehicle with client price override
+        }
+      }
+
+      // Create dual price display object for frontend
+      let priceDisplay;
+      if (clientPriceData) {
+        // Show both base and client price
+        priceDisplay = {
+          basePrice,
+          clientPrice: clientPriceData.precio,
+          formattedBasePrice: `$${basePrice.toLocaleString()} MXN`,
+          formattedClientPrice: `$${clientPriceData.precio.toLocaleString()} MXN`,
+          showBoth: true,
+        };
+      } else {
+        // Show only base price
+        priceDisplay = {
+          basePrice,
+          clientPrice: null,
+          formattedBasePrice: `$${basePrice.toLocaleString()} MXN`,
+          formattedClientPrice: null,
+          showBoth: false,
+        };
+      }
+
+      return {
+        rate: rate
+          ? {
+            id: rate.id,
+            name: rate.get('name'),
+            color: rate.get('color') || '#6c757d',
+          }
+          : null,
+        vehicleType: vehicleType
+          ? {
+            id: vehicleType.id,
+            name: vehicleType.get('name'),
+            code: vehicleType.get('code'),
+            defaultCapacity: vehicleType.get('defaultCapacity') || 4,
+            trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+          }
+          : null,
+        service: service
+          ? {
+            id: service.id,
+          }
+          : null,
+        price: finalPrice,
+        basePrice, // Always include base price for reference
+        formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
+        priceDisplay, // Include dual price display object
+        currency: 'MXN',
+        isClientPrice: !!clientPriceData, // Flag to indicate if this is a custom price
+      };
+    });
+
+    logger.info('Rate prices with client overrides retrieved successfully', {
+      userId: currentUser.id,
+      serviceId,
+      clientId,
+      totalPrices: data.length,
+      clientOverrides: clientPricesMap.size,
+    });
+
+    return res.json({
+      success: true,
+      data,
+      meta: {
+        totalPrices: data.length,
+        clientOverrides: clientPricesMap.size,
+        hasClientPrices: clientPricesMap.size > 0,
+      },
+    });
+  } catch (error) {
+    logger.error('Error in getAllRatePricesForServiceWithClientPrices', {
+      error: error.message,
+      serviceId: req.params?.id,
+      clientId: req.query?.clientId,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, 'Error al obtener precios con tarifas personalizadas', 500);
+  }
+}
+
+  /**
+   * GET /api/services/:id/prices - Get service pricing data by service ID.
+   * Returns pricing information for all rates available for this service.
+   * @param {object} req - Express request object with params.id.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * GET /api/services/abc123/prices
+   * Returns: {
+   *   success: true,
+   *   data: [
+   *     {
+   *       rate: { id: "rate1", name: "Económico", percentage: 0 },
+   *       price: 2500.00,
+   *       formattedPrice: "$2,500.00",
+   *       currency: "MXN"
+   *     }
+   *   ]
+   * }
+   */
+  async getServicePrices(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    const { id } = req.params;
+    if (!id) {
+      return this.sendError(res, 'ID de servicio requerido', 400);
+    }
+
+    // Validate service ID format - Parse ObjectIds should be 10 character strings
+    if (id === 'undefined' || id === 'null' || !id || id.length !== 10) {
+      logger.warn('Invalid service ID format received in getServicePrices', {
+        receivedId: id,
+        idLength: id ? id.length : 'null',
+        userId: currentUser.id,
+      });
+      return this.sendError(res, 'Formato de ID de servicio inválido', 400);
+    }
+
+    logger.info('ServicesController.getServicePrices called', {
+      userId: currentUser.id,
+      serviceId: id,
+    });
+
+    // Verify service exists
+    let service;
+    try {
+      const serviceQuery = new Parse.Query('Services');
+      serviceQuery.equalTo('exists', true);
+      service = await serviceQuery.get(id, { useMasterKey: true });
+    } catch (parseError) {
+      logger.error('Error querying service in getServicePrices', {
+        error: parseError.message,
+        serviceId: id,
+        userId: currentUser.id,
+        parseErrorCode: parseError.code,
+      });
+      return this.sendError(res, 'Error al verificar el servicio', 500);
+    }
+
+    if (!service) {
+      return this.sendError(res, 'Servicio no encontrado', 404);
+    }
+
+    // Get all rate prices for this service
+    let ratePrices;
+    try {
+      logger.info('Attempting to call RatePrices.getRatePricesByService', {
+        serviceId: id,
+        ratePricesClass: typeof RatePrices,
+        ratePricesMethod: typeof RatePrices.getRatePricesByService,
+      });
+      ratePrices = await RatePrices.getRatePricesByService(id);
+      logger.info('RatePrices.getRatePricesByService completed successfully', {
+        serviceId: id,
+        resultCount: ratePrices ? ratePrices.length : 0,
+      });
+    } catch (ratePricesError) {
+      logger.error('Error fetching RatePrices in getServicePrices', {
+        error: ratePricesError.message,
+        errorType: ratePricesError.constructor.name,
+        serviceId: id,
+        userId: currentUser.id,
+        stack: ratePricesError.stack,
+      });
+      return this.sendError(res, 'Error al obtener precios por tarifas', 500);
+    }
+
+    // Format the pricing data
+    let formattedPrices;
+    try {
+      logger.info('Starting to format pricing data', {
+        serviceId: id,
+        ratePricesCount: ratePrices.length,
+        ratePricesType: typeof ratePrices,
+        firstRatePrice:
+          ratePrices.length > 0
+            ? {
+              hasGetMethod: typeof ratePrices[0].get,
+              ratePtrValue: ratePrices[0].get ? ratePrices[0].get('ratePtr') : 'no-get-method',
+            }
+            : 'no-rate-prices',
       });
 
-      // Format debug data from HTTP
-      const httpDebugData = filteredClientPrices.map((cp) => ({
-        id: cp.objectId,
-        clientId: cp.clientPtr?.objectId,
-        rateId: cp.ratePtr?.objectId,
-        vehicleId: cp.vehiclePtr?.objectId,
-        serviceId: cp.itemId,
-        itemType: cp.itemType,
-        precio: cp.precio,
-        basePrice: cp.basePrice,
-        currency: cp.currency,
-        active: cp.active,
-        exists: cp.exists,
-        createdAt: cp.createdAt,
-        updatedAt: cp.updatedAt,
-      }));
+      formattedPrices = ratePrices.map((ratePrice, index) => {
+        try {
+          logger.info(`Processing rate price ${index}`, {
+            serviceId: id,
+            ratePriceType: typeof ratePrice,
+            ratePriceClassName: ratePrice.className,
+            hasGetMethod: typeof ratePrice.get,
+          });
 
-      // Statistics
-      const stats = {
-        parseSDK: {
-          success: !parseError,
-          error: parseError?.message || null,
-          count: parseDebugData.length,
+          // Check if rate is properly included
+          const rate = ratePrice.get('rate');
+          logger.info(`Rate object extracted for index ${index}`, {
+            serviceId: id,
+            rateExists: !!rate,
+            rateType: typeof rate,
+            rateId: rate?.id || 'no-id',
+            rateName: rate?.get ? rate.get('name') : 'no-get-method',
+          });
+
+          // Try to call methods safely
+          let price;
+          let formattedPrice;
+          let currency;
+          try {
+            price = ratePrice.getPrice();
+            formattedPrice = ratePrice.getFormattedPrice();
+            currency = ratePrice.getCurrency();
+          } catch (methodError) {
+            logger.error(`Error calling RatePrice methods for index ${index}`, {
+              serviceId: id,
+              methodError: methodError.message,
+            });
+            price = 0;
+            formattedPrice = '$0.00';
+            currency = 'MXN';
+          }
+
+          return {
+            rate: {
+              id: rate?.id || null,
+              name: rate?.get ? rate.get('name') : 'Sin tarifa',
+              percentage: rate?.get ? rate.get('percentage') : 0,
+            },
+            price,
+            formattedPrice,
+            currency,
+          };
+        } catch (itemError) {
+          logger.error(`Error formatting rate price item ${index}`, {
+            serviceId: id,
+            itemError: itemError.message,
+            itemStack: itemError.stack,
+          });
+          // Return safe default object
+          return {
+            rate: {
+              id: null,
+              name: 'Error en tarifa',
+              percentage: 0,
+            },
+            price: 0,
+            formattedPrice: '$0.00',
+            currency: 'MXN',
+          };
+        }
+      });
+
+      logger.info('Pricing data formatting completed', {
+        serviceId: id,
+        formattedCount: formattedPrices.length,
+      });
+    } catch (formatError) {
+      logger.error('Error in pricing data formatting main block', {
+        serviceId: id,
+        formatError: formatError.message,
+        formatStack: formatError.stack,
+      });
+      // Return empty array as fallback
+      formattedPrices = [];
+    }
+
+    logger.info('Service pricing data retrieved successfully', {
+      userId: currentUser.id,
+      serviceId: id,
+      priceCount: formattedPrices.length,
+    });
+
+    return res.json({
+      success: true,
+      data: formattedPrices,
+    });
+  } catch (error) {
+    logger.error('Error in getServicePrices - MAIN CATCH', {
+      error: error.message,
+      errorType: error.constructor.name,
+      serviceId: req.params?.id,
+      userId: req.user?.id,
+      stack: error.stack,
+      errorString: error.toString(),
+    });
+    return this.sendError(res, 'Error al obtener precios del servicio', 500);
+  }
+}
+
+  /**
+   * POST /api/services - Create new service.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * // Usage example documented above
+   */
+  async createService(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    // Check permissions
+    const userRole = currentUser.get?.('role') || currentUser.role;
+    if (!['superadmin', 'admin'].includes(userRole)) {
+      return this.sendError(res, 'Permisos insuficientes', 403);
+    }
+
+    const {
+      originPOI, destinationPOI, vehicleType, rate, note,
+    } = req.body;
+
+    // Validation
+    if (!destinationPOI || !vehicleType || !rate) {
+      return this.sendError(res, 'Destino, tipo de vehículo y tarifa son requeridos', 400);
+    }
+
+    if (originPOI === destinationPOI) {
+      return this.sendError(res, 'El origen y destino deben ser diferentes', 400);
+    }
+
+    // Check if service already exists
+    const existingService = await Services.findByRoute(originPOI, destinationPOI, vehicleType);
+    if (existingService && existingService.get('exists')) {
+      return this.sendError(res, 'Ya existe un servicio con esta ruta, tipo de vehículo y tarifa', 409);
+    }
+
+    // Create service
+    const service = new Services();
+    if (originPOI) {
+      service.setOriginPOI({
+        __type: 'Pointer',
+        className: 'POI',
+        objectId: originPOI,
+      });
+    }
+    service.setDestinationPOI({
+      __type: 'Pointer',
+      className: 'POI',
+      objectId: destinationPOI,
+    });
+    service.setVehicleType({
+      __type: 'Pointer',
+      className: 'VehicleType',
+      objectId: vehicleType,
+    });
+    service.setRate({
+      __type: 'Pointer',
+      className: 'Rate',
+      objectId: rate,
+    });
+    service.setNote(note || '');
+    service.set('active', true);
+    service.set('exists', true);
+
+    await service.save(null, { useMasterKey: true });
+
+    logger.info('Service created successfully', {
+      serviceId: service.id,
+      userId: currentUser.id,
+      userRole,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: { id: service.id },
+      message: 'Servicio creado exitosamente',
+    });
+  } catch (error) {
+    logger.error('Error in createService', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+      requestBody: req.body,
+    });
+    return this.sendError(res, 'Error al crear servicio', 500);
+  }
+}
+
+  /**
+   * PUT /api/services/:id - Update existing service.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * // Usage example documented above
+   */
+  async updateService(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    // Check permissions - use req.userRole from JWT middleware instead of accessing user object directly
+    const { userRole } = req;
+
+    if (!['superadmin', 'admin'].includes(userRole)) {
+      return this.sendError(res, 'Permisos insuficientes', 403);
+    }
+
+    const { id } = req.params;
+    const {
+      originPOI, destinationPOI, rate, note,
+    } = req.body;
+
+    if (!id) {
+      return this.sendError(res, 'ID de servicio requerido', 400);
+    }
+
+    // Validation - only destination is required for update (vehicle and rate are optional)
+    if (!destinationPOI) {
+      return this.sendError(res, 'Destino es requerido', 400);
+    }
+
+    if (originPOI === destinationPOI) {
+      return this.sendError(res, 'El origen y destino deben ser diferentes', 400);
+    }
+
+    // Get existing service
+    const query = new Parse.Query('Services');
+    query.equalTo('exists', true);
+    const service = await query.get(id, { useMasterKey: true });
+
+    if (!service) {
+      return this.sendError(res, 'Servicio no encontrado', 404);
+    }
+
+    // Note: Route conflict checking removed since vehicleType is no longer used in this simplified service model
+
+    // Update service - only update fields that are provided (using standard Parse.Object set() method)
+    if (originPOI) {
+      service.set('originPOI', {
+        __type: 'Pointer',
+        className: 'POI',
+        objectId: originPOI,
+      });
+    } else {
+      service.unset('originPOI');
+    }
+    service.set('destinationPOI', {
+      __type: 'Pointer',
+      className: 'POI',
+      objectId: destinationPOI,
+    });
+
+    // Only update rate if provided (vehicleType not supported in simplified Services model)
+    if (rate) {
+      service.set('rate', {
+        __type: 'Pointer',
+        className: 'Rate',
+        objectId: rate,
+      });
+    }
+
+    service.set('note', note || '');
+
+    await service.save(null, { useMasterKey: true });
+
+    logger.info('Service updated successfully', {
+      serviceId: service.id,
+      userId: currentUser.id,
+      userRole,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Servicio actualizado exitosamente',
+    });
+  } catch (error) {
+    logger.error('Error in updateService', {
+      error: error.message,
+      serviceId: req.params.id,
+      userId: req.user?.id,
+      requestBody: req.body,
+    });
+    return this.sendError(res, 'Error al actualizar servicio', 500);
+  }
+}
+
+  /**
+   * PATCH /api/services/:id/toggle-status - Toggle service active status.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * // Usage example documented above
+   */
+  async toggleServiceStatus(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    // Check permissions
+    const userRole = currentUser.get?.('role') || currentUser.role;
+    if (!['superadmin', 'admin'].includes(userRole)) {
+      return this.sendError(res, 'Permisos insuficientes', 403);
+    }
+
+    const { id } = req.params;
+    const { active } = req.body;
+
+    if (!id) {
+      return this.sendError(res, 'ID de servicio requerido', 400);
+    }
+
+    if (typeof active !== 'boolean') {
+      return this.sendError(res, 'Estado activo debe ser verdadero o falso', 400);
+    }
+
+    // Get existing service
+    const query = new Parse.Query('Services');
+    query.equalTo('exists', true);
+    const service = await query.get(id, { useMasterKey: true });
+
+    if (!service) {
+      return this.sendError(res, 'Servicio no encontrado', 404);
+    }
+
+    // Update status
+    service.set('active', active);
+    await service.save(null, { useMasterKey: true });
+
+    logger.info('Service status toggled', {
+      serviceId: service.id,
+      newStatus: active,
+      userId: currentUser.id,
+      userRole,
+    });
+
+    return res.json({
+      success: true,
+      message: `Servicio ${active ? 'activado' : 'desactivado'} exitosamente`,
+    });
+  } catch (error) {
+    logger.error('Error in toggleServiceStatus', {
+      error: error.message,
+      serviceId: req.params.id,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, 'Error al cambiar estado del servicio', 500);
+  }
+}
+
+  /**
+   * DELETE /api/services/:id - Soft delete service.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * // Usage example documented above
+   */
+  async deleteService(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    // Check permissions
+    const userRole = currentUser.get?.('role') || currentUser.role;
+    if (!['superadmin', 'admin'].includes(userRole)) {
+      return this.sendError(res, 'Permisos insuficientes', 403);
+    }
+
+    const { id } = req.params;
+    if (!id) {
+      return this.sendError(res, 'ID de servicio requerido', 400);
+    }
+
+    // Get existing service
+    const query = new Parse.Query('Services');
+    query.equalTo('exists', true);
+    const service = await query.get(id, { useMasterKey: true });
+
+    if (!service) {
+      return this.sendError(res, 'Servicio no encontrado', 404);
+    }
+
+    // Soft delete
+    service.set('exists', false);
+    service.set('active', false);
+    await service.save(null, { useMasterKey: true });
+
+    logger.info('Service deleted successfully', {
+      serviceId: service.id,
+      userId: currentUser.id,
+      userRole,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Servicio eliminado exitosamente',
+    });
+  } catch (error) {
+    logger.error('Error in deleteService', {
+      error: error.message,
+      serviceId: req.params.id,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, 'Error al eliminar servicio', 500);
+  }
+}
+
+  /**
+   * PATCH /api/services/:id/rate - Update service rate.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   * // Update service rate
+   * PATCH /api/services/abc123/rate
+   * Body: { rateId: "def456" }
+   */
+  async updateServiceRate(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    // Check permissions
+    const userRole = currentUser.get?.('role') || currentUser.role;
+    if (!['superadmin', 'admin'].includes(userRole)) {
+      return this.sendError(res, 'Permisos insuficientes', 403);
+    }
+
+    const { id } = req.params;
+    const { rateId } = req.body;
+
+    if (!id) {
+      return this.sendError(res, 'ID de servicio requerido', 400);
+    }
+
+    if (!rateId) {
+      return this.sendError(res, 'ID de tarifa requerido', 400);
+    }
+
+    // Get existing service
+    const query = new Parse.Query('Services');
+    query.equalTo('exists', true);
+    query.include('rate');
+    const service = await query.get(id, { useMasterKey: true });
+
+    if (!service) {
+      return this.sendError(res, 'Servicio no encontrado', 404);
+    }
+
+    // Update rate
+    service.setRate({
+      __type: 'Pointer',
+      className: 'Rate',
+      objectId: rateId,
+    });
+
+    await service.save(null, { useMasterKey: true });
+
+    logger.info('Service rate updated successfully', {
+      serviceId: service.id,
+      rateId,
+      userId: currentUser.id,
+      userRole,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Tarifa asignada exitosamente',
+    });
+  } catch (error) {
+    logger.error('Error in updateServiceRate', {
+      error: error.message,
+      serviceId: req.params?.id,
+      rateId: req.body?.rateId,
+      userId: req.user?.id,
+    });
+
+    const message = error.code === 101 ? 'Servicio no encontrado' : 'Error al actualizar la tarifa';
+    return this.sendError(res, message, error.code === 101 ? 404 : 500);
+  }
+}
+
+  /**
+   * Save client-specific prices for a service.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async saveClientPrices(req, res) {
+  try {
+    const { clientId, serviceId, prices } = req.body;
+    const currentUser = req.user;
+
+    // Validate input
+    if (!clientId || !serviceId || !prices || !Array.isArray(prices)) {
+      return this.sendError(res, 'Datos incompletos', 400);
+    }
+
+    // Process each price
+    const objectsToSave = [];
+    const ClientPricesClass = Parse.Object.extend('ClientPrices');
+
+    // First, find existing ACTIVE prices for this client and service (valid_until IS NULL)
+    const existingQuery = new Parse.Query(ClientPricesClass);
+    const AmexingUser = Parse.Object.extend('AmexingUser');
+    const clientPointer = new AmexingUser();
+    clientPointer.id = clientId;
+
+    existingQuery.equalTo('clientPtr', clientPointer);
+    existingQuery.equalTo('itemType', 'SERVICES');
+    existingQuery.equalTo('itemId', serviceId);
+    existingQuery.equalTo('exists', true);
+    // Only get active records (not versioned/historical ones)
+    existingQuery.doesNotExist('valid_until');
+
+    const existingPrices = await existingQuery.find({ useMasterKey: true });
+
+    // Create a map to track which prices to update vs create
+    const existingMap = new Map();
+    existingPrices.forEach((price) => {
+      const key = `${price.get('ratePtr').id}_${price.get('vehiclePtr').id}`;
+      existingMap.set(key, price);
+    });
+
+    // Process each new price
+    for (const priceData of prices) {
+      const key = `${priceData.ratePtr}_${priceData.vehiclePtr}`;
+      const existingPriceObject = existingMap.get(key);
+
+      if (existingPriceObject) {
+        // VERSIONING: Don't update existing price, instead:
+        // 1. Mark existing price as historical (set valid_until to today)
+        existingPriceObject.set('valid_until', new Date());
+        existingPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
+        objectsToSave.push(existingPriceObject);
+
+        // 2. Create NEW price record with the updated price
+        const newPriceObject = new ClientPricesClass();
+
+        const Rate = Parse.Object.extend('Rate');
+        const ratePointer = new Rate();
+        ratePointer.id = priceData.ratePtr;
+
+        const VehicleType = Parse.Object.extend('VehicleType');
+        const vehiclePointer = new VehicleType();
+        vehiclePointer.id = priceData.vehiclePtr;
+
+        newPriceObject.set('clientPtr', clientPointer);
+        newPriceObject.set('ratePtr', ratePointer);
+        newPriceObject.set('vehiclePtr', vehiclePointer);
+        newPriceObject.set('itemType', 'SERVICES');
+        newPriceObject.set('itemId', serviceId);
+        newPriceObject.set('precio', priceData.precio);
+        newPriceObject.set('basePrice', priceData.basePrice || 0);
+        newPriceObject.set('currency', 'MXN');
+        newPriceObject.set('active', true);
+        newPriceObject.set('exists', true);
+        newPriceObject.set('createdBy', currentUser ? currentUser.id : null);
+        newPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
+        // valid_until remains null (active record)
+
+        objectsToSave.push(newPriceObject);
+        existingMap.delete(key);
+      } else {
+        // Create completely new price (no existing record)
+        const newPriceObject = new ClientPricesClass();
+
+        const Rate = Parse.Object.extend('Rate');
+        const ratePointer = new Rate();
+        ratePointer.id = priceData.ratePtr;
+
+        const VehicleType = Parse.Object.extend('VehicleType');
+        const vehiclePointer = new VehicleType();
+        vehiclePointer.id = priceData.vehiclePtr;
+
+        newPriceObject.set('clientPtr', clientPointer);
+        newPriceObject.set('ratePtr', ratePointer);
+        newPriceObject.set('vehiclePtr', vehiclePointer);
+        newPriceObject.set('itemType', 'SERVICES');
+        newPriceObject.set('itemId', serviceId);
+        newPriceObject.set('precio', priceData.precio);
+        newPriceObject.set('basePrice', priceData.basePrice || 0);
+        newPriceObject.set('currency', 'MXN');
+        newPriceObject.set('active', true);
+        newPriceObject.set('exists', true);
+        newPriceObject.set('createdBy', currentUser ? currentUser.id : null);
+        newPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
+        // valid_until remains null (active record)
+
+        objectsToSave.push(newPriceObject);
+      }
+    }
+
+    // Mark remaining existing prices as historical (prices that were removed)
+    existingMap.forEach((price) => {
+      // Set valid_until to today instead of marking as deleted
+      price.set('valid_until', new Date());
+      price.set('active', false);
+      price.set('lastModifiedBy', currentUser ? currentUser.id : null);
+      objectsToSave.push(price);
+    });
+
+    // Save all objects
+    if (objectsToSave.length > 0) {
+      await Parse.Object.saveAll(objectsToSave, { useMasterKey: true });
+    }
+
+    logger.info('Client prices saved successfully', {
+      clientId,
+      serviceId,
+      priceCount: prices.length,
+      userId: currentUser?.id,
+    });
+
+    return res.json({
+      success: true,
+      message: `Se guardaron ${prices.length} precio(s) personalizados`,
+      data: {
+        saved: prices.length,
+        clientId,
+        serviceId,
+      },
+    });
+  } catch (error) {
+    logger.error('Error saving client prices', {
+      error: error.message,
+      stack: error.stack,
+      clientId: req.body?.clientId,
+      serviceId: req.body?.serviceId,
+      userId: req.user?.id,
+    });
+
+    return this.sendError(res, `Error al guardar los precios: ${error.message}`, 500);
+  }
+}
+
+  /**
+   * GET /api/services/debug-rate-prices - Debug endpoint to examine RatePrices data.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async debugRatePrices(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    const { clientId, serviceId } = req.query;
+
+    logger.info('🔧 DEBUG: Starting debugRatePrices', {
+      userId: currentUser.id,
+      clientId,
+      serviceId,
+    });
+
+    // Get rate prices with detailed information
+    const ratePricesQuery = new Parse.Query('RatePrices');
+
+    if (serviceId) {
+      ratePricesQuery.equalTo('service', {
+        __type: 'Pointer',
+        className: 'Services',
+        objectId: serviceId,
+      });
+    }
+
+    ratePricesQuery.equalTo('exists', true);
+    ratePricesQuery.equalTo('active', true);
+    ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
+    ratePricesQuery.include('rate');
+    ratePricesQuery.include('service');
+    ratePricesQuery.include('vehicleType');
+    ratePricesQuery.limit(100);
+
+    const ratePrices = await ratePricesQuery.find({ useMasterKey: true });
+
+    // Format debug data
+    const debugData = ratePrices.map((rp) => {
+      const service = rp.get('service');
+      const rate = rp.get('rate');
+      const vehicleType = rp.get('vehicleType');
+
+      return {
+        id: rp.id,
+        serviceId: service?.id,
+        serviceName: service
+          ? `${service.get('originPOI')?.get('name') || 'N/A'} → ${service.get('destinationPOI')?.get('name') || 'N/A'}`
+          : 'N/A',
+        rateId: rate?.id,
+        rateName: rate?.get('name'),
+        vehicleTypeId: vehicleType?.id,
+        vehicleTypeName: vehicleType?.get('name'),
+        price: rp.get('price'),
+        formattedPrice: `$${(rp.get('price') || 0).toLocaleString()} MXN`,
+        active: rp.get('active'),
+        exists: rp.get('exists'),
+        createdAt: rp.get('createdAt'),
+        updatedAt: rp.get('updatedAt'),
+      };
+    });
+
+    // Statistics
+    const stats = {
+      totalRatePrices: ratePrices.length,
+      uniqueServices: [...new Set(debugData.map((d) => d.serviceId))].length,
+      uniqueRates: [...new Set(debugData.map((d) => d.rateId))].length,
+      uniqueVehicleTypes: [...new Set(debugData.map((d) => d.vehicleTypeId))].length,
+      priceRange: {
+        min: Math.min(...debugData.map((d) => d.price || 0)),
+        max: Math.max(...debugData.map((d) => d.price || 0)),
+        average: debugData.reduce((sum, d) => sum + (d.price || 0), 0) / debugData.length,
+      },
+    };
+
+    logger.info('🔧 DEBUG: RatePrices data retrieved', stats);
+
+    return res.json({
+      success: true,
+      debug: 'RatePrices',
+      data: debugData,
+      stats,
+      meta: {
+        query: {
+          clientId: clientId || null,
+          serviceId: serviceId || null,
         },
-        httpAPI: {
-          success: !httpError,
-          error: httpError?.message || null,
-          totalCount: clientPricesViaHTTP.length,
-          filteredCount: filteredClientPrices.length,
-        },
-        comparison: {
-          countMatch: parseDebugData.length === filteredClientPrices.length,
-          parseCount: parseDebugData.length,
-          httpCount: filteredClientPrices.length,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error('🔧 DEBUG: Error in debugRatePrices', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, `Error en debug RatePrices: ${error.message}`, 500);
+  }
+}
+
+  /**
+   * GET /api/services/debug-client-prices - Debug endpoint to examine ClientPrices data.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>}
+   * @example
+   */
+  async debugClientPrices(req, res) {
+  try {
+    const currentUser = req.user;
+    if (!currentUser) {
+      return this.sendError(res, 'Autenticación requerida', 401);
+    }
+
+    const { clientId, serviceId } = req.query;
+
+    logger.info('🔧 DEBUG: Starting debugClientPrices', {
+      userId: currentUser.id,
+      clientId,
+      serviceId,
+    });
+
+    // Method 1: Try Parse SDK first
+    let clientPricesViaParse = [];
+    let parseError = null;
+    try {
+      const clientPricesQuery = new Parse.Query('ClientPrices');
+
+      if (clientId) {
+        const AmexingUser = Parse.Object.extend('AmexingUser');
+        const clientPointer = new AmexingUser();
+        clientPointer.id = clientId;
+        clientPricesQuery.equalTo('clientPtr', clientPointer);
+      }
+
+      if (serviceId) {
+        clientPricesQuery.equalTo('itemId', serviceId);
+      }
+
+      clientPricesQuery.equalTo('itemType', 'SERVICES');
+      clientPricesQuery.equalTo('exists', true);
+      clientPricesQuery.equalTo('active', true);
+      // Only get active records (valid_until IS NULL)
+      clientPricesQuery.doesNotExist('valid_until');
+      clientPricesQuery.include('ratePtr');
+      clientPricesQuery.include('vehiclePtr');
+      clientPricesQuery.include('clientPtr');
+      clientPricesQuery.limit(100);
+
+      clientPricesViaParse = await clientPricesQuery.find({ useMasterKey: true });
+      logger.info('🔧 DEBUG: Parse SDK query successful', {
+        count: clientPricesViaParse.length,
+      });
+    } catch (error) {
+      parseError = error;
+      logger.warn('🔧 DEBUG: Parse SDK query failed', {
+        error: error.message,
+      });
+    }
+
+    // Method 2: Direct HTTP approach (our workaround)
+    let clientPricesViaHTTP = [];
+    let httpError = null;
+    try {
+      const http = require('http');
+      const options = {
+        hostname: 'localhost',
+        port: 1337,
+        path: '/parse/classes/ClientPrices',
+        method: 'GET',
+        headers: {
+          'X-Parse-Application-Id': process.env.PARSE_APP_ID,
+          'X-Parse-Master-Key': process.env.PARSE_MASTER_KEY,
         },
       };
 
-      logger.info('🔧 DEBUG: ClientPrices data comparison', stats);
+      const clientPricesData = await new Promise((resolve, reject) => {
+        const httpReq = http.request(options, (httpRes) => {
+          let data = '';
+          httpRes.on('data', (chunk) => {
+            data += chunk;
+          });
+          httpRes.on('end', () => {
+            try {
+              const parsed = JSON.parse(data);
+              resolve(parsed);
+            } catch (error) {
+              reject(new Error(`JSON parse error: ${error.message}`));
+            }
+          });
+        });
 
-      return res.json({
-        success: true,
-        debug: 'ClientPrices',
-        methods: {
-          parseSDK: {
-            data: parseDebugData,
-            error: parseError?.message || null,
-          },
-          httpAPI: {
-            data: httpDebugData,
-            error: httpError?.message || null,
-          },
-        },
-        stats,
-        meta: {
-          query: {
-            clientId: clientId || null,
-            serviceId: serviceId || null,
-          },
-          timestamp: new Date().toISOString(),
-        },
+        httpReq.on('error', (error) => {
+          reject(new Error(`HTTP request error: ${error.message}`));
+        });
+
+        httpReq.end();
+      });
+
+      clientPricesViaHTTP = clientPricesData.results || [];
+      logger.info('🔧 DEBUG: HTTP query successful', {
+        count: clientPricesViaHTTP.length,
       });
     } catch (error) {
-      logger.error('🔧 DEBUG: Error in debugClientPrices', {
+      httpError = error;
+      logger.warn('🔧 DEBUG: HTTP query failed', {
         error: error.message,
-        stack: error.stack,
-        userId: req.user?.id,
       });
-      return this.sendError(res, `Error en debug ClientPrices: ${error.message}`, 500);
     }
+
+    // Filter HTTP results if needed
+    let filteredClientPrices = clientPricesViaHTTP;
+    if (clientId || serviceId) {
+      filteredClientPrices = clientPricesViaHTTP.filter((cp) => {
+        const matchesClient = !clientId || (cp.clientPtr && cp.clientPtr.objectId === clientId);
+        const matchesService = !serviceId || cp.itemId === serviceId;
+        const isServices = cp.itemType === 'SERVICES';
+        const isActive = cp.active === true;
+        const exists = cp.exists === true;
+        return matchesClient && matchesService && isServices && isActive && exists;
+      });
+    }
+
+    // Format debug data from Parse SDK
+    const parseDebugData = clientPricesViaParse.map((cp) => {
+      const client = cp.get('clientPtr');
+      const rate = cp.get('ratePtr');
+      const vehicle = cp.get('vehiclePtr');
+
+      return {
+        id: cp.id,
+        clientId: client?.id,
+        clientEmail: client?.get('email'),
+        rateId: rate?.id,
+        rateName: rate?.get('name'),
+        vehicleId: vehicle?.id,
+        vehicleName: vehicle?.get('name'),
+        serviceId: cp.get('itemId'),
+        itemType: cp.get('itemType'),
+        precio: cp.get('precio'),
+        basePrice: cp.get('basePrice'),
+        currency: cp.get('currency'),
+        active: cp.get('active'),
+        exists: cp.get('exists'),
+        createdAt: cp.get('createdAt'),
+        updatedAt: cp.get('updatedAt'),
+      };
+    });
+
+    // Format debug data from HTTP
+    const httpDebugData = filteredClientPrices.map((cp) => ({
+      id: cp.objectId,
+      clientId: cp.clientPtr?.objectId,
+      rateId: cp.ratePtr?.objectId,
+      vehicleId: cp.vehiclePtr?.objectId,
+      serviceId: cp.itemId,
+      itemType: cp.itemType,
+      precio: cp.precio,
+      basePrice: cp.basePrice,
+      currency: cp.currency,
+      active: cp.active,
+      exists: cp.exists,
+      createdAt: cp.createdAt,
+      updatedAt: cp.updatedAt,
+    }));
+
+    // Statistics
+    const stats = {
+      parseSDK: {
+        success: !parseError,
+        error: parseError?.message || null,
+        count: parseDebugData.length,
+      },
+      httpAPI: {
+        success: !httpError,
+        error: httpError?.message || null,
+        totalCount: clientPricesViaHTTP.length,
+        filteredCount: filteredClientPrices.length,
+      },
+      comparison: {
+        countMatch: parseDebugData.length === filteredClientPrices.length,
+        parseCount: parseDebugData.length,
+        httpCount: filteredClientPrices.length,
+      },
+    };
+
+    logger.info('🔧 DEBUG: ClientPrices data comparison', stats);
+
+    return res.json({
+      success: true,
+      debug: 'ClientPrices',
+      methods: {
+        parseSDK: {
+          data: parseDebugData,
+          error: parseError?.message || null,
+        },
+        httpAPI: {
+          data: httpDebugData,
+          error: httpError?.message || null,
+        },
+      },
+      stats,
+      meta: {
+        query: {
+          clientId: clientId || null,
+          serviceId: serviceId || null,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error('🔧 DEBUG: Error in debugClientPrices', {
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, `Error en debug ClientPrices: ${error.message}`, 500);
   }
+}
 
   /**
    * Update base prices for a service (TourPrices table).
@@ -2983,116 +3088,116 @@ class ServicesController {
    * }
    */
   async updateBasePrices(req, res) {
-    try {
-      console.log('🔧 updateBasePrices called - serviceId:', req.params.id);
-      console.log('🔧 updateBasePrices called - body:', JSON.stringify(req.body, null, 2));
+  try {
+    console.log('🔧 updateBasePrices called - serviceId:', req.params.id);
+    console.log('🔧 updateBasePrices called - body:', JSON.stringify(req.body, null, 2));
 
-      const currentUser = req.user;
-      const serviceId = req.params.id; // Get serviceId from the :id parameter
-      const { prices } = req.body;
+    const currentUser = req.user;
+    const serviceId = req.params.id; // Get serviceId from the :id parameter
+    const { prices } = req.body;
 
-      logger.info('ServicesController.updateBasePrices called', {
-        userId: currentUser?.id,
-        serviceId,
-        pricesCount: prices?.length || 0,
-      });
+    logger.info('ServicesController.updateBasePrices called', {
+      userId: currentUser?.id,
+      serviceId,
+      pricesCount: prices?.length || 0,
+    });
 
-      // Validate user permissions
-      if (!currentUser) {
-        return this.sendError(res, 'Usuario no autenticado', 401);
-      }
+    // Validate user permissions
+    if (!currentUser) {
+      return this.sendError(res, 'Usuario no autenticado', 401);
+    }
 
-      // Validate input
-      if (!serviceId) {
-        return this.sendError(res, 'ID del servicio es requerido', 400);
-      }
+    // Validate input
+    if (!serviceId) {
+      return this.sendError(res, 'ID del servicio es requerido', 400);
+    }
 
-      if (!prices || !Array.isArray(prices) || prices.length === 0) {
-        return this.sendError(res, 'Lista de precios es requerida', 400);
-      }
+    if (!prices || !Array.isArray(prices) || prices.length === 0) {
+      return this.sendError(res, 'Lista de precios es requerida', 400);
+    }
 
-      // Verify service exists
-      const ServiceClass = Parse.Object.extend('Services');
-      const serviceQuery = new Parse.Query(ServiceClass);
-      serviceQuery.equalTo('objectId', serviceId);
-      serviceQuery.equalTo('exists', true);
-      const service = await serviceQuery.first({ useMasterKey: true });
+    // Verify service exists
+    const ServiceClass = Parse.Object.extend('Services');
+    const serviceQuery = new Parse.Query(ServiceClass);
+    serviceQuery.equalTo('objectId', serviceId);
+    serviceQuery.equalTo('exists', true);
+    const service = await serviceQuery.first({ useMasterKey: true });
 
-      if (!service) {
-        return this.sendError(res, 'Servicio no encontrado', 404);
-      }
+    if (!service) {
+      return this.sendError(res, 'Servicio no encontrado', 404);
+    }
 
-      // Get RatePrices class (Services use RatePrices, not TourPrices)
-      const RatePricesClass = Parse.Object.extend('RatePrices');
-      const objectsToSave = [];
+    // Get RatePrices class (Services use RatePrices, not TourPrices)
+    const RatePricesClass = Parse.Object.extend('RatePrices');
+    const objectsToSave = [];
 
-      // Process each price update
-      for (const priceData of prices) {
-        const { id, price } = priceData;
+    // Process each price update
+    for (const priceData of prices) {
+      const { id, price } = priceData;
 
-        if (id && typeof price === 'number' && price >= 0) {
-          // Get the existing RatePrice record
-          const priceQuery = new Parse.Query(RatePricesClass);
-          priceQuery.equalTo('objectId', id);
-          const priceRecord = await priceQuery.first({ useMasterKey: true });
+      if (id && typeof price === 'number' && price >= 0) {
+        // Get the existing RatePrice record
+        const priceQuery = new Parse.Query(RatePricesClass);
+        priceQuery.equalTo('objectId', id);
+        const priceRecord = await priceQuery.first({ useMasterKey: true });
 
-          if (priceRecord) {
-            // VERSIONING: Don't update existing price, instead:
-            // 1. Mark existing price as historical (set valid_until to today)
-            priceRecord.set('valid_until', new Date());
-            priceRecord.set('lastModifiedBy', currentUser.id);
-            objectsToSave.push(priceRecord);
+        if (priceRecord) {
+          // VERSIONING: Don't update existing price, instead:
+          // 1. Mark existing price as historical (set valid_until to today)
+          priceRecord.set('valid_until', new Date());
+          priceRecord.set('lastModifiedBy', currentUser.id);
+          objectsToSave.push(priceRecord);
 
-            // 2. Create NEW price record with the updated price
-            const newPriceRecord = new RatePricesClass();
+          // 2. Create NEW price record with the updated price
+          const newPriceRecord = new RatePricesClass();
 
-            // Copy all fields from the original record
-            newPriceRecord.set('service', priceRecord.get('service'));
-            newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
-            newPriceRecord.set('rate', priceRecord.get('rate'));
-            newPriceRecord.set('price', price); // New price value
-            newPriceRecord.set('currency', priceRecord.get('currency') || 'MXN');
-            newPriceRecord.set('active', priceRecord.get('active'));
-            newPriceRecord.set('exists', priceRecord.get('exists'));
-            newPriceRecord.set('createdBy', priceRecord.get('createdBy'));
-            newPriceRecord.set('lastModifiedBy', currentUser.id);
-            // valid_until remains null (active record)
+          // Copy all fields from the original record
+          newPriceRecord.set('service', priceRecord.get('service'));
+          newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
+          newPriceRecord.set('rate', priceRecord.get('rate'));
+          newPriceRecord.set('price', price); // New price value
+          newPriceRecord.set('currency', priceRecord.get('currency') || 'MXN');
+          newPriceRecord.set('active', priceRecord.get('active'));
+          newPriceRecord.set('exists', priceRecord.get('exists'));
+          newPriceRecord.set('createdBy', priceRecord.get('createdBy'));
+          newPriceRecord.set('lastModifiedBy', currentUser.id);
+          // valid_until remains null (active record)
 
-            objectsToSave.push(newPriceRecord);
-          }
+          objectsToSave.push(newPriceRecord);
         }
       }
-
-      // Save all updated prices
-      if (objectsToSave.length > 0) {
-        await Parse.Object.saveAll(objectsToSave, { useMasterKey: true });
-      }
-
-      // Log the action
-      logger.info('Service base prices updated', {
-        serviceId,
-        updatedPrices: objectsToSave.length,
-        userId: currentUser.id,
-        userEmail: currentUser.get('email'),
-        timestamp: new Date().toISOString(),
-      });
-
-      return res.json({
-        success: true,
-        message: `${objectsToSave.length} precios base actualizados exitosamente`,
-        updatedCount: objectsToSave.length,
-      });
-    } catch (error) {
-      logger.error('Error updating service base prices', {
-        error: error.message,
-        stack: error.stack,
-        serviceId: req.params.id,
-        userId: req.user?.id,
-      });
-
-      return this.sendError(res, 'Error interno del servidor al actualizar precios base', 500);
     }
+
+    // Save all updated prices
+    if (objectsToSave.length > 0) {
+      await Parse.Object.saveAll(objectsToSave, { useMasterKey: true });
+    }
+
+    // Log the action
+    logger.info('Service base prices updated', {
+      serviceId,
+      updatedPrices: objectsToSave.length,
+      userId: currentUser.id,
+      userEmail: currentUser.get('email'),
+      timestamp: new Date().toISOString(),
+    });
+
+    return res.json({
+      success: true,
+      message: `${objectsToSave.length} precios base actualizados exitosamente`,
+      updatedCount: objectsToSave.length,
+    });
+  } catch (error) {
+    logger.error('Error updating service base prices', {
+      error: error.message,
+      stack: error.stack,
+      serviceId: req.params.id,
+      userId: req.user?.id,
+    });
+
+    return this.sendError(res, 'Error interno del servidor al actualizar precios base', 500);
   }
+}
 
   /**
    * Get price history for a service.
@@ -3123,150 +3228,150 @@ class ServicesController {
    * }
    */
   async getPriceHistory(req, res) {
-    try {
-      const { id: serviceId } = req.params;
-      const currentUser = req.user;
+  try {
+    const { id: serviceId } = req.params;
+    const currentUser = req.user;
 
-      if (!serviceId) {
-        return this.sendError(res, 'Service ID is required', 400);
-      }
+    if (!serviceId) {
+      return this.sendError(res, 'Service ID is required', 400);
+    }
 
-      // Get the current service to find the name
-      // Note: Table name is 'Services' (plural) in the database
-      const serviceQuery = new Parse.Query('Services');
-      serviceQuery.equalTo('objectId', serviceId);
-      serviceQuery.equalTo('exists', true);
-      serviceQuery.include(['originPOI', 'destinationPOI']);
+    // Get the current service to find the name
+    // Note: Table name is 'Services' (plural) in the database
+    const serviceQuery = new Parse.Query('Services');
+    serviceQuery.equalTo('objectId', serviceId);
+    serviceQuery.equalTo('exists', true);
+    serviceQuery.include(['originPOI', 'destinationPOI']);
 
-      const currentService = await serviceQuery.first({ useMasterKey: true });
+    const currentService = await serviceQuery.first({ useMasterKey: true });
 
-      if (!currentService) {
-        logger.error('Service not found for price history', {
-          serviceId,
-          userId: currentUser?.id,
-        });
-        return this.sendError(res, 'Service not found', 404);
-      }
-
-      // Build service name from origin and destination POIs
-      const originPOI = currentService.get('originPOI');
-      const destinationPOI = currentService.get('destinationPOI');
-      const serviceName = `${originPOI?.get('name') || 'Unknown'} → ${destinationPOI?.get('name') || 'Unknown'}`;
-
-      // Query all RatePrices for this service (current and historical)
-      const RatePricesClass = Parse.Object.extend('RatePrices');
-      const historyQuery = new Parse.Query(RatePricesClass);
-
-      // Create service pointer for query - NOTE: Use 'Services' (plural) as className
-      const servicePointer = new Parse.Object('Services');
-      servicePointer.id = serviceId;
-
-      // Filter by service reference
-      historyQuery.equalTo('service', servicePointer);
-      // Include related objects for complete data
-      historyQuery.include(['service', 'vehicleType', 'rate']);
-      historyQuery.equalTo('exists', true);
-      historyQuery.addDescending('createdAt');
-      historyQuery.limit(100); // Limit to last 100 price changes
-
-      logger.info('RatePrices query details', {
+    if (!currentService) {
+      logger.error('Service not found for price history', {
         serviceId,
-        servicePointerClassName: servicePointer.className,
-        query: 'RatePrices with service pointer to Services table',
-      });
-
-      const priceHistory = await historyQuery.find({ useMasterKey: true });
-
-      logger.info('RatePrices query result', {
-        serviceId,
-        priceHistoryCount: priceHistory.length,
-      });
-
-      if (!priceHistory || priceHistory.length === 0) {
-        return res.json({
-          success: true,
-          data: [],
-          message: 'No price history found for this service',
-        });
-      }
-
-      // Process and format price history data
-      const formattedHistory = priceHistory.map((record) => {
-        const price = parseFloat(record.get('price') || 0);
-        const createdAt = record.get('createdAt');
-        const validUntil = record.get('valid_until');
-        const isActive = !validUntil; // No valid_until means it's the active record
-
-        // Get related object names
-        const vehicleType = record.get('vehicleType');
-        const rate = record.get('rate');
-        const vehicleTypeName = vehicleType ? vehicleType.get('name') : null;
-        const rateName = rate ? rate.get('name') : null;
-
-        // Calculate duration if there's a valid_until date
-        let duration = null;
-        if (validUntil) {
-          const diffMs = validUntil.getTime() - createdAt.getTime();
-          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Convert to days
-        } else {
-          // For active record, calculate days since creation
-          const diffMs = new Date().getTime() - createdAt.getTime();
-          duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        }
-
-        return {
-          id: record.id,
-          price: price.toFixed(2),
-          validFrom: createdAt.toISOString(),
-          validUntil: validUntil ? validUntil.toISOString() : null,
-          status: isActive ? 'active' : 'historical',
-          duration,
-          vehicleTypeName,
-          rateName,
-          createdAt: createdAt.toISOString(),
-        };
-      });
-
-      logger.info('Service price history retrieved successfully', {
-        serviceId,
-        serviceName,
-        recordCount: formattedHistory.length,
         userId: currentUser?.id,
       });
+      return this.sendError(res, 'Service not found', 404);
+    }
 
+    // Build service name from origin and destination POIs
+    const originPOI = currentService.get('originPOI');
+    const destinationPOI = currentService.get('destinationPOI');
+    const serviceName = `${originPOI?.get('name') || 'Unknown'} → ${destinationPOI?.get('name') || 'Unknown'}`;
+
+    // Query all RatePrices for this service (current and historical)
+    const RatePricesClass = Parse.Object.extend('RatePrices');
+    const historyQuery = new Parse.Query(RatePricesClass);
+
+    // Create service pointer for query - NOTE: Use 'Services' (plural) as className
+    const servicePointer = new Parse.Object('Services');
+    servicePointer.id = serviceId;
+
+    // Filter by service reference
+    historyQuery.equalTo('service', servicePointer);
+    // Include related objects for complete data
+    historyQuery.include(['service', 'vehicleType', 'rate']);
+    historyQuery.equalTo('exists', true);
+    historyQuery.addDescending('createdAt');
+    historyQuery.limit(100); // Limit to last 100 price changes
+
+    logger.info('RatePrices query details', {
+      serviceId,
+      servicePointerClassName: servicePointer.className,
+      query: 'RatePrices with service pointer to Services table',
+    });
+
+    const priceHistory = await historyQuery.find({ useMasterKey: true });
+
+    logger.info('RatePrices query result', {
+      serviceId,
+      priceHistoryCount: priceHistory.length,
+    });
+
+    if (!priceHistory || priceHistory.length === 0) {
       return res.json({
         success: true,
-        data: formattedHistory,
-        serviceName,
-        totalRecords: formattedHistory.length,
+        data: [],
+        message: 'No price history found for this service',
       });
-    } catch (error) {
-      logger.error('Error getting service price history', {
-        serviceId: req.params.id,
-        error: error.message,
-        stack: error.stack,
-        userId: req.user?.id,
-      });
-      return this.sendError(res, 'Error retrieving price history', 500);
     }
-  }
 
-  /**
-   * Send error response.
-   * @param {object} res - Express response object.
-   * @param {string} message - Error message.
-   * @param {number} statusCode - HTTP status code.
-   * @returns {Promise<void>}
-   * @example
-   * // Usage example documented above
-   */
-  sendError(res, message, statusCode = 500) {
-    return res.status(statusCode).json({
-      success: false,
-      error: message,
-      timestamp: new Date().toISOString(),
+    // Process and format price history data
+    const formattedHistory = priceHistory.map((record) => {
+      const price = parseFloat(record.get('price') || 0);
+      const createdAt = record.get('createdAt');
+      const validUntil = record.get('valid_until');
+      const isActive = !validUntil; // No valid_until means it's the active record
+
+      // Get related object names
+      const vehicleType = record.get('vehicleType');
+      const rate = record.get('rate');
+      const vehicleTypeName = vehicleType ? vehicleType.get('name') : null;
+      const rateName = rate ? rate.get('name') : null;
+
+      // Calculate duration if there's a valid_until date
+      let duration = null;
+      if (validUntil) {
+        const diffMs = validUntil.getTime() - createdAt.getTime();
+        duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Convert to days
+      } else {
+        // For active record, calculate days since creation
+        const diffMs = new Date().getTime() - createdAt.getTime();
+        duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      }
+
+      return {
+        id: record.id,
+        price: price.toFixed(2),
+        validFrom: createdAt.toISOString(),
+        validUntil: validUntil ? validUntil.toISOString() : null,
+        status: isActive ? 'active' : 'historical',
+        duration,
+        vehicleTypeName,
+        rateName,
+        createdAt: createdAt.toISOString(),
+      };
     });
+
+    logger.info('Service price history retrieved successfully', {
+      serviceId,
+      serviceName,
+      recordCount: formattedHistory.length,
+      userId: currentUser?.id,
+    });
+
+    return res.json({
+      success: true,
+      data: formattedHistory,
+      serviceName,
+      totalRecords: formattedHistory.length,
+    });
+  } catch (error) {
+    logger.error('Error getting service price history', {
+      serviceId: req.params.id,
+      error: error.message,
+      stack: error.stack,
+      userId: req.user?.id,
+    });
+    return this.sendError(res, 'Error retrieving price history', 500);
   }
+}
+
+/**
+ * Send error response.
+ * @param {object} res - Express response object.
+ * @param {string} message - Error message.
+ * @param {number} statusCode - HTTP status code.
+ * @returns {Promise<void>}
+ * @example
+ * // Usage example documented above
+ */
+sendError(res, message, statusCode = 500) {
+  return res.status(statusCode).json({
+    success: false,
+    error: message,
+    timestamp: new Date().toISOString(),
+  });
+}
 }
 
 module.exports = new ServicesController();
