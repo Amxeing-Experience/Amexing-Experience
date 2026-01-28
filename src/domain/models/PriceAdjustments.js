@@ -347,9 +347,11 @@ class PriceAdjustments extends BaseModel {
       const types = ['exchange_rate', 'inflation', 'agency', 'transfer'];
       const result = {};
 
-      await Promise.all(types.map(async (type) => {
-        result[type] = await this.getCurrentByType(type);
-      }));
+      await Promise.all(
+        types.map(async (type) => {
+          result[type] = await this.getCurrentByType(type);
+        })
+      );
 
       return result;
     } catch (error) {

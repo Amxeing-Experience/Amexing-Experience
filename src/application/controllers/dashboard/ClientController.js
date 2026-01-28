@@ -274,7 +274,7 @@ class ClientController extends RoleBasedController {
       const { user } = req;
 
       // req.user is a Parse Object, so use .get() to access the clientId field
-      const clientId = user?.get ? user.get('clientId') : (user?.clientId || '');
+      const clientId = user?.get ? user.get('clientId') : user?.clientId || '';
 
       // Debug logging to understand clientId
       console.log('🔍 Client Services Dashboard - User Info:', {
@@ -372,7 +372,7 @@ class ClientController extends RoleBasedController {
       const { user } = req;
 
       // req.user is a Parse Object, so use .get() to access the clientId field
-      const clientId = user?.get ? user.get('clientId') : (user?.clientId || '');
+      const clientId = user?.get ? user.get('clientId') : user?.clientId || '';
 
       await this.renderRoleView(req, res, 'tours', {
         title: 'Tours',

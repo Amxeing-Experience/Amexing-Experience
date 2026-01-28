@@ -1,0 +1,102 @@
+<%
+/**
+ * Checkbox Atom
+ * Single checkbox or checkbox group
+ *
+ * @param {string} id - Field ID
+ * @param {string} name - Field name attribute
+ * @param {string} label - Main label text
+ * @param {string|array} value - Current value(s)
+ * @param {array} options - Array of {value, label} objects for checkbox group
+ * @param {boolean} inline - Display checkboxes inline
+ * @param {boolean} required - Whether field is required
+ * @param {boolean} disabled - Whether field is disabled
+ * @param {string} helpText - Help text to display below field
+ * @param {string} errorText - Error message to display
+ * @param {string} className - Additional CSS classes
+ */
+
+const fieldId = typeof id !== 'undefined' ? id : `checkbox_${Math.random().toString(36).substr(2, 9)}`;
+const fieldName = typeof name !== 'undefined' ? name : fieldId;
+const fieldLabel = typeof label !== 'undefined' ? label : '';
+const fieldValue = typeof value !== 'undefined' ? value : [];
+const fieldOptions = typeof options !== 'undefined' ? options : [];
+const isInline = typeof inline !== 'undefined' ? inline : false;
+const isRequired = typeof required !== 'undefined' ? required : false;
+const isDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const fieldHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const fieldErrorText = typeof errorText !== 'undefined' ? errorText : '';
+const fieldClassName = typeof className !== 'undefined' ? className : '';
+
+// Convert single value to array for consistent handling
+const selectedValues = Array.isArray(fieldValue) ? fieldValue : [fieldValue];
+
+// Single checkbox vs checkbox group
+const isSingleCheckbox = fieldOptions.length === 0;
+
+let fieldContent = '';
+
+if (isSingleCheckbox) {
+    // Single checkbox
+    fieldContent = `
+        <div class="form-check ${fieldClassName}">
+            <input 
+                type="checkbox" 
+                class="form-check-input ${fieldErrorText ? 'is-invalid' : ''}"
+                id="${fieldId}" 
+                name="${fieldName}" 
+                value="true"
+                ${selectedValues.includes('true') || selectedValues.includes(true) ? 'checked' : ''}
+                ${isRequired ? 'required' : ''}
+                ${isDisabled ? 'disabled' : ''}
+            />
+            ${fieldLabel ? `<label class="form-check-label" for="${fieldId}">${fieldLabel}</label>` : ''}
+        </div>
+    `;
+} else {
+    // Checkbox group
+    const checkboxesHtml = fieldOptions.map((opt, index) => {
+        const checkboxId = `${fieldId}_${index}`;
+        const isChecked = selectedValues.includes(opt.value);
+        return `
+            <div class="form-check ${isInline ? 'form-check-inline' : ''}">
+                <input 
+                    type="checkbox" 
+                    class="form-check-input ${fieldErrorText ? 'is-invalid' : ''}"
+                    id="${checkboxId}" 
+                    name="${fieldName}[]" 
+                    value="${opt.value}"
+                    ${isChecked ? 'checked' : ''}
+                    ${isRequired && index === 0 ? 'required' : ''}
+                    ${isDisabled ? 'disabled' : ''}
+                />
+                <label class="form-check-label" for="${checkboxId}">
+                    ${opt.label}
+                </label>
+            </div>
+        `;
+    }).join('');
+
+    fieldContent = `
+        <div class="checkbox-group">
+            ${checkboxesHtml}
+        </div>
+    `;
+}
+
+// For single checkbox, we don't use the wrapper
+if (isSingleCheckbox && !fieldLabel) { %>
+    <%- fieldContent %>
+<% } else { %>
+    <%- include('_field-wrapper', {
+        id: fieldId,
+        name: fieldName,
+        label: isSingleCheckbox ? '' : fieldLabel,
+        required: isRequired,
+        helpText: fieldHelpText,
+        errorText: fieldErrorText,
+        className: '',
+        size: 'md',
+        fieldContent: fieldContent
+    }) %>
+<% } %>

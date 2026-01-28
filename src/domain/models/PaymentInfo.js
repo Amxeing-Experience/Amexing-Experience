@@ -103,9 +103,20 @@ class PaymentInfo extends Parse.Object {
 
       // Update allowed fields
       const allowedFields = [
-        'name', 'bank', 'accountHolder', 'accountNumber',
-        'routingNumber', 'achRoutingNumber', 'swiftCode', 'iban',
-        'zelle', 'paypal', 'venmo', 'notes', 'currency', 'active',
+        'name',
+        'bank',
+        'accountHolder',
+        'accountNumber',
+        'routingNumber',
+        'achRoutingNumber',
+        'swiftCode',
+        'iban',
+        'zelle',
+        'paypal',
+        'venmo',
+        'notes',
+        'currency',
+        'active',
       ];
 
       allowedFields.forEach((field) => {

@@ -234,10 +234,12 @@ class AgencyRateController {
           active: rate.get('active'),
           createdAt: rate.get('createdAt'),
           updatedAt: rate.get('updatedAt'),
-          createdBy: createdBy ? {
-            id: createdBy.id,
-            name: createdBy.get('name') || createdBy.get('email'),
-          } : null,
+          createdBy: createdBy
+            ? {
+              id: createdBy.id,
+              name: createdBy.get('name') || createdBy.get('email'),
+            }
+            : null,
         },
       });
     } catch (error) {

@@ -846,6 +846,57 @@ class AuthController {
       });
     }
   }
+
+  /**
+   * Get JWT credentials for the current session
+   * This endpoint provides a JWT token for authenticated dashboard users
+   * to use with API calls (like the form builder).
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - JSON response with token or error.
+   * @example
+   */
+  async getCredentials(req, res) {
+    try {
+      // Check if user is authenticated via session
+      if (!req.session || !req.session.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'Not authenticated',
+        });
+      }
+
+      // Get the user from Parse using the session
+      const userQuery = new Parse.Query('AmexingUser');
+      const user = await userQuery.get(req.session.user.id, { useMasterKey: true });
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not found',
+        });
+      }
+
+      // Generate JWT token for this user
+      const AuthenticationServiceCore = require('../services/AuthenticationServiceCore');
+      const authService = new AuthenticationServiceCore();
+      const tokens = await authService.generateTokens(user);
+
+      // Return the token
+      return res.json({
+        success: true,
+        token: tokens.accessToken,
+        tokenType: tokens.tokenType,
+        expiresIn: tokens.expiresIn,
+      });
+    } catch (error) {
+      logger.error('Error getting credentials:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate credentials',
+      });
+    }
+  }
 }
 
 module.exports = new AuthController();

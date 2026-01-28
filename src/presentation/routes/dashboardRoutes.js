@@ -64,6 +64,8 @@ router.get('/admin/billing', dashboardAuth.requireRole('admin'), (req, res) => a
 router.get('/admin/reports', dashboardAuth.requireRole('admin'), (req, res) => adminController.reports(req, res));
 router.get('/admin/settings', dashboardAuth.requireRole('admin'), (req, res) => adminController.settings(req, res));
 router.get('/admin/notifications', dashboardAuth.requireRole('admin'), (req, res) => adminController.notifications(req, res));
+router.get('/admin/forms', dashboardAuth.requireRole('admin'), (req, res) => adminController.forms(req, res));
+router.get('/admin/form-preview', dashboardAuth.requireRole('admin'), (req, res) => adminController.formPreview(req, res));
 
 // Client Routes - Redirect to vehicles (first item in Servicios)
 router.get('/client', dashboardAuth.requireRole('client'), (req, res) => res.redirect('/dashboard/client/vehicles'));

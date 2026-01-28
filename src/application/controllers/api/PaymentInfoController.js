@@ -150,9 +150,20 @@ class PaymentInfoController {
       }
 
       const {
-        name, bank, accountHolder, accountNumber,
-        routingNumber, achRoutingNumber, swiftCode, iban,
-        zelle, paypal, venmo, notes, currency, isDefault,
+        name,
+        bank,
+        accountHolder,
+        accountNumber,
+        routingNumber,
+        achRoutingNumber,
+        swiftCode,
+        iban,
+        zelle,
+        paypal,
+        venmo,
+        notes,
+        currency,
+        isDefault,
       } = req.body;
 
       // Validate required fields

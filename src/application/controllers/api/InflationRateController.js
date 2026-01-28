@@ -235,10 +235,12 @@ class InflationRateController {
           active: rate.get('active'),
           createdAt: rate.get('createdAt'),
           updatedAt: rate.get('updatedAt'),
-          createdBy: createdBy ? {
-            id: createdBy.id,
-            name: createdBy.get('name') || createdBy.get('email'),
-          } : null,
+          createdBy: createdBy
+            ? {
+              id: createdBy.id,
+              name: createdBy.get('name') || createdBy.get('email'),
+            }
+            : null,
         },
       });
     } catch (error) {
@@ -272,12 +274,16 @@ class InflationRateController {
       }
 
       // Call the cloud function
-      const result = await Parse.Cloud.run('iniciarProcesoInflacion', {
-        percentage,
-      }, {
-        useMasterKey: true,
-        sessionToken: user.sessionToken,
-      });
+      const result = await Parse.Cloud.run(
+        'iniciarProcesoInflacion',
+        {
+          percentage,
+        },
+        {
+          useMasterKey: true,
+          sessionToken: user.sessionToken,
+        }
+      );
 
       if (result.success) {
         logger.info(`Inflation process initiated: ${percentage}%`, {
@@ -322,12 +328,16 @@ class InflationRateController {
       }
 
       // Call the cloud function
-      const result = await Parse.Cloud.run('revertirInflacion', {
-        batchId,
-      }, {
-        useMasterKey: true,
-        sessionToken: user.sessionToken,
-      });
+      const result = await Parse.Cloud.run(
+        'revertirInflacion',
+        {
+          batchId,
+        },
+        {
+          useMasterKey: true,
+          sessionToken: user.sessionToken,
+        }
+      );
 
       if (result.success) {
         logger.info('Inflation reverted successfully', {
@@ -372,9 +382,13 @@ class InflationRateController {
       }
 
       // Call the cloud function
-      const result = await Parse.Cloud.run('obtenerEstadoInflacion', {
-        batchId,
-      }, { useMasterKey: true });
+      const result = await Parse.Cloud.run(
+        'obtenerEstadoInflacion',
+        {
+          batchId,
+        },
+        { useMasterKey: true }
+      );
 
       res.json(result);
     } catch (error) {

@@ -128,11 +128,7 @@ class AgencyRate extends Parse.Object {
   static async getHistory(options = {}) {
     try {
       const {
-        page = 1,
-        limit = 10,
-        sortBy = 'createdAt',
-        sortOrder = 'desc',
-        search = '',
+        page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc', search = '',
       } = options;
 
       const query = new Parse.Query('AgencyRate');

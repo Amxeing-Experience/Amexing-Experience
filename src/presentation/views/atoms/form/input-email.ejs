@@ -1,0 +1,68 @@
+<%
+/**
+ * Email Input Atom
+ * Email input field with built-in email validation
+ *
+ * @param {string} id - Field ID
+ * @param {string} name - Field name attribute
+ * @param {string} label - Field label text
+ * @param {string} value - Current field value
+ * @param {string} placeholder - Placeholder text
+ * @param {boolean} required - Whether field is required
+ * @param {boolean} disabled - Whether field is disabled
+ * @param {boolean} readonly - Whether field is readonly
+ * @param {string} helpText - Help text to display below field
+ * @param {string} errorText - Error message to display
+ * @param {string} className - Additional CSS classes
+ * @param {string} size - Field size: 'sm' | 'md' | 'lg'
+ */
+
+const fieldId = typeof id !== 'undefined' ? id : `email_${Math.random().toString(36).substr(2, 9)}`;
+const fieldName = typeof name !== 'undefined' ? name : fieldId;
+const fieldLabel = typeof label !== 'undefined' ? label : 'Email';
+const fieldValue = typeof value !== 'undefined' ? value : '';
+const fieldPlaceholder = typeof placeholder !== 'undefined' ? placeholder : 'correo@ejemplo.com';
+const isRequired = typeof required !== 'undefined' ? required : false;
+const isDisabled = typeof disabled !== 'undefined' ? disabled : false;
+const isReadonly = typeof readonly !== 'undefined' ? readonly : false;
+const fieldHelpText = typeof helpText !== 'undefined' ? helpText : '';
+const fieldErrorText = typeof errorText !== 'undefined' ? errorText : '';
+const fieldClassName = typeof className !== 'undefined' ? className : '';
+const fieldSize = typeof size !== 'undefined' ? size : 'md';
+
+// Size classes mapping
+const sizeClasses = {
+    'sm': 'form-control-sm',
+    'md': '',
+    'lg': 'form-control-lg'
+};
+
+const inputClass = `form-control ${sizeClasses[fieldSize]} ${fieldErrorText ? 'is-invalid' : ''} ${fieldClassName}`;
+
+// Prepare field content
+const fieldContent = `
+    <input 
+        type="email" 
+        id="${fieldId}" 
+        name="${fieldName}" 
+        class="${inputClass}"
+        value="${fieldValue}"
+        placeholder="${fieldPlaceholder}"
+        ${isRequired ? 'required' : ''}
+        ${isDisabled ? 'disabled' : ''}
+        ${isReadonly ? 'readonly' : ''}
+    />
+`;
+%>
+
+<%- include('_field-wrapper', {
+    id: fieldId,
+    name: fieldName,
+    label: fieldLabel,
+    required: isRequired,
+    helpText: fieldHelpText,
+    errorText: fieldErrorText,
+    className: '',
+    size: fieldSize,
+    fieldContent: fieldContent
+}) %>

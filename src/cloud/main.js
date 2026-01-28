@@ -908,7 +908,10 @@ function registerCloudFunctions() {
               service.set('originPOI', aeropuertoPOIs[i]);
               service.set('destinationPOI', aeropuertoPOIs[j]);
               service.set('vehicleType', vehicleTypes[k]);
-              service.set('note', `Test service ${count + 1}: ${aeropuertoPOIs[i].get('name')} → ${aeropuertoPOIs[j].get('name')}`);
+              service.set(
+                'note',
+                `Test service ${count + 1}: ${aeropuertoPOIs[i].get('name')} → ${aeropuertoPOIs[j].get('name')}`
+              );
               service.set('active', true);
               service.set('exists', true);
 
@@ -1084,7 +1087,10 @@ function registerCloudFunctions() {
             // Debug: Check how many records match the query
             const totalMatchingRecords = await query.count({ useMasterKey: true });
             message(`Found ${totalMatchingRecords} ${className} records ready for inflation`);
-            logger.info(`Inflation job: Query found ${totalMatchingRecords} records for ${className}`, { batchId, className });
+            logger.info(`Inflation job: Query found ${totalMatchingRecords} records for ${className}`, {
+              batchId,
+              className,
+            });
 
             if (totalMatchingRecords === 0) {
               message(`No records found for ${className} - skipping`);
@@ -1096,270 +1102,287 @@ function registerCloudFunctions() {
             // Process batches with proper error handling
             try {
               console.log(`🔍 STARTING eachBatch for ${className} - about to process batches`);
-              await query.eachBatch(async (records) => { // eslint-disable-line no-loop-func
-                console.log(`🎯 eachBatch callback triggered for ${className} with ${records.length} records`);
-                batchCount++;
-                logger.info(`Processing ${className} batch ${batchCount} with ${records.length} records`, { batchId });
-                message(`Processing ${className} batch ${batchCount} (${records.length} records)`);
-
-                const recordsToSave = [];
-                const recordsToUpdate = [];
-
-                // Process each record in the batch
-                for (const record of records) {
-                  try {
-                    // Extract relationships based on table type
-                    let service; let rate; let
-                      vehicleType;
-
-                    if (className === 'RatePrices') {
-                      service = record.get('service');
-                      rate = record.get('rate');
-                      vehicleType = record.get('vehicleType');
-
-                      // Validate required relationships for RatePrices
-                      if (!service || !rate || !vehicleType) {
-                        logger.warn(`Skipping ${className} record with missing relationships`, {
-                          recordId: record.id,
-                          className,
-                          hasService: !!service,
-                          hasRate: !!rate,
-                          hasVehicleType: !!vehicleType,
-                        });
-                        totalSkipped++;
-                        continue; // eslint-disable-line no-continue
-                      }
-                    } else if (className === 'TourPrices') {
-                      // TourPrices uses different field names
-                      rate = record.get('ratePtr');
-                      vehicleType = record.get('vehicleType');
-                      service = record.get('tourPtr');
-
-                      // Validate required relationships for TourPrices
-                      if (!rate || !vehicleType) {
-                        logger.warn(`Skipping ${className} record with missing relationships`, {
-                          recordId: record.id,
-                          className,
-                          hasRate: !!rate,
-                          hasVehicleType: !!vehicleType,
-                        });
-                        totalSkipped++;
-                        continue; // eslint-disable-line no-continue
-                      }
-                    } else if (className === 'ClientPrices') {
-                      // ClientPrices uses different field names
-                      rate = record.get('ratePtr');
-                      vehicleType = record.get('vehiclePtr');
-                      service = record.get('clientPtr');
-
-                      // Validate required relationships for ClientPrices
-                      if (!rate || !vehicleType) {
-                        logger.warn(`Skipping ${className} record with missing relationships`, {
-                          recordId: record.id,
-                          className,
-                          hasRate: !!rate,
-                          hasVehicleType: !!vehicleType,
-                        });
-                        totalSkipped++;
-                        continue; // eslint-disable-line no-continue
-                      }
-                    } else if (className === 'Experience') {
-                      // Experience table doesn't require relationship validation
-                      // It has name, cost, type, etc. as standalone fields
-                      rate = null;
-                      vehicleType = null;
-                      service = null;
-                    }
-
-                    logger.info(`Processing ${className} record with relationships`, {
-                      recordId: record.id,
-                      className,
-                      serviceId: service ? service.id : null,
-                      rateId: rate ? rate.id : null,
-                      vehicleTypeId: vehicleType ? vehicleType.id : null,
-                      batchId,
-                    });
-
-                    // Check for duplicates based on table-specific fields
-                    const duplicateQuery = new Parse.Query(ClassObj);
-
-                    // Add field constraints based on table type
-                    if (className === 'RatePrices') {
-                      if (service) duplicateQuery.equalTo('service', service);
-                      if (rate) duplicateQuery.equalTo('rate', rate);
-                      if (vehicleType) duplicateQuery.equalTo('vehicleType', vehicleType);
-                    } else if (className === 'TourPrices') {
-                      if (rate) duplicateQuery.equalTo('ratePtr', rate);
-                      if (vehicleType) duplicateQuery.equalTo('vehicleType', vehicleType);
-                      if (service) duplicateQuery.equalTo('tourPtr', service);
-                    } else if (className === 'ClientPrices') {
-                      if (rate) duplicateQuery.equalTo('ratePtr', rate);
-                      if (vehicleType) duplicateQuery.equalTo('vehiclePtr', vehicleType);
-                      if (service) duplicateQuery.equalTo('clientPtr', service);
-                    } else if (className === 'Experience') {
-                      // For Experience, use name and type as unique identifiers
-                      duplicateQuery.equalTo('name', record.get('name'));
-                      duplicateQuery.equalTo('type', record.get('type'));
-                    }
-
-                    duplicateQuery.equalTo('active', true);
-                    duplicateQuery.equalTo('exists', true);
-                    duplicateQuery.equalTo('inflation_batch_id', batchId);
-                    duplicateQuery.notEqualTo('objectId', record.id);
-
-                    const existingInflated = await duplicateQuery.first({ useMasterKey: true });
-
-                    if (existingInflated) {
-                      logger.info(`Skipping duplicate ${className} record - already inflated in this batch`, {
-                        recordId: record.id,
-                        className,
-                        serviceId: service.id,
-                        rateId: rate.id,
-                        vehicleTypeId: vehicleType.id,
-                        existingRecordId: existingInflated.id,
-                      });
-                      totalSkipped++;
-                      continue; // eslint-disable-line no-continue
-                    }
-
-                    // Get price fields based on table name
-                    const priceFields = [];
-                    let hasValidPrice = false;
-
-                    if (className === 'ClientPrices') {
-                      // For ClientPrices, inflate both precio and basePrice
-                      const precio = record.get('precio') || 0;
-                      const basePrice = record.get('basePrice') || 0;
-
-                      if (precio > 0) {
-                        priceFields.push({ fieldName: 'precio', currentValue: precio });
-                        hasValidPrice = true;
-                      }
-                      if (basePrice > 0) {
-                        priceFields.push({ fieldName: 'basePrice', currentValue: basePrice });
-                        hasValidPrice = true;
-                      }
-                    } else if (className === 'Experience') {
-                      // For Experience, inflate cost field
-                      const cost = record.get('cost') || 0;
-                      if (cost > 0) {
-                        priceFields.push({ fieldName: 'cost', currentValue: cost });
-                        hasValidPrice = true;
-                      }
-                    } else {
-                      // For RatePrices and TourPrices, only inflate price field
-                      const price = record.get('price') || 0;
-                      if (price > 0) {
-                        priceFields.push({ fieldName: 'price', currentValue: price });
-                        hasValidPrice = true;
-                      }
-                    }
-
-                    if (!hasValidPrice) {
-                      logger.warn('Skipping record with invalid prices', {
-                        recordId: record.id,
-                        className,
-                        priceFields: priceFields.map((p) => `${p.fieldName}=${p.currentValue}`),
-                      });
-                      totalSkipped++;
-                      continue; // eslint-disable-line no-continue
-                    }
-
-                    // Mark current record as historical
-                    record.set('valid_until', now);
-                    record.set('active', false);
-                    recordsToUpdate.push(record);
-
-                    // Create new record with inflated prices
-                    const newRecord = new ClassObj();
-
-                    // Copy all relevant fields except excluded ones
-                    const fieldsToExclude = ['objectId', 'createdAt', 'updatedAt', 'valid_until', 'inflation_batch_id'];
-                    const attrs = record.attributes;
-
-                    for (const key in attrs) {
-                      if (!fieldsToExclude.includes(key)) {
-                        newRecord.set(key, attrs[key]);
-                      }
-                    }
-
-                    // Apply inflation to all price fields and store previous values
-                    const inflatedPrices = {};
-                    const previousPrices = {};
-
-                    priceFields.forEach((priceField) => {
-                      const newPrice = Math.round(priceField.currentValue * (1 + percentage / 100));
-                      newRecord.set(priceField.fieldName, newPrice);
-                      inflatedPrices[priceField.fieldName] = newPrice;
-                      previousPrices[priceField.fieldName] = priceField.currentValue;
-                    });
-
-                    // Set inflation metadata
-                    newRecord.set('active', true);
-                    newRecord.set('exists', true);
-                    newRecord.set('inflation_batch_id', batchId);
-                    newRecord.set('inflation_percentage', percentage);
-                    newRecord.set('previous_prices', previousPrices); // Store all previous prices
-                    newRecord.set('inflated_prices', inflatedPrices); // Store all new prices
-                    newRecord.set('inflation_applied_at', now);
-
-                    recordsToSave.push(newRecord);
-                    totalProcessed++;
-                  } catch (recordError) {
-                    totalErrors++;
-                    logger.error(`Error processing ${className} record`, {
-                      recordId: record.id,
-                      error: recordError.message,
-                      batchId,
-                    });
-                  }
-                }
-
-                // IMPROVEMENT 3: Atomic batch processing with better error handling
-                message(`Saving batch: ${recordsToUpdate.length} updates, ${recordsToSave.length} new records`);
-
-                try {
-                  // Save in specific order to maintain consistency:
-                  // 1. First mark old records as historical
-                  if (recordsToUpdate.length > 0) {
-                    logger.info(`Updating ${recordsToUpdate.length} historical records for ${className}`, { batchId });
-                    await Parse.Object.saveAll(recordsToUpdate, { useMasterKey: true });
-                  }
-
-                  // 2. Then create new inflated records
-                  if (recordsToSave.length > 0) {
-                    logger.info(`Creating ${recordsToSave.length} inflated records for ${className}`, { batchId });
-                    await Parse.Object.saveAll(recordsToSave, { useMasterKey: true });
-                  }
-
-                  // 3. Update progress only after successful save
-                  historyRecord.set('processed_count', totalProcessed);
-                  historyRecord.set('skipped_count', totalSkipped);
-                  historyRecord.set('error_count', totalErrors);
-                  await historyRecord.save(null, { useMasterKey: true });
-
-                  message(`${className} batch saved successfully: processed=${totalProcessed}, skipped=${totalSkipped}, errors=${totalErrors}`);
-                } catch (batchError) {
-                  // If batch save fails, log detailed error and continue with next batch
-                  logger.error(`Failed to save ${className} batch`, {
+              await query.eachBatch(
+                // eslint-disable-next-line no-loop-func
+                async (records) => {
+                  console.log(`🎯 eachBatch callback triggered for ${className} with ${records.length} records`);
+                  batchCount++;
+                  logger.info(`Processing ${className} batch ${batchCount} with ${records.length} records`, {
                     batchId,
-                    className,
-                    updateCount: recordsToUpdate.length,
-                    saveCount: recordsToSave.length,
-                    error: batchError.message,
-                    stack: batchError.stack,
                   });
+                  message(`Processing ${className} batch ${batchCount} (${records.length} records)`);
 
-                  // Try to recover: mark the batch as having errors but continue
-                  totalErrors += recordsToUpdate.length + recordsToSave.length;
-                  historyRecord.set('error_count', totalErrors);
-                  await historyRecord.save(null, { useMasterKey: true });
+                  const recordsToSave = [];
+                  const recordsToUpdate = [];
 
-                  message(`${className} batch failed - continuing with next batch`);
+                  // Process each record in the batch
+                  for (const record of records) {
+                    try {
+                      // Extract relationships based on table type
+                      let service;
+                      let rate;
+                      let vehicleType;
 
-                  // Don't re-throw - continue processing other batches
-                }
-              }, { useMasterKey: true });
+                      if (className === 'RatePrices') {
+                        service = record.get('service');
+                        rate = record.get('rate');
+                        vehicleType = record.get('vehicleType');
+
+                        // Validate required relationships for RatePrices
+                        if (!service || !rate || !vehicleType) {
+                          logger.warn(`Skipping ${className} record with missing relationships`, {
+                            recordId: record.id,
+                            className,
+                            hasService: !!service,
+                            hasRate: !!rate,
+                            hasVehicleType: !!vehicleType,
+                          });
+                          totalSkipped++;
+                          continue; // eslint-disable-line no-continue
+                        }
+                      } else if (className === 'TourPrices') {
+                        // TourPrices uses different field names
+                        rate = record.get('ratePtr');
+                        vehicleType = record.get('vehicleType');
+                        service = record.get('tourPtr');
+
+                        // Validate required relationships for TourPrices
+                        if (!rate || !vehicleType) {
+                          logger.warn(`Skipping ${className} record with missing relationships`, {
+                            recordId: record.id,
+                            className,
+                            hasRate: !!rate,
+                            hasVehicleType: !!vehicleType,
+                          });
+                          totalSkipped++;
+                          continue; // eslint-disable-line no-continue
+                        }
+                      } else if (className === 'ClientPrices') {
+                        // ClientPrices uses different field names
+                        rate = record.get('ratePtr');
+                        vehicleType = record.get('vehiclePtr');
+                        service = record.get('clientPtr');
+
+                        // Validate required relationships for ClientPrices
+                        if (!rate || !vehicleType) {
+                          logger.warn(`Skipping ${className} record with missing relationships`, {
+                            recordId: record.id,
+                            className,
+                            hasRate: !!rate,
+                            hasVehicleType: !!vehicleType,
+                          });
+                          totalSkipped++;
+                          continue; // eslint-disable-line no-continue
+                        }
+                      } else if (className === 'Experience') {
+                        // Experience table doesn't require relationship validation
+                        // It has name, cost, type, etc. as standalone fields
+                        rate = null;
+                        vehicleType = null;
+                        service = null;
+                      }
+
+                      logger.info(`Processing ${className} record with relationships`, {
+                        recordId: record.id,
+                        className,
+                        serviceId: service ? service.id : null,
+                        rateId: rate ? rate.id : null,
+                        vehicleTypeId: vehicleType ? vehicleType.id : null,
+                        batchId,
+                      });
+
+                      // Check for duplicates based on table-specific fields
+                      const duplicateQuery = new Parse.Query(ClassObj);
+
+                      // Add field constraints based on table type
+                      if (className === 'RatePrices') {
+                        if (service) duplicateQuery.equalTo('service', service);
+                        if (rate) duplicateQuery.equalTo('rate', rate);
+                        if (vehicleType) duplicateQuery.equalTo('vehicleType', vehicleType);
+                      } else if (className === 'TourPrices') {
+                        if (rate) duplicateQuery.equalTo('ratePtr', rate);
+                        if (vehicleType) duplicateQuery.equalTo('vehicleType', vehicleType);
+                        if (service) duplicateQuery.equalTo('tourPtr', service);
+                      } else if (className === 'ClientPrices') {
+                        if (rate) duplicateQuery.equalTo('ratePtr', rate);
+                        if (vehicleType) duplicateQuery.equalTo('vehiclePtr', vehicleType);
+                        if (service) duplicateQuery.equalTo('clientPtr', service);
+                      } else if (className === 'Experience') {
+                        // For Experience, use name and type as unique identifiers
+                        duplicateQuery.equalTo('name', record.get('name'));
+                        duplicateQuery.equalTo('type', record.get('type'));
+                      }
+
+                      duplicateQuery.equalTo('active', true);
+                      duplicateQuery.equalTo('exists', true);
+                      duplicateQuery.equalTo('inflation_batch_id', batchId);
+                      duplicateQuery.notEqualTo('objectId', record.id);
+
+                      const existingInflated = await duplicateQuery.first({ useMasterKey: true });
+
+                      if (existingInflated) {
+                        logger.info(`Skipping duplicate ${className} record - already inflated in this batch`, {
+                          recordId: record.id,
+                          className,
+                          serviceId: service.id,
+                          rateId: rate.id,
+                          vehicleTypeId: vehicleType.id,
+                          existingRecordId: existingInflated.id,
+                        });
+                        totalSkipped++;
+                        continue; // eslint-disable-line no-continue
+                      }
+
+                      // Get price fields based on table name
+                      const priceFields = [];
+                      let hasValidPrice = false;
+
+                      if (className === 'ClientPrices') {
+                        // For ClientPrices, inflate both precio and basePrice
+                        const precio = record.get('precio') || 0;
+                        const basePrice = record.get('basePrice') || 0;
+
+                        if (precio > 0) {
+                          priceFields.push({ fieldName: 'precio', currentValue: precio });
+                          hasValidPrice = true;
+                        }
+                        if (basePrice > 0) {
+                          priceFields.push({ fieldName: 'basePrice', currentValue: basePrice });
+                          hasValidPrice = true;
+                        }
+                      } else if (className === 'Experience') {
+                        // For Experience, inflate cost field
+                        const cost = record.get('cost') || 0;
+                        if (cost > 0) {
+                          priceFields.push({ fieldName: 'cost', currentValue: cost });
+                          hasValidPrice = true;
+                        }
+                      } else {
+                        // For RatePrices and TourPrices, only inflate price field
+                        const price = record.get('price') || 0;
+                        if (price > 0) {
+                          priceFields.push({ fieldName: 'price', currentValue: price });
+                          hasValidPrice = true;
+                        }
+                      }
+
+                      if (!hasValidPrice) {
+                        logger.warn('Skipping record with invalid prices', {
+                          recordId: record.id,
+                          className,
+                          priceFields: priceFields.map((p) => `${p.fieldName}=${p.currentValue}`),
+                        });
+                        totalSkipped++;
+                        continue; // eslint-disable-line no-continue
+                      }
+
+                      // Mark current record as historical
+                      record.set('valid_until', now);
+                      record.set('active', false);
+                      recordsToUpdate.push(record);
+
+                      // Create new record with inflated prices
+                      const newRecord = new ClassObj();
+
+                      // Copy all relevant fields except excluded ones
+                      const fieldsToExclude = [
+                        'objectId',
+                        'createdAt',
+                        'updatedAt',
+                        'valid_until',
+                        'inflation_batch_id',
+                      ];
+                      const attrs = record.attributes;
+
+                      for (const key in attrs) {
+                        if (!fieldsToExclude.includes(key)) {
+                          newRecord.set(key, attrs[key]);
+                        }
+                      }
+
+                      // Apply inflation to all price fields and store previous values
+                      const inflatedPrices = {};
+                      const previousPrices = {};
+
+                      priceFields.forEach((priceField) => {
+                        const newPrice = Math.round(priceField.currentValue * (1 + percentage / 100));
+                        newRecord.set(priceField.fieldName, newPrice);
+                        inflatedPrices[priceField.fieldName] = newPrice;
+                        previousPrices[priceField.fieldName] = priceField.currentValue;
+                      });
+
+                      // Set inflation metadata
+                      newRecord.set('active', true);
+                      newRecord.set('exists', true);
+                      newRecord.set('inflation_batch_id', batchId);
+                      newRecord.set('inflation_percentage', percentage);
+                      newRecord.set('previous_prices', previousPrices); // Store all previous prices
+                      newRecord.set('inflated_prices', inflatedPrices); // Store all new prices
+                      newRecord.set('inflation_applied_at', now);
+
+                      recordsToSave.push(newRecord);
+                      totalProcessed++;
+                    } catch (recordError) {
+                      totalErrors++;
+                      logger.error(`Error processing ${className} record`, {
+                        recordId: record.id,
+                        error: recordError.message,
+                        batchId,
+                      });
+                    }
+                  }
+
+                  // IMPROVEMENT 3: Atomic batch processing with better error handling
+                  message(`Saving batch: ${recordsToUpdate.length} updates, ${recordsToSave.length} new records`);
+
+                  try {
+                    // Save in specific order to maintain consistency:
+                    // 1. First mark old records as historical
+                    if (recordsToUpdate.length > 0) {
+                      logger.info(`Updating ${recordsToUpdate.length} historical records for ${className}`, {
+                        batchId,
+                      });
+                      await Parse.Object.saveAll(recordsToUpdate, { useMasterKey: true });
+                    }
+
+                    // 2. Then create new inflated records
+                    if (recordsToSave.length > 0) {
+                      logger.info(`Creating ${recordsToSave.length} inflated records for ${className}`, { batchId });
+                      await Parse.Object.saveAll(recordsToSave, { useMasterKey: true });
+                    }
+
+                    // 3. Update progress only after successful save
+                    historyRecord.set('processed_count', totalProcessed);
+                    historyRecord.set('skipped_count', totalSkipped);
+                    historyRecord.set('error_count', totalErrors);
+                    await historyRecord.save(null, { useMasterKey: true });
+
+                    message(
+                      `${className} batch saved successfully: processed=${totalProcessed}, skipped=${totalSkipped}, errors=${totalErrors}`
+                    );
+                  } catch (batchError) {
+                    // If batch save fails, log detailed error and continue with next batch
+                    logger.error(`Failed to save ${className} batch`, {
+                      batchId,
+                      className,
+                      updateCount: recordsToUpdate.length,
+                      saveCount: recordsToSave.length,
+                      error: batchError.message,
+                      stack: batchError.stack,
+                    });
+
+                    // Try to recover: mark the batch as having errors but continue
+                    totalErrors += recordsToUpdate.length + recordsToSave.length;
+                    historyRecord.set('error_count', totalErrors);
+                    await historyRecord.save(null, { useMasterKey: true });
+
+                    message(`${className} batch failed - continuing with next batch`);
+
+                    // Don't re-throw - continue processing other batches
+                  }
+                },
+                { useMasterKey: true }
+              );
             } catch (eachBatchError) {
               // Handle error in eachBatch processing with detailed logging
               console.error(`❌ DETAILED EACHBATCH ERROR for ${className}:`, eachBatchError);
@@ -1427,7 +1450,7 @@ function registerCloudFunctions() {
 
         // End of main try block
       } catch (error) {
-      // Mark job as failed
+        // Mark job as failed
         try {
           const InflationHistory = Parse.Object.extend('InflationHistory');
           const historyQuery = new Parse.Query(InflationHistory);
@@ -1584,7 +1607,9 @@ function registerCloudFunctions() {
 
           const lastInflation = await historyQuery.first({ useMasterKey: true });
           if (!lastInflation) {
-            throw new Error('No inflation history found to revert. No completed inflation processes have records to revert.');
+            throw new Error(
+              'No inflation history found to revert. No completed inflation processes have records to revert.'
+            );
           }
 
           batchId = lastInflation.get('batch_id');
@@ -1760,7 +1785,11 @@ function registerCloudFunctions() {
      */
     Parse.Cloud.define('testBackgroundJobDefinition', async (request) => {
       try {
-        return { success: true, message: 'Background job definition endpoint is working', timestamp: new Date().toISOString() };
+        return {
+          success: true,
+          message: 'Background job definition endpoint is working',
+          timestamp: new Date().toISOString(),
+        };
       } catch (error) {
         logger.error('Test background job definition failed', { error: error.message });
         throw error;
@@ -1814,7 +1843,8 @@ function registerCloudFunctions() {
           processedCount: batch.get('processed_count'),
           createdAt: batch.get('createdAt'),
           completedAt: batch.get('completedAt'),
-          descriptiveMessage: batch.get('descriptive_message') || `${batch.get('processed_count')} registros procesados`,
+          descriptiveMessage:
+            batch.get('descriptive_message') || `${batch.get('processed_count')} registros procesados`,
         }));
 
         return {

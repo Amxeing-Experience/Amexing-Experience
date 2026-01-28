@@ -178,10 +178,12 @@ class ExperienceController {
       name: provExp.get('name'),
       description: provExp.get('description'),
       price: provExp.get('price'),
-      provider: provExp.get('provider') ? {
-        id: provExp.get('provider').id,
-        name: provExp.get('provider').get('name'),
-      } : null,
+      provider: provExp.get('provider')
+        ? {
+          id: provExp.get('provider').id,
+          name: provExp.get('provider').get('name'),
+        }
+        : null,
     }));
   }
 
@@ -221,6 +223,15 @@ class ExperienceController {
     };
   }
 
+  /**
+   * Get experience by ID.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Returns experience data or error.
+   * @author Denisse Maldonado
+   * @since 1.0.0
+   * @example
+   */
   async getExperienceById(req, res) {
     try {
       const currentUser = req.user;
@@ -361,8 +372,8 @@ class ExperienceController {
     }
 
     const totalItems = (experiences ? experiences.length : 0)
-                      + (providerExperiences ? providerExperiences.length : 0)
-                      + (tours ? tours.length : 0);
+      + (providerExperiences ? providerExperiences.length : 0)
+      + (tours ? tours.length : 0);
     if (totalItems > this.maxTotalItemsPerPackage) {
       return {
         error: `Maximum ${this.maxTotalItemsPerPackage} total items (experiences + provider experiences + tours) per package`,
@@ -529,7 +540,14 @@ class ExperienceController {
    */
   createExperienceObject(data) {
     const {
-      name, description, type, providerType, duration, cost, min_people: minPeople, time_journey: timeJourney,
+      name,
+      description,
+      type,
+      providerType,
+      duration,
+      cost,
+      min_people: minPeople,
+      time_journey: timeJourney,
     } = data;
 
     const Experience = Parse.Object.extend('Experience');
@@ -606,6 +624,15 @@ class ExperienceController {
     });
   }
 
+  /**
+   * Create a new experience.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Returns created experience or error.
+   * @author Denisse Maldonado
+   * @since 1.0.0
+   * @example
+   */
   async createExperience(req, res) {
     try {
       const currentUser = req.user;
@@ -656,20 +683,12 @@ class ExperienceController {
       const { availability } = req.body;
       if (availability && Array.isArray(availability)) {
         if (availability.length === 0) {
-          return this.sendError(
-            res,
-            'At least one day schedule must be provided if availability is set',
-            400
-          );
+          return this.sendError(res, 'At least one day schedule must be provided if availability is set', 400);
         }
 
         const availabilityValidation = validateDaySchedules(availability);
         if (!availabilityValidation.valid) {
-          return this.sendError(
-            res,
-            `Invalid availability data: ${availabilityValidation.errors.join(', ')}`,
-            400
-          );
+          return this.sendError(res, `Invalid availability data: ${availabilityValidation.errors.join(', ')}`, 400);
         }
 
         const sortedSchedules = sortDaySchedulesChronological(availability);
@@ -704,7 +723,14 @@ class ExperienceController {
    */
   validateAndUpdateBasicFields(experienceObj, data) {
     const {
-      name, description, cost, duration, providerType, active, min_people: minPeople, time_journey: timeJourney,
+      name,
+      description,
+      cost,
+      duration,
+      providerType,
+      active,
+      min_people: minPeople,
+      time_journey: timeJourney,
     } = data;
 
     if (name !== undefined) {
@@ -894,7 +920,10 @@ class ExperienceController {
       const currentProviderExperiences = providerExperiences !== undefined ? providerExperiences : experienceObj.get('providerExperiences') || [];
       const totalItems = currentExperiences.length + currentProviderExperiences.length + tours.length;
       if (totalItems > this.maxTotalItemsPerPackage) {
-        return { error: `Maximum ${this.maxTotalItemsPerPackage} total items (experiences + provider experiences + tours) per package`, status: 400 };
+        return {
+          error: `Maximum ${this.maxTotalItemsPerPackage} total items (experiences + provider experiences + tours) per package`,
+          status: 400,
+        };
       }
 
       if (tours.length > 0) {
@@ -1005,21 +1034,13 @@ class ExperienceController {
         } else if (Array.isArray(availability) && availability.length > 0) {
           const availabilityValidation = validateDaySchedules(availability);
           if (!availabilityValidation.valid) {
-            return this.sendError(
-              res,
-              `Invalid availability data: ${availabilityValidation.errors.join(', ')}`,
-              400
-            );
+            return this.sendError(res, `Invalid availability data: ${availabilityValidation.errors.join(', ')}`, 400);
           }
 
           const sortedSchedules = sortDaySchedulesChronological(availability);
           experienceObj.set('availability', sortedSchedules);
         } else if (Array.isArray(availability) && availability.length === 0) {
-          return this.sendError(
-            res,
-            'At least one day schedule must be provided if availability is set',
-            400
-          );
+          return this.sendError(res, 'At least one day schedule must be provided if availability is set', 400);
         }
       }
 
@@ -1052,7 +1073,11 @@ class ExperienceController {
             if (key === 'cost') {
               // Use the new cost
               newExperience.set(key, costChangeInfo.newCost);
-            } else if (experienceJSON[key] && typeof experienceJSON[key] === 'object' && experienceJSON[key].className) {
+            } else if (
+              experienceJSON[key]
+              && typeof experienceJSON[key] === 'object'
+              && experienceJSON[key].className
+            ) {
               // Handle Parse pointers
               const PointerClass = Parse.Object.extend(experienceJSON[key].className);
               const pointer = new PointerClass();
@@ -1423,10 +1448,12 @@ class ExperienceController {
         const poi = tour.get('destinationPOI');
         return {
           id: tour.id,
-          destinationPOI: poi ? {
-            objectId: poi.id,
-            name: poi.get('name'),
-          } : null,
+          destinationPOI: poi
+            ? {
+              objectId: poi.id,
+              name: poi.get('name'),
+            }
+            : null,
           time: tour.get('time'),
         };
       }),
