@@ -35,11 +35,12 @@ const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : `/api/c
 const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const dtAccessToken = typeof accessToken !== 'undefined' ? accessToken : '';
+const dtCurrentUserId = typeof currentUserId !== 'undefined' ? currentUserId : '';
 
 // Role-Based Permission Checks
 const canEdit = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
-const canCreate = ['superadmin', 'admin', 'client', 'department_manager'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin', 'department_manager'].includes(dtUserRole);
 const showActionsColumn = dtShowActions && (canEdit || canDelete) && dtUserRole !== 'client';
 
 // Role translations
@@ -57,13 +58,15 @@ const roleLabels = {
                     <i class="ti ti-users me-2"></i>
                     Empleados de la Agencia
                 </h5>
+                <% if (dtUserRole !== 'client') { %>
                 <small class="text-white" style="opacity: 0.9;">Gestiona agentes y empleados de la empresa</small>
+                <% } %>
             </div>
             <div class="col-auto">
                 <% if (canCreate) { %>
                     <button type="button" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#createEmployeeModal">
                         <i class="ti ti-plus me-1"></i>
-                        Nuevo Empleado
+                        Nuevo Agente
                     </button>
                 <% } %>
             </div>
@@ -257,7 +260,13 @@ function initializeEmployeesDataTable() {
                     const firstName = row.firstName || '';
                     const lastName = row.lastName || '';
                     const fullName = `${firstName} ${lastName}`.trim() || '-';
-                    return `<strong class="text-dark">${fullName}</strong>`;
+                    
+                    // Add "ME" badge if this is the current user
+                    const currentUserId = '<%= dtCurrentUserId %>';
+                    const isCurrentUser = currentUserId && row.id === currentUserId;
+                    const meBadge = isCurrentUser ? ' <span class="badge bg-primary ms-2">ME</span>' : '';
+                    
+                    return `<strong class="text-dark">${fullName}</strong>${meBadge}`;
                 }
             },
             {

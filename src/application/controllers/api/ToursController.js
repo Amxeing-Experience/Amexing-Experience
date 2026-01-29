@@ -72,15 +72,24 @@ class ToursController {
       // Check for client ID to include client-specific prices
       const { clientId } = req.query;
 
-      // Extract additional filters (if provided) - removed since Tour table doesn't have rate field
+      // Extract tour type filter
+      const { tourType } = req.query; // 'walking', 'vehicle', or undefined (all)
 
       // Column mapping for sorting (matches frontend columns order)
       const columns = ['destinationPOI', 'time', 'availability', 'active'];
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
-      // Get total records count (without search filter)
+      // Get total records count (with tour type filter but without search filter)
       const totalRecordsQuery = new Parse.Query('Tour');
       totalRecordsQuery.equalTo('exists', true);
+
+      // Apply tour type filter to total count
+      if (tourType === 'walking') {
+        totalRecordsQuery.equalTo('isWalkingTour', true);
+      } else if (tourType === 'vehicle') {
+        totalRecordsQuery.notEqualTo('isWalkingTour', true);
+      }
+
       const recordsTotal = await totalRecordsQuery.count({
         useMasterKey: true,
       });
@@ -90,7 +99,13 @@ class ToursController {
       baseQuery.equalTo('exists', true);
       baseQuery.include(['destinationPOI']);
 
-      // Remove rate filter since Tour table doesn't have rate field
+      // Apply tour type filter if provided
+      if (tourType === 'walking') {
+        baseQuery.equalTo('isWalkingTour', true);
+      } else if (tourType === 'vehicle') {
+        baseQuery.notEqualTo('isWalkingTour', true);
+      }
+      // If tourType is undefined, show all tours (no additional filter)
 
       // Build filtered query with search
       let filteredQuery = baseQuery;
@@ -99,10 +114,21 @@ class ToursController {
         const poiQuery = new Parse.Query('POI');
         poiQuery.matches('name', searchValue, 'i');
 
-        // Create separate queries for each search field
-        const searchQueries = [
-          new Parse.Query('Tour').equalTo('exists', true).matchesQuery('destinationPOI', poiQuery),
-        ];
+        // Create separate queries for each search field with tour type filter
+        const searchQueries = [];
+
+        const tourSearchQuery = new Parse.Query('Tour');
+        tourSearchQuery.equalTo('exists', true);
+        tourSearchQuery.matchesQuery('destinationPOI', poiQuery);
+
+        // Apply tour type filter to search query
+        if (tourType === 'walking') {
+          tourSearchQuery.equalTo('isWalkingTour', true);
+        } else if (tourType === 'vehicle') {
+          tourSearchQuery.notEqualTo('isWalkingTour', true);
+        }
+
+        searchQueries.push(tourSearchQuery);
 
         filteredQuery = Parse.Query.or(...searchQueries);
         filteredQuery.include(['destinationPOI']);

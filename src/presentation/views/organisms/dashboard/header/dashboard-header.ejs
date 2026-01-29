@@ -13,8 +13,9 @@ const headerUserRole = typeof userRole !== 'undefined' ? userRole : 'guest';
 const headerUser = (typeof user !== 'undefined' && user !== null) ? user : {};
 const headerTitle = typeof title !== 'undefined' ? title : 'Dashboard';
 
-// User data extraction with null safety
-const userName = (headerUser && (headerUser.name || headerUser.fullName)) || 'User';
+// User data extraction with null safety - use the userName parameter passed from controller
+const displayUserName = (typeof userName !== 'undefined' && userName) || 
+                        (headerUser && (headerUser.name || headerUser.fullName)) || 'User';
 const userEmail = (headerUser && headerUser.email) || '';
 const userAvatar = (headerUser && (headerUser.avatar || headerUser.profilePicture)) || '';
 
@@ -27,7 +28,7 @@ function getInitials(name) {
         .toUpperCase();
 }
 
-const userInitials = getInitials(userName);
+const userInitials = getInitials(displayUserName);
 
 // Role colors
 const roleColors = {
@@ -117,7 +118,7 @@ const colors = roleColors[headerUserRole] || roleColors.guest;
                     user: headerUser,
                     userRole: headerUserRole,
                     colors: colors,
-                    userName: userName,
+                    userName: displayUserName,
                     userEmail: userEmail,
                     userAvatar: userAvatar,
                     userInitials: userInitials

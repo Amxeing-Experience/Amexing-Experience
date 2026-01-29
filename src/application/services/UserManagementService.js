@@ -112,6 +112,9 @@ class UserManagementService {
         'clientId',
         'departmentId',
         'contextualData',
+        'phone',
+        'notes',
+        'address',
         'createdAt',
         'updatedAt',
         'createdBy',
@@ -504,6 +507,7 @@ class UserManagementService {
         'phone',
         'address',
         'contextualData',
+        'notes',
       ];
 
       allowedUpdateFields.forEach((field) => {
@@ -1596,6 +1600,7 @@ class UserManagementService {
       contextualData, // Include full contextual data object
       address: user.get('address'), // Include address data for client details
       phone: user.get('phone'), // Include phone number
+      notes: user.get('notes'), // Include notes field
     };
   }
 
