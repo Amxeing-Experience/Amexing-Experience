@@ -1,0 +1,167 @@
+<%
+/**
+ * Walking Tours Section
+ * Displays walking tours with group-based pricing tiers
+ * Separate from vehicle-based tours due to different pricing model
+ * Created by Denisse Maldonado
+ */
+
+// Default parameters
+const sectionId = typeof walkingToursId !== 'undefined' ? walkingToursId : 'walking-tours-section';
+const apiEndpoint = typeof walkingApiEndpoint !== 'undefined' ? walkingApiEndpoint : '/api/tours/walking';
+%>
+
+<!-- Walking Tours Section -->
+<div class="card mb-4" id="<%= sectionId %>">
+    <div class="card-header bg-light">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <h5 class="card-title mb-1">
+                    <i class="ti ti-walk me-2 text-success"></i>Tours a Pie
+                </h5>
+                <p class="text-muted small mb-0">Precios por grupo de personas</p>
+            </div>
+            <div class="badge bg-success-subtle text-success">
+                <i class="ti ti-users me-1"></i>Sin vehículos
+            </div>
+        </div>
+    </div>
+    
+    <div class="card-body">
+        <!-- Loading state -->
+        <div id="walking-tours-loading" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando tours a pie...</span>
+            </div>
+            <p class="text-muted mt-2">Cargando tours a pie...</p>
+        </div>
+        
+        <!-- Walking tours container -->
+        <div id="walking-tours-container" class="d-none">
+            <!-- Tours will be populated here via JavaScript -->
+        </div>
+        
+        <!-- No walking tours message -->
+        <div id="no-walking-tours" class="text-center py-4 d-none">
+            <div class="text-muted">
+                <i class="ti ti-walk" style="font-size: 3rem; opacity: 0.3;"></i>
+                <p class="mt-2 mb-0">No hay tours a pie disponibles</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadWalkingTours();
+});
+
+async function loadWalkingTours() {
+    try {
+        // Use tourType parameter to filter for walking tours only
+        const url = new URL('<%= apiEndpoint %>', window.location.origin);
+        url.searchParams.append('tourType', 'walking');
+        
+        const response = await fetch(url, {
+            credentials: 'include',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Error loading walking tours');
+        }
+        
+        displayWalkingTours(data.data || []);
+        
+    } catch (error) {
+        console.error('Error loading walking tours:', error);
+        showWalkingToursError();
+    }
+}
+
+function displayWalkingTours(tours) {
+    const loadingEl = document.getElementById('walking-tours-loading');
+    const containerEl = document.getElementById('walking-tours-container');
+    const noToursEl = document.getElementById('no-walking-tours');
+    
+    loadingEl.classList.add('d-none');
+    
+    if (!tours || tours.length === 0) {
+        noToursEl.classList.remove('d-none');
+        return;
+    }
+    
+    // Tours are already filtered by the API with tourType=walking
+    const toursHtml = tours.map(tour => `
+        <div class="walking-tour-item mb-3">
+            <div class="row align-items-center p-3 border rounded-3 bg-white">
+                <div class="col-md-3">
+                    <h6 class="mb-1 fw-bold text-dark">${tour.destinationPOI?.name || 'Tour a pie'}</h6>
+                    <div class="d-flex align-items-center text-muted small">
+                        <i class="ti ti-clock me-1"></i>
+                        <span>${Math.round((tour.time || 0) / 60 * 10) / 10} horas mínimo</span>
+                    </div>
+                </div>
+                
+                <div class="col-md-9">
+                    <div class="row g-2">
+                        <!-- 1-5 pax -->
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-success-subtle rounded-2 border border-success-subtle">
+                                <div class="fw-bold text-success">1-5 personas</div>
+                                <div class="h5 mb-0 text-success">$1,050 MXN</div>
+                                <div class="small text-muted">por hora</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 6-10 pax -->
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-warning-subtle rounded-2 border border-warning-subtle">
+                                <div class="fw-bold text-warning-emphasis">6-10 personas</div>
+                                <div class="h5 mb-0 text-warning-emphasis">$2,100 MXN</div>
+                                <div class="small text-muted">por hora</div>
+                            </div>
+                        </div>
+                        
+                        <!-- 11-15 pax -->
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-info-subtle rounded-2 border border-info-subtle">
+                                <div class="fw-bold text-info-emphasis">11-15 personas</div>
+                                <div class="h5 mb-0 text-info-emphasis">$3,150 MXN</div>
+                                <div class="small text-muted">por hora</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    containerEl.innerHTML = toursHtml;
+    containerEl.classList.remove('d-none');
+}
+
+function showWalkingToursError() {
+    const loadingEl = document.getElementById('walking-tours-loading');
+    const containerEl = document.getElementById('walking-tours-container');
+    
+    loadingEl.classList.add('d-none');
+    
+    containerEl.innerHTML = `
+        <div class="text-center py-4">
+            <div class="text-danger">
+                <i class="ti ti-alert-circle" style="font-size: 2rem;"></i>
+                <p class="mt-2 mb-0">Error al cargar tours a pie</p>
+                <button class="btn btn-outline-primary btn-sm mt-2" onclick="loadWalkingTours()">
+                    <i class="ti ti-reload me-1"></i>Reintentar
+                </button>
+            </div>
+        </div>
+    `;
+    containerEl.classList.remove('d-none');
+}
+</script>

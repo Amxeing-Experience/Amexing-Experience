@@ -160,7 +160,7 @@ class AmexingUser extends BaseModel {
     if (userData.phone) {
       user.set('phone', userData.phone);
     }
-    
+
     // Additional information
     if (userData.notes) {
       user.set('notes', userData.notes);

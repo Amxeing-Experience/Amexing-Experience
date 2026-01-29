@@ -38,16 +38,35 @@ const currentPath = '/dashboard/department_manager/tours';
     </div>
 </div>
 
-<!-- Tours DataTable -->
+<!-- Walking Tours Section -->
 <div class="row">
     <div class="col-12">
-        <%- include('../../organisms/datatable/tours-table', {
-            tableId: 'tours-table',
-            apiEndpoint: '/api/tours',
-            userRole: currentUserRole,
-            showActions: false,
-            showClientPricing: false,
-            clientId: typeof clientId !== 'undefined' ? clientId : null
+        <%- include('../../organisms/tours/walking-tours-section', {
+            walkingToursId: 'department-walking-tours',
+            walkingApiEndpoint: '/api/tours'
         }) %>
+    </div>
+</div>
+
+<!-- Vehicle Tours DataTable -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="ti ti-car me-2 text-primary"></i>Tours con Vehículos
+                </h5>
+            </div>
+            <div class="card-body">
+                <%- include('../../organisms/datatable/tours-table', {
+                    tableId: 'tours-table',
+                    apiEndpoint: '/api/tours',
+                    userRole: currentUserRole,
+                    showActions: false,
+                    showClientPricing: false,
+                    clientId: typeof clientId !== 'undefined' ? clientId : null
+                }) %>
+            </div>
+        </div>
     </div>
 </div>
