@@ -221,6 +221,15 @@ class ToursController {
           exists: tour.get('exists') || true,
           createdAt: tour.get('createdAt'),
           updatedAt: tour.get('updatedAt'),
+          // Walking tour pricing fields
+          isWalkingTour: tour.get('isWalkingTour') || false,
+          walkingPriceSmall: tour.get('walkingPriceSmall') || null,
+          walkingPriceMedium: tour.get('walkingPriceMedium') || null,
+          walkingPriceLarge: tour.get('walkingPriceLarge') || null,
+          walkingPriceCurrency: tour.get('walkingPriceCurrency') || null,
+          walkingRangeSmall: tour.get('walkingRangeSmall') || null,
+          walkingRangeMedium: tour.get('walkingRangeMedium') || null,
+          walkingRangeLarge: tour.get('walkingRangeLarge') || null,
           // Include client pricing information
           clientPrices: Object.keys(tourClientPrices).length > 0 ? tourClientPrices : {},
           hasClientPrices: Object.keys(tourClientPrices).length > 0,
@@ -290,6 +299,12 @@ class ToursController {
         exists: tour.get('exists'),
         createdAt: tour.get('createdAt'),
         updatedAt: tour.get('updatedAt'),
+        // Walking tour pricing fields
+        isWalkingTour: tour.get('isWalkingTour') || false,
+        walkingPriceSmall: tour.get('walkingPriceSmall') || null,
+        walkingPriceMedium: tour.get('walkingPriceMedium') || null,
+        walkingPriceLarge: tour.get('walkingPriceLarge') || null,
+        walkingPriceCurrency: tour.get('walkingPriceCurrency') || null,
       };
 
       res.json({
@@ -784,6 +799,15 @@ class ToursController {
           exists: tour.get('exists'),
           createdAt: tour.get('createdAt'),
           updatedAt: tour.get('updatedAt'),
+          // Walking tour pricing fields
+          isWalkingTour: tour.get('isWalkingTour') || false,
+          walkingPriceSmall: tour.get('walkingPriceSmall') || null,
+          walkingPriceMedium: tour.get('walkingPriceMedium') || null,
+          walkingPriceLarge: tour.get('walkingPriceLarge') || null,
+          walkingPriceCurrency: tour.get('walkingPriceCurrency') || null,
+          walkingRangeSmall: tour.get('walkingRangeSmall') || null,
+          walkingRangeMedium: tour.get('walkingRangeMedium') || null,
+          walkingRangeLarge: tour.get('walkingRangeLarge') || null,
           priceData,
           hasClientPrices,
           clientPrices,

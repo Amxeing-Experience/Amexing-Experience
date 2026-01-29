@@ -62,6 +62,12 @@ async function loadWalkingTours() {
         const url = new URL('<%= apiEndpoint %>', window.location.origin);
         url.searchParams.append('tourType', 'walking');
         
+        // Add client ID if available to get client-specific prices
+        const clientId = getClientId();
+        if (clientId) {
+            url.searchParams.append('clientId', clientId);
+        }
+        
         const response = await fetch(url, {
             credentials: 'include',
             headers: {
@@ -83,6 +89,64 @@ async function loadWalkingTours() {
     }
 }
 
+// Helper function to get client ID from the page context
+function getClientId() {
+    // Try to get from global variable, URL parameter, or element data attribute
+    return window.clientId || 
+           new URLSearchParams(window.location.search).get('clientId') ||
+           document.querySelector('[data-client-id]')?.getAttribute('data-client-id') ||
+           null;
+}
+
+// Helper function to extract pricing for walking tours
+function getWalkingTourPricing(tour) {
+    const defaultPricing = {
+        small: '$1,050 MXN',      // 1-5 pax
+        medium: '$2,100 MXN',     // 6-10 pax  
+        large: '$3,150 MXN',      // 11-15 pax
+        hasTourPricing: false
+    };
+    
+    // Use Tour's built-in walking pricing fields (from migration)
+    if (tour.walkingPriceSmall && tour.walkingPriceMedium && tour.walkingPriceLarge) {
+        const currency = tour.walkingPriceCurrency || 'MXN';
+        const smallRange = tour.walkingRangeSmall || '1-5 pax';
+        const mediumRange = tour.walkingRangeMedium || '6-10 pax';
+        const largeRange = tour.walkingRangeLarge || '11-15 pax';
+        
+        return {
+            small: `$${tour.walkingPriceSmall.toLocaleString()} ${currency}`,
+            medium: `$${tour.walkingPriceMedium.toLocaleString()} ${currency}`,
+            large: `$${tour.walkingPriceLarge.toLocaleString()} ${currency}`,
+            smallRange: smallRange.replace(' pax', ' personas'),
+            mediumRange: mediumRange.replace(' pax', ' personas'),
+            largeRange: largeRange.replace(' pax', ' personas'),
+            hasTourPricing: true
+        };
+    }
+    
+    // Fallback: Check if client has custom pricing (for backward compatibility)
+    if (tour.hasClientPrices && tour.clientPrices) {
+        const clientPrices = tour.clientPrices;
+        const priceKeys = Object.keys(clientPrices);
+        
+        if (priceKeys.length > 0) {
+            const firstPrice = clientPrices[priceKeys[0]];
+            const basePrice = firstPrice.price || firstPrice.basePrice || 1050;
+            
+            return {
+                small: `$${basePrice.toLocaleString()} MXN`,           // 1-5 pax
+                medium: `$${(basePrice * 2).toLocaleString()} MXN`,    // 6-10 pax (double)
+                large: `$${(basePrice * 3).toLocaleString()} MXN`,     // 11-15 pax (triple)
+                hasTourPricing: false // This is client pricing, not tour pricing
+            };
+        }
+    }
+    
+    // Ultimate fallback to defaults
+    return defaultPricing;
+}
+
 function displayWalkingTours(tours) {
     const loadingEl = document.getElementById('walking-tours-loading');
     const containerEl = document.getElementById('walking-tours-container');
@@ -96,7 +160,11 @@ function displayWalkingTours(tours) {
     }
     
     // Tours are already filtered by the API with tourType=walking
-    const toursHtml = tours.map(tour => `
+    const toursHtml = tours.map(tour => {
+        // Get pricing information for walking tours
+        const pricing = getWalkingTourPricing(tour);
+        
+        return `
         <div class="walking-tour-item mb-3">
             <div class="row align-items-center p-3 border rounded-3 bg-white">
                 <div class="col-md-3">
@@ -109,29 +177,29 @@ function displayWalkingTours(tours) {
                 
                 <div class="col-md-9">
                     <div class="row g-2">
-                        <!-- 1-5 pax -->
+                        <!-- Small group -->
                         <div class="col-md-4">
                             <div class="text-center p-3 bg-success-subtle rounded-2 border border-success-subtle">
-                                <div class="fw-bold text-success">1-5 personas</div>
-                                <div class="h5 mb-0 text-success">$1,050 MXN</div>
+                                <div class="fw-bold text-success">${pricing.smallRange || '1-5 personas'}</div>
+                                <div class="h5 mb-0 text-success">${pricing.small}</div>
                                 <div class="small text-muted">por hora</div>
                             </div>
                         </div>
                         
-                        <!-- 6-10 pax -->
+                        <!-- Medium group -->
                         <div class="col-md-4">
                             <div class="text-center p-3 bg-warning-subtle rounded-2 border border-warning-subtle">
-                                <div class="fw-bold text-warning-emphasis">6-10 personas</div>
-                                <div class="h5 mb-0 text-warning-emphasis">$2,100 MXN</div>
+                                <div class="fw-bold text-warning-emphasis">${pricing.mediumRange || '6-10 personas'}</div>
+                                <div class="h5 mb-0 text-warning-emphasis">${pricing.medium}</div>
                                 <div class="small text-muted">por hora</div>
                             </div>
                         </div>
                         
-                        <!-- 11-15 pax -->
+                        <!-- Large group -->
                         <div class="col-md-4">
                             <div class="text-center p-3 bg-info-subtle rounded-2 border border-info-subtle">
-                                <div class="fw-bold text-info-emphasis">11-15 personas</div>
-                                <div class="h5 mb-0 text-info-emphasis">$3,150 MXN</div>
+                                <div class="fw-bold text-info-emphasis">${pricing.largeRange || '11-15 personas'}</div>
+                                <div class="h5 mb-0 text-info-emphasis">${pricing.large}</div>
                                 <div class="small text-muted">por hora</div>
                             </div>
                         </div>
@@ -139,7 +207,8 @@ function displayWalkingTours(tours) {
                 </div>
             </div>
         </div>
-    `).join('');
+        `;
+    }).join('');
     
     containerEl.innerHTML = toursHtml;
     containerEl.classList.remove('d-none');
