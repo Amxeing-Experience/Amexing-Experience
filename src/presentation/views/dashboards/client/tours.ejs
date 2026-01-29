@@ -40,13 +40,18 @@ const currentPath = '/dashboard/client/tours';
 
 <!-- Walking Tours Section -->
 <div class="row">
-    <div class="col-12">
+    <div class="col-12" data-client-id="<%= clientId || '' %>">
         <%- include('../../organisms/tours/walking-tours-section', {
             walkingToursId: 'client-walking-tours',
             walkingApiEndpoint: '/api/tours'
         }) %>
     </div>
 </div>
+
+<script>
+// Make client ID available globally for the walking tours component
+window.clientId = '<%= clientId || "" %>';
+</script>
 
 <!-- Vehicle Tours DataTable -->
 <div class="row">

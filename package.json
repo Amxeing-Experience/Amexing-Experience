@@ -290,7 +290,7 @@
     "prettier": "^3.7.4",
     "sonarqube-scanner": "^4.3.0",
     "standard-version": "^9.5.0",
-    "supertest": "^6.3.3",
+    "supertest": "^6.3.4",
     "yarn-audit-fix": "^10.1.1"
   },
   "resolutions": {
