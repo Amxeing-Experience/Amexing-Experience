@@ -72,15 +72,24 @@ class ToursController {
       // Check for client ID to include client-specific prices
       const { clientId } = req.query;
 
-      // Extract additional filters (if provided) - removed since Tour table doesn't have rate field
+      // Extract tour type filter
+      const { tourType } = req.query; // 'walking', 'vehicle', or undefined (all)
 
       // Column mapping for sorting (matches frontend columns order)
       const columns = ['destinationPOI', 'time', 'availability', 'active'];
       const sortField = columns[sortColumnIndex] || 'createdAt';
 
-      // Get total records count (without search filter)
+      // Get total records count (with tour type filter but without search filter)
       const totalRecordsQuery = new Parse.Query('Tour');
       totalRecordsQuery.equalTo('exists', true);
+
+      // Apply tour type filter to total count
+      if (tourType === 'walking') {
+        totalRecordsQuery.equalTo('isWalkingTour', true);
+      } else if (tourType === 'vehicle') {
+        totalRecordsQuery.notEqualTo('isWalkingTour', true);
+      }
+
       const recordsTotal = await totalRecordsQuery.count({
         useMasterKey: true,
       });
@@ -90,7 +99,13 @@ class ToursController {
       baseQuery.equalTo('exists', true);
       baseQuery.include(['destinationPOI']);
 
-      // Remove rate filter since Tour table doesn't have rate field
+      // Apply tour type filter if provided
+      if (tourType === 'walking') {
+        baseQuery.equalTo('isWalkingTour', true);
+      } else if (tourType === 'vehicle') {
+        baseQuery.notEqualTo('isWalkingTour', true);
+      }
+      // If tourType is undefined, show all tours (no additional filter)
 
       // Build filtered query with search
       let filteredQuery = baseQuery;
@@ -99,10 +114,21 @@ class ToursController {
         const poiQuery = new Parse.Query('POI');
         poiQuery.matches('name', searchValue, 'i');
 
-        // Create separate queries for each search field
-        const searchQueries = [
-          new Parse.Query('Tour').equalTo('exists', true).matchesQuery('destinationPOI', poiQuery),
-        ];
+        // Create separate queries for each search field with tour type filter
+        const searchQueries = [];
+
+        const tourSearchQuery = new Parse.Query('Tour');
+        tourSearchQuery.equalTo('exists', true);
+        tourSearchQuery.matchesQuery('destinationPOI', poiQuery);
+
+        // Apply tour type filter to search query
+        if (tourType === 'walking') {
+          tourSearchQuery.equalTo('isWalkingTour', true);
+        } else if (tourType === 'vehicle') {
+          tourSearchQuery.notEqualTo('isWalkingTour', true);
+        }
+
+        searchQueries.push(tourSearchQuery);
 
         filteredQuery = Parse.Query.or(...searchQueries);
         filteredQuery.include(['destinationPOI']);
@@ -297,11 +323,7 @@ class ToursController {
 
       // Role checking is handled by jwtMiddleware.requireRoleLevel(6) in routes
 
-      const {
-        destinationPOI,
-        time,
-        availability,
-      } = req.body;
+      const { destinationPOI, time, availability } = req.body;
 
       // Validate required fields
       if (!destinationPOI || !time) {
@@ -397,11 +419,7 @@ class ToursController {
       // Role checking is handled by jwtMiddleware.requireRoleLevel(6) in routes
 
       const tourId = req.params.id;
-      const {
-        destinationPOI,
-        time,
-        availability,
-      } = req.body;
+      const { destinationPOI, time, availability } = req.body;
 
       if (!tourId) {
         return this.sendError(res, 'ID de tour requerido', 400);
@@ -707,17 +725,21 @@ class ToursController {
             price,
             formattedPrice,
             isClientPrice,
-            rate: rate ? {
-              id: rate.id,
-              name: rate.get('name'),
-              color: rate.get('color') || '#6c757d',
-            } : null,
-            vehicleType: vehicleType ? {
-              id: vehicleType.id,
-              name: vehicleType.get('name'),
-              defaultCapacity: vehicleType.get('defaultCapacity') || 4,
-              trunkCapacity: vehicleType.get('trunkCapacity') || 2,
-            } : null,
+            rate: rate
+              ? {
+                id: rate.id,
+                name: rate.get('name'),
+                color: rate.get('color') || '#6c757d',
+              }
+              : null,
+            vehicleType: vehicleType
+              ? {
+                id: vehicleType.id,
+                name: vehicleType.get('name'),
+                defaultCapacity: vehicleType.get('defaultCapacity') || 4,
+                trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+              }
+              : null,
           });
         }
       });
@@ -749,11 +771,13 @@ class ToursController {
         return {
           id: tour.id,
           objectId: tour.id,
-          destinationPOI: destinationPOI ? {
-            objectId: destinationPOI.id,
-            id: destinationPOI.id,
-            name: destinationPOI.get('name'),
-          } : null,
+          destinationPOI: destinationPOI
+            ? {
+              objectId: destinationPOI.id,
+              id: destinationPOI.id,
+              name: destinationPOI.get('name'),
+            }
+            : null,
           time: tour.get('time'),
           availability: tour.get('availability'),
           active: tour.get('active'),
@@ -846,17 +870,21 @@ class ToursController {
           id: tourPrice.id,
           price,
           formattedPrice,
-          rate: rate ? {
-            id: rate.id,
-            name: rate.get('name'),
-            color: rate.get('color') || '#6c757d',
-          } : null,
-          vehicleType: vehicleType ? {
-            id: vehicleType.id,
-            name: vehicleType.get('name'),
-            defaultCapacity: vehicleType.get('defaultCapacity') || 4,
-            trunkCapacity: vehicleType.get('trunkCapacity') || 2,
-          } : null,
+          rate: rate
+            ? {
+              id: rate.id,
+              name: rate.get('name'),
+              color: rate.get('color') || '#6c757d',
+            }
+            : null,
+          vehicleType: vehicleType
+            ? {
+              id: vehicleType.id,
+              name: vehicleType.get('name'),
+              defaultCapacity: vehicleType.get('defaultCapacity') || 4,
+              trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+            }
+            : null,
         };
       });
 
@@ -953,14 +981,18 @@ class ToursController {
       const allClientPrices = await clientPricesQuery.find({ useMasterKey: true });
 
       // Debug: Log all client prices and their itemIds
-      logger.info(`[getAllRatePricesForTourWithClientPrices] Found ${allClientPrices.length} total TOUR client prices for client ${clientId}`);
+      logger.info(
+        `[getAllRatePricesForTourWithClientPrices] Found ${allClientPrices.length} total TOUR client prices for client ${clientId}`
+      );
       allClientPrices.forEach((cp) => {
         logger.info(`ClientPrice ID: ${cp.id}, ItemId: "${cp.get('itemId')}", Looking for tourId: "${tourId}"`);
       });
 
       // Filter client prices for this specific tour
       const clientPrices = allClientPrices.filter((cp) => cp.get('itemId') === tourId);
-      logger.info(`[getAllRatePricesForTourWithClientPrices] After filtering for tour ${tourId}: ${clientPrices.length} prices found`);
+      logger.info(
+        `[getAllRatePricesForTourWithClientPrices] After filtering for tour ${tourId}: ${clientPrices.length} prices found`
+      );
 
       // Create a map of client prices for easy lookup
       const clientPriceMap = {};
@@ -997,18 +1029,22 @@ class ToursController {
           formattedPrice: `$${Math.round(finalPrice).toLocaleString()} MXN`,
           basePrice,
           isClientPrice: hasClientPrice,
-          rate: rate ? {
-            id: rate.id,
-            name: rate.get('name'),
-            color: rate.get('color') || '#6c757d',
-          } : null,
-          vehicleType: vehicleType ? {
-            id: vehicleType.id,
-            name: vehicleType.get('name'),
-            code: vehicleType.get('code') || '',
-            defaultCapacity: vehicleType.get('defaultCapacity') || 4,
-            trunkCapacity: vehicleType.get('trunkCapacity') || 2,
-          } : null,
+          rate: rate
+            ? {
+              id: rate.id,
+              name: rate.get('name'),
+              color: rate.get('color') || '#6c757d',
+            }
+            : null,
+          vehicleType: vehicleType
+            ? {
+              id: vehicleType.id,
+              name: vehicleType.get('name'),
+              code: vehicleType.get('code') || '',
+              defaultCapacity: vehicleType.get('defaultCapacity') || 4,
+              trunkCapacity: vehicleType.get('trunkCapacity') || 2,
+            }
+            : null,
         };
       });
 
@@ -1031,18 +1067,22 @@ class ToursController {
               formattedPrice: `$${Math.round(clientPriceValue).toLocaleString()} MXN`,
               basePrice: 0, // No base price since there's no TourPrice record
               isClientPrice: true,
-              rate: ratePtr ? {
-                id: ratePtr.id,
-                name: ratePtr.get('name'),
-                color: ratePtr.get('color') || '#6c757d',
-              } : null,
-              vehicleType: vehiclePtr ? {
-                id: vehiclePtr.id,
-                name: vehiclePtr.get('name'),
-                code: vehiclePtr.get('code') || '',
-                defaultCapacity: vehiclePtr.get('defaultCapacity') || 4,
-                trunkCapacity: vehiclePtr.get('trunkCapacity') || 2,
-              } : null,
+              rate: ratePtr
+                ? {
+                  id: ratePtr.id,
+                  name: ratePtr.get('name'),
+                  color: ratePtr.get('color') || '#6c757d',
+                }
+                : null,
+              vehicleType: vehiclePtr
+                ? {
+                  id: vehiclePtr.id,
+                  name: vehiclePtr.get('name'),
+                  code: vehiclePtr.get('code') || '',
+                  defaultCapacity: vehiclePtr.get('defaultCapacity') || 4,
+                  trunkCapacity: vehiclePtr.get('trunkCapacity') || 2,
+                }
+                : null,
             });
           }
         }

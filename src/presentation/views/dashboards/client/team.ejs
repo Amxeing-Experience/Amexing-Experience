@@ -27,6 +27,48 @@ const companyName = locals.companyName || 'Company';
   </div>
 </div>
 
+<!-- Client Information Section -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card border-0 shadow-sm" id="client-info-section">
+      <div class="card-header bg-dark text-white">
+        <div>
+          <h5 class="card-title mb-1 text-white">
+            <i class="ti ti-user me-2"></i>Datos del Representante
+          </h5>
+          <p class="text-white-50 mb-0">Información del agente representante</p>
+        </div>
+      </div>
+      
+      <div class="card-body">
+        <!-- Loading state -->
+        <div id="client-info-loading" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando información...</span>
+          </div>
+          <p class="text-muted mt-2">Cargando información del representante...</p>
+        </div>
+        
+        <!-- Client info container -->
+        <div id="client-info-container" class="d-none">
+          <!-- Info will be populated here via JavaScript -->
+        </div>
+        
+        <!-- Error state -->
+        <div id="client-info-error" class="text-center py-4 d-none">
+          <div class="text-danger">
+            <i class="ti ti-alert-circle" style="font-size: 2rem; opacity: 0.3;"></i>
+            <p class="mt-2 mb-2">Error al cargar información del representante</p>
+            <button class="btn btn-outline-primary btn-sm" onclick="loadClientInfo()">
+              <i class="ti ti-reload me-1"></i>Reintentar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Team Management Section -->
 <div class="row">
   <div class="col-12">
@@ -34,7 +76,6 @@ const companyName = locals.companyName || 'Company';
       <div class="card-body">
         <div class="mb-4">
           <h4 class="card-title fw-semibold">Team Members</h4>
-          <p class="card-subtitle mb-0">Manage your company's team members</p>
         </div>
 
         <!-- Include Employees DataTable -->
@@ -44,6 +85,7 @@ const companyName = locals.companyName || 'Company';
           userRole: 'client',
           showActions: true,
           clientId: clientId,
+          currentUserId: currentUserId,
           accessToken: locals.accessToken || ''
         }) %>
       </div>
@@ -134,6 +176,9 @@ const companyName = locals.companyName || 'Company';
 <script>
     // Initialize all modal functionality when DOM is ready
     document.addEventListener('DOMContentLoaded', function() {
+      // Display static client information
+      displayStaticRepresentativeInfo();
+      
       // Add save button event listener
       const saveBtn = document.getElementById('saveTeamMemberBtn');
       if (saveBtn) {
@@ -349,5 +394,132 @@ const companyName = locals.companyName || 'Company';
         modalContainer.style.display = 'none';
         modalContainer.innerHTML = '';
       }, 5000);
+    }
+
+    // Function to display static representative information
+    // Function to load department manager information (server-side data)
+    function loadClientInfo() {
+      const loadingEl = document.getElementById('client-info-loading');
+      const containerEl = document.getElementById('client-info-container');
+      const errorEl = document.getElementById('client-info-error');
+      
+      // Hide loading and error states
+      loadingEl.classList.add('d-none');
+      errorEl.classList.add('d-none');
+      
+      // Get contextual data passed from server
+      const contextualData = <%-JSON.stringify(locals.contextualData || {}) %>;
+      console.log('🔍 Contextual Data:', contextualData);
+      
+      const departmentManager = contextualData.departmentManager || <%-JSON.stringify(locals.departmentManager || null) %>;
+      
+      if (departmentManager) {
+        displayRepresentativeInfo(departmentManager);
+      } else {
+        // Show fallback information for debugging
+        console.log('🔍 No department manager data, showing fallback');
+        const fallbackManager = {
+          objectId: contextualData.clientId || '<%= clientId || "unknown" %>',
+          firstName: 'Gerente',
+          lastName: 'de Departamento',
+          email: 'gerente@empresa.com',
+          phone: 'No especificado',
+          role: 'department_manager',
+          active: true,
+          companyName: contextualData.companyName || '<%= locals.companyName || "Mi Empresa" %>'
+        };
+        displayRepresentativeInfo(fallbackManager);
+      }
+    }
+
+    function displayStaticRepresentativeInfo() {
+      // Call the new async function instead
+      loadClientInfo();
+    }
+
+    function displayRepresentativeInfo(departmentManager) {
+      const loadingEl = document.getElementById('client-info-loading');
+      const containerEl = document.getElementById('client-info-container');
+      const errorEl = document.getElementById('client-info-error');
+      
+      // Hide loading and error states
+      loadingEl.classList.add('d-none');
+      errorEl.classList.add('d-none');
+      
+      // Get company name from contextual data, locals, or department manager data
+      const contextualData = <%-JSON.stringify(locals.contextualData || {}) %>;
+      const companyName = contextualData.companyName || '<%= locals.companyName || "" %>' || departmentManager.companyName || departmentManager.company || 'Mi Empresa';
+      
+      // Extract department manager information
+      const userEmail = departmentManager.email || departmentManager.username || '';
+      const userId = departmentManager.objectId || departmentManager.id || '';
+      const userRole = departmentManager.role || 'department_manager';
+      const isActive = departmentManager.active !== undefined ? departmentManager.active : true;
+      const firstName = departmentManager.firstName || '';
+      const lastName = departmentManager.lastName || '';
+      const phone = departmentManager.phone || 'No especificado';
+      
+      // Parse name from email if firstName/lastName not available
+      const emailParts = (!firstName && userEmail.includes('@')) ? userEmail.split('@')[0] : '';
+      const userFirstName = firstName || emailParts || 'Gerente';
+      const userLastName = lastName || '';
+      
+      console.log('Department Manager Data:', {
+        userEmail, userId, userFirstName, userLastName, phone, isActive, companyName
+      });
+      
+      const today = new Date().toLocaleDateString('es-ES', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      
+      // Format user name
+      const displayName = userFirstName && userLastName ? `${userFirstName} ${userLastName}` : userFirstName || 'Gerente';
+      
+      const infoHtml = `
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label text-muted small">Nombre</label>
+            <p class="fw-semibold mb-0">${displayName}</p>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label text-muted small">Email</label>
+            <p class="mb-0">
+              <a href="mailto:${userEmail}"><i class="ti ti-mail me-1"></i>${userEmail}</a>
+            </p>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label text-muted small">Teléfono</label>
+            <p class="mb-0">
+              <i class="ti ti-phone me-1"></i>${phone}
+            </p>
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label text-muted small">Nombre de la Empresa</label>
+            <p class="fw-semibold mb-0">${companyName}</p>
+          </div>
+        </div>
+      `;
+      
+      containerEl.innerHTML = infoHtml;
+      containerEl.classList.remove('d-none');
+    }
+
+    // Function to show error state
+    function showClientInfoError(errorMessage = 'Error al cargar información del representante') {
+      const loadingEl = document.getElementById('client-info-loading');
+      const containerEl = document.getElementById('client-info-container');
+      const errorEl = document.getElementById('client-info-error');
+      
+      loadingEl.classList.add('d-none');
+      containerEl.classList.add('d-none');
+      errorEl.classList.remove('d-none');
+      
+      // Update error message if different from default
+      const errorText = errorEl.querySelector('p');
+      if (errorText && errorMessage !== 'Error al cargar información del representante') {
+        errorText.textContent = errorMessage;
+      }
     }
 </script>

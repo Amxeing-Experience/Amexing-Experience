@@ -73,7 +73,10 @@ class PDFReceiptService {
       const doc = new PDFDocument({
         size: 'A4',
         margins: {
-          top: 40, bottom: 40, left: 50, right: 50,
+          top: 40,
+          bottom: 40,
+          left: 50,
+          right: 50,
         },
       });
 
@@ -140,12 +143,11 @@ class PDFReceiptService {
     const margin = doc.page.margins.left;
 
     // Header background (light gray) - reduced height
-    doc.fillColor('#f8f9fa')
-      .rect(0, 0, pageWidth, 60)
-      .fill();
+    doc.fillColor('#f8f9fa').rect(0, 0, pageWidth, 60).fill();
 
     // Company name and invoice title - smaller font
-    doc.fillColor('#333333')
+    doc
+      .fillColor('#333333')
       .font('Helvetica-Bold')
       .fontSize(12)
       .text('TAXINVOICE-AMEXING', margin, 20, { align: 'left' });
@@ -162,8 +164,7 @@ class PDFReceiptService {
       hour12: false,
     });
 
-    doc.fontSize(10)
-      .text(`${currentDate}, ${currentTime}`, margin, 20, { align: 'right' });
+    doc.fontSize(10).text(`${currentDate}, ${currentTime}`, margin, 20, { align: 'right' });
 
     // Reset position after header - reduced spacing
     doc.y = 75;
@@ -199,31 +200,22 @@ class PDFReceiptService {
         leftY += logoHeight + 20;
       } else {
         // Fallback to text if logo not found - bigger
-        doc.fillColor('#333333')
-          .fontSize(28)
-          .text('AMEXING', leftColumnX, leftY, { width: 140, align: 'left' });
+        doc.fillColor('#333333').fontSize(28).text('AMEXING', leftColumnX, leftY, { width: 140, align: 'left' });
         leftY += 30;
-        doc.fontSize(14)
-          .text('E X P E R I E N C E', leftColumnX, leftY, { width: 140, align: 'left' });
+        doc.fontSize(14).text('E X P E R I E N C E', leftColumnX, leftY, { width: 140, align: 'left' });
         leftY += 30;
       }
     } catch (error) {
       // Fallback to text if logo loading fails - bigger
       logger.warn('Failed to load logo, using text fallback', { error: error.message });
-      doc.fillColor('#333333')
-        .fontSize(28)
-        .text('AMEXING', leftColumnX, leftY, { width: 140, align: 'left' });
+      doc.fillColor('#333333').fontSize(28).text('AMEXING', leftColumnX, leftY, { width: 140, align: 'left' });
       leftY += 30;
-      doc.fontSize(14)
-        .text('E X P E R I E N C E', leftColumnX, leftY, { width: 140, align: 'left' });
+      doc.fontSize(14).text('E X P E R I E N C E', leftColumnX, leftY, { width: 140, align: 'left' });
       leftY += 30;
     }
 
     // Add client information below the logo on the left
-    doc.font('Helvetica')
-      .fontSize(10)
-      .fillColor('#666666')
-      .text('ISSUED TO:', leftColumnX, leftY, { width: 200 });
+    doc.font('Helvetica').fontSize(10).fillColor('#666666').text('ISSUED TO:', leftColumnX, leftY, { width: 200 });
     leftY += 15;
 
     // Determine display name: firstName + lastName, or just email if both names are empty
@@ -237,50 +229,47 @@ class PDFReceiptService {
       displayName = 'N/A';
     }
 
-    doc.font('Helvetica-Bold')
-      .fontSize(12)
-      .fillColor('#333333')
-      .text(displayName, leftColumnX, leftY);
+    doc.font('Helvetica-Bold').fontSize(12).fillColor('#333333').text(displayName, leftColumnX, leftY);
     leftY += 15;
 
     if (client.phone) {
-      doc.font('Helvetica')
-        .fontSize(10)
-        .fillColor('#333333')
-        .text(client.phone, leftColumnX, leftY);
+      doc.font('Helvetica').fontSize(10).fillColor('#333333').text(client.phone, leftColumnX, leftY);
       leftY += 12;
     }
 
     if (client.email) {
-      doc.fontSize(10)
-        .text(client.email, leftColumnX, leftY);
+      doc.fontSize(10).text(client.email, leftColumnX, leftY);
       leftY += 12;
     }
 
     // Right side - All invoice information
     let rightY = startY;
     // Invoice title
-    doc.fillColor('#333333')
+    doc
+      .fillColor('#333333')
       .fontSize(32)
       .font('Helvetica-Bold')
       .text('INVOICE', rightColumnX, rightY, { width: 200, align: 'right' });
     rightY += 40;
 
     // Invoice number
-    doc.font('Helvetica')
+    doc
+      .font('Helvetica')
       .fontSize(10)
       .fillColor('#666666')
       .text('INVOICE NO.', rightColumnX, rightY, { width: 200, align: 'right' });
     rightY += 12;
 
-    doc.font('Helvetica-Bold')
+    doc
+      .font('Helvetica-Bold')
       .fontSize(14)
       .fillColor('#333333')
       .text(quote.folio.replace('QTE-', ''), rightColumnX, rightY, { width: 200, align: 'right' });
     rightY += 20;
 
     // Invoice date
-    doc.font('Helvetica')
+    doc
+      .font('Helvetica')
       .fontSize(10)
       .fillColor('#666666')
       .text('DATE:', rightColumnX, rightY, { width: 200, align: 'right' });
@@ -291,7 +280,8 @@ class PDFReceiptService {
       day: '2-digit',
       year: 'numeric',
     });
-    doc.font('Helvetica-Bold')
+    doc
+      .font('Helvetica-Bold')
       .fontSize(14)
       .fillColor('#333333')
       .text(invoiceDate, rightColumnX, rightY, { width: 200, align: 'right' });
@@ -312,23 +302,22 @@ class PDFReceiptService {
   addServiceItems(doc, serviceItems) {
     const margin = doc.page.margins.left;
     const pageWidth = doc.page.width;
-    const tableWidth = pageWidth - (margin * 2);
+    const tableWidth = pageWidth - margin * 2;
 
     // Table header - smaller font and spacing
     const headerY = doc.y; // Store the Y position for both headers
-    doc.font('Helvetica-Bold')
-      .fontSize(10)
-      .fillColor('#333333');
+    doc.font('Helvetica-Bold').fontSize(10).fillColor('#333333');
 
     // Left header: DESCRIPTION
     doc.text('DESCRIPTION', margin, headerY, { width: tableWidth * 0.7 });
 
     // Right header: TOTAL (positioned at same Y)
-    doc.text('TOTAL', margin + (tableWidth * 0.7), headerY, { width: tableWidth * 0.3, align: 'right' });
+    doc.text('TOTAL', margin + tableWidth * 0.7, headerY, { width: tableWidth * 0.3, align: 'right' });
 
     // Header line - reduced spacing
     doc.y += 15;
-    doc.strokeColor('#cccccc')
+    doc
+      .strokeColor('#cccccc')
       .lineWidth(1)
       .moveTo(margin, doc.y)
       .lineTo(margin + tableWidth, doc.y)
@@ -350,10 +339,21 @@ class PDFReceiptService {
       if (item.dayNumber) {
         const date = new Date();
         date.setDate(date.getDate() + (item.dayNumber - 1));
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-          'July', 'August', 'September', 'October', 'November', 'December'];
-        description += `${monthNames[date.getMonth()]} ${date.getDate()}`
-          + `${this.getOrdinalSuffix(date.getDate())}\n`;
+        const monthNames = [
+          'January',
+          'February',
+          'March',
+          'April',
+          'May',
+          'June',
+          'July',
+          'August',
+          'September',
+          'October',
+          'November',
+          'December',
+        ];
+        description += `${monthNames[date.getMonth()]} ${date.getDate()}${this.getOrdinalSuffix(date.getDate())}\n`;
       }
 
       if (item.concept) {
@@ -371,7 +371,8 @@ class PDFReceiptService {
       }
 
       // Add description text and capture the Y position after it's rendered
-      doc.font('Helvetica')
+      doc
+        .font('Helvetica')
         .fontSize(9)
         .fillColor('#333333')
         .text(description, margin, startY, { width: tableWidth * 0.7 });
@@ -386,9 +387,10 @@ class PDFReceiptService {
 
       // Price - positioned to align with the last line of the description
       const price = `$ ${this.formatCurrency(item.total || 0)} MXN`;
-      doc.fontSize(9)
+      doc
+        .fontSize(9)
         .fillColor('#333333')
-        .text(price, margin + (tableWidth * 0.7), priceY, { width: tableWidth * 0.3, align: 'right' });
+        .text(price, margin + tableWidth * 0.7, priceY, { width: tableWidth * 0.3, align: 'right' });
 
       // Ensure consistent spacing between items - use the description end position
       doc.y = descriptionEndY + 5;
@@ -396,7 +398,8 @@ class PDFReceiptService {
 
     // Add note if there are more items
     if (hasMoreItems) {
-      doc.font('Helvetica')
+      doc
+        .font('Helvetica')
         .fontSize(8)
         .fillColor('#666666')
         .text(`... and ${serviceItems.length - maxItems} more item(s)`, margin, doc.y);
@@ -415,14 +418,15 @@ class PDFReceiptService {
   addTotals(doc, totals) {
     const margin = doc.page.margins.left;
     const pageWidth = doc.page.width;
-    const tableWidth = pageWidth - (margin * 2);
+    const tableWidth = pageWidth - margin * 2;
 
     // Totals table
-    const totalsX = margin + (tableWidth * 0.6);
+    const totalsX = margin + tableWidth * 0.6;
     const totalsWidth = tableWidth * 0.4;
 
     // Separator line
-    doc.strokeColor('#cccccc')
+    doc
+      .strokeColor('#cccccc')
       .lineWidth(1)
       .moveTo(totalsX, doc.y)
       .lineTo(margin + tableWidth, doc.y)
@@ -431,39 +435,35 @@ class PDFReceiptService {
     doc.y += 10;
 
     // Subtotal - smaller font and spacing
-    doc.font('Helvetica')
+    doc
+      .font('Helvetica')
       .fontSize(10)
       // .text('SUBTOTAL', totalsX, doc.y)
-      .text(
-        `SUBTOTAL  $ ${this.formatCurrency(totals.subtotal || 0)} MXN`,
-        totalsX,
-        doc.y,
-        { width: totalsWidth, align: 'right' }
-      );
+      .text(`SUBTOTAL  $ ${this.formatCurrency(totals.subtotal || 0)} MXN`, totalsX, doc.y, {
+        width: totalsWidth,
+        align: 'right',
+      });
 
     doc.y += 15;
 
     // Taxes
-    doc// .text('TAXES', totalsX, doc.y)
-      .text(
-        `TAXES  $ ${this.formatCurrency(totals.iva || 0)} MXN`,
-        totalsX,
-        doc.y,
-        { width: totalsWidth, align: 'right' }
-      );
+    doc // .text('TAXES', totalsX, doc.y)
+      .text(`TAXES  $ ${this.formatCurrency(totals.iva || 0)} MXN`, totalsX, doc.y, {
+        width: totalsWidth,
+        align: 'right',
+      });
 
     doc.y += 15;
 
     // Total
-    doc.font('Helvetica-Bold')
+    doc
+      .font('Helvetica-Bold')
       .fontSize(11)
       // .text('TOTAL', totalsX, doc.y)
-      .text(
-        `TOTAL  $ ${this.formatCurrency(totals.total || 0)} MXN`,
-        totalsX,
-        doc.y,
-        { width: totalsWidth, align: 'right' }
-      );
+      .text(`TOTAL  $ ${this.formatCurrency(totals.total || 0)} MXN`, totalsX, doc.y, {
+        width: totalsWidth,
+        align: 'right',
+      });
 
     doc.y += 25;
   }
@@ -480,18 +480,14 @@ class PDFReceiptService {
     // Use selected payment info if provided, otherwise use default
     const paymentInfo = selectedPaymentInfo || this.paymentInfo;
 
-    doc.font('Helvetica-Bold')
-      .fontSize(10)
-      .text('PAYMENT INFO:', margin, doc.y);
+    doc.font('Helvetica-Bold').fontSize(10).text('PAYMENT INFO:', margin, doc.y);
 
     doc.y += 15;
 
     // Store starting Y position for payment info
     let currentY = doc.y;
 
-    doc.font('Helvetica')
-      .fontSize(8)
-      .fillColor('#333333');
+    doc.font('Helvetica').fontSize(8).fillColor('#333333');
 
     // Add payment info lines with consistent spacing
     if (paymentInfo.bank) {
@@ -536,12 +532,10 @@ class PDFReceiptService {
 
     // Zelle info
     if (paymentInfo.zelle) {
-      doc.font('Helvetica-Bold')
-        .fontSize(12)
-        .fillColor('#6c5ce7')
-        .text('Zelle', rightColumnX, rightColumnY);
+      doc.font('Helvetica-Bold').fontSize(12).fillColor('#6c5ce7').text('Zelle', rightColumnX, rightColumnY);
 
-      doc.fillColor('#333333')
+      doc
+        .fillColor('#333333')
         .font('Helvetica')
         .fontSize(8)
         .text(paymentInfo.zelle, rightColumnX, rightColumnY + 15);
@@ -552,12 +546,10 @@ class PDFReceiptService {
 
     // PayPal info
     if (paymentInfo.paypal) {
-      doc.font('Helvetica-Bold')
-        .fontSize(12)
-        .fillColor('#003087')
-        .text('PayPal', rightColumnX, rightColumnY);
+      doc.font('Helvetica-Bold').fontSize(12).fillColor('#003087').text('PayPal', rightColumnX, rightColumnY);
 
-      doc.fillColor('#333333')
+      doc
+        .fillColor('#333333')
         .font('Helvetica')
         .fontSize(8)
         .text(paymentInfo.paypal, rightColumnX, rightColumnY + 15);
@@ -568,12 +560,10 @@ class PDFReceiptService {
 
     // Venmo info
     if (paymentInfo.venmo) {
-      doc.font('Helvetica-Bold')
-        .fontSize(12)
-        .fillColor('#008cff')
-        .text('Venmo', rightColumnX, rightColumnY);
+      doc.font('Helvetica-Bold').fontSize(12).fillColor('#008cff').text('Venmo', rightColumnX, rightColumnY);
 
-      doc.fillColor('#333333')
+      doc
+        .fillColor('#333333')
         .font('Helvetica')
         .fontSize(8)
         .text(paymentInfo.venmo, rightColumnX, rightColumnY + 15);
@@ -585,12 +575,10 @@ class PDFReceiptService {
     // Add notes if present
     if (paymentInfo.notes) {
       const notesY = Math.max(currentY, rightColumnY) + 10;
-      doc.font('Helvetica-Bold')
-        .fontSize(9)
-        .fillColor('#666666')
-        .text('Notes:', margin, notesY);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#666666').text('Notes:', margin, notesY);
 
-      doc.font('Helvetica')
+      doc
+        .font('Helvetica')
         .fontSize(8)
         .fillColor('#333333')
         .text(paymentInfo.notes, margin, notesY + 12, { width: 400 });
@@ -614,17 +602,19 @@ class PDFReceiptService {
     const pageWidth = doc.page.width;
 
     // Thank you message - smaller
-    doc.font('Helvetica-Bold')
+    doc
+      .font('Helvetica-Bold')
       .fontSize(10)
       .fillColor('#333333')
-      .text('THANK YOU FOR YOUR PREFERENCE!', margin, doc.y, { width: pageWidth - (margin * 2), align: 'center' });
+      .text('THANK YOU FOR YOUR PREFERENCE!', margin, doc.y, { width: pageWidth - margin * 2, align: 'center' });
 
     doc.y += 15;
 
     // Website - smaller
-    doc.font('Helvetica')
+    doc
+      .font('Helvetica')
       .fontSize(8)
-      .text(this.companyWebsite, margin, doc.y, { width: pageWidth - (margin * 2), align: 'center' });
+      .text(this.companyWebsite, margin, doc.y, { width: pageWidth - margin * 2, align: 'center' });
   }
 
   /**
@@ -649,10 +639,14 @@ class PDFReceiptService {
   getOrdinalSuffix(day) {
     if (day >= 11 && day <= 13) return 'th';
     switch (day % 10) {
-      case 1: return 'st';
-      case 2: return 'nd';
-      case 3: return 'rd';
-      default: return 'th';
+      case 1:
+        return 'st';
+      case 2:
+        return 'nd';
+      case 3:
+        return 'rd';
+      default:
+        return 'th';
     }
   }
 }

@@ -249,12 +249,14 @@ class QuoteServicesState {
    * state.reset(true); // Reset but keep quote ID/data
    */
   reset(keepQuoteData = false) {
-    const preservedState = keepQuoteData ? {
-      quoteId: this.state.quoteId,
-      quoteData: this.state.quoteData,
-      rateId: this.state.rateId,
-      rateName: this.state.rateName,
-    } : {};
+    const preservedState = keepQuoteData
+      ? {
+        quoteId: this.state.quoteId,
+        quoteData: this.state.quoteData,
+        rateId: this.state.rateId,
+        rateName: this.state.rateName,
+      }
+      : {};
 
     this.state = {
       quoteId: null,
@@ -287,10 +289,13 @@ class QuoteServicesState {
    * state.markAsSaved();
    */
   markAsSaved() {
-    this.setMultiple({
-      hasUnsavedChanges: false,
-      lastSaved: new Date().toISOString(),
-    }, true); // Silent to avoid notifications
+    this.setMultiple(
+      {
+        hasUnsavedChanges: false,
+        lastSaved: new Date().toISOString(),
+      },
+      true
+    ); // Silent to avoid notifications
   }
 
   /**

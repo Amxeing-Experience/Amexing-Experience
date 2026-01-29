@@ -55,13 +55,7 @@ function sanitizeValue(value, replaceWith, onSanitize, req, path = []) {
           }
         }
 
-        sanitized[sanitizedKey] = sanitizeValue(
-          value[key],
-          replaceWith,
-          onSanitize,
-          req,
-          [...path, sanitizedKey]
-        );
+        sanitized[sanitizedKey] = sanitizeValue(value[key], replaceWith, onSanitize, req, [...path, sanitizedKey]);
       }
     }
 

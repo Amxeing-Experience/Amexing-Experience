@@ -64,11 +64,13 @@ class PriceAdjustmentsController {
           effectiveDate: adjustment.getEffectiveDate(),
           note: adjustment.getNote(),
           active: adjustment.get('active'),
-          createdBy: createdBy ? {
-            id: createdBy.id,
-            username: createdBy.get('username') || createdBy.get('email'),
-            email: createdBy.get('email'),
-          } : null,
+          createdBy: createdBy
+            ? {
+              id: createdBy.id,
+              username: createdBy.get('username') || createdBy.get('email'),
+              email: createdBy.get('email'),
+            }
+            : null,
           createdAt: adjustment.get('createdAt'),
         };
       });
@@ -145,11 +147,13 @@ class PriceAdjustmentsController {
         effectiveDate: adjustment.getEffectiveDate(),
         note: adjustment.getNote(),
         active: adjustment.get('active'),
-        createdBy: createdBy ? {
-          id: createdBy.id,
-          username: createdBy.get('username') || createdBy.get('email'),
-          email: createdBy.get('email'),
-        } : null,
+        createdBy: createdBy
+          ? {
+            id: createdBy.id,
+            username: createdBy.get('username') || createdBy.get('email'),
+            email: createdBy.get('email'),
+          }
+          : null,
         createdAt: adjustment.get('createdAt'),
         updatedAt: adjustment.get('updatedAt'),
       };
@@ -314,11 +318,13 @@ class PriceAdjustmentsController {
             effectiveDate: adjustment.getEffectiveDate(),
             note: adjustment.getNote(),
             active: adjustment.get('active'),
-            createdBy: createdBy ? {
-              id: createdBy.id,
-              username: createdBy.get('username') || createdBy.get('email'),
-              email: createdBy.get('email'),
-            } : null,
+            createdBy: createdBy
+              ? {
+                id: createdBy.id,
+                username: createdBy.get('username') || createdBy.get('email'),
+                email: createdBy.get('email'),
+              }
+              : null,
             createdAt: adjustment.get('createdAt'),
             updatedAt: adjustment.get('updatedAt'),
           };

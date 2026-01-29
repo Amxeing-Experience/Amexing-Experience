@@ -120,9 +120,7 @@ function createQuoteServicesAPI(options = {}) {
    * // Only returns experiences available on Christmas (backend filtered)
    */
   async function getExperiences(type = 'Experience', dayDate = null) {
-    const cacheKey = dayDate
-      ? `experiences_${type}_day_${dayDate}`
-      : `experiences_${type}_all`;
+    const cacheKey = dayDate ? `experiences_${type}_day_${dayDate}` : `experiences_${type}_all`;
 
     return cache.getOrSet(cacheKey, async () => {
       console.log(`[QuoteServicesAPI] Fetching experiences (type=${type}, dayDate=${dayDate || 'all'})...`);
@@ -148,9 +146,7 @@ function createQuoteServicesAPI(options = {}) {
    * // Returns only destinations with tours available on that day
    */
   async function getTourDestinations(rateId, dayDate = null) {
-    const cacheKey = dayDate
-      ? `tour_destinations_${rateId}_day_${dayDate}`
-      : `tour_destinations_${rateId}_all`;
+    const cacheKey = dayDate ? `tour_destinations_${rateId}_day_${dayDate}` : `tour_destinations_${rateId}_all`;
 
     return cache.getOrSet(cacheKey, async () => {
       console.log(`[QuoteServicesAPI] Fetching tour destinations (rate=${rateId}, dayDate=${dayDate || 'all'})...`);
@@ -183,7 +179,9 @@ function createQuoteServicesAPI(options = {}) {
     const cacheKey = `tour_vehicles_${rateId}_${destinationId}_people_${numberOfPeople || 0}_day_${dayDate || 'all'}`;
 
     return cache.getOrSet(cacheKey, async () => {
-      console.log(`[QuoteServicesAPI] Fetching tour vehicles (rate=${rateId}, dest=${destinationId}, people=${numberOfPeople}, day=${dayDate || 'all'})...`);
+      console.log(
+        `[QuoteServicesAPI] Fetching tour vehicles (rate=${rateId}, dest=${destinationId}, people=${numberOfPeople}, day=${dayDate || 'all'})...`
+      );
 
       let url = `/api/quotes/tours/vehicles-by-rate-destination/${rateId}/${destinationId}`;
       const params = [];

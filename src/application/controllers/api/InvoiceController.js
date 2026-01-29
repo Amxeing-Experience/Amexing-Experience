@@ -201,17 +201,21 @@ class InvoiceController {
           contactPhone: quote?.get('contactPhone'),
           contactEmail: quote?.get('contactEmail'),
           serviceItems: quote?.get('serviceItems') || {},
-          client: quote?.get('client') ? {
-            id: quote.get('client').id,
-            fullName: quote.get('client').get('fullName'),
-            email: quote.get('client').get('email'),
-            companyName: quote.get('client').get('companyName'),
-          } : null,
-          rate: quote?.get('rate') ? {
-            id: quote.get('rate').id,
-            name: quote.get('rate').get('name'),
-            color: quote.get('rate').get('color'),
-          } : null,
+          client: quote?.get('client')
+            ? {
+              id: quote.get('client').id,
+              fullName: quote.get('client').get('fullName'),
+              email: quote.get('client').get('email'),
+              companyName: quote.get('client').get('companyName'),
+            }
+            : null,
+          rate: quote?.get('rate')
+            ? {
+              id: quote.get('rate').id,
+              name: quote.get('rate').get('name'),
+              color: quote.get('rate').get('color'),
+            }
+            : null,
         },
         requestedBy: {
           id: requestedBy?.id,
@@ -219,12 +223,14 @@ class InvoiceController {
           email: requestedBy?.get('email') || '',
           role: requestedBy?.get('role') || '',
         },
-        processedBy: processedBy ? {
-          id: processedBy.id,
-          fullName: processedBy.get('fullName') || processedBy.get('email') || 'N/A',
-          email: processedBy.get('email') || '',
-          role: processedBy.get('role') || '',
-        } : null,
+        processedBy: processedBy
+          ? {
+            id: processedBy.id,
+            fullName: processedBy.get('fullName') || processedBy.get('email') || 'N/A',
+            email: processedBy.get('email') || '',
+            role: processedBy.get('role') || '',
+          }
+          : null,
         createdAt: invoice.get('createdAt'),
         updatedAt: invoice.get('updatedAt'),
       };
@@ -476,7 +482,11 @@ class InvoiceController {
 
       const fileExtension = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
       if (!allowedExtensions[fileType].includes(fileExtension)) {
-        return this.sendError(res, `Archivo ${fileType.toUpperCase()} debe tener extensión ${allowedExtensions[fileType].join(' o ')}`, 400);
+        return this.sendError(
+          res,
+          `Archivo ${fileType.toUpperCase()} debe tener extensión ${allowedExtensions[fileType].join(' o ')}`,
+          400
+        );
       }
 
       // Find the invoice
@@ -510,21 +520,16 @@ class InvoiceController {
           });
 
           // Upload file to S3
-          uploadResult = await fileStorageService.uploadFile(
-            file.buffer,
-            uniqueFilename,
-            file.mimetype,
-            {
-              entityId: invoiceId,
-              metadata: {
-                invoiceId,
-                fileType,
-                originalName: file.originalname,
-                uploadedBy: currentUser.id,
-                uploadedAt: new Date().toISOString(),
-              },
-            }
-          );
+          uploadResult = await fileStorageService.uploadFile(file.buffer, uniqueFilename, file.mimetype, {
+            entityId: invoiceId,
+            metadata: {
+              invoiceId,
+              fileType,
+              originalName: file.originalname,
+              uploadedBy: currentUser.id,
+              uploadedAt: new Date().toISOString(),
+            },
+          });
 
           storageMethod = 's3';
 

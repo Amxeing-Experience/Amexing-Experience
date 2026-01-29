@@ -219,7 +219,11 @@ class ClientsController {
       // Validate password complexity (at least one uppercase, one lowercase, one number, one special character)
       const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{12,}$/;
       if (!passwordRegex.test(password)) {
-        return this.sendError(res, 'La contraseña debe incluir al menos una mayúscula, una minúscula, un número y un carácter especial', 400);
+        return this.sendError(
+          res,
+          'La contraseña debe incluir al menos una mayúscula, una minúscula, un número y un carácter especial',
+          400
+        );
       }
 
       // Generate username from email (lowercase)
@@ -353,8 +357,12 @@ class ClientsController {
       }
 
       // Handle contextualData fields
-      if (updateData.companyName !== undefined || updateData.taxId !== undefined
-          || updateData.website !== undefined || updateData.notes !== undefined) {
+      if (
+        updateData.companyName !== undefined
+        || updateData.taxId !== undefined
+        || updateData.website !== undefined
+        || updateData.notes !== undefined
+      ) {
         // Get the existing user to preserve existing contextualData
         const Parse = require('parse/node');
         const query = new Parse.Query('AmexingUser');
@@ -363,18 +371,11 @@ class ClientsController {
 
         preparedUpdateData.contextualData = {
           ...existingContextualData,
-          companyName: updateData.companyName !== undefined
-            ? updateData.companyName
-            : existingContextualData.companyName,
-          taxId: updateData.taxId !== undefined
-            ? updateData.taxId
-            : existingContextualData.taxId,
-          website: updateData.website !== undefined
-            ? updateData.website
-            : existingContextualData.website,
-          notes: updateData.notes !== undefined
-            ? updateData.notes
-            : existingContextualData.notes,
+          companyName:
+            updateData.companyName !== undefined ? updateData.companyName : existingContextualData.companyName,
+          taxId: updateData.taxId !== undefined ? updateData.taxId : existingContextualData.taxId,
+          website: updateData.website !== undefined ? updateData.website : existingContextualData.website,
+          notes: updateData.notes !== undefined ? updateData.notes : existingContextualData.notes,
         };
 
         // Remove individual fields that are now in contextualData

@@ -632,6 +632,15 @@ class AdminController extends RoleBasedController {
     }
   }
 
+  /**
+   * Display quotes management dashboard.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} Renders quotes management view.
+   * @author Denisse Maldonado
+   * @since 1.0.0
+   * @example
+   */
   async quotes(req, res) {
     try {
       await this.renderRoleView(req, res, 'quotes', {
@@ -1130,7 +1139,7 @@ class AdminController extends RoleBasedController {
       if (!currentExchangeRate) {
         try {
           currentExchangeRate = await ExchangeRate.createExchangeRate({
-            value: 18.50,
+            value: 18.5,
             description: 'Tipo de cambio inicial del sistema (USD a MXN)',
             createdBy: null,
           });
@@ -1139,7 +1148,7 @@ class AdminController extends RoleBasedController {
         }
       }
 
-      const exchangeValue = currentExchangeRate ? currentExchangeRate.get('value') : 18.50;
+      const exchangeValue = currentExchangeRate ? currentExchangeRate.get('value') : 18.5;
       const inflationValue = currentInflationRate ? currentInflationRate.get('value') : 5.25;
       const agencyValue = currentAgencyRate ? currentAgencyRate.get('value') : 15.0;
       const transferValue = currentTransferRate ? currentTransferRate.get('value') : 3.0;
@@ -1182,6 +1191,61 @@ class AdminController extends RoleBasedController {
           <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
           <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
         `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Forms builder page.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   * @example
+   */
+  async forms(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'forms', {
+        title: 'Gestión de Formularios',
+        breadcrumb: null,
+        pageStyles: ['https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.css'],
+        footerScripts: `
+          <!-- SortableJS for drag and drop -->
+          <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Form preview page.
+   * Test runtime rendering of forms.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @example
+   * // Usage example
+   * const result = await formPreview(parameters);
+   * // Returns: operation result
+   * // controller.methodName(req, res)
+   * // Handles HTTP request and sends appropriate response
+   * // Example usage:
+   * // const result = await methodName(params);
+   * // console.log(result);
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   */
+  async formPreview(req, res) {
+    try {
+      const requestedFormId = req.query.formId || 'experience';
+
+      await this.renderRoleView(req, res, 'form-preview', {
+        title: 'Vista Previa del Formulario',
+        breadcrumb: null,
+        requestedFormId,
+        pageStyles: [],
+        footerScripts: '',
       });
     } catch (error) {
       this.handleError(res, error);

@@ -283,7 +283,11 @@ class AuditLogController {
     logs.forEach((log) => {
       const entityType = log.get('entityType');
       // Validate that entityType is a safe string and not a prototype property
-      if (typeof entityType === 'string' && entityType && !['__proto__', 'constructor', 'prototype'].includes(entityType)) {
+      if (
+        typeof entityType === 'string'
+        && entityType
+        && !['__proto__', 'constructor', 'prototype'].includes(entityType)
+      ) {
         breakdown[entityType] = (breakdown[entityType] || 0) + 1;
       }
     });

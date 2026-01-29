@@ -156,6 +156,16 @@ class AmexingUser extends BaseModel {
     // Contextual data for permissions
     user.set('contextualData', userData.contextualData || {});
 
+    // Contact information
+    if (userData.phone) {
+      user.set('phone', userData.phone);
+    }
+
+    // Additional information
+    if (userData.notes) {
+      user.set('notes', userData.notes);
+    }
+
     // Audit fields - Handle both User objects and string IDs
     // In test environment, use strings; in production, use Pointers
     const isTestEnvironment = process.env.NODE_ENV === 'test';

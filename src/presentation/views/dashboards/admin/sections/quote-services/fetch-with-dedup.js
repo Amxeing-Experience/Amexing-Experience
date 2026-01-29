@@ -210,9 +210,7 @@ async function fetchWithDedupAndRetry(url, options = {}) {
  * );
  */
 async function batchFetch(requests) {
-  return Promise.all(
-    requests.map(({ url, options }) => fetchWithDedup(url, options))
-  );
+  return Promise.all(requests.map(({ url, options }) => fetchWithDedup(url, options)));
 }
 
 // Export for use in other modules

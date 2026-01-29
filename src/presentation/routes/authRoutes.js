@@ -20,6 +20,7 @@ const jwt = require('jsonwebtoken');
 const jwtMiddleware = require('../../application/middleware/jwtMiddleware');
 const dashboardAuthMiddleware = require('../../application/middleware/dashboardAuthMiddleware');
 const logger = require('../../infrastructure/logger');
+const authController = require('../../application/controllers/authController');
 
 const router = express.Router();
 
@@ -168,6 +169,9 @@ router.use(authRateLimit);
  *       429:
  *         $ref: '#/components/responses/RateLimitError'
  */
+// Get JWT credentials for authenticated session
+router.get('/credentials', dashboardAuthMiddleware.requireAuth, authController.getCredentials);
+
 // Login endpoint
 router.post('/login', async (req, res) => {
   try {

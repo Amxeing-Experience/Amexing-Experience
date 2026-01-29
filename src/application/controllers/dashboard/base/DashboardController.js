@@ -86,6 +86,33 @@ class DashboardController extends BaseController {
     try {
       const stats = await this.getDashboardStats(req.user?.id, req.user?.role);
 
+      // Fetch user data from AmexingUser table if needed
+      let userName = 'Guest User';
+      if (req.user?.id) {
+        try {
+          const Parse = require('parse/node');
+          const query = new Parse.Query('AmexingUser');
+          query.equalTo('objectId', req.user.id);
+          const amexingUser = await query.first({ useMasterKey: true });
+
+          if (amexingUser) {
+            const firstName = amexingUser.get('firstName') || '';
+            const lastName = amexingUser.get('lastName') || '';
+            userName = `${firstName} ${lastName}`.trim() || amexingUser.get('email') || req.user.email || 'User';
+            console.log('DEBUG - Found AmexingUser:', firstName, lastName);
+          } else {
+            // Fallback to Parse User data
+            userName = req.user?.firstName && req.user?.lastName
+              ? `${req.user.firstName} ${req.user.lastName}`
+              : (req.user?.email || 'User');
+            console.log('DEBUG - Using Parse User fallback');
+          }
+        } catch (error) {
+          console.log('DEBUG - Error fetching AmexingUser:', error.message);
+          userName = req.user?.email || 'User';
+        }
+      }
+
       const dashboardData = {
         stats,
         user: req.user || {
@@ -96,7 +123,7 @@ class DashboardController extends BaseController {
           departmentId: '',
         },
         userRole: req.user?.role || 'guest',
-        userName: req.user?.name || 'Guest User',
+        userName,
         userId: req.user?.id,
         accessToken: res.locals.accessToken || req.cookies?.accessToken || '',
         breadcrumb: this.buildBreadcrumb(req.path, req.user?.role),

@@ -13,6 +13,7 @@ const profileData = {
   firstName: user.firstName || '',
   lastName: user.lastName || '',
   fullName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
+  phone: user.phone || '',
   joinedDate: (user.createdAt || user.created_at || user._created_at) ? 
     new Date(user.createdAt || user.created_at || user._created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 
     'Jan 1, 2024',
@@ -106,27 +107,80 @@ const formatRoleName = (role) => {
 
             <!-- Personal Information -->
             <div class="col-lg-8">
-              <h5 class="mb-4">Personal Information</h5>
-              <div class="row">
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">First Name</label>
-                  <p class="fw-semibold mb-0"><%= profileData.firstName || 'Not provided' %></p>
+              <div class="d-flex justify-content-between align-items-center mb-4">
+                <h5 class="mb-0">Personal Information</h5>
+                <button type="button" class="btn btn-primary btn-sm" id="editProfileBtn">
+                  <i class="ti ti-edit me-1"></i>Edit Profile
+                </button>
+              </div>
+              <form id="profileForm">
+                <div class="row">
+                  <div class="col-md-6 mb-3">
+                    <label class="text-muted small">First Name</label>
+                    <div class="view-mode">
+                      <p class="fw-semibold mb-0"><%= profileData.firstName || 'Not provided' %></p>
+                    </div>
+                    <div class="edit-mode d-none">
+                      <input type="text" class="form-control" id="firstName" name="firstName" value="<%= profileData.firstName %>" placeholder="Enter first name">
+                    </div>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label class="text-muted small">Last Name</label>
+                    <div class="view-mode">
+                      <p class="fw-semibold mb-0"><%= profileData.lastName || 'Not provided' %></p>
+                    </div>
+                    <div class="edit-mode d-none">
+                      <input type="text" class="form-control" id="lastName" name="lastName" value="<%= profileData.lastName %>" placeholder="Enter last name">
+                    </div>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label class="text-muted small">Email Address</label>
+                    <div class="view-mode">
+                      <p class="fw-semibold mb-0">
+                        <%= profileData.email || 'Not provided' %>
+                        <% if (profileData.emailVerified) { %>
+                          <i class="ti ti-circle-check text-success ms-1" title="Verified"></i>
+                        <% } else { %>
+                          <i class="ti ti-alert-circle text-warning ms-1" title="Not Verified"></i>
+                        <% } %>
+                      </p>
+                    </div>
+                    <div class="edit-mode d-none">
+                      <input type="email" class="form-control" id="email" name="email" value="<%= profileData.email %>" placeholder="Enter email address">
+                    </div>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label class="text-muted small">Phone Number</label>
+                    <div class="view-mode">
+                      <p class="fw-semibold mb-0">
+                        <% if (profileData.phone) { %>
+                          <i class="ti ti-phone me-1"></i><%= profileData.phone %>
+                        <% } else { %>
+                          <span class="text-muted">Not provided</span>
+                        <% } %>
+                      </p>
+                    </div>
+                    <div class="edit-mode d-none">
+                      <input type="tel" class="form-control" id="phone" name="phone" value="<%= profileData.phone %>" placeholder="Enter phone number">
+                    </div>
+                  </div>
+                  <!-- Edit Mode Buttons - Move to top of editable section -->
+                  <div class="col-12 edit-mode d-none mb-4">
+                    <div class="d-flex gap-2 justify-content-end">
+                      <button type="button" class="btn btn-success" id="saveProfileBtn">
+                        <i class="ti ti-check me-1"></i>Save Changes
+                      </button>
+                      <button type="button" class="btn btn-secondary" id="cancelEditBtn">
+                        <i class="ti ti-x me-1"></i>Cancel
+                      </button>
+                    </div>
+                    <hr class="my-3">
+                  </div>
                 </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Last Name</label>
-                  <p class="fw-semibold mb-0"><%= profileData.lastName || 'Not provided' %></p>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Email Address</label>
-                  <p class="fw-semibold mb-0">
-                    <%= profileData.email || 'Not provided' %>
-                    <% if (profileData.emailVerified) { %>
-                      <i class="ti ti-circle-check text-success ms-1" title="Verified"></i>
-                    <% } else { %>
-                      <i class="ti ti-alert-circle text-warning ms-1" title="Not Verified"></i>
-                    <% } %>
-                  </p>
-                </div>
+              </form>
+              
+              <!-- Non-editable fields section -->
+              <div class="row mt-3">
                 <div class="col-md-6 mb-3">
                   <label class="text-muted small">Account Status</label>
                   <p class="fw-semibold mb-0">
@@ -137,11 +191,11 @@ const formatRoleName = (role) => {
                     <% } %>
                   </p>
                 </div>
-                <div class="col-12 mb-3">
+                <div class="col-md-6 mb-3">
                   <label class="text-muted small">Password</label>
                   <p class="fw-semibold mb-0">
                     <span class="text-muted">Last changed 30 days ago</span>
-                    <button class="btn btn-sm btn-outline-primary ms-2" id="change-password-btn">
+                    <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="change-password-btn">
                       Change
                     </button>
                   </p>
@@ -305,6 +359,25 @@ const formatRoleName = (role) => {
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // Edit Profile button
+  const editProfileBtn = document.getElementById('editProfileBtn');
+  if (editProfileBtn) {
+    editProfileBtn.addEventListener('click', toggleEditMode);
+  }
+  
+  // Save Profile button
+  const saveProfileBtn = document.getElementById('saveProfileBtn');
+  if (saveProfileBtn) {
+    saveProfileBtn.addEventListener('click', saveProfile);
+  }
+  
+  // Cancel Edit button
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
+  if (cancelEditBtn) {
+    cancelEditBtn.addEventListener('click', cancelEdit);
+  }
+  
+  // Change Password button
   const changePasswordBtn = document.getElementById('change-password-btn');
   if (changePasswordBtn) {
     changePasswordBtn.addEventListener('click', function() {
@@ -498,6 +571,68 @@ document.addEventListener('DOMContentLoaded', function() {
   // Load existing billing data
   loadBillingData();
 });
+
+// Toggle between view and edit mode
+function toggleEditMode() {
+  const viewModes = document.querySelectorAll('.view-mode');
+  const editModes = document.querySelectorAll('.edit-mode');
+  const editBtn = document.getElementById('editProfileBtn');
+  
+  viewModes.forEach(el => el.classList.add('d-none'));
+  editModes.forEach(el => el.classList.remove('d-none'));
+  editBtn.classList.add('d-none');
+}
+
+// Cancel edit mode
+function cancelEdit() {
+  const viewModes = document.querySelectorAll('.view-mode');
+  const editModes = document.querySelectorAll('.edit-mode');
+  const editBtn = document.getElementById('editProfileBtn');
+  
+  viewModes.forEach(el => el.classList.remove('d-none'));
+  editModes.forEach(el => el.classList.add('d-none'));
+  editBtn.classList.remove('d-none');
+  
+  // Reset form values to original
+  document.getElementById('firstName').value = '<%= profileData.firstName %>';
+  document.getElementById('lastName').value = '<%= profileData.lastName %>';
+  document.getElementById('email').value = '<%= profileData.email %>';
+  document.getElementById('phone').value = '<%= profileData.phone %>';
+}
+
+// Save profile changes
+async function saveProfile() {
+  const formData = {
+    firstName: document.getElementById('firstName').value,
+    lastName: document.getElementById('lastName').value,
+    email: document.getElementById('email').value,
+    phone: document.getElementById('phone').value
+  };
+  
+  try {
+    const response = await fetch('/api/users/me/profile', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('token')
+      },
+      body: JSON.stringify(formData)
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      // Update the displayed values
+      location.reload(); // Reload to show updated data
+      showAlert('success', 'Profile updated successfully');
+    } else {
+      showAlert('danger', result.error || 'Failed to update profile');
+    }
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    showAlert('danger', 'An error occurred while updating profile');
+  }
+}
 
 function showAlert(type, message) {
   const alertContainer = document.createElement('div');
