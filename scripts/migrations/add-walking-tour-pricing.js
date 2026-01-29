@@ -15,7 +15,12 @@
  */
 
 const Parse = require('parse/node');
-require('dotenv').config({ path: './environments/.env.development' });
+
+// Load environment based on NODE_ENV
+const envPath = process.env.NODE_ENV === 'production' 
+  ? './environments/.env.production'
+  : './environments/.env.development';
+require('dotenv').config({ path: envPath });
 
 // Initialize Parse
 Parse.initialize(
@@ -23,7 +28,11 @@ Parse.initialize(
   process.env.PARSE_JAVASCRIPT_KEY,
   process.env.PARSE_MASTER_KEY || 'AMEXING_DEV_MASTER_KEY'
 );
-Parse.serverURL = process.env.PARSE_SERVER_URL || 'http://localhost:1337/parse';
+// Set Parse Server URL based on environment
+const defaultServerURL = process.env.NODE_ENV === 'production' 
+  ? 'http://localhost:1338/parse' 
+  : 'http://localhost:1337/parse';
+Parse.serverURL = process.env.PARSE_SERVER_URL || defaultServerURL;
 
 // Default walking tour pricing structure (in MXN)
 const DEFAULT_WALKING_PRICES = {
