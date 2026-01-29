@@ -228,7 +228,7 @@ table.dataTable tbody tr.hover {
                 <thead class="table-light">
                     <tr>
                         <th style="width: 30%;">Tour (Destino)</th>
-                        <th style="width: 15%;">Tiempo</th>
+                        <th style="width: 15%;">Mínimo de horas</th>
                         <th style="width: 20%;">
                             <div class="text-center mb-1" style="font-size: 0.875rem; font-weight: 500;">
                                 Seleccionar categoría...
@@ -670,6 +670,9 @@ table.dataTable tbody tr.hover {
                     console.log(`📡 API URL: ${url.toString()}`);
                 }
                 
+                // Filter to show only vehicle tours (exclude walking tours)
+                url.searchParams.append('tourType', 'vehicle');
+                
                 $.ajax({
                     url: url.toString(),
                     type: 'GET',
@@ -688,8 +691,9 @@ table.dataTable tbody tr.hover {
                                 });
                             }
                             
+                            // Tours are already filtered by the API with tourType=vehicle
                             allToursData = newToursData;
-                            filteredData = allToursData; // Show all tours by default
+                            filteredData = allToursData; // Show filtered vehicle tours by default
                             
                             
                             resolve(allToursData);
@@ -791,7 +795,6 @@ table.dataTable tbody tr.hover {
                             let pricesHtml = sortedPrices.map(p => {
                                 // Get capacity info from price data
                                 const defaultCapacity = p.vehicleType?.defaultCapacity || 4;
-                                const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
                                 const vehicleName = p.vehicleType?.name || 'Vehículo';
                                 const price = p.formattedPrice;
                                 
@@ -802,11 +805,11 @@ table.dataTable tbody tr.hover {
                                                 <div class="fw-semibold small text-dark">${vehicleName}</div>
                                                 <div class="text-muted d-flex align-items-center gap-2" style="font-size: 0.7rem;">
                                                     <span>${defaultCapacity} <i class="ti ti-user"></i></span>
-                                                    <span>${trunkCapacity} <i class="ti ti-briefcase"></i></span>
                                                 </div>
                                             </div>
                                             <div class="text-end">
                                                 <div class="fw-bold text-primary small" data-original-price="${price}">${price}</div>
+                                                <div class="text-muted" style="font-size: 0.65rem;">por hora</div>
                                             </div>
                                         </div>
                                     </div>
@@ -859,6 +862,7 @@ table.dataTable tbody tr.hover {
                                                     </div>
                                                     <div class="text-end">
                                                         <div class="fw-bold text-success small">${p.formattedPrice}</div>
+                                                        <div class="text-muted" style="font-size: 0.65rem;">por hora</div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1723,8 +1727,7 @@ table.dataTable tbody tr.hover {
                                     
                                     // Get capacity info from database
                                     const defaultCapacity = p.vehicleType?.defaultCapacity || 4;
-                                    const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
-                                    const capacityInfo = `${defaultCapacity} <i class="ti ti-user"></i> ${trunkCapacity} <i class="ti ti-briefcase"></i>`;
+                                    const capacityInfo = `${defaultCapacity} <i class="ti ti-user"></i>`;
                                     
                                     return `
                                         <div class="vehicle-option p-2 mb-1 border rounded bg-white">
@@ -1736,7 +1739,10 @@ table.dataTable tbody tr.hover {
                                                         <div class="text-muted" style="font-size: 0.75rem;">${capacityInfo}</div>
                                                     </div>
                                                 </div>
-                                                <div class="fw-bold small" style="color: ${rateColor}" data-original-price="${price}">${price}</div>
+                                                <div class="text-end">
+                                                    <div class="fw-bold small" style="color: ${rateColor}" data-original-price="${price}">${price}</div>
+                                                    <div class="text-muted" style="font-size: 0.65rem;">por hora</div>
+                                                </div>
                                             </div>
                                         </div>
                                     `;

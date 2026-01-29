@@ -15,6 +15,15 @@ const TemplateService = require('../../infrastructure/email/TemplateService');
 
 // Lazy load EmailLog to avoid Parse initialization issues in unit tests
 let EmailLog;
+/**
+ * Get EmailLog module with lazy loading.
+ * Avoids Parse initialization issues in unit tests.
+ * @function getEmailLog
+ * @returns {object} EmailLog module.
+ * @author Denisse Maldonado
+ * @since 1.0.0
+ * @example
+ */
 const getEmailLog = () => {
   if (!EmailLog) {
     // eslint-disable-next-line global-require
@@ -23,6 +32,13 @@ const getEmailLog = () => {
   return EmailLog;
 };
 
+/**
+ * Email Service for sending transactional emails.
+ * Integrates with MailerSend API for PCI DSS compliant email delivery.
+ * @class EmailService
+ * @author Denisse Maldonado
+ * @since 1.0.0
+ */
 class EmailService {
   constructor() {
     this.mailerSend = null;
@@ -88,8 +104,7 @@ class EmailService {
       }
 
       const {
-        to, toName, subject, text, html, from, fromName, tags,
-        notificationType, recipientUser, metadata,
+        to, toName, subject, text, html, from, fromName, tags, notificationType, recipientUser, metadata,
       } = emailData;
 
       // Validate required fields
@@ -99,10 +114,12 @@ class EmailService {
 
       // Create email parameters
       const emailParams = new EmailParams()
-        .setFrom(new Sender(
-          from || process.env.EMAIL_FROM || 'noreply@amexing.com',
-          fromName || process.env.EMAIL_FROM_NAME || 'Amexing Experience'
-        ))
+        .setFrom(
+          new Sender(
+            from || process.env.EMAIL_FROM || 'noreply@amexing.com',
+            fromName || process.env.EMAIL_FROM_NAME || 'Amexing Experience'
+          )
+        )
         .setTo([new Recipient(to, toName || '')])
         .setSubject(subject);
 
@@ -265,11 +282,7 @@ class EmailService {
       };
 
       // Render template
-      const { html, text } = TemplateService.render(
-        'welcome',
-        templateVariables,
-        { includeText: true }
-      );
+      const { html, text } = TemplateService.render('welcome', templateVariables, { includeText: true });
 
       // Send email
       return await this.sendEmail({
@@ -331,11 +344,7 @@ class EmailService {
       };
 
       // Render template
-      const { html, text } = TemplateService.render(
-        'password_reset',
-        templateVariables,
-        { includeText: true }
-      );
+      const { html, text } = TemplateService.render('password_reset', templateVariables, { includeText: true });
 
       // Send email
       return await this.sendEmail({
@@ -403,9 +412,7 @@ class EmailService {
 
     // For emails with 3+ characters in local part: first + ** + last
     // For emails with 1-2 characters: *** (no domain shown for short emails)
-    const maskedLocal = localPart.length > 2
-      ? `${localPart[0]}**${localPart[localPart.length - 1]}`
-      : '***';
+    const maskedLocal = localPart.length > 2 ? `${localPart[0]}**${localPart[localPart.length - 1]}` : '***';
 
     return `${maskedLocal}@${domain}`;
   }
@@ -731,15 +738,12 @@ This is an automated message from Amexing Experience. Please do not reply to thi
         LUGAR: location,
         URL_BOTON: buttonUrl || '#',
         TEXTO_BOTON: buttonText || 'Ver Detalles de Reserva',
-        MENSAJE_ADICIONAL: additionalMessage || 'Si tiene alguna pregunta o necesita hacer cambios, no dude en contactarnos.',
+        MENSAJE_ADICIONAL:
+          additionalMessage || 'Si tiene alguna pregunta o necesita hacer cambios, no dude en contactarnos.',
       };
 
       // Render template
-      const { html, text } = TemplateService.render(
-        'booking_confirmation',
-        templateVariables,
-        { includeText: true }
-      );
+      const { html, text } = TemplateService.render('booking_confirmation', templateVariables, { includeText: true });
 
       // Send email
       return await this.sendEmail({
@@ -893,9 +897,7 @@ This is an automated message from Amexing Experience. Please do not reply to thi
 
       // Calculate success rate
       const totalMonthEmails = successCount + failedCount;
-      const successRate = totalMonthEmails > 0
-        ? ((successCount / totalMonthEmails) * 100).toFixed(1)
-        : '0.0';
+      const successRate = totalMonthEmails > 0 ? ((successCount / totalMonthEmails) * 100).toFixed(1) : '0.0';
 
       return {
         success: true,

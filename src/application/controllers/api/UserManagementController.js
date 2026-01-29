@@ -1105,7 +1105,7 @@ class UserManagementController {
       const updates = req.body;
 
       // Only allow certain fields to be updated by the user themselves
-      const allowedFields = ['billingInfo'];
+      const allowedFields = ['firstName', 'lastName', 'email', 'phone', 'billingInfo'];
       const sanitizedUpdates = {};
 
       for (const field of allowedFields) {

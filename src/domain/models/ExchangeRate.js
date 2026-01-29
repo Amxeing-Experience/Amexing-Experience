@@ -84,10 +84,10 @@ class ExchangeRate extends Parse.Object {
   static async getCurrentValue() {
     try {
       const current = await this.getCurrentExchangeRate();
-      return current ? current.get('value') : 18.50; // Default fallback
+      return current ? current.get('value') : 18.5; // Default fallback
     } catch (error) {
       console.error('Error getting current exchange rate value:', error);
-      return 18.50; // Default fallback
+      return 18.5; // Default fallback
     }
   }
 
@@ -104,10 +104,7 @@ class ExchangeRate extends Parse.Object {
   static async getHistory(options = {}) {
     try {
       const {
-        page = 1,
-        limit = 10,
-        sortBy = 'createdAt',
-        sortOrder = 'desc',
+        page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc',
       } = options;
 
       const query = new Parse.Query(ExchangeRate);

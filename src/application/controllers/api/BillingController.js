@@ -7,6 +7,13 @@
 const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 
+/**
+ * Billing Controller for managing user billing information.
+ * Handles CRUD operations for billing data in PCI DSS compliant manner.
+ * @class BillingController
+ * @author Denisse Maldonado
+ * @since 1.0.0
+ */
 class BillingController {
   /**
    * Get user's billing information

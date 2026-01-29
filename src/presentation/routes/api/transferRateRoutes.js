@@ -111,12 +111,7 @@ const writeRateLimit = rateLimit({
  *       429:
  *         description: Too many requests
  */
-router.post(
-  '/',
-  writeRateLimit,
-  jwtMiddleware.requireRoleLevel(6),
-  (req, res) => transferRateController.create(req, res)
-);
+router.post('/', writeRateLimit, jwtMiddleware.requireRoleLevel(6), (req, res) => transferRateController.create(req, res));
 
 /**
  * @swagger
@@ -183,12 +178,7 @@ router.post(
  *       429:
  *         description: Too many requests
  */
-router.get(
-  '/history',
-  readRateLimit,
-  jwtMiddleware.requireRoleLevel(6),
-  (req, res) => transferRateController.getHistory(req, res)
-);
+router.get('/history', readRateLimit, jwtMiddleware.requireRoleLevel(6), (req, res) => transferRateController.getHistory(req, res));
 
 /**
  * @swagger
@@ -293,18 +283,8 @@ router.get(
  *       429:
  *         description: Too many requests
  */
-router.get(
-  '/:id',
-  readRateLimit,
-  jwtMiddleware.requireRoleLevel(6),
-  (req, res) => transferRateController.getById(req, res)
-);
+router.get('/:id', readRateLimit, jwtMiddleware.requireRoleLevel(6), (req, res) => transferRateController.getById(req, res));
 
-router.delete(
-  '/:id',
-  writeRateLimit,
-  jwtMiddleware.requireRoleLevel(8),
-  (req, res) => transferRateController.delete(req, res)
-);
+router.delete('/:id', writeRateLimit, jwtMiddleware.requireRoleLevel(8), (req, res) => transferRateController.delete(req, res));
 
 module.exports = router;

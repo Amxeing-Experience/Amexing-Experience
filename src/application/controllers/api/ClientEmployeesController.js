@@ -239,7 +239,9 @@ class ClientEmployeesController {
 
           // Fallback: if no clientId field, treat user as the client
           if (!userClientId) {
-            userClientId = currentUser.get ? (currentUser.get('objectId') || currentUser.id) : (currentUser.id || currentUser.objectId);
+            userClientId = currentUser.get
+              ? currentUser.get('objectId') || currentUser.id
+              : currentUser.id || currentUser.objectId;
           }
         } else if (currentUserRole === 'department_manager') {
           // For department_manager, the user IS the client, so use their own ID
@@ -291,7 +293,11 @@ class ClientEmployeesController {
       const hasSpecialChars = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
 
       if (!hasUppercase || !hasLowercase || !hasNumbers || !hasSpecialChars) {
-        return this.sendError(res, 'La contraseña debe incluir mayúsculas, minúsculas, números y caracteres especiales', 400);
+        return this.sendError(
+          res,
+          'La contraseña debe incluir mayúsculas, minúsculas, números y caracteres especiales',
+          400
+        );
       }
 
       // Validate client exists and is active (after all input validations)
@@ -632,7 +638,11 @@ class ClientEmployeesController {
       }
 
       if (!['superadmin', 'admin', 'department_manager'].includes(currentUserRole)) {
-        return this.sendError(res, 'Access denied. Only SuperAdmin, Admin, or Department Manager can modify employee status.', 403);
+        return this.sendError(
+          res,
+          'Access denied. Only SuperAdmin, Admin, or Department Manager can modify employee status.',
+          403
+        );
       }
 
       // Validate client exists

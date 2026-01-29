@@ -8,6 +8,7 @@
  * - destinationPOI: Pointer to POI table (destination location)
  * - time: Number (duration in minutes)
  * - notes: String (tour description/notes, optional)
+ * - isWalkingTour: Boolean (true = walking tour, false/undefined = vehicle tour)
  * - availability: Array (new availability format, optional)
  * - availableDays: Array (legacy availability format, optional)
  * - startTime: String (legacy start time, optional)
@@ -95,6 +96,26 @@ class Tour extends Parse.Object {
     } else {
       this.unset('notes');
     }
+    return this;
+  }
+
+  /**
+   * Check if this is a walking tour.
+   * @returns {boolean} True if walking tour.
+   * @example
+   */
+  isWalkingTour() {
+    return this.get('isWalkingTour') === true;
+  }
+
+  /**
+   * Set walking tour status.
+   * @param {boolean} isWalking Walking tour status.
+   * @returns {Tour} This instance for chaining.
+   * @example
+   */
+  setWalkingTour(isWalking) {
+    this.set('isWalkingTour', Boolean(isWalking));
     return this;
   }
 
@@ -256,6 +277,7 @@ class Tour extends Parse.Object {
    * @param {number} data.time Duration in minutes.
    * @param {boolean} [data.active] Active status.
    * @param {boolean} [data.exists] Exists status.
+   * @param {boolean} [data.isWalkingTour] Walking tour status.
    * @returns {Tour} New Tour instance.
    * @example
    */
@@ -269,6 +291,9 @@ class Tour extends Parse.Object {
     // Optional fields
     if (data.notes) {
       tour.setNotes(data.notes);
+    }
+    if (typeof data.isWalkingTour === 'boolean') {
+      tour.setWalkingTour(data.isWalkingTour);
     }
     if (data.availability) {
       tour.setAvailability(data.availability);
@@ -297,6 +322,34 @@ class Tour extends Parse.Object {
    */
   static getActiveToursQuery() {
     const query = new Parse.Query(Tour);
+    query.equalTo('active', true);
+    query.equalTo('exists', true);
+    query.include(['destinationPOI']);
+    return query;
+  }
+
+  /**
+   * Query helper to get walking tours only.
+   * @returns {Parse.Query} Query for walking tours.
+   * @example
+   */
+  static getWalkingToursQuery() {
+    const query = new Parse.Query(Tour);
+    query.equalTo('isWalkingTour', true);
+    query.equalTo('active', true);
+    query.equalTo('exists', true);
+    query.include(['destinationPOI']);
+    return query;
+  }
+
+  /**
+   * Query helper to get vehicle tours only.
+   * @returns {Parse.Query} Query for vehicle tours.
+   * @example
+   */
+  static getVehicleToursQuery() {
+    const query = new Parse.Query(Tour);
+    query.notEqualTo('isWalkingTour', true);
     query.equalTo('active', true);
     query.equalTo('exists', true);
     query.include(['destinationPOI']);

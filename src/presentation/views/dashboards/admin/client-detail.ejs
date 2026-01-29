@@ -54,7 +54,7 @@ const isActive = clientData.active;
 
 const menuItems = [
     { label: 'Información', icon: 'info-circle', section: 'information', href: `/dashboard/admin/clients/${clientId}` },
-    { label: 'Empleados', icon: 'users', section: 'employees', href: `/dashboard/admin/clients/${clientId}?section=employees` },
+    { label: 'Agentes', icon: 'users', section: 'employees', href: `/dashboard/admin/clients/${clientId}?section=employees` },
     { label: 'Cotizaciones', icon: 'file-invoice', section: 'quotes', href: `/dashboard/admin/clients/${clientId}?section=quotes` },
     { label: 'Tarifario', icon: 'receipt-2', section: 'tarifario', href: `/dashboard/admin/clients/${clientId}?section=tarifario` }
 ];
@@ -1820,7 +1820,7 @@ function setupExperienceFilters() {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title text-white" id="createEmployeeModalLabel">
-                    <i class="ti ti-user-plus me-2"></i>Crear Nuevo Empleado
+                    <i class="ti ti-user-plus me-2"></i>Crear Nuevo Agente
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -1950,8 +1950,7 @@ function setupExperienceFilters() {
                             <label for="employeeRole" class="form-label">Rol <span class="text-danger">*</span></label>
                             <select class="form-select" id="employeeRole" name="role" required>
                                 <option value="">Seleccionar rol...</option>
-                                <option value="client">Agent (Representante de agencia con capacidades de gestión)</option>
-                                <option value="employee">Employee (Empleado estándar)</option>
+                                <option value="client" selected>Agent (Representante de agencia con capacidades de gestión)</option>
                             </select>
                             <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
                         </div>
@@ -2037,7 +2036,7 @@ function setupExperienceFilters() {
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title text-white" id="editEmployeeModalLabel">
-                    <i class="ti ti-edit me-2"></i>Editar Empleado
+                    <i class="ti ti-edit me-2"></i>Editar Agente
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -2106,7 +2105,6 @@ function setupExperienceFilters() {
                             <select class="form-select" id="editEmployeeRole" name="role" required>
                                 <option value="">Seleccionar rol...</option>
                                 <option value="client">Agent (Representante de agencia con capacidades de gestión)</option>
-                                <option value="employee">Employee (Empleado estándar)</option>
                             </select>
                             <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
                         </div>
@@ -2256,7 +2254,7 @@ function setupExperienceFilters() {
                 <%- include('../../atoms/common/button', {
                     type: 'button',
                     variant: 'primary',
-                    text: 'Actualizar Empleado',
+                    text: 'Actualizar Agente',
                     icon: 'check',
                     attributes: {
                         'id': 'submitEditEmployee',
@@ -2652,7 +2650,7 @@ function setupExperienceFilters() {
                 email: document.getElementById('employeeEmail').value.trim(),
                 password: document.getElementById('employeePassword').value.trim(),
                 role: document.getElementById('employeeRole').value.trim(),
-                phone: document.getElementById('employeePhone').value.trim() || undefined,
+                phone: document.getElementById('employeePhone').value.trim() || '',
                 notes: document.getElementById('employeeNotes').value.trim() || ''
             };
 
@@ -2727,7 +2725,7 @@ function setupExperienceFilters() {
             const result = await response.json();
 
             if (!response.ok || !result.success) {
-                throw new Error(result.error || 'Error al crear el empleado');
+                throw new Error(result.error || 'Error al crear el agente');
             }
 
             // Success - restore button before hiding modal
@@ -2735,7 +2733,7 @@ function setupExperienceFilters() {
             submitBtn.innerHTML = originalContent;
 
             modal.hide();
-            showSuccessAlert(`Empleado "${formData.firstName} ${formData.lastName}" creado exitosamente`);
+            showSuccessAlert(`Agente "${formData.firstName} ${formData.lastName}" creado exitosamente`);
 
             // Reload table
             if (window.employeesTable) {
@@ -2743,8 +2741,8 @@ function setupExperienceFilters() {
             }
 
         } catch (error) {
-            console.error('Error creating employee:', error);
-            showErrorAlert(error.message || 'Error al crear el empleado. Por favor, intenta nuevamente.');
+            console.error('Error creating agent:', error);
+            showErrorAlert(error.message || 'Error al crear el agente. Por favor, intenta nuevamente.');
 
             // Restore button
             submitBtn.disabled = false;
@@ -3060,7 +3058,7 @@ function setupExperienceFilters() {
                 lastName: document.getElementById('editEmployeeLastName').value.trim(),
                 email: document.getElementById('editEmployeeEmail').value.trim(),
                 role: document.getElementById('editEmployeeRole').value.trim(),
-                phone: document.getElementById('editEmployeePhone').value.trim() || undefined,
+                phone: document.getElementById('editEmployeePhone').value.trim() || '',
                 notes: document.getElementById('editEmployeeNotes').value.trim() || '',
                 active: document.getElementById('editEmployeeActive').checked
             };
@@ -3203,7 +3201,7 @@ function setupExperienceFilters() {
 
             const result = await response.json();
             if (!response.ok || !result.success) {
-                throw new Error(result.error || 'Error al actualizar el empleado');
+                throw new Error(result.error || 'Error al actualizar el agente');
             }
 
             // Success - restore button before hiding modal
@@ -3214,15 +3212,15 @@ function setupExperienceFilters() {
             const modal = bootstrap.Modal.getInstance(document.getElementById('editEmployeeModal'));
             modal.hide();
 
-            showSuccessAlert(`Empleado "${formData.firstName} ${formData.lastName}" actualizado exitosamente`);
+            showSuccessAlert(`Agente "${formData.firstName} ${formData.lastName}" actualizado exitosamente`);
             
             // Reload table
             if (window.employeesTable) {
                 window.employeesTable.ajax.reload(null, false);
             }
         } catch (error) {
-            console.error('Error updating employee:', error);
-            showErrorAlert(error.message || 'Error al actualizar el empleado. Por favor, intenta nuevamente.');
+            console.error('Error updating agent:', error);
+            showErrorAlert(error.message || 'Error al actualizar el agente. Por favor, intenta nuevamente.');
             
             // Restore button
             submitBtn.disabled = false;

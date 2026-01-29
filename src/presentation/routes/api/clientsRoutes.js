@@ -98,7 +98,7 @@ async function validateClientAccess(req, res, next) {
         if (userRole === 'client') {
           // For client role users, get their clientId field
           // This is the ID of the client organization they belong to
-          userClientId = user.get ? user.get('clientId') : (user.clientId || null);
+          userClientId = user.get ? user.get('clientId') : user.clientId || null;
         } else if (userRole === 'department_manager') {
           // For department_manager, their objectId IS the clientId
           userClientId = user.id || (user.get ? user.get('objectId') : user.objectId);
@@ -1023,9 +1023,14 @@ router.delete('/:clientId/employees/:id', validateClientAccess, writeOperationsL
  *       404:
  *         description: Employee not found
  */
-router.patch('/:clientId/employees/:id/toggle-status', validateClientAccess, writeOperationsLimiter, async (req, res) => {
-  await clientEmployeesController.toggleEmployeeStatus(req, res);
-});
+router.patch(
+  '/:clientId/employees/:id/toggle-status',
+  validateClientAccess,
+  writeOperationsLimiter,
+  async (req, res) => {
+    await clientEmployeesController.toggleEmployeeStatus(req, res);
+  }
+);
 
 /**
  * Error handling middleware for this router.

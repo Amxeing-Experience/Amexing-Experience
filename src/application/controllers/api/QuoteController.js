@@ -49,14 +49,7 @@ class QuoteController {
 
       // 2. Extract fields from request body
       const {
-        client,
-        clientId,
-        contactPerson,
-        contactEmail,
-        contactPhone,
-        notes,
-        eventType,
-        numberOfPeople,
+        client, clientId, contactPerson, contactEmail, contactPhone, notes, eventType, numberOfPeople,
       } = req.body;
 
       // Normalize field names (accept both formats)
@@ -270,62 +263,64 @@ class QuoteController {
       const quotes = await filteredQuery.find({ useMasterKey: true });
 
       // Format data for DataTables and check for pending invoice requests
-      const data = await Promise.all(quotes.map(async (quote) => {
-        const client = quote.get('client');
-        const rate = quote.get('rate');
-        const createdBy = quote.get('createdBy');
+      const data = await Promise.all(
+        quotes.map(async (quote) => {
+          const client = quote.get('client');
+          const rate = quote.get('rate');
+          const createdBy = quote.get('createdBy');
 
-        // Check if quote has pending invoice request
-        let hasPendingInvoiceRequest = false;
-        try {
-          hasPendingInvoiceRequest = await this.quoteService.hasPendingInvoiceRequest(quote.id);
-        } catch (error) {
-          logger.warn('Error checking pending invoice request', { quoteId: quote.id, error: error.message });
-        }
+          // Check if quote has pending invoice request
+          let hasPendingInvoiceRequest = false;
+          try {
+            hasPendingInvoiceRequest = await this.quoteService.hasPendingInvoiceRequest(quote.id);
+          } catch (error) {
+            logger.warn('Error checking pending invoice request', { quoteId: quote.id, error: error.message });
+          }
 
-        return {
-          id: quote.id,
-          objectId: quote.id,
-          folio: quote.get('folio') || 'N/A',
-          client: client
-            ? {
-              id: client.id,
-              firstName: client.get('firstName') || '',
-              lastName: client.get('lastName') || '',
-              companyName: client.get('companyName') || '',
-              fullName: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
-            }
-            : null,
-          rate: rate
-            ? {
-              id: rate.id,
-              name: rate.get('name') || 'N/A',
-              color: rate.get('color') || '#6366F1',
-            }
-            : null,
-          eventType: quote.get('eventType') || '',
-          numberOfPeople: quote.get('numberOfPeople') || 1,
-          createdBy: createdBy
-            ? {
-              id: createdBy.id,
-              firstName: createdBy.get('firstName') || '',
-              lastName: createdBy.get('lastName') || '',
-              email: createdBy.get('email') || '',
-              fullName: `${createdBy.get('firstName') || ''} ${createdBy.get('lastName') || ''}`.trim(),
-            }
-            : null,
-          status: quote.get('status') || 'requested',
-          contactPerson: quote.get('contactPerson') || '',
-          contactEmail: quote.get('contactEmail') || '',
-          contactPhone: quote.get('contactPhone') || '',
-          notes: quote.get('notes') || '',
-          validUntil: quote.get('validUntil'),
-          active: quote.get('active'),
-          hasPendingInvoiceRequest, // Add invoice status
-          createdAt: quote.createdAt,
-          updatedAt: quote.updatedAt,
-        };
-      }));
+          return {
+            id: quote.id,
+            objectId: quote.id,
+            folio: quote.get('folio') || 'N/A',
+            client: client
+              ? {
+                id: client.id,
+                firstName: client.get('firstName') || '',
+                lastName: client.get('lastName') || '',
+                companyName: client.get('companyName') || '',
+                fullName: `${client.get('firstName') || ''} ${client.get('lastName') || ''}`.trim(),
+              }
+              : null,
+            rate: rate
+              ? {
+                id: rate.id,
+                name: rate.get('name') || 'N/A',
+                color: rate.get('color') || '#6366F1',
+              }
+              : null,
+            eventType: quote.get('eventType') || '',
+            numberOfPeople: quote.get('numberOfPeople') || 1,
+            createdBy: createdBy
+              ? {
+                id: createdBy.id,
+                firstName: createdBy.get('firstName') || '',
+                lastName: createdBy.get('lastName') || '',
+                email: createdBy.get('email') || '',
+                fullName: `${createdBy.get('firstName') || ''} ${createdBy.get('lastName') || ''}`.trim(),
+              }
+              : null,
+            status: quote.get('status') || 'requested',
+            contactPerson: quote.get('contactPerson') || '',
+            contactEmail: quote.get('contactEmail') || '',
+            contactPhone: quote.get('contactPhone') || '',
+            notes: quote.get('notes') || '',
+            validUntil: quote.get('validUntil'),
+            active: quote.get('active'),
+            hasPendingInvoiceRequest, // Add invoice status
+            createdAt: quote.createdAt,
+            updatedAt: quote.updatedAt,
+          };
+        })
+      );
 
       // DataTables response format
       const response = {
@@ -1812,7 +1807,8 @@ class QuoteController {
           // The 'hasSufficientCapacity' flag is sent to frontend for warning display.
           // Frontend shows visual warnings (red text + alert) when capacity is insufficient.
           // This allows users to select any vehicle but be informed of capacity limitations.
-          if (true) { // Include all vehicles
+          if (true) {
+            // Include all vehicles
             // Get price breakdown with surcharge
             const basePrice = tour.get('price') || 0;
             const priceBreakdown = await pricingHelper.getPriceBreakdown(basePrice);
@@ -2530,7 +2526,7 @@ class QuoteController {
               objectId: quote ? quote.id : null,
               folio: quote ? quote.get('folio') : 'N/A',
               eventType: quote ? quote.get('eventType') : 'N/A',
-              numberOfPeople: quote ? (quote.get('numberOfPeople') || 1) : 1,
+              numberOfPeople: quote ? quote.get('numberOfPeople') || 1 : 1,
               status: quote ? quote.get('status') : 'N/A',
               createdAt: quote ? quote.get('createdAt') : invoice.get('createdAt'),
               updatedAt: quote ? quote.get('updatedAt') : invoice.get('updatedAt'),

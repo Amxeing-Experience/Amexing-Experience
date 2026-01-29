@@ -129,6 +129,7 @@ function formatRoleName(role) {
   const safeRole = String(role || 'guest');
   if (safeRole === 'department_manager') return 'Jefe de Departamento';
   if (safeRole === 'superadmin') return 'Super Administrador';
+  if (safeRole === 'client') return 'Agente';
   return safeRole.charAt(0).toUpperCase() + safeRole.slice(1);
 }
 

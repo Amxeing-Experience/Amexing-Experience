@@ -372,6 +372,50 @@ document.addEventListener('DOMContentLoaded', function() {
         return null;
     }
 
+    // Filter vehicles to only include those with at least one image
+    async function filterVehiclesWithImages(vehicles, token) {
+        console.log('Filtering vehicles with images. Total vehicles:', vehicles.length);
+        const vehiclesWithImages = [];
+        
+        for (const vehicle of vehicles) {
+            try {
+                // First check if vehicle has a main image
+                if (vehicle.image) {
+                    vehiclesWithImages.push(vehicle);
+                    continue;
+                }
+                
+                // If no main image, check if it has additional images
+                const vehicleId = vehicle.id || vehicle.objectId;
+                if (!vehicleId) continue;
+                
+                const response = await fetch(`/api/vehicles/${vehicleId}/images`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const imagesData = await response.json();
+                    if (imagesData.success && imagesData.data && imagesData.data.length > 0) {
+                        vehiclesWithImages.push(vehicle);
+                    }
+                }
+            } catch (error) {
+                console.log('Error checking images for vehicle:', vehicle.id, error.message);
+                // If error checking images, include vehicle if it has main image
+                if (vehicle.image) {
+                    vehiclesWithImages.push(vehicle);
+                }
+            }
+        }
+        
+        console.log('Vehicles with images:', vehiclesWithImages.length);
+        return vehiclesWithImages;
+    }
+
     // Load vehicles from API
     async function loadVehicles() {
         try {
@@ -396,7 +440,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
             const data = await response.json();
             console.log('Vehicles data received:', data);
-            allVehicles = data.data || [];
+            const rawVehicles = data.data || [];
+            
+            // Filter vehicles to only include those with at least one image
+            allVehicles = await filterVehiclesWithImages(rawVehicles, token);
             filteredVehicles = [...allVehicles];
             
             populateFilters();

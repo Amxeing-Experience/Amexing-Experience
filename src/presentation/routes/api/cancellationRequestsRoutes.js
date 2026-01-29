@@ -82,84 +82,76 @@ router.put(
  * Get cancellation requests for specific quote
  * Access: SuperAdmin, Admin, employee_amexing with view_cancellation_requests permission.
  */
-router.get(
-  '/quote/:quoteFolio',
-  jwtMiddleware.requireRole(['superadmin', 'admin']),
-  async (req, res) => {
-    try {
-      const { quoteFolio } = req.params;
+router.get('/quote/:quoteFolio', jwtMiddleware.requireRole(['superadmin', 'admin']), async (req, res) => {
+  try {
+    const { quoteFolio } = req.params;
 
-      // Find quote by folio first
-      const Quote = require('../../../domain/models/Quote');
-      const quote = await Quote.findByFolio(quoteFolio);
+    // Find quote by folio first
+    const Quote = require('../../../domain/models/Quote');
+    const quote = await Quote.findByFolio(quoteFolio);
 
-      if (!quote) {
-        return res.status(404).json({
-          success: false,
-          error: 'Quote not found',
-          timestamp: new Date().toISOString(),
-        });
-      }
-
-      // Find cancellation requests for this quote
-      const CancellationRequest = require('../../../domain/models/CancellationRequest');
-      const requests = await CancellationRequest.findByQuote(quote.id);
-
-      res.json({
-        success: true,
-        data: {
-          requests,
-          quote: {
-            id: quote.id,
-            folio: quote.getFolio(),
-            status: quote.getStatus(),
-          },
-        },
-        message: 'Cancellation requests retrieved successfully',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      res.status(500).json({
+    if (!quote) {
+      return res.status(404).json({
         success: false,
-        error: error.message,
+        error: 'Quote not found',
         timestamp: new Date().toISOString(),
       });
     }
+
+    // Find cancellation requests for this quote
+    const CancellationRequest = require('../../../domain/models/CancellationRequest');
+    const requests = await CancellationRequest.findByQuote(quote.id);
+
+    res.json({
+      success: true,
+      data: {
+        requests,
+        quote: {
+          id: quote.id,
+          folio: quote.getFolio(),
+          status: quote.getStatus(),
+        },
+      },
+      message: 'Cancellation requests retrieved successfully',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
   }
-);
+});
 
 /**
  * GET /api/cancellation-requests/pending/count
  * Get count of pending cancellation requests
  * Access: SuperAdmin, Admin, employee_amexing with view_cancellation_requests permission.
  */
-router.get(
-  '/pending/count',
-  jwtMiddleware.requireRole(['superadmin', 'admin']),
-  async (req, res) => {
-    try {
-      const query = new Parse.Query('CancellationRequest');
-      query.equalTo('status', 'pending');
-      query.equalTo('active', true);
-      query.equalTo('exists', true);
+router.get('/pending/count', jwtMiddleware.requireRole(['superadmin', 'admin']), async (req, res) => {
+  try {
+    const query = new Parse.Query('CancellationRequest');
+    query.equalTo('status', 'pending');
+    query.equalTo('active', true);
+    query.equalTo('exists', true);
 
-      const count = await query.count({ useMasterKey: true });
+    const count = await query.count({ useMasterKey: true });
 
-      res.json({
-        success: true,
-        data: { count },
-        message: 'Pending cancellation requests count retrieved successfully',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      });
-    }
+    res.json({
+      success: true,
+      data: { count },
+      message: 'Pending cancellation requests count retrieved successfully',
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
   }
-);
+});
 
 // =============================================================================
 // ERROR HANDLING

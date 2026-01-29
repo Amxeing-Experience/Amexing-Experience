@@ -1,0 +1,451 @@
+<%
+/**
+ * Form Preview Page
+ * Test runtime rendering of forms
+ * 
+ * Created by Denisse Maldonado
+ */
+
+const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+const formId = typeof requestedFormId !== 'undefined' ? requestedFormId : 'experience';
+%>
+
+<!-- Page Header with Breadcrumb -->
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2 class="mb-1 fw-bold">Vista Previa del Formulario</h2>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0 small">
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/admin"><i class="ti ti-home me-1"></i>Dashboard</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a href="/dashboard/admin/forms"><i class="ti ti-file-text me-1"></i>Formularios</a>
+                        </li>
+                        <li class="breadcrumb-item active">
+                            <i class="ti ti-eye me-1"></i>Vista Previa
+                        </li>
+                    </ol>
+                </nav>
+            </div>
+            <!-- Action Buttons -->
+            <div class="d-flex align-items-center gap-2">
+                <button id="toggleModeBtn" class="btn btn-sm btn-outline-secondary">
+                    <i class="ti ti-eye"></i> Modo Vista
+                </button>
+                <button id="loadDraftBtn" class="btn btn-sm btn-outline-secondary">
+                    <i class="ti ti-file-download"></i> Cargar Borrador
+                </button>
+                <div class="vr"></div>
+                <a href="/dashboard/admin/forms" class="btn btn-sm btn-secondary">
+                    <i class="ti ti-arrow-left"></i> Volver al Constructor
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Container -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Formulario en Tiempo de Ejecución</h5>
+                    <div class="d-flex align-items-center gap-3">
+                        <!-- Form Selector -->
+                        <div class="d-flex align-items-center">
+                            <label class="me-2 small">Formulario:</label>
+                            <select id="formSelector" class="form-select form-select-sm">
+                                <option value="experience" <%= formId === 'experience' ? 'selected' : '' %>>Experiencias</option>
+                                <option value="tour" <%= formId === 'tour' ? 'selected' : '' %>>Tours</option>
+                                <option value="reservation" <%= formId === 'reservation' ? 'selected' : '' %>>Reservaciones</option>
+                                <option value="vehicle" <%= formId === 'vehicle' ? 'selected' : '' %>>Vehículos</option>
+                                <option value="client" <%= formId === 'client' ? 'selected' : '' %>>Clientes</option>
+                                <option value="employee" <%= formId === 'employee' ? 'selected' : '' %>>Empleados</option>
+                                <option value="custom" <%= formId === 'custom' ? 'selected' : '' %>>Personalizado</option>
+                            </select>
+                        </div>
+                        <!-- Mode Indicator -->
+                        <div>
+                            <span class="badge bg-primary" id="modeIndicator">Modo Creación</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Form Container -->
+                <div id="formContainer" class="p-3">
+                    <!-- Form will be rendered here -->
+                </div>
+
+                <!-- Debug Panel (hidden by default) -->
+                <div id="debugPanel" class="mt-4 d-none">
+                    <div class="card bg-light">
+                        <div class="card-header">
+                            <h6 class="mb-0">Panel de Depuración</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Configuración del Formulario</h6>
+                                    <pre id="formConfig" class="bg-white p-2 rounded" style="max-height: 300px; overflow-y: auto;">
+                                        <!-- Configuration JSON will be displayed here -->
+                                    </pre>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Datos del Formulario</h6>
+                                    <pre id="formData" class="bg-white p-2 rounded" style="max-height: 300px; overflow-y: auto;">
+                                        <!-- Form data JSON will be displayed here -->
+                                    </pre>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <h6>Registro de Eventos</h6>
+                                <div id="eventLog" class="bg-white p-2 rounded" style="max-height: 200px; overflow-y: auto;">
+                                    <!-- Event log will be displayed here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <button id="debugToggle" class="btn btn-sm btn-outline-secondary">
+                            <i class="ti ti-bug"></i> Debug
+                        </button>
+                        <button id="exportDataBtn" class="btn btn-sm btn-outline-secondary">
+                            <i class="ti ti-download"></i> Exportar Datos
+                        </button>
+                    </div>
+                    <div>
+                        <span class="text-muted small">Estado: </span>
+                        <span id="statusIndicator" class="badge bg-success">Listo</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Test Data Modal -->
+<div class="modal fade" id="testDataModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cargar Datos de Prueba</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">JSON de Datos</label>
+                    <textarea id="testDataJson" class="form-control" rows="10" placeholder='{"fieldName": "value"}'></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="loadTestData">Cargar Datos</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+#formContainer {
+    min-height: 400px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+#debugPanel pre {
+    font-size: 0.85rem;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+#eventLog {
+    font-size: 0.85rem;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.event-entry {
+    padding: 2px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.event-time {
+    color: #6c757d;
+    font-weight: 600;
+}
+
+.event-type {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.event-type.submit { background: #d4edda; color: #155724; }
+.event-type.validate { background: #cce5ff; color: #004085; }
+.event-type.error { background: #f8d7da; color: #721c24; }
+.event-type.save { background: #fff3cd; color: #856404; }
+</style>
+
+<!-- Load Form Runtime -->
+<script src="/js/FormRuntime.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let currentFormId = '<%= formId %>';
+    let currentMode = 'create';
+    let formInstance = null;
+    
+    // Initialize form
+    async function loadForm(formId, mode = 'create') {
+        try {
+            updateStatus('loading', 'Cargando formulario...');
+            
+            // Clear container
+            const container = document.getElementById('formContainer');
+            
+            // Initialize form with runtime
+            formInstance = await FormRuntime.initializeForm(formId, 'formContainer', {
+                mode: mode,
+                includeTitle: true,
+                includeActions: true,
+                showCancel: true,
+                showSaveDraft: true,
+                autoSave: true,
+                autoSaveInterval: 30000,
+                onSuccess: handleFormSuccess,
+                onError: handleFormError,
+                onCancel: handleFormCancel
+            });
+            
+            // Load configuration for debug panel
+            if (document.querySelector('#debugPanel:not(.d-none)')) {
+                await loadFormConfig(formId);
+            }
+            
+            // Load draft if exists
+            const draft = FormRuntime.loadDraft(formId);
+            if (draft) {
+                showNotification(`Borrador encontrado (${new Date(draft.savedAt).toLocaleString()})`, 'info');
+            }
+            
+            updateStatus('ready', 'Listo');
+            logEvent('load', `Formulario ${formId} cargado en modo ${mode}`);
+        } catch (error) {
+            console.error('Error loading form:', error);
+            updateStatus('error', 'Error al cargar');
+            document.getElementById('formContainer').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    Error al cargar el formulario: ${error.message}
+                </div>
+            `;
+        }
+    }
+    
+    // Handle form success
+    function handleFormSuccess(result) {
+        logEvent('submit', 'Formulario enviado exitosamente');
+        showNotification('Formulario enviado exitosamente', 'success');
+        updateFormData({});
+    }
+    
+    // Handle form error
+    function handleFormError(result) {
+        logEvent('error', 'Error al enviar formulario');
+        showNotification('Error al enviar el formulario', 'error');
+    }
+    
+    // Handle form cancel
+    function handleFormCancel() {
+        logEvent('cancel', 'Formulario cancelado');
+        if (confirm('¿Está seguro de que desea cancelar?')) {
+            window.location.href = '/dashboard/admin/forms';
+        }
+    }
+    
+    // Load form configuration
+    async function loadFormConfig(formId) {
+        try {
+            const response = await fetch(`/api/forms/${formId}`);
+            const result = await response.json();
+            
+            if (result.success) {
+                document.getElementById('formConfig').textContent = JSON.stringify(result.data, null, 2);
+            }
+        } catch (error) {
+            console.error('Error loading config:', error);
+        }
+    }
+    
+    // Update form data display
+    function updateFormData(data) {
+        document.getElementById('formData').textContent = JSON.stringify(data, null, 2);
+    }
+    
+    // Update status
+    function updateStatus(type, message) {
+        const indicator = document.getElementById('statusIndicator');
+        indicator.textContent = message;
+        indicator.className = 'badge';
+        
+        switch(type) {
+            case 'loading':
+                indicator.classList.add('bg-warning');
+                break;
+            case 'ready':
+                indicator.classList.add('bg-success');
+                break;
+            case 'error':
+                indicator.classList.add('bg-danger');
+                break;
+            default:
+                indicator.classList.add('bg-secondary');
+        }
+    }
+    
+    // Log event
+    function logEvent(type, message) {
+        const log = document.getElementById('eventLog');
+        const time = new Date().toLocaleTimeString();
+        const entry = document.createElement('div');
+        entry.className = 'event-entry';
+        entry.innerHTML = `
+            <span class="event-time">${time}</span>
+            <span class="event-type ${type}">${type.toUpperCase()}</span>
+            ${message}
+        `;
+        log.insertBefore(entry, log.firstChild);
+        
+        // Keep only last 50 entries
+        while (log.children.length > 50) {
+            log.removeChild(log.lastChild);
+        }
+    }
+    
+    // Show notification
+    function showNotification(message, type = 'info') {
+        FormRuntime.showNotification(message, type);
+    }
+    
+    // Form selector
+    document.getElementById('formSelector').addEventListener('change', function(e) {
+        currentFormId = e.target.value;
+        loadForm(currentFormId, currentMode);
+    });
+    
+    // Toggle mode button
+    document.getElementById('toggleModeBtn').addEventListener('click', function() {
+        if (currentMode === 'create') {
+            currentMode = 'edit';
+            this.innerHTML = '<i class="ti ti-edit"></i> Modo Edición';
+            document.getElementById('modeIndicator').textContent = 'Modo Edición';
+            document.getElementById('modeIndicator').className = 'badge bg-warning';
+        } else if (currentMode === 'edit') {
+            currentMode = 'view';
+            this.innerHTML = '<i class="ti ti-file-text"></i> Modo Creación';
+            document.getElementById('modeIndicator').textContent = 'Modo Vista';
+            document.getElementById('modeIndicator').className = 'badge bg-info';
+        } else {
+            currentMode = 'create';
+            this.innerHTML = '<i class="ti ti-eye"></i> Modo Vista';
+            document.getElementById('modeIndicator').textContent = 'Modo Creación';
+            document.getElementById('modeIndicator').className = 'badge bg-primary';
+        }
+        loadForm(currentFormId, currentMode);
+    });
+    
+    // Debug toggle
+    document.getElementById('debugToggle').addEventListener('click', function() {
+        const panel = document.getElementById('debugPanel');
+        panel.classList.toggle('d-none');
+        
+        if (!panel.classList.contains('d-none')) {
+            loadFormConfig(currentFormId);
+            
+            // Monitor form changes
+            const form = document.querySelector('#formContainer form');
+            if (form) {
+                form.addEventListener('input', () => {
+                    const formData = new FormData(form);
+                    const data = Object.fromEntries(formData.entries());
+                    updateFormData(data);
+                    logEvent('change', 'Datos del formulario actualizados');
+                });
+            }
+        }
+    });
+    
+    // Load draft button
+    document.getElementById('loadDraftBtn').addEventListener('click', function() {
+        const draft = FormRuntime.loadDraft(currentFormId);
+        if (draft) {
+            const modal = new bootstrap.Modal(document.getElementById('testDataModal'));
+            document.getElementById('testDataJson').value = JSON.stringify(draft.data, null, 2);
+            modal.show();
+        } else {
+            showNotification('No hay borrador guardado para este formulario', 'warning');
+        }
+    });
+    
+    // Load test data
+    document.getElementById('loadTestData').addEventListener('click', function() {
+        try {
+            const jsonData = document.getElementById('testDataJson').value;
+            const data = JSON.parse(jsonData);
+            
+            // Fill form with test data
+            const form = document.querySelector('#formContainer form');
+            if (form) {
+                Object.entries(data).forEach(([key, value]) => {
+                    const field = form.querySelector(`[name="${key}"]`);
+                    if (field) {
+                        field.value = value;
+                        field.dispatchEvent(new Event('input'));
+                    }
+                });
+                
+                showNotification('Datos de prueba cargados', 'success');
+                logEvent('load', 'Datos de prueba cargados');
+            }
+            
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('testDataModal')).hide();
+        } catch (error) {
+            alert('Error al parsear JSON: ' + error.message);
+        }
+    });
+    
+    // Export data button
+    document.getElementById('exportDataBtn').addEventListener('click', async function() {
+        const form = document.querySelector('#formContainer form');
+        if (form) {
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `form-${currentFormId}-data-${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            showNotification('Datos exportados', 'success');
+            logEvent('export', 'Datos del formulario exportados');
+        } else {
+            showNotification('No hay datos para exportar', 'warning');
+        }
+    });
+    
+    // Initialize default form
+    loadForm(currentFormId, currentMode);
+});
+</script>

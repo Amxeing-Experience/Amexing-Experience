@@ -134,9 +134,7 @@ function validateAvailability(availability) {
     errors.push('At least one day must be selected');
   } else {
     // Validate each day code
-    const invalidDays = availability.availableDays.filter(
-      (day) => !Number.isInteger(day) || day < 0 || day > 6
-    );
+    const invalidDays = availability.availableDays.filter((day) => !Number.isInteger(day) || day < 0 || day > 6);
     if (invalidDays.length > 0) {
       errors.push(`Invalid day codes: ${invalidDays.join(', ')}. Must be integers between 0 and 6.`);
     }
@@ -279,7 +277,9 @@ function validateDaySchedule(schedule) {
   if (!schedule.startTime) {
     errors.push(`startTime is required for day ${schedule.day}`);
   } else if (!validateTimeFormat(schedule.startTime)) {
-    errors.push(`Invalid startTime format for day ${schedule.day}: ${schedule.startTime}. Must be HH:MM (00:00 to 23:59)`);
+    errors.push(
+      `Invalid startTime format for day ${schedule.day}: ${schedule.startTime}. Must be HH:MM (00:00 to 23:59)`
+    );
   }
 
   // Validate endTime
@@ -290,9 +290,12 @@ function validateDaySchedule(schedule) {
   }
 
   // Validate time range
-  if (schedule.startTime && schedule.endTime
-      && validateTimeFormat(schedule.startTime)
-      && validateTimeFormat(schedule.endTime)) {
+  if (
+    schedule.startTime
+    && schedule.endTime
+    && validateTimeFormat(schedule.startTime)
+    && validateTimeFormat(schedule.endTime)
+  ) {
     if (schedule.startTime >= schedule.endTime) {
       errors.push(`endTime must be after startTime for day ${schedule.day}`);
     }
