@@ -15,9 +15,9 @@ const profileData = {
   fullName: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'N/A',
   phone: user.phone || '',
   joinedDate: (user.createdAt || user.created_at || user._created_at) ? 
-    new Date(user.createdAt || user.created_at || user._created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 
-    'Jan 1, 2024',
-  lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never',
+    new Date(user.createdAt || user.created_at || user._created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' }) : 
+    '1 ene 2024',
+  lastLoginAt: user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString('es-MX', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Sin registro',
   emailVerified: user.emailVerified || false,
   active: user.active !== undefined ? user.active : true,
   profilePicture: user.profilePicture || user.avatar || '',
@@ -199,7 +199,7 @@ const formatRoleName = (role) => {
                   <p class="fw-semibold mb-0"><%= profileData.joinedDate %></p>
                 </div>
                 <div class="col-md-6 mb-3">
-                  <label class="text-muted small">Last Login</label>
+                  <label class="text-muted small">Last login</label>
                   <p class="fw-semibold mb-0"><%= profileData.lastLoginAt %></p>
                 </div>
               </div>

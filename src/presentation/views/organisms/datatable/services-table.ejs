@@ -28,6 +28,33 @@ const isClient = dtUserRole === 'client';
 %>
 
 <style>
+/* Global font size increase for all datatable elements */
+#<%= dtTableId %>,
+#<%= dtTableId %>_wrapper {
+    font-size: 0.95rem !important; /* Increased from default ~0.875rem */
+}
+
+#<%= dtTableId %> thead th,
+#<%= dtTableId %> tbody td {
+    font-size: 0.95rem !important; /* Increased for table headers and cells */
+}
+
+#<%= dtTableId %> .small {
+    font-size: 0.9rem !important; /* Increased from ~0.75rem */
+}
+
+#<%= dtTableId %> .badge {
+    font-size: 0.85rem !important; /* Increased badge font size */
+}
+
+/* DataTable controls (pagination, search, etc.) */
+#<%= dtTableId %>_wrapper .dataTables_length,
+#<%= dtTableId %>_wrapper .dataTables_filter,
+#<%= dtTableId %>_wrapper .dataTables_info,
+#<%= dtTableId %>_wrapper .dataTables_paginate {
+    font-size: 0.95rem !important;
+}
+
 /* Hide default DataTables sorting icons */
 .dt-control::before,
 .dt-control::after {
@@ -216,7 +243,9 @@ table.dataTable thead th:nth-child(2) select {
                             </select>
                         </th>
                         <th style="width: 30%;">Notas</th>
+                        <% if (!isDepartmentManager && !isClient) { %>
                         <th style="width: 15%;">Estado</th>
+                        <% } %>
                         <% if (dtShowClientPricing) { %>
                             <th class="text-center" style="width: 15%;">Precio Cliente</th>
                         <% } %>
@@ -392,7 +421,9 @@ table.dataTable thead th:nth-child(2) select {
                                     <th>Tarifa</th>
                                     <th>Válido Hasta</th>
                                     <th>Duración</th>
+                                    <% if (!isDepartmentManager && !isClient) { %>
                                     <th>Estado</th>
+                                    <% } %>
                                 </tr>
                             </thead>
                             <tbody id="servicePriceHistoryTableBody">
@@ -709,7 +740,7 @@ table.dataTable thead th:nth-child(2) select {
                             // For services without specific origin (like local services)
                             return `
                                 <div class="d-flex flex-column">
-                                    <div class="fw-semibold text-center" style="font-size: 0.85rem;">
+                                    <div class="fw-semibold text-center" style="font-size: 1rem;">
                                         ${destination}
                                     </div>
                                 </div>
@@ -719,13 +750,13 @@ table.dataTable thead th:nth-child(2) select {
                         // Show bidirectional route for services with both origin and destination
                         return `
                             <div class="d-flex flex-column">
-                                <div class="fw-semibold text-center" style="font-size: 0.85rem;">
+                                <div class="fw-semibold text-center" style="font-size: 1rem;">
                                     ${origin}
                                 </div>
                                 <div class="text-center my-1">
                                     <span class="text-muted" style="font-size: 1.2rem;" title="Ruta bidireccional">↔</span>
                                 </div>
-                                <div class="fw-semibold text-center" style="font-size: 0.85rem;">
+                                <div class="fw-semibold text-center" style="font-size: 1rem;">
                                     ${destination}
                                 </div>
                             </div>
@@ -850,7 +881,8 @@ table.dataTable thead th:nth-child(2) select {
                         return `<div class="small" title="${data}">${truncated}</div>`;
                     }
                 },
-                // 4. Estado
+                // 4. Estado (only for admin and superadmin)
+                <% if (!isDepartmentManager && !isClient) { %>
                 {
                     data: 'active',
                     render: function(data) {
@@ -859,6 +891,7 @@ table.dataTable thead th:nth-child(2) select {
                             : '<span class="badge bg-secondary">Inactivo</span>';
                     }
                 },
+                <% } %>
                 ...(showActions ? [{
                     data: null,
                     orderable: false,
