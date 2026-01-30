@@ -27,6 +27,33 @@ const isClient = dtUserRole === 'client';
 %>
 
 <style>
+/* Global font size increase for all datatable elements */
+#<%= dtTableId %>,
+#<%= dtTableId %>_wrapper {
+    font-size: 0.95rem !important; /* Increased from default ~0.875rem */
+}
+
+#<%= dtTableId %> thead th,
+#<%= dtTableId %> tbody td {
+    font-size: 0.95rem !important; /* Increased for table headers and cells */
+}
+
+#<%= dtTableId %> .small {
+    font-size: 0.9rem !important; /* Increased from ~0.75rem */
+}
+
+#<%= dtTableId %> .badge {
+    font-size: 0.85rem !important; /* Increased badge font size */
+}
+
+/* DataTable controls (pagination, search, etc.) */
+#<%= dtTableId %>_wrapper .dataTables_length,
+#<%= dtTableId %>_wrapper .dataTables_filter,
+#<%= dtTableId %>_wrapper .dataTables_info,
+#<%= dtTableId %>_wrapper .dataTables_paginate {
+    font-size: 0.95rem !important;
+}
+
 /* Hide default DataTables sorting icons */
 .dt-control::before,
 .dt-control::after {
@@ -766,7 +793,7 @@ table.dataTable tbody tr.hover {
                         
                         return `
                             <div class="d-flex flex-column">
-                                <div class="fw-semibold" style="font-size: 0.9rem;">
+                                <div class="fw-semibold" style="font-size: 1.05rem;">
                                     ${destination}
                                 </div>
                             </div>

@@ -99,16 +99,13 @@ class DashboardController extends BaseController {
             const firstName = amexingUser.get('firstName') || '';
             const lastName = amexingUser.get('lastName') || '';
             userName = `${firstName} ${lastName}`.trim() || amexingUser.get('email') || req.user.email || 'User';
-            console.log('DEBUG - Found AmexingUser:', firstName, lastName);
           } else {
             // Fallback to Parse User data
             userName = req.user?.firstName && req.user?.lastName
               ? `${req.user.firstName} ${req.user.lastName}`
               : (req.user?.email || 'User');
-            console.log('DEBUG - Using Parse User fallback');
           }
         } catch (error) {
-          console.log('DEBUG - Error fetching AmexingUser:', error.message);
           userName = req.user?.email || 'User';
         }
       }
