@@ -696,7 +696,35 @@ table.dataTable tbody tr.hover {
                             }
                             
                             // Tours are already filtered by the API with tourType=vehicle
-                            allToursData = newToursData;
+                            // Add additional client-side filter to ensure walking tours are excluded
+                            console.log('🔍 Debug: Raw tours data before filtering:', newToursData);
+                            
+                            const vehicleOnlyTours = newToursData.filter(tour => {
+                                // Simple and explicit filter: only show tours that are NOT walking tours
+                                // If isWalkingTour is explicitly false or undefined/null, keep the tour
+                                // If isWalkingTour is explicitly true, filter it out
+                                const shouldKeepTour = tour.isWalkingTour !== true;
+                                
+                                // Debug logging for each tour
+                                console.log(`🔍 Tour analysis:`, {
+                                    id: tour.id,
+                                    name: tour.name || tour.title,
+                                    destinationPOI: tour.destinationPOI?.name,
+                                    tourType: tour.tourType,
+                                    isWalkingTour: tour.isWalkingTour,
+                                    shouldKeepTour: shouldKeepTour
+                                });
+                                
+                                if (!shouldKeepTour) {
+                                    console.log('🚫 Filtering out walking tour:', tour.destinationPOI?.name || tour.name);
+                                }
+                                
+                                return shouldKeepTour;
+                            });
+                            
+                            console.log(`📊 Filtered ${newToursData.length - vehicleOnlyTours.length} walking tours out of ${newToursData.length} total tours`);
+                            
+                            allToursData = vehicleOnlyTours;
                             filteredData = allToursData; // Show filtered vehicle tours by default
                             
                             
@@ -1600,8 +1628,22 @@ table.dataTable tbody tr.hover {
                     if (response.success && response.data) {
                         console.log('✅ Tours with prices loaded:', response.data.length, 'tours');
                         
-                        // Update the data with price information
-                        allToursData = response.data;
+                        // Apply walking tour filter to rate-filtered data
+                        const vehicleOnlyTours = response.data.filter(tour => {
+                            // Simple and explicit filter: only show tours that are NOT walking tours
+                            const shouldKeepTour = tour.isWalkingTour !== true;
+                            
+                            if (!shouldKeepTour) {
+                                console.log('🚫 Filtering out walking tour from rate data:', tour.destinationPOI?.name || tour.name);
+                            }
+                            
+                            return shouldKeepTour;
+                        });
+                        
+                        console.log(`📊 Rate filter: Filtered ${response.data.length - vehicleOnlyTours.length} walking tours out of ${response.data.length} total tours`);
+                        
+                        // Update the data with price information (walking tours excluded)
+                        allToursData = vehicleOnlyTours;
                         filteredData = allToursData;
                         
                         // Update table
