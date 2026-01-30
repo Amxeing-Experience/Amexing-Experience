@@ -62,7 +62,7 @@ const activeSection = typeof section !== 'undefined' ? section : 'vehicles';
                 <div class="row g-3">
                     <div class="col-md-4">
                         <label for="filterRate" class="form-label fw-semibold">
-                            <i class="ti ti-percentage me-1"></i>Filtrar por Segmento
+                            Filtrar por Segmento
                         </label>
                         <select class="form-select" id="filterRate">
                             <option value="">Todos los segmentos</option>
@@ -485,9 +485,13 @@ document.addEventListener('DOMContentLoaded', function() {
         grid.innerHTML = filteredVehicles.map(vehicle => {
             const typeName = vehicle.vehicleTypeId?.name || 'Sin tipo';
             const rateName = vehicle.rateId?.name || 'Sin segmento';
-            const rateColor = getRateColor(rateName);
+            const rateColor = vehicle.rateId?.color || '#6b7280'; // Use color from Rate table or default
             const imageUrl = vehicle.image || '';
-            const luggageCount = vehicle.luggageCapacity || vehicle.luggage_quantity || vehicle.luggageQuantity || vehicle.luggage || '-';
+            // Use vehicle's luggage capacity, or fallback to VehicleType's trunkCapacity if vehicle capacity is 0 or undefined
+            const vehicleLuggage = vehicle.luggageCapacity || vehicle.luggage_quantity || vehicle.luggageQuantity || vehicle.luggage;
+            const luggageCount = (vehicleLuggage && vehicleLuggage > 0) 
+                ? vehicleLuggage 
+                : (vehicle.vehicleTypeId?.trunkCapacity || '-');
             
             return `
                 <div class="col-md-6 col-lg-4">
@@ -509,7 +513,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="vehicle-card-info">
                                 <div class="vehicle-info-row">
                                     <span class="vehicle-info-label">
-                                        <i class="ti ti-percentage me-1"></i>Segmento
+                                        Segmento
                                     </span>
                                     <span class="rate-badge" style="background: ${rateColor};">
                                         ${rateName}
@@ -548,17 +552,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }).join('');
     }
 
-    // Get color for rate badge
-    function getRateColor(rate) {
-        const colors = {
-            'Económica': '#10b981',
-            'Estándar': '#3b82f6', 
-            'Premium': '#8b5cf6',
-            'Ejecutiva': '#f59e0b',
-            'VIP': '#ef4444'
-        };
-        return colors[rate] || '#6b7280';
-    }
 
     // Filter vehicles
     function filterVehicles() {

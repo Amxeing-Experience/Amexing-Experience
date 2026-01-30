@@ -138,11 +138,6 @@ const formatRoleName = (role) => {
                     <div class="view-mode">
                       <p class="fw-semibold mb-0">
                         <%= profileData.email || 'Not provided' %>
-                        <% if (profileData.emailVerified) { %>
-                          <i class="ti ti-circle-check text-success ms-1" title="Verified"></i>
-                        <% } else { %>
-                          <i class="ti ti-alert-circle text-warning ms-1" title="Not Verified"></i>
-                        <% } %>
                       </p>
                     </div>
                     <div class="edit-mode d-none">
@@ -194,7 +189,6 @@ const formatRoleName = (role) => {
                 <div class="col-md-6 mb-3">
                   <label class="text-muted small">Password</label>
                   <p class="fw-semibold mb-0">
-                    <span class="text-muted">Last changed 30 days ago</span>
                     <button type="button" class="btn btn-sm btn-outline-primary ms-2" id="change-password-btn">
                       Change
                     </button>

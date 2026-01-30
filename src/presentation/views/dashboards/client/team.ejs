@@ -34,9 +34,9 @@ const companyName = locals.companyName || 'Company';
       <div class="card-header bg-dark text-white">
         <div>
           <h5 class="card-title mb-1 text-white">
-            <i class="ti ti-user me-2"></i>Datos del Representante
+            <i class="ti ti-user me-2"></i>Datos del Agente Admin
           </h5>
-          <p class="text-white-50 mb-0">Información del agente representante</p>
+          <p class="text-white-50 mb-0">Información del agente admin</p>
         </div>
       </div>
       
@@ -46,7 +46,7 @@ const companyName = locals.companyName || 'Company';
           <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Cargando información...</span>
           </div>
-          <p class="text-muted mt-2">Cargando información del representante...</p>
+          <p class="text-muted mt-2">Cargando información del agente admin...</p>
         </div>
         
         <!-- Client info container -->
@@ -58,7 +58,7 @@ const companyName = locals.companyName || 'Company';
         <div id="client-info-error" class="text-center py-4 d-none">
           <div class="text-danger">
             <i class="ti ti-alert-circle" style="font-size: 2rem; opacity: 0.3;"></i>
-            <p class="mt-2 mb-2">Error al cargar información del representante</p>
+            <p class="mt-2 mb-2">Error al cargar información del agente admin</p>
             <button class="btn btn-outline-primary btn-sm" onclick="loadClientInfo()">
               <i class="ti ti-reload me-1"></i>Reintentar
             </button>
@@ -144,7 +144,7 @@ const companyName = locals.companyName || 'Company';
             <select class="form-select" id="role" required>
               <option value="">Seleccionar rol...</option>
               <option value="employee">Employee (Empleado estándar)</option>
-              <option value="client">Agent (Representante de agencia)</option>
+              <option value="client">Agent (Agente Admin)</option>
             </select>
           </div>
           
@@ -507,7 +507,7 @@ const companyName = locals.companyName || 'Company';
     }
 
     // Function to show error state
-    function showClientInfoError(errorMessage = 'Error al cargar información del representante') {
+    function showClientInfoError(errorMessage = 'Error al cargar información del agente admin') {
       const loadingEl = document.getElementById('client-info-loading');
       const containerEl = document.getElementById('client-info-container');
       const errorEl = document.getElementById('client-info-error');
@@ -518,7 +518,7 @@ const companyName = locals.companyName || 'Company';
       
       // Update error message if different from default
       const errorText = errorEl.querySelector('p');
-      if (errorText && errorMessage !== 'Error al cargar información del representante') {
+      if (errorText && errorMessage !== 'Error al cargar información del agente admin') {
         errorText.textContent = errorMessage;
       }
     }
