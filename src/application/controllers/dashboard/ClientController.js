@@ -132,15 +132,6 @@ class ClientController extends RoleBasedController {
 
             const clientRecord = await clientRecordQuery.first({ useMasterKey: true });
             if (clientRecord) {
-              console.log('🔍 DEBUG: Client record found, available fields:', {
-                name: clientRecord.get('name'),
-                companyName: clientRecord.get('companyName'),
-                company: clientRecord.get('company'),
-                businessName: clientRecord.get('businessName'),
-                organizationName: clientRecord.get('organizationName'),
-                allAttributes: Object.keys(clientRecord.attributes),
-              });
-
               // Get company name from Client record
               companyName = clientRecord.get('name')
                            || clientRecord.get('companyName')
@@ -148,26 +139,13 @@ class ClientController extends RoleBasedController {
                            || clientRecord.get('businessName')
                            || clientRecord.get('organizationName')
                            || 'Mi Empresa';
-              console.log('🔍 DEBUG: Got company name from Client record:', companyName);
             } else {
-              console.log('🔍 DEBUG: No Client record found for clientId:', clientId);
-
               // Try to get from the current user record
               const clientQuery = new Parse.Query(Parse.User);
               clientQuery.equalTo('objectId', user.id);
 
               const clientUser = await clientQuery.first({ useMasterKey: true });
               if (clientUser) {
-                // Debug: log all available fields
-                console.log('🔍 DEBUG: Client user fields available:', {
-                  companyName: clientUser.get('companyName'),
-                  company: clientUser.get('company'),
-                  organizationName: clientUser.get('organizationName'),
-                  clientName: clientUser.get('clientName'),
-                  businessName: clientUser.get('businessName'),
-                  allAttributes: clientUser.attributes,
-                });
-
                 // Get company name from the client user - check all possible fields
                 companyName = clientUser.get('companyName')
                              || clientUser.get('company')
@@ -175,14 +153,11 @@ class ClientController extends RoleBasedController {
                              || clientUser.get('clientName')
                              || clientUser.get('businessName')
                              || 'Mi Empresa';
-                console.log('🔍 DEBUG: Fetched client user company name from database:', companyName);
               } else {
-                console.log('🔍 DEBUG: Client user not found in database for ID:', user.id);
                 companyName = 'Mi Empresa';
               }
             }
           } catch (error) {
-            console.error('🔍 DEBUG: Error fetching client user data:', error);
             // Use fallback from session if available
             companyName = user.companyName || user.company || user.organizationName || 'Mi Empresa';
           }
@@ -191,49 +166,25 @@ class ClientController extends RoleBasedController {
           companyName = user.companyName || user.company || user.organizationName || 'Mi Empresa';
         }
 
-        // Debug: Check what user data we have
-        console.log('🔍 DEBUG: Current CLIENT user data:', {
-          userId: user.id,
-          userEmail: user.email || user.username,
-          clientId,
-          companyName,
-          availableUserFields: Object.keys(user),
-        });
-
         // Fetch department manager information if clientId exists
         if (clientId) {
           try {
-            console.log('🔍 DEBUG: Looking for department manager with clientId:', clientId);
-
             const query = new Parse.Query(Parse.User);
             query.equalTo('objectId', clientId);
             query.equalTo('exists', true);
             query.select(['firstName', 'lastName', 'email', 'phone', 'role', 'active', 'companyName', 'contextualData']);
 
             departmentManager = await query.first({ useMasterKey: true });
-            console.log('🔍 DEBUG: Query result:', departmentManager ? 'Found' : 'Not found');
 
             if (departmentManager) {
               // Get contextualData and extract company name from it
               const contextualData = departmentManager.get('contextualData');
-              console.log('🔍 DEBUG: Department manager contextualData:', contextualData);
 
               // Extract company name from contextualData if it exists
               if (contextualData && contextualData.companyName) {
                 const { companyName: extractedCompanyName } = contextualData;
                 companyName = extractedCompanyName;
-                console.log('🔍 DEBUG: Got company name from department manager contextualData:', companyName);
               }
-
-              console.log('🔍 DEBUG: Department manager details:', {
-                objectId: departmentManager.id,
-                email: departmentManager.get('email'),
-                username: departmentManager.get('username'),
-                role: departmentManager.get('role'),
-                firstName: departmentManager.get('firstName'),
-                lastName: departmentManager.get('lastName'),
-                hasContextualData: !!departmentManager.get('contextualData'),
-              });
 
               // Convert Parse object to plain object for template use
               // Use the company name from contextualData
@@ -247,11 +198,7 @@ class ClientController extends RoleBasedController {
                 active: departmentManager.get('active'),
                 companyName, // Use the company name from contextualData
               };
-
-              console.log('🔍 DEBUG: Department manager data prepared with client company name:', companyName);
             } else {
-              console.log('🔍 DEBUG: No department manager found, checking alternative table...');
-
               // Try AmexingUser table as well
               const amexingUserQuery = new Parse.Query('AmexingUser');
               amexingUserQuery.equalTo('objectId', clientId);
@@ -260,17 +207,13 @@ class ClientController extends RoleBasedController {
 
               const amexingUser = await amexingUserQuery.first({ useMasterKey: true });
               if (amexingUser) {
-                console.log('🔍 DEBUG: Found in AmexingUser table');
-
                 // Get contextualData and extract company name from it
                 const contextualData = amexingUser.get('contextualData');
-                console.log('🔍 DEBUG: AmexingUser contextualData:', contextualData);
 
                 // Extract company name from contextualData if it exists
                 if (contextualData && contextualData.companyName) {
                   const { companyName: extractedCompanyName } = contextualData;
                   companyName = extractedCompanyName;
-                  console.log('🔍 DEBUG: Got company name from AmexingUser contextualData:', companyName);
                 }
 
                 departmentManager = {
@@ -283,26 +226,15 @@ class ClientController extends RoleBasedController {
                   active: amexingUser.get('active'),
                   companyName, // Use the company name from contextualData
                 };
-
-                console.log('🔍 DEBUG: AmexingUser data prepared with company name:', companyName);
               }
             }
           } catch (error) {
-            console.error('🔍 DEBUG: Error fetching department manager:', error);
             // Continue without department manager data
           }
-        } else {
-          console.log('🔍 DEBUG: No clientId provided, user data:', {
-            hasUser: !!user,
-            userKeys: user ? Object.keys(user) : [],
-            clientId: user?.clientId,
-            userClientId: user?.get ? user.get('clientId') : 'N/A',
-          });
         }
       }
 
       // Final fallback for company name - only replace if it looks like an ID or is clearly invalid
-      const originalCompanyName = companyName;
       if (!companyName
           || companyName === 'Company'
           || companyName === 'undefined'
@@ -314,18 +246,7 @@ class ClientController extends RoleBasedController {
           || companyName.includes('ObjectId')
       ) {
         companyName = 'Mi Empresa';
-        console.log('🔍 DEBUG: Using fallback company name. Original:', originalCompanyName, 'New:', companyName);
-      } else {
-        console.log('🔍 DEBUG: Keeping original company name:', companyName);
       }
-
-      console.log('🔍 DEBUG: Final data being passed to template:', {
-        clientId,
-        companyName,
-        hasDepartmentManager: !!departmentManager,
-        departmentManagerCompany: departmentManager?.companyName,
-        currentUserId: user?.id,
-      });
 
       await this.renderRoleView(req, res, 'team', {
         title: 'My Team',
@@ -492,13 +413,6 @@ class ClientController extends RoleBasedController {
       const clientId = user?.get ? user.get('clientId') : user?.clientId || '';
 
       // Debug logging to understand clientId
-      console.log('🔍 Client Services Dashboard - User Info:', {
-        userId: user?.id || user?.objectId,
-        userRole: user?.get ? user.get('role') : user?.role,
-        clientId,
-        userClientIdField: user?.get ? user.get('clientId') : 'N/A',
-        userObjectId: user?.id || user?.objectId || 'N/A',
-      });
 
       await this.renderRoleView(req, res, 'services', {
         title: 'Traslados',
@@ -614,6 +528,17 @@ class ClientController extends RoleBasedController {
       this.handleError(res, error);
     }
   }
+
+  /**
+   * Client profile page.
+   * @function profile
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} - Renders client profile view or handles errors.
+   * @example
+   * // GET /dashboard/client/profile
+   * await clientController.profile(req, res);
+   */
 
   /**
    * Get client statistics.

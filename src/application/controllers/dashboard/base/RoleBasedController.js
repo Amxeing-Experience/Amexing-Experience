@@ -160,9 +160,6 @@ class RoleBasedController extends DashboardController {
       try {
         const Parse = require('parse/node');
 
-        console.log('=== FETCHING USER FROM DATABASE ===');
-        console.log('basicUserData.id:', basicUserData.id);
-
         // Try both Parse.User and AmexingUser tables
         let parseUser = null;
 
@@ -171,9 +168,8 @@ class RoleBasedController extends DashboardController {
           const userQuery = new Parse.Query(Parse.User);
           userQuery.equalTo('objectId', basicUserData.id);
           parseUser = await userQuery.first({ useMasterKey: true });
-          console.log('Parse.User query result:', parseUser ? 'Found' : 'Not found');
         } catch (error) {
-          console.log('Parse.User query error:', error.message);
+          // Parse.User query failed, will try AmexingUser next
         }
 
         // If not found in Parse.User, try AmexingUser table
@@ -182,17 +178,12 @@ class RoleBasedController extends DashboardController {
             const amexingUserQuery = new Parse.Query('AmexingUser');
             amexingUserQuery.equalTo('objectId', basicUserData.id);
             parseUser = await amexingUserQuery.first({ useMasterKey: true });
-            console.log('AmexingUser query result:', parseUser ? 'Found' : 'Not found');
           } catch (error) {
-            console.log('AmexingUser query error:', error.message);
+            // AmexingUser query failed, will use basic user data
           }
         }
 
         if (parseUser) {
-          console.log('User createdAt from DB:', parseUser.get('createdAt'));
-          console.log('User created_at from DB:', parseUser.get('created_at'));
-          console.log('User _created_at from DB:', parseUser.get('_created_at'));
-
           fullUserData = {
             id: parseUser.id,
             objectId: parseUser.id,
@@ -214,12 +205,11 @@ class RoleBasedController extends DashboardController {
             role: parseUser.get('role') || basicUserData.role,
             organizationId: parseUser.get('organizationId'),
           };
-          console.log('Final fullUserData.createdAt:', fullUserData.createdAt);
         } else {
-          console.log('User not found in either table');
+          // User not found in either table, will use basic user data
         }
-        console.log('=====================================');
       } catch (dbError) {
+        // eslint-disable-next-line no-console
         console.error('Error fetching user from database:', dbError);
         // Fall back to basic user data if database fetch fails
         fullUserData = basicUserData;

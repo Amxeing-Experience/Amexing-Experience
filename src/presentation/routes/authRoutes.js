@@ -451,11 +451,22 @@ router.post('/login', async (req, res) => {
               : user.get('displayName') || `${user.get('firstName')} ${user.get('lastName')}` || user.get('username'),
         };
 
-        // Record successful login - use method if available, otherwise skip
+        // Record successful login - manually update lastLoginAt since this is a raw Parse object
         if (typeof user.recordSuccessfulLogin === 'function') {
           await user.recordSuccessfulLogin('password');
         } else {
-          logger.info('recordSuccessfulLogin method not available, skipping', { userId: user.id });
+          // Manually update lastLoginAt for raw Parse objects
+          const now = new Date();
+          user.set('loginAttempts', 0);
+          user.set('lockedUntil', null);
+          user.set('lastLoginAt', now);
+          user.set('lastAuthMethod', 'password');
+          await user.save(null, { useMasterKey: true });
+
+          logger.info('lastLoginAt updated manually for raw Parse object', {
+            userId: user.id,
+            lastLoginAt: now.toISOString(),
+          });
         }
 
         logger.info('Parse Object authentication successful', {
