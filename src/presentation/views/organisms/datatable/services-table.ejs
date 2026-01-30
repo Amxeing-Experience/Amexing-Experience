@@ -1673,7 +1673,7 @@ table.dataTable thead th:nth-child(2) select {
                             // Generate card-based HTML for all rates
                             let allRatesHtml = '<div class="row g-3 mt-2">';
                             
-                            Object.keys(pricesByRate).forEach(rateName => {
+                            Object.keys(pricesByRate).sort().forEach(rateName => {
                                 const prices = pricesByRate[rateName];
                                 
                                 // Get rate color from the first price item (all items have same rate)

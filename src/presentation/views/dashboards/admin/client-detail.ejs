@@ -127,7 +127,7 @@ const tarifarioTabs = [
                 <div class="card-header bg-white"><h5 class="mb-0"><i class="ti ti-info-circle me-2 text-primary"></i>Información del Cliente</h5></div>
                 <div class="card-body">
                     <div class="mb-4">
-                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-user me-1"></i>Datos del Representante</h6>
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="ti ti-user me-1"></i>Datos del Agente Admin</h6>
                         <div class="row">
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">Nombre</label><p class="fw-semibold mb-0"><%= clientData.firstName || 'N/A' %></p></div>
                             <div class="col-md-6 mb-3"><label class="form-label text-muted small">Apellido</label><p class="fw-semibold mb-0"><%= clientData.lastName || 'N/A' %></p></div>
@@ -1950,7 +1950,7 @@ function setupExperienceFilters() {
                             <label for="employeeRole" class="form-label">Rol <span class="text-danger">*</span></label>
                             <select class="form-select" id="employeeRole" name="role" required>
                                 <option value="">Seleccionar rol...</option>
-                                <option value="client" selected>Agent (Representante de agencia con capacidades de gestión)</option>
+                                <option value="client" selected>Agent</option>
                             </select>
                             <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
                         </div>
@@ -1958,7 +1958,15 @@ function setupExperienceFilters() {
                         <!-- Role descriptions -->
                         <div class="alert alert-info role-description d-none" id="roleDescriptionClient">
                             <strong><i class="ti ti-briefcase me-1"></i>Agent:</strong>
-                            Representante de la agencia con capacidades de gestión. Puede gestionar empleados y cotizaciones.
+                            <p class="mb-2">El agente es responsable de la gestión integral de los servicios de los clientes dentro de su agencia. Entre sus funciones se incluyen:</p>
+                            <ul class="mb-0">
+                                <li>Crear, consultar y editar cotizaciones</li>
+                                <li>Compartir cotizaciones con otros agentes de la misma agencia</li>
+                                <li>Solicitar invoice y factura</li>
+                                <li>Solicitar, modificar o cancelar servicios</li>
+                                <li>Bloquear o eliminar servicios, según sea necesario</li>
+                                <li>Realizar todas las acciones relacionadas con la administración del servicio</li>
+                            </ul>
                         </div>
                         <div class="alert alert-secondary role-description d-none" id="roleDescriptionEmployee">
                             <strong><i class="ti ti-user me-1"></i>Employee:</strong>
@@ -2104,7 +2112,7 @@ function setupExperienceFilters() {
                             </label>
                             <select class="form-select" id="editEmployeeRole" name="role" required>
                                 <option value="">Seleccionar rol...</option>
-                                <option value="client">Agent (Representante de agencia con capacidades de gestión)</option>
+                                <option value="client">Agent</option>
                             </select>
                             <div class="form-text">Selecciona el nivel de acceso para este empleado</div>
                         </div>
@@ -2112,7 +2120,15 @@ function setupExperienceFilters() {
                         <!-- Role descriptions -->
                         <div class="alert alert-info role-description d-none" id="editRoleDescriptionClient">
                             <strong><i class="ti ti-briefcase me-1"></i>Agent:</strong>
-                            Representante de la agencia con capacidades de gestión. Puede gestionar empleados y cotizaciones.
+                            <p class="mb-2">El agente es responsable de la gestión integral de los servicios de los clientes dentro de su agencia. Entre sus funciones se incluyen:</p>
+                            <ul class="mb-0">
+                                <li>Crear, consultar y editar cotizaciones</li>
+                                <li>Compartir cotizaciones con otros agentes de la misma agencia</li>
+                                <li>Solicitar invoice y factura</li>
+                                <li>Solicitar, modificar o cancelar servicios</li>
+                                <li>Bloquear o eliminar servicios, según sea necesario</li>
+                                <li>Realizar todas las acciones relacionadas con la administración del servicio</li>
+                            </ul>
                         </div>
                         <div class="alert alert-secondary role-description d-none" id="editRoleDescriptionEmployee">
                             <strong><i class="ti ti-user me-1"></i>Employee:</strong>
@@ -2505,6 +2521,9 @@ function setupExperienceFilters() {
         // Role description display
         const roleSelect = document.getElementById('employeeRole');
         if (roleSelect) {
+            // Show default description on modal open since "client" is selected by default
+            document.getElementById('roleDescriptionClient')?.classList.remove('d-none');
+            
             roleSelect.addEventListener('change', function() {
                 // Hide all descriptions
                 document.querySelectorAll('.role-description').forEach(el => el.classList.add('d-none'));
@@ -3785,7 +3804,7 @@ function setupExperienceFilters() {
                     <!-- Personal Information Section -->
                     <div class="mb-4">
                         <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
-                            <i class="ti ti-user me-1"></i>Datos del Representante
+                            <i class="ti ti-user me-1"></i>Datos del Agente Admin
                         </h6>
                         <div class="row">
                             <div class="col-md-6 mb-3">
