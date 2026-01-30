@@ -20,7 +20,14 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-start mb-3">
             <div>
-                <h2 class="mb-1 fw-bold">Gestión de Traslados</h2>
+                <h2 class="mb-1 fw-bold">
+                    Gestión de Traslados
+                    <% if (typeof isDevelopment !== 'undefined' && isDevelopment) { %>
+                        <span class="badge bg-warning text-dark ms-2" style="font-size: 12px; vertical-align: middle;">
+                            <i class="ti ti-bug"></i> DEV MODE
+                        </span>
+                    <% } %>
+                </h2>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-0">
                         <li class="breadcrumb-item">
@@ -48,7 +55,8 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
             apiEndpoint: '/api/services',
             userRole: currentUserRole,
             showActions: true,
-            showClientPricing: false
+            showClientPricing: false,
+            isDevelopment: typeof isDevelopment !== 'undefined' ? isDevelopment : false
         }) %>
     </div>
 </div>
