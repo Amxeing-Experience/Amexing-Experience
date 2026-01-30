@@ -110,6 +110,20 @@ const clientId = locals.clientId || '';
             </select>
           </div>
           
+          <!-- Role description -->
+          <div class="alert alert-info role-description d-none" id="roleDescriptionClient">
+              <strong><i class="ti ti-briefcase me-1"></i>Agent:</strong>
+              <p class="mb-2">El agente es responsable de la gestión integral de los servicios de los clientes dentro de su agencia. Entre sus funciones se incluyen:</p>
+              <ul class="mb-0">
+                  <li>Crear, consultar y editar cotizaciones</li>
+                  <li>Compartir cotizaciones con otros agentes de la misma agencia</li>
+                  <li>Solicitar invoice y factura</li>
+                  <li>Solicitar, modificar o cancelar servicios</li>
+                  <li>Bloquear o eliminar servicios, según sea necesario</li>
+                  <li>Realizar todas las acciones relacionadas con la administración del servicio</li>
+              </ul>
+          </div>
+          
           <!-- Phone Field (Optional) -->
           <div class="mb-3">
             <label for="phone" class="form-label">Teléfono de Contacto</label>
@@ -200,7 +214,15 @@ const clientId = locals.clientId || '';
                         <!-- Role description -->
                         <div class="alert alert-info role-description" id="editRoleDescriptionClient">
                             <strong><i class="ti ti-briefcase me-1"></i>Agent:</strong>
-                            Representante de la agencia con capacidades de gestión. Puede gestionar empleados y cotizaciones.
+                            <p class="mb-2">El agente es responsable de la gestión integral de los servicios de los clientes dentro de su agencia. Entre sus funciones se incluyen:</p>
+                            <ul class="mb-0">
+                                <li>Crear, consultar y editar cotizaciones</li>
+                                <li>Compartir cotizaciones con otros agentes de la misma agencia</li>
+                                <li>Solicitar invoice y factura</li>
+                                <li>Solicitar, modificar o cancelar servicios</li>
+                                <li>Bloquear o eliminar servicios, según sea necesario</li>
+                                <li>Realizar todas las acciones relacionadas con la administración del servicio</li>
+                            </ul>
                         </div>
                     </div>
 
@@ -468,6 +490,24 @@ const clientId = locals.clientId || '';
         submitEditBtn.addEventListener('click', function() {
           submitEditEmployee();
         });
+      }
+
+      // Role selection change handler for create modal
+      const roleSelect = document.getElementById('role');
+      if (roleSelect) {
+        roleSelect.addEventListener('change', function() {
+          // Since we only have client role now, always show client description
+          const clientDesc = document.getElementById('roleDescriptionClient');
+          if (clientDesc) {
+            clientDesc.classList.remove('d-none');
+          }
+        });
+
+        // Show description by default since client is selected by default
+        const clientDesc = document.getElementById('roleDescriptionClient');
+        if (clientDesc) {
+          clientDesc.classList.remove('d-none');
+        }
       }
     });
 

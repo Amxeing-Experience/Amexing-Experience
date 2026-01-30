@@ -170,6 +170,7 @@ class VehicleController {
               name: vehicleType.get('name'),
               code: vehicleType.get('code'),
               icon: vehicleType.get('icon'),
+              trunkCapacity: vehicleType.get('trunkCapacity'),
             };
           }
 

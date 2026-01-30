@@ -18,6 +18,7 @@ const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
 const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
 const dtShowClientPricing = typeof showClientPricing !== 'undefined' ? showClientPricing : false;
 const dtClientId = typeof clientId !== 'undefined' ? clientId : null;
+const dtIsDevelopment = typeof isDevelopment !== 'undefined' ? isDevelopment : false;
 
 const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
 const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
@@ -410,6 +411,9 @@ table.dataTable thead th:nth-child(2) select {
 
 <script>
 (function() {
+    // Development mode flag for debugging
+    const isDevelopment = <%= dtIsDevelopment ? 'true' : 'false' %>;
+    
     // Wait for DOM and all dependencies to be ready
     function initWhenReady() {
         // Check if jQuery and DataTables are loaded
@@ -1669,7 +1673,7 @@ table.dataTable thead th:nth-child(2) select {
                             // Generate card-based HTML for all rates
                             let allRatesHtml = '<div class="row g-3 mt-2">';
                             
-                            Object.keys(pricesByRate).forEach(rateName => {
+                            Object.keys(pricesByRate).sort().forEach(rateName => {
                                 const prices = pricesByRate[rateName];
                                 
                                 // Get rate color from the first price item (all items have same rate)
@@ -1701,6 +1705,7 @@ table.dataTable thead th:nth-child(2) select {
                                                     <div>
                                                         <div class="fw-semibold small">${vehicleName}</div>
                                                         <div class="text-muted" style="font-size: 0.75rem;">${capacityInfo}</div>
+                                                        ${isDevelopment && (p.id || p.objectId) ? `<div class="text-info" style="font-size: 9px;"><i class="ti ti-bug"></i> ID: ${p.id || p.objectId}</div>` : ''}
                                                     </div>
                                                 </div>
                                                 <div class="text-end">
@@ -1722,6 +1727,7 @@ table.dataTable thead th:nth-child(2) select {
                                                 <div class="rate-color-circle me-2" style="background-color: ${rateColor}; width: 12px; height: 12px; border-radius: 50%;"></div>
                                                 <h6 class="mb-0 fw-bold" style="color: ${rateColor}">${rateName}</h6>
                                             </div>
+                                            ${isDevelopment ? `<div class="text-info mb-2" style="font-size: 10px;"><i class="ti ti-bug"></i> DEV: ${prices.length} prices found</div>` : ''}
                                             
                                             ${vehicleOptionsHtml}
                                         </div>
@@ -2780,6 +2786,15 @@ table.dataTable thead th:nth-child(2) select {
                 const ratePricesData = await ratePricesResponse.json();
                 const ratePrices = ratePricesData.success ? ratePricesData.data : [];
                 
+                // Debug logging in development mode
+                if (isDevelopment) {
+                    console.log('🔍 DEBUG: RatePrices Response Data:', ratePricesData);
+                    console.log('🔍 DEBUG: RatePrices Array:', ratePrices);
+                    if (ratePrices.length > 0) {
+                        console.log('🔍 DEBUG: Sample RatePrice Object:', ratePrices[0]);
+                        console.log('🔍 DEBUG: RatePrice IDs:', ratePrices.map(rp => rp.id || rp.objectId));
+                    }
+                }
 
                 // Build the rates and prices HTML
                 let ratesHtml = '';
@@ -2822,6 +2837,7 @@ table.dataTable thead th:nth-child(2) select {
                         const currentPrice = ratePrice.price || 0; // This is the final price (client or base)
                         const basePrice = ratePrice.basePrice || currentPrice; // Base price for reference
                         const isClientPrice = ratePrice.isClientPrice || false;
+                        const ratePriceId = ratePrice.id || ratePrice.objectId || ''; // Get RatePrices objectId
                         
                         // Determine labels and styling based on whether this is a client price
                         const basePriceLabel = isClientPrice ? 'Precio Base:' : 'Precio Base:';
@@ -2839,6 +2855,7 @@ table.dataTable thead th:nth-child(2) select {
                                             ${isClientPrice ? '<span class="badge bg-success ms-2">Personalizado</span>' : ''}
                                             <br>
                                             <small class="text-muted">${vehicleType?.code || ''} - Capacidad: ${vehicleType?.defaultCapacity || 'N/A'} pax</small>
+                                            ${isDevelopment && ratePriceId ? `<br><small class="text-info" style="font-size: 10px;"><i class="ti ti-bug"></i> RatePrices ID: ${ratePriceId}</small>` : ''}
                                         </div>
                                     </div>
                                 </div>
@@ -3279,6 +3296,11 @@ table.dataTable thead th:nth-child(2) select {
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title text-white" id="serviceClientPricingModalLabel">
                     <i class="ti ti-currency-dollar me-2"></i>Configurar Precios Cliente - Traslado
+                    <% if (dtIsDevelopment) { %>
+                        <span class="badge bg-warning text-dark ms-2" style="font-size: 10px;">
+                            <i class="ti ti-bug"></i> DEV MODE
+                        </span>
+                    <% } %>
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
