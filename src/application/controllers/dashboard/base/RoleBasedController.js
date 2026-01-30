@@ -160,27 +160,15 @@ class RoleBasedController extends DashboardController {
       try {
         const Parse = require('parse/node');
 
-        // Try both Parse.User and AmexingUser tables
+        // Use only AmexingUser table
         let parseUser = null;
 
-        // First try Parse.User table
         try {
-          const userQuery = new Parse.Query(Parse.User);
-          userQuery.equalTo('objectId', basicUserData.id);
-          parseUser = await userQuery.first({ useMasterKey: true });
+          const amexingUserQuery = new Parse.Query('AmexingUser');
+          amexingUserQuery.equalTo('objectId', basicUserData.id);
+          parseUser = await amexingUserQuery.first({ useMasterKey: true });
         } catch (error) {
-          // Parse.User query failed, will try AmexingUser next
-        }
-
-        // If not found in Parse.User, try AmexingUser table
-        if (!parseUser) {
-          try {
-            const amexingUserQuery = new Parse.Query('AmexingUser');
-            amexingUserQuery.equalTo('objectId', basicUserData.id);
-            parseUser = await amexingUserQuery.first({ useMasterKey: true });
-          } catch (error) {
-            // AmexingUser query failed, will use basic user data
-          }
+          // AmexingUser query failed, will use basic user data
         }
 
         if (parseUser) {

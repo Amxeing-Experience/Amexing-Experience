@@ -141,7 +141,7 @@ class ClientController extends RoleBasedController {
                            || 'Mi Empresa';
             } else {
               // Try to get from the current user record
-              const clientQuery = new Parse.Query(Parse.User);
+              const clientQuery = new Parse.Query('AmexingUser');
               clientQuery.equalTo('objectId', user.id);
 
               const clientUser = await clientQuery.first({ useMasterKey: true });
@@ -169,7 +169,7 @@ class ClientController extends RoleBasedController {
         // Fetch department manager information if clientId exists
         if (clientId) {
           try {
-            const query = new Parse.Query(Parse.User);
+            const query = new Parse.Query('AmexingUser');
             query.equalTo('objectId', clientId);
             query.equalTo('exists', true);
             query.select(['firstName', 'lastName', 'email', 'phone', 'role', 'active', 'companyName', 'contextualData']);

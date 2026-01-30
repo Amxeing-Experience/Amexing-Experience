@@ -190,107 +190,15 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // Use Parse authentication with fallback to direct auth, but standardize on JWT tokens
+    // Use AmexingUser authentication directly
     let authenticatedUser = null;
 
+    // Skip Parse.User.logIn - use only AmexingUser authentication
     try {
-      // Try to authenticate with Parse first
-      const parseUser = await Parse.User.logIn(identifier, password);
-
-      // Check if Parse authentication was successful
-      if (parseUser) {
-        // Check if user is active and exists (not deleted)
-        const isActive = parseUser.get('active');
-        const exists = parseUser.get('exists');
-
-        if (isActive === false) {
-          logger.warn('Login attempt with deactivated Parse User account', {
-            userId: parseUser.id,
-            email: parseUser.get('email'),
-          });
-          // Check if client expects HTML response
-          if (req.accepts('html')) {
-            return res.redirect(`/login?error=${encodeURIComponent('Your account has been deactivated')}`);
-          }
-          return res.status(401).json({
-            success: false,
-            error: 'Your account has been deactivated',
-          });
-        }
-
-        if (exists === false) {
-          logger.warn('Login attempt with deleted Parse User account', {
-            userId: parseUser.id,
-            email: parseUser.get('email'),
-          });
-          // Check if client expects HTML response
-          if (req.accepts('html')) {
-            return res.redirect(`/login?error=${encodeURIComponent('Account not found')}`);
-          }
-          return res.status(401).json({
-            success: false,
-            error: 'Account not found',
-          });
-        }
-
-        // Get role name from the new Role relationship for Parse User too
-        let roleName = 'guest';
-        const rolePointer = parseUser.get('roleId');
-        // Check if user has a role ID (could be Pointer or string)
-        if (rolePointer) {
-          try {
-            // Handle both Pointer objects and string IDs
-            let roleId;
-            if (typeof rolePointer === 'string') {
-              roleId = rolePointer;
-            } else if (rolePointer.id) {
-              roleId = rolePointer.id;
-            }
-
-            if (roleId) {
-              const roleQuery = new Parse.Query('Role');
-              const roleObject = await roleQuery.get(roleId, {
-                useMasterKey: true,
-              });
-              // Check if role object was found
-              if (roleObject) {
-                roleName = roleObject.get('name');
-              }
-            }
-          } catch (roleError) {
-            logger.warn('Failed to fetch role for Parse user, defaulting to guest', {
-              userId: parseUser.id,
-              rolePointer: typeof rolePointer === 'string' ? rolePointer : rolePointer?.id,
-              error: roleError.message,
-            });
-            // Fall back to old role field if new relationship fails
-            roleName = parseUser.get('role') || 'guest';
-          }
-        } else {
-          // Fall back to old role field if no roleId
-          roleName = parseUser.get('role') || 'guest';
-        }
-
-        // Convert Parse user to standardized user object for JWT
-        authenticatedUser = {
-          id: parseUser.id,
-          username: parseUser.get('username'),
-          email: parseUser.get('email'),
-          role: roleName,
-          roleId: rolePointer,
-          clientId: parseUser.get('clientId'),
-          organizationId: parseUser.get('organizationId'),
-          name: parseUser.get('displayName') || parseUser.get('username'),
-        };
-
-        logger.info('Parse authentication successful', {
-          userId: authenticatedUser.id,
-          role: authenticatedUser.role,
-        });
-      }
+      // Force immediate fallback to AmexingUser by throwing error
+      throw new Error('Using AmexingUser authentication only');
     } catch (parseError) {
-      logger.warn('Parse authentication failed, falling back to Parse Object auth:', parseError.message);
-      // Fallback to Parse Object authentication using AmexingUser model
+      // Use AmexingUser authentication directly
       const AmexingUser = require('../../domain/models/AmexingUser');
 
       try {
@@ -469,12 +377,12 @@ router.post('/login', async (req, res) => {
           });
         }
 
-        logger.info('Parse Object authentication successful', {
+        logger.info('AmexingUser authentication successful', {
           userId: authenticatedUser.id,
           role: authenticatedUser.role,
         });
       } catch (fallbackError) {
-        logger.error('Parse Object authentication failed:', fallbackError);
+        logger.error('AmexingUser authentication failed:', fallbackError);
         throw fallbackError;
       }
     }
