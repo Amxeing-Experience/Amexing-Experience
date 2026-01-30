@@ -205,6 +205,23 @@ class AuthController {
         username: user.get('username'),
       });
 
+      // Update lastLoginAt timestamp
+      const now = new Date();
+      logger.info('Updating lastLoginAt for user', {
+        userId: user.id,
+        username: user.get('username'),
+        newLastLoginAt: now.toISOString(),
+        oldLastLoginAt: user.get('lastLoginAt'),
+      });
+
+      user.set('lastLoginAt', now);
+      await user.save(null, { useMasterKey: true });
+
+      logger.info('Successfully updated lastLoginAt', {
+        userId: user.id,
+        updatedValue: user.get('lastLoginAt'),
+      });
+
       return user;
     } catch (error) {
       logger.error('Error during AmexingUser authentication:', {

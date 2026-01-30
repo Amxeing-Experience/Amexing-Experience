@@ -21,8 +21,32 @@ const apiEndpoint = typeof walkingApiEndpoint !== 'undefined' ? walkingApiEndpoi
                 </h5>
                 <p class="text-muted small mb-0">Precios por grupo de personas</p>
             </div>
-            <div class="badge bg-success-subtle text-success">
-                <i class="ti ti-users me-1"></i>Sin vehículos
+            <div class="d-flex align-items-center gap-3">
+                <!-- Filter Controls -->
+                <div class="d-flex gap-2 align-items-center">
+                    <!-- Currency Dropdown -->
+                    <div class="d-flex align-items-center gap-1">
+                        <label for="walkingCurrencyFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Moneda:</label>
+                        <select class="form-select form-select-sm" id="walkingCurrencyFilter-<%= sectionId %>" style="min-width: 80px;">
+                            <option value="MXN" selected>MXN</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Payment Type Dropdown -->
+                    <div class="d-flex align-items-center gap-1">
+                        <label for="walkingPaymentFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Pago:</label>
+                        <select class="form-select form-select-sm" id="walkingPaymentFilter-<%= sectionId %>" style="min-width: 180px;">
+                            <option value="efectivo"<%= (typeof defaultPaymentType !== 'undefined' && defaultPaymentType === 'efectivo') ? ' selected' : '' %>>Efectivo</option>
+                            <option value="transferencia"<%= (typeof defaultPaymentType === 'undefined' || defaultPaymentType === 'transferencia') ? ' selected' : '' %>>Transferencia</option>
+                            <option value="tarjeta"<%= (typeof defaultPaymentType !== 'undefined' && defaultPaymentType === 'tarjeta') ? ' selected' : '' %>>Tarjeta de Crédito/Débito</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="badge bg-success-subtle text-success">
+                    <i class="ti ti-users me-1"></i>Sin vehículos
+                </div>
             </div>
         </div>
     </div>
@@ -104,6 +128,9 @@ function getWalkingTourPricing(tour) {
         small: '$1,050 MXN',      // 1-5 pax
         medium: '$2,100 MXN',     // 6-10 pax  
         large: '$3,150 MXN',      // 11-15 pax
+        smallNumber: 1050,        // Numeric value for data attribute
+        mediumNumber: 2100,       // Numeric value for data attribute
+        largeNumber: 3150,        // Numeric value for data attribute
         hasTourPricing: false
     };
     
@@ -118,6 +145,9 @@ function getWalkingTourPricing(tour) {
             small: `$${tour.walkingPriceSmall.toLocaleString()} ${currency}`,
             medium: `$${tour.walkingPriceMedium.toLocaleString()} ${currency}`,
             large: `$${tour.walkingPriceLarge.toLocaleString()} ${currency}`,
+            smallNumber: tour.walkingPriceSmall,     // Numeric value for data attribute
+            mediumNumber: tour.walkingPriceMedium,   // Numeric value for data attribute
+            largeNumber: tour.walkingPriceLarge,     // Numeric value for data attribute
             smallRange: smallRange.replace(' pax', ' personas'),
             mediumRange: mediumRange.replace(' pax', ' personas'),
             largeRange: largeRange.replace(' pax', ' personas'),
@@ -138,6 +168,9 @@ function getWalkingTourPricing(tour) {
                 small: `$${basePrice.toLocaleString()} MXN`,           // 1-5 pax
                 medium: `$${(basePrice * 2).toLocaleString()} MXN`,    // 6-10 pax (double)
                 large: `$${(basePrice * 3).toLocaleString()} MXN`,     // 11-15 pax (triple)
+                smallNumber: basePrice,                                // Numeric value for data attribute
+                mediumNumber: basePrice * 2,                          // Numeric value for data attribute
+                largeNumber: basePrice * 3,                           // Numeric value for data attribute
                 hasTourPricing: false // This is client pricing, not tour pricing
             };
         }
@@ -181,7 +214,12 @@ function displayWalkingTours(tours) {
                         <div class="col-md-4">
                             <div class="text-center p-3 bg-success-subtle rounded-2 border border-success-subtle">
                                 <div class="fw-bold text-success">${pricing.smallRange || '1-5 personas'}</div>
-                                <div class="h5 mb-0 text-success">${pricing.small}</div>
+                                <div class="h5 mb-0 text-success walking-tour-price-small" data-original-price="${pricing.smallNumber || 0}">
+                                    <div class="price-loader d-flex align-items-center justify-content-center">
+                                        <div class="spinner-border spinner-border-sm text-success me-2" role="status" aria-hidden="true"></div>
+                                        <span class="small">Cargando...</span>
+                                    </div>
+                                </div>
                                 <div class="small text-muted">por hora</div>
                             </div>
                         </div>
@@ -190,7 +228,12 @@ function displayWalkingTours(tours) {
                         <div class="col-md-4">
                             <div class="text-center p-3 bg-warning-subtle rounded-2 border border-warning-subtle">
                                 <div class="fw-bold text-warning-emphasis">${pricing.mediumRange || '6-10 personas'}</div>
-                                <div class="h5 mb-0 text-warning-emphasis">${pricing.medium}</div>
+                                <div class="h5 mb-0 text-warning-emphasis walking-tour-price-medium" data-original-price="${pricing.mediumNumber || 0}">
+                                    <div class="price-loader d-flex align-items-center justify-content-center">
+                                        <div class="spinner-border spinner-border-sm text-warning me-2" role="status" aria-hidden="true"></div>
+                                        <span class="small">Cargando...</span>
+                                    </div>
+                                </div>
                                 <div class="small text-muted">por hora</div>
                             </div>
                         </div>
@@ -199,7 +242,12 @@ function displayWalkingTours(tours) {
                         <div class="col-md-4">
                             <div class="text-center p-3 bg-info-subtle rounded-2 border border-info-subtle">
                                 <div class="fw-bold text-info-emphasis">${pricing.largeRange || '11-15 personas'}</div>
-                                <div class="h5 mb-0 text-info-emphasis">${pricing.large}</div>
+                                <div class="h5 mb-0 text-info-emphasis walking-tour-price-large" data-original-price="${pricing.largeNumber || 0}">
+                                    <div class="price-loader d-flex align-items-center justify-content-center">
+                                        <div class="spinner-border spinner-border-sm text-info me-2" role="status" aria-hidden="true"></div>
+                                        <span class="small">Cargando...</span>
+                                    </div>
+                                </div>
                                 <div class="small text-muted">por hora</div>
                             </div>
                         </div>
@@ -212,6 +260,48 @@ function displayWalkingTours(tours) {
     
     containerEl.innerHTML = toursHtml;
     containerEl.classList.remove('d-none');
+    
+    // Initialize filters after tours are displayed
+    setTimeout(() => {
+        initWalkingToursFilters();
+        
+        // Apply initial pricing based on current filter selections
+        const sectionId = '<%= sectionId %>';
+        const initialPayment = $(`#walkingPaymentFilter-${sectionId}`).val();
+        const initialCurrency = $(`#walkingCurrencyFilter-${sectionId}`).val();
+        
+        // Force load transfer rate if needed and apply pricing
+        const ensureCorrectPricing = () => {
+            console.log('🔍 Checking rates for', initialPayment, '- Transfer:', walkingCurrentTransferRate);
+            
+            if (initialPayment === 'transferencia') {
+                if (walkingCurrentTransferRate <= 0) {
+                    console.log('🔄 Transfer rate not loaded, forcing reload...');
+                    loadWalkingTransferRate().then(() => {
+                        console.log('✅ Transfer rate loaded:', walkingCurrentTransferRate, '- applying prices');
+                        updateWalkingToursPrices(initialPayment, initialCurrency);
+                    });
+                } else {
+                    console.log('✅ Transfer rate already loaded:', walkingCurrentTransferRate, '- applying prices');
+                    updateWalkingToursPrices(initialPayment, initialCurrency);
+                }
+            } else if (initialPayment === 'tarjeta') {
+                if (walkingCurrentAgencyRate <= 0) {
+                    loadWalkingAgencyRate().then(() => {
+                        updateWalkingToursPrices(initialPayment, initialCurrency);
+                    });
+                } else {
+                    updateWalkingToursPrices(initialPayment, initialCurrency);
+                }
+            } else {
+                // Efectivo - no rates needed
+                updateWalkingToursPrices(initialPayment, initialCurrency);
+            }
+        };
+        
+        // Start the process
+        setTimeout(ensureCorrectPricing, 300);
+    }, 500);
 }
 
 function showWalkingToursError() {
@@ -233,4 +323,246 @@ function showWalkingToursError() {
     `;
     containerEl.classList.remove('d-none');
 }
+
+// Global variables for walking tours pricing
+let walkingCurrentTransferRate = 0;
+let walkingCurrentExchangeRate = 0;
+let walkingCurrentAgencyRate = 0;
+
+// Initialize filter event handlers
+function initWalkingToursFilters() {
+    const sectionId = '<%= sectionId %>';
+    console.log('🔧 Initializing walking tours filters for section:', sectionId);
+    
+    // Remove any existing event handlers to prevent duplicates
+    $(`#walkingCurrencyFilter-${sectionId}`).off('change.walkingtours');
+    $(`#walkingPaymentFilter-${sectionId}`).off('change.walkingtours');
+    
+    // Currency filter change handler
+    $(`#walkingCurrencyFilter-${sectionId}`).on('change.walkingtours', function() {
+        const selectedCurrency = $(this).val();
+        const selectedPaymentType = $(`#walkingPaymentFilter-${sectionId}`).val();
+        console.log('💱 Currency changed to:', selectedCurrency, 'Payment:', selectedPaymentType);
+        
+        if (selectedCurrency === 'USD' && walkingCurrentExchangeRate <= 0) {
+            loadWalkingExchangeRate().then(() => {
+                updateWalkingToursPrices(selectedPaymentType, selectedCurrency);
+            });
+        } else {
+            updateWalkingToursPrices(selectedPaymentType, selectedCurrency);
+        }
+    });
+    
+    // Payment type filter change handler
+    $(`#walkingPaymentFilter-${sectionId}`).on('change.walkingtours', function() {
+        const selectedPaymentType = $(this).val();
+        const selectedCurrency = $(`#walkingCurrencyFilter-${sectionId}`).val();
+        console.log('💳 Payment type changed to:', selectedPaymentType, 'Currency:', selectedCurrency);
+        
+        // Handle payment type specific rates
+        if (selectedPaymentType === 'transferencia' && walkingCurrentTransferRate <= 0) {
+            loadWalkingTransferRate().then(() => {
+                updateWalkingToursPrices(selectedPaymentType, selectedCurrency);
+            });
+        } else if (selectedPaymentType === 'tarjeta' && walkingCurrentAgencyRate <= 0) {
+            loadWalkingAgencyRate().then(() => {
+                updateWalkingToursPrices(selectedPaymentType, selectedCurrency);
+            });
+        } else {
+            updateWalkingToursPrices(selectedPaymentType, selectedCurrency);
+        }
+    });
+    
+    // Test that selectors work
+    console.log('🔍 Currency selector found:', $(`#walkingCurrencyFilter-${sectionId}`).length > 0);
+    console.log('🔍 Payment selector found:', $(`#walkingPaymentFilter-${sectionId}`).length > 0);
+}
+
+// Get JWT token from localStorage or cookies
+function getAccessToken() {
+    // First try localStorage (used by other parts of the app)
+    const tokenFromStorage = localStorage.getItem('accessToken');
+    if (tokenFromStorage) {
+        return tokenFromStorage;
+    }
+    
+    // Fallback to cookies (httpOnly cookies won't work, but try anyway)
+    const cookies = document.cookie.split(';');
+    for (let cookie of cookies) {
+        const [name, value] = cookie.trim().split('=');
+        if (name === 'accessToken') {
+            return value;
+        }
+    }
+    return null;
+}
+
+// Load current exchange rate for USD conversion
+function loadWalkingExchangeRate() {
+    return $.ajax({
+        url: '/api/exchange-rate/current',
+        type: 'GET',
+        beforeSend: function(xhr) {
+            const token = getAccessToken();
+            if (token) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            }
+        },
+        success: function(response) {
+            if (response.success && response.data) {
+                walkingCurrentExchangeRate = response.data.value || 0;
+                console.log('✅ Walking tours exchange rate loaded:', walkingCurrentExchangeRate, 'MXN per USD');
+            } else {
+                console.warn('⚠️ No active exchange rate found for walking tours');
+                walkingCurrentExchangeRate = 0;
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Error loading exchange rate for walking tours:', error);
+            walkingCurrentExchangeRate = 0;
+        }
+    });
+}
+
+// Load current transfer rate for payment calculations
+function loadWalkingTransferRate() {
+    return $.ajax({
+        url: '/api/transfer-rate/current',
+        type: 'GET',
+        beforeSend: function(xhr) {
+            const token = getAccessToken();
+            if (token) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            }
+        },
+        success: function(response) {
+            if (response.success && response.data) {
+                walkingCurrentTransferRate = response.data.value || 0;
+            } else {
+                walkingCurrentTransferRate = 0;
+            }
+        },
+        error: function(xhr, status, error) {
+            walkingCurrentTransferRate = 0;
+        }
+    });
+}
+
+// Load current agency rate for credit card payments
+function loadWalkingAgencyRate() {
+    return $.ajax({
+        url: '/api/agency-rate/current',
+        type: 'GET',
+        beforeSend: function(xhr) {
+            const token = getAccessToken();
+            if (token) {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+            }
+        },
+        success: function(response) {
+            if (response.success && response.data) {
+                walkingCurrentAgencyRate = response.data.value || 0;
+                console.log('✅ Walking tours agency rate loaded:', walkingCurrentAgencyRate + '%');
+            } else {
+                console.warn('⚠️ No active agency rate found for walking tours');
+                walkingCurrentAgencyRate = 0;
+            }
+        },
+        error: function(xhr, status, error) {
+            console.error('❌ Error loading agency rate for walking tours:', error);
+            walkingCurrentAgencyRate = 0;
+        }
+    });
+}
+
+// Format price with currency symbol
+function formatWalkingTourPrice(price, currency) {
+    if (currency === 'USD') {
+        return `$${parseFloat(price).toLocaleString('en-US', { 
+            minimumFractionDigits: 0, 
+            maximumFractionDigits: 2 
+        })} USD`;
+    } else {
+        return `$${parseFloat(price).toLocaleString('es-MX')} MXN`;
+    }
+}
+
+// Apply USD rounding rules (same as main tours table)
+function applyWalkingUSDRoundingRules(usdPrice) {
+    if (usdPrice <= 50) {
+        return Math.round(usdPrice);
+    } else if (usdPrice <= 100) {
+        return Math.round(usdPrice / 5) * 5;
+    } else {
+        return Math.round(usdPrice / 10) * 10;
+    }
+}
+
+// Convert and format price based on currency and payment type
+function convertWalkingTourPrice(priceInput, currency, paymentType) {
+    // Handle both numeric and string inputs
+    let numericValue;
+    if (typeof priceInput === 'number') {
+        numericValue = priceInput;
+    } else if (typeof priceInput === 'string') {
+        numericValue = parseFloat(priceInput.replace(/[^0-9.]/g, ''));
+    } else {
+        console.error('Invalid price input:', priceInput);
+        return '$0 MXN';
+    }
+    
+    if (isNaN(numericValue)) {
+        console.error('Could not parse price:', priceInput);
+        return '$0 MXN';
+    }
+    
+    // Apply payment type rate first
+    let adjustedPrice = numericValue;
+    if (paymentType === 'transferencia' && walkingCurrentTransferRate > 0) {
+        adjustedPrice = numericValue * (1 + walkingCurrentTransferRate / 100);
+    } else if (paymentType === 'tarjeta' && walkingCurrentAgencyRate > 0) {
+        adjustedPrice = numericValue * (1 + walkingCurrentAgencyRate / 100);
+    }
+    
+    // Then convert currency if needed
+    if (currency === 'USD' && walkingCurrentExchangeRate > 0) {
+        const convertedValue = adjustedPrice / walkingCurrentExchangeRate;
+        const roundedValue = applyWalkingUSDRoundingRules(convertedValue);
+        return formatWalkingTourPrice(roundedValue, 'USD');
+    } else {
+        return formatWalkingTourPrice(adjustedPrice, 'MXN');
+    }
+}
+
+// Update all walking tour prices based on selected filters
+function updateWalkingToursPrices(paymentType, currency) {
+    const tourItems = $('.walking-tour-item');
+    
+    tourItems.each(function() {
+        const tourItem = $(this);
+        
+        // Update price displays in each pricing tier
+        ['small', 'medium', 'large'].forEach(size => {
+            const priceElement = tourItem.find(`.walking-tour-price-${size}`);
+            
+            if (priceElement.length > 0) {
+                const originalPrice = priceElement.data('original-price');
+                
+                if (originalPrice !== undefined && originalPrice !== null) {
+                    const updatedPrice = convertWalkingTourPrice(originalPrice, currency, paymentType);
+                    // Replace loader with actual price
+                    priceElement.html(updatedPrice);
+                }
+            }
+        });
+    });
+}
+
+// Initialize walking tours filters when document is ready
+$(document).ready(function() {
+    // Load rates for walking tours (these are global and can be loaded immediately)
+    loadWalkingTransferRate();
+    loadWalkingAgencyRate();
+    loadWalkingExchangeRate();
+});
 </script>
