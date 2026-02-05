@@ -247,9 +247,6 @@ table.dataTable tbody tr.hover {
                             <option value="transferencia">Transferencia</option>
                         <% } %>
                         <option value="tarjeta">Tarjeta Débito/Crédito</option>
-                        <% if (!isDepartmentManager && !isClient) { %>
-                        <option value="transf_agencias">Transf. Agencias</option>
-                        <% } %>
                     </select>
                 </div>
             </div>
@@ -1171,11 +1168,13 @@ table.dataTable tbody tr.hover {
         // Store initializeTable function globally for refresh after save
         window[`initializeToursTable_${tableId}`] = initializeTable;
 
-        // Store transfer rate data globally
-        let currentTransferRate = 0;
+        // Store transfer rate data globally (accessible to all scripts)
+        window.currentTransferRate = 0;
+        let currentTransferRate = window.currentTransferRate;
         
-        // Store agency rate data globally (for department managers)
-        let currentAgencyRate = 0;
+        // Store agency rate data globally (for department managers, accessible to all scripts)
+        window.currentAgencyRate = 0;
+        let currentAgencyRate = window.currentAgencyRate;
         
         // Store exchange rate data globally
         let currentExchangeRate = 0;
@@ -1197,16 +1196,16 @@ table.dataTable tbody tr.hover {
                 },
                 success: function(response) {
                     if (response.success && response.data) {
-                        currentTransferRate = response.data.value || 0;
+                        currentTransferRate = window.currentTransferRate = response.data.value || 0;
                         console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
                     } else {
                         console.warn('⚠️ No active transfer rate found');
-                        currentTransferRate = 0;
+                        currentTransferRate = window.currentTransferRate = 0;
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('❌ Error loading transfer rate:', error);
-                    currentTransferRate = 0;
+                    currentTransferRate = window.currentTransferRate = 0;
                 }
             });
         }
@@ -1320,11 +1319,13 @@ table.dataTable tbody tr.hover {
             }
         }
 
-        // Function to update all displayed prices based on payment type and currency
-        function updatePricesForFilters(paymentType, currency) {
+        // Function to update all displayed prices based on payment type, currency, and driver rate
+        function updatePricesForFilters(paymentType, currency, includeDriver = false) {
             console.log('🔄 updatePricesForFilters called with:', { 
                 paymentType, 
                 currency,
+                includeDriver,
+                currentDriverRate,
                 currentTransferRate,
                 currentAgencyRate
             });
@@ -1353,9 +1354,12 @@ table.dataTable tbody tr.hover {
                     } else if (paymentType === 'tarjeta') {
                         console.log('🐳 Applying Agency Rate for tarjeta, rate value:', currentAgencyRate);
                         finalPrice = applyAgencyRate(finalPrice);
-                    } else if (paymentType === 'transf_agencias') {
-                        console.log('🏢 Applying Agency Rate for transf_agencias, rate value:', currentAgencyRate);
-                        finalPrice = applyAgencyRate(finalPrice);
+                    }
+                    
+                    // Apply driver rate if needed (Guía + Chofer)
+                    if (includeDriver && currentDriverRate > 0) {
+                        console.log('🚗 Applying Driver Rate:', currentDriverRate);
+                        finalPrice = applyDriverRate(finalPrice);
                     }
                     
                     // Always apply currency conversion/formatting
@@ -1385,9 +1389,12 @@ table.dataTable tbody tr.hover {
                 } else if (paymentType === 'tarjeta') {
                     console.log('💳 [Expanded View] Applying Agency Rate for tarjeta, rate value:', currentAgencyRate);
                     finalPrice = applyAgencyRate(finalPrice);
-                } else if (paymentType === 'transf_agencias') {
-                    console.log('🏢 [Expanded View] Applying Agency Rate for transf_agencias, rate value:', currentAgencyRate);
-                    finalPrice = applyAgencyRate(finalPrice);
+                }
+                
+                // Apply driver rate if needed (Guía + Chofer)
+                if (includeDriver && currentDriverRate > 0) {
+                    console.log('🚗 [Expanded View] Applying Driver Rate:', currentDriverRate);
+                    finalPrice = applyDriverRate(finalPrice);
                 }
                 
                 // Always apply currency conversion/formatting
@@ -1461,16 +1468,16 @@ table.dataTable tbody tr.hover {
                 },
                 success: function(response) {
                     if (response.success && response.data) {
-                        currentAgencyRate = response.data.value || 0;
+                        currentAgencyRate = window.currentAgencyRate = response.data.value || 0;
                         console.log('✅ Current agency rate loaded:', currentAgencyRate + '%');
                     } else {
                         console.warn('⚠️ No active agency rate found');
-                        currentAgencyRate = 0;
+                        currentAgencyRate = window.currentAgencyRate = 0;
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('❌ Error loading agency rate:', error);
-                    currentAgencyRate = 0;
+                    currentAgencyRate = window.currentAgencyRate = 0;
                 }
             });
         }
@@ -1488,16 +1495,16 @@ table.dataTable tbody tr.hover {
                 },
                 success: function(response) {
                     if (response.success && response.data) {
-                        currentExchangeRate = response.data.value || 0;
+                        currentExchangeRate = window.currentExchangeRate = response.data.value || 0;
                         console.log('✅ Current exchange rate loaded:', currentExchangeRate, 'MXN per USD');
                     } else {
                         console.warn('⚠️ No active exchange rate found');
-                        currentExchangeRate = 0;
+                        currentExchangeRate = window.currentExchangeRate = 0;
                     }
                 },
                 error: function(xhr, status, error) {
                     console.error('❌ Error loading exchange rate:', error);
-                    currentExchangeRate = 0;
+                    currentExchangeRate = window.currentExchangeRate = 0;
                 }
             });
         }
@@ -3571,6 +3578,523 @@ function showTourPriceHistoryError(message) {
 }
 
 // ========== END TOUR PRICE HISTORY MODAL MANAGEMENT ==========
+
+// ========== DRIVER RATE FUNCTIONALITY ==========
+
+// Centralized state management for all rates and pricing
+const TourPricingState = {
+    rates: {
+        driver: { value: 0, loaded: false },
+        transfer: { value: 0, loaded: false },
+        agency: { value: 0, loaded: false },
+        exchange: { value: 0, loaded: false }
+    },
+    
+    // Getters for rate values
+    getDriverRate() { return this.rates.driver.value; },
+    getTransferRate() { return window.currentTransferRate || this.rates.transfer.value; },
+    getAgencyRate() { return window.currentAgencyRate || this.rates.agency.value; },
+    getExchangeRate() { return window.currentExchangeRate || this.rates.exchange.value; },
+    
+    // Setters for rate values (sync with window properties for backward compatibility)
+    setDriverRate(value) { 
+        this.rates.driver.value = value; 
+        this.rates.driver.loaded = true;
+    },
+    setTransferRate(value) { 
+        this.rates.transfer.value = window.currentTransferRate = value; 
+        this.rates.transfer.loaded = true;
+    },
+    setAgencyRate(value) { 
+        this.rates.agency.value = window.currentAgencyRate = value; 
+        this.rates.agency.loaded = true;
+    },
+    setExchangeRate(value) { 
+        this.rates.exchange.value = window.currentExchangeRate = value; 
+        this.rates.exchange.loaded = true;
+    }
+};
+
+// Legacy support - maintain backward compatibility
+let currentDriverRate = 0;
+let driverRateLoaded = false;
+let globalTransferRate = 0;
+let globalAgencyRate = 0;
+let transferRateLoaded = false;
+let agencyRateLoaded = false;
+
+/**
+ * Fetch current driver tour rate from API
+ * @returns {Promise<number>} Current driver rate value
+ */
+async function fetchCurrentDriverRate() {
+    try {
+        const token = getAccessToken();
+        const response = await fetch('/api/driver-tour-rate/current', {
+            method: 'GET',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+                const rate = data.data.value || 0;
+                TourPricingState.setDriverRate(rate);
+                currentDriverRate = rate; // Legacy support
+                console.log('✅ Current driver rate loaded:', rate);
+                return rate;
+            }
+        } else if (response.status === 404) {
+            console.log('No driver rate found, creating default...');
+            return await createDefaultDriverRate();
+        }
+        
+        throw new Error('Failed to fetch driver rate');
+    } catch (error) {
+        console.error('❌ Error fetching driver rate:', error);
+        return await createDefaultDriverRate();
+    }
+}
+
+/**
+ * Create default driver tour rate if none exists
+ * @returns {Promise<number>} Created driver rate value
+ */
+async function createDefaultDriverRate() {
+    try {
+        const token = getAccessToken();
+        const response = await fetch('/api/driver-tour-rate', {
+            method: 'POST',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                value: 635,
+                active: true,
+                exists: true
+            })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+                const rate = data.data.value || 635;
+                TourPricingState.setDriverRate(rate);
+                currentDriverRate = rate; // Legacy support
+                console.log('✅ Default driver rate created:', rate);
+                return rate;
+            }
+        }
+        
+        // Fallback to default value if creation fails
+        console.warn('⚠️ Failed to create driver rate, using default value');
+        const defaultRate = 635;
+        TourPricingState.setDriverRate(defaultRate);
+        currentDriverRate = defaultRate; // Legacy support
+        return defaultRate;
+    } catch (error) {
+        console.error('❌ Error creating default driver rate:', error);
+        const defaultRate = 635;
+        TourPricingState.setDriverRate(defaultRate);
+        currentDriverRate = defaultRate; // Legacy support
+        return defaultRate;
+    }
+}
+
+/**
+ * Fetch current exchange rate from API (vanilla JS version)
+ * @returns {Promise<number>} Current exchange rate value
+ */
+async function fetchExchangeRateVanilla() {
+    try {
+        const token = getAccessToken();
+        const response = await fetch('/api/exchange-rate/current', {
+            method: 'GET',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+                const rate = data.data.value || 0;
+                TourPricingState.setExchangeRate(rate);
+                console.log('✅ Current exchange rate loaded:', rate, 'MXN per USD');
+                return rate;
+            }
+        }
+        
+        console.warn('⚠️ No active exchange rate found');
+        TourPricingState.setExchangeRate(0);
+        return 0;
+    } catch (error) {
+        console.error('❌ Error fetching exchange rate:', error);
+        TourPricingState.setExchangeRate(0);
+        return 0;
+    }
+}
+
+/**
+ * Fetch current transfer rate from API
+ * @returns {Promise<number>} Current transfer rate value
+ */
+async function fetchTransferRate() {
+    try {
+        const token = getAccessToken();
+        const response = await fetch('/api/transfer-rate/current', {
+            method: 'GET',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+                globalTransferRate = data.data.value || 0;
+                console.log('✅ Transfer rate loaded:', globalTransferRate + '%');
+                return globalTransferRate;
+            }
+        }
+        
+        console.warn('⚠️ No transfer rate found, using 0');
+        globalTransferRate = 0;
+        return globalTransferRate;
+    } catch (error) {
+        console.error('❌ Error fetching transfer rate:', error);
+        globalTransferRate = 0;
+        return globalTransferRate;
+    }
+}
+
+/**
+ * Fetch current agency rate from API
+ * @returns {Promise<number>} Current agency rate value
+ */
+async function fetchAgencyRate() {
+    try {
+        const token = getAccessToken();
+        const response = await fetch('/api/agency-rate/current', {
+            method: 'GET',
+            headers: {
+                'Authorization': token ? `Bearer ${token}` : '',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+                globalAgencyRate = data.data.value || 0;
+                console.log('✅ Agency rate loaded:', globalAgencyRate + '%');
+                return globalAgencyRate;
+            }
+        }
+        
+        console.warn('⚠️ No agency rate found, using 0');
+        globalAgencyRate = 0;
+        return globalAgencyRate;
+    } catch (error) {
+        console.error('❌ Error fetching agency rate:', error);
+        globalAgencyRate = 0;
+        return globalAgencyRate;
+    }
+}
+
+/**
+ * Load driver rate and ensure it's available
+ */
+async function ensureDriverRateLoaded() {
+    if (!driverRateLoaded) {
+        await fetchCurrentDriverRate();
+        driverRateLoaded = true;
+    }
+}
+
+/**
+ * Check if "Guía + Chofer" filter pill is currently active
+ * @returns {boolean} True if driver mode is active
+ */
+function isDriverModeActive() {
+    const activeFilterPill = document.querySelector('.filter-pill.active');
+    return activeFilterPill && activeFilterPill.dataset.filter === 'with-driver';
+}
+
+/**
+ * Apply driver rate to price
+ * @param {number} basePrice - Base price to add driver rate to
+ * @returns {number} Price with driver rate added
+ */
+function applyDriverRate(basePrice) {
+    return basePrice + currentDriverRate;
+}
+
+/**
+ * Vanilla JavaScript version of price update functionality
+ * @param {string} paymentType - Payment type
+ * @param {string} currency - Currency
+ * @param {boolean} includeDriver - Include driver rate
+ */
+function updatePricesVanilla(paymentType = 'efectivo', currency = 'MXN', includeDriver = false) {
+    console.log('🔄 Updating prices:', { paymentType, currency, includeDriver });
+
+    // Find all price containers using vanilla JavaScript
+    const priceContainers = document.querySelectorAll('.price-container');
+    console.log('📋 Found price containers:', priceContainers.length);
+
+    priceContainers.forEach(container => {
+        const priceElements = container.querySelectorAll('.fw-bold');
+        
+        priceElements.forEach(priceElement => {
+            // Get or store original price
+            let originalPrice = priceElement.dataset.originalPrice;
+            if (!originalPrice) {
+                originalPrice = priceElement.textContent.trim();
+                priceElement.dataset.originalPrice = originalPrice;
+            }
+            
+            // Parse the original price to get numeric value
+            const numericPrice = parseFloat(originalPrice.replace(/[^\d.-]/g, '')) || 0;
+            let finalPrice = numericPrice;
+            
+            // Step 1: Apply driver rate if needed (Guía + Chofer)
+            if (includeDriver && TourPricingState.getDriverRate() > 0) {
+                finalPrice += TourPricingState.getDriverRate();
+            }
+            
+            // Step 2: Apply payment type rates
+            const transferRate = TourPricingState.getTransferRate();
+            const agencyRate = TourPricingState.getAgencyRate();
+            
+            if (paymentType === 'transferencia' && transferRate > 0) {
+                finalPrice *= (1 + transferRate / 100);
+            } else if (paymentType === 'tarjeta' && agencyRate > 0) {
+                finalPrice *= (1 + agencyRate / 100);
+            }
+            
+            // Step 3: Apply currency conversion if needed
+            const exchangeRate = TourPricingState.getExchangeRate();
+            if (currency === 'USD' && exchangeRate > 0) {
+                finalPrice /= exchangeRate;
+            }
+            
+            // Format the final price (maintain original formatting and add currency suffix)
+            let formattedPrice;
+            if (currency === 'USD') {
+                formattedPrice = originalPrice.includes('$') 
+                    ? `$${Math.round(finalPrice).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})} USD`
+                    : `${Math.round(finalPrice)} USD`;
+            } else {
+                formattedPrice = originalPrice.includes('$') 
+                    ? `$${Math.round(finalPrice).toLocaleString('es-MX', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`
+                    : Math.round(finalPrice).toString();
+            }
+            
+            priceElement.textContent = formattedPrice;
+        });
+    });
+}
+
+/**
+ * Update vehicle capacity displays based on driver mode
+ * @param {boolean} includeDriver - Whether driver is included (reduces capacity by 1)
+ */
+function updateCapacityDisplays(includeDriver) {
+    // Update capacity displays in the table
+    document.querySelectorAll('span').forEach(span => {
+        if (span.innerHTML && span.innerHTML.includes('ti-user') && span.textContent.match(/^\d+/)) {
+            // Store original capacity if not already stored
+            if (!span.dataset.originalCapacity) {
+                const match = span.textContent.match(/^(\d+)/);
+                if (match) {
+                    span.dataset.originalCapacity = match[1];
+                }
+            }
+            
+            const originalCapacity = parseInt(span.dataset.originalCapacity) || 4;
+            const displayCapacity = includeDriver ? Math.max(1, originalCapacity - 1) : originalCapacity;
+            span.innerHTML = `${displayCapacity} <i class="ti ti-user"></i>`;
+        }
+    });
+    
+    // Update capacity in detailed views (like expanded rows)
+    document.querySelectorAll('.text-muted').forEach(element => {
+        if (element.textContent && element.textContent.includes('Capacidad:')) {
+            if (!element.dataset.originalCapacity) {
+                const match = element.textContent.match(/Capacidad:\s*(\d+)/);
+                if (match) {
+                    element.dataset.originalCapacity = match[1];
+                }
+            }
+            
+            const originalCapacity = parseInt(element.dataset.originalCapacity) || 4;
+            const displayCapacity = includeDriver ? Math.max(1, originalCapacity - 1) : originalCapacity;
+            element.innerHTML = element.innerHTML.replace(
+                /Capacidad:\s*\d+/,
+                `Capacidad: ${displayCapacity}`
+            );
+        }
+    });
+}
+
+/**
+ * Unified update function for both prices and capacity
+ * @param {string} paymentType - Payment type
+ * @param {string} currency - Currency  
+ * @param {boolean} includeDriver - Whether to include driver
+ */
+function updateToursDisplay(paymentType = 'efectivo', currency = 'MXN', includeDriver = false) {
+    updateCapacityDisplays(includeDriver);
+    updatePricesVanilla(paymentType, currency, includeDriver);
+}
+
+// ========== FILTER PILL HANDLERS ==========
+
+/**
+ * Initialize payment dropdown handler to work with driver rates
+ */
+function initPaymentDropdownHandler() {
+    const paymentDropdown = document.querySelector('[id^="paymentTypeFilter-"]');
+    if (paymentDropdown) {
+        paymentDropdown.addEventListener('change', async function() {
+            const selectedPaymentType = this.value;
+            const currencyDropdown = document.querySelector('[id^="currencyFilter-"]');
+            const selectedCurrency = currencyDropdown ? currencyDropdown.value : 'MXN';
+            const includeDriver = isDriverModeActive();
+            
+            // Ensure driver rate is loaded if needed
+            if (includeDriver) {
+                await ensureDriverRateLoaded();
+            }
+            
+            // Ensure rates are loaded for payment types
+            if (selectedPaymentType === 'transferencia' && typeof loadCurrentTransferRate === 'function' && TourPricingState.getTransferRate() <= 0) {
+                try { await loadCurrentTransferRate(); } catch (e) {}
+            } else if (selectedPaymentType === 'tarjeta' && typeof loadCurrentAgencyRate === 'function' && TourPricingState.getAgencyRate() <= 0) {
+                try { await loadCurrentAgencyRate(); } catch (e) {}
+            }
+            
+            // Update both capacity and prices
+            updateToursDisplay(selectedPaymentType, selectedCurrency, includeDriver);
+        });
+    }
+
+    // Find currency dropdown and add vanilla JS event listener
+    const currencyDropdown = document.querySelector('[id^="currencyFilter-"]');
+    if (currencyDropdown) {
+        currencyDropdown.addEventListener('change', async function() {
+            const selectedCurrency = this.value;
+            const paymentDropdown = document.querySelector('[id^="paymentTypeFilter-"]');
+            const selectedPaymentType = paymentDropdown ? paymentDropdown.value : 'efectivo';
+            const includeDriver = isDriverModeActive();
+            
+            // If USD is selected and exchange rate is not loaded, fetch it
+            if (selectedCurrency === 'USD' && TourPricingState.getExchangeRate() <= 0) {
+                await fetchExchangeRateVanilla();
+            }
+            
+            // Ensure driver rate is loaded if needed
+            if (includeDriver) {
+                await ensureDriverRateLoaded();
+            }
+            
+            // Update both capacity and prices with currency conversion
+            updateToursDisplay(selectedPaymentType, selectedCurrency, includeDriver);
+        });
+    }
+}
+
+/**
+ * Initialize filter pill functionality
+ */
+function initFilterPills() {
+    
+    // Use vanilla JavaScript for event delegation
+    document.addEventListener('click', async function(e) {
+        if (e.target.classList.contains('filter-pill')) {
+            e.preventDefault();
+            
+            // Remove active class from all pills
+            document.querySelectorAll('.filter-pill').forEach(pill => {
+                pill.classList.remove('active');
+            });
+            
+            // Add active class to clicked pill
+            e.target.classList.add('active');
+            
+            const filter = e.target.dataset.filter;
+            
+            if (filter === 'with-driver') {
+                await ensureDriverRateLoaded();
+                
+                // Get current filters using vanilla JS (find tableId dynamically)
+                const paymentTypeEl = document.querySelector('[id^="paymentTypeFilter-"]');
+                const currencyEl = document.querySelector('[id^="currencyFilter-"]');
+                const paymentType = paymentTypeEl ? paymentTypeEl.value : 'efectivo';
+                const currency = currencyEl ? currencyEl.value : 'MXN';
+                
+                // Update both capacity and prices for driver mode
+                updateToursDisplay(paymentType, currency, true);
+            } else {
+                // Get current filters using vanilla JS (find tableId dynamically)
+                const paymentTypeEl = document.querySelector('[id^="paymentTypeFilter-"]');
+                const currencyEl = document.querySelector('[id^="currencyFilter-"]');
+                const paymentType = paymentTypeEl ? paymentTypeEl.value : 'efectivo';
+                const currency = currencyEl ? currencyEl.value : 'MXN';
+                
+                // Update both capacity and prices for solo guide mode
+                updateToursDisplay(paymentType, currency, false);
+            }
+        }
+    });
+}
+
+// Initialize filter pills when the DOM is ready
+function initDriverRateFunctionality() {
+    // Load driver rate on page load
+    fetchCurrentDriverRate().then(() => {
+        driverRateLoaded = true;
+    });
+    
+    // Initialize filter pill handlers
+    initFilterPills();
+    
+    // Initialize payment dropdown handler
+    initPaymentDropdownHandler();
+    
+    // Set initial display state (Solo Guía mode is default)
+    setTimeout(() => {
+        const isDriverActive = isDriverModeActive();
+        const paymentTypeEl = document.querySelector('[id^="paymentTypeFilter-"]');
+        const currencyEl = document.querySelector('[id^="currencyFilter-"]');
+        const paymentType = paymentTypeEl ? paymentTypeEl.value : 'efectivo';
+        const currency = currencyEl ? currencyEl.value : 'MXN';
+        
+        updateToursDisplay(paymentType, currency, isDriverActive);
+    }, 500); // Small delay to ensure DOM elements are fully loaded
+}
+
+// Initialize when DOM is ready (fallback for both jQuery and vanilla JS)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDriverRateFunctionality);
+} else {
+    initDriverRateFunctionality();
+}
+
+// Also try to initialize with jQuery if available
+if (typeof $ !== 'undefined') {
+    $(document).ready(initDriverRateFunctionality);
+}
+
+// ========== END DRIVER RATE FUNCTIONALITY ==========
+
 </script>
 
 <!-- Tour Client Pricing Modal -->
