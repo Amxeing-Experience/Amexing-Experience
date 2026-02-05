@@ -1540,7 +1540,13 @@ table.dataTable thead th:nth-child(2) select {
         $(`#currencyFilter-${tableId}`).on('change', function() {
             const selectedCurrency = $(this).val();
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
-            console.log('Currency changed:', selectedCurrency);
+            console.log('🏪 Services currency changed:', selectedCurrency);
+            
+            // Call global sync to update all currency dropdowns across tables
+            if (typeof window.syncCurrencyDropdowns === 'function') {
+                console.log('🔄 Services calling global sync for currency:', selectedCurrency);
+                window.syncCurrencyDropdowns(selectedCurrency, this);
+            }
             
             if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
                 // Try to load exchange rate if not already loaded

@@ -3907,6 +3907,49 @@ function updateToursDisplay(paymentType = 'efectivo', currency = 'MXN', includeD
     console.log('✅ updateToursDisplay completed');
 }
 
+// ========== GLOBAL CURRENCY SYNC FUNCTIONALITY ==========
+
+/**
+ * Global function to synchronize currency dropdowns across all tables
+ */
+window.syncCurrencyDropdowns = function(selectedCurrency, sourceDropdown = null) {
+    console.log('🔄 Global sync: Currency dropdowns to:', selectedCurrency);
+    
+    // Find all currency dropdowns on the page
+    const allCurrencyDropdowns = document.querySelectorAll('[id^="currencyFilter-"]');
+    
+    allCurrencyDropdowns.forEach(dropdown => {
+        if (dropdown.value !== selectedCurrency && dropdown !== sourceDropdown) {
+            console.log(`📝 Updating ${dropdown.id} from ${dropdown.value} to ${selectedCurrency}`);
+            dropdown.value = selectedCurrency;
+            
+            // Don't trigger change events to avoid infinite loops
+            // The price updates will happen through the global exchange rate variables
+        }
+    });
+};
+
+/**
+ * Global currency change listener that works for all tables
+ */
+function initGlobalCurrencySync() {
+    document.addEventListener('change', function(event) {
+        // Check if the changed element is a currency dropdown
+        if (event.target.id && event.target.id.startsWith('currencyFilter-')) {
+            console.log('🌍 Global currency change detected:', event.target.id, '→', event.target.value);
+            window.syncCurrencyDropdowns(event.target.value, event.target);
+        }
+    });
+    console.log('✅ Global currency sync listener initialized');
+}
+
+// Initialize global sync when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initGlobalCurrencySync);
+} else {
+    initGlobalCurrencySync();
+}
+
 // ========== FILTER PILL HANDLERS ==========
 
 /**
@@ -4025,6 +4068,9 @@ function initPaymentDropdownHandler() {
                     if (includeDriver) {
                         await ensureDriverRateLoaded();
                     }
+                    
+                    // Sync currency across all tables (tours and services)
+                    syncCurrencyDropdowns(selectedCurrency, this);
                     
                     // Update both capacity and prices with currency conversion
                     updateToursDisplay(selectedPaymentType, selectedCurrency, includeDriver);
