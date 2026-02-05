@@ -1801,15 +1801,20 @@ table.dataTable tbody tr.hover {
                                 const currentCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
                                 const includeDriver = isDriverModeActive();
                                 
+                                console.log('📋 Applying filters to expanded row:', { currentPaymentType, currentCurrency, includeDriver });
+                                
                                 // Ensure required rates are loaded
                                 if (includeDriver) await ensureDriverRateLoaded();
                                 if (currentCurrency === 'USD' && TourPricingState.getExchangeRate() <= 0) {
                                     await fetchExchangeRateVanilla();
                                 }
                                 
-                                // Use unified update function
+                                // Update main table prices first
                                 updateToursDisplay(currentPaymentType, currentCurrency, includeDriver);
-                            }, 100);
+                                
+                                // Then specifically update expanded row content
+                                updateExpandedRowPrices(currentPaymentType, currentCurrency, includeDriver);
+                            }, 150);
                         } else {
                             console.error('❌ Invalid response format for tour all-prices:', response);
                             button.html('<i class="ti ti-chevron-down me-1"></i>Error al cargar')
@@ -3831,16 +3836,21 @@ function updatePricesVanilla(paymentType = 'efectivo', currency = 'MXN', include
                 finalPrice /= exchangeRate;
             }
             
-            // Format the final price (maintain original formatting and add currency suffix)
+            // Format the final price - USD without decimals, MXN with decimals
             let formattedPrice;
             if (currency === 'USD') {
-                formattedPrice = originalPrice.includes('$') 
-                    ? `$${Math.round(finalPrice).toLocaleString('en-US', {minimumFractionDigits: 0, maximumFractionDigits: 0})} USD`
-                    : `${Math.round(finalPrice)} USD`;
+                formattedPrice = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(finalPrice);
             } else {
-                formattedPrice = originalPrice.includes('$') 
-                    ? `$${Math.round(finalPrice).toLocaleString('es-MX', {minimumFractionDigits: 0, maximumFractionDigits: 0})}`
-                    : Math.round(finalPrice).toString();
+                formattedPrice = new Intl.NumberFormat('es-MX', {
+                    style: 'currency',
+                    currency: 'MXN',
+                    minimumFractionDigits: 2
+                }).format(finalPrice);
             }
             
             priceElement.textContent = formattedPrice;
@@ -3905,6 +3915,135 @@ function updateToursDisplay(paymentType = 'efectivo', currency = 'MXN', includeD
     updatePricesVanilla(paymentType, currency, includeDriver);
     
     console.log('✅ updateToursDisplay completed');
+}
+
+/**
+ * Specifically update prices in expanded row content
+ * @param {string} paymentType - Payment type
+ * @param {string} currency - Currency
+ * @param {boolean} includeDriver - Include driver rate
+ */
+function updateExpandedRowPrices(paymentType = 'efectivo', currency = 'MXN', includeDriver = false) {
+    console.log('🔍 updateExpandedRowPrices called:', { paymentType, currency, includeDriver });
+    
+    // Find all price elements in expanded rows directly by looking for the expanded content structure
+    // DataTables child rows contain our custom HTML with data-original-price attributes
+    const priceElements = document.querySelectorAll('.p-4.bg-light.border-top .fw-bold[data-original-price]');
+    
+    if (priceElements.length === 0) {
+        console.log('⚠️ No expanded row price elements found');
+        
+        // Try alternative selectors for debugging
+        const expandedContainers = document.querySelectorAll('.p-4.bg-light.border-top');
+        console.log('📦 Expanded containers found:', expandedContainers.length);
+        
+        if (expandedContainers.length > 0) {
+            expandedContainers.forEach((container, i) => {
+                const prices = container.querySelectorAll('.fw-bold');
+                console.log(`Container ${i} - .fw-bold elements:`, prices.length);
+                prices.forEach(p => {
+                    console.log('  Price element:', p.textContent, 'has data-original-price?', p.hasAttribute('data-original-price'));
+                });
+            });
+        }
+        
+        return;
+    }
+    
+    console.log('💰 Found', priceElements.length, 'price elements in expanded rows');
+    
+    // Process each price element found
+    priceElements.forEach((priceElement, index) => {
+            const originalPriceAttr = priceElement.getAttribute('data-original-price');
+            if (!originalPriceAttr) {
+                console.log('⚠️ No original price found for element:', priceElement);
+                return;
+            }
+            
+            // Extract numeric value from original price
+            const numericValue = parseFloat(originalPriceAttr.replace(/[^0-9.]/g, ''));
+            if (isNaN(numericValue)) {
+                console.log('⚠️ Invalid numeric value:', originalPriceAttr);
+                return;
+            }
+            
+            console.log(`🔄 Processing expanded row price: ${originalPriceAttr} → ${numericValue}`);
+            
+            let finalPrice = numericValue;
+            
+            // Step 1: Add driver rate if active
+            if (includeDriver) {
+                const driverRate = TourPricingState.getDriverRate();
+                if (driverRate > 0) {
+                    finalPrice += driverRate;
+                    console.log(`➕ Added driver rate ${driverRate}: ${numericValue} → ${finalPrice}`);
+                }
+            }
+            
+            // Step 2: Apply payment rate
+            if (paymentType === 'transferencia') {
+                const transferRate = TourPricingState.getTransferRate();
+                if (transferRate > 0) {
+                    finalPrice = finalPrice * (1 + transferRate / 100);
+                    console.log(`💳 Applied transfer rate ${transferRate}%: → ${finalPrice}`);
+                }
+            } else if (paymentType === 'tarjeta') {
+                const agencyRate = TourPricingState.getAgencyRate();
+                if (agencyRate > 0) {
+                    finalPrice = finalPrice * (1 + agencyRate / 100);
+                    console.log(`💳 Applied agency rate ${agencyRate}%: → ${finalPrice}`);
+                }
+            }
+            
+            // Step 3: Apply currency conversion
+            if (currency === 'USD') {
+                const exchangeRate = TourPricingState.getExchangeRate();
+                if (exchangeRate > 0) {
+                    finalPrice = finalPrice / exchangeRate;
+                    console.log(`💱 Applied exchange rate ${exchangeRate}: → ${finalPrice}`);
+                }
+            }
+            
+            // Format and display the final price - USD without decimals, MXN with decimals
+            const formattedPrice = currency === 'USD' 
+                ? new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(finalPrice)
+                : new Intl.NumberFormat('es-MX', {
+                    style: 'currency',
+                    currency: 'MXN',
+                    minimumFractionDigits: 2
+                }).format(finalPrice);
+                
+            console.log(`✅ Final expanded row price: ${originalPriceAttr} → ${formattedPrice}`);
+            priceElement.textContent = formattedPrice;
+    });
+    
+    // Also update capacity in expanded rows
+    const capacityElements = document.querySelectorAll('.p-4.bg-light.border-top .text-muted');
+    capacityElements.forEach(element => {
+        if (element.textContent && element.textContent.includes('Capacidad:')) {
+            if (!element.dataset.originalCapacity) {
+                const match = element.textContent.match(/Capacidad:\s*(\d+)/);
+                if (match) {
+                    element.dataset.originalCapacity = match[1];
+                }
+            }
+            
+            const originalCapacity = parseInt(element.dataset.originalCapacity) || 4;
+            const displayCapacity = includeDriver ? Math.max(1, originalCapacity - 1) : originalCapacity;
+            element.innerHTML = element.innerHTML.replace(
+                /Capacidad:\s*\d+/,
+                `Capacidad: ${displayCapacity}`
+            );
+            console.log(`🚗 Updated expanded row capacity: ${originalCapacity} → ${displayCapacity}`);
+        }
+    });
+    
+    console.log('✅ updateExpandedRowPrices completed');
 }
 
 // ========== GLOBAL CURRENCY SYNC FUNCTIONALITY ==========
@@ -4003,6 +4142,11 @@ function initPaymentDropdownHandler() {
                     
                     // Update both capacity and prices
                     updateToursDisplay(selectedPaymentType, selectedCurrency, includeDriver);
+                    
+                    // Also update any currently expanded rows with a small delay
+                    setTimeout(() => {
+                        updateExpandedRowPrices(selectedPaymentType, selectedCurrency, includeDriver);
+                    }, 100);
                 } catch (error) {
                     console.error('❌ Error in payment dropdown handler:', error);
                 }
@@ -4074,6 +4218,11 @@ function initPaymentDropdownHandler() {
                     
                     // Update both capacity and prices with currency conversion
                     updateToursDisplay(selectedPaymentType, selectedCurrency, includeDriver);
+                    
+                    // Also update any currently expanded rows with a small delay
+                    setTimeout(() => {
+                        updateExpandedRowPrices(selectedPaymentType, selectedCurrency, includeDriver);
+                    }, 100);
                 } catch (error) {
                     console.error('❌ Error in currency dropdown handler:', error);
                 }
@@ -4142,6 +4291,11 @@ function initFilterPills() {
                 
                 // Update both capacity and prices for driver mode
                 updateToursDisplay(paymentType, currency, true);
+                
+                // Also update any currently expanded rows with a small delay
+                setTimeout(() => {
+                    updateExpandedRowPrices(paymentType, currency, true);
+                }, 100);
             } else {
                 // Get current filters using vanilla JS (find tours dropdowns)
                 const allPaymentDropdowns = document.querySelectorAll('[id^="paymentTypeFilter-"]');
@@ -4159,6 +4313,11 @@ function initFilterPills() {
                 
                 // Update both capacity and prices for solo guide mode
                 updateToursDisplay(paymentType, currency, false);
+                
+                // Also update any currently expanded rows with a small delay
+                setTimeout(() => {
+                    updateExpandedRowPrices(paymentType, currency, false);
+                }, 100);
             }
         }
     });
