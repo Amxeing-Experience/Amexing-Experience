@@ -63,9 +63,9 @@
   integrity sha512-pGwCl/po6+rxRmDMFgozKQo2pbsSwE91TpsDBAOgf74CRDPXHHtM88wbwjab0wMMZh95QfR45GGyDIdhY24bkQ==
   dependencies:
     "@apollo/usage-reporting-protobuf" "^4.1.1"
-    "@apollo/utils.fetcher" "^2.0.0"
-    "@apollo/utils.keyvaluecache" "^2.1.0"
-    "@apollo/utils.logger" "^2.0.0"
+    "@apollo/utils.fetcher" "^3.0.0"
+    "@apollo/utils.keyvaluecache" "^4.0.0"
+    "@apollo/utils.logger" "^3.0.0"
 
 "@apollo/server@4.12.1":
   version "4.12.1"
@@ -73,29 +73,26 @@
   integrity sha512-jceK1LK6l074in4mWu8XkwzDjvxdSzkmk8M7YpVLOGjQ6PmlaChcGRJ9BUwB46r22MxdPCXdC/6U5Vi8gzYbvQ==
   dependencies:
     "@apollo/cache-control-types" "^1.0.3"
-    "@apollo/server-gateway-interface" "^1.1.1"
+    "@apollo/server-gateway-interface" "^2.0.0"
     "@apollo/usage-reporting-protobuf" "^4.1.1"
-    "@apollo/utils.createhash" "^2.0.2"
-    "@apollo/utils.fetcher" "^2.0.0"
-    "@apollo/utils.isnodelike" "^2.0.0"
-    "@apollo/utils.keyvaluecache" "^2.1.0"
-    "@apollo/utils.logger" "^2.0.0"
+    "@apollo/utils.createhash" "^3.0.0"
+    "@apollo/utils.fetcher" "^3.0.0"
+    "@apollo/utils.isnodelike" "^3.0.0"
+    "@apollo/utils.keyvaluecache" "^4.0.0"
+    "@apollo/utils.logger" "^3.0.0"
     "@apollo/utils.usagereporting" "^2.1.0"
-    "@apollo/utils.withrequired" "^2.0.0"
-    "@graphql-tools/schema" "^9.0.0"
-    "@types/express" "^4.17.13"
-    "@types/express-serve-static-core" "^4.17.30"
-    "@types/node-fetch" "^2.6.1"
+    "@apollo/utils.withrequired" "^3.0.0"
+    "@graphql-tools/schema" "^10.0.0"
     async-retry "^1.2.1"
+    body-parser "^2.2.2"
+    content-type "^1.0.5"
     cors "^2.8.5"
-    express "^4.21.1"
+    finalhandler "^2.1.0"
     loglevel "^1.6.8"
-    lru-cache "^7.10.1"
-    negotiator "^0.6.3"
-    node-abort-controller "^3.1.1"
-    node-fetch "^2.6.7"
-    uuid "^9.0.0"
-    whatwg-mimetype "^3.0.0"
+    lru-cache "^11.1.0"
+    negotiator "^1.0.0"
+    uuid "^11.1.0"
+    whatwg-mimetype "^4.0.0"
 
 "@apollo/usage-reporting-protobuf@^4.1.0", "@apollo/usage-reporting-protobuf@^4.1.1":
   version "4.1.1"
@@ -109,7 +106,7 @@
   resolved "https://registry.yarnpkg.com/@apollo/utils.createhash/-/utils.createhash-2.0.2.tgz#838767c83714354ab36892196b209e45d29745e6"
   integrity sha512-UkS3xqnVFLZ3JFpEmU/2cM2iKJotQXMoSTgxXsfQgXLC5gR1WaepoXagmYnPSA7Q/2cmnyTYK5OgAgoC4RULPg==
   dependencies:
-    "@apollo/utils.isnodelike" "^2.0.1"
+    "@apollo/utils.isnodelike" "^3.0.0"
     sha.js "^2.4.11"
 
 "@apollo/utils.dropunuseddefinitions@^2.0.1":
@@ -132,8 +129,8 @@
   resolved "https://registry.yarnpkg.com/@apollo/utils.keyvaluecache/-/utils.keyvaluecache-2.1.1.tgz#f3f79a2f00520c6ab7a77a680a4e1fec4d19e1a6"
   integrity sha512-qVo5PvUUMD8oB9oYvq4ViCjYAMWnZ5zZwEjNF37L2m1u528x5mueMlU+Cr1UinupCgdB78g+egA1G98rbJ03Vw==
   dependencies:
-    "@apollo/utils.logger" "^2.0.1"
-    lru-cache "^7.14.1"
+    "@apollo/utils.logger" "^3.0.0"
+    lru-cache "^11.0.0"
 
 "@apollo/utils.logger@^2.0.0", "@apollo/utils.logger@^2.0.1":
   version "2.0.1"
@@ -1478,6 +1475,14 @@
     tslib "^2.4.0"
 
 "@graphql-tools/merge@^9.0.24":
+  version "9.1.7"
+  resolved "https://registry.yarnpkg.com/@graphql-tools/merge/-/merge-9.1.7.tgz#8040553c19aeadf6df41060b811e9c5df8716be1"
+  integrity sha512-Y5E1vTbTabvcXbkakdFUt4zUIzB1fyaEnVmIWN0l0GMed2gdD01TpZWLUm4RNAxpturvolrb24oGLQrBbPLSoQ==
+  dependencies:
+    "@graphql-tools/utils" "^11.0.0"
+    tslib "^2.4.0"
+
+"@graphql-tools/merge@^9.1.7":
   version "9.1.7"
   resolved "https://registry.yarnpkg.com/@graphql-tools/merge/-/merge-9.1.7.tgz#8040553c19aeadf6df41060b811e9c5df8716be1"
   integrity sha512-Y5E1vTbTabvcXbkakdFUt4zUIzB1fyaEnVmIWN0l0GMed2gdD01TpZWLUm4RNAxpturvolrb24oGLQrBbPLSoQ==
@@ -2912,7 +2917,7 @@
     "@types/range-parser" "*"
     "@types/send" "*"
 
-"@types/express@^4.17.13", "@types/express@^4.17.20":
+"@types/express@^4.17.20":
   version "4.17.25"
   resolved "https://registry.yarnpkg.com/@types/express/-/express-4.17.25.tgz#070c8c73a6fee6936d65c195dbbfb7da5026649b"
   integrity sha512-dVd04UKsfpINUnK0yBoYHDF3xu7xVH4BuDotC/xGuycx4CgbP48X/KF/586bcObxT0HENHXEU8Nqtu6NR+eKhw==
@@ -8327,6 +8332,11 @@ lru-cache@^10.0.1:
   version "10.4.3"
   resolved "https://registry.yarnpkg.com/lru-cache/-/lru-cache-10.4.3.tgz#410fc8a17b70e598013df257c2446b7f3383f119"
   integrity sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==
+
+lru-cache@^11.0.0, lru-cache@^11.1.0:
+  version "11.2.5"
+  resolved "https://registry.yarnpkg.com/lru-cache/-/lru-cache-11.2.5.tgz#6811ae01652ae5d749948cdd80bcc22218c6744f"
+  integrity sha512-vFrFJkWtJvJnD5hg+hJvVE8Lh/TcMzKnTgCWmtBipwI5yLX/iX+5UB2tfuyODF5E7k9xEzMdYgGqaSb1c0c5Yw==
 
 lru-cache@^5.1.1:
   version "5.1.1"

@@ -318,7 +318,7 @@ async function createClientPriceIdempotent(data, stats) {
   clientPrice.set('currency', data.currency);
   clientPrice.set('active', true);
   clientPrice.set('exists', true);
-  clientPrice.set('valid_until', null);
+  // Don't set valid_until for current prices - Parse treats unset differently than null
 
   await clientPrice.save(null, { useMasterKey: true });
   stats.created++;
