@@ -326,6 +326,7 @@ const exchangeRateRoutes = require('./api/exchangeRateRoutes');
 const inflationRateRoutes = require('./api/inflationRateRoutes');
 const agencyRateRoutes = require('./api/agencyRateRoutes');
 const transferRateRoutes = require('./api/transferRateRoutes');
+const driverTourRateRoutes = require('./api/driverTourRateRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
@@ -357,6 +358,7 @@ router.use('/exchange-rate', exchangeRateRoutes); // Exchange rate management en
 router.use('/inflation-rate', inflationRateRoutes); // Inflation rate management endpoints
 router.use('/agency-rate', agencyRateRoutes); // Agency rate management endpoints
 router.use('/transfer-rate', transferRateRoutes); // Transfer rate management endpoints
+router.use('/driver-tour-rate', driverTourRateRoutes); // Driver tour rate management endpoints
 
 /**
  * Email Test Endpoint - SuperAdmin Only
