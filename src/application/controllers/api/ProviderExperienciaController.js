@@ -242,14 +242,19 @@ class ProviderExperienciaController {
         name,
         description,
         price,
+        price_no_alcohol: priceNoAlcohol,
+        price_child: priceChild,
         duration,
+        travel_duration: travelDuration,
         min_people: minPeople,
         max_people: maxPeople,
         displayOrder,
         tipo,
         availability,
         includes,
+        languages,
         notincludes,
+        advance_booking_time: advanceBookingTime,
         photos,
       } = req.body;
 
@@ -307,11 +312,20 @@ class ProviderExperienciaController {
 
       experiencia.setPrice(price || 0);
 
+      if (priceNoAlcohol !== undefined && priceNoAlcohol !== null) {
+        experiencia.set('price_no_alcohol', priceNoAlcohol);
+      }
+      if (priceChild !== undefined && priceChild !== null) {
+        experiencia.set('price_child', priceChild);
+      }
       if (tipo !== undefined && tipo !== null && tipo !== '') {
         experiencia.setTipo(tipo);
       }
       if (duration !== undefined && duration !== null) {
         experiencia.setDuration(duration);
+      }
+      if (travelDuration !== undefined && travelDuration !== null) {
+        experiencia.set('travel_duration', travelDuration);
       }
       if (minPeople !== undefined && minPeople !== null) {
         experiencia.setMinPeople(minPeople);
@@ -326,12 +340,22 @@ class ProviderExperienciaController {
         experiencia.setAvailability(availability);
       }
 
-      // Set includes, notincludes, and photos fields
+      // Set includes, languages, notincludes, and photos fields
       if (includes !== undefined && Array.isArray(includes)) {
         experiencia.set('includes', includes);
       }
+      if (languages !== undefined && Array.isArray(languages)) {
+        experiencia.set('languages', languages);
+      }
       if (notincludes !== undefined && Array.isArray(notincludes)) {
         experiencia.set('notincludes', notincludes);
+      }
+      if (advanceBookingTime !== undefined) {
+        if (typeof advanceBookingTime === 'number' && advanceBookingTime > 0) {
+          experiencia.set('advance_booking_time', advanceBookingTime);
+        } else if (advanceBookingTime === 0 || advanceBookingTime === null) {
+          experiencia.unset('advance_booking_time');
+        }
       }
       if (photos !== undefined && Array.isArray(photos)) {
         experiencia.set('photos', photos);
@@ -400,7 +424,10 @@ class ProviderExperienciaController {
         name,
         description,
         price,
+        price_no_alcohol: priceNoAlcohol,
+        price_child: priceChild,
         duration,
+        travel_duration: travelDuration,
         min_people: minPeople,
         max_people: maxPeople,
         displayOrder,
@@ -408,7 +435,9 @@ class ProviderExperienciaController {
         tipo,
         availability,
         includes,
+        languages,
         notincludes,
+        advance_booking_time: advanceBookingTime,
         photos,
       } = req.body;
 
@@ -455,15 +484,36 @@ class ProviderExperienciaController {
 
       if (description !== undefined) experiencia.setDescription(description);
       if (price !== undefined) experiencia.setPrice(price);
+      if (priceNoAlcohol !== undefined) {
+        if (priceNoAlcohol === null || priceNoAlcohol === '') {
+          experiencia.unset('price_no_alcohol');
+        } else {
+          experiencia.set('price_no_alcohol', priceNoAlcohol);
+        }
+      }
+      if (priceChild !== undefined) {
+        if (priceChild === null || priceChild === '') {
+          experiencia.unset('price_child');
+        } else {
+          experiencia.set('price_child', priceChild);
+        }
+      }
       if (tipo !== undefined) experiencia.setTipo(tipo === '' ? null : tipo);
       if (duration !== undefined) experiencia.setDuration(duration);
+      if (travelDuration !== undefined) {
+        if (travelDuration === null || travelDuration === '') {
+          experiencia.unset('travel_duration');
+        } else {
+          experiencia.set('travel_duration', travelDuration);
+        }
+      }
       if (minPeople !== undefined) experiencia.setMinPeople(minPeople);
       if (maxPeople !== undefined) experiencia.setMaxPeople(maxPeople);
       if (displayOrder !== undefined) experiencia.setDisplayOrder(displayOrder);
       if (active !== undefined) experiencia.setActive(active);
       if (availability !== undefined) experiencia.setAvailability(availability);
 
-      // Update includes, notincludes, and photos fields
+      // Update includes, languages, notincludes, advance booking time, and photos fields
       if (includes !== undefined) {
         if (Array.isArray(includes)) {
           experiencia.set('includes', includes);
@@ -471,11 +521,25 @@ class ProviderExperienciaController {
           experiencia.set('includes', []);
         }
       }
+      if (languages !== undefined) {
+        if (Array.isArray(languages)) {
+          experiencia.set('languages', languages);
+        } else if (languages === null) {
+          experiencia.set('languages', []);
+        }
+      }
       if (notincludes !== undefined) {
         if (Array.isArray(notincludes)) {
           experiencia.set('notincludes', notincludes);
         } else if (notincludes === null) {
           experiencia.set('notincludes', []);
+        }
+      }
+      if (advanceBookingTime !== undefined) {
+        if (typeof advanceBookingTime === 'number' && advanceBookingTime > 0) {
+          experiencia.set('advance_booking_time', advanceBookingTime);
+        } else if (advanceBookingTime === 0 || advanceBookingTime === null) {
+          experiencia.unset('advance_booking_time');
         }
       }
       if (photos !== undefined) {
@@ -662,12 +726,17 @@ class ProviderExperienciaController {
       name: experiencia.getName(),
       description: experiencia.getDescription(),
       price: experiencia.getPrice(),
+      price_no_alcohol: experiencia.get('price_no_alcohol') || null,
+      price_child: experiencia.get('price_child') || null,
       tipo: experiencia.getTipo(),
       duration: experiencia.getDuration(),
+      travel_duration: experiencia.get('travel_duration') || null,
       min_people: experiencia.getMinPeople(),
       max_people: experiencia.getMaxPeople(),
       includes: experiencia.get('includes') || [],
+      languages: experiencia.get('languages') || [],
       notincludes: experiencia.get('notincludes') || [],
+      advance_booking_time: experiencia.get('advance_booking_time') || null,
       photos: experiencia.get('photos') || [],
       displayOrder: experiencia.getDisplayOrder(),
       active: experiencia.isActive(),
