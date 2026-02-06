@@ -319,6 +319,36 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                           placeholder="Descripción detallada de lo que incluye esta experiencia..."></textarea>
             </div>
             
+            <!-- Incluye -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium text-success">
+                    Incluye <span class="text-muted">(uno por línea)</span>
+                </label>
+                <textarea class="form-control form-control-sm experiencia-includes-input" 
+                          rows="4" 
+                          maxlength="1000"
+                          placeholder="Transporte ida y vuelta&#10;Guía bilingüe certificado&#10;Entrada al sitio&#10;Degustación de platillos&#10;Agua embotellada"
+                          style="font-size: 0.875rem; line-height: 1.5;"></textarea>
+                <div class="form-text">
+                    <small><i class="ti ti-info-circle me-1"></i>Escriba cada elemento en una línea nueva • Se mostrarán como viñetas</small>
+                </div>
+            </div>
+            
+            <!-- No Incluye -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium text-success">
+                    No incluye <span class="text-muted">(uno por línea)</span>
+                </label>
+                <textarea class="form-control form-control-sm experiencia-notincludes-input" 
+                          rows="3" 
+                          maxlength="1000"
+                          placeholder="Propinas&#10;Comidas adicionales&#10;Transporte desde aeropuerto&#10;Gastos personales"
+                          style="font-size: 0.875rem; line-height: 1.5;"></textarea>
+                <div class="form-text">
+                    <small><i class="ti ti-alert-circle me-1"></i>Escriba cada exclusión en una línea nueva • Se mostrarán como viñetas</small>
+                </div>
+            </div>
+            
             <!-- Campos opcionales en una fila -->
             <div class="row mb-2">
                 <div class="col-md-4">
@@ -382,6 +412,36 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <i class="ti ti-calendar-off me-1"></i>
                         <small>Selecciona días para configurar horarios</small>
                     </div>
+                </div>
+            </div>
+            
+            <!-- Fotos de la experiencia -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium text-success">
+                    Fotos <span class="text-muted">(Opcional)</span>
+                </label>
+                <div class="experience-photos-container">
+                    <!-- Photo upload section -->
+                    <div class="row g-2 mb-2 photos-preview-container">
+                        <!-- Uploaded photos will be displayed here -->
+                    </div>
+                    
+                    <!-- Add photo button -->
+                    <div class="d-grid">
+                        <button type="button" class="btn btn-outline-primary btn-sm add-photo-btn">
+                            <i class="ti ti-camera-plus me-1"></i>
+                            Agregar Foto
+                        </button>
+                    </div>
+                    
+                    <!-- Hidden file input -->
+                    <input type="file" 
+                           class="d-none experience-photo-input" 
+                           accept=".jpg,.jpeg,.png,.webp" 
+                           multiple>
+                </div>
+                <div class="form-text">
+                    <small><i class="ti ti-info-circle me-1"></i>Máximo 5 fotos por experiencia • Formatos: JPG, PNG, WebP • Máx. 5MB cada una</small>
                 </div>
             </div>
             
@@ -729,6 +789,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 duration: null,
                 min_people: null,
                 max_people: null,
+                includes: [],
+                notincludes: [],
+                photos: [],
                 availability: null
             };
             
@@ -758,6 +821,24 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
             card.querySelector('.experiencia-max-people-input').value = experiencia.max_people || '';
             
+            // Populate includes field - convert array back to lines
+            const includesText = experiencia.includes && experiencia.includes.length > 0 ? 
+                experiencia.includes.join('\n') : '';
+            card.querySelector('.experiencia-includes-input').value = includesText;
+            
+            // Populate notincludes field - convert array back to lines
+            const notIncludesText = experiencia.notincludes && experiencia.notincludes.length > 0 ? 
+                experiencia.notincludes.join('\n') : '';
+            card.querySelector('.experiencia-notincludes-input').value = notIncludesText;
+            
+            // Populate photos if they exist
+            const photosContainer = $(card).find('.photos-preview-container');
+            if (experiencia.photos && experiencia.photos.length > 0) {
+                experiencia.photos.forEach(photo => {
+                    addPhotoPreview(photosContainer, { name: photo.fileName }, photo.dataUrl);
+                });
+            }
+            
             // Update availability display and populate availability interface
             updateAvailabilityDisplay($(card), experiencia.availability);
             populateAvailabilityInterface($(card), experiencia.availability);
@@ -778,6 +859,35 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             experiencia.duration = card.find('.experiencia-duration-input').val() ? parseFloat(card.find('.experiencia-duration-input').val()) : null;
             experiencia.min_people = card.find('.experiencia-min-people-input').val() ? parseInt(card.find('.experiencia-min-people-input').val()) : null;
             experiencia.max_people = card.find('.experiencia-max-people-input').val() ? parseInt(card.find('.experiencia-max-people-input').val()) : null;
+            
+            // Process includes field - convert lines to array
+            const includesText = card.find('.experiencia-includes-input').val().trim();
+            experiencia.includes = includesText ? 
+                includesText.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0)
+                : [];
+            
+            // Process notincludes field - convert lines to array
+            const notIncludesText = card.find('.experiencia-notincludes-input').val().trim();
+            experiencia.notincludes = notIncludesText ? 
+                notIncludesText.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0)
+                : [];
+            
+            // Collect photos data from card
+            const photoElements = card.find('.photo-preview');
+            experiencia.photos = [];
+            photoElements.each(function() {
+                const img = $(this).find('img');
+                if (img.length > 0) {
+                    experiencia.photos.push({
+                        dataUrl: img.attr('src'),
+                        fileName: $(this).find('small').attr('title') || 'image.jpg'
+                    });
+                }
+            });
             
             // Collect availability data from card
             experiencia.availability = collectAvailabilityFromCard(card);
@@ -1335,6 +1445,35 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 const card = $(this);
                 const id = card.data('id');
                 
+                // Process includes field - convert lines to array
+                const includesText = card.find('.experiencia-includes-input').val().trim();
+                const includesList = includesText ? 
+                    includesText.split('\n')
+                        .map(item => item.trim())
+                        .filter(item => item.length > 0)
+                    : [];
+                
+                // Process notincludes field - convert lines to array
+                const notIncludesText = card.find('.experiencia-notincludes-input').val().trim();
+                const notIncludesList = notIncludesText ? 
+                    notIncludesText.split('\n')
+                        .map(item => item.trim())
+                        .filter(item => item.length > 0)
+                    : [];
+                
+                // Collect photos data from card
+                const photoElements = card.find('.photo-preview');
+                const photosList = [];
+                photoElements.each(function() {
+                    const img = $(this).find('img');
+                    if (img.length > 0) {
+                        photosList.push({
+                            dataUrl: img.attr('src'),
+                            fileName: $(this).find('small').attr('title') || 'image.jpg'
+                        });
+                    }
+                });
+                
                 const experiencia = {
                     name: card.find('.experiencia-name-input').val().trim(),
                     description: card.find('.experiencia-description-input').val().trim(),
@@ -1343,6 +1482,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     duration: card.find('.experiencia-duration-input').val() ? parseFloat(card.find('.experiencia-duration-input').val()) : null,
                     min_people: card.find('.experiencia-min-people-input').val() ? parseInt(card.find('.experiencia-min-people-input').val()) : null,
                     max_people: card.find('.experiencia-max-people-input').val() ? parseInt(card.find('.experiencia-max-people-input').val()) : null,
+                    includes: includesList,
+                    notincludes: notIncludesList,
+                    photos: photosList,
                     availability: collectAvailabilityFromCard(card),
                     displayOrder: index
                 };
@@ -2007,6 +2149,90 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 container.insertAdjacentHTML('afterbegin', alertHtml);
             }
         }
+
+        // Photo upload functionality for experiences
+        function initPhotoUpload() {
+            // Handle add photo button clicks
+            $(document).on('click', '.add-photo-btn', function() {
+                const card = $(this).closest('.experiencia-editable');
+                const fileInput = card.find('.experience-photo-input');
+                fileInput.click();
+            });
+
+            // Handle file selection
+            $(document).on('change', '.experience-photo-input', function() {
+                const card = $(this).closest('.experiencia-editable');
+                const files = this.files;
+                const previewContainer = card.find('.photos-preview-container');
+                
+                // Check maximum files limit
+                const currentPhotos = previewContainer.find('.photo-preview').length;
+                const maxPhotos = 5;
+                
+                if (currentPhotos + files.length > maxPhotos) {
+                    showErrorAlert(`Máximo ${maxPhotos} fotos permitidas por experiencia`);
+                    this.value = ''; // Clear the input
+                    return;
+                }
+
+                // Process each selected file
+                Array.from(files).forEach(file => {
+                    // Validate file size (5MB max)
+                    if (file.size > 5 * 1024 * 1024) {
+                        showErrorAlert(`La imagen "${file.name}" es muy grande. Máximo 5MB.`);
+                        return;
+                    }
+
+                    // Validate file type
+                    if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/)) {
+                        showErrorAlert(`La imagen "${file.name}" no tiene un formato válido.`);
+                        return;
+                    }
+
+                    // Create preview
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        addPhotoPreview(previewContainer, file, e.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                // Clear input
+                this.value = '';
+            });
+
+            // Handle photo removal
+            $(document).on('click', '.remove-photo-btn', function() {
+                $(this).closest('.photo-preview').remove();
+            });
+        }
+
+        function addPhotoPreview(container, file, dataUrl) {
+            const photoId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const photoHtml = `
+                <div class="col-4 photo-preview" data-photo-id="${photoId}">
+                    <div class="position-relative">
+                        <img src="${dataUrl}" 
+                             class="img-fluid rounded border" 
+                             style="height: 80px; width: 100%; object-fit: cover;">
+                        <button type="button" 
+                                class="btn btn-danger btn-sm position-absolute top-0 end-0 remove-photo-btn" 
+                                style="padding: 2px 6px; margin: 2px;">
+                            <i class="ti ti-x" style="font-size: 12px;"></i>
+                        </button>
+                        <div class="text-center mt-1">
+                            <small class="text-muted text-truncate d-block" style="font-size: 10px;" title="${file.name}">
+                                ${file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.append(photoHtml);
+        }
+
+        // Initialize photo upload functionality
+        initPhotoUpload();
     }
 
     if (document.readyState === 'loading') {
@@ -2016,3 +2242,45 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     }
 })();
 </script>
+
+<style>
+/* Experience Photo Upload Styles */
+.experience-photos-container {
+    background: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    transition: border-color 0.2s ease;
+}
+
+.experience-photos-container:hover {
+    border-color: #6c757d;
+}
+
+.photo-preview {
+    transition: transform 0.2s ease;
+}
+
+.photo-preview:hover {
+    transform: translateY(-2px);
+}
+
+.photo-preview img {
+    transition: opacity 0.2s ease;
+}
+
+.photo-preview:hover img {
+    opacity: 0.9;
+}
+
+.remove-photo-btn {
+    border-radius: 50%;
+    line-height: 1;
+    font-size: 10px !important;
+}
+
+.add-photo-btn:hover {
+    border-color: #0d6efd;
+    background-color: #f8f9ff;
+}
+</style>

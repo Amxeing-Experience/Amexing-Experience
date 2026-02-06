@@ -748,7 +748,9 @@ class ServicesController {
 
                   for (const key of possibleKeys) {
                     if (clientPricesMap[key]) {
-                      console.log(`✅ Found client price override for service ${serviceId}: ${clientPricesMap[key]} MXN (key: ${key})`);
+                      console.log(
+                        `✅ Found client price override for service ${serviceId}: ${clientPricesMap[key]} MXN (key: ${key})`
+                      );
                       // Override the price from the helper with the client-specific price
                       if (pricingData) {
                         pricingData.finalPrice = clientPricesMap[key];
@@ -759,7 +761,9 @@ class ServicesController {
                   }
 
                   if (!pricingData?.isClientPrice) {
-                    console.log(`⚠️ No client price override found for service ${serviceId}, using base price: ${pricingData?.finalPrice} MXN`);
+                    console.log(
+                      `⚠️ No client price override found for service ${serviceId}, using base price: ${pricingData?.finalPrice} MXN`
+                    );
                   }
                 }
               }
@@ -791,17 +795,19 @@ class ServicesController {
                   Object.assign(service, { priceData: priceDataForMultiple });
                 } else {
                   // Fallback to single vehicle (backward compatibility)
-                  const priceDataForSingle = [{
-                    vehicleType: {
-                      name: vehicleTypeToUse?.get('name'),
-                      code: vehicleTypeToUse?.get('code'),
-                      defaultCapacity: vehicleTypeToUse?.get('defaultCapacity'),
-                      trunkCapacity: vehicleTypeToUse?.get('trunkCapacity'),
+                  const priceDataForSingle = [
+                    {
+                      vehicleType: {
+                        name: vehicleTypeToUse?.get('name'),
+                        code: vehicleTypeToUse?.get('code'),
+                        defaultCapacity: vehicleTypeToUse?.get('defaultCapacity'),
+                        trunkCapacity: vehicleTypeToUse?.get('trunkCapacity'),
+                      },
+                      price: finalPrice, // This will now use the correct updated price
+                      formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
+                      isClientPrice: pricingData.isClientPrice || false,
                     },
-                    price: finalPrice, // This will now use the correct updated price
-                    formattedPrice: `$${finalPrice.toLocaleString()} MXN`,
-                    isClientPrice: pricingData.isClientPrice || false,
-                  }];
+                  ];
                   Object.assign(service, { priceData: priceDataForSingle });
                 }
               } else if (clientId && rateId) {
@@ -851,11 +857,11 @@ class ServicesController {
                   // Fallback pricing failed - continue with no pricing
                 }
               } else if (clientId && !rateId) {
-              // FALLBACK 2: If we have clientId but no rateId (initial load),
-              // try to get ANY available pricing for this service to show something instead of "Sin precios"
+                // FALLBACK 2: If we have clientId but no rateId (initial load),
+                // try to get ANY available pricing for this service to show something instead of "Sin precios"
 
                 try {
-                // Get any RatePrice for this service and rate combination
+                  // Get any RatePrice for this service and rate combination
                   const fallbackRatePriceQuery = new Parse.Query('RatePrices');
                   fallbackRatePriceQuery.equalTo('service', {
                     __type: 'Pointer',
@@ -898,8 +904,8 @@ class ServicesController {
                     ];
                     Object.assign(service, { priceData: fallbackPriceData });
                   } else {
-                  // FALLBACK 3: If FALLBACK 1 failed, try to get ANY available pricing for this service
-                  // (similar to FALLBACK 2 logic but for the clientId + rateId scenario)
+                    // FALLBACK 3: If FALLBACK 1 failed, try to get ANY available pricing for this service
+                    // (similar to FALLBACK 2 logic but for the clientId + rateId scenario)
 
                     try {
                       const fallback3Query = new Parse.Query('RatePrices');
@@ -940,7 +946,7 @@ class ServicesController {
                         ];
                         Object.assign(service, { priceData: fallback3PriceData });
                       } else {
-                      // No fallback pricing found
+                        // No fallback pricing found
                       }
                     } catch (fallback3Error) {
                       console.error('❌ FALLBACK 3 ERROR:', fallback3Error.message);
@@ -950,11 +956,11 @@ class ServicesController {
                   console.error('❌ FALLBACK ERROR:', fallbackError.message);
                 }
               } else {
-              // FALLBACK 3: Final fallback - try to get any available pricing
-              // for this service when other methods have failed
+                // FALLBACK 3: Final fallback - try to get any available pricing
+                // for this service when other methods have failed
 
                 try {
-                // Get any RatePrice for this service (prefer Economic rate if available)
+                  // Get any RatePrice for this service (prefer Economic rate if available)
                   const fallbackAnyRatePriceQuery = new Parse.Query('RatePrices');
                   fallbackAnyRatePriceQuery.equalTo('service', {
                     __type: 'Pointer',
@@ -993,7 +999,7 @@ class ServicesController {
                     ];
                     Object.assign(service, { priceData: fallback2PriceData });
                   } else {
-                  // No fallback pricing available
+                    // No fallback pricing available
                   }
                 } catch (fallbackError) {
                   console.error('❌ FALLBACK 2 ERROR:', fallbackError.message);
@@ -1002,7 +1008,7 @@ class ServicesController {
 
               // Debug logging for Queretaro service after vehicle type assignment
               if (service.id === '6p4zqx7YCf') {
-              // Queretaro service specific logging would go here
+                // Queretaro service specific logging would go here
               }
 
               return {
@@ -1385,16 +1391,16 @@ class ServicesController {
           const originName = originPOI?.get('name') || '';
           return (
             destName.includes('Queretaro')
-          || originName.includes('Queretaro')
-          || destName.includes('Querétaro')
-          || originName.includes('Querétaro')
+            || originName.includes('Queretaro')
+            || destName.includes('Querétaro')
+            || originName.includes('Querétaro')
           );
         });
 
         if (queretaroServices.length > 0) {
           for (const service of queretaroServices.slice(0, 2)) {
-          // Limit to first 2 for brevity
-          // Get RatePrices for this service
+            // Limit to first 2 for brevity
+            // Get RatePrices for this service
             const ratePricesQuery = new Parse.Query('RatePrices');
             ratePricesQuery.include(['servicePtr', 'ratePtr', 'vehiclePtr']);
             ratePricesQuery.equalTo('servicePtr', service);
@@ -1403,7 +1409,7 @@ class ServicesController {
             ratePricesQuery.doesNotExist('valid_until'); // Only show active prices (versioning)
 
             await ratePricesQuery.find({ useMasterKey: true });
-          // Rate prices retrieved for debugging purposes
+            // Rate prices retrieved for debugging purposes
           }
         }
       } catch (debugError) {
@@ -1435,7 +1441,7 @@ class ServicesController {
       const clientPricesMap = {};
       if (clientId && ratePrices.length > 0) {
         try {
-        // Since Parse SDK queries fail with "Service Unavailable", use a direct HTTP approach
+          // Since Parse SDK queries fail with "Service Unavailable", use a direct HTTP approach
           const http = require('http');
           const options = {
             hostname: 'localhost',
@@ -1530,12 +1536,12 @@ class ServicesController {
             finalPrice = clientPriceOverride;
             isClientPrice = true;
           } else {
-          // Use base rate price when no client override exists
+            // Use base rate price when no client override exists
           }
 
           // Debug logging for service 6p4zqx7YCf
           if (service?.id === '6p4zqx7YCf') {
-          // Specific service debugging would go here
+            // Specific service debugging would go here
           }
 
           // Create dual price display object for frontend
@@ -1829,10 +1835,10 @@ class ServicesController {
           for (const [key, priceData] of clientPricesMap.entries()) {
             const [clientRateId] = key.split('_');
             if (clientRateId === rate.id) {
-            // Find matching client price by rate, regardless of exact vehicle ID
+              // Find matching client price by rate, regardless of exact vehicle ID
               const matchingClientPrice = clientPrices.find(
                 (cp) => cp.get('ratePtr')?.id === rate.id
-                && cp.get('vehiclePtr')?.get('name')?.toLowerCase() === vehicleType.get('name')?.toLowerCase()
+                  && cp.get('vehiclePtr')?.get('name')?.toLowerCase() === vehicleType.get('name')?.toLowerCase()
               );
               if (matchingClientPrice) {
                 clientPriceData = priceData;
@@ -1848,17 +1854,17 @@ class ServicesController {
         // Debug logging for VAN vehicles to track the discrepancy issue
         if (
           vehicleType?.get('name')?.toLowerCase().includes('van')
-        && rate?.get('name')?.toLowerCase().includes('económico')
+          && rate?.get('name')?.toLowerCase().includes('económico')
         ) {
           if (clientPriceData) {
-          // VAN vehicle with client price override
+            // VAN vehicle with client price override
           }
         }
 
         // Create dual price display object for frontend
         let priceDisplay;
         if (clientPriceData) {
-        // Show both base and client price
+          // Show both base and client price
           priceDisplay = {
             basePrice,
             clientPrice: clientPriceData.precio,
@@ -1867,7 +1873,7 @@ class ServicesController {
             showBoth: true,
           };
         } else {
-        // Show only base price
+          // Show only base price
           priceDisplay = {
             basePrice,
             clientPrice: null,
@@ -2035,12 +2041,12 @@ class ServicesController {
           ratePricesCount: ratePrices.length,
           ratePricesType: typeof ratePrices,
           firstRatePrice:
-          ratePrices.length > 0
-            ? {
-              hasGetMethod: typeof ratePrices[0].get,
-              ratePtrValue: ratePrices[0].get ? ratePrices[0].get('ratePtr') : 'no-get-method',
-            }
-            : 'no-rate-prices',
+            ratePrices.length > 0
+              ? {
+                hasGetMethod: typeof ratePrices[0].get,
+                ratePtrValue: ratePrices[0].get ? ratePrices[0].get('ratePtr') : 'no-get-method',
+              }
+              : 'no-rate-prices',
         });
 
         formattedPrices = ratePrices.map((ratePrice, index) => {
@@ -2592,8 +2598,8 @@ class ServicesController {
         const existingPriceObject = existingMap.get(key);
 
         if (existingPriceObject) {
-        // VERSIONING: Don't update existing price, instead:
-        // 1. Mark existing price as historical (set valid_until to today)
+          // VERSIONING: Don't update existing price, instead:
+          // 1. Mark existing price as historical (set valid_until to today)
           existingPriceObject.set('valid_until', new Date());
           existingPriceObject.set('lastModifiedBy', currentUser ? currentUser.id : null);
           objectsToSave.push(existingPriceObject);
@@ -2626,7 +2632,7 @@ class ServicesController {
           objectsToSave.push(newPriceObject);
           existingMap.delete(key);
         } else {
-        // Create completely new price (no existing record)
+          // Create completely new price (no existing record)
           const newPriceObject = new ClientPricesClass();
 
           const Rate = Parse.Object.extend('Rate');
@@ -2657,7 +2663,7 @@ class ServicesController {
 
       // Mark remaining existing prices as historical (prices that were removed)
       existingMap.forEach((price) => {
-      // Set valid_until to today instead of marking as deleted
+        // Set valid_until to today instead of marking as deleted
         price.set('valid_until', new Date());
         price.set('active', false);
         price.set('lastModifiedBy', currentUser ? currentUser.id : null);
@@ -3092,14 +3098,14 @@ class ServicesController {
         const { id, price } = priceData;
 
         if (id && typeof price === 'number' && price >= 0) {
-        // Get the existing RatePrice record
+          // Get the existing RatePrice record
           const priceQuery = new Parse.Query(RatePricesClass);
           priceQuery.equalTo('objectId', id);
           const priceRecord = await priceQuery.first({ useMasterKey: true });
 
           if (priceRecord) {
-          // VERSIONING: Don't update existing price, instead:
-          // 1. Mark existing price as historical (set valid_until to today)
+            // VERSIONING: Don't update existing price, instead:
+            // 1. Mark existing price as historical (set valid_until to today)
             priceRecord.set('valid_until', new Date());
             priceRecord.set('lastModifiedBy', currentUser.id);
             objectsToSave.push(priceRecord);
@@ -3270,7 +3276,7 @@ class ServicesController {
           const diffMs = validUntil.getTime() - createdAt.getTime();
           duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24)); // Convert to days
         } else {
-        // For active record, calculate days since creation
+          // For active record, calculate days since creation
           const diffMs = new Date().getTime() - createdAt.getTime();
           duration = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
         }

@@ -45,6 +45,16 @@ const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
     </div>
 </div>
 
+<!-- Vehicle Rate Prices Section -->
+<div class="row">
+    <div class="col-12">
+        <%- include('../../organisms/services/vehicle-rate-prices-section', {
+            vehicleRatePricesId: 'admin-vehicle-rate-prices',
+            vehicleRatesEndpoint: '/api/vehicle-rate-prices/all'
+        }) %>
+    </div>
+</div>
+
 <!-- Main Content -->
 <div class="row">
     <!-- Content Column - Full Width -->

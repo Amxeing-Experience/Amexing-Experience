@@ -18,6 +18,7 @@ const corporateSyncFunctions = require('./functions/corporate-sync');
 const oauthPermissionsFunctions = require('./functions/oauth-permissions');
 const departmentOAuthFunctions = require('./functions/department-oauth');
 const appleOAuthFunctions = require('./functions/apple-oauth');
+const vehicleRatePricesFunctions = require('./functions/vehicle-rate-prices');
 
 // Import audit trail hooks
 const { registerAuditHooks } = require('./hooks/auditTrailHooks');

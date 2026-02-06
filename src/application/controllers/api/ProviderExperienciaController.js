@@ -84,15 +84,20 @@ class ProviderExperienciaController {
         count: data.length,
       });
     } catch (error) {
-      logger.error('Error in ProviderExperienciaController.getAllProviderExperiencias', {
-        error: error.message,
-        stack: error.stack,
-        userId: req.user?.id,
-      });
+      logger.error(
+        'Error in ProviderExperienciaController.getAllProviderExperiencias',
+        {
+          error: error.message,
+          stack: error.stack,
+          userId: req.user?.id,
+        }
+      );
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve provider experiencias',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to retrieve provider experiencias',
         500
       );
     }
@@ -142,16 +147,21 @@ class ProviderExperienciaController {
         },
       });
     } catch (error) {
-      logger.error('Error in ProviderExperienciaController.getProviderExperiencias', {
-        error: error.message,
-        stack: error.stack,
-        providerId: req.params.providerId,
-        userId: req.user?.id,
-      });
+      logger.error(
+        'Error in ProviderExperienciaController.getProviderExperiencias',
+        {
+          error: error.message,
+          stack: error.stack,
+          providerId: req.params.providerId,
+          userId: req.user?.id,
+        }
+      );
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve experiencias',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to retrieve experiencias',
         500
       );
     }
@@ -186,7 +196,11 @@ class ProviderExperienciaController {
 
       // Verify it belongs to the specified provider
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
+        return this.sendError(
+          res,
+          'Experiencia does not belong to this provider',
+          403
+        );
       }
 
       return res.json({
@@ -194,12 +208,15 @@ class ProviderExperienciaController {
         data: this.formatExperienciaForResponse(experiencia),
       });
     } catch (error) {
-      logger.error('Error in ProviderExperienciaController.getExperienciaById', {
-        error: error.message,
-        providerId: req.params.providerId,
-        experienciaId: req.params.id,
-        userId: req.user?.id,
-      });
+      logger.error(
+        'Error in ProviderExperienciaController.getExperienciaById',
+        {
+          error: error.message,
+          providerId: req.params.providerId,
+          experienciaId: req.params.id,
+          userId: req.user?.id,
+        }
+      );
 
       return this.sendError(res, 'Failed to retrieve experiencia', 500);
     }
@@ -231,6 +248,9 @@ class ProviderExperienciaController {
         displayOrder,
         tipo,
         availability,
+        includes,
+        notincludes,
+        photos,
       } = req.body;
 
       // Validate required fields
@@ -252,13 +272,21 @@ class ProviderExperienciaController {
       // Check experiencias limit
       const count = await ProviderExperiencia.countByProvider(providerId);
       if (count >= this.maxExperienciasPerProvider) {
-        return this.sendError(res, `Maximum ${this.maxExperienciasPerProvider} experiencias per provider`, 400);
+        return this.sendError(
+          res,
+          `Maximum ${this.maxExperienciasPerProvider} experiencias per provider`,
+          400
+        );
       }
 
       // Check name uniqueness for this provider
       const isUnique = await ProviderExperiencia.isNameUnique(providerId, name);
       if (!isUnique) {
-        return this.sendError(res, 'An experiencia with this name already exists for this provider', 409);
+        return this.sendError(
+          res,
+          'An experiencia with this name already exists for this provider',
+          409
+        );
       }
 
       // Create new experiencia
@@ -298,6 +326,17 @@ class ProviderExperienciaController {
         experiencia.setAvailability(availability);
       }
 
+      // Set includes, notincludes, and photos fields
+      if (includes !== undefined && Array.isArray(includes)) {
+        experiencia.set('includes', includes);
+      }
+      if (notincludes !== undefined && Array.isArray(notincludes)) {
+        experiencia.set('notincludes', notincludes);
+      }
+      if (photos !== undefined && Array.isArray(photos)) {
+        experiencia.set('photos', photos);
+      }
+
       // Set required lifecycle fields before validation
       experiencia.set('active', true);
       experiencia.set('exists', true);
@@ -334,7 +373,9 @@ class ProviderExperienciaController {
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to create experiencia',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to create experiencia',
         500
       );
     }
@@ -366,6 +407,9 @@ class ProviderExperienciaController {
         active,
         tipo,
         availability,
+        includes,
+        notincludes,
+        photos,
       } = req.body;
 
       // Get experiencia
@@ -382,16 +426,28 @@ class ProviderExperienciaController {
 
       // Verify it belongs to the specified provider
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
+        return this.sendError(
+          res,
+          'Experiencia does not belong to this provider',
+          403
+        );
       }
 
       // Update fields
       if (name !== undefined) {
         // Check name uniqueness if changing
         if (name !== experiencia.getName()) {
-          const isUnique = await ProviderExperiencia.isNameUnique(providerId, name, id);
+          const isUnique = await ProviderExperiencia.isNameUnique(
+            providerId,
+            name,
+            id
+          );
           if (!isUnique) {
-            return this.sendError(res, 'An experiencia with this name already exists for this provider', 409);
+            return this.sendError(
+              res,
+              'An experiencia with this name already exists for this provider',
+              409
+            );
           }
         }
         experiencia.setName(name);
@@ -406,6 +462,29 @@ class ProviderExperienciaController {
       if (displayOrder !== undefined) experiencia.setDisplayOrder(displayOrder);
       if (active !== undefined) experiencia.setActive(active);
       if (availability !== undefined) experiencia.setAvailability(availability);
+
+      // Update includes, notincludes, and photos fields
+      if (includes !== undefined) {
+        if (Array.isArray(includes)) {
+          experiencia.set('includes', includes);
+        } else if (includes === null) {
+          experiencia.set('includes', []);
+        }
+      }
+      if (notincludes !== undefined) {
+        if (Array.isArray(notincludes)) {
+          experiencia.set('notincludes', notincludes);
+        } else if (notincludes === null) {
+          experiencia.set('notincludes', []);
+        }
+      }
+      if (photos !== undefined) {
+        if (Array.isArray(photos)) {
+          experiencia.set('photos', photos);
+        } else if (photos === null) {
+          experiencia.set('photos', []);
+        }
+      }
 
       // Validate experiencia before saving
       const validation = experiencia.validateExplicitly();
@@ -470,7 +549,11 @@ class ProviderExperienciaController {
 
       // Verify it belongs to the specified provider
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
+        return this.sendError(
+          res,
+          'Experiencia does not belong to this provider',
+          403
+        );
       }
 
       // Soft delete
@@ -525,7 +608,9 @@ class ProviderExperienciaController {
 
       // Get all experiencias for this provider
       const providerExperiencias = await ProviderExperiencia.findByProvider(providerId);
-      const experienciaMap = new Map(providerExperiencias.map((exp) => [exp.id, exp]));
+      const experienciaMap = new Map(
+        providerExperiencias.map((exp) => [exp.id, exp])
+      );
 
       // Update display order for each experiencia
       const updates = experiencias.map((item) => {
@@ -550,11 +635,14 @@ class ProviderExperienciaController {
         message: 'Experiencias reordered successfully',
       });
     } catch (error) {
-      logger.error('Error in ProviderExperienciaController.reorderExperiencias', {
-        error: error.message,
-        providerId: req.params.providerId,
-        userId: req.user?.id,
-      });
+      logger.error(
+        'Error in ProviderExperienciaController.reorderExperiencias',
+        {
+          error: error.message,
+          providerId: req.params.providerId,
+          userId: req.user?.id,
+        }
+      );
 
       return this.sendError(res, 'Failed to reorder experiencias', 500);
     }
@@ -578,6 +666,9 @@ class ProviderExperienciaController {
       duration: experiencia.getDuration(),
       min_people: experiencia.getMinPeople(),
       max_people: experiencia.getMaxPeople(),
+      includes: experiencia.get('includes') || [],
+      notincludes: experiencia.get('notincludes') || [],
+      photos: experiencia.get('photos') || [],
       displayOrder: experiencia.getDisplayOrder(),
       active: experiencia.isActive(),
       availability: experiencia.getAvailability(),

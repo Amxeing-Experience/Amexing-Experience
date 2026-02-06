@@ -69,13 +69,24 @@ class ExperienceController {
 
       // Build filtered query (with day-of-week filtering if dayDate provided)
       const filteredQuery = params.searchValue
-        ? this.buildSearchQuery(params.searchValue, params.typeFilter, params.excludeId, params.dayDate)
-        : this.buildBaseQuery(params.typeFilter, params.excludeId, params.dayDate);
+        ? this.buildSearchQuery(
+          params.searchValue,
+          params.typeFilter,
+          params.excludeId,
+          params.dayDate
+        )
+        : this.buildBaseQuery(
+          params.typeFilter,
+          params.excludeId,
+          params.dayDate
+        );
 
       const recordsFiltered = await filteredQuery.count({ useMasterKey: true });
 
       // Apply sorting and pagination
-      filteredQuery[params.sortDirection === 'asc' ? 'ascending' : 'descending'](sortField);
+      filteredQuery[
+        params.sortDirection === 'asc' ? 'ascending' : 'descending'
+      ](sortField);
       filteredQuery.include('experiences');
       filteredQuery.include('vehicleType');
       filteredQuery.include('tours');
@@ -85,7 +96,9 @@ class ExperienceController {
 
       // Execute and format
       const experiences = await filteredQuery.find({ useMasterKey: true });
-      const data = await Promise.all(experiences.map((exp) => this.formatExperienceForDataTable(exp)));
+      const data = await Promise.all(
+        experiences.map((exp) => this.formatExperienceForDataTable(exp))
+      );
 
       return res.json({
         draw: params.draw,
@@ -102,7 +115,9 @@ class ExperienceController {
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve experiences',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to retrieve experiences',
         500
       );
     }
@@ -197,7 +212,13 @@ class ExperienceController {
    * @returns {object} Formatted experience data.
    * @example
    */
-  formatExperienceData(experience, includedExperiences, includedProviderExperiences, includedTours, vehicleType) {
+  formatExperienceData(
+    experience,
+    includedExperiences,
+    includedProviderExperiences,
+    includedTours,
+    vehicleType
+  ) {
     return {
       id: experience.id,
       name: experience.get('name'),
@@ -212,8 +233,12 @@ class ExperienceController {
       vehicleTypeId: vehicleType ? vehicleType.id : null,
       experiences: includedExperiences.map((exp) => exp.id),
       experienceDetails: this.formatExperienceDetails(includedExperiences),
-      providerExperiences: includedProviderExperiences.map((provExp) => provExp.id),
-      providerExperienceDetails: this.formatProviderExperienceDetails(includedProviderExperiences),
+      providerExperiences: includedProviderExperiences.map(
+        (provExp) => provExp.id
+      ),
+      providerExperienceDetails: this.formatProviderExperienceDetails(
+        includedProviderExperiences
+      ),
       tours: includedTours.map((tour) => tour.id),
       tourDetails: this.formatTourDetails(includedTours),
       availability: experience.get('availability') || null,
@@ -290,7 +315,9 @@ class ExperienceController {
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve experience',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to retrieve experience',
         500
       );
     }
@@ -316,7 +343,10 @@ class ExperienceController {
     } = data;
 
     if (!name || !description || !type || cost === undefined) {
-      return { error: 'Required fields: name, description, type, cost', status: 400 };
+      return {
+        error: 'Required fields: name, description, type, cost',
+        status: 400,
+      };
     }
 
     if (!['Experience', 'Provider'].includes(type)) {
@@ -325,7 +355,10 @@ class ExperienceController {
 
     if (type === 'Provider' && providerType) {
       if (!['Exclusivo', 'Compartido', 'Privado'].includes(providerType)) {
-        return { error: 'Provider type must be Exclusivo, Compartido, or Privado', status: 400 };
+        return {
+          error: 'Provider type must be Exclusivo, Compartido, or Privado',
+          status: 400,
+        };
       }
     }
 
@@ -344,7 +377,10 @@ class ExperienceController {
     }
 
     if (description.length > 1000) {
-      return { error: 'Description must be 1000 characters or less', status: 400 };
+      return {
+        error: 'Description must be 1000 characters or less',
+        status: 400,
+      };
     }
 
     return null;
@@ -360,15 +396,27 @@ class ExperienceController {
    */
   validateExperienceArrays(experiences, providerExperiences, tours) {
     if (experiences && experiences.length > this.maxExperiencesPerPackage) {
-      return { error: `Maximum ${this.maxExperiencesPerPackage} experiences per package`, status: 400 };
+      return {
+        error: `Maximum ${this.maxExperiencesPerPackage} experiences per package`,
+        status: 400,
+      };
     }
 
-    if (providerExperiences && providerExperiences.length > this.maxExperiencesPerPackage) {
-      return { error: `Maximum ${this.maxExperiencesPerPackage} provider experiences per package`, status: 400 };
+    if (
+      providerExperiences
+      && providerExperiences.length > this.maxExperiencesPerPackage
+    ) {
+      return {
+        error: `Maximum ${this.maxExperiencesPerPackage} provider experiences per package`,
+        status: 400,
+      };
     }
 
     if (tours && tours.length > this.maxToursPerPackage) {
-      return { error: `Maximum ${this.maxToursPerPackage} tours per package`, status: 400 };
+      return {
+        error: `Maximum ${this.maxToursPerPackage} tours per package`,
+        status: 400,
+      };
     }
 
     const totalItems = (experiences ? experiences.length : 0)
@@ -407,12 +455,18 @@ class ExperienceController {
             const exp = await expQuery.first({ useMasterKey: true });
             if (!exp) {
               logger.warn(`Experience ${expId} not found or inactive`);
-              return { error: `Experience ${expId} not found or is inactive`, status: 404 };
+              return {
+                error: `Experience ${expId} not found or is inactive`,
+                status: 404,
+              };
             }
             experiencePointers.push(exp);
           } catch (err) {
             logger.error(`Error fetching experience ${expId}:`, err);
-            return { error: `Error fetching experience ${expId}: ${err.message}`, status: 404 };
+            return {
+              error: `Error fetching experience ${expId}: ${err.message}`,
+              status: 404,
+            };
           }
         }
         experienceObj.set('experiences', experiencePointers);
@@ -431,12 +485,18 @@ class ExperienceController {
             const tour = await tourQuery.first({ useMasterKey: true });
             if (!tour) {
               logger.warn(`Tour ${tourId} not found or inactive`);
-              return { error: `Tour ${tourId} not found or is inactive`, status: 404 };
+              return {
+                error: `Tour ${tourId} not found or is inactive`,
+                status: 404,
+              };
             }
             tourPointers.push(tour);
           } catch (err) {
             logger.error(`Error fetching tour ${tourId}:`, err);
-            return { error: `Error fetching tour ${tourId}: ${err.message}`, status: 404 };
+            return {
+              error: `Error fetching tour ${tourId}: ${err.message}`,
+              status: 404,
+            };
           }
         }
         experienceObj.set('tours', tourPointers);
@@ -452,7 +512,10 @@ class ExperienceController {
         experiences,
         tours,
       });
-      return { error: `Failed to process relationships: ${error.message}`, status: 404 };
+      return {
+        error: `Failed to process relationships: ${error.message}`,
+        status: 404,
+      };
     }
   }
 
@@ -463,7 +526,10 @@ class ExperienceController {
    * @returns {object|null} Error object or null if successful.
    * @example
    */
-  async processProviderExperienceRelationships(experienceObj, providerExperiences) {
+  async processProviderExperienceRelationships(
+    experienceObj,
+    providerExperiences
+  ) {
     try {
       // Process provider experiences
       if (providerExperiences && providerExperiences.length > 0) {
@@ -476,17 +542,30 @@ class ExperienceController {
             providerExpQuery.equalTo('exists', true);
             providerExpQuery.equalTo('active', true);
 
-            const providerExp = await providerExpQuery.first({ useMasterKey: true });
+            const providerExp = await providerExpQuery.first({
+              useMasterKey: true,
+            });
             if (!providerExp) {
-              logger.warn(`Provider Experience ${providerExpId} not found or inactive`);
-              return { error: `Provider Experience ${providerExpId} not found or is inactive`, status: 404 };
+              logger.warn(
+                `Provider Experience ${providerExpId} not found or inactive`
+              );
+              return {
+                error: `Provider Experience ${providerExpId} not found or is inactive`,
+                status: 404,
+              };
             }
 
             // Use the actual Parse object (consistent with experiences and tours)
             providerExperiencePointers.push(providerExp);
           } catch (err) {
-            logger.error(`Error fetching provider experience ${providerExpId}:`, err);
-            return { error: `Error fetching provider experience ${providerExpId}: ${err.message}`, status: 404 };
+            logger.error(
+              `Error fetching provider experience ${providerExpId}:`,
+              err
+            );
+            return {
+              error: `Error fetching provider experience ${providerExpId}: ${err.message}`,
+              status: 404,
+            };
           }
         }
         experienceObj.set('providerExperiences', providerExperiencePointers);
@@ -501,7 +580,10 @@ class ExperienceController {
         stack: error.stack,
         providerExperiences,
       });
-      return { error: `Failed to process provider experience relationships: ${error.message}`, status: 404 };
+      return {
+        error: `Failed to process provider experience relationships: ${error.message}`,
+        status: 404,
+      };
     }
   }
 
@@ -521,14 +603,22 @@ class ExperienceController {
       const vehicleTypeQuery = new Parse.Query('VehicleType');
       vehicleTypeQuery.equalTo('exists', true);
       vehicleTypeQuery.equalTo('active', true);
-      const vehicleTypeObj = await vehicleTypeQuery.get(vehicleType, { useMasterKey: true });
+      const vehicleTypeObj = await vehicleTypeQuery.get(vehicleType, {
+        useMasterKey: true,
+      });
       if (!vehicleTypeObj) {
-        return { error: `Vehicle type ${vehicleType} not found or inactive`, status: 404 };
+        return {
+          error: `Vehicle type ${vehicleType} not found or inactive`,
+          status: 404,
+        };
       }
       experienceObj.set('vehicleType', vehicleTypeObj);
       return null;
     } catch (error) {
-      return { error: `Vehicle type ${vehicleType} not found or inactive`, status: 404 };
+      return {
+        error: `Vehicle type ${vehicleType} not found or inactive`,
+        status: 404,
+      };
     }
   }
 
@@ -548,6 +638,9 @@ class ExperienceController {
       cost,
       min_people: minPeople,
       time_journey: timeJourney,
+      includes,
+      notincludes,
+      photos,
     } = data;
 
     const Experience = Parse.Object.extend('Experience');
@@ -565,8 +658,21 @@ class ExperienceController {
     if (minPeople !== undefined && minPeople !== null && minPeople !== '') {
       experienceObj.set('min_people', parseInt(minPeople, 10));
     }
-    if (timeJourney !== undefined && timeJourney !== null && timeJourney !== '') {
+    if (
+      timeJourney !== undefined
+      && timeJourney !== null
+      && timeJourney !== ''
+    ) {
       experienceObj.set('time_journey', parseFloat(timeJourney));
+    }
+    if (includes !== undefined && Array.isArray(includes)) {
+      experienceObj.set('includes', includes);
+    }
+    if (notincludes !== undefined && Array.isArray(notincludes)) {
+      experienceObj.set('notincludes', notincludes);
+    }
+    if (photos !== undefined && Array.isArray(photos)) {
+      experienceObj.set('photos', photos);
     }
     experienceObj.set('cost', parseFloat(cost));
     experienceObj.set('active', true);
@@ -647,22 +753,42 @@ class ExperienceController {
       // Validate input
       const inputValidation = this.validateCreateExperienceInput(req.body);
       if (inputValidation) {
-        return this.sendError(res, inputValidation.error, inputValidation.status);
+        return this.sendError(
+          res,
+          inputValidation.error,
+          inputValidation.status
+        );
       }
 
       // Validate arrays
-      const arrayValidation = this.validateExperienceArrays(experiences, providerExperiences, tours);
+      const arrayValidation = this.validateExperienceArrays(
+        experiences,
+        providerExperiences,
+        tours
+      );
       if (arrayValidation) {
-        return this.sendError(res, arrayValidation.error, arrayValidation.status);
+        return this.sendError(
+          res,
+          arrayValidation.error,
+          arrayValidation.status
+        );
       }
 
       // Create and setup experience object
       const experienceObj = this.createExperienceObject(req.body);
 
       // Process relationships
-      const relationshipError = await this.processExperienceRelationships(experienceObj, experiences, tours);
+      const relationshipError = await this.processExperienceRelationships(
+        experienceObj,
+        experiences,
+        tours
+      );
       if (relationshipError) {
-        return this.sendError(res, relationshipError.error, relationshipError.status);
+        return this.sendError(
+          res,
+          relationshipError.error,
+          relationshipError.status
+        );
       }
 
       // Process provider experience relationships
@@ -671,24 +797,43 @@ class ExperienceController {
         providerExperiences
       );
       if (providerExperienceError) {
-        return this.sendError(res, providerExperienceError.error, providerExperienceError.status);
+        return this.sendError(
+          res,
+          providerExperienceError.error,
+          providerExperienceError.status
+        );
       }
 
-      const vehicleTypeError = await this.processVehicleTypeRelationship(experienceObj, vehicleType);
+      const vehicleTypeError = await this.processVehicleTypeRelationship(
+        experienceObj,
+        vehicleType
+      );
       if (vehicleTypeError) {
-        return this.sendError(res, vehicleTypeError.error, vehicleTypeError.status);
+        return this.sendError(
+          res,
+          vehicleTypeError.error,
+          vehicleTypeError.status
+        );
       }
 
       // Process availability (optional)
       const { availability } = req.body;
       if (availability && Array.isArray(availability)) {
         if (availability.length === 0) {
-          return this.sendError(res, 'At least one day schedule must be provided if availability is set', 400);
+          return this.sendError(
+            res,
+            'At least one day schedule must be provided if availability is set',
+            400
+          );
         }
 
         const availabilityValidation = validateDaySchedules(availability);
         if (!availabilityValidation.valid) {
-          return this.sendError(res, `Invalid availability data: ${availabilityValidation.errors.join(', ')}`, 400);
+          return this.sendError(
+            res,
+            `Invalid availability data: ${availabilityValidation.errors.join(', ')}`,
+            400
+          );
         }
 
         const sortedSchedules = sortDaySchedulesChronological(availability);
@@ -697,7 +842,12 @@ class ExperienceController {
 
       // Save and respond
       await this.saveExperienceWithAudit(experienceObj, currentUser);
-      return this.handleCreateExperienceSuccess(res, experienceObj, req.body, currentUser.id);
+      return this.handleCreateExperienceSuccess(
+        res,
+        experienceObj,
+        req.body,
+        currentUser.id
+      );
     } catch (error) {
       logger.error('Error in ExperienceController.createExperience', {
         error: error.message,
@@ -708,7 +858,9 @@ class ExperienceController {
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to create experience',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to create experience',
         500
       );
     }
@@ -731,6 +883,9 @@ class ExperienceController {
       active,
       min_people: minPeople,
       time_journey: timeJourney,
+      includes,
+      notincludes,
+      photos,
     } = data;
 
     if (name !== undefined) {
@@ -748,14 +903,20 @@ class ExperienceController {
         return { error: 'Description cannot be empty', status: 400 };
       }
       if (description.length > 1000) {
-        return { error: 'Description must be 1000 characters or less', status: 400 };
+        return {
+          error: 'Description must be 1000 characters or less',
+          status: 400,
+        };
       }
       experienceObj.set('description', description);
     }
 
     if (cost !== undefined) {
       if (cost < 0) {
-        return { error: 'Cost must be greater than or equal to 0', status: 400 };
+        return {
+          error: 'Cost must be greater than or equal to 0',
+          status: 400,
+        };
       }
       // Store cost change info for versioning (will be returned to caller)
       const oldCost = experienceObj.get('cost');
@@ -792,8 +953,14 @@ class ExperienceController {
     if (providerType !== undefined) {
       const currentType = experienceObj.get('type');
       if (currentType === 'Provider') {
-        if (providerType && !['Exclusivo', 'Compartido', 'Privado'].includes(providerType)) {
-          return { error: 'Provider type must be Exclusivo, Compartido, or Privado', status: 400 };
+        if (
+          providerType
+          && !['Exclusivo', 'Compartido', 'Privado'].includes(providerType)
+        ) {
+          return {
+            error: 'Provider type must be Exclusivo, Compartido, or Privado',
+            status: 400,
+          };
         }
         experienceObj.set('providerType', providerType || null);
       }
@@ -803,8 +970,14 @@ class ExperienceController {
       if (minPeople === null || minPeople === '') {
         experienceObj.set('min_people', null);
       } else {
-        if (Number.isNaN(parseInt(minPeople, 10)) || parseInt(minPeople, 10) < 1) {
-          return { error: 'Minimum people must be a positive number', status: 400 };
+        if (
+          Number.isNaN(parseInt(minPeople, 10))
+          || parseInt(minPeople, 10) < 1
+        ) {
+          return {
+            error: 'Minimum people must be a positive number',
+            status: 400,
+          };
         }
         experienceObj.set('min_people', parseInt(minPeople, 10));
       }
@@ -814,10 +987,40 @@ class ExperienceController {
       if (timeJourney === null || timeJourney === '') {
         experienceObj.set('time_journey', null);
       } else {
-        if (Number.isNaN(parseFloat(timeJourney)) || parseFloat(timeJourney) < 0) {
-          return { error: 'Journey time must be greater than or equal to 0', status: 400 };
+        if (
+          Number.isNaN(parseFloat(timeJourney))
+          || parseFloat(timeJourney) < 0
+        ) {
+          return {
+            error: 'Journey time must be greater than or equal to 0',
+            status: 400,
+          };
         }
         experienceObj.set('time_journey', parseFloat(timeJourney));
+      }
+    }
+
+    if (includes !== undefined) {
+      if (Array.isArray(includes)) {
+        experienceObj.set('includes', includes);
+      } else if (includes === null) {
+        experienceObj.set('includes', []);
+      }
+    }
+
+    if (notincludes !== undefined) {
+      if (Array.isArray(notincludes)) {
+        experienceObj.set('notincludes', notincludes);
+      } else if (notincludes === null) {
+        experienceObj.set('notincludes', []);
+      }
+    }
+
+    if (photos !== undefined) {
+      if (Array.isArray(photos)) {
+        experienceObj.set('photos', photos);
+      } else if (photos === null) {
+        experienceObj.set('photos', []);
       }
     }
 
@@ -843,7 +1046,9 @@ class ExperienceController {
     logger.info('=== UPDATE EXPERIENCE RELATIONSHIPS DEBUG ===', {
       experienceId,
       experiencesCount: experiences ? experiences.length : 0,
-      providerExperiencesCount: providerExperiences ? providerExperiences.length : 0,
+      providerExperiencesCount: providerExperiences
+        ? providerExperiences.length
+        : 0,
       toursCount: tours ? tours.length : 0,
       providerExperiences,
     });
@@ -851,7 +1056,10 @@ class ExperienceController {
     // Update experiences array
     if (experiences !== undefined) {
       if (experiences.length > this.maxExperiencesPerPackage) {
-        return { error: `Maximum ${this.maxExperiencesPerPackage} experiences per package`, status: 400 };
+        return {
+          error: `Maximum ${this.maxExperiencesPerPackage} experiences per package`,
+          status: 400,
+        };
       }
       if (experiences.includes(experienceId)) {
         return { error: 'An experience cannot include itself', status: 400 };
@@ -881,7 +1089,10 @@ class ExperienceController {
     // Update provider experiences array
     if (providerExperiences !== undefined) {
       if (providerExperiences.length > this.maxExperiencesPerPackage) {
-        return { error: `Maximum ${this.maxExperiencesPerPackage} provider experiences per package`, status: 400 };
+        return {
+          error: `Maximum ${this.maxExperiencesPerPackage} provider experiences per package`,
+          status: 400,
+        };
       }
 
       if (providerExperiences.length > 0) {
@@ -893,15 +1104,23 @@ class ExperienceController {
             providerExpQuery.equalTo('exists', true);
             providerExpQuery.equalTo('active', true);
 
-            const providerExp = await providerExpQuery.first({ useMasterKey: true });
+            const providerExp = await providerExpQuery.first({
+              useMasterKey: true,
+            });
             if (!providerExp) {
-              return { error: `Provider Experience ${providerExpId} not found or is inactive`, status: 404 };
+              return {
+                error: `Provider Experience ${providerExpId} not found or is inactive`,
+                status: 404,
+              };
             }
 
             // Use the actual Parse object (consistent with experiences and tours)
             providerExperiencePointers.push(providerExp);
           } catch (err) {
-            return { error: `Error fetching provider experience ${providerExpId}: ${err.message}`, status: 404 };
+            return {
+              error: `Error fetching provider experience ${providerExpId}: ${err.message}`,
+              status: 404,
+            };
           }
         }
         experienceObj.set('providerExperiences', providerExperiencePointers);
@@ -913,12 +1132,21 @@ class ExperienceController {
     // Update tours array
     if (tours !== undefined) {
       if (tours.length > this.maxToursPerPackage) {
-        return { error: `Maximum ${this.maxToursPerPackage} tours per package`, status: 400 };
+        return {
+          error: `Maximum ${this.maxToursPerPackage} tours per package`,
+          status: 400,
+        };
       }
 
-      const currentExperiences = experiences !== undefined ? experiences : experienceObj.get('experiences') || [];
-      const currentProviderExperiences = providerExperiences !== undefined ? providerExperiences : experienceObj.get('providerExperiences') || [];
-      const totalItems = currentExperiences.length + currentProviderExperiences.length + tours.length;
+      const currentExperiences = experiences !== undefined
+        ? experiences
+        : experienceObj.get('experiences') || [];
+      const currentProviderExperiences = providerExperiences !== undefined
+        ? providerExperiences
+        : experienceObj.get('providerExperiences') || [];
+      const totalItems = currentExperiences.length
+        + currentProviderExperiences.length
+        + tours.length;
       if (totalItems > this.maxTotalItemsPerPackage) {
         return {
           error: `Maximum ${this.maxTotalItemsPerPackage} total items (experiences + provider experiences + tours) per package`,
@@ -964,13 +1192,21 @@ class ExperienceController {
         const vehicleTypeQuery = new Parse.Query('VehicleType');
         vehicleTypeQuery.equalTo('exists', true);
         vehicleTypeQuery.equalTo('active', true);
-        const vehicleTypeObj = await vehicleTypeQuery.get(vehicleType, { useMasterKey: true });
+        const vehicleTypeObj = await vehicleTypeQuery.get(vehicleType, {
+          useMasterKey: true,
+        });
         if (!vehicleTypeObj) {
-          return { error: `Vehicle type ${vehicleType} not found or inactive`, status: 404 };
+          return {
+            error: `Vehicle type ${vehicleType} not found or inactive`,
+            status: 404,
+          };
         }
         experienceObj.set('vehicleType', vehicleTypeObj);
       } catch (error) {
-        return { error: `Vehicle type ${vehicleType} not found or inactive`, status: 404 };
+        return {
+          error: `Vehicle type ${vehicleType} not found or inactive`,
+          status: 404,
+        };
       }
     } else {
       experienceObj.unset('vehicleType');
@@ -1001,28 +1237,54 @@ class ExperienceController {
 
       // Get existing experience
       const query = new Parse.Query('Experience');
-      const experienceObj = await query.get(experienceId, { useMasterKey: true });
+      const experienceObj = await query.get(experienceId, {
+        useMasterKey: true,
+      });
       if (!experienceObj) {
         return this.sendError(res, 'Experience not found', 404);
       }
 
       // Validate and update all fields and relationships
-      const basicFieldsResult = this.validateAndUpdateBasicFields(experienceObj, req.body);
+      const basicFieldsResult = this.validateAndUpdateBasicFields(
+        experienceObj,
+        req.body
+      );
       if (basicFieldsResult && basicFieldsResult.error) {
-        return this.sendError(res, basicFieldsResult.error, basicFieldsResult.status);
+        return this.sendError(
+          res,
+          basicFieldsResult.error,
+          basicFieldsResult.status
+        );
       }
 
       // Extract cost change information if it exists
-      const costChangeInfo = basicFieldsResult && basicFieldsResult.costChanged ? basicFieldsResult : null;
+      const costChangeInfo = basicFieldsResult && basicFieldsResult.costChanged
+        ? basicFieldsResult
+        : null;
 
-      const relationshipsError = await this.updateExperienceRelationships(experienceObj, experienceId, req.body);
+      const relationshipsError = await this.updateExperienceRelationships(
+        experienceObj,
+        experienceId,
+        req.body
+      );
       if (relationshipsError) {
-        return this.sendError(res, relationshipsError.error, relationshipsError.status);
+        return this.sendError(
+          res,
+          relationshipsError.error,
+          relationshipsError.status
+        );
       }
 
-      const vehicleTypeError = await this.updateVehicleTypeRelationship(experienceObj, req.body.vehicleType);
+      const vehicleTypeError = await this.updateVehicleTypeRelationship(
+        experienceObj,
+        req.body.vehicleType
+      );
       if (vehicleTypeError) {
-        return this.sendError(res, vehicleTypeError.error, vehicleTypeError.status);
+        return this.sendError(
+          res,
+          vehicleTypeError.error,
+          vehicleTypeError.status
+        );
       }
 
       // Update availability (optional)
@@ -1034,13 +1296,21 @@ class ExperienceController {
         } else if (Array.isArray(availability) && availability.length > 0) {
           const availabilityValidation = validateDaySchedules(availability);
           if (!availabilityValidation.valid) {
-            return this.sendError(res, `Invalid availability data: ${availabilityValidation.errors.join(', ')}`, 400);
+            return this.sendError(
+              res,
+              `Invalid availability data: ${availabilityValidation.errors.join(', ')}`,
+              400
+            );
           }
 
           const sortedSchedules = sortDaySchedulesChronological(availability);
           experienceObj.set('availability', sortedSchedules);
         } else if (Array.isArray(availability) && availability.length === 0) {
-          return this.sendError(res, 'At least one day schedule must be provided if availability is set', 400);
+          return this.sendError(
+            res,
+            'At least one day schedule must be provided if availability is set',
+            400
+          );
         }
       }
 
@@ -1065,7 +1335,12 @@ class ExperienceController {
         const newExperience = new ExperienceClass();
 
         // Copy all fields from original experience
-        const fieldsToExclude = ['objectId', 'createdAt', 'updatedAt', 'valid_until'];
+        const fieldsToExclude = [
+          'objectId',
+          'createdAt',
+          'updatedAt',
+          'valid_until',
+        ];
         const experienceJSON = experienceObj.toJSON();
 
         Object.keys(experienceJSON).forEach((key) => {
@@ -1079,7 +1354,9 @@ class ExperienceController {
               && experienceJSON[key].className
             ) {
               // Handle Parse pointers
-              const PointerClass = Parse.Object.extend(experienceJSON[key].className);
+              const PointerClass = Parse.Object.extend(
+                experienceJSON[key].className
+              );
               const pointer = new PointerClass();
               pointer.id = experienceJSON[key].objectId;
               newExperience.set(key, pointer);
@@ -1147,7 +1424,9 @@ class ExperienceController {
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to update experience',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to update experience',
         500
       );
     }
@@ -1219,7 +1498,9 @@ class ExperienceController {
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to delete experience',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to delete experience',
         500
       );
     }
@@ -1297,7 +1578,9 @@ class ExperienceController {
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to check dependencies',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to check dependencies',
         500
       );
     }
@@ -1314,7 +1597,10 @@ class ExperienceController {
     return {
       draw: parseInt(query.draw, 10) || 1,
       start: parseInt(query.start, 10) || 0,
-      length: Math.min(parseInt(query.length, 10) || this.defaultPageSize, this.maxPageSize),
+      length: Math.min(
+        parseInt(query.length, 10) || this.defaultPageSize,
+        this.maxPageSize
+      ),
       searchValue: query.search?.value || '',
       sortColumnIndex: parseInt(query.order?.[0]?.column, 10) || 0,
       sortDirection: query.order?.[0]?.dir || 'asc',
@@ -1417,7 +1703,9 @@ class ExperienceController {
     let experienciasCount = 0;
     if (experience.get('type') === 'Provider') {
       const ProviderExperiencia = require('../../../domain/models/ProviderExperiencia');
-      experienciasCount = await ProviderExperiencia.countByProvider(experience.id);
+      experienciasCount = await ProviderExperiencia.countByProvider(
+        experience.id
+      );
     }
 
     return {
@@ -1460,7 +1748,10 @@ class ExperienceController {
       experienceCount: includedExperiences.length,
       providerExperienceCount: includedProviderExperiences.length,
       tourCount: includedTours.length,
-      totalItemCount: includedExperiences.length + includedProviderExperiences.length + includedTours.length,
+      totalItemCount:
+        includedExperiences.length
+        + includedProviderExperiences.length
+        + includedTours.length,
       availability: experience.get('availability') || null,
       active: experience.get('active'),
       createdAt: experience.createdAt,
@@ -1514,7 +1805,9 @@ class ExperienceController {
       experienceQuery.equalTo('objectId', experienceId);
       experienceQuery.equalTo('exists', true);
 
-      const currentExperience = await experienceQuery.first({ useMasterKey: true });
+      const currentExperience = await experienceQuery.first({
+        useMasterKey: true,
+      });
 
       if (!currentExperience) {
         return this.sendError(res, 'Experience not found', 404);

@@ -222,9 +222,6 @@ table.dataTable thead th:nth-child(2) select {
                             <option value="transferencia">Transferencia</option>
                         <% } %>
                         <option value="tarjeta">Tarjeta Débito/Crédito</option>
-                        <% if (!isDepartmentManager && !isClient) { %>
-                        <option value="transf_agencias">Transf. Agencias</option>
-                        <% } %>
                     </select>
                 </div>
             </div>
@@ -1077,12 +1074,18 @@ table.dataTable thead th:nth-child(2) select {
             });
         }
 
-        // Filter pill click handlers (nav-pills style)
+        // Filter pill click handlers (nav-pills style) - Only respond to service-specific filters
         $('.filter-pill').on('click', async function() {
             const filterType = $(this).data('filter');
             
-            // Update active pill (nav-pills style)
-            $('.filter-pill').removeClass('active');
+            // Only handle service-specific filters (airport, p2p, local), ignore tours filters (solo-guide, with-driver)
+            if (!['airport', 'p2p', 'local'].includes(filterType)) {
+                console.log('🚫 Services table ignoring non-service filter:', filterType);
+                return;
+            }
+            
+            // Update active pill (nav-pills style) - Only update service pills
+            $('.filter-pill[data-filter="airport"], .filter-pill[data-filter="p2p"], .filter-pill[data-filter="local"]').removeClass('active');
             $(this).addClass('active');
             
             console.log('Filter pill clicked:', filterType);
@@ -1178,8 +1181,8 @@ table.dataTable thead th:nth-child(2) select {
             // This ensures both main table and expanded view use the same rate-specific data
             await loadAllServices();
             
-            // Re-apply the current filter after reloading
-            const currentFilter = $('.filter-pill.active').data('filter') || 'airport';
+            // Re-apply the current filter after reloading - Only check service filter pills
+            const currentFilter = $('.filter-pill.active[data-filter="airport"], .filter-pill.active[data-filter="p2p"], .filter-pill.active[data-filter="local"]').data('filter') || 'airport';
             filteredData = filterServicesByType(currentFilter);
             
             // Update the table with the new data (which already includes rate-specific pricing)
@@ -1457,9 +1460,6 @@ table.dataTable thead th:nth-child(2) select {
                     } else if (paymentType === 'tarjeta') {
                         console.log('💳 Applying Agency Rate for tarjeta');
                         finalPrice = applyAgencyRate(finalPrice);
-                    } else if (paymentType === 'transf_agencias') {
-                        console.log('🏢 Applying Agency Rate for transf_agencias');
-                        finalPrice = applyAgencyRate(finalPrice);
                     }
                     
                     // Always apply currency conversion/formatting
@@ -1488,9 +1488,6 @@ table.dataTable thead th:nth-child(2) select {
                     finalPrice = applyTransferRate(finalPrice);
                 } else if (paymentType === 'tarjeta') {
                     console.log('💳 [Expanded View] Applying Agency Rate for tarjeta');
-                    finalPrice = applyAgencyRate(finalPrice);
-                } else if (paymentType === 'transf_agencias') {
-                    console.log('🏢 [Expanded View] Applying Agency Rate for transf_agencias');
                     finalPrice = applyAgencyRate(finalPrice);
                 }
                 
@@ -1543,7 +1540,13 @@ table.dataTable thead th:nth-child(2) select {
         $(`#currencyFilter-${tableId}`).on('change', function() {
             const selectedCurrency = $(this).val();
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
-            console.log('Currency changed:', selectedCurrency);
+            console.log('🏪 Services currency changed:', selectedCurrency);
+            
+            // Call global sync to update all currency dropdowns across tables
+            if (typeof window.syncCurrencyDropdowns === 'function') {
+                console.log('🔄 Services calling global sync for currency:', selectedCurrency);
+                window.syncCurrencyDropdowns(selectedCurrency, this);
+            }
             
             if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
                 // Try to load exchange rate if not already loaded

@@ -134,11 +134,11 @@ class ClientController extends RoleBasedController {
             if (clientRecord) {
               // Get company name from Client record
               companyName = clientRecord.get('name')
-                           || clientRecord.get('companyName')
-                           || clientRecord.get('company')
-                           || clientRecord.get('businessName')
-                           || clientRecord.get('organizationName')
-                           || 'Mi Empresa';
+                || clientRecord.get('companyName')
+                || clientRecord.get('company')
+                || clientRecord.get('businessName')
+                || clientRecord.get('organizationName')
+                || 'Mi Empresa';
             } else {
               // Try to get from the current user record
               const clientQuery = new Parse.Query('AmexingUser');
@@ -148,11 +148,11 @@ class ClientController extends RoleBasedController {
               if (clientUser) {
                 // Get company name from the client user - check all possible fields
                 companyName = clientUser.get('companyName')
-                             || clientUser.get('company')
-                             || clientUser.get('organizationName')
-                             || clientUser.get('clientName')
-                             || clientUser.get('businessName')
-                             || 'Mi Empresa';
+                  || clientUser.get('company')
+                  || clientUser.get('organizationName')
+                  || clientUser.get('clientName')
+                  || clientUser.get('businessName')
+                  || 'Mi Empresa';
               } else {
                 companyName = 'Mi Empresa';
               }
@@ -172,7 +172,16 @@ class ClientController extends RoleBasedController {
             const query = new Parse.Query('AmexingUser');
             query.equalTo('objectId', clientId);
             query.equalTo('exists', true);
-            query.select(['firstName', 'lastName', 'email', 'phone', 'role', 'active', 'companyName', 'contextualData']);
+            query.select([
+              'firstName',
+              'lastName',
+              'email',
+              'phone',
+              'role',
+              'active',
+              'companyName',
+              'contextualData',
+            ]);
 
             departmentManager = await query.first({ useMasterKey: true });
 
@@ -235,15 +244,16 @@ class ClientController extends RoleBasedController {
       }
 
       // Final fallback for company name - only replace if it looks like an ID or is clearly invalid
-      if (!companyName
-          || companyName === 'Company'
-          || companyName === 'undefined'
-          || companyName === 'null'
-          || companyName.length > 50
-          || /^[a-zA-Z0-9]{10,}$/.test(companyName) // IDs are usually 10+ chars
-          || /^[A-Z0-9]{8,}$/.test(companyName) // All caps IDs
-          || companyName.includes('objectId')
-          || companyName.includes('ObjectId')
+      if (
+        !companyName
+        || companyName === 'Company'
+        || companyName === 'undefined'
+        || companyName === 'null'
+        || companyName.length > 50
+        || /^[a-zA-Z0-9]{10,}$/.test(companyName) // IDs are usually 10+ chars
+        || /^[A-Z0-9]{8,}$/.test(companyName) // All caps IDs
+        || companyName.includes('objectId')
+        || companyName.includes('ObjectId')
       ) {
         companyName = 'Mi Empresa';
       }

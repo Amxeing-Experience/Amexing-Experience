@@ -1090,12 +1090,14 @@ class AdminController extends RoleBasedController {
       const InflationRate = require('../../../domain/models/InflationRate');
       const AgencyRate = require('../../../domain/models/AgencyRate');
       const TransferRate = require('../../../domain/models/TransferRate');
+      const DriverTourRate = require('../../../domain/models/DriverTourRate');
 
       // Get current rates
       let currentExchangeRate = await ExchangeRate.getCurrentExchangeRate();
       let currentInflationRate = await InflationRate.getCurrentInflationRate();
       let currentAgencyRate = await AgencyRate.getCurrentAgencyRate();
       let currentTransferRate = await TransferRate.getCurrentTransferRate();
+      let currentDriverTourRate = await DriverTourRate.getCurrentDriverTourRate();
 
       // Create default inflation rate if none exists
       if (!currentInflationRate) {
@@ -1136,6 +1138,19 @@ class AdminController extends RoleBasedController {
         }
       }
 
+      // Create default driver tour rate if none exists
+      if (!currentDriverTourRate) {
+        try {
+          currentDriverTourRate = await DriverTourRate.createDriverTourRate({
+            value: 635.0,
+            description: 'Tarifa por defecto para tours con guía+chofer',
+            createdBy: null,
+          });
+        } catch (error) {
+          console.warn('Could not create default driver tour rate:', error.message);
+        }
+      }
+
       // Create default exchange rate if none exists
       if (!currentExchangeRate) {
         try {
@@ -1153,6 +1168,7 @@ class AdminController extends RoleBasedController {
       const inflationValue = currentInflationRate ? currentInflationRate.get('value') : 5.25;
       const agencyValue = currentAgencyRate ? currentAgencyRate.get('value') : 15.0;
       const transferValue = currentTransferRate ? currentTransferRate.get('value') : 3.0;
+      const driverTourValue = currentDriverTourRate ? currentDriverTourRate.get('value') : 635.0;
 
       await this.renderRoleView(req, res, 'price-settings', {
         title: 'Ajustes de Precio',
@@ -1180,6 +1196,12 @@ class AdminController extends RoleBasedController {
           formatted: TransferRate.formatValue(transferValue),
           lastUpdated: currentTransferRate ? currentTransferRate.get('createdAt') : new Date(),
           id: currentTransferRate ? currentTransferRate.id : null,
+        },
+        currentDriverTourRate: {
+          value: driverTourValue,
+          formatted: DriverTourRate.formatValue(driverTourValue),
+          lastUpdated: currentDriverTourRate ? currentDriverTourRate.get('createdAt') : new Date(),
+          id: currentDriverTourRate ? currentDriverTourRate.id : null,
         },
         breadcrumb: null, // Disable automatic breadcrumb
         pageStyles: [
