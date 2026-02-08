@@ -95,7 +95,8 @@ async function loadVehicleRates() {
             headers: {
                 'Content-Type': 'application/json',
                 'X-Parse-Application-Id': 'CrTRTaJpoJFNt8PJ',
-                'X-Requested-With': 'XMLHttpRequest'
+                'X-Requested-With': 'XMLHttpRequest',
+                'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
             },
             body: JSON.stringify({})
         });
