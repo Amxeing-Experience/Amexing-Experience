@@ -315,6 +315,77 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         </div>
                     </div>
 
+                    <!-- Notas (4 campos) -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <!-- Notas internas -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-notes me-1"></i>Notas internas <span class="text-muted">(Uso interno)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaInternalNotes" 
+                                          rows="3" 
+                                          maxlength="1000"
+                                          placeholder="Notas para uso exclusivo interno del equipo..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-lock me-1"></i>Solo visible para el equipo interno</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Notas cliente (reservar) -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-user-check me-1"></i>Notas cliente (reservar) <span class="text-muted">(Cliente)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaClientBookingNotes" 
+                                          rows="3" 
+                                          maxlength="1000"
+                                          placeholder="Notas que verá el cliente al reservar esta experiencia..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-eye me-1"></i>Visible para el cliente durante reserva</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <!-- Notas proveedor -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-building-store me-1"></i>Notas proveedor <span class="text-muted">(Proveedor)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaProviderNotes" 
+                                          rows="3" 
+                                          maxlength="1000"
+                                          placeholder="Notas e instrucciones para el proveedor de la experiencia..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-truck me-1"></i>Instrucciones para el proveedor</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Notas colaboradores Amexing -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-users me-1"></i>Notas colaboradores Amexing <span class="text-muted">(Equipo)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaTeamNotes" 
+                                          rows="3" 
+                                          maxlength="1000"
+                                          placeholder="Notas para colaboradores y equipo de Amexing..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-heart me-1"></i>Información para el equipo Amexing</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="alert alert-success" role="alert">
                         <i class="ti ti-check-circle me-2"></i>
                         <small>Esta experiencia se agregará inmediatamente al proveedor. Puedes editarla más tarde desde "Editar Proveedor".</small>
@@ -652,6 +723,77 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 </div>
             </div>
             
+            <!-- Notas (4 campos) -->
+            <div class="row">
+                <div class="col-md-6">
+                    <!-- Notas internas -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            <i class="ti ti-notes me-1"></i>Notas internas <span class="text-muted">(Uso interno)</span>
+                        </label>
+                        <textarea class="form-control experiencia-internal-notes-input" 
+                                  rows="3" 
+                                  maxlength="1000"
+                                  placeholder="Notas para uso exclusivo interno del equipo..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-lock me-1"></i>Solo visible para el equipo interno</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- Notas cliente (reservar) -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            <i class="ti ti-user-check me-1"></i>Notas cliente (reservar) <span class="text-muted">(Cliente)</span>
+                        </label>
+                        <textarea class="form-control experiencia-client-booking-notes-input" 
+                                  rows="3" 
+                                  maxlength="1000"
+                                  placeholder="Notas que verá el cliente al reservar esta experiencia..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-eye me-1"></i>Visible para el cliente durante reserva</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <!-- Notas proveedor -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            <i class="ti ti-building-store me-1"></i>Notas proveedor <span class="text-muted">(Proveedor)</span>
+                        </label>
+                        <textarea class="form-control experiencia-provider-notes-input" 
+                                  rows="3" 
+                                  maxlength="1000"
+                                  placeholder="Notas e instrucciones para el proveedor de la experiencia..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-truck me-1"></i>Instrucciones para el proveedor</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- Notas colaboradores Amexing -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            <i class="ti ti-users me-1"></i>Notas colaboradores Amexing <span class="text-muted">(Equipo)</span>
+                        </label>
+                        <textarea class="form-control experiencia-team-notes-input" 
+                                  rows="3" 
+                                  maxlength="1000"
+                                  placeholder="Notas para colaboradores y equipo de Amexing..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-heart me-1"></i>Información para el equipo Amexing</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <!-- Indicador de validez -->
             <div class="validation-feedback" style="display: none;"></div>
         </div>
@@ -726,12 +868,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             columns: [
                 {
                     data: 'name',
+                    orderable: false,
                     render: function(data) {
                         return `<div class="fw-semibold">${data || '-'}</div>`;
                     }
                 },
                 {
                     data: 'description',
+                    orderable: false,
                     render: function(data) {
                         if (!data) return '<span class="text-muted">Sin descripción</span>';
                         const truncated = data.length > 100 ? data.substring(0, 100) + '...' : data;
@@ -740,6 +884,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 },
                 {
                     data: 'experienciasCount',
+                    orderable: false,
                     render: function(data) {
                         if (!data || data === 0) {
                             return '<span class="text-muted">Sin experiencias</span>';
@@ -750,6 +895,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 // Última Actualización
                 {
                     data: 'updatedAt',
+                    orderable: false,
                     render: function(data) {
                         if (!data) return '-';
                         const date = new Date(data);
@@ -763,6 +909,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 // Estado
                 {
                     data: 'active',
+                    orderable: false,
                     render: function(data) {
                         return data
                             ? '<span class="badge bg-success">Activo</span>'
@@ -1004,7 +1151,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 languages: languagesList,
                 notincludes: notIncludesList,
                 photos: photosList,
-                availability: collectQuickAddAvailability()
+                availability: collectQuickAddAvailability(),
+                // Notes fields
+                internal_notes: $('#quickExperienciaInternalNotes').val().trim() || null,
+                client_booking_notes: $('#quickExperienciaClientBookingNotes').val().trim() || null,
+                provider_notes: $('#quickExperienciaProviderNotes').val().trim() || null,
+                team_notes: $('#quickExperienciaTeamNotes').val().trim() || null
             };
             
             $('#saveQuickExperienceBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
@@ -1164,6 +1316,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     card.querySelector('.experiencia-advance-minutes-input').value = experiencia.advance_booking_time;
                 }
             }
+            
+            // Populate notes fields
+            card.querySelector('.experiencia-internal-notes-input').value = experiencia.internal_notes || '';
+            card.querySelector('.experiencia-client-booking-notes-input').value = experiencia.client_booking_notes || '';
+            card.querySelector('.experiencia-provider-notes-input').value = experiencia.provider_notes || '';
+            card.querySelector('.experiencia-team-notes-input').value = experiencia.team_notes || '';
             
             // Populate photos if they exist
             const photosContainer = $(card).find('.photos-preview-container');
@@ -1866,7 +2024,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     advance_booking_time: advanceBookingTime,
                     photos: photosList,
                     availability: collectAvailabilityFromCard(card),
-                    displayOrder: index
+                    displayOrder: index,
+                    // Notes fields
+                    internal_notes: card.find('.experiencia-internal-notes-input').val().trim() || null,
+                    client_booking_notes: card.find('.experiencia-client-booking-notes-input').val().trim() || null,
+                    provider_notes: card.find('.experiencia-provider-notes-input').val().trim() || null,
+                    team_notes: card.find('.experiencia-team-notes-input').val().trim() || null
                 };
                 
                 // Only include experiences with at least name and description

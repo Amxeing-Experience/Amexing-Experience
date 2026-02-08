@@ -256,6 +256,10 @@ class ProviderExperienciaController {
         notincludes,
         advance_booking_time: advanceBookingTime,
         photos,
+        internal_notes: internalNotes,
+        client_booking_notes: clientBookingNotes,
+        provider_notes: providerNotes,
+        team_notes: teamNotes,
       } = req.body;
 
       // Validate required fields
@@ -361,6 +365,20 @@ class ProviderExperienciaController {
         experiencia.set('photos', photos);
       }
 
+      // Set notes fields
+      if (internalNotes !== undefined && internalNotes !== null && internalNotes !== '') {
+        experiencia.set('internal_notes', internalNotes);
+      }
+      if (clientBookingNotes !== undefined && clientBookingNotes !== null && clientBookingNotes !== '') {
+        experiencia.set('client_booking_notes', clientBookingNotes);
+      }
+      if (providerNotes !== undefined && providerNotes !== null && providerNotes !== '') {
+        experiencia.set('provider_notes', providerNotes);
+      }
+      if (teamNotes !== undefined && teamNotes !== null && teamNotes !== '') {
+        experiencia.set('team_notes', teamNotes);
+      }
+
       // Set required lifecycle fields before validation
       experiencia.set('active', true);
       experiencia.set('exists', true);
@@ -439,6 +457,10 @@ class ProviderExperienciaController {
         notincludes,
         advance_booking_time: advanceBookingTime,
         photos,
+        internal_notes: internalNotes,
+        client_booking_notes: clientBookingNotes,
+        provider_notes: providerNotes,
+        team_notes: teamNotes,
       } = req.body;
 
       // Get experiencia
@@ -547,6 +569,36 @@ class ProviderExperienciaController {
           experiencia.set('photos', photos);
         } else if (photos === null) {
           experiencia.set('photos', []);
+        }
+      }
+
+      // Update notes fields
+      if (internalNotes !== undefined) {
+        if (internalNotes === null || internalNotes === '') {
+          experiencia.unset('internal_notes');
+        } else {
+          experiencia.set('internal_notes', internalNotes);
+        }
+      }
+      if (clientBookingNotes !== undefined) {
+        if (clientBookingNotes === null || clientBookingNotes === '') {
+          experiencia.unset('client_booking_notes');
+        } else {
+          experiencia.set('client_booking_notes', clientBookingNotes);
+        }
+      }
+      if (providerNotes !== undefined) {
+        if (providerNotes === null || providerNotes === '') {
+          experiencia.unset('provider_notes');
+        } else {
+          experiencia.set('provider_notes', providerNotes);
+        }
+      }
+      if (teamNotes !== undefined) {
+        if (teamNotes === null || teamNotes === '') {
+          experiencia.unset('team_notes');
+        } else {
+          experiencia.set('team_notes', teamNotes);
         }
       }
 
@@ -738,6 +790,10 @@ class ProviderExperienciaController {
       notincludes: experiencia.get('notincludes') || [],
       advance_booking_time: experiencia.get('advance_booking_time') || null,
       photos: experiencia.get('photos') || [],
+      internal_notes: experiencia.get('internal_notes') || null,
+      client_booking_notes: experiencia.get('client_booking_notes') || null,
+      provider_notes: experiencia.get('provider_notes') || null,
+      team_notes: experiencia.get('team_notes') || null,
       displayOrder: experiencia.getDisplayOrder(),
       active: experiencia.isActive(),
       availability: experiencia.getAvailability(),
