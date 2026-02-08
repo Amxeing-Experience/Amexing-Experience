@@ -1062,6 +1062,7 @@ class ServicesController {
                   : null,
                 price: finalPrice,
                 note: service.get('note') || '',
+                routeDuration: service.get('routeDuration') || 0,
                 active: service.get('active') === true,
                 exists: service.get('exists') === true,
                 createdAt: service.get('createdAt'),
@@ -1085,6 +1086,7 @@ class ServicesController {
               rate: null,
               price: 0,
               note: '',
+              routeDuration: 0,
               active: false,
               exists: true,
               createdAt: service.get('createdAt'),
@@ -1317,6 +1319,7 @@ class ServicesController {
         },
         price,
         note: service.get('note') || '',
+        routeDuration: service.get('routeDuration') || 0,
         active: service.get('active'),
         exists: service.get('exists'),
         createdAt: service.get('createdAt'),
@@ -2175,7 +2178,7 @@ class ServicesController {
       }
 
       const {
-        originPOI, destinationPOI, vehicleType, rate, note,
+        originPOI, destinationPOI, vehicleType, rate, note, routeDuration,
       } = req.body;
 
       // Validation
@@ -2218,6 +2221,7 @@ class ServicesController {
         objectId: rate,
       });
       service.setNote(note || '');
+      service.setRouteDuration(routeDuration || null);
       service.set('active', true);
       service.set('exists', true);
 
@@ -2269,7 +2273,7 @@ class ServicesController {
 
       const { id } = req.params;
       const {
-        originPOI, destinationPOI, rate, note,
+        originPOI, destinationPOI, rate, note, routeDuration,
       } = req.body;
 
       if (!id) {
@@ -2322,6 +2326,13 @@ class ServicesController {
       }
 
       service.set('note', note || '');
+
+      // Set route duration
+      if (routeDuration !== undefined && routeDuration !== null && routeDuration !== '') {
+        service.set('routeDuration', parseInt(routeDuration));
+      } else {
+        service.set('routeDuration', null);
+      }
 
       await service.save(null, { useMasterKey: true });
 
