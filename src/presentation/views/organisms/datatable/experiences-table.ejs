@@ -1188,12 +1188,14 @@ const isClient = dtUserRole === 'client';
             columns: [
                 {
                     data: 'name',
+                    orderable: false,
                     render: function(data) {
                         return `<div class="fw-semibold">${data}</div>`;
                     }
                 },
                 {
                     data: 'description',
+                    orderable: false,
                     render: function(data, type, row) {
                         // Show included experiences and tours instead of description for all roles
                         if (true) {
@@ -1268,6 +1270,7 @@ const isClient = dtUserRole === 'client';
                 // 3. Duración
                 {
                     data: 'duration',
+                    orderable: false,
                     render: function(data) {
                         if (!data) return '<span class="text-muted">No especificado</span>';
                         return `<span class="text-primary">${data} hrs</span>`;
@@ -1276,6 +1279,7 @@ const isClient = dtUserRole === 'client';
                 // 4. Mín. Personas
                 {
                     data: 'min_people',
+                    orderable: false,
                     render: function(data) {
                         if (!data) return '<span class="text-muted">No especificado</span>';
                         return `<span class="text-info">${data} personas</span>`;
@@ -1284,6 +1288,7 @@ const isClient = dtUserRole === 'client';
                 // 5. Precio (base price from database)
                 {
                     data: 'cost',
+                    orderable: false,
                     render: function(data, type, row) {
                         const baseCost = data || 0;
 
@@ -1309,6 +1314,7 @@ const isClient = dtUserRole === 'client';
                 // 6. Estado
                 {
                     data: 'active',
+                    orderable: false,
                     render: function(data) {
                         return data
                             ? '<span class="badge bg-success">Activa</span>'

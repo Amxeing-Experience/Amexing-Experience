@@ -299,6 +299,25 @@ class ToursController {
         exists: tour.get('exists'),
         createdAt: tour.get('createdAt'),
         updatedAt: tour.get('updatedAt'),
+        // Additional fields
+        type: tour.get('type') || null,
+        description: tour.get('description') || null,
+        price: tour.get('price') || null,
+        price_no_alcohol: tour.get('price_no_alcohol') || null,
+        price_child: tour.get('price_child') || null,
+        travel_duration: tour.get('travel_duration') || null,
+        advance_booking_time: tour.get('advance_booking_time') || null,
+        min_people: tour.get('min_people') || null,
+        max_people: tour.get('max_people') || null,
+        includes: tour.get('includes') || [],
+        notincludes: tour.get('notincludes') || [],
+        languages: tour.get('languages') || [],
+        photos: tour.get('photos') || [],
+        // Notes fields
+        internal_notes: tour.get('internal_notes') || null,
+        client_booking_notes: tour.get('client_booking_notes') || null,
+        provider_notes: tour.get('provider_notes') || null,
+        team_notes: tour.get('team_notes') || null,
         // Walking tour pricing fields
         isWalkingTour: tour.get('isWalkingTour') || false,
         walkingPriceSmall: tour.get('walkingPriceSmall') || null,
@@ -338,7 +357,28 @@ class ToursController {
 
       // Role checking is handled by jwtMiddleware.requireRoleLevel(6) in routes
 
-      const { destinationPOI, time, availability } = req.body;
+      const {
+        destinationPOI,
+        time,
+        availability,
+        type,
+        description,
+        price,
+        price_no_alcohol: priceNoAlcohol,
+        price_child: priceChild,
+        travel_duration: travelDuration,
+        advance_booking_time: advanceBookingTime,
+        min_people: minPeople,
+        max_people: maxPeople,
+        includes,
+        notincludes,
+        languages,
+        photos,
+        internal_notes: internalNotes,
+        client_booking_notes: clientBookingNotes,
+        provider_notes: providerNotes,
+        team_notes: teamNotes,
+      } = req.body;
 
       // Validate required fields
       if (!destinationPOI || !time) {
@@ -385,6 +425,37 @@ class ToursController {
       if (availability && Array.isArray(availability) && availability.length > 0) {
         const sortedSchedules = sortDaySchedulesChronological(availability);
         tour.set('availability', sortedSchedules);
+      }
+
+      // Set optional fields
+      if (type !== undefined && type !== null) tour.set('type', type);
+      if (description !== undefined && description !== null) tour.set('description', description);
+      if (price !== undefined && price !== null) tour.set('price', price);
+      if (priceNoAlcohol !== undefined && priceNoAlcohol !== null) tour.set('price_no_alcohol', priceNoAlcohol);
+      if (priceChild !== undefined && priceChild !== null) tour.set('price_child', priceChild);
+      if (travelDuration !== undefined && travelDuration !== null) tour.set('travel_duration', travelDuration);
+      if (advanceBookingTime !== undefined && advanceBookingTime !== null) tour.set('advance_booking_time', advanceBookingTime);
+      if (minPeople !== undefined && minPeople !== null) tour.set('min_people', minPeople);
+      if (maxPeople !== undefined && maxPeople !== null) tour.set('max_people', maxPeople);
+
+      // Set array fields
+      if (includes !== undefined && Array.isArray(includes)) tour.set('includes', includes);
+      if (notincludes !== undefined && Array.isArray(notincludes)) tour.set('notincludes', notincludes);
+      if (languages !== undefined && Array.isArray(languages)) tour.set('languages', languages);
+      if (photos !== undefined && Array.isArray(photos)) tour.set('photos', photos);
+
+      // Set notes fields
+      if (internalNotes !== undefined && internalNotes !== null && internalNotes !== '') {
+        tour.set('internal_notes', internalNotes);
+      }
+      if (clientBookingNotes !== undefined && clientBookingNotes !== null && clientBookingNotes !== '') {
+        tour.set('client_booking_notes', clientBookingNotes);
+      }
+      if (providerNotes !== undefined && providerNotes !== null && providerNotes !== '') {
+        tour.set('provider_notes', providerNotes);
+      }
+      if (teamNotes !== undefined && teamNotes !== null && teamNotes !== '') {
+        tour.set('team_notes', teamNotes);
       }
 
       tour.set('active', true);
@@ -434,7 +505,28 @@ class ToursController {
       // Role checking is handled by jwtMiddleware.requireRoleLevel(6) in routes
 
       const tourId = req.params.id;
-      const { destinationPOI, time, availability } = req.body;
+      const {
+        destinationPOI,
+        time,
+        availability,
+        type,
+        description,
+        price,
+        price_no_alcohol: priceNoAlcohol,
+        price_child: priceChild,
+        travel_duration: travelDuration,
+        advance_booking_time: advanceBookingTime,
+        min_people: minPeople,
+        max_people: maxPeople,
+        includes,
+        notincludes,
+        languages,
+        photos,
+        internal_notes: internalNotes,
+        client_booking_notes: clientBookingNotes,
+        provider_notes: providerNotes,
+        team_notes: teamNotes,
+      } = req.body;
 
       if (!tourId) {
         return this.sendError(res, 'ID de tour requerido', 400);
@@ -494,6 +586,80 @@ class ToursController {
       } else if (availability === null) {
         // If explicitly set to null, remove availability field
         tour.unset('availability');
+      }
+
+      // Update optional fields
+      if (type !== undefined) {
+        if (type === null || type === '') tour.unset('type');
+        else tour.set('type', type);
+      }
+      if (description !== undefined) {
+        if (description === null || description === '') tour.unset('description');
+        else tour.set('description', description);
+      }
+      if (price !== undefined) {
+        if (price === null) tour.unset('price');
+        else tour.set('price', price);
+      }
+      if (priceNoAlcohol !== undefined) {
+        if (priceNoAlcohol === null) tour.unset('price_no_alcohol');
+        else tour.set('price_no_alcohol', priceNoAlcohol);
+      }
+      if (priceChild !== undefined) {
+        if (priceChild === null) tour.unset('price_child');
+        else tour.set('price_child', priceChild);
+      }
+      if (travelDuration !== undefined) {
+        if (travelDuration === null) tour.unset('travel_duration');
+        else tour.set('travel_duration', travelDuration);
+      }
+      if (advanceBookingTime !== undefined) {
+        if (advanceBookingTime === null) tour.unset('advance_booking_time');
+        else tour.set('advance_booking_time', advanceBookingTime);
+      }
+      if (minPeople !== undefined) {
+        if (minPeople === null) tour.unset('min_people');
+        else tour.set('min_people', minPeople);
+      }
+      if (maxPeople !== undefined) {
+        if (maxPeople === null) tour.unset('max_people');
+        else tour.set('max_people', maxPeople);
+      }
+
+      // Update array fields
+      if (includes !== undefined) {
+        if (includes === null || !Array.isArray(includes)) tour.set('includes', []);
+        else tour.set('includes', includes);
+      }
+      if (notincludes !== undefined) {
+        if (notincludes === null || !Array.isArray(notincludes)) tour.set('notincludes', []);
+        else tour.set('notincludes', notincludes);
+      }
+      if (languages !== undefined) {
+        if (languages === null || !Array.isArray(languages)) tour.set('languages', []);
+        else tour.set('languages', languages);
+      }
+      if (photos !== undefined) {
+        if (photos === null || !Array.isArray(photos)) tour.set('photos', []);
+        else tour.set('photos', photos);
+      }
+
+      // Update notes fields
+      if (internalNotes !== undefined) {
+        if (internalNotes === null || internalNotes === '') tour.unset('internal_notes');
+        else tour.set('internal_notes', internalNotes);
+      }
+      if (clientBookingNotes !== undefined) {
+        if (clientBookingNotes === null || clientBookingNotes === '') tour.unset('client_booking_notes');
+        else tour.set('client_booking_notes', clientBookingNotes);
+      }
+      if (providerNotes !== undefined) {
+        if (providerNotes === null || providerNotes === '') tour.unset('provider_notes');
+        else tour.set('provider_notes', providerNotes);
+      }
+      if (teamNotes !== undefined) {
+        if (teamNotes === null || teamNotes === '') tour.unset('team_notes');
+        else tour.set('team_notes', teamNotes);
       }
 
       await tour.save(null, { useMasterKey: true });
@@ -1339,72 +1505,124 @@ class ToursController {
         timestamp: new Date().toISOString(),
       });
 
-      // Process each price update with VERSIONING
+      // Process each price update/creation with VERSIONING
       for (const priceData of prices) {
-        const { id, price } = priceData;
+        const {
+          id, rateId, vehicleId, price,
+        } = priceData;
 
-        if (id && typeof price === 'number' && price >= 0) {
-          logger.info('Processing price update for TourPrice', {
-            tourPriceId: id,
-            newPrice: price,
-          });
+        if (typeof price === 'number' && price >= 0) {
+          if (id) {
+            // UPDATE EXISTING: Handle existing TourPrices record
+            logger.info('Processing price update for existing TourPrice', {
+              tourPriceId: id,
+              newPrice: price,
+            });
 
-          // Get the existing TourPrice record
-          const priceQuery = new Parse.Query(TourPricesClass);
-          priceQuery.equalTo('objectId', id);
-          priceQuery.include('tourPtr');
-          priceQuery.include('ratePtr');
-          priceQuery.include('vehicleType');
-          const priceRecord = await priceQuery.first({ useMasterKey: true });
+            // Get the existing TourPrice record
+            const priceQuery = new Parse.Query(TourPricesClass);
+            priceQuery.equalTo('objectId', id);
+            priceQuery.include('tourPtr');
+            priceQuery.include('ratePtr');
+            priceQuery.include('vehicleType');
+            const priceRecord = await priceQuery.first({ useMasterKey: true });
 
-          if (priceRecord) {
-            const currentPrice = priceRecord.get('price');
+            if (priceRecord) {
+              const currentPrice = priceRecord.get('price');
 
-            if (currentPrice !== price) {
-              // Only version if price has changed
-              logger.info('Creating price version history', {
-                tourPriceId: id,
-                oldPrice: currentPrice,
-                newPrice: price,
-              });
+              if (currentPrice !== price) {
+                // Only version if price has changed
+                logger.info('Creating price version history', {
+                  tourPriceId: id,
+                  oldPrice: currentPrice,
+                  newPrice: price,
+                });
 
-              // VERSIONING: Don't update existing price, instead:
-              // 1. Mark existing price as historical (set valid_until to today)
-              priceRecord.set('valid_until', new Date());
-              priceRecord.set('lastModifiedBy', currentUser.id);
-              objectsToSave.push(priceRecord);
+                // VERSIONING: Don't update existing price, instead:
+                // 1. Mark existing price as historical (set valid_until to today)
+                priceRecord.set('valid_until', new Date());
+                priceRecord.set('lastModifiedBy', currentUser.id);
+                objectsToSave.push(priceRecord);
 
-              // 2. Create NEW price record with the updated price
-              const newPriceRecord = new TourPricesClass();
+                // 2. Create NEW price record with the updated price
+                const newPriceRecord = new TourPricesClass();
 
-              // Copy all fields from original record
-              newPriceRecord.set('tourPtr', priceRecord.get('tourPtr'));
-              newPriceRecord.set('ratePtr', priceRecord.get('ratePtr'));
-              newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
-              newPriceRecord.set('price', price); // New price value
-              // valid_until remains null (active record)
-              newPriceRecord.set('active', true);
-              newPriceRecord.set('exists', true);
-              newPriceRecord.set('createdBy', currentUser.id);
-              newPriceRecord.set('lastModifiedBy', currentUser.id);
+                // Copy all fields from original record
+                newPriceRecord.set('tourPtr', priceRecord.get('tourPtr'));
+                newPriceRecord.set('ratePtr', priceRecord.get('ratePtr'));
+                newPriceRecord.set('vehicleType', priceRecord.get('vehicleType'));
+                newPriceRecord.set('price', price); // New price value
+                // valid_until remains null (active record)
+                newPriceRecord.set('active', true);
+                newPriceRecord.set('exists', true);
+                newPriceRecord.set('createdBy', currentUser.id);
+                newPriceRecord.set('lastModifiedBy', currentUser.id);
 
-              objectsToSave.push(newPriceRecord);
+                objectsToSave.push(newPriceRecord);
 
-              logger.info('Prepared versioning update', {
-                originalRecordId: id,
-                newRecordWillBeCreated: true,
-                historicalPrice: currentPrice,
-                newActivePrice: price,
-              });
+                logger.info('Prepared versioning update', {
+                  originalRecordId: id,
+                  newRecordWillBeCreated: true,
+                  historicalPrice: currentPrice,
+                  newActivePrice: price,
+                });
+              } else {
+                logger.info('Price unchanged, skipping versioning', {
+                  tourPriceId: id,
+                  price,
+                });
+              }
             } else {
-              logger.info('Price unchanged, skipping versioning', {
+              logger.warn('TourPrice record not found', {
                 tourPriceId: id,
-                price,
               });
             }
+          } else if (rateId && vehicleId && price > 0) {
+            // CREATE NEW: Handle new TourPrices record for new tours
+            logger.info('Creating new TourPrice record', {
+              tourId,
+              rateId,
+              vehicleId,
+              price,
+            });
+
+            // Create pointers to related objects
+            const tourPointer = new Parse.Object('Tour');
+            tourPointer.id = tourId;
+
+            const ratePointer = new Parse.Object('Rate');
+            ratePointer.id = rateId;
+
+            const vehiclePointer = new Parse.Object('VehicleType');
+            vehiclePointer.id = vehicleId;
+
+            // Create NEW TourPrices record
+            const newPriceRecord = new TourPricesClass();
+
+            // Set all fields for new record
+            newPriceRecord.set('tourPtr', tourPointer);
+            newPriceRecord.set('ratePtr', ratePointer);
+            newPriceRecord.set('vehicleType', vehiclePointer);
+            newPriceRecord.set('price', price);
+            newPriceRecord.set('active', true);
+            newPriceRecord.set('exists', true);
+            newPriceRecord.set('createdBy', currentUser.id);
+            newPriceRecord.set('lastModifiedBy', currentUser.id);
+            // valid_until remains null (active record)
+
+            objectsToSave.push(newPriceRecord);
+
+            logger.info('Prepared new TourPrice creation', {
+              tourId,
+              rateId,
+              vehicleId,
+              price,
+            });
           } else {
-            logger.warn('TourPrice record not found', {
-              tourPriceId: id,
+            logger.warn('Invalid price data, missing rateId/vehicleId or price is 0', {
+              rateId,
+              vehicleId,
+              price,
             });
           }
         }

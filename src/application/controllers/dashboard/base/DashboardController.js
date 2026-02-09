@@ -103,7 +103,7 @@ class DashboardController extends BaseController {
             // Fallback to Parse User data
             userName = req.user?.firstName && req.user?.lastName
               ? `${req.user.firstName} ${req.user.lastName}`
-              : (req.user?.email || 'User');
+              : req.user?.email || 'User';
           }
         } catch (error) {
           userName = req.user?.email || 'User';

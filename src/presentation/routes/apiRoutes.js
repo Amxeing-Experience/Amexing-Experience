@@ -326,6 +326,8 @@ const exchangeRateRoutes = require('./api/exchangeRateRoutes');
 const inflationRateRoutes = require('./api/inflationRateRoutes');
 const agencyRateRoutes = require('./api/agencyRateRoutes');
 const transferRateRoutes = require('./api/transferRateRoutes');
+const driverTourRateRoutes = require('./api/driverTourRateRoutes');
+const vehicleRatePricesRoutes = require('./api/vehicleRatePricesRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
@@ -357,6 +359,8 @@ router.use('/exchange-rate', exchangeRateRoutes); // Exchange rate management en
 router.use('/inflation-rate', inflationRateRoutes); // Inflation rate management endpoints
 router.use('/agency-rate', agencyRateRoutes); // Agency rate management endpoints
 router.use('/transfer-rate', transferRateRoutes); // Transfer rate management endpoints
+router.use('/driver-tour-rate', driverTourRateRoutes); // Driver tour rate management endpoints
+router.use('/vehicle-rate-prices', vehicleRatePricesRoutes); // Vehicle rate prices management endpoints
 
 /**
  * Email Test Endpoint - SuperAdmin Only
@@ -712,6 +716,11 @@ const BulkImportController = require('../../application/controllers/api/BulkImpo
 
 const bulkImportController = new BulkImportController();
 
+// Client Prices API routes
+const ClientPricesController = require('../../application/controllers/api/ClientPricesController');
+
+const clientPricesController = new ClientPricesController();
+
 /**
  * @swagger
  * /api/clients/bulk/template:
@@ -940,6 +949,93 @@ router.get(
   '/clients/bulk/error-report/:jobId',
   jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
   bulkImportController.downloadErrorReport.bind(bulkImportController)
+);
+
+/**
+ * @swagger
+ * /api/client-prices/bulk-apply:
+ *   post:
+ *     tags:
+ *       - Client Prices
+ *     summary: Apply bulk pricing with markup percentage
+ *     description: |
+ *       Apply pricing with specified markup percentage for a client.
+ *       Can be applied to services, tours, or both.
+ *       Preserves version history of previous prices.
+ *
+ *       **Required Role:** Admin or SuperAdmin (level 6+)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - clientId
+ *               - markupPercentage
+ *             properties:
+ *               clientId:
+ *                 type: string
+ *                 description: Client ID to apply pricing to
+ *               applyToServices:
+ *                 type: boolean
+ *                 description: Apply to services
+ *                 default: true
+ *               applyToTours:
+ *                 type: boolean
+ *                 description: Apply to tours
+ *                 default: true
+ *               markupPercentage:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 100
+ *                 description: Markup percentage to apply (0-100)
+ *     responses:
+ *       200:
+ *         description: Pricing applied successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 servicesCreated:
+ *                   type: number
+ *                 servicesUpdated:
+ *                   type: number
+ *                 toursCreated:
+ *                   type: number
+ *                 toursUpdated:
+ *                   type: number
+ *                 totalCreated:
+ *                   type: number
+ *                 totalUpdated:
+ *                   type: number
+ *       400:
+ *         description: Invalid request parameters
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: Client not found
+ *       500:
+ *         description: Server error
+ */
+router.post(
+  '/client-prices/bulk-apply',
+  jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
+  clientPricesController.bulkApplyPricing
+);
+
+router.post(
+  '/client-prices/bulk-apply-with-progress',
+  jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
+  clientPricesController.bulkApplyPricingWithProgress
+);
+
+router.get(
+  '/client-prices/progress/:processId',
+  clientPricesController.getProgressUpdates // No auth middleware for SSE
 );
 
 module.exports = router;
