@@ -232,6 +232,7 @@
     "@apollo/server": "5.4.0",
     "@aws-sdk/client-s3": "^3.690.0",
     "@aws-sdk/lib-storage": "^3.690.0",
+    "aws-sdk": "^2.1693.0",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",
     "connect-mongo": "^6.0.0",
@@ -268,12 +269,14 @@
     "winston": "^3.11.0",
     "winston-daily-rotate-file": "^5.0.0",
     "xss": "^1.0.15",
-    "xss-clean": "^0.1.4"
+    "xss-clean": "^0.1.4",
+    "sharp": "^0.34.5"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "20.0.0",
     "auto-changelog": "^2.4.0",
+    "chokidar": "^5.0.0",
     "conventional-changelog-cli": "^4.1.0",
     "depcheck": "^1.4.7",
     "eslint": "^8.56.0",

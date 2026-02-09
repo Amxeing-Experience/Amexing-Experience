@@ -489,7 +489,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                             // Manage images button
                             actions += `<button type="button"
-                                            class="btn btn-info manage-images-btn"
+                                            class="btn btn-info manage-vehicle-images-btn"
                                             data-id="${data.objectId || data.id}"
                                             data-brand="${data.brand}"
                                             data-model="${data.model}"
@@ -550,7 +550,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
         $('#createVehicleBtn').on('click', function() { openVehicleModal(); });
         $(`#${tableId}`).on('click', '.edit-vehicle-btn', function() { loadVehicleData($(this).data('id')); });
-        $(`#${tableId}`).on('click', '.manage-images-btn', function() {
+        $(`#${tableId}`).on('click', '.manage-vehicle-images-btn', function() {
             const vehicleId = $(this).data('id');
             const brand = $(this).data('brand');
             const model = $(this).data('model');

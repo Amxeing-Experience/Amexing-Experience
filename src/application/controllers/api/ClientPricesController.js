@@ -16,6 +16,19 @@
 const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 
+/**
+ * Client Prices Controller for managing bulk pricing operations and real-time updates.
+ * Handles batch price calculations, progress tracking with Server-Sent Events (SSE),
+ * and efficient bulk database operations for vehicle and tour pricing systems.
+ * @class ClientPricesController
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 1.0.0
+ * @example
+ * // Usage in routes
+ * router.post('/apply-pricing/:clientId', ClientPricesController.bulkApplyPricing);
+ * router.get('/pricing-progress/:processId', ClientPricesController.getProgressUpdates);
+ */
 class ClientPricesController {
   constructor() { // Bind methods to preserve context
     this.bulkApplyPricing = this.bulkApplyPricing.bind(this);
@@ -262,6 +275,12 @@ class ClientPricesController {
       'Access-Control-Allow-Headers': 'Cache-Control',
     });
 
+    /**
+     * Send Server-Sent Events data to the connected client.
+     * @param {object} data - Data object to send via SSE
+     * @example
+     * sendSSE({ type: 'progress', value: 50, message: 'Processing...' });
+     */
     const sendSSE = (data) => {
       res.write(`data: ${JSON.stringify(data)}\n\n`);
     };
@@ -395,14 +414,13 @@ class ClientPricesController {
         existingPricesMap.set(key, existing);
       }
       // Step 6: Process combinations efficiently
-      const totalCombinations = services.length * rates.length * vehicleTypes.length;
-      console.log(`🔢 Total combinations to process: ${totalCombinations.toLocaleString()}`);
+      // const totalCombinations = services.length * rates.length * vehicleTypes.length;
 
       const toUpdate = [];
       const toCreate = [];
       let processedCount = 0;
-      let skippedNoBasePrice = 0;
-      const skippedSamePrice = 0;
+      // let skippedNoBasePrice = 0;
+      // const skippedSamePrice = 0;
 
       for (const service of services) {
         for (const rate of rates) {
@@ -411,7 +429,7 @@ class ClientPricesController {
 
             // Progress logging every 1000 combinations
             if (processedCount % 1000 === 0) {
-              console.log(`📊 Progress: ${processedCount.toLocaleString()}/${totalCombinations.toLocaleString()} (${Math.round((processedCount / totalCombinations) * 100)}%)`);
+              // Progress logging placeholder
             }
 
             try {
@@ -420,7 +438,7 @@ class ClientPricesController {
               const ratePriceData = ratePricesMap.get(ratePriceKey);
 
               if (!ratePriceData) {
-                skippedNoBasePrice += 1;
+                // skippedNoBasePrice += 1; // Track skipped items
                 // eslint-disable-next-line no-continue
                 // eslint-disable-next-line no-continue
                 continue; // No base price, skip
@@ -496,11 +514,8 @@ class ClientPricesController {
         for (let i = 0; i < toCreate.length; i += chunkSize) {
           const chunk = toCreate.slice(i, i + chunkSize);
           await Parse.Object.saveAll(chunk, { useMasterKey: true });
-          console.log(`💾 Saved chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(toCreate.length / chunkSize)} (${chunk.length} items)`);
         }
       }
-
-      console.log(`📊 Processing summary: Total=${totalCombinations.toLocaleString()}, NoBasePrice=${skippedNoBasePrice}, SamePrice=${skippedSamePrice}, ToUpdate=${toUpdate.length}, ToCreate=${toCreate.length}`);
     } catch (error) {
       stats.errors.push(`Services processing: ${error.message}`);
     }
@@ -725,7 +740,7 @@ class ClientPricesController {
 
         // Progress logging every 100 tours
         if (processedCount % 100 === 0) {
-          console.log(`📊 Tours progress: ${processedCount}/${tourPrices.length} (${Math.round((processedCount / tourPrices.length) * 100)}%)`);
+          // Progress logging placeholder
         }
 
         try {
@@ -973,6 +988,12 @@ class ClientPricesController {
       clientId, applyToServices, applyToTours, markupPercentage, currentUser,
     } = params;
 
+    /**
+     * Update progress state and send real-time updates via SSE.
+     * @param {object} data - Progress data object containing status, percentage, message, etc.
+     * @example
+     * updateProgress({ progress: 75, message: 'Processing services...', phase: 'services' });
+     */
     const updateProgress = (data) => {
       // Update process state
       const currentState = this.activeProcesses.get(processId);

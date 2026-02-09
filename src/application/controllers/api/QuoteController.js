@@ -2326,15 +2326,7 @@ class QuoteController {
    * @example
    */
   async getQuotesWithInvoices(req, res) {
-    console.log('🔍🔍🔍 getQuotesWithInvoices method START - FIRST LINE!');
     try {
-      console.log('🔍 getQuotesWithInvoices method called!');
-      console.log('User info:', {
-        hasUser: !!req.user,
-        userRole: req.userRole,
-        userId: req.user?.objectId || req.user?.userId || req.user?.id,
-      });
-
       logger.info('getQuotesWithInvoices called', {
         hasUser: !!req.user,
         userRole: req.userRole,

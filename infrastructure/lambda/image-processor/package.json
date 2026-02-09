@@ -1,0 +1,24 @@
+{
+  "name": "amexing-image-processor",
+  "version": "1.0.0",
+  "description": "AWS Lambda function for processing vehicle images into multiple formats (AVIF, WebP, JPEG) and sizes",
+  "main": "index.js",
+  "author": "Denisse Maldonado",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.1500.0",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.125",
+    "aws-lambda": "^1.0.7"
+  },
+  "scripts": {
+    "package": "zip -r function.zip index.js node_modules",
+    "deploy": "aws lambda update-function-code --function-name amexing-image-processor --zip-file fileb://function.zip",
+    "test": "node test.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

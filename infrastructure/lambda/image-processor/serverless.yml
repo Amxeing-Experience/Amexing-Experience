@@ -1,0 +1,75 @@
+service: amexing-image-processor
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-2
+  stage: ${opt:stage, 'dev'}
+  environment:
+    NODE_ENV: ${self:provider.stage}
+    S3_BUCKET: ${env:S3_BUCKET}
+    S3_PREFIX: ${self:provider.stage}/
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+        - s3:PutObject
+        - s3:DeleteObject
+      Resource:
+        - arn:aws:s3:::${env:S3_BUCKET}/*
+    - Effect: Allow
+      Action:
+        - logs:CreateLogGroup
+        - logs:CreateLogStream
+        - logs:PutLogEvents
+      Resource: "*"
+
+functions:
+  imageProcessor:
+    handler: index.handler
+    description: Process vehicle images into multiple formats (AVIF, WebP, JPEG) and sizes
+    memorySize: 3008  # Maximum memory for faster processing
+    timeout: 60       # 1 minute timeout for large images
+    reservedConcurrency: 10  # Limit concurrent executions
+    events:
+      # Trigger on original image uploads
+      - s3:
+          bucket: ${env:S3_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: ${self:provider.stage}/vehicles/
+            - suffix: .jpg
+      - s3:
+          bucket: ${env:S3_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: ${self:provider.stage}/vehicles/
+            - suffix: .jpeg
+      - s3:
+          bucket: ${env:S3_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: ${self:provider.stage}/vehicles/
+            - suffix: .png
+      - s3:
+          bucket: ${env:S3_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: ${self:provider.stage}/vehicles/
+            - suffix: .webp
+    layers:
+      # Sharp layer for Lambda (pre-compiled for Lambda environment)
+      - arn:aws:lambda:us-east-2:${aws:accountId}:layer:sharp:1
+
+plugins:
+  - serverless-plugin-optimize
+  - serverless-layers
+
+custom:
+  optimize:
+    external:
+      - sharp  # Don't bundle sharp, use Lambda layer instead
+  serverless-layers:
+    layersDeploymentBucket: ${env:S3_BUCKET}-layers
+    compatibleRuntimes:
+      - nodejs18.x

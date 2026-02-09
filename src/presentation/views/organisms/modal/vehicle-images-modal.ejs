@@ -170,6 +170,126 @@ Features:
     color: #64748b;
 }
 
+/* Hide Dropzone default progress elements */
+.dropzone .dz-progress {
+    display: none !important;
+}
+
+.dropzone .dz-upload {
+    display: none !important;
+}
+
+.dropzone .dz-size {
+    margin-bottom: 0.25rem;
+}
+
+/* Custom Upload Progress Styles */
+.upload-progress-container {
+    margin-top: 0.5rem;
+}
+
+.upload-progress-container .progress {
+    height: 6px;
+    background-color: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.upload-progress-container .progress-bar {
+    transition: width 0.3s ease;
+    background: linear-gradient(45deg, #007bff, #0056b3);
+}
+
+.upload-status-text {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+/* Upload completed state */
+.dropzone .dz-preview.upload-completed {
+    border-color: #28a745 !important;
+    background-color: #f8fff9 !important;
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.2);
+}
+
+.dropzone .dz-preview.upload-completed .progress-bar {
+    background: linear-gradient(45deg, #28a745, #20c997) !important;
+}
+
+.dropzone .dz-preview.upload-completed .upload-status-text {
+    color: #28a745 !important;
+    font-weight: 500;
+}
+
+.upload-complete-message {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.upload-complete-message .text-success {
+    color: #155724 !important;
+}
+
+/* File formats info styling */
+.file-formats-info {
+    padding: 0.25rem 0;
+    border-top: 1px solid #e9ecef;
+    margin-top: 0.5rem !important;
+}
+
+.file-formats-info small {
+    display: block;
+    line-height: 1.3;
+}
+
+.file-formats-info .text-success {
+    font-weight: 500;
+}
+
+.file-formats-info i {
+    opacity: 0.8;
+}
+
+/* Upload results info display */
+.upload-results-info {
+    font-size: 0.875rem;
+    line-height: 1.4;
+    background: rgba(25, 135, 84, 0.1) !important;
+    border-color: rgba(25, 135, 84, 0.2) !important;
+}
+
+.upload-results-info div {
+    margin-bottom: 0.25rem;
+}
+
+.upload-results-info div:last-child {
+    margin-bottom: 0;
+}
+
+.upload-results-info i {
+    opacity: 0.9;
+}
+
+/* Fallback info display */
+.upload-info-fallback {
+    font-size: 0.875rem;
+    border: 1px solid #dee2e6;
+}
+
+.upload-info-fallback div {
+    margin-bottom: 0.25rem;
+}
+
+.upload-info-fallback div:last-child {
+    margin-bottom: 0;
+}
+
 /* Gallery Grid Styles */
 .gallery-section {
     position: relative;
@@ -298,12 +418,12 @@ Features:
         return new Promise((resolve, reject) => {
             // Check if already loaded
             if (typeof Dropzone !== 'undefined') {
-                console.log('Dropzone already loaded');
+                // Dropzone already loaded
                 resolve();
                 return;
             }
 
-            console.log('Loading Dropzone library dynamically...');
+            // Loading Dropzone library dynamically
 
             // Load CSS first
             const link = document.createElement('link');
@@ -315,7 +435,7 @@ Features:
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/dropzone@5.9.3/dist/min/dropzone.min.js';
             script.onload = () => {
-                console.log('Dropzone library loaded successfully');
+                // Dropzone library loaded successfully
                 resolve();
             };
             script.onerror = () => {
@@ -392,7 +512,7 @@ Features:
         }
 
         const dropzone = new Dropzone(dropzoneElement, {
-            url: '/api/vehicles/PLACEHOLDER/images',
+            url: currentVehicleId ? `/api/vehicles/${currentVehicleId}/images` : '/api/vehicles/PLACEHOLDER/images',
             paramName: 'image',
             maxFilesize: 250,
             maxFiles: 10,
@@ -404,6 +524,8 @@ Features:
             dictFileTooBig: 'El archivo es demasiado grande ({{filesize}}MB). Tamaño máximo: {{maxFilesize}}MB.',
             dictInvalidFileType: 'No puedes subir archivos de este tipo.',
             dictMaxFilesExceeded: 'No puedes subir más archivos.',
+            uploadMultiple: false,
+            createImageThumbnails: false,
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',
                 'Authorization': 'Bearer ' + (localStorage.getItem('token') || '')
@@ -413,16 +535,85 @@ Features:
         // Store instance
         window['dropzone_vehicle-images-dropzone'] = dropzone;
 
+        // Hide default progress elements when file is added
+        dropzone.on('addedfile', function(file) {
+            // Remove any existing default progress elements
+            const progressElements = file.previewElement.querySelectorAll('.dz-progress, .dz-upload');
+            progressElements.forEach(el => el.remove());
+        });
+        
+
+        // Upload progress tracking
+        dropzone.on('uploadprogress', function(file, progress, bytesSent) {
+            // Upload progress (0-60% of total progress)
+            const uploadProgress = Math.min(progress * 0.6, 60);
+            updateProgressBar(file, uploadProgress, 'Subiendo imagen...');
+        });
+
+        // Processing progress simulation
+        dropzone.on('sending', function(file, xhr, formData) {
+            // First check if we have a global currentVehicleId
+            if (!currentVehicleId || currentVehicleId === 'null' || currentVehicleId === 'undefined') {
+                // Try to get it from the current dropzone URL
+                const urlMatch = this.options.url.match(/\/api\/vehicles\/([^\/]+)\/images/);
+                if (urlMatch && urlMatch[1] && urlMatch[1] !== 'PLACEHOLDER') {
+                    // Use the vehicleId from the URL
+                } else {
+                    dropzone.removeFile(file);
+                    showErrorAlert('Error: ID de vehículo no válido para subir imagen');
+                    return false;
+                }
+            } else {
+                // Update the URL with the current vehicle ID
+                this.options.url = `/api/vehicles/${currentVehicleId}/images`;
+            }
+            
+            // Initialize progress tracking
+            updateProgressBar(file, 0, 'Iniciando subida...');
+        });
+
         // Success event
         dropzone.on('success', function(file, response) {
             if (response.success) {
-                showSuccessAlert(response.message || 'Imagen subida exitosamente');
-                loadVehicleImages();
+                // Just update the thumbnail image for the preview
+                if (response.data && response.data.url && file.previewElement) {
+                    const imgElement = file.previewElement.querySelector('[data-dz-thumbnail]') || 
+                                      file.previewElement.querySelector('img') ||
+                                      file.previewElement.querySelector('.dz-image img');
+                    if (imgElement) {
+                        imgElement.src = response.data.url;
+                        imgElement.style.opacity = '1';
+                    }
+                }
+                
+                // Simulate processing stages after upload completes
+                simulateProcessingProgress(file, response);
+                
+                // Extract vehicleId from the current URL being used by Dropzone
+                const urlMatch = this.options.url.match(/\/api\/vehicles\/([^\/]+)\/images/);
+                const vehicleIdFromUrl = urlMatch && urlMatch[1] && urlMatch[1] !== 'PLACEHOLDER' ? urlMatch[1] : null;
+                
+                if (vehicleIdFromUrl) {
+                    // Update global variables to ensure they're set
+                    currentVehicleId = vehicleIdFromUrl;
+                    window.currentVehicleId = vehicleIdFromUrl;
+                    
+                    // Delay reloading images until after preview is shown and removed
+                    setTimeout(() => {
+                        loadVehicleImages(vehicleIdFromUrl);
+                    }, 5000); // Load gallery after preview disappears (4.5s + 0.5s buffer)
+                }
             }
         });
 
         // Error event
         dropzone.on('error', function(file, errorMessage) {
+            // Hide progress bar on error
+            const progressContainer = file.previewElement?.querySelector('.upload-progress-container');
+            if (progressContainer) {
+                progressContainer.remove();
+            }
+            
             showErrorAlert(errorMessage.error || errorMessage || 'Error al subir la imagen');
         });
 
@@ -435,17 +626,22 @@ Features:
     function initVehicleImagesModal() {
         // Initialize Dropzone
         vehicleImagesDropzone = initDropzone();
+        // Also ensure the window reference is set
+        if (!vehicleImagesDropzone && window['dropzone_vehicle-images-dropzone']) {
+            vehicleImagesDropzone = window['dropzone_vehicle-images-dropzone'];
+        }
 
         // Close carousel on backdrop or close button click
         document.getElementById('carousel-backdrop')?.addEventListener('click', closeCarousel);
         document.getElementById('carousel-close-btn')?.addEventListener('click', closeCarousel);
 
-        // Modal shown event
-        $('#vehicleImagesModal').on('shown.bs.modal', function() {
-            if (currentVehicleId) {
-                loadVehicleImages();
-            }
-        });
+        // Modal shown event - REMOVED duplicate call to loadVehicleImages
+        // The loading is already handled by openVehicleImagesModal in vehicle-images-modal.js
+        // $('#vehicleImagesModal').on('shown.bs.modal', function() {
+        //     if (currentVehicleId) {
+        //         loadVehicleImages();
+        //     }
+        // });
 
         // Modal hidden event
         $('#vehicleImagesModal').on('hidden.bs.modal', function() {
@@ -457,7 +653,15 @@ Features:
      * Open vehicle images modal
      */
     window.openVehicleImagesModal = function(vehicleId, brand, model) {
+        // Validate vehicleId before proceeding
+        if (!vehicleId || vehicleId === 'null' || vehicleId === 'undefined') {
+            alert('Error: ID de vehículo no válido');
+            return;
+        }
+        
+        // Set both local and window variables to ensure accessibility
         currentVehicleId = vehicleId;
+        window.currentVehicleId = vehicleId;
         currentVehicleInfo = { brand, model };
 
         // Update modal title
@@ -471,26 +675,49 @@ Features:
 
         // Show loader while loading images
         showModalLoader('vehicleImagesModal');
+        
+        // Load images immediately after showing modal
+        // This replaces the shown.bs.modal event handler
+        loadVehicleImages();
     };
 
     /**
      * Update dropzone URL with current vehicle ID
      */
     function updateDropzoneUrl() {
+        // First try the vehicleImagesDropzone variable
         if (vehicleImagesDropzone && currentVehicleId) {
             vehicleImagesDropzone.options.url = `/api/vehicles/${currentVehicleId}/images`;
-            console.log('Dropzone URL updated:', vehicleImagesDropzone.options.url);
+            return;
+        }
+        
+        // Also try the window stored dropzone instance
+        const dropzoneInstance = window['dropzone_vehicle-images-dropzone'];
+        if (dropzoneInstance && currentVehicleId) {
+            dropzoneInstance.options.url = `/api/vehicles/${currentVehicleId}/images`;
+            // Also update the vehicleImagesDropzone reference
+            vehicleImagesDropzone = dropzoneInstance;
         }
     }
 
     /**
      * Load vehicle images from API
+     * @param {string} vehicleIdOverride - Optional vehicleId to use instead of global currentVehicleId
      */
-    async function loadVehicleImages() {
+    async function loadVehicleImages(vehicleIdOverride) {
+        // Use provided vehicleId or fall back to global currentVehicleId
+        const vehicleId = vehicleIdOverride || currentVehicleId || window.currentVehicleId;
+        
+        // Check for null vehicleId to prevent errors
+        if (!vehicleId || vehicleId === 'null' || vehicleId === 'undefined') {
+            return;
+        }
+        
         try {
-            const response = await fetch(`/api/vehicles/${currentVehicleId}/images`, {
+            const response = await fetch(`/api/vehicles/${vehicleId}/images`, {
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json, image/avif, image/webp, image/*'
                 }
             });
 
@@ -536,30 +763,86 @@ Features:
             col.innerHTML = `
                 <div class="card h-100 shadow-sm position-relative">
                     ${image.isPrimary ? '<span class="badge bg-success primary-badge">Principal</span>' : ''}
-                    <img src="${image.url}"
-                         class="card-img-top image-preview"
-                         alt="${image.fileName}"
-                         data-index="${index}"
-                         loading="lazy">
-                    <div class="card-body p-2">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted text-truncate" style="max-width: 60%;" title="${image.fileName}">
-                                ${image.fileName}
-                            </small>
-                            <div class="btn-group btn-group-sm">
-                                ${!image.isPrimary ? `
-                                    <button class="btn btn-sm btn-outline-primary set-primary-btn"
-                                            data-image-id="${image.id}"
-                                            title="Establecer como principal">
-                                        <i class="ti ti-star"></i>
-                                    </button>
-                                ` : ''}
-                                <button class="btn btn-sm btn-outline-danger delete-image-btn"
+                    <div class="position-relative">
+                        <img src="${image.url}"
+                             class="card-img-top image-preview"
+                             alt="${image.fileName}"
+                             data-index="${index}"
+                             loading="lazy">
+                        <span class="badge bg-info position-absolute bottom-0 start-0 m-2" style="z-index: 2;">
+                            <i class="ti ti-photo me-1" style="font-size: 0.7rem;"></i>
+                            ${(() => {
+                                // Try to detect format from the actual URL being served
+                                const imageUrl = image.url || '';
+                                
+                                // Check URL for format indicators
+                                if (imageUrl.includes('/avif/') || imageUrl.includes('.avif')) {
+                                    return 'AVIF';
+                                } else if (imageUrl.includes('/webp/') || imageUrl.includes('.webp')) {
+                                    return 'WEBP';
+                                } else if (imageUrl.includes('/jpeg/') || imageUrl.includes('.jpeg') || imageUrl.includes('.jpg')) {
+                                    return 'JPEG';
+                                } else if (imageUrl.includes('/png/') || imageUrl.includes('.png')) {
+                                    return 'PNG';
+                                }
+                                
+                                // Fallback to metadata if URL detection fails
+                                const metadata = image.optimizationMetadata || {};
+                                const preferredFormat = metadata.preferredFormat;
+                                
+                                if (preferredFormat && preferredFormat !== 'original') {
+                                    return preferredFormat.toUpperCase();
+                                } else {
+                                    return 'ORIGINAL';
+                                }
+                            })()}
+                        </span>
+                    </div>
+                    <div class="position-absolute top-0 end-0 m-2" style="z-index: 3;">
+                        <div class="btn-group-vertical">
+                            ${!image.isPrimary ? `
+                                <button class="btn btn-primary btn-sm set-primary-btn"
                                         data-image-id="${image.id}"
-                                        title="Eliminar">
-                                    <i class="ti ti-trash"></i>
+                                        title="Establecer como principal">
+                                    <i class="ti ti-star"></i>
                                 </button>
+                            ` : ''}
+                            <button class="btn btn-danger btn-sm delete-image-btn"
+                                    data-image-id="${image.id}"
+                                    title="Eliminar">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-3">
+                        <div class="d-flex align-items-start mb-3">
+                            <i class="ti ti-file-text me-2 mt-1 text-muted"></i>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="text-truncate fw-medium" title="${image.fileName}">
+                                    ${image.fileName}
+                                </div>
                             </div>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="ti ti-info-circle me-2 text-muted" style="font-size: 0.9rem;"></i>
+                            <small class="text-muted">${image.fileSize ? formatFileSize(image.fileSize) : 'N/A'}</small>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <i class="ti ti-layers-intersect me-2 text-muted" style="font-size: 0.9rem;"></i>
+                            <small class="text-muted">
+                                ${(() => {
+                                    const metadata = image.optimizationMetadata || {};
+                                    const allFormats = metadata.availableFormats || [];
+                                    const optimizedFormats = allFormats.filter(f => f !== 'original');
+                                    const optimizedCount = optimizedFormats.length;
+                                    
+                                    if (optimizedCount > 0) {
+                                        return `${optimizedCount} formato${optimizedCount > 1 ? 's' : ''}`;
+                                    } else {
+                                        return '0 formatos';
+                                    }
+                                })()}
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -839,6 +1122,179 @@ Features:
     function updateImagesCount(count) {
         const badge = document.getElementById('images-count-badge');
         badge.textContent = `${count} ${count === 1 ? 'imagen' : 'imágenes'}`;
+    }
+
+    /**
+     * Format file size for display
+     */
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    /**
+     * Update file formats display in preview
+     */
+    function updateFileFormatsDisplay(file, data) {
+        if (!file.previewElement) {
+            console.log('No preview element for formats display');
+            return;
+        }
+
+        console.log('Adding formats display, data:', data);
+
+        // Remove existing formats display
+        const existingFormats = file.previewElement.querySelector('.file-formats-info');
+        if (existingFormats) {
+            existingFormats.remove();
+            console.log('Removed existing formats display');
+        }
+
+        // Create formats info display
+        const formatsInfo = document.createElement('div');
+        formatsInfo.className = 'file-formats-info mt-1';
+        
+        let formatsHtml = '';
+        
+        // Show optimization info if available
+        if (data.optimization && data.optimization.availableFormats) {
+            const formatCount = data.optimization.availableFormats.length;
+            console.log('Found optimized formats:', data.optimization.availableFormats);
+            formatsHtml += `<small class="text-success">
+                <i class="ti ti-photo-check me-1"></i>
+                ${formatCount} formato${formatCount > 1 ? 's' : ''} optimizado${formatCount > 1 ? 's' : ''}
+            </small>`;
+            
+            // Show format list
+            if (formatCount > 0) {
+                const formatsList = data.optimization.availableFormats
+                    .map(f => f.toUpperCase())
+                    .join(', ');
+                formatsHtml += `<br><small class="text-muted">${formatsList}</small>`;
+            }
+        } else {
+            console.log('No optimization data found, showing original format');
+            formatsHtml += `<small class="text-muted">
+                <i class="ti ti-photo me-1"></i>
+                Formato original
+            </small>`;
+        }
+
+        formatsInfo.innerHTML = formatsHtml;
+        console.log('Created formats HTML:', formatsHtml);
+        
+        // Try multiple insertion strategies
+        const detailsElement = file.previewElement.querySelector('.dz-details');
+        const sizeElement = file.previewElement.querySelector('.dz-size');
+        
+        if (detailsElement) {
+            detailsElement.appendChild(formatsInfo);
+            console.log('Added formats info to dz-details');
+        } else if (sizeElement && sizeElement.parentElement) {
+            sizeElement.parentElement.appendChild(formatsInfo);
+            console.log('Added formats info to size parent');
+        } else {
+            file.previewElement.appendChild(formatsInfo);
+            console.log('Added formats info to preview element directly');
+        }
+    }
+
+    /**
+     * Update progress bar for file upload
+     */
+    function updateProgressBar(file, progress, statusText) {
+        // Find the file preview element
+        const filePreview = file.previewElement;
+        if (!filePreview) return;
+
+        // Update or create progress bar
+        let progressBar = filePreview.querySelector('.upload-progress-bar');
+        let progressContainer = filePreview.querySelector('.upload-progress-container');
+        let statusElement = filePreview.querySelector('.upload-status-text');
+
+        if (!progressContainer) {
+            // Create progress container
+            progressContainer = document.createElement('div');
+            progressContainer.className = 'upload-progress-container mt-2';
+            progressContainer.innerHTML = `
+                <div class="progress mb-1" style="height: 6px;">
+                    <div class="progress-bar upload-progress-bar bg-primary" 
+                         role="progressbar" style="width: 0%"></div>
+                </div>
+                <small class="upload-status-text text-muted">${statusText}</small>
+            `;
+            
+            // Insert after file info, before any buttons
+            const fileInfo = filePreview.querySelector('.dz-details') || filePreview.querySelector('.dz-filename');
+            if (fileInfo && fileInfo.parentNode) {
+                fileInfo.parentNode.insertBefore(progressContainer, fileInfo.nextSibling);
+            } else {
+                filePreview.appendChild(progressContainer);
+            }
+            
+            progressBar = progressContainer.querySelector('.upload-progress-bar');
+            statusElement = progressContainer.querySelector('.upload-status-text');
+        }
+
+        // Update progress
+        if (progressBar) {
+            progressBar.style.width = Math.round(progress) + '%';
+            progressBar.setAttribute('aria-valuenow', Math.round(progress));
+        }
+
+        if (statusElement) {
+            statusElement.textContent = statusText;
+        }
+    }
+
+    /**
+     * Simulate processing progress after upload
+     */
+    function simulateProcessingProgress(file, response) {
+        const stages = [
+            { progress: 65, text: 'Optimizando imagen AVIF...', delay: 300 },
+            { progress: 75, text: 'Generando versión WebP...', delay: 400 },
+            { progress: 85, text: 'Creando variantes de tamaño...', delay: 500 },
+            { progress: 95, text: 'Guardando en base de datos...', delay: 300 },
+            { progress: 100, text: 'Imagen procesada exitosamente', delay: 200 }
+        ];
+
+        let currentStage = 0;
+        
+        function runNextStage() {
+            if (currentStage < stages.length) {
+                const stage = stages[currentStage];
+                updateProgressBar(file, stage.progress, stage.text);
+                
+                currentStage++;
+                setTimeout(runNextStage, stage.delay);
+            } else {
+                // Processing complete - show success message and clean up preview
+                setTimeout(() => {
+                    showSuccessAlert(response.message || 'Imagen subida y optimizada exitosamente');
+                    
+                    // Clean up the preview after a short delay
+                    setTimeout(() => {
+                        const dropzoneInstance = vehicleImagesDropzone || window['dropzone_vehicle-images-dropzone'];
+                        if (dropzoneInstance && file.previewElement) {
+                            const previewElement = file.previewElement;
+                            previewElement.style.transition = 'opacity 0.3s ease';
+                            previewElement.style.opacity = '0';
+                            
+                            setTimeout(() => {
+                                dropzoneInstance.removeFile(file);
+                            }, 300);
+                        }
+                    }, 1000); // Show for 1 second then remove
+                }, 200);
+            }
+        }
+
+        // Start processing stages
+        setTimeout(runNextStage, 100);
     }
 
     /**
