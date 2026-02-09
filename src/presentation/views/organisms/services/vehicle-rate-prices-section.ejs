@@ -1,0 +1,588 @@
+<%
+/**
+ * Vehicle Rate Prices Section
+ * Displays vehicle hourly rates per rate category in a grid format
+ * Similar to walking tours pricing but for vehicle rates
+ * Created by Denisse Maldonado
+ */
+
+// Default parameters
+const sectionId = typeof vehicleRatePricesId !== 'undefined' ? vehicleRatePricesId : 'vehicle-rate-prices-section';
+const apiEndpoint = typeof vehicleRatesEndpoint !== 'undefined' ? vehicleRatesEndpoint : '/api/vehicle-rate-prices/all';
+%>
+
+<!-- Vehicle Rate Prices Section -->
+<div class="card mb-4" id="<%= sectionId %>">
+    <div class="card-header bg-light">
+        <div class="d-flex align-items-center justify-content-between">
+            <div>
+                <h5 class="card-title mb-1">
+                    <i class="ti ti-car me-2 text-primary"></i>Tiempo de Espera
+                </h5>
+                <p class="text-muted small mb-0">Tarifas por hora por tipo de vehículo y categoría</p>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <!-- Filter Controls -->
+                <div class="d-flex gap-2 align-items-center">
+                    <!-- Currency Dropdown -->
+                    <div class="d-flex align-items-center gap-1">
+                        <label for="vehicleRatesCurrencyFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Moneda:</label>
+                        <select class="form-select form-select-sm" id="vehicleRatesCurrencyFilter-<%= sectionId %>" style="min-width: 80px;">
+                            <option value="MXN" selected>MXN</option>
+                            <option value="USD">USD</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Payment Type Dropdown -->
+                    <div class="d-flex align-items-center gap-1">
+                        <label for="vehicleRatesPaymentFilter-<%= sectionId %>" class="form-label mb-0 text-muted small">Pago:</label>
+                        <select class="form-select form-select-sm" id="vehicleRatesPaymentFilter-<%= sectionId %>" style="min-width: 180px;">
+                            <option value="efectivo" selected>Efectivo</option>
+                            <option value="transferencia">Transferencia</option>
+                            <option value="tarjeta">Tarjeta de Crédito/Débito</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="badge bg-primary-subtle text-primary">
+                    <i class="ti ti-clock me-1"></i>Por hora
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card-body">
+        <!-- Loading state -->
+        <div id="vehicle-rates-loading" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Cargando precios de vehículos...</span>
+            </div>
+            <p class="text-muted mt-2">Cargando precios de vehículos...</p>
+        </div>
+        
+        <!-- Rate Selection Pills -->
+        <div id="vehicle-rates-pills" class="d-none mb-4">
+            <div class="d-flex gap-2 flex-wrap" id="rate-pills-container">
+                <!-- Rate pills will be populated by JavaScript -->
+            </div>
+        </div>
+        
+        <!-- Vehicle rates container -->
+        <div id="vehicle-rates-container" class="d-none">
+            <!-- Selected rate vehicles will be populated here via JavaScript -->
+        </div>
+        
+        <!-- No vehicle rates message -->
+        <div id="no-vehicle-rates" class="text-center py-4 d-none">
+            <div class="text-muted">
+                <i class="ti ti-car" style="font-size: 3rem; opacity: 0.3;"></i>
+                <p class="mt-2 mb-0">No hay precios de vehículos disponibles</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    loadVehicleRates();
+});
+
+async function loadVehicleRates() {
+    try {
+        // Use API endpoint instead of cloud function to handle JWT authentication properly
+        const response = await fetch('/api/vehicle-rate-prices/all', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Error loading vehicle rates');
+        }
+        
+        // Since our API now includes rate and vehicle type data, we can directly display
+        displayOrganizedVehicleRates(organizeVehicleRatesData(data.result.prices || []));
+        
+    } catch (error) {
+        console.error('Error loading vehicle rates:', error);
+        showVehicleRatesError();
+    }
+}
+
+function organizeVehicleRatesData(prices) {
+    if (!prices || prices.length === 0) {
+        return {};
+    }
+    
+    // Group prices by rate name
+    const groupedByRate = {};
+    
+    prices.forEach(price => {
+        const rateName = price.rateName || 'undefined';
+        
+        if (!groupedByRate[rateName]) {
+            groupedByRate[rateName] = {
+                rateName: rateName,
+                color: price.rateColor || '#6c757d',
+                vehicles: [],
+                vehicleTypes: {}
+            };
+        }
+        
+        const vehicleTypeName = price.vehicleTypeName || price.vehicleTypeCode || 'undefined';
+        groupedByRate[rateName].vehicleTypes[vehicleTypeName] = price;
+        
+        // Also add to vehicles array for backward compatibility
+        groupedByRate[rateName].vehicles.push({
+            vehicleCode: price.vehicleTypeCode,
+            vehicleTypeName: price.vehicleTypeName,
+            originalPrice: price.pricePerHour,
+            pricePerHour: price.pricePerHour,
+            currency: price.currency,
+            ...price
+        });
+    });
+    
+    return groupedByRate;
+}
+
+async function fetchRatesAndVehicleTypes(prices) {
+    try {
+        // Get unique rate IDs and vehicle type IDs
+        const rateIds = [...new Set(prices.map(p => p.rateId))];
+        const vehicleTypeIds = [...new Set(prices.map(p => p.vehicleTypeId))];
+        
+        // Fetch rate names
+        const ratesPromises = rateIds.map(async (rateId) => {
+            const response = await fetch(`/parse/classes/Rate/${rateId}`, {
+                headers: {
+                    'X-Parse-Application-Id': 'CrTRTaJpoJFNt8PJ',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            const data = await response.json();
+            return { id: rateId, name: data.name, data: data };
+        });
+        
+        // Fetch vehicle type names
+        const vehicleTypesPromises = vehicleTypeIds.map(async (vehicleTypeId) => {
+            const response = await fetch(`/parse/classes/VehicleType/${vehicleTypeId}`, {
+                headers: {
+                    'X-Parse-Application-Id': 'CrTRTaJpoJFNt8PJ',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+            const data = await response.json();
+            return { id: vehicleTypeId, code: data.code, name: data.name, data: data };
+        });
+        
+        const [rates, vehicleTypes] = await Promise.all([
+            Promise.all(ratesPromises),
+            Promise.all(vehicleTypesPromises)
+        ]);
+        
+        // Organize data by rate
+        const organizedData = {};
+        
+        for (const rate of rates) {
+            organizedData[rate.name] = {
+                rateId: rate.id,
+                rateName: rate.name,
+                color: rate.data.color || '#6c757d',
+                vehicles: []
+            };
+            
+            // Find all prices for this rate
+            const ratePrices = prices.filter(p => p.rateId === rate.id);
+            
+            for (const price of ratePrices) {
+                const vehicleType = vehicleTypes.find(v => v.id === price.vehicleTypeId);
+                if (vehicleType) {
+                    organizedData[rate.name].vehicles.push({
+                        vehicleCode: vehicleType.code,
+                        vehicleName: vehicleType.name,
+                        pricePerHour: price.pricePerHour,
+                        currency: price.currency,
+                        originalPrice: price.pricePerHour
+                    });
+                }
+            }
+            
+            // Sort vehicles by price
+            organizedData[rate.name].vehicles.sort((a, b) => a.pricePerHour - b.pricePerHour);
+        }
+        
+        return organizedData;
+        
+    } catch (error) {
+        console.error('Error fetching rates and vehicle types:', error);
+        return {};
+    }
+}
+
+let globalOrganizedData = {};
+let currentActiveRate = null;
+
+function displayOrganizedVehicleRates(organizedData) {
+    // Hide the main loading spinner
+    const loadingEl = document.getElementById('vehicle-rates-loading');
+    if (loadingEl) {
+        loadingEl.classList.add('d-none');
+    }
+    
+    const containerEl = document.getElementById('vehicle-rates-container');
+    const pillsContainer = document.getElementById('rate-pills-container');
+    const pillsSection = document.getElementById('vehicle-rates-pills');
+    
+    if (Object.keys(organizedData).length === 0) {
+        document.getElementById('no-vehicle-rates').classList.remove('d-none');
+        return;
+    }
+    
+    // Store data globally for pill switching
+    globalOrganizedData = organizedData;
+    
+    // Create rate pills with colors (sorted alphabetically)
+    const sortedRates = Object.entries(organizedData).sort(([nameA], [nameB]) => nameA.localeCompare(nameB));
+    const ratePills = sortedRates.map(([rateName, rateData], index) => {
+        const rateColor = rateData.color || '#6c757d'; // Default gray if no color
+        const isFirst = index === 0;
+        
+        return `
+        <button class="btn rate-pill ${isFirst ? 'active' : ''}" 
+                data-rate-name="${rateName}"
+                style="
+                    background-color: ${isFirst ? rateColor : 'transparent'};
+                    border-color: ${rateColor};
+                    color: ${isFirst ? '#fff' : rateColor};
+                ">
+            <i class="ti ti-tag me-1"></i>${rateName}
+        </button>`;
+    }).join('');
+    
+    pillsContainer.innerHTML = ratePills;
+    pillsSection.classList.remove('d-none');
+    
+    // Add click event listeners to pills
+    document.querySelectorAll('.rate-pill').forEach(pill => {
+        console.log('Adding event listener to pill:', pill.getAttribute('data-rate-name'));
+        pill.addEventListener('click', function() {
+            console.log('Pill clicked:', this.getAttribute('data-rate-name'));
+            const rateName = this.getAttribute('data-rate-name');
+            switchToRate(rateName);
+        });
+    });
+    
+    // Show first rate by default (alphabetically sorted)
+    const firstRate = sortedRates[0][0];
+    currentActiveRate = firstRate;
+    displaySingleRate(firstRate, organizedData[firstRate]);
+    
+    containerEl.classList.remove('d-none');
+    
+    // Initialize filters and update prices immediately
+    initVehicleRatesFilters();
+    
+    // Apply initial pricing based on current filter selections
+    const sectionId = '<%= sectionId %>';
+    const initialPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`)?.value || 'efectivo';
+    const initialCurrency = document.querySelector(`#vehicleRatesCurrencyFilter-${sectionId}`)?.value || 'MXN';
+    
+    // Update prices immediately to remove loaders (small delay to ensure DOM is ready)
+    setTimeout(() => {
+        updateVehicleRatesPrices(initialPayment, initialCurrency);
+    }, 100);
+}
+
+function switchToRate(rateName) {
+    console.log('Switching to rate:', rateName);
+    currentActiveRate = rateName;
+    
+    // Update pill states
+    document.querySelectorAll('.rate-pill').forEach(pill => {
+        const pillRateName = pill.getAttribute('data-rate-name');
+        const rateData = globalOrganizedData[pillRateName];
+        const rateColor = rateData?.color || '#6c757d';
+        
+        if (pillRateName === rateName) {
+            pill.classList.add('active');
+            pill.style.backgroundColor = rateColor;
+            pill.style.color = '#fff';
+        } else {
+            pill.classList.remove('active');
+            pill.style.backgroundColor = 'transparent';
+            pill.style.color = rateColor;
+        }
+    });
+    
+    // Display the selected rate's vehicles
+    displaySingleRate(rateName, globalOrganizedData[rateName]);
+    
+    // Update pricing with current filters immediately after switching
+    const sectionId = '<%= sectionId %>';
+    const currentPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`)?.value || 'efectivo';
+    const currentCurrency = document.querySelector(`#vehicleRatesCurrencyFilter-${sectionId}`)?.value || 'MXN';
+    updateVehicleRatesPrices(currentPayment, currentCurrency);
+}
+
+function displaySingleRate(rateName, rateData) {
+    const containerEl = document.getElementById('vehicle-rates-container');
+    
+    const vehicles = rateData.vehicles || [];
+    
+    const vehiclesHtml = vehicles.map((vehicle, index) => {
+        const vehicleCode = vehicle.vehicleCode || vehicle.vehicleTypeCode || 'N/A';
+        const originalPrice = vehicle.originalPrice || vehicle.pricePerHour || 0;
+        
+        return `
+        <div class="col-md-2 col-6">
+            <div class="text-center p-3 bg-white border rounded-2 shadow-sm">
+                <div class="fw-bold text-dark mb-1">${vehicleCode}</div>
+                <div class="h6 mb-0 vehicle-rate-price text-primary" data-original-price="${originalPrice}">
+                    <div class="price-loader d-flex align-items-center justify-content-center">
+                        <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+                        <span class="small">Cargando...</span>
+                    </div>
+                </div>
+                <div class="small text-muted">por hora</div>
+            </div>
+        </div>`;
+    }).join('');
+    
+    containerEl.innerHTML = `
+        <div class="row g-2">
+            ${vehiclesHtml}
+        </div>`;
+}
+
+function showVehicleRatesError() {
+    const loadingEl = document.getElementById('vehicle-rates-loading');
+    const containerEl = document.getElementById('vehicle-rates-container');
+    
+    loadingEl.classList.add('d-none');
+    
+    containerEl.innerHTML = `
+        <div class="text-center py-4">
+            <div class="text-danger">
+                <i class="ti ti-alert-circle" style="font-size: 2rem;"></i>
+                <p class="mt-2 mb-0">Error al cargar precios de vehículos</p>
+                <button class="btn btn-outline-primary btn-sm mt-2" onclick="loadVehicleRates()">
+                    <i class="ti ti-reload me-1"></i>Reintentar
+                </button>
+            </div>
+        </div>
+    `;
+    containerEl.classList.remove('d-none');
+}
+
+// Global variables for vehicle rates pricing (reuse from tours)
+let vehicleRatesCurrentTransferRate = 0;
+let vehicleRatesCurrentExchangeRate = 0;
+let vehicleRatesCurrentAgencyRate = 0;
+
+// Initialize filter event handlers
+function initVehicleRatesFilters() {
+    const sectionId = '<%= sectionId %>';
+    console.log('🔧 Initializing vehicle rates filters for section:', sectionId);
+    
+    const currencySelect = document.querySelector(`#vehicleRatesCurrencyFilter-${sectionId}`);
+    const paymentSelect = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`);
+    
+    if (currencySelect) {
+        currencySelect.addEventListener('change', function() {
+            const selectedCurrency = this.value;
+            const selectedPaymentType = paymentSelect.value;
+            console.log('💱 Currency changed to:', selectedCurrency, 'Payment:', selectedPaymentType);
+            
+            if (selectedCurrency === 'USD' && vehicleRatesCurrentExchangeRate <= 0) {
+                loadVehicleRatesExchangeRate().then(() => {
+                    updateVehicleRatesPrices(selectedPaymentType, selectedCurrency);
+                });
+            } else {
+                updateVehicleRatesPrices(selectedPaymentType, selectedCurrency);
+            }
+        });
+    }
+    
+    if (paymentSelect) {
+        paymentSelect.addEventListener('change', function() {
+            const selectedPaymentType = this.value;
+            const selectedCurrency = currencySelect.value;
+            console.log('💳 Payment type changed to:', selectedPaymentType, 'Currency:', selectedCurrency);
+            
+            // Handle payment type specific rates
+            if (selectedPaymentType === 'transferencia' && vehicleRatesCurrentTransferRate <= 0) {
+                loadVehicleRatesTransferRate().then(() => {
+                    updateVehicleRatesPrices(selectedPaymentType, selectedCurrency);
+                });
+            } else if (selectedPaymentType === 'tarjeta' && vehicleRatesCurrentAgencyRate <= 0) {
+                loadVehicleRatesAgencyRate().then(() => {
+                    updateVehicleRatesPrices(selectedPaymentType, selectedCurrency);
+                });
+            } else {
+                updateVehicleRatesPrices(selectedPaymentType, selectedCurrency);
+            }
+        });
+    }
+}
+
+// Load rates functions (reuse existing patterns)
+function loadVehicleRatesExchangeRate() {
+    return fetch('/api/exchange-rate/current', {
+        credentials: 'include',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(response => response.json())
+    .then(data => {
+        if (data.success && data.data) {
+            vehicleRatesCurrentExchangeRate = data.data.value || 0;
+            console.log('✅ Vehicle rates exchange rate loaded:', vehicleRatesCurrentExchangeRate, 'MXN per USD');
+        } else {
+            vehicleRatesCurrentExchangeRate = 0;
+        }
+    }).catch(error => {
+        console.error('❌ Error loading exchange rate for vehicle rates:', error);
+        vehicleRatesCurrentExchangeRate = 0;
+    });
+}
+
+function loadVehicleRatesTransferRate() {
+    return fetch('/api/transfer-rate/current', {
+        credentials: 'include',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(response => response.json())
+    .then(data => {
+        if (data.success && data.data) {
+            vehicleRatesCurrentTransferRate = data.data.value || 0;
+        } else {
+            vehicleRatesCurrentTransferRate = 0;
+        }
+    }).catch(error => {
+        vehicleRatesCurrentTransferRate = 0;
+    });
+}
+
+function loadVehicleRatesAgencyRate() {
+    return fetch('/api/agency-rate/current', {
+        credentials: 'include',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(response => response.json())
+    .then(data => {
+        if (data.success && data.data) {
+            vehicleRatesCurrentAgencyRate = data.data.value || 0;
+            console.log('✅ Vehicle rates agency rate loaded:', vehicleRatesCurrentAgencyRate + '%');
+        } else {
+            vehicleRatesCurrentAgencyRate = 0;
+        }
+    }).catch(error => {
+        console.error('❌ Error loading agency rate for vehicle rates:', error);
+        vehicleRatesCurrentAgencyRate = 0;
+    });
+}
+
+// Format price with currency symbol (reuse existing pattern)
+function formatVehicleRatePrice(price, currency) {
+    if (currency === 'USD') {
+        return `$${parseFloat(price).toLocaleString('en-US', { 
+            minimumFractionDigits: 0, 
+            maximumFractionDigits: 2 
+        })} USD`;
+    } else {
+        return `$${parseFloat(price).toLocaleString('es-MX')} MXN`;
+    }
+}
+
+// Apply USD rounding rules (same as main tours table)
+function applyVehicleRatesUSDRoundingRules(usdPrice) {
+    if (usdPrice <= 50) {
+        return Math.round(usdPrice);
+    } else if (usdPrice <= 100) {
+        return Math.round(usdPrice / 5) * 5;
+    } else {
+        return Math.round(usdPrice / 10) * 10;
+    }
+}
+
+// Convert and format price based on currency and payment type
+function convertVehicleRatePrice(priceInput, currency, paymentType) {
+    let numericValue = parseFloat(priceInput) || 0;
+    
+    // Apply payment type rate first
+    let adjustedPrice = numericValue;
+    if (paymentType === 'transferencia' && vehicleRatesCurrentTransferRate > 0) {
+        adjustedPrice = numericValue * (1 + vehicleRatesCurrentTransferRate / 100);
+    } else if (paymentType === 'tarjeta' && vehicleRatesCurrentAgencyRate > 0) {
+        adjustedPrice = numericValue * (1 + vehicleRatesCurrentAgencyRate / 100);
+    }
+    
+    // Then convert currency if needed
+    if (currency === 'USD' && vehicleRatesCurrentExchangeRate > 0) {
+        const convertedValue = adjustedPrice / vehicleRatesCurrentExchangeRate;
+        const roundedValue = applyVehicleRatesUSDRoundingRules(convertedValue);
+        return formatVehicleRatePrice(roundedValue, 'USD');
+    } else {
+        return formatVehicleRatePrice(adjustedPrice, 'MXN');
+    }
+}
+
+// Update all vehicle rate prices based on selected filters
+function updateVehicleRatesPrices(paymentType, currency) {
+    const priceElements = document.querySelectorAll('.vehicle-rate-price');
+    
+    priceElements.forEach(priceElement => {
+        const originalPrice = priceElement.getAttribute('data-original-price');
+        
+        if (originalPrice !== undefined && originalPrice !== null) {
+            const updatedPrice = convertVehicleRatePrice(originalPrice, currency, paymentType);
+            // Replace loader with actual price
+            priceElement.innerHTML = updatedPrice;
+        }
+    });
+}
+
+// Load rates when document is ready
+document.addEventListener('DOMContentLoaded', function() {
+    // Load rates for vehicle pricing
+    loadVehicleRatesTransferRate();
+    loadVehicleRatesAgencyRate();
+    loadVehicleRatesExchangeRate();
+});
+</script>
+
+<style>
+/* Rate Pills Styling */
+.rate-pill {
+    border-width: 2px;
+    font-weight: 500;
+    padding: 8px 16px;
+    border-radius: 25px;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.rate-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.rate-pill.active {
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.rate-pill:not(.active):hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.1) !important;
+}
+
+/* Responsive pills */
+@media (max-width: 768px) {
+    .rate-pill {
+        font-size: 12px;
+        padding: 6px 12px;
+        margin-bottom: 8px;
+    }
+}
+</style>

@@ -24,6 +24,7 @@
  * service.setDestinationPOI(destPointer); // Required
  * service.setRate(ratePointer); // Required
  * service.setNote('Additional service information');
+ * service.setRouteDuration(90); // 1.5 hours in minutes
  * await service.save();
  *
  * // Query services with populated relations
@@ -115,6 +116,27 @@ class Services extends BaseModel {
    */
   setNote(note) {
     this.set('note', note);
+  }
+
+  /**
+   * Get route duration in minutes.
+   * @returns {number} Route duration in minutes.
+   * @example
+   * const duration = service.getRouteDuration();
+   * console.log(`Route takes ${duration} minutes`);
+   */
+  getRouteDuration() {
+    return this.get('routeDuration') || 0;
+  }
+
+  /**
+   * Set route duration in minutes.
+   * @param {number} duration - Route duration in minutes.
+   * @example
+   * service.setRouteDuration(120); // 2 hours
+   */
+  setRouteDuration(duration) {
+    this.set('routeDuration', duration);
   }
 
   /**

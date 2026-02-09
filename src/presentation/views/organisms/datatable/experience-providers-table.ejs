@@ -86,18 +86,40 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 <form id="quickAddExperienceForm">
                     <input type="hidden" id="quickAddProviderId">
                     
-                    <!-- Essential fields only for quick add -->
+                    <!-- Nombre y Tipo -->
                     <div class="row mb-3">
-                        <div class="col-md-8">
-                            <label for="quickExperienciaName" class="form-label">
-                                Nombre de la Experiencia <span class="text-danger">*</span>
+                        <div class="col-md-7">
+                            <label for="quickExperienciaName" class="form-label form-label-sm fw-medium text-success">
+                                Nombre <span class="text-danger">*</span>
                             </label>
                             <input type="text" class="form-control" id="quickExperienciaName" required maxlength="200" 
                                    placeholder="Ej: Tour Centro Histórico">
                         </div>
                         <div class="col-md-4">
-                            <label for="quickExperienciaPrice" class="form-label">
-                                Precio <span class="text-danger">*</span>
+                            <label for="quickExperienciaTipo" class="form-label form-label-sm fw-medium text-success">Tipo</label>
+                            <select class="form-select" id="quickExperienciaTipo">
+                                <option value="">Seleccionar</option>
+                                <option value="Exclusivo">Exclusivo</option>
+                                <option value="Compartido">Compartido</option>
+                                <option value="Privado">Privado</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <label for="quickExperienciaDescription" class="form-label form-label-sm fw-medium text-success">
+                            Descripción <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="quickExperienciaDescription" rows="2" required maxlength="1000"
+                                  placeholder="Descripción detallada de lo que incluye esta experiencia..."></textarea>
+                    </div>
+
+                    <!-- Todos los precios en una fila -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">
+                                Precio Adulto <span class="text-danger">*</span>
                             </label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
@@ -105,70 +127,262 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                        placeholder="0.00">
                             </div>
                         </div>
-                    </div>
-                    
-                    <!-- Description -->
-                    <div class="mb-3">
-                        <label for="quickExperienciaDescription" class="form-label">
-                            Descripción <span class="text-danger">*</span>
-                        </label>
-                        <textarea class="form-control" id="quickExperienciaDescription" rows="3" required maxlength="1000"
-                                  placeholder="Descripción detallada de lo que incluye esta experiencia..."></textarea>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Precio Adulto Sin Alcohol</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="quickExperienciaPriceNoAlcohol" min="0" step="0.01" 
+                                       placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Precio Niño</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="quickExperienciaPriceChild" min="0" step="0.01" 
+                                       placeholder="0.00">
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- Optional fields in one row -->
+                    <!-- Campos de tiempo -->
                     <div class="row mb-3">
                         <div class="col-md-4">
-                            <label for="quickExperienciaTipo" class="form-label">Tipo</label>
-                            <select class="form-select" id="quickExperienciaTipo">
-                                <option value="">Seleccionar (opcional)</option>
-                                <option value="Exclusivo">Exclusivo</option>
-                                <option value="Compartido">Compartido</option>
-                                <option value="Privado">Privado</option>
-                            </select>
-                        </div>
-                        <div class="col-md-4">
-                            <label for="quickExperienciaDuration" class="form-label">Duración (hrs)</label>
+                            <label class="form-label form-label-sm fw-medium text-success">Duración (hrs)</label>
                             <input type="number" class="form-control" id="quickExperienciaDuration" min="0" step="0.5" 
                                    placeholder="2.5">
+                            <div class="form-text">
+                                <small>Tiempo total experiencia</small>
+                            </div>
                         </div>
                         <div class="col-md-4">
-                            <label for="quickExperienciaMaxPeople" class="form-label">Máx. Personas</label>
+                            <label class="form-label form-label-sm fw-medium text-success">Duración Trayecto (min)</label>
+                            <input type="number" class="form-control" id="quickExperienciaTravelDuration" min="0" step="1" 
+                                   placeholder="60">
+                            <div class="form-text">
+                                <small>Tiempo traslado</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
+                            <input type="number" class="form-control" id="quickExperienciaAdvanceTime" min="0" step="1" 
+                                   placeholder="1440">
+                            <div class="form-text">
+                                <small>Ej: 1440 = 24hrs</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Campos de personas -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="quickExperienciaMinPeople" class="form-label form-label-sm fw-medium text-success">Mín. Personas</label>
+                            <input type="number" class="form-control" id="quickExperienciaMinPeople" min="1" step="1" 
+                                   placeholder="1">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quickExperienciaMaxPeople" class="form-label form-label-sm fw-medium text-success">Máx. Personas</label>
                             <input type="number" class="form-control" id="quickExperienciaMaxPeople" min="1" step="1" 
                                    placeholder="10">
                         </div>
                     </div>
 
-                    <!-- Disponibilidad Rápida -->
-                    <div class="mb-3">
-                        <label class="form-label fw-medium text-muted">
-                            Disponibilidad <span class="text-muted">(Opcional)</span>
-                        </label>
-                        
-                        <div class="alert alert-info py-2" role="alert">
-                            <small><i class="ti ti-info-circle me-1"></i>Selecciona días y configura horarios específicos, o déjalo vacío para disponibilidad completa</small>
+                    <!-- Incluye y No Incluye en 2 columnas -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <!-- Incluye -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    Incluye <span class="text-muted">(uno por línea)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaIncludes" 
+                                          rows="4" 
+                                          maxlength="1000"
+                                          placeholder="Transporte ida y vuelta&#10;Guía bilingüe certificado&#10;Entrada al sitio&#10;Degustación de platillos&#10;Agua embotellada"
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-info-circle me-1"></i>Cada elemento en una línea nueva</small>
+                                </div>
+                            </div>
                         </div>
-                        
-                        <!-- Day selection buttons -->
-                        <div class="mb-3">
-                            <div class="d-flex gap-1 flex-wrap" id="quickAddAvailableDaysContainer">
-                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="1" data-day-name="Lunes">Lu</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="2" data-day-name="Martes">Ma</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="3" data-day-name="Miércoles">Mi</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="4" data-day-name="Jueves">Ju</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="5" data-day-name="Viernes">Vi</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="6" data-day-name="Sábado">Sa</button>
-                                <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="0" data-day-name="Domingo">Do</button>
+                        <div class="col-md-6">
+                            <!-- No Incluye -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    No incluye <span class="text-muted">(uno por línea)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaNotIncludes" 
+                                          rows="4" 
+                                          maxlength="1000"
+                                          placeholder="Propinas&#10;Comidas adicionales&#10;Transporte desde aeropuerto&#10;Gastos personales"
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-alert-circle me-1"></i>Cada exclusión en una línea nueva</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Idiomas disponibles -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            <i class="ti ti-language me-1"></i>Idiomas disponibles <span class="text-muted">(uno por línea)</span>
+                        </label>
+                        <textarea class="form-control" id="quickExperienciaLanguages" 
+                                  rows="3" 
+                                  maxlength="500"
+                                  placeholder="Español&#10;Inglés&#10;Francés&#10;Alemán"
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-world me-1"></i>Escriba cada idioma en una línea nueva • Se mostrarán como lista</small>
+                        </div>
+                    </div>
+
+                    <!-- Disponibilidad compacta -->
+                    <div class="availability-section mb-3">
+                        <!-- Availability Summary View (default) -->
+                        <div class="availability-summary-quickadd">
+                            <label class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center">
+                                <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
+                                <button type="button" class="btn btn-sm btn-link p-0 toggle-quickadd-availability-btn" title="Configurar horarios">
+                                    <i class="ti ti-settings"></i>
+                                </button>
+                            </label>
+                            <div class="availability-display bg-light border rounded p-2" style="min-height: 35px;">
+                                <small class="text-success">
+                                    <i class="ti ti-check-circle me-1"></i>
+                                    <span class="availability-status-quickadd">Disponible todos los días</span>
+                                </small>
                             </div>
                         </div>
                         
-                        <!-- Selected schedule days container -->
-                        <div id="quickAddSelectedScheduleDays" class="mb-2"></div>
-                        
-                        <!-- No days selected message -->
-                        <div id="quickAddNoDaysSelected" class="text-center text-muted py-2 border rounded bg-light" style="font-size: 0.875rem;">
-                            <i class="ti ti-calendar-off me-1"></i>
-                            <small>Disponible todos los días (sin selección específica)</small>
+                        <!-- Availability Configuration View (hidden by default) -->
+                        <div class="availability-content-quickadd" style="display: none;">
+                            <label class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center">
+                                <span>Configurar Disponibilidad</span>
+                                <button type="button" class="btn btn-sm btn-link p-0 toggle-quickadd-availability-btn" title="Cerrar configuración">
+                                    <i class="ti ti-x"></i>
+                                </button>
+                            </label>
+                            <div class="mb-2">
+                                <div class="d-flex gap-1 flex-wrap" id="quickAddAvailableDaysContainer">
+                                    <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="1" data-day-name="Lunes">Lu</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="2" data-day-name="Martes">Ma</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="3" data-day-name="Miércoles">Mi</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="4" data-day-name="Jueves">Ju</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="5" data-day-name="Viernes">Vi</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="6" data-day-name="Sábado">Sa</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm day-btn" data-day="0" data-day-name="Domingo">Do</button>
+                                </div>
+                            </div>
+                            
+                            <div id="quickAddSelectedScheduleDays" class="mb-2"></div>
+                            
+                            <div id="quickAddNoDaysSelected" class="text-center text-muted py-2 border rounded bg-light" style="font-size: 1rem;">
+                                <i class="ti ti-calendar-off me-1"></i>
+                                <small>Selecciona días para configurar horarios</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Fotos de la experiencia -->
+                    <div class="mb-3">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            Fotos <span class="text-muted">(Opcional)</span>
+                        </label>
+                        <div class="experience-photos-container">
+                            <!-- Photo upload section -->
+                            <div class="row g-2 mb-2 photos-preview-container">
+                                <!-- Uploaded photos will be displayed here -->
+                            </div>
+                            
+                            <!-- Add photo button -->
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary btn-sm add-photo-btn">
+                                    <i class="ti ti-camera-plus me-1"></i>
+                                    Agregar Foto
+                                </button>
+                            </div>
+                            
+                            <!-- Hidden file input -->
+                            <input type="file" 
+                                   class="d-none experience-photo-input" 
+                                   accept=".jpg,.jpeg,.png,.webp" 
+                                   multiple>
+                        </div>
+                        <div class="form-text">
+                            <small><i class="ti ti-info-circle me-1"></i>Máximo 5 fotos por experiencia • Formatos: JPG, PNG, WebP • Máx. 5MB cada una</small>
+                        </div>
+                    </div>
+
+                    <!-- Notas (4 campos) -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <!-- Notas internas -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-notes me-1"></i>Notas internas <span class="text-muted">(Uso interno)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaInternalNotes" 
+                                          rows="3" 
+                                          maxlength="1000"
+                                          placeholder="Notas para uso exclusivo interno del equipo..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-lock me-1"></i>Solo visible para el equipo interno</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Notas cliente (reservar) -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-user-check me-1"></i>Notas cliente (reservar) <span class="text-muted">(Cliente)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaClientBookingNotes" 
+                                          rows="3" 
+                                          maxlength="1000"
+                                          placeholder="Notas que verá el cliente al reservar esta experiencia..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-eye me-1"></i>Visible para el cliente durante reserva</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <!-- Notas proveedor -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-building-store me-1"></i>Notas proveedor <span class="text-muted">(Proveedor)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaProviderNotes" 
+                                          rows="3" 
+                                          maxlength="1000"
+                                          placeholder="Notas e instrucciones para el proveedor de la experiencia..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-truck me-1"></i>Instrucciones para el proveedor</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <!-- Notas colaboradores Amexing -->
+                            <div class="mb-2">
+                                <label class="form-label form-label-sm fw-medium text-success">
+                                    <i class="ti ti-users me-1"></i>Notas colaboradores Amexing <span class="text-muted">(Equipo)</span>
+                                </label>
+                                <textarea class="form-control" id="quickExperienciaTeamNotes" 
+                                          rows="3" 
+                                          maxlength="1000"
+                                          placeholder="Notas para colaboradores y equipo de Amexing..."
+                                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                                <div class="form-text">
+                                    <small><i class="ti ti-heart me-1"></i>Información para el equipo Amexing</small>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -281,29 +495,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 <template id="experienciaEditableTemplate">
     <div class="experiencia-editable card mb-3 border-success border-opacity-25" data-index="" data-id="">
         <div class="card-body p-3">
-            <!-- Fila principal: Nombre, Tipo, Precio -->
+            <!-- Fila principal: Nombre y Tipo -->
             <div class="row mb-2">
-                <div class="col-md-5">
+                <div class="col-md-7">
                     <label class="form-label form-label-sm fw-medium text-success">Nombre <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control form-control-sm experiencia-name-input" required maxlength="200" 
+                    <input type="text" class="form-control experiencia-name-input" required maxlength="200" 
                            placeholder="Ej: Tour Centro Histórico">
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label form-label-sm fw-medium text-success">Tipo</label>
-                    <select class="form-select form-select-sm experiencia-tipo-input">
+                    <select class="form-select form-select experiencia-tipo-input">
                         <option value="">Seleccionar</option>
                         <option value="Exclusivo">Exclusivo</option>
                         <option value="Compartido">Compartido</option>
                         <option value="Privado">Privado</option>
                     </select>
-                </div>
-                <div class="col-md-3">
-                    <label class="form-label form-label-sm fw-medium text-success">Precio <span class="text-danger">*</span></label>
-                    <div class="input-group input-group-sm">
-                        <span class="input-group-text">$</span>
-                        <input type="number" class="form-control experiencia-price-input" required min="0" step="0.01" 
-                               placeholder="0.00">
-                    </div>
                 </div>
                 <div class="col-md-1 d-flex align-items-end">
                     <button type="button" class="btn btn-sm btn-outline-danger delete-experiencia-btn w-100" title="Eliminar experiencia">
@@ -315,26 +521,128 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <!-- Descripción -->
             <div class="mb-2">
                 <label class="form-label form-label-sm fw-medium text-success">Descripción <span class="text-danger">*</span></label>
-                <textarea class="form-control form-control-sm experiencia-description-input" rows="2" required maxlength="1000"
+                <textarea class="form-control experiencia-description-input" rows="2" required maxlength="1000"
                           placeholder="Descripción detallada de lo que incluye esta experiencia..."></textarea>
             </div>
             
-            <!-- Campos opcionales en una fila -->
+            <!-- Todos los precios en una fila -->
             <div class="row mb-2">
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium text-muted">Duración (hrs)</label>
-                    <input type="number" class="form-control form-control-sm experiencia-duration-input" min="0" step="0.5" 
-                           placeholder="2.5">
+                    <label class="form-label form-label-sm fw-medium text-success">Precio Adulto <span class="text-danger">*</span></label>
+                    <div class="input-group input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control experiencia-price-input" required min="0" step="0.01" 
+                               placeholder="0.00">
+                    </div>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium text-muted">Mín. Personas</label>
-                    <input type="number" class="form-control form-control-sm experiencia-min-people-input" min="1" step="1" 
+                    <label class="form-label form-label-sm fw-medium text-success">Precio Adulto Sin Alcohol</label>
+                    <div class="input-group input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control experiencia-price-no-alcohol-input" min="0" step="0.01" 
+                               placeholder="0.00">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium text-success">Precio Niño</label>
+                    <div class="input-group input-group">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control experiencia-price-child-input" min="0" step="0.01" 
+                               placeholder="0.00">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Campos de tiempo en una fila -->
+            <div class="row mb-2">
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium text-success">Duración (hrs)</label>
+                    <input type="number" class="form-control experiencia-duration-input" min="0" step="0.5" 
+                           placeholder="2.5">
+                    <div class="form-text">
+                        <small>Tiempo total experiencia</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium text-success">Duración Trayecto (min)</label>
+                    <input type="number" class="form-control experiencia-travel-duration-input" min="0" step="1" 
+                           placeholder="60">
+                    <div class="form-text">
+                        <small>Tiempo traslado</small>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label form-label-sm fw-medium text-success">Tiempo Anticipación (min)</label>
+                    <input type="number" class="form-control experiencia-advance-minutes-input" 
+                           min="0" step="1" placeholder="1440">
+                    <div class="form-text">
+                        <small>Ej: 1440 = 24hrs</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Campos de personas -->
+            <div class="row mb-2">
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm fw-medium text-success">Mín. Personas</label>
+                    <input type="number" class="form-control experiencia-min-people-input" min="1" step="1" 
                            placeholder="1">
                 </div>
-                <div class="col-md-4">
-                    <label class="form-label form-label-sm fw-medium text-muted">Máx. Personas</label>
-                    <input type="number" class="form-control form-control-sm experiencia-max-people-input" min="1" step="1" 
+                <div class="col-md-6">
+                    <label class="form-label form-label-sm fw-medium text-success">Máx. Personas</label>
+                    <input type="number" class="form-control experiencia-max-people-input" min="1" step="1" 
                            placeholder="10">
+                </div>
+            </div>
+            
+            <!-- Incluye y No Incluye en 2 columnas -->
+            <div class="row">
+                <div class="col-md-6">
+                    <!-- Incluye -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            Incluye <span class="text-muted">(uno por línea)</span>
+                        </label>
+                        <textarea class="form-control experiencia-includes-input" 
+                                  rows="4" 
+                                  maxlength="1000"
+                                  placeholder="Transporte ida y vuelta&#10;Guía bilingüe certificado&#10;Entrada al sitio&#10;Degustación de platillos&#10;Agua embotellada"
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-info-circle me-1"></i>Cada elemento en una línea nueva</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- No Incluye -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            No incluye <span class="text-muted">(uno por línea)</span>
+                        </label>
+                        <textarea class="form-control experiencia-notincludes-input" 
+                                  rows="4" 
+                                  maxlength="1000"
+                                  placeholder="Propinas&#10;Comidas adicionales&#10;Transporte desde aeropuerto&#10;Gastos personales"
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-alert-circle me-1"></i>Cada exclusión en una línea nueva</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Idiomas disponibles -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium text-success">
+                    <i class="ti ti-language me-1"></i>Idiomas disponibles <span class="text-muted">(uno por línea)</span>
+                </label>
+                <textarea class="form-control experiencia-languages-input" 
+                          rows="3" 
+                          maxlength="500"
+                          placeholder="Español&#10;Inglés&#10;Francés&#10;Alemán"
+                          style="font-size: 1rem; line-height: 1.5;"></textarea>
+                <div class="form-text">
+                    <small><i class="ti ti-world me-1"></i>Escriba cada idioma en una línea nueva • Se mostrarán como lista</small>
                 </div>
             </div>
             
@@ -342,7 +650,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             <div class="availability-section">
                 <!-- Availability Summary View (default) -->
                 <div class="availability-summary">
-                    <label class="form-label form-label-sm fw-medium text-muted d-flex justify-content-between align-items-center">
+                    <label class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center">
                         <span>Disponibilidad <span class="text-muted">(Opcional)</span></span>
                         <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Configurar horarios">
                             <i class="ti ti-settings"></i>
@@ -358,7 +666,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 
                 <!-- Availability Configuration View (hidden by default) -->
                 <div class="availability-content" style="display: none;">
-                    <label class="form-label form-label-sm fw-medium text-muted d-flex justify-content-between align-items-center">
+                    <label class="form-label form-label-sm fw-medium text-success d-flex justify-content-between align-items-center">
                         <span>Configurar Disponibilidad</span>
                         <button type="button" class="btn btn-sm btn-link p-0 toggle-availability-btn" title="Cerrar configuración">
                             <i class="ti ti-x"></i>
@@ -378,9 +686,110 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     
                     <div class="experiencia-selected-schedule-days mb-2"></div>
                     
-                    <div class="experiencia-no-days-selected text-center text-muted py-2 border rounded bg-light" style="font-size: 0.875rem;">
+                    <div class="experiencia-no-days-selected text-center text-muted py-2 border rounded bg-light" style="font-size: 1rem;">
                         <i class="ti ti-calendar-off me-1"></i>
                         <small>Selecciona días para configurar horarios</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Fotos de la experiencia -->
+            <div class="mb-2">
+                <label class="form-label form-label-sm fw-medium text-success">
+                    Fotos <span class="text-muted">(Opcional)</span>
+                </label>
+                <div class="experience-photos-container">
+                    <!-- Photo upload section -->
+                    <div class="row g-2 mb-2 photos-preview-container">
+                        <!-- Uploaded photos will be displayed here -->
+                    </div>
+                    
+                    <!-- Add photo button -->
+                    <div class="d-grid">
+                        <button type="button" class="btn btn-outline-primary btn-sm add-photo-btn">
+                            <i class="ti ti-camera-plus me-1"></i>
+                            Agregar Foto
+                        </button>
+                    </div>
+                    
+                    <!-- Hidden file input -->
+                    <input type="file" 
+                           class="d-none experience-photo-input" 
+                           accept=".jpg,.jpeg,.png,.webp" 
+                           multiple>
+                </div>
+                <div class="form-text">
+                    <small><i class="ti ti-info-circle me-1"></i>Máximo 5 fotos por experiencia • Formatos: JPG, PNG, WebP • Máx. 5MB cada una</small>
+                </div>
+            </div>
+            
+            <!-- Notas (4 campos) -->
+            <div class="row">
+                <div class="col-md-6">
+                    <!-- Notas internas -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            <i class="ti ti-notes me-1"></i>Notas internas <span class="text-muted">(Uso interno)</span>
+                        </label>
+                        <textarea class="form-control experiencia-internal-notes-input" 
+                                  rows="3" 
+                                  maxlength="1000"
+                                  placeholder="Notas para uso exclusivo interno del equipo..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-lock me-1"></i>Solo visible para el equipo interno</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- Notas cliente (reservar) -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            <i class="ti ti-user-check me-1"></i>Notas cliente (reservar) <span class="text-muted">(Cliente)</span>
+                        </label>
+                        <textarea class="form-control experiencia-client-booking-notes-input" 
+                                  rows="3" 
+                                  maxlength="1000"
+                                  placeholder="Notas que verá el cliente al reservar esta experiencia..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-eye me-1"></i>Visible para el cliente durante reserva</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <!-- Notas proveedor -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            <i class="ti ti-building-store me-1"></i>Notas proveedor <span class="text-muted">(Proveedor)</span>
+                        </label>
+                        <textarea class="form-control experiencia-provider-notes-input" 
+                                  rows="3" 
+                                  maxlength="1000"
+                                  placeholder="Notas e instrucciones para el proveedor de la experiencia..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-truck me-1"></i>Instrucciones para el proveedor</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <!-- Notas colaboradores Amexing -->
+                    <div class="mb-2">
+                        <label class="form-label form-label-sm fw-medium text-success">
+                            <i class="ti ti-users me-1"></i>Notas colaboradores Amexing <span class="text-muted">(Equipo)</span>
+                        </label>
+                        <textarea class="form-control experiencia-team-notes-input" 
+                                  rows="3" 
+                                  maxlength="1000"
+                                  placeholder="Notas para colaboradores y equipo de Amexing..."
+                                  style="font-size: 1rem; line-height: 1.5;"></textarea>
+                        <div class="form-text">
+                            <small><i class="ti ti-heart me-1"></i>Información para el equipo Amexing</small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -403,12 +812,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             </div>
             <div class="col-md-4">
                 <label class="form-label small mb-1">Hora de Inicio</label>
-                <input type="text" class="form-control form-control-sm day-start-time time-input" placeholder="HH:MM" maxlength="5">
+                <input type="text" class="form-control day-start-time time-input" placeholder="HH:MM" maxlength="5">
                 <div class="invalid-feedback"></div>
             </div>
             <div class="col-md-4">
                 <label class="form-label small mb-1">Hora de Fin</label>
-                <input type="text" class="form-control form-control-sm day-end-time time-input" placeholder="HH:MM" maxlength="5">
+                <input type="text" class="form-control day-end-time time-input" placeholder="HH:MM" maxlength="5">
                 <div class="invalid-feedback"></div>
             </div>
             <div class="col-md-1 text-end">
@@ -459,12 +868,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             columns: [
                 {
                     data: 'name',
+                    orderable: false,
                     render: function(data) {
                         return `<div class="fw-semibold">${data || '-'}</div>`;
                     }
                 },
                 {
                     data: 'description',
+                    orderable: false,
                     render: function(data) {
                         if (!data) return '<span class="text-muted">Sin descripción</span>';
                         const truncated = data.length > 100 ? data.substring(0, 100) + '...' : data;
@@ -473,6 +884,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 },
                 {
                     data: 'experienciasCount',
+                    orderable: false,
                     render: function(data) {
                         if (!data || data === 0) {
                             return '<span class="text-muted">Sin experiencias</span>';
@@ -483,6 +895,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 // Última Actualización
                 {
                     data: 'updatedAt',
+                    orderable: false,
                     render: function(data) {
                         if (!data) return '-';
                         const date = new Date(data);
@@ -496,6 +909,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 // Estado
                 {
                     data: 'active',
+                    orderable: false,
                     render: function(data) {
                         return data
                             ? '<span class="badge bg-success">Activo</span>'
@@ -601,6 +1015,57 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
         $('#saveProviderBtn').on('click', function() { saveProvider(); });
         $('#saveQuickExperienceBtn').on('click', function() { saveQuickExperience(); });
         
+        // Handle add photo button click for quick add modal
+        $('#quickAddExperienceModal').on('click', '.add-photo-btn', function() {
+            $(this).closest('.experience-photos-container').find('.experience-photo-input').click();
+        });
+        
+        // Handle photo upload for quick add modal - now using the new class
+        $('#quickAddExperienceModal').on('change', '.experience-photo-input', function(e) {
+            const files = e.target.files;
+            const previewContainer = $(this).closest('.experience-photos-container').find('.photos-preview-container');
+            
+            Array.from(files).forEach(file => {
+                if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                    alert(`El archivo "${file.name}" excede el tamaño máximo de 5MB`);
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const photoId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                    const previewHtml = `
+                        <div class="col-4 photo-preview" data-photo-id="${photoId}"
+                             data-filename="${file.name}" 
+                             data-dataurl="${e.target.result}">
+                            <div class="position-relative">
+                                <img src="${e.target.result}" 
+                                     class="img-fluid rounded border" 
+                                     style="height: 80px; width: 100%; object-fit: cover;">
+                                <button type="button" 
+                                        class="btn btn-danger btn-sm position-absolute top-0 end-0 remove-photo-btn" 
+                                        style="padding: 2px 6px; margin: 2px;">
+                                    <i class="ti ti-x" style="font-size: 12px;"></i>
+                                </button>
+                                <div class="text-center mt-1">
+                                    <small class="text-muted text-truncate d-block" style="font-size: 10px;" title="${file.name}">
+                                        ${file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    previewContainer.append(previewHtml);
+                };
+                reader.readAsDataURL(file);
+            });
+            
+            // Clear the input so same file can be selected again
+            $(this).val('');
+        });
+        
+        // Note: Remove photo handler is already handled globally by '.remove-photo-btn' selector
+        
         // ========== QUICK ADD EXPERIENCE MODAL ==========
         function openQuickAddExperienceModal(providerId, providerName) {
             $('#quickAddProviderId').val(providerId);
@@ -609,6 +1074,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             // Reset availability
             resetQuickAddAvailability();
+            
+            // Clear photos preview
+            $('#quickAddExperienceModal .photos-preview-container').empty();
             
             // Clear any previous alerts
             const alertsContainer = document.getElementById('quickAddModalAlerts');
@@ -632,14 +1100,63 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             }
             
             const providerId = $('#quickAddProviderId').val();
+            // Process includes field
+            const includesText = $('#quickExperienciaIncludes').val().trim();
+            const includesList = includesText ? 
+                includesText.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0)
+                : [];
+                
+            // Process languages field  
+            const languagesText = $('#quickExperienciaLanguages').val().trim();
+            const languagesList = languagesText ? 
+                languagesText.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0)
+                : [];
+                
+            // Process not includes field
+            const notIncludesText = $('#quickExperienciaNotIncludes').val().trim();
+            const notIncludesList = notIncludesText ? 
+                notIncludesText.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0)
+                : [];
+                
+            // Collect photos data (similar to main form implementation)
+            const photosList = [];
+            const photoElements = $('#quickAddExperienceModal .photos-preview-container .photo-preview');
+            photoElements.each(function() {
+                const photoData = {
+                    fileName: $(this).data('filename'),
+                    dataUrl: $(this).data('dataurl')
+                };
+                photosList.push(photoData);
+            });
+
             const experienciaData = {
                 name: $('#quickExperienciaName').val().trim(),
                 description: $('#quickExperienciaDescription').val().trim(),
                 price: parseFloat($('#quickExperienciaPrice').val()) || 0,
+                price_no_alcohol: $('#quickExperienciaPriceNoAlcohol').val() ? parseFloat($('#quickExperienciaPriceNoAlcohol').val()) : null,
+                price_child: $('#quickExperienciaPriceChild').val() ? parseFloat($('#quickExperienciaPriceChild').val()) : null,
                 tipo: $('#quickExperienciaTipo').val() || null,
                 duration: $('#quickExperienciaDuration').val() ? parseFloat($('#quickExperienciaDuration').val()) : null,
+                travel_duration: $('#quickExperienciaTravelDuration').val() ? parseInt($('#quickExperienciaTravelDuration').val()) : null,
+                advance_booking_time: $('#quickExperienciaAdvanceTime').val() ? parseInt($('#quickExperienciaAdvanceTime').val()) : null,
+                min_people: $('#quickExperienciaMinPeople').val() ? parseInt($('#quickExperienciaMinPeople').val()) : null,
                 max_people: $('#quickExperienciaMaxPeople').val() ? parseInt($('#quickExperienciaMaxPeople').val()) : null,
-                availability: collectQuickAddAvailability()
+                includes: includesList,
+                languages: languagesList,
+                notincludes: notIncludesList,
+                photos: photosList,
+                availability: collectQuickAddAvailability(),
+                // Notes fields
+                internal_notes: $('#quickExperienciaInternalNotes').val().trim() || null,
+                client_booking_notes: $('#quickExperienciaClientBookingNotes').val().trim() || null,
+                provider_notes: $('#quickExperienciaProviderNotes').val().trim() || null,
+                team_notes: $('#quickExperienciaTeamNotes').val().trim() || null
             };
             
             $('#saveQuickExperienceBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
@@ -729,6 +1246,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 duration: null,
                 min_people: null,
                 max_people: null,
+                includes: [],
+                notincludes: [],
+                photos: [],
                 availability: null
             };
             
@@ -754,9 +1274,62 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             card.querySelector('.experiencia-description-input').value = experiencia.description || '';
             card.querySelector('.experiencia-tipo-input').value = experiencia.tipo || '';
             card.querySelector('.experiencia-price-input').value = experiencia.price || '';
-            card.querySelector('.experiencia-duration-input').value = experiencia.duration || '';
+            card.querySelector('.experiencia-price-no-alcohol-input').value = experiencia.price_no_alcohol || '';
+            card.querySelector('.experiencia-price-child-input').value = experiencia.price_child || '';
+            // Handle duration - keep as hours, convert from minutes if needed
+            if (experiencia.duration) {
+                const duration = parseFloat(experiencia.duration);
+                if (duration > 24) {
+                    // Likely stored in minutes, convert to hours
+                    card.querySelector('.experiencia-duration-input').value = (duration / 60).toFixed(1);
+                } else {
+                    // Already in hours or reasonable hour value
+                    card.querySelector('.experiencia-duration-input').value = duration;
+                }
+            }
+            card.querySelector('.experiencia-travel-duration-input').value = experiencia.travel_duration || '';
             card.querySelector('.experiencia-min-people-input').value = experiencia.min_people || '';
             card.querySelector('.experiencia-max-people-input').value = experiencia.max_people || '';
+            
+            // Populate includes field - convert array back to lines
+            const includesText = experiencia.includes && experiencia.includes.length > 0 ? 
+                experiencia.includes.join('\n') : '';
+            card.querySelector('.experiencia-includes-input').value = includesText;
+            
+            // Populate languages field - convert array back to lines
+            const languagesText = experiencia.languages && experiencia.languages.length > 0 ? 
+                experiencia.languages.join('\n') : '';
+            card.querySelector('.experiencia-languages-input').value = languagesText;
+            
+            // Populate notincludes field - convert array back to lines
+            const notIncludesText = experiencia.notincludes && experiencia.notincludes.length > 0 ? 
+                experiencia.notincludes.join('\n') : '';
+            card.querySelector('.experiencia-notincludes-input').value = notIncludesText;
+            
+            // Populate advance booking time field (minutes only)
+            if (experiencia.advance_booking_time) {
+                // If it's the old format with hours/minutes, convert to total minutes
+                if (typeof experiencia.advance_booking_time === 'object' && experiencia.advance_booking_time.total_minutes) {
+                    card.querySelector('.experiencia-advance-minutes-input').value = experiencia.advance_booking_time.total_minutes;
+                } else if (typeof experiencia.advance_booking_time === 'number') {
+                    // If it's already just minutes
+                    card.querySelector('.experiencia-advance-minutes-input').value = experiencia.advance_booking_time;
+                }
+            }
+            
+            // Populate notes fields
+            card.querySelector('.experiencia-internal-notes-input').value = experiencia.internal_notes || '';
+            card.querySelector('.experiencia-client-booking-notes-input').value = experiencia.client_booking_notes || '';
+            card.querySelector('.experiencia-provider-notes-input').value = experiencia.provider_notes || '';
+            card.querySelector('.experiencia-team-notes-input').value = experiencia.team_notes || '';
+            
+            // Populate photos if they exist
+            const photosContainer = $(card).find('.photos-preview-container');
+            if (experiencia.photos && experiencia.photos.length > 0) {
+                experiencia.photos.forEach(photo => {
+                    addPhotoPreview(photosContainer, { name: photo.fileName }, photo.dataUrl);
+                });
+            }
             
             // Update availability display and populate availability interface
             updateAvailabilityDisplay($(card), experiencia.availability);
@@ -775,9 +1348,53 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             experiencia.description = card.find('.experiencia-description-input').val().trim();
             experiencia.tipo = card.find('.experiencia-tipo-input').val().trim() || null;
             experiencia.price = parseFloat(card.find('.experiencia-price-input').val()) || 0;
+            experiencia.price_no_alcohol = card.find('.experiencia-price-no-alcohol-input').val() ? parseFloat(card.find('.experiencia-price-no-alcohol-input').val()) : null;
+            experiencia.price_child = card.find('.experiencia-price-child-input').val() ? parseFloat(card.find('.experiencia-price-child-input').val()) : null;
             experiencia.duration = card.find('.experiencia-duration-input').val() ? parseFloat(card.find('.experiencia-duration-input').val()) : null;
+            experiencia.travel_duration = card.find('.experiencia-travel-duration-input').val() ? parseInt(card.find('.experiencia-travel-duration-input').val()) : null;
             experiencia.min_people = card.find('.experiencia-min-people-input').val() ? parseInt(card.find('.experiencia-min-people-input').val()) : null;
             experiencia.max_people = card.find('.experiencia-max-people-input').val() ? parseInt(card.find('.experiencia-max-people-input').val()) : null;
+            
+            // Process includes field - convert lines to array
+            const includesText = card.find('.experiencia-includes-input').val().trim();
+            experiencia.includes = includesText ? 
+                includesText.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0)
+                : [];
+            
+            // Process languages field - convert lines to array
+            const languagesText = card.find('.experiencia-languages-input').val().trim();
+            experiencia.languages = languagesText ? 
+                languagesText.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0)
+                : [];
+            
+            // Process notincludes field - convert lines to array
+            const notIncludesText = card.find('.experiencia-notincludes-input').val().trim();
+            experiencia.notincludes = notIncludesText ? 
+                notIncludesText.split('\n')
+                    .map(item => item.trim())
+                    .filter(item => item.length > 0)
+                : [];
+            
+            // Process advance booking time (minutes only)
+            const totalMinutes = parseInt(card.find('.experiencia-advance-minutes-input').val()) || 0;
+            experiencia.advance_booking_time = totalMinutes;
+            
+            // Collect photos data from card
+            const photoElements = card.find('.photo-preview');
+            experiencia.photos = [];
+            photoElements.each(function() {
+                const img = $(this).find('img');
+                if (img.length > 0) {
+                    experiencia.photos.push({
+                        dataUrl: img.attr('src'),
+                        fileName: $(this).find('small').attr('title') || 'image.jpg'
+                    });
+                }
+            });
             
             // Collect availability data from card
             experiencia.availability = collectAvailabilityFromCard(card);
@@ -887,13 +1504,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                             <small class="text-muted">De:</small>
                                         </div>
                                         <div class="col">
-                                            <input type="time" class="form-control form-control-sm start-time" value="${timeSlot.start}">
+                                            <input type="time" class="form-control start-time" value="${timeSlot.start}">
                                         </div>
                                         <div class="col-auto">
                                             <small class="text-muted">A:</small>
                                         </div>
                                         <div class="col">
-                                            <input type="time" class="form-control form-control-sm end-time" value="${timeSlot.end}">
+                                            <input type="time" class="form-control end-time" value="${timeSlot.end}">
                                         </div>
                                         <div class="col-auto">
                                             <button type="button" class="btn btn-sm btn-outline-success add-time-slot-btn" title="Agregar horario">
@@ -956,13 +1573,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                             <small class="text-muted">De:</small>
                                         </div>
                                         <div class="col">
-                                            <input type="time" class="form-control form-control-sm start-time" value="${startTime}">
+                                            <input type="time" class="form-control start-time" value="${startTime}">
                                         </div>
                                         <div class="col-auto">
                                             <small class="text-muted">A:</small>
                                         </div>
                                         <div class="col">
-                                            <input type="time" class="form-control form-control-sm end-time" value="${endTime}">
+                                            <input type="time" class="form-control end-time" value="${endTime}">
                                         </div>
                                         <div class="col-auto">
                                             <button type="button" class="btn btn-sm btn-outline-success add-time-slot-btn" title="Agregar horario">
@@ -1078,13 +1695,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             <small class="text-muted">De:</small>
                         </div>
                         <div class="col">
-                            <input type="time" class="form-control form-control-sm start-time" value="09:00">
+                            <input type="time" class="form-control start-time" value="09:00">
                         </div>
                         <div class="col-auto">
                             <small class="text-muted">A:</small>
                         </div>
                         <div class="col">
-                            <input type="time" class="form-control form-control-sm end-time" value="18:00">
+                            <input type="time" class="form-control end-time" value="18:00">
                         </div>
                         <div class="col-auto">
                             <button type="button" class="btn btn-sm btn-outline-success add-time-slot-btn" title="Agregar horario">
@@ -1135,6 +1752,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             }
         });
 
+        // Toggle availability configuration in quick add modal
+        $(document).on('click', '.toggle-quickadd-availability-btn', function() {
+            const summaryView = $('.availability-summary-quickadd');
+            const configView = $('.availability-content-quickadd');
+            
+            if (configView.is(':visible')) {
+                configView.hide();
+                summaryView.show();
+                updateQuickAddAvailabilityStatus();
+            } else {
+                summaryView.hide();
+                configView.show();
+            }
+        });
+
         // Event handler for quick add availability day buttons
         $(document).on('click', '#quickAddAvailableDaysContainer .day-btn', function() {
             const dayCode = parseInt($(this).data('day'));
@@ -1172,13 +1804,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             <small class="text-muted">De:</small>
                         </div>
                         <div class="col">
-                            <input type="time" class="form-control form-control-sm start-time" value="09:00">
+                            <input type="time" class="form-control start-time" value="09:00">
                         </div>
                         <div class="col-auto">
                             <small class="text-muted">A:</small>
                         </div>
                         <div class="col">
-                            <input type="time" class="form-control form-control-sm end-time" value="18:00">
+                            <input type="time" class="form-control end-time" value="18:00">
                         </div>
                         <div class="col-auto">
                             <button type="button" class="btn btn-sm btn-outline-success add-quick-add-time-slot-btn" title="Agregar horario">
@@ -1225,10 +1857,10 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                             <span class="fw-medium">${dayName}</span>
                         </div>
                         <div class="col-4">
-                            <input type="time" class="form-control form-control-sm day-start-time" value="${startTime}">
+                            <input type="time" class="form-control day-start-time" value="${startTime}">
                         </div>
                         <div class="col-4">
-                            <input type="time" class="form-control form-control-sm day-end-time" value="${endTime}">
+                            <input type="time" class="form-control day-end-time" value="${endTime}">
                         </div>
                         <div class="col-1">
                             <button type="button" class="btn btn-sm btn-outline-danger remove-experiencia-day-btn" title="Eliminar día">
@@ -1335,16 +1967,69 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 const card = $(this);
                 const id = card.data('id');
                 
+                // Process includes field - convert lines to array
+                const includesText = card.find('.experiencia-includes-input').val().trim();
+                const includesList = includesText ? 
+                    includesText.split('\n')
+                        .map(item => item.trim())
+                        .filter(item => item.length > 0)
+                    : [];
+                
+                // Process languages field - convert lines to array
+                const languagesText = card.find('.experiencia-languages-input').val().trim();
+                const languagesList = languagesText ? 
+                    languagesText.split('\n')
+                        .map(item => item.trim())
+                        .filter(item => item.length > 0)
+                    : [];
+                
+                // Process notincludes field - convert lines to array
+                const notIncludesText = card.find('.experiencia-notincludes-input').val().trim();
+                const notIncludesList = notIncludesText ? 
+                    notIncludesText.split('\n')
+                        .map(item => item.trim())
+                        .filter(item => item.length > 0)
+                    : [];
+                
+                // Process advance booking time (minutes only)
+                const advanceBookingTime = parseInt(card.find('.experiencia-advance-minutes-input').val()) || 0;
+                
+                // Collect photos data from card
+                const photoElements = card.find('.photo-preview');
+                const photosList = [];
+                photoElements.each(function() {
+                    const img = $(this).find('img');
+                    if (img.length > 0) {
+                        photosList.push({
+                            dataUrl: img.attr('src'),
+                            fileName: $(this).find('small').attr('title') || 'image.jpg'
+                        });
+                    }
+                });
+                
                 const experiencia = {
                     name: card.find('.experiencia-name-input').val().trim(),
                     description: card.find('.experiencia-description-input').val().trim(),
                     tipo: card.find('.experiencia-tipo-input').val().trim() || null,
                     price: parseFloat(card.find('.experiencia-price-input').val()) || 0,
+                    price_no_alcohol: card.find('.experiencia-price-no-alcohol-input').val() ? parseFloat(card.find('.experiencia-price-no-alcohol-input').val()) : null,
+                    price_child: card.find('.experiencia-price-child-input').val() ? parseFloat(card.find('.experiencia-price-child-input').val()) : null,
                     duration: card.find('.experiencia-duration-input').val() ? parseFloat(card.find('.experiencia-duration-input').val()) : null,
+                    travel_duration: card.find('.experiencia-travel-duration-input').val() ? parseInt(card.find('.experiencia-travel-duration-input').val()) : null,
                     min_people: card.find('.experiencia-min-people-input').val() ? parseInt(card.find('.experiencia-min-people-input').val()) : null,
                     max_people: card.find('.experiencia-max-people-input').val() ? parseInt(card.find('.experiencia-max-people-input').val()) : null,
+                    includes: includesList,
+                    languages: languagesList,
+                    notincludes: notIncludesList,
+                    advance_booking_time: advanceBookingTime,
+                    photos: photosList,
                     availability: collectAvailabilityFromCard(card),
-                    displayOrder: index
+                    displayOrder: index,
+                    // Notes fields
+                    internal_notes: card.find('.experiencia-internal-notes-input').val().trim() || null,
+                    client_booking_notes: card.find('.experiencia-client-booking-notes-input').val().trim() || null,
+                    provider_notes: card.find('.experiencia-provider-notes-input').val().trim() || null,
+                    team_notes: card.find('.experiencia-team-notes-input').val().trim() || null
                 };
                 
                 // Only include experiences with at least name and description
@@ -1382,13 +2067,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                             <small class="text-muted">De:</small>
                                         </div>
                                         <div class="col">
-                                            <input type="time" class="form-control form-control-sm start-time" value="${startTime}">
+                                            <input type="time" class="form-control start-time" value="${startTime}">
                                         </div>
                                         <div class="col-auto">
                                             <small class="text-muted">A:</small>
                                         </div>
                                         <div class="col">
-                                            <input type="time" class="form-control form-control-sm end-time" value="${endTime}">
+                                            <input type="time" class="form-control end-time" value="${endTime}">
                                         </div>
                                         <div class="col-auto">
                                             <button type="button" class="btn btn-sm btn-outline-success add-quick-add-time-slot-btn" title="Agregar horario">
@@ -1433,6 +2118,26 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 noDaysMessage.show();
             } else {
                 noDaysMessage.hide();
+            }
+        }
+
+        function updateQuickAddAvailabilityStatus() {
+            const selectedDays = $('#quickAddAvailableDaysContainer .day-btn.active');
+            const statusText = $('.availability-status-quickadd');
+            
+            if (selectedDays.length === 0) {
+                statusText.text('Disponible todos los días');
+            } else if (selectedDays.length === 7) {
+                statusText.text('Disponible todos los días');
+            } else {
+                const dayNames = [];
+                selectedDays.each(function() {
+                    const dayName = $(this).data('day-name');
+                    if (dayName) {
+                        dayNames.push(dayName.substring(0, 3));
+                    }
+                });
+                statusText.text(`Disponible: ${dayNames.join(', ')}`);
             }
         }
 
@@ -1482,6 +2187,11 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             
             // Show no days message
             updateQuickAddNoDaysMessage();
+            
+            // Reset compact view
+            $('.availability-content-quickadd').hide();
+            $('.availability-summary-quickadd').show();
+            $('.availability-status-quickadd').text('Disponible todos los días');
         }
         // ========== END QUICK ADD AVAILABILITY MANAGEMENT ==========
 
@@ -2007,6 +2717,90 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 container.insertAdjacentHTML('afterbegin', alertHtml);
             }
         }
+
+        // Photo upload functionality for experiences
+        function initPhotoUpload() {
+            // Handle add photo button clicks
+            $(document).on('click', '.add-photo-btn', function() {
+                const card = $(this).closest('.experiencia-editable');
+                const fileInput = card.find('.experience-photo-input');
+                fileInput.click();
+            });
+
+            // Handle file selection
+            $(document).on('change', '.experience-photo-input', function() {
+                const card = $(this).closest('.experiencia-editable');
+                const files = this.files;
+                const previewContainer = card.find('.photos-preview-container');
+                
+                // Check maximum files limit
+                const currentPhotos = previewContainer.find('.photo-preview').length;
+                const maxPhotos = 5;
+                
+                if (currentPhotos + files.length > maxPhotos) {
+                    showErrorAlert(`Máximo ${maxPhotos} fotos permitidas por experiencia`);
+                    this.value = ''; // Clear the input
+                    return;
+                }
+
+                // Process each selected file
+                Array.from(files).forEach(file => {
+                    // Validate file size (5MB max)
+                    if (file.size > 5 * 1024 * 1024) {
+                        showErrorAlert(`La imagen "${file.name}" es muy grande. Máximo 5MB.`);
+                        return;
+                    }
+
+                    // Validate file type
+                    if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/)) {
+                        showErrorAlert(`La imagen "${file.name}" no tiene un formato válido.`);
+                        return;
+                    }
+
+                    // Create preview
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        addPhotoPreview(previewContainer, file, e.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                });
+
+                // Clear input
+                this.value = '';
+            });
+
+            // Handle photo removal
+            $(document).on('click', '.remove-photo-btn', function() {
+                $(this).closest('.photo-preview').remove();
+            });
+        }
+
+        function addPhotoPreview(container, file, dataUrl) {
+            const photoId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const photoHtml = `
+                <div class="col-4 photo-preview" data-photo-id="${photoId}">
+                    <div class="position-relative">
+                        <img src="${dataUrl}" 
+                             class="img-fluid rounded border" 
+                             style="height: 80px; width: 100%; object-fit: cover;">
+                        <button type="button" 
+                                class="btn btn-danger btn-sm position-absolute top-0 end-0 remove-photo-btn" 
+                                style="padding: 2px 6px; margin: 2px;">
+                            <i class="ti ti-x" style="font-size: 12px;"></i>
+                        </button>
+                        <div class="text-center mt-1">
+                            <small class="text-muted text-truncate d-block" style="font-size: 10px;" title="${file.name}">
+                                ${file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.append(photoHtml);
+        }
+
+        // Initialize photo upload functionality
+        initPhotoUpload();
     }
 
     if (document.readyState === 'loading') {
@@ -2016,3 +2810,45 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
     }
 })();
 </script>
+
+<style>
+/* Experience Photo Upload Styles */
+.experience-photos-container {
+    background: #f8f9fa;
+    border: 1px dashed #dee2e6;
+    border-radius: 6px;
+    padding: 12px;
+    transition: border-color 0.2s ease;
+}
+
+.experience-photos-container:hover {
+    border-color: #6c757d;
+}
+
+.photo-preview {
+    transition: transform 0.2s ease;
+}
+
+.photo-preview:hover {
+    transform: translateY(-2px);
+}
+
+.photo-preview img {
+    transition: opacity 0.2s ease;
+}
+
+.photo-preview:hover img {
+    opacity: 0.9;
+}
+
+.remove-photo-btn {
+    border-radius: 50%;
+    line-height: 1;
+    font-size: 10px !important;
+}
+
+.add-photo-btn:hover {
+    border-color: #0d6efd;
+    background-color: #f8f9ff;
+}
+</style>

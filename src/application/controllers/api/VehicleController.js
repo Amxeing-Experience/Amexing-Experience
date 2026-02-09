@@ -86,64 +86,77 @@ class VehicleController {
       const baseQuery = new Parse.Query('Vehicle');
       baseQuery.equalTo('exists', true);
 
-      // Build filtered query with search
+      // Build filtered query with search and rate filter
       let filteredQuery = baseQuery;
-      if (searchValue) {
-        const brandQuery = new Parse.Query('Vehicle');
-        brandQuery.equalTo('exists', true);
-        brandQuery.matches('brand', searchValue, 'i');
 
-        const modelQuery = new Parse.Query('Vehicle');
-        modelQuery.equalTo('exists', true);
-        modelQuery.matches('model', searchValue, 'i');
-
-        const plateQuery = new Parse.Query('Vehicle');
-        plateQuery.equalTo('exists', true);
-        plateQuery.matches('licensePlate', searchValue, 'i');
-
-        filteredQuery = Parse.Query.or(brandQuery, modelQuery, plateQuery);
-      }
-
-      // Apply rate filter if provided
+      // Apply rate filter first if provided (more efficient)
       const { rateId } = req.query;
       if (rateId && rateId.trim() !== '') {
         // Create Rate pointer
         const Rate = Parse.Object.extend('Rate');
         const ratePointer = Rate.createWithoutData(rateId);
+        filteredQuery.equalTo('rateId', ratePointer);
+      }
 
-        // If we already have a filtered query from search, need to combine with AND
-        if (searchValue) {
-          // Create new queries for each search field that also include rate filter
-          const brandQuery = new Parse.Query('Vehicle');
-          brandQuery.equalTo('exists', true);
-          brandQuery.matches('brand', searchValue, 'i');
+      // Then apply search filter if provided
+      if (searchValue) {
+        // Create a single compound query for search that works with the existing filters
+        const searchQueries = [];
+
+        // Brand search
+        const brandQuery = new Parse.Query('Vehicle');
+        brandQuery.equalTo('exists', true);
+        brandQuery.matches('brand', searchValue, 'i');
+        if (rateId && rateId.trim() !== '') {
+          const Rate = Parse.Object.extend('Rate');
+          const ratePointer = Rate.createWithoutData(rateId);
           brandQuery.equalTo('rateId', ratePointer);
-
-          const modelQuery = new Parse.Query('Vehicle');
-          modelQuery.equalTo('exists', true);
-          modelQuery.matches('model', searchValue, 'i');
-          modelQuery.equalTo('rateId', ratePointer);
-
-          const plateQuery = new Parse.Query('Vehicle');
-          plateQuery.equalTo('exists', true);
-          plateQuery.matches('licensePlate', searchValue, 'i');
-          plateQuery.equalTo('rateId', ratePointer);
-
-          filteredQuery = Parse.Query.or(brandQuery, modelQuery, plateQuery);
-        } else {
-          // Just apply rate filter to base query
-          filteredQuery.equalTo('rateId', ratePointer);
         }
+        searchQueries.push(brandQuery);
+
+        // Model search
+        const modelQuery = new Parse.Query('Vehicle');
+        modelQuery.equalTo('exists', true);
+        modelQuery.matches('model', searchValue, 'i');
+        if (rateId && rateId.trim() !== '') {
+          const Rate = Parse.Object.extend('Rate');
+          const ratePointer = Rate.createWithoutData(rateId);
+          modelQuery.equalTo('rateId', ratePointer);
+        }
+        searchQueries.push(modelQuery);
+
+        // License plate search
+        const plateQuery = new Parse.Query('Vehicle');
+        plateQuery.equalTo('exists', true);
+        plateQuery.matches('licensePlate', searchValue, 'i');
+        if (rateId && rateId.trim() !== '') {
+          const Rate = Parse.Object.extend('Rate');
+          const ratePointer = Rate.createWithoutData(rateId);
+          plateQuery.equalTo('rateId', ratePointer);
+        }
+        searchQueries.push(plateQuery);
+
+        // Combine search queries with OR
+        filteredQuery = Parse.Query.or(...searchQueries);
       }
 
       // Get count of filtered results
       const recordsFiltered = await filteredQuery.count({ useMasterKey: true });
 
-      // Apply sorting
+      // Apply sorting with a secondary sort key for consistency
+      // This ensures stable pagination across requests
       if (sortDirection === 'asc') {
         filteredQuery.ascending(sortField);
+        // Add secondary sort by objectId for stability
+        if (sortField !== 'objectId') {
+          filteredQuery.addAscending('objectId');
+        }
       } else {
         filteredQuery.descending(sortField);
+        // Add secondary sort by objectId for stability
+        if (sortField !== 'objectId') {
+          filteredQuery.addDescending('objectId');
+        }
       }
 
       // Include VehicleType and Rate for display

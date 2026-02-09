@@ -84,15 +84,20 @@ class ProviderExperienciaController {
         count: data.length,
       });
     } catch (error) {
-      logger.error('Error in ProviderExperienciaController.getAllProviderExperiencias', {
-        error: error.message,
-        stack: error.stack,
-        userId: req.user?.id,
-      });
+      logger.error(
+        'Error in ProviderExperienciaController.getAllProviderExperiencias',
+        {
+          error: error.message,
+          stack: error.stack,
+          userId: req.user?.id,
+        }
+      );
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve provider experiencias',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to retrieve provider experiencias',
         500
       );
     }
@@ -142,16 +147,21 @@ class ProviderExperienciaController {
         },
       });
     } catch (error) {
-      logger.error('Error in ProviderExperienciaController.getProviderExperiencias', {
-        error: error.message,
-        stack: error.stack,
-        providerId: req.params.providerId,
-        userId: req.user?.id,
-      });
+      logger.error(
+        'Error in ProviderExperienciaController.getProviderExperiencias',
+        {
+          error: error.message,
+          stack: error.stack,
+          providerId: req.params.providerId,
+          userId: req.user?.id,
+        }
+      );
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve experiencias',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to retrieve experiencias',
         500
       );
     }
@@ -186,7 +196,11 @@ class ProviderExperienciaController {
 
       // Verify it belongs to the specified provider
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
+        return this.sendError(
+          res,
+          'Experiencia does not belong to this provider',
+          403
+        );
       }
 
       return res.json({
@@ -194,12 +208,15 @@ class ProviderExperienciaController {
         data: this.formatExperienciaForResponse(experiencia),
       });
     } catch (error) {
-      logger.error('Error in ProviderExperienciaController.getExperienciaById', {
-        error: error.message,
-        providerId: req.params.providerId,
-        experienciaId: req.params.id,
-        userId: req.user?.id,
-      });
+      logger.error(
+        'Error in ProviderExperienciaController.getExperienciaById',
+        {
+          error: error.message,
+          providerId: req.params.providerId,
+          experienciaId: req.params.id,
+          userId: req.user?.id,
+        }
+      );
 
       return this.sendError(res, 'Failed to retrieve experiencia', 500);
     }
@@ -225,12 +242,24 @@ class ProviderExperienciaController {
         name,
         description,
         price,
+        price_no_alcohol: priceNoAlcohol,
+        price_child: priceChild,
         duration,
+        travel_duration: travelDuration,
         min_people: minPeople,
         max_people: maxPeople,
         displayOrder,
         tipo,
         availability,
+        includes,
+        languages,
+        notincludes,
+        advance_booking_time: advanceBookingTime,
+        photos,
+        internal_notes: internalNotes,
+        client_booking_notes: clientBookingNotes,
+        provider_notes: providerNotes,
+        team_notes: teamNotes,
       } = req.body;
 
       // Validate required fields
@@ -252,13 +281,21 @@ class ProviderExperienciaController {
       // Check experiencias limit
       const count = await ProviderExperiencia.countByProvider(providerId);
       if (count >= this.maxExperienciasPerProvider) {
-        return this.sendError(res, `Maximum ${this.maxExperienciasPerProvider} experiencias per provider`, 400);
+        return this.sendError(
+          res,
+          `Maximum ${this.maxExperienciasPerProvider} experiencias per provider`,
+          400
+        );
       }
 
       // Check name uniqueness for this provider
       const isUnique = await ProviderExperiencia.isNameUnique(providerId, name);
       if (!isUnique) {
-        return this.sendError(res, 'An experiencia with this name already exists for this provider', 409);
+        return this.sendError(
+          res,
+          'An experiencia with this name already exists for this provider',
+          409
+        );
       }
 
       // Create new experiencia
@@ -279,11 +316,20 @@ class ProviderExperienciaController {
 
       experiencia.setPrice(price || 0);
 
+      if (priceNoAlcohol !== undefined && priceNoAlcohol !== null) {
+        experiencia.set('price_no_alcohol', priceNoAlcohol);
+      }
+      if (priceChild !== undefined && priceChild !== null) {
+        experiencia.set('price_child', priceChild);
+      }
       if (tipo !== undefined && tipo !== null && tipo !== '') {
         experiencia.setTipo(tipo);
       }
       if (duration !== undefined && duration !== null) {
         experiencia.setDuration(duration);
+      }
+      if (travelDuration !== undefined && travelDuration !== null) {
+        experiencia.set('travel_duration', travelDuration);
       }
       if (minPeople !== undefined && minPeople !== null) {
         experiencia.setMinPeople(minPeople);
@@ -296,6 +342,41 @@ class ProviderExperienciaController {
       }
       if (availability !== undefined && availability !== null) {
         experiencia.setAvailability(availability);
+      }
+
+      // Set includes, languages, notincludes, and photos fields
+      if (includes !== undefined && Array.isArray(includes)) {
+        experiencia.set('includes', includes);
+      }
+      if (languages !== undefined && Array.isArray(languages)) {
+        experiencia.set('languages', languages);
+      }
+      if (notincludes !== undefined && Array.isArray(notincludes)) {
+        experiencia.set('notincludes', notincludes);
+      }
+      if (advanceBookingTime !== undefined) {
+        if (typeof advanceBookingTime === 'number' && advanceBookingTime > 0) {
+          experiencia.set('advance_booking_time', advanceBookingTime);
+        } else if (advanceBookingTime === 0 || advanceBookingTime === null) {
+          experiencia.unset('advance_booking_time');
+        }
+      }
+      if (photos !== undefined && Array.isArray(photos)) {
+        experiencia.set('photos', photos);
+      }
+
+      // Set notes fields
+      if (internalNotes !== undefined && internalNotes !== null && internalNotes !== '') {
+        experiencia.set('internal_notes', internalNotes);
+      }
+      if (clientBookingNotes !== undefined && clientBookingNotes !== null && clientBookingNotes !== '') {
+        experiencia.set('client_booking_notes', clientBookingNotes);
+      }
+      if (providerNotes !== undefined && providerNotes !== null && providerNotes !== '') {
+        experiencia.set('provider_notes', providerNotes);
+      }
+      if (teamNotes !== undefined && teamNotes !== null && teamNotes !== '') {
+        experiencia.set('team_notes', teamNotes);
       }
 
       // Set required lifecycle fields before validation
@@ -334,7 +415,9 @@ class ProviderExperienciaController {
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to create experiencia',
+        process.env.NODE_ENV === 'development'
+          ? `Error: ${error.message}`
+          : 'Failed to create experiencia',
         500
       );
     }
@@ -359,13 +442,25 @@ class ProviderExperienciaController {
         name,
         description,
         price,
+        price_no_alcohol: priceNoAlcohol,
+        price_child: priceChild,
         duration,
+        travel_duration: travelDuration,
         min_people: minPeople,
         max_people: maxPeople,
         displayOrder,
         active,
         tipo,
         availability,
+        includes,
+        languages,
+        notincludes,
+        advance_booking_time: advanceBookingTime,
+        photos,
+        internal_notes: internalNotes,
+        client_booking_notes: clientBookingNotes,
+        provider_notes: providerNotes,
+        team_notes: teamNotes,
       } = req.body;
 
       // Get experiencia
@@ -382,16 +477,28 @@ class ProviderExperienciaController {
 
       // Verify it belongs to the specified provider
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
+        return this.sendError(
+          res,
+          'Experiencia does not belong to this provider',
+          403
+        );
       }
 
       // Update fields
       if (name !== undefined) {
         // Check name uniqueness if changing
         if (name !== experiencia.getName()) {
-          const isUnique = await ProviderExperiencia.isNameUnique(providerId, name, id);
+          const isUnique = await ProviderExperiencia.isNameUnique(
+            providerId,
+            name,
+            id
+          );
           if (!isUnique) {
-            return this.sendError(res, 'An experiencia with this name already exists for this provider', 409);
+            return this.sendError(
+              res,
+              'An experiencia with this name already exists for this provider',
+              409
+            );
           }
         }
         experiencia.setName(name);
@@ -399,13 +506,101 @@ class ProviderExperienciaController {
 
       if (description !== undefined) experiencia.setDescription(description);
       if (price !== undefined) experiencia.setPrice(price);
+      if (priceNoAlcohol !== undefined) {
+        if (priceNoAlcohol === null || priceNoAlcohol === '') {
+          experiencia.unset('price_no_alcohol');
+        } else {
+          experiencia.set('price_no_alcohol', priceNoAlcohol);
+        }
+      }
+      if (priceChild !== undefined) {
+        if (priceChild === null || priceChild === '') {
+          experiencia.unset('price_child');
+        } else {
+          experiencia.set('price_child', priceChild);
+        }
+      }
       if (tipo !== undefined) experiencia.setTipo(tipo === '' ? null : tipo);
       if (duration !== undefined) experiencia.setDuration(duration);
+      if (travelDuration !== undefined) {
+        if (travelDuration === null || travelDuration === '') {
+          experiencia.unset('travel_duration');
+        } else {
+          experiencia.set('travel_duration', travelDuration);
+        }
+      }
       if (minPeople !== undefined) experiencia.setMinPeople(minPeople);
       if (maxPeople !== undefined) experiencia.setMaxPeople(maxPeople);
       if (displayOrder !== undefined) experiencia.setDisplayOrder(displayOrder);
       if (active !== undefined) experiencia.setActive(active);
       if (availability !== undefined) experiencia.setAvailability(availability);
+
+      // Update includes, languages, notincludes, advance booking time, and photos fields
+      if (includes !== undefined) {
+        if (Array.isArray(includes)) {
+          experiencia.set('includes', includes);
+        } else if (includes === null) {
+          experiencia.set('includes', []);
+        }
+      }
+      if (languages !== undefined) {
+        if (Array.isArray(languages)) {
+          experiencia.set('languages', languages);
+        } else if (languages === null) {
+          experiencia.set('languages', []);
+        }
+      }
+      if (notincludes !== undefined) {
+        if (Array.isArray(notincludes)) {
+          experiencia.set('notincludes', notincludes);
+        } else if (notincludes === null) {
+          experiencia.set('notincludes', []);
+        }
+      }
+      if (advanceBookingTime !== undefined) {
+        if (typeof advanceBookingTime === 'number' && advanceBookingTime > 0) {
+          experiencia.set('advance_booking_time', advanceBookingTime);
+        } else if (advanceBookingTime === 0 || advanceBookingTime === null) {
+          experiencia.unset('advance_booking_time');
+        }
+      }
+      if (photos !== undefined) {
+        if (Array.isArray(photos)) {
+          experiencia.set('photos', photos);
+        } else if (photos === null) {
+          experiencia.set('photos', []);
+        }
+      }
+
+      // Update notes fields
+      if (internalNotes !== undefined) {
+        if (internalNotes === null || internalNotes === '') {
+          experiencia.unset('internal_notes');
+        } else {
+          experiencia.set('internal_notes', internalNotes);
+        }
+      }
+      if (clientBookingNotes !== undefined) {
+        if (clientBookingNotes === null || clientBookingNotes === '') {
+          experiencia.unset('client_booking_notes');
+        } else {
+          experiencia.set('client_booking_notes', clientBookingNotes);
+        }
+      }
+      if (providerNotes !== undefined) {
+        if (providerNotes === null || providerNotes === '') {
+          experiencia.unset('provider_notes');
+        } else {
+          experiencia.set('provider_notes', providerNotes);
+        }
+      }
+      if (teamNotes !== undefined) {
+        if (teamNotes === null || teamNotes === '') {
+          experiencia.unset('team_notes');
+        } else {
+          experiencia.set('team_notes', teamNotes);
+        }
+      }
 
       // Validate experiencia before saving
       const validation = experiencia.validateExplicitly();
@@ -470,7 +665,11 @@ class ProviderExperienciaController {
 
       // Verify it belongs to the specified provider
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
+        return this.sendError(
+          res,
+          'Experiencia does not belong to this provider',
+          403
+        );
       }
 
       // Soft delete
@@ -525,7 +724,9 @@ class ProviderExperienciaController {
 
       // Get all experiencias for this provider
       const providerExperiencias = await ProviderExperiencia.findByProvider(providerId);
-      const experienciaMap = new Map(providerExperiencias.map((exp) => [exp.id, exp]));
+      const experienciaMap = new Map(
+        providerExperiencias.map((exp) => [exp.id, exp])
+      );
 
       // Update display order for each experiencia
       const updates = experiencias.map((item) => {
@@ -550,11 +751,14 @@ class ProviderExperienciaController {
         message: 'Experiencias reordered successfully',
       });
     } catch (error) {
-      logger.error('Error in ProviderExperienciaController.reorderExperiencias', {
-        error: error.message,
-        providerId: req.params.providerId,
-        userId: req.user?.id,
-      });
+      logger.error(
+        'Error in ProviderExperienciaController.reorderExperiencias',
+        {
+          error: error.message,
+          providerId: req.params.providerId,
+          userId: req.user?.id,
+        }
+      );
 
       return this.sendError(res, 'Failed to reorder experiencias', 500);
     }
@@ -574,10 +778,22 @@ class ProviderExperienciaController {
       name: experiencia.getName(),
       description: experiencia.getDescription(),
       price: experiencia.getPrice(),
+      price_no_alcohol: experiencia.get('price_no_alcohol') || null,
+      price_child: experiencia.get('price_child') || null,
       tipo: experiencia.getTipo(),
       duration: experiencia.getDuration(),
+      travel_duration: experiencia.get('travel_duration') || null,
       min_people: experiencia.getMinPeople(),
       max_people: experiencia.getMaxPeople(),
+      includes: experiencia.get('includes') || [],
+      languages: experiencia.get('languages') || [],
+      notincludes: experiencia.get('notincludes') || [],
+      advance_booking_time: experiencia.get('advance_booking_time') || null,
+      photos: experiencia.get('photos') || [],
+      internal_notes: experiencia.get('internal_notes') || null,
+      client_booking_notes: experiencia.get('client_booking_notes') || null,
+      provider_notes: experiencia.get('provider_notes') || null,
+      team_notes: experiencia.get('team_notes') || null,
       displayOrder: experiencia.getDisplayOrder(),
       active: experiencia.isActive(),
       availability: experiencia.getAvailability(),

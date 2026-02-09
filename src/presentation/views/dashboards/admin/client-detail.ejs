@@ -119,6 +119,86 @@ const tarifarioTabs = [
                 <% }); %>
             </div>
         </nav>
+        
+        <!-- Bulk Pricing Panel (only visible in tarifario section) -->
+        <% if (activeSection === 'tarifario') { %>
+        <div class="card border-0 shadow-sm mt-3" id="bulk-pricing-panel">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">
+                    Incrementar precios tarifario
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Informational text -->
+                <div class="alert alert-info py-2 px-3 mb-3">
+                    <small class="mb-0">
+                        <i class="ti ti-info-circle me-1"></i>
+                        El incremento se aplicará sobre el precio base del tarifario general
+                    </small>
+                </div>
+                
+                <!-- Services Checkbox -->
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="checkbox" id="apply-to-services" checked>
+                    <label class="form-check-label small" for="apply-to-services">
+                        <i class="ti ti-car me-1"></i>
+                        Traslados
+                    </label>
+                </div>
+                
+                <!-- Tours Checkbox -->
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="apply-to-tours" checked>
+                    <label class="form-check-label small" for="apply-to-tours">
+                        <i class="ti ti-map-pin me-1"></i>
+                        Tours
+                    </label>
+                </div>
+                
+                <!-- Percentage Input -->
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Incremento (%)</label>
+                    <div class="input-group input-group-sm">
+                        <input type="number" 
+                               class="form-control" 
+                               id="markup-percentage" 
+                               min="0" 
+                               max="100" 
+                               value="15"
+                               step="1">
+                        <span class="input-group-text">%</span>
+                    </div>
+                </div>
+                
+                <!-- Apply Button -->
+                <button class="btn btn-primary btn-sm w-100" id="apply-bulk-pricing">
+                    <i class="ti ti-check me-2"></i>
+                    Aplicar
+                </button>
+                
+                <!-- Progress Bar -->
+                <div id="bulk-pricing-progress" class="mt-3" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <small class="text-muted">Procesando precios...</small>
+                        <small class="text-muted" id="progress-percentage">0%</small>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                        <div class="progress-bar progress-bar-animated" role="progressbar" id="progress-bar" style="width: 0%"></div>
+                    </div>
+                    <div class="text-center mt-2">
+                        <small class="text-muted" id="progress-status">Iniciando...</small>
+                    </div>
+                </div>
+                
+                <!-- Results Message -->
+                <div id="bulk-pricing-results" class="mt-3" style="display: none;">
+                    <div class="alert alert-sm mb-0" role="alert">
+                        <div id="results-content"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <% } %>
     </div>
 
     <div class="col-lg-9" id="contentColumn">
@@ -211,7 +291,7 @@ const tarifarioTabs = [
                         <% }); %>
                     </nav>
                 </div>
-
+                
                 <!-- Tab Content -->
                 <div class="card-body p-0">
                     <div class="tab-content" id="tarifario-content">
@@ -3786,6 +3866,244 @@ function setupExperienceFilters() {
         });
     } else {
         initializePasswordResetModal();
+    }
+    
+    // Bulk Pricing Application Function
+    async function applyBulkPricing(clientId, source) {
+        // Get the checkbox and input values based on the source (services or tours tab)
+        const suffix = source === 'services' ? '' : '-tours';
+        const applyServices = document.getElementById(`apply-services-check${suffix}`).checked;
+        const applyTours = document.getElementById(`apply-tours-check${suffix}`).checked;
+        const markupPercentage = parseFloat(document.getElementById(`markup-percentage-${source}`).value);
+        
+        // Validate input
+        if (!applyServices && !applyTours) {
+            showPricingAlert('Por favor seleccione al menos un tipo de servicio (Servicios o Tours).', 'warning', source);
+            return;
+        }
+        
+        if (isNaN(markupPercentage) || markupPercentage < 0 || markupPercentage > 100) {
+            showPricingAlert('Por favor ingrese un porcentaje válido entre 0 y 100.', 'danger', source);
+            return;
+        }
+        
+        // Disable button and show loading
+        const button = document.getElementById(`apply-pricing-btn-${source}`);
+        const originalText = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Aplicando...';
+        
+        try {
+            // Call API endpoint to apply bulk pricing
+            const response = await fetch('/api/client-prices/bulk-apply', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                    clientId: clientId,
+                    applyToServices: applyServices,
+                    applyToTours: applyTours,
+                    markupPercentage: markupPercentage
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok && data.success) {
+                // Show success message
+                const message = `✅ Incremento aplicado exitosamente. ` +
+                    `Servicios: ${data.servicesCreated || 0} precios creados. ` +
+                    `Tours: ${data.toursCreated || 0} precios creados.`;
+                showPricingAlert(message, 'success', source);
+                
+                // Reload the respective table after a delay
+                setTimeout(() => {
+                    if (source === 'services' && window.servicesTable) {
+                        window.servicesTable.ajax.reload();
+                    } else if (source === 'tours' && window.toursTable) {
+                        window.toursTable.ajax.reload();
+                    }
+                    // Hide alert after reload
+                    setTimeout(() => {
+                        hidePricingAlert(source);
+                    }, 3000);
+                }, 2000);
+            } else {
+                throw new Error(data.error || 'Error al aplicar el incremento de precios');
+            }
+        } catch (error) {
+            console.error('Error applying bulk pricing:', error);
+            showPricingAlert('Error al aplicar el incremento: ' + error.message, 'danger', source);
+        } finally {
+            // Re-enable button
+            button.disabled = false;
+            button.innerHTML = originalText;
+        }
+    }
+    
+    function showPricingAlert(message, type, source) {
+        const alertDiv = document.getElementById(`pricing-alert-${source}`);
+        const alertText = document.getElementById(`pricing-alert-text-${source}`);
+        
+        alertDiv.classList.remove('d-none', 'alert-info', 'alert-success', 'alert-warning', 'alert-danger');
+        alertDiv.classList.add(`alert-${type}`);
+        alertText.textContent = message;
+    }
+    
+    function hidePricingAlert(source) {
+        const alertDiv = document.getElementById(`pricing-alert-${source}`);
+        alertDiv.classList.add('d-none');
+    }
+
+    // New Sidebar Bulk Pricing Functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const applyBulkPricingBtn = document.getElementById('apply-bulk-pricing');
+        
+        if (applyBulkPricingBtn) {
+            applyBulkPricingBtn.addEventListener('click', async function() {
+                console.log('Button clicked!'); // Debug log
+                
+                const applyServices = document.getElementById('apply-to-services').checked;
+                const applyTours = document.getElementById('apply-to-tours').checked;
+                const markupPercentage = parseFloat(document.getElementById('markup-percentage').value);
+                
+                console.log('Values:', { applyServices, applyTours, markupPercentage }); // Debug log
+                
+                // Validate input
+                if (!applyServices && !applyTours) {
+                    showSidebarAlert('Por favor seleccione al menos un tipo de servicio (Servicios o Tours).', 'warning');
+                    return;
+                }
+                
+                if (isNaN(markupPercentage) || markupPercentage < 0 || markupPercentage > 100) {
+                    showSidebarAlert('Por favor ingrese un porcentaje válido entre 0 y 100.', 'danger');
+                    return;
+                }
+                
+                // Disable button and show loading
+                const originalText = applyBulkPricingBtn.innerHTML;
+                applyBulkPricingBtn.disabled = true;
+                applyBulkPricingBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Aplicando...';
+                
+                // Show progress bar and hide results
+                const progressContainer = document.getElementById('bulk-pricing-progress');
+                const progressBar = document.getElementById('progress-bar');
+                const progressPercentage = document.getElementById('progress-percentage');
+                const progressStatus = document.getElementById('progress-status');
+                const resultsContainer = document.getElementById('bulk-pricing-results');
+                
+                progressContainer.style.display = 'block';
+                resultsContainer.style.display = 'none';
+                progressBar.style.width = '0%';
+                progressPercentage.textContent = '0%';
+                progressStatus.textContent = 'Iniciando proceso...';
+
+                // Simulate progress updates during the request
+                let simulatedProgress = 5;
+                const progressInterval = setInterval(() => {
+                    if (simulatedProgress < 95) {
+                        simulatedProgress += Math.random() * 10;
+                        if (simulatedProgress > 95) simulatedProgress = 95;
+                        
+                        progressBar.style.width = simulatedProgress + '%';
+                        progressPercentage.textContent = Math.round(simulatedProgress) + '%';
+                        
+                        if (simulatedProgress < 30) {
+                            progressStatus.textContent = 'Cargando servicios y tarifas...';
+                        } else if (simulatedProgress < 60) {
+                            progressStatus.textContent = 'Procesando combinaciones de precios...';
+                        } else if (simulatedProgress < 90) {
+                            progressStatus.textContent = 'Aplicando incrementos...';
+                        } else {
+                            progressStatus.textContent = 'Finalizando proceso...';
+                        }
+                    }
+                }, 500);
+
+                try {
+                    // Use the original working endpoint
+                    const response = await fetch('/api/client-prices/bulk-apply', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            clientId: '<%= clientId %>',
+                            applyToServices: applyServices,
+                            applyToTours: applyTours,
+                            markupPercentage: markupPercentage
+                        })
+                    });
+                    
+                    clearInterval(progressInterval);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    // Complete the progress bar
+                    progressBar.style.width = '100%';
+                    progressPercentage.textContent = '100%';
+                    progressStatus.textContent = 'Proceso completado exitosamente';
+
+                    if (data.success) {
+                        // Use the message from backend if available, otherwise fall back to detailed breakdown
+                        const message = data.message || 
+                            `✅ Incremento aplicado exitosamente. ` +
+                            `Servicios: ${data.servicesCreated || 0} creados, ${data.servicesUpdated || 0} actualizados. ` +
+                            `Tours: ${data.toursCreated || 0} creados, ${data.toursUpdated || 0} actualizados.`;
+                        
+                        setTimeout(() => {
+                            progressContainer.style.display = 'none';
+                            showSidebarAlert(message, 'success');
+                            
+                            // Reload tables after showing success
+                            setTimeout(() => {
+                                if (window.servicesTable) window.servicesTable.ajax.reload();
+                                if (window.toursTable) window.toursTable.ajax.reload();
+                            }, 1500);
+                        }, 1000);
+                    } else {
+                        throw new Error(data.error || 'No se pudo aplicar el incremento');
+                    }
+
+                } catch (error) {
+                    clearInterval(progressInterval);
+                    console.error('Error during bulk pricing process:', error);
+                    progressContainer.style.display = 'none';
+                    showSidebarAlert('Error durante el proceso: ' + error.message, 'danger');
+                } finally {
+                    clearInterval(progressInterval);
+                    applyBulkPricingBtn.disabled = false;
+                    applyBulkPricingBtn.innerHTML = originalText;
+                }
+            });
+        }
+    });
+    
+    function showSidebarAlert(message, type) {
+        const alertDiv = document.getElementById('bulk-pricing-results');
+        const alertContent = document.getElementById('results-content');
+        
+        if (alertDiv && alertContent) {
+            alertContent.textContent = message;
+            const alertClass = alertDiv.querySelector('.alert');
+            alertClass.className = `alert alert-${type} mb-0`;
+            alertDiv.style.display = 'block';
+        }
+        
+        // Auto-hide after 8 seconds for success, longer for errors
+        const hideDelay = type === 'success' ? 8000 : 12000;
+        setTimeout(() => {
+            if (alertDiv) {
+                alertDiv.style.display = 'none';
+            }
+        }, hideDelay);
     }
 </script>
 
