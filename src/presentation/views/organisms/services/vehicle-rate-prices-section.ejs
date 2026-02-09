@@ -104,7 +104,8 @@ async function loadVehicleRates() {
             throw new Error(data.error || 'Error loading vehicle rates');
         }
         
-        displayVehicleRates(data.result.prices || []);
+        // Since our API now includes rate and vehicle type data, we can directly display
+        displayOrganizedVehicleRates(organizeVehicleRatesData(data.result.prices || []));
         
     } catch (error) {
         console.error('Error loading vehicle rates:', error);
@@ -112,22 +113,41 @@ async function loadVehicleRates() {
     }
 }
 
-function displayVehicleRates(prices) {
-    const loadingEl = document.getElementById('vehicle-rates-loading');
-    const containerEl = document.getElementById('vehicle-rates-container');
-    const noRatesEl = document.getElementById('no-vehicle-rates');
-    
-    loadingEl.classList.add('d-none');
-    
+function organizeVehicleRatesData(prices) {
     if (!prices || prices.length === 0) {
-        noRatesEl.classList.remove('d-none');
-        return;
+        return {};
     }
     
-    // Group prices by rate name (we'll need to fetch rate and vehicle type data)
-    fetchRatesAndVehicleTypes(prices).then((organizedData) => {
-        displayOrganizedVehicleRates(organizedData);
+    // Group prices by rate name
+    const groupedByRate = {};
+    
+    prices.forEach(price => {
+        const rateName = price.rateName || 'undefined';
+        
+        if (!groupedByRate[rateName]) {
+            groupedByRate[rateName] = {
+                rateName: rateName,
+                color: price.rateColor || '#6c757d',
+                vehicles: [],
+                vehicleTypes: {}
+            };
+        }
+        
+        const vehicleTypeName = price.vehicleTypeName || price.vehicleTypeCode || 'undefined';
+        groupedByRate[rateName].vehicleTypes[vehicleTypeName] = price;
+        
+        // Also add to vehicles array for backward compatibility
+        groupedByRate[rateName].vehicles.push({
+            vehicleCode: price.vehicleTypeCode,
+            vehicleTypeName: price.vehicleTypeName,
+            originalPrice: price.pricePerHour,
+            pricePerHour: price.pricePerHour,
+            currency: price.currency,
+            ...price
+        });
     });
+    
+    return groupedByRate;
 }
 
 async function fetchRatesAndVehicleTypes(prices) {
@@ -208,6 +228,12 @@ let globalOrganizedData = {};
 let currentActiveRate = null;
 
 function displayOrganizedVehicleRates(organizedData) {
+    // Hide the main loading spinner
+    const loadingEl = document.getElementById('vehicle-rates-loading');
+    if (loadingEl) {
+        loadingEl.classList.add('d-none');
+    }
+    
     const containerEl = document.getElementById('vehicle-rates-container');
     const pillsContainer = document.getElementById('rate-pills-container');
     const pillsSection = document.getElementById('vehicle-rates-pills');
@@ -258,18 +284,18 @@ function displayOrganizedVehicleRates(organizedData) {
     
     containerEl.classList.remove('d-none');
     
-    // Initialize filters after rates are displayed
+    // Initialize filters and update prices immediately
+    initVehicleRatesFilters();
+    
+    // Apply initial pricing based on current filter selections
+    const sectionId = '<%= sectionId %>';
+    const initialPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`)?.value || 'efectivo';
+    const initialCurrency = document.querySelector(`#vehicleRatesCurrencyFilter-${sectionId}`)?.value || 'MXN';
+    
+    // Update prices immediately to remove loaders (small delay to ensure DOM is ready)
     setTimeout(() => {
-        initVehicleRatesFilters();
-        
-        // Apply initial pricing based on current filter selections
-        const sectionId = '<%= sectionId %>';
-        const initialPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`).value;
-        const initialCurrency = document.querySelector(`#vehicleRatesCurrencyFilter-${sectionId}`).value;
-        
-        // Apply initial pricing
         updateVehicleRatesPrices(initialPayment, initialCurrency);
-    }, 500);
+    }, 100);
 }
 
 function switchToRate(rateName) {
@@ -296,24 +322,27 @@ function switchToRate(rateName) {
     // Display the selected rate's vehicles
     displaySingleRate(rateName, globalOrganizedData[rateName]);
     
-    // Update pricing with current filters
-    setTimeout(() => {
-        const sectionId = '<%= sectionId %>';
-        const currentPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`).value;
-        const currentCurrency = document.querySelector(`#vehicleRatesCurrencyFilter-${sectionId}`).value;
-        updateVehicleRatesPrices(currentPayment, currentCurrency);
-    }, 100);
+    // Update pricing with current filters immediately after switching
+    const sectionId = '<%= sectionId %>';
+    const currentPayment = document.querySelector(`#vehicleRatesPaymentFilter-${sectionId}`)?.value || 'efectivo';
+    const currentCurrency = document.querySelector(`#vehicleRatesCurrencyFilter-${sectionId}`)?.value || 'MXN';
+    updateVehicleRatesPrices(currentPayment, currentCurrency);
 }
 
 function displaySingleRate(rateName, rateData) {
     const containerEl = document.getElementById('vehicle-rates-container');
     
-    const vehiclesHtml = rateData.vehicles.map((vehicle, index) => {
+    const vehicles = rateData.vehicles || [];
+    
+    const vehiclesHtml = vehicles.map((vehicle, index) => {
+        const vehicleCode = vehicle.vehicleCode || vehicle.vehicleTypeCode || 'N/A';
+        const originalPrice = vehicle.originalPrice || vehicle.pricePerHour || 0;
+        
         return `
         <div class="col-md-2 col-6">
             <div class="text-center p-3 bg-white border rounded-2 shadow-sm">
-                <div class="fw-bold text-dark mb-1">${vehicle.vehicleCode}</div>
-                <div class="h6 mb-0 vehicle-rate-price text-primary" data-original-price="${vehicle.originalPrice}">
+                <div class="fw-bold text-dark mb-1">${vehicleCode}</div>
+                <div class="h6 mb-0 vehicle-rate-price text-primary" data-original-price="${originalPrice}">
                     <div class="price-loader d-flex align-items-center justify-content-center">
                         <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
                         <span class="small">Cargando...</span>

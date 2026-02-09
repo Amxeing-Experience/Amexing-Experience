@@ -24,46 +24,8 @@ class VehicleRatePricesController {
    * @example
    */
   async getAllVehicleRatePrices(req, res) {
-    try {
-      const currentUser = req.user;
-      if (!currentUser) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
-      // Query the VehicleRatePrices table directly
-      const query = new Parse.Query('VehicleRatePrices');
-      query.doesNotExist('valid_until'); // Current prices only
-      query.equalTo('exists', true);
-      query.equalTo('active', true);
-
-      const prices = await query.find({ useMasterKey: true });
-
-      return res.json({
-        success: true,
-        result: {
-          count: prices.length,
-          prices: prices.map((p) => ({
-            id: p.id,
-            rateId: p.get('rateId'),
-            vehicleTypeId: p.get('vehicleTypeId'),
-            pricePerHour: p.get('pricePerHour'),
-            currency: p.get('currency'),
-            validFrom: p.get('valid_from'),
-            active: p.get('active'),
-          })),
-        },
-      });
-    } catch (error) {
-      console.error('Error in VehicleRatePricesController.getAllVehicleRatePrices:', error);
-
-      return res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve vehicle rate prices',
-      });
-    }
+    // Just call the getAllCurrentPrices method to avoid duplication
+    return this.getAllCurrentPrices(req, res);
   }
 
   /**
@@ -83,27 +45,67 @@ class VehicleRatePricesController {
         });
       }
 
-      // Query the VehicleRatePrices table directly
+      // Query the VehicleRatePrices table directly with related data
       const query = new Parse.Query('VehicleRatePrices');
       query.doesNotExist('valid_until'); // Current prices only
       query.equalTo('exists', true);
       query.equalTo('active', true);
 
+      // Include related Rate and VehicleType data
+      query.include('rateId');
+      query.include('vehicleTypeId');
+
       const prices = await query.find({ useMasterKey: true });
+
+      // Fetch rates and vehicle types separately if includes didn't work
+      const rateIds = [...new Set(prices.map((p) => p.get('rateId')).filter((id) => id))];
+      const vehicleTypeIds = [...new Set(prices.map((p) => p.get('vehicleTypeId')).filter((id) => id))];
+
+      const rateQuery = new Parse.Query('Rate');
+      rateQuery.containedIn('objectId', rateIds);
+      const rates = await rateQuery.find({ useMasterKey: true });
+      const rateMap = {};
+      const rateColors = {};
+      rates.forEach((rate) => {
+        rateMap[rate.id] = rate;
+        rateColors[rate.get('name')] = rate.get('color') || '#6c757d';
+      });
+
+      const vehicleTypeQuery = new Parse.Query('VehicleType');
+      vehicleTypeQuery.containedIn('objectId', vehicleTypeIds);
+      const vehicleTypes = await vehicleTypeQuery.find({ useMasterKey: true });
+      const vehicleTypeMap = {};
+      vehicleTypes.forEach((vt) => {
+        vehicleTypeMap[vt.id] = vt;
+      });
 
       return res.json({
         success: true,
         result: {
           count: prices.length,
-          prices: prices.map((p) => ({
-            id: p.id,
-            rateId: p.get('rateId'),
-            vehicleTypeId: p.get('vehicleTypeId'),
-            pricePerHour: p.get('pricePerHour'),
-            currency: p.get('currency'),
-            validFrom: p.get('valid_from'),
-            active: p.get('active'),
-          })),
+          prices: prices.map((p) => {
+            const rateId = p.get('rateId');
+            const vehicleTypeId = p.get('vehicleTypeId');
+
+            // Use the maps to get the full objects
+            const rate = rateMap[rateId];
+            const vehicleType = vehicleTypeMap[vehicleTypeId];
+
+            return {
+              id: p.id,
+              rateId,
+              rateName: rate ? rate.get('name') : 'undefined',
+              rateColor: rate ? (rate.get('color') || '#6c757d') : '#6c757d',
+              vehicleTypeId,
+              vehicleTypeName: vehicleType ? vehicleType.get('name') : 'undefined',
+              vehicleTypeCode: vehicleType ? vehicleType.get('code') : 'undefined',
+              pricePerHour: p.get('pricePerHour'),
+              currency: p.get('currency'),
+              validFrom: p.get('valid_from'),
+              active: p.get('active'),
+            };
+          }),
+          rateColors,
         },
       });
     } catch (error) {
