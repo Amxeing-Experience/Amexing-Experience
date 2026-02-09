@@ -424,6 +424,24 @@
       ],
       "idempotent": true,
       "order": 22
+    },
+    {
+      "name": "023-seed-vehicle-rate-prices",
+      "file": "023-seed-vehicle-rate-prices.js",
+      "description": "Create initial pricing for all vehicle types across all rates (hourly rates)",
+      "version": "1.0.0",
+      "enabled": true,
+      "environments": [
+        "development",
+        "staging",
+        "production"
+      ],
+      "dependencies": [
+        "005-seed-rates",
+        "006-seed-vehicle-types"
+      ],
+      "idempotent": true,
+      "order": 23
     }
   ],
   "notes": [
