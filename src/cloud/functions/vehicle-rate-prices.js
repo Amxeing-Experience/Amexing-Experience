@@ -146,7 +146,14 @@ Parse.Cloud.define('createVehicleRatePrices', async (request) => {
  * Get all current vehicle rate prices.
  */
 Parse.Cloud.define('getAllVehicleRatePrices', async (request) => {
+  const { user } = request;
+
   try {
+    // Require authentication for staging/production environments
+    if (!user) {
+      throw new Error('Authentication required');
+    }
+
     const query = new Parse.Query('VehicleRatePrices');
     query.doesNotExist('valid_until'); // Current prices only
     query.equalTo('exists', true);

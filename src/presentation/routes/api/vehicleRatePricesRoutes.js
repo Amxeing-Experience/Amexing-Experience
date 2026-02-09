@@ -30,7 +30,7 @@ router.get('/by-vehicle/:vehicleTypeId', vehicleRatePricesController.getPricesBy
 
 // Get all current prices (matrix view)
 // GET /api/vehicle-rate-prices/all
-router.get('/all', vehicleRatePricesController.getAllCurrentPrices);
+router.get('/all', authenticateToken, vehicleRatePricesController.getAllCurrentPrices);
 
 // Get price at specific date
 // GET /api/vehicle-rate-prices/at-date?rateId=xxx&vehicleTypeId=xxx&date=2024-01-01
