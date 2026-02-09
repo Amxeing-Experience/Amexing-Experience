@@ -97,7 +97,7 @@ async function seedVehicleRatePrices() {
     }
     
     // Fetch all rates
-    const rateQuery = new Parse.Query('Rates');
+    const rateQuery = new Parse.Query('Rate');
     rateQuery.equalTo('exists', true);
     rateQuery.equalTo('active', true);
     const rates = await rateQuery.find({ useMasterKey: true });
