@@ -238,6 +238,10 @@ async function loadVehicleImages(vehicleId) {
         
         
         if (data.success) {
+            console.log('Vehicle Images API Response:', data.data);
+            if (data.data && data.data.length > 0) {
+                console.log('First image optimization metadata:', data.data[0].optimizationMetadata);
+            }
             renderImagesGallery(data.data);
             updateImagesCount(data.data.length);
         } else {
@@ -315,20 +319,55 @@ function createImageCard(image) {
                     </div>
                 </div>
                 
-                ${image.optimizationMetadata ? `
-                    <div class="position-absolute bottom-0 start-0 m-2">
-                        <span class="badge bg-info" title="Formato optimizado: ${image.optimizationMetadata.preferredFormat || 'Auto'}">
-                            <i class="ti ti-photo"></i> ${image.optimizationMetadata.preferredFormat?.toUpperCase() || 'OPT'}
-                        </span>
-                    </div>
-                ` : ''}
+                ${(() => {
+                    // Determine the format being displayed
+                    let displayFormat = 'ORIGINAL';
+                    
+                    if (image.url) {
+                        // Try to detect format from URL - check for optimized path patterns
+                        // The optimized images are stored in 'optimized/' subfolder with format extensions
+                        if (image.url.includes('/optimized/') && image.url.includes('.avif')) {
+                            displayFormat = 'AVIF';
+                        } else if (image.url.includes('/optimized/') && image.url.includes('.webp')) {
+                            displayFormat = 'WEBP';
+                        } else if (image.url.includes('/optimized/') && (image.url.includes('.jpg') || image.url.includes('.jpeg'))) {
+                            displayFormat = 'JPEG';
+                        } else if (image.url.includes('.avif')) {
+                            displayFormat = 'AVIF';
+                        } else if (image.url.includes('.webp')) {
+                            displayFormat = 'WEBP';
+                        } else if (image.url.includes('.jpg') || image.url.includes('.jpeg')) {
+                            displayFormat = 'JPEG';
+                        } else if (image.url.includes('.png')) {
+                            displayFormat = 'PNG';
+                        }
+                    }
+                    
+                    // Only show badge if image is optimized
+                    if (image.optimizationMetadata && image.optimizationMetadata.optimized) {
+                        return `
+                            <div class="position-absolute bottom-0 start-0 m-2">
+                                <span class="badge bg-info" title="Formato: ${displayFormat}">
+                                    <i class="ti ti-photo"></i> ${displayFormat}
+                                </span>
+                            </div>
+                        `;
+                    }
+                    return '';
+                })()}
             </div>
             
             <div class="card-body p-2">
                 <small class="text-muted">
                     <i class="ti ti-file"></i> ${image.fileName || 'Imagen'}<br>
                     <i class="ti ti-weight"></i> ${formatFileSize(image.fileSize)}
-                    ${image.formats ? `<br><i class="ti ti-versions"></i> ${Object.keys(image.formats).length} formatos` : ''}
+                    ${(() => {
+                        const metadata = image.optimizationMetadata || {};
+                        const availableFormats = metadata.availableFormats || [];
+                        const optimizedFormats = availableFormats.filter(f => f !== 'original');
+                        const count = optimizedFormats.length;
+                        return count > 0 ? `<br><i class="ti ti-versions"></i> ${count} formato${count > 1 ? 's' : ''}` : '<br><i class="ti ti-versions"></i> 0 formatos';
+                    })()}
                 </small>
             </div>
         </div>

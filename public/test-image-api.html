@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image API</title>
+</head>
+<body>
+    <h1>Test Vehicle Image API</h1>
+    <button onclick="testAPI()">Test API</button>
+    <pre id="output"></pre>
+    
+    <script>
+    async function testAPI() {
+        const output = document.getElementById('output');
+        output.textContent = 'Testing...';
+        
+        try {
+            // First, let's check if we're logged in via dashboard session
+            const response = await fetch('/api/vehicles/ubYLLjbQAH/images', {
+                credentials: 'include',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success && data.data && data.data.length > 0) {
+                output.textContent = 'SUCCESS!\n\n';
+                output.textContent += 'First image:\n';
+                output.textContent += '- fileName: ' + data.data[0].fileName + '\n';
+                output.textContent += '- optimizationMetadata: ' + JSON.stringify(data.data[0].optimizationMetadata, null, 2) + '\n\n';
+                
+                // Check all images
+                output.textContent += '\nAll images optimization status:\n';
+                data.data.forEach((img, index) => {
+                    const meta = img.optimizationMetadata;
+                    const formats = meta ? meta.availableFormats : null;
+                    output.textContent += `${index + 1}. ${img.fileName}: ${formats ? formats.join(', ') : 'NO METADATA'}\n`;
+                });
+            } else {
+                output.textContent = 'Response: ' + JSON.stringify(data, null, 2);
+            }
+        } catch (error) {
+            output.textContent = 'Error: ' + error.message;
+        }
+    }
+    </script>
+</body>
+</html>

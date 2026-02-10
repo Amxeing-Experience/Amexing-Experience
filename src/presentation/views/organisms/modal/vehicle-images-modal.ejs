@@ -713,17 +713,33 @@ Features:
             return;
         }
         
+        // Get the auth token from localStorage or sessionStorage
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        
         try {
+            const headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json, image/avif, image/webp, image/*'
+            };
+            
+            // Add authorization header if token exists
+            if (token) {
+                headers['Authorization'] = 'Bearer ' + token;
+            }
+            
             const response = await fetch(`/api/vehicles/${vehicleId}/images`, {
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json, image/avif, image/webp, image/*'
-                }
+                headers: headers
             });
 
             const result = await response.json();
 
             if (result.success) {
+                // Debug logging
+                console.log('API Response for vehicle images:', result.data);
+                if (result.data && result.data.length > 0) {
+                    console.log('First image optimization metadata:', result.data[0].optimizationMetadata);
+                }
+                
                 renderImages(result.data || []);
                 updateImagesCount(result.count || 0);
                 hideModalLoader('vehicleImagesModal');
@@ -831,8 +847,10 @@ Features:
                             <i class="ti ti-layers-intersect me-2 text-muted" style="font-size: 0.9rem;"></i>
                             <small class="text-muted">
                                 ${(() => {
+                                    console.log('Rendering formats for image:', image.fileName, 'metadata:', image.optimizationMetadata);
                                     const metadata = image.optimizationMetadata || {};
                                     const allFormats = metadata.availableFormats || [];
+                                    console.log('Available formats:', allFormats);
                                     const optimizedFormats = allFormats.filter(f => f !== 'original');
                                     const optimizedCount = optimizedFormats.length;
                                     
@@ -970,12 +988,18 @@ Features:
      * Set primary image
      */
     window.setPrimaryImage = async function(imageId) {
+        const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (token) {
+            headers['Authorization'] = 'Bearer ' + token;
+        }
+        
         try {
             const response = await fetch(`/api/vehicles/${currentVehicleId}/images/${imageId}/primary`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: headers
             });
 
             const result = await response.json();
@@ -1057,11 +1081,17 @@ Features:
             deleteBtn.disabled = true;
             deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Eliminando...';
 
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers['Authorization'] = 'Bearer ' + token;
+            }
+            
             const response = await fetch(`/api/vehicles/${currentVehicleId}/images/${imageId}`, {
                 method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: headers
             });
 
             const result = await response.json();
@@ -1095,11 +1125,17 @@ Features:
      */
     async function reorderImages(imageIds) {
         try {
+            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const headers = {
+                'Content-Type': 'application/json'
+            };
+            if (token) {
+                headers['Authorization'] = 'Bearer ' + token;
+            }
+            
             const response = await fetch(`/api/vehicles/${currentVehicleId}/images/reorder`, {
                 method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: headers,
                 body: JSON.stringify({ imageIds })
             });
 

@@ -347,6 +347,9 @@ class VehicleImageController {
           const s3Key = img.get('s3Key');
           const imageFile = img.get('imageFile'); // Legacy Parse.File support
 
+          // Debug log
+          console.log('Processing image:', img.get('fileName'), 'optimizationMetadata:', img.get('optimizationMetadata'));
+
           // Generate optimized URLs if optimization is enabled
           let imageData = null;
 
@@ -378,6 +381,8 @@ class VehicleImageController {
             imageData = { url: '/images/placeholder-image.svg' };
           }
 
+          const optimizationMetadata = img.get('optimizationMetadata') || imageData.metadata || null;
+
           const result = {
             id: img.id,
             url: imageData.url,
@@ -388,8 +393,14 @@ class VehicleImageController {
             isPrimary: img.get('isPrimary'),
             displayOrder: img.get('displayOrder'),
             uploadedAt: img.get('uploadedAt'),
-            optimizationMetadata: imageData.metadata || null,
+            optimizationMetadata,
           };
+
+          console.log('Returning image data:', {
+            fileName: result.fileName,
+            optimizationMetadata: result.optimizationMetadata,
+          });
+
           return result;
         })
       );

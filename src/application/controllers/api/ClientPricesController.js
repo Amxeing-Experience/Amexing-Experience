@@ -277,7 +277,7 @@ class ClientPricesController {
 
     /**
      * Send Server-Sent Events data to the connected client.
-     * @param {object} data - Data object to send via SSE
+     * @param {object} data - Data object to send via SSE.
      * @example
      * sendSSE({ type: 'progress', value: 50, message: 'Processing...' });
      */

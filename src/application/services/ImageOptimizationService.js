@@ -15,6 +15,7 @@
 const Parse = require('parse/node');
 const FileStorageService = require('./FileStorageService');
 const logger = require('../../infrastructure/logger');
+const { getEnvironmentRegion } = require('../../infrastructure/aws/awsRegionValidator');
 
 class ImageOptimizationService extends FileStorageService {
   constructor(config = {}) {
@@ -314,7 +315,7 @@ class ImageOptimizationService extends FileStorageService {
       } if (this.useDirectS3) {
         // Direct S3 URL (requires public bucket or public ACL)
         const bucket = process.env.S3_BUCKET;
-        const region = process.env.AWS_REGION || 'us-east-2';
+        const region = getEnvironmentRegion();
         return `https://${bucket}.s3.${region}.amazonaws.com/${optimizedKey}`;
       }
       // Presigned URL for private buckets
@@ -424,42 +425,53 @@ class ImageOptimizationService extends FileStorageService {
 
         // Detect preferred format from Accept header
         const preferredFormat = this.detectPreferredFormat(acceptHeader);
+        console.log('Detected preferred format from Accept header:', preferredFormat, 'Accept:', acceptHeader);
+
+        // Create FileStorageService instance for generating presigned URLs
+        const BaseFileStorageService = require('./FileStorageService');
+        const fileService = new BaseFileStorageService({
+          baseFolder: 'vehicles',
+          isPublic: false,
+          presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+        });
 
         // Check if preferred format is available in optimized variants
         let bestFormat = 'original';
         let bestUrl = null;
+        let bestS3Key = null;
 
         // Try preferred format first
-        if (optimizedVariants[preferredFormat] && optimizedVariants[preferredFormat].original) {
+        if (optimizedVariants[preferredFormat] && optimizedVariants[preferredFormat].s3Key) {
           bestFormat = preferredFormat;
-          bestUrl = optimizedVariants[preferredFormat].original.url;
+          bestS3Key = optimizedVariants[preferredFormat].s3Key;
+          bestUrl = await fileService.getPresignedUrl(bestS3Key);
+          console.log('Using preferred format:', bestFormat, 'S3 key:', bestS3Key);
         } else {
           // Fallback chain: avif -> webp -> jpeg -> original
           for (const format of ['avif', 'webp', 'jpeg']) {
-            if (optimizedVariants[format] && optimizedVariants[format].original) {
+            if (optimizedVariants[format] && optimizedVariants[format].s3Key) {
               bestFormat = format;
-              bestUrl = optimizedVariants[format].original.url;
+              bestS3Key = optimizedVariants[format].s3Key;
+              bestUrl = await fileService.getPresignedUrl(bestS3Key);
+              console.log('Using fallback format:', bestFormat, 'S3 key:', bestS3Key);
               break;
             }
           }
         }
 
         // Final fallback to original file if no optimized variants
-        if (!bestUrl && optimizedVariants.original) {
+        if (!bestUrl && optimizedVariants.original && optimizedVariants.original.s3Key) {
           bestFormat = 'original';
-          bestUrl = optimizedVariants.original.url;
+          bestS3Key = optimizedVariants.original.s3Key;
+          bestUrl = await fileService.getPresignedUrl(bestS3Key);
+          console.log('Using original format as fallback, S3 key:', bestS3Key);
         }
 
-        // Last resort: generate presigned URL for S3 key if no URL found in variants
+        // Last resort: use the main s3Key if nothing else works
         if (!bestUrl) {
-          const BaseFileStorageService = require('./FileStorageService');
-          const fileService = new BaseFileStorageService({
-            baseFolder: 'vehicles',
-            isPublic: false,
-            presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
-          });
           bestUrl = await fileService.getPresignedUrl(s3Key);
           bestFormat = 'original';
+          console.log('Using main s3Key as last resort:', s3Key);
         }
 
         // Ensure we return a proper response object
@@ -515,7 +527,7 @@ class ImageOptimizationService extends FileStorageService {
 
         // Final fallback - try direct S3 URL construction
         const bucket = process.env.S3_BUCKET;
-        const region = process.env.AWS_REGION || 'us-east-2';
+        const region = getEnvironmentRegion();
         const directS3Url = `https://${bucket}.s3.${region}.amazonaws.com/${s3Key}`;
 
         const responseData = {

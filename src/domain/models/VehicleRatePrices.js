@@ -20,7 +20,7 @@ const Parse = require('parse/node');
  * Extends Parse.Object to provide structured vehicle rate pricing data with
  * service, rate, and vehicle type relationships for pricing calculations.
  * @class VehicleRatePrices
- * @extends Parse.Object
+ * @augments Parse.Object
  * @author Amexing Development Team
  * @version 1.0.0
  * @since 1.0.0

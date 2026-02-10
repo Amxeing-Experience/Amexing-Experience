@@ -145,10 +145,10 @@ class VehicleRatePricesController {
 
   /**
    * Bulk update multiple vehicle rate prices.
-   * POST /api/vehicle-rate-prices/bulk-update
-   * @param {object} req - Express request object containing array of price updates
-   * @param {object} res - Express response object
-   * @returns {Promise<void>} JSON response with operation status
+   * POST /api/vehicle-rate-prices/bulk-update.
+   * @param {object} req - Express request object containing array of price updates.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} JSON response with operation status.
    * @example
    * // Request body
    * {

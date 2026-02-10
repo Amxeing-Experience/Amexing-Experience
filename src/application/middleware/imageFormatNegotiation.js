@@ -17,8 +17,8 @@ let s3;
 
 /**
  * Check if request is for an image.
- * @param {string} imagePath - Request path to check
- * @returns {boolean} True if path is for an image
+ * @param {string} imagePath - Request path to check.
+ * @returns {boolean} True if path is for an image.
  * @example
  */
 function isImageRequest(imagePath) {
@@ -28,8 +28,8 @@ function isImageRequest(imagePath) {
 
 /**
  * Detect preferred format from Accept header.
- * @param {string} acceptHeader - Accept header value
- * @returns {string} Preferred format (avif, webp, or jpeg)
+ * @param {string} acceptHeader - Accept header value.
+ * @returns {string} Preferred format (avif, webp, or jpeg).
  * @example
  */
 function detectPreferredFormat(acceptHeader) {
@@ -44,7 +44,7 @@ function detectPreferredFormat(acceptHeader) {
 
 /**
  * Initialize AWS SDK if not already loaded.
- * @returns {boolean} True if AWS is available
+ * @returns {boolean} True if AWS is available.
  * @example
  */
 function initializeAWS() {
@@ -62,10 +62,10 @@ function initializeAWS() {
 
 /**
  * Find optimized image in S3.
- * @param {string} originalPath - Original image path
- * @param {string} format - Target format (avif, webp, jpeg)
- * @param {string} bucket - S3 bucket name
- * @returns {Promise<string|null>} S3 key for optimized image or null
+ * @param {string} originalPath - Original image path.
+ * @param {string} format - Target format (avif, webp, jpeg).
+ * @param {string} bucket - S3 bucket name.
+ * @returns {Promise<string|null>} S3 key for optimized image or null.
  * @example
  */
 async function findOptimizedImage(originalPath, format, bucket) {
@@ -99,8 +99,8 @@ async function findOptimizedImage(originalPath, format, bucket) {
 
 /**
  * Get content type for format.
- * @param {string} format - Image format
- * @returns {string} MIME content type
+ * @param {string} format - Image format.
+ * @returns {string} MIME content type.
  * @example
  */
 function getContentType(format) {
@@ -116,11 +116,11 @@ function getContentType(format) {
 
 /**
  * Serve optimized image from S3.
- * @param {object} res - Express response object
- * @param {string} s3Key - S3 object key
- * @param {string} bucket - S3 bucket name
- * @param {object} options - Serving options
- * @returns {Promise<void>} Resolves when image is sent
+ * @param {object} res - Express response object.
+ * @param {string} s3Key - S3 object key.
+ * @param {string} bucket - S3 bucket name.
+ * @param {object} options - Serving options.
+ * @returns {Promise<void>} Resolves when image is sent.
  * @example
  */
 async function serveOptimizedImage(res, s3Key, bucket, options) {
@@ -156,8 +156,8 @@ async function serveOptimizedImage(res, s3Key, bucket, options) {
 /**
  * Middleware to handle image format negotiation
  * Intercepts image requests and serves the best format.
- * @param {object} options - Configuration options
- * @returns {Function} Express middleware function
+ * @param {object} options - Configuration options.
+ * @returns {Function} Express middleware function.
  * @example
  */
 function imageFormatNegotiation(options = {}) {
