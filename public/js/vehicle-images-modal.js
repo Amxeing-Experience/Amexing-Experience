@@ -238,10 +238,6 @@ async function loadVehicleImages(vehicleId) {
         
         
         if (data.success) {
-            console.log('Vehicle Images API Response:', data.data);
-            if (data.data && data.data.length > 0) {
-                console.log('First image optimization metadata:', data.data[0].optimizationMetadata);
-            }
             renderImagesGallery(data.data);
             updateImagesCount(data.data.length);
         } else {
@@ -362,10 +358,74 @@ function createImageCard(image) {
                     <i class="ti ti-file"></i> ${image.fileName || 'Imagen'}<br>
                     <i class="ti ti-weight"></i> ${formatFileSize(image.fileSize)}
                     ${(() => {
-                        const metadata = image.optimizationMetadata || {};
-                        const availableFormats = metadata.availableFormats || [];
+                        // Handle potential Parse object or proxy wrapping
+                        let metadata = image.optimizationMetadata || {};
+                        
+                        // If metadata looks like an object but properties aren't accessible,
+                        // try to extract the actual data
+                        if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+                            // Force conversion to plain object
+                            try {
+                                // This handles Parse objects or other wrapped objects
+                                const metadataStr = JSON.stringify(metadata);
+                                metadata = JSON.parse(metadataStr);
+                            } catch (e) {
+                                // Silently handle parse errors
+                            }
+                        }
+                        
+                        // Handle both old and new metadata structures
+                        // Check for availableFormats first (from ImageOptimizationService)
+                        // Then check for formats (from database/ServerImageOptimizationService)
+                        let availableFormats = metadata.availableFormats || metadata.formats || [];
+                        
+                        // Try different ways to access formats if the above didn't work
+                        if ((!availableFormats || availableFormats.length === 0)) {
+                            // Try accessing through bracket notation
+                            if (metadata['formats']) {
+                                availableFormats = metadata['formats'];
+                            } 
+                            // Try parsing the entire metadata if it's a string
+                            else if (typeof metadata === 'string') {
+                                try {
+                                    const parsed = JSON.parse(metadata);
+                                    availableFormats = parsed.formats || parsed.availableFormats || [];
+                                } catch (e) {
+                                    // Silently handle parse errors
+                                }
+                            }
+                            // Try extracting from JSON representation
+                            else {
+                                try {
+                                    const metadataStr = JSON.stringify(metadata);
+                                    const reparsed = JSON.parse(metadataStr);
+                                    availableFormats = reparsed.formats || reparsed.availableFormats || [];
+                                } catch (e) {
+                                    // Silently handle parse errors
+                                }
+                            }
+                        }
+                        
+                        // Handle case where formats might be a string that needs parsing
+                        if (typeof availableFormats === 'string') {
+                            try {
+                                availableFormats = JSON.parse(availableFormats);
+                            } catch (e) {
+                                console.warn('Failed to parse formats string:', availableFormats);
+                                availableFormats = [];
+                            }
+                        }
+                        
+                        // Ensure it's an array
+                        if (!Array.isArray(availableFormats)) {
+                            console.warn('Formats is not an array:', availableFormats);
+                            availableFormats = [];
+                        }
+                        
                         const optimizedFormats = availableFormats.filter(f => f !== 'original');
                         const count = optimizedFormats.length;
+                        
+                        
                         return count > 0 ? `<br><i class="ti ti-versions"></i> ${count} formato${count > 1 ? 's' : ''}` : '<br><i class="ti ti-versions"></i> 0 formatos';
                     })()}
                 </small>

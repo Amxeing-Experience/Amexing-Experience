@@ -47,6 +47,8 @@ const CONFIG = {
   dryRun: false,
   force: false,
   vehicleId: null,
+  experienceId: null,
+  imageType: 'both', // 'vehicles', 'experiences', or 'both'
   formats: ['avif', 'webp', 'jpeg'],
   quality: {
     avif: 85,
@@ -95,6 +97,18 @@ Examples:
       CONFIG.force = true;
     } else if (arg.startsWith('--vehicle-id=')) {
       CONFIG.vehicleId = arg.split('=')[1];
+      CONFIG.imageType = 'vehicles'; // If vehicle-id specified, only process vehicles
+    } else if (arg.startsWith('--experience-id=')) {
+      CONFIG.experienceId = arg.split('=')[1];
+      CONFIG.imageType = 'experiences'; // If experience-id specified, only process experiences
+    } else if (arg.startsWith('--type=')) {
+      const type = arg.split('=')[1];
+      if (['vehicles', 'experiences', 'both'].includes(type)) {
+        CONFIG.imageType = type;
+      } else {
+        console.error(`Invalid type: ${type}. Must be 'vehicles', 'experiences', or 'both'`);
+        process.exit(1);
+      }
     }
   }
 }
@@ -154,22 +168,22 @@ function getContentType(format) {
   return types[format] || 'application/octet-stream';
 }
 
-// Optimize a single image
-async function optimizeImage(vehicleImage) {
-  const imageId = vehicleImage.id;
-  const fileName = vehicleImage.get('fileName');
-  const s3Key = vehicleImage.get('s3Key');
+// Optimize a single image (works for both VehicleImage and ExperienceImage)
+async function optimizeImage(image, imageType = 'vehicle') {
+  const imageId = image.id;
+  const fileName = image.get('fileName');
+  const s3Key = image.get('s3Key');
   
   if (!s3Key) {
     console.log(`  ⚠️  Image ${fileName} has no S3 key, skipping`);
     return { skipped: true, reason: 'No S3 key' };
   }
   
-  console.log(`  📸 Processing: ${fileName} (ID: ${imageId})`);
+  console.log(`  📸 Processing ${imageType} image: ${fileName} (ID: ${imageId})`);
   
   // Check if already optimized and not forcing
   if (!CONFIG.force) {
-    const optimizationMetadata = vehicleImage.get('optimizationMetadata');
+    const optimizationMetadata = image.get('optimizationMetadata');
     if (optimizationMetadata?.optimized) {
       console.log(`    ✅ Already optimized, skipping`);
       return { skipped: true, reason: 'Already optimized' };
@@ -241,8 +255,13 @@ async function optimizeImage(vehicleImage) {
         const optimizedStats = await fs.stat(optimizedPath);
         const optimizedSize = optimizedStats.size;
         
-        // Upload to S3 in optimized subfolder
-        const optimizedS3Key = s3Key.replace('/vehicles/', '/vehicles/optimized/').replace(path.extname(s3Key), `.${format === 'jpeg' ? 'jpg' : format}`);
+        // Upload to S3 in optimized subfolder - handle both vehicles and experiences
+        let optimizedS3Key;
+        if (imageType === 'vehicle') {
+          optimizedS3Key = s3Key.replace('/vehicles/', '/vehicles/optimized/').replace(path.extname(s3Key), `.${format === 'jpeg' ? 'jpg' : format}`);
+        } else {
+          optimizedS3Key = s3Key.replace('/experiences/', '/experiences/optimized/').replace(path.extname(s3Key), `.${format === 'jpeg' ? 'jpg' : format}`);
+        }
         
         if (!CONFIG.dryRun) {
           console.log(`    ⬆️  Uploading ${format.toUpperCase()} to S3...`);
@@ -273,7 +292,7 @@ async function optimizeImage(vehicleImage) {
       console.log(`    💾 Updating database...`);
       
       // Set optimization metadata
-      vehicleImage.set('optimizationMetadata', {
+      image.set('optimizationMetadata', {
         optimized: true,
         optimizedAt: new Date().toISOString(),
         availableFormats: availableFormats,
@@ -291,9 +310,9 @@ async function optimizeImage(vehicleImage) {
       });
       
       // Set optimized variants with S3 keys
-      vehicleImage.set('optimizedVariants', optimizedVariants);
+      image.set('optimizedVariants', optimizedVariants);
       
-      await vehicleImage.save(null, { useMasterKey: true });
+      await image.save(null, { useMasterKey: true });
       console.log(`    ✅ Database updated successfully`);
     } else {
       console.log(`    🔍 [DRY RUN] Would update database with metadata and variants`);
@@ -326,26 +345,15 @@ async function optimizeImage(vehicleImage) {
   }
 }
 
-// Main processing function
-async function processImages() {
-  try {
-    console.log('\n🚀 Unified Image Optimization Script');
-    console.log('====================================');
-    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`S3 Bucket: ${CONFIG.s3Bucket}`);
-    console.log(`S3 Prefix: ${CONFIG.s3Prefix}`);
-    console.log(`Batch Size: ${CONFIG.batchSize}`);
-    console.log(`Dry Run: ${CONFIG.dryRun}`);
-    console.log(`Force Re-optimize: ${CONFIG.force}`);
-    if (CONFIG.vehicleId) {
-      console.log(`Vehicle ID: ${CONFIG.vehicleId}`);
-    }
-    console.log('');
-    
-    // Build query for vehicle images
-    const query = new Parse.Query('VehicleImage');
-    
-    if (CONFIG.vehicleId) {
+// Process vehicle images
+async function processVehicleImages() {
+  console.log('\n🚘 Processing Vehicle Images...');
+  console.log('--------------------------------');
+  
+  // Build query for vehicle images
+  const query = new Parse.Query('VehicleImage');
+  
+  if (CONFIG.vehicleId) {
       // Process specific vehicle
       const vehicle = new Parse.Object('Vehicle');
       vehicle.id = CONFIG.vehicleId;
@@ -396,10 +404,10 @@ async function processImages() {
         break;
       }
       
-      console.log(`\n📦 Processing batch ${Math.floor(processedCount / CONFIG.batchSize) + 1} (${images.length} images):`);
+      console.log(`\n📦 Processing batch ${Math.floor(processedCount / CONFIG.batchSize) + 1} (${images.length} vehicle images):`);
       
       for (const image of images) {
-        const result = await optimizeImage(image);
+        const result = await optimizeImage(image, 'vehicle');
         
         if (result.success) {
           successCount++;
@@ -422,14 +430,163 @@ async function processImages() {
       }
     }
     
+    return { processed: processedCount, success: successCount, error: errorCount, skipped: skippedCount };
+}
+
+// Process experience images
+async function processExperienceImages() {
+  console.log('\n🎨 Processing Experience Images...');
+  console.log('-----------------------------------');
+  
+  // Build query for experience images
+  const query = new Parse.Query('ExperienceImage');
+  
+  if (CONFIG.experienceId) {
+    // Process specific experience
+    const experience = new Parse.Object('Experience');
+    experience.id = CONFIG.experienceId;
+    query.equalTo('experience', experience);
+  } else if (!CONFIG.force) {
+    // Only process unoptimized images
+    const unoptimizedQuery = new Parse.Query('ExperienceImage');
+    unoptimizedQuery.doesNotExist('optimizationMetadata');
+    
+    const notOptimizedQuery = new Parse.Query('ExperienceImage');
+    notOptimizedQuery.equalTo('optimizationMetadata.optimized', false);
+    
+    query._orQuery([unoptimizedQuery, notOptimizedQuery]);
+  }
+  
+  // Only process images with valid S3 keys and that are active
+  query.exists('s3Key');
+  query.equalTo('active', true);
+  query.equalTo('exists', true);
+  query.ascending('createdAt');
+  query.limit(CONFIG.batchSize);
+  
+  // Get total count
+  const totalCount = await query.count({ useMasterKey: true });
+  console.log(`📊 Found ${totalCount} experience images to process\n`);
+  
+  if (totalCount === 0) {
+    console.log('✅ No experience images need optimization!');
+    return { processed: 0, success: 0, error: 0, skipped: 0 };
+  }
+  
+  // Process in batches
+  let processedCount = 0;
+  let successCount = 0;
+  let errorCount = 0;
+  let skippedCount = 0;
+  
+  while (processedCount < totalCount) {
+    query.skip(processedCount);
+    const images = await query.find({ useMasterKey: true });
+    
+    if (images.length === 0) {
+      break;
+    }
+    
+    console.log(`\n📦 Processing batch ${Math.floor(processedCount / CONFIG.batchSize) + 1} (${images.length} experience images):`);
+    
+    for (const image of images) {
+      const result = await optimizeImage(image, 'experience');
+      
+      if (result.success) {
+        successCount++;
+      } else if (result.error) {
+        errorCount++;
+      } else if (result.skipped) {
+        skippedCount++;
+      }
+      
+      processedCount++;
+      
+      // Show progress
+      const progress = ((processedCount / totalCount) * 100).toFixed(1);
+      console.log(`  📊 Progress: ${processedCount}/${totalCount} (${progress}%)\n`);
+    }
+    
+    // Small delay between batches to avoid overloading
+    if (processedCount < totalCount) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  
+  return { processed: processedCount, success: successCount, error: errorCount, skipped: skippedCount };
+}
+
+// Main processing function
+async function processImages() {
+  try {
+    console.log('\n🚀 Unified Image Optimization Script');
+    console.log('====================================');
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`S3 Bucket: ${CONFIG.s3Bucket}`);
+    console.log(`S3 Prefix: ${CONFIG.s3Prefix}`);
+    console.log(`Batch Size: ${CONFIG.batchSize}`);
+    console.log(`Dry Run: ${CONFIG.dryRun}`);
+    console.log(`Force Re-optimize: ${CONFIG.force}`);
+    console.log(`Image Type: ${CONFIG.imageType}`);
+    if (CONFIG.vehicleId) {
+      console.log(`Vehicle ID: ${CONFIG.vehicleId}`);
+    }
+    if (CONFIG.experienceId) {
+      console.log(`Experience ID: ${CONFIG.experienceId}`);
+    }
+    console.log('');
+    
+    if (CONFIG.dryRun) {
+      console.log('🔍 DRY RUN MODE - No changes will be made\n');
+    }
+    
+    // Track overall stats
+    const stats = {
+      vehicles: { processed: 0, success: 0, error: 0, skipped: 0 },
+      experiences: { processed: 0, success: 0, error: 0, skipped: 0 }
+    };
+    
+    // Process based on imageType setting
+    if (CONFIG.imageType === 'vehicles' || CONFIG.imageType === 'both') {
+      stats.vehicles = await processVehicleImages();
+    }
+    
+    if (CONFIG.imageType === 'experiences' || CONFIG.imageType === 'both') {
+      stats.experiences = await processExperienceImages();
+    }
+    
+    // Calculate totals
+    const totalProcessed = stats.vehicles.processed + stats.experiences.processed;
+    const totalSuccess = stats.vehicles.success + stats.experiences.success;
+    const totalError = stats.vehicles.error + stats.experiences.error;
+    const totalSkipped = stats.vehicles.skipped + stats.experiences.skipped;
+    
     // Final summary
     console.log('\n========================================');
     console.log('📈 Optimization Complete!');
     console.log('========================================');
-    console.log(`✅ Successfully optimized: ${successCount} images`);
-    console.log(`⏭️  Skipped (already optimized): ${skippedCount} images`);
-    console.log(`❌ Errors: ${errorCount} images`);
-    console.log(`📊 Total processed: ${processedCount} images`);
+    
+    if (CONFIG.imageType === 'both' || CONFIG.imageType === 'vehicles') {
+      console.log('\n🚘 Vehicle Images:');
+      console.log(`  ✅ Successfully optimized: ${stats.vehicles.success}`);
+      console.log(`  ⏭️  Skipped: ${stats.vehicles.skipped}`);
+      console.log(`  ❌ Errors: ${stats.vehicles.error}`);
+      console.log(`  📊 Total: ${stats.vehicles.processed}`);
+    }
+    
+    if (CONFIG.imageType === 'both' || CONFIG.imageType === 'experiences') {
+      console.log('\n🎨 Experience Images:');
+      console.log(`  ✅ Successfully optimized: ${stats.experiences.success}`);
+      console.log(`  ⏭️  Skipped: ${stats.experiences.skipped}`);
+      console.log(`  ❌ Errors: ${stats.experiences.error}`);
+      console.log(`  📊 Total: ${stats.experiences.processed}`);
+    }
+    
+    console.log('\n📊 Overall Summary:');
+    console.log(`  ✅ Successfully optimized: ${totalSuccess} images`);
+    console.log(`  ⏭️  Skipped (already optimized): ${totalSkipped} images`);
+    console.log(`  ❌ Errors: ${totalError} images`);
+    console.log(`  📊 Total processed: ${totalProcessed} images`);
     
     if (CONFIG.dryRun) {
       console.log('\n🔍 This was a DRY RUN - no actual changes were made');

@@ -425,7 +425,8 @@ class ImageOptimizationService extends FileStorageService {
 
         // Detect preferred format from Accept header
         const preferredFormat = this.detectPreferredFormat(acceptHeader);
-        console.log('Detected preferred format from Accept header:', preferredFormat, 'Accept:', acceptHeader);
+        console.log('[ImageOptimizationService] Accept header:', acceptHeader);
+        console.log('[ImageOptimizationService] Detected preferred format:', preferredFormat);
 
         // Create FileStorageService instance for generating presigned URLs
         const BaseFileStorageService = require('./FileStorageService');
@@ -440,18 +441,50 @@ class ImageOptimizationService extends FileStorageService {
         let bestUrl = null;
         let bestS3Key = null;
 
+        // Helper function to get S3 key from variant (handles both structures)
+        const getS3KeyFromVariant = (variant) => {
+          if (!variant) return null;
+
+          // Direct s3Key (vehicle optimization structure)
+          if (variant.s3Key) {
+            return variant.s3Key;
+          }
+
+          // Nested size structure (ServerImageOptimizationService for experiences)
+          // Prefer 'original' size, then 'desktop', then any available size
+          if (typeof variant === 'object') {
+            if (variant.original && variant.original.s3Key) {
+              return variant.original.s3Key;
+            }
+            if (variant.desktop && variant.desktop.s3Key) {
+              return variant.desktop.s3Key;
+            }
+            // Get first available size
+            const sizes = Object.keys(variant);
+            for (const size of sizes) {
+              if (variant[size] && variant[size].s3Key) {
+                return variant[size].s3Key;
+              }
+            }
+          }
+
+          return null;
+        };
+
         // Try preferred format first
-        if (optimizedVariants[preferredFormat] && optimizedVariants[preferredFormat].s3Key) {
+        const preferredS3Key = getS3KeyFromVariant(optimizedVariants[preferredFormat]);
+        if (preferredS3Key) {
           bestFormat = preferredFormat;
-          bestS3Key = optimizedVariants[preferredFormat].s3Key;
+          bestS3Key = preferredS3Key;
           bestUrl = await fileService.getPresignedUrl(bestS3Key);
           console.log('Using preferred format:', bestFormat, 'S3 key:', bestS3Key);
         } else {
           // Fallback chain: avif -> webp -> jpeg -> original
           for (const format of ['avif', 'webp', 'jpeg']) {
-            if (optimizedVariants[format] && optimizedVariants[format].s3Key) {
+            const formatS3Key = getS3KeyFromVariant(optimizedVariants[format]);
+            if (formatS3Key) {
               bestFormat = format;
-              bestS3Key = optimizedVariants[format].s3Key;
+              bestS3Key = formatS3Key;
               bestUrl = await fileService.getPresignedUrl(bestS3Key);
               console.log('Using fallback format:', bestFormat, 'S3 key:', bestS3Key);
               break;
@@ -460,11 +493,14 @@ class ImageOptimizationService extends FileStorageService {
         }
 
         // Final fallback to original file if no optimized variants
-        if (!bestUrl && optimizedVariants.original && optimizedVariants.original.s3Key) {
-          bestFormat = 'original';
-          bestS3Key = optimizedVariants.original.s3Key;
-          bestUrl = await fileService.getPresignedUrl(bestS3Key);
-          console.log('Using original format as fallback, S3 key:', bestS3Key);
+        if (!bestUrl) {
+          const originalS3Key = getS3KeyFromVariant(optimizedVariants.original);
+          if (originalS3Key) {
+            bestFormat = 'original';
+            bestS3Key = originalS3Key;
+            bestUrl = await fileService.getPresignedUrl(bestS3Key);
+            console.log('Using original format as fallback, S3 key:', bestS3Key);
+          }
         }
 
         // Last resort: use the main s3Key if nothing else works

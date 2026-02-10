@@ -293,14 +293,172 @@ node scripts/test-image-optimization-localhost.js
 - **Express.js**: API endpoints and middleware
 - **Bootstrap**: Frontend UI components
 
+## Implementing Optimization for New Entities
+
+The optimization system is now **highly reusable**. Here's how to add it to any new image entity:
+
+### Step 1: Update Your Controller
+
+```javascript
+// In your controller constructor
+constructor() {
+  // Add optimization services
+  this.imageOptimizationService = new ImageOptimizationService({
+    enableOptimization: process.env.ENABLE_IMAGE_OPTIMIZATION === 'true',
+    formatPriority: ['avif', 'webp', 'jpeg'],
+  });
+  
+  this.serverOptimizationService = new ServerImageOptimizationService({
+    formats: ['avif', 'webp', 'jpeg'],
+    sizes: ['thumb', 'mobile', 'desktop', 'original'],
+    quality: { avif: 85, webp: 85, jpeg: 85 }
+  });
+}
+```
+
+### Step 2: Handle Upload with Optimization
+
+```javascript
+async uploadImage(req, res) {
+  const file = req.file;
+  
+  // Use server optimization service for upload
+  const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
+    file.buffer,
+    uniqueFileName,
+    file.mimetype,
+    {
+      entityPath: `yourEntity/${entityId}`, // e.g., 'products/abc123'
+      entityId: entityId,
+      userContext: {
+        userId: req.user.id,
+        email: req.user.get('email'),
+        username: req.user.get('username'),
+      },
+    }
+  );
+  
+  // Save to database with optimization data
+  const image = new YourImageClass();
+  image.set('s3Key', optimizationResult.originalS3Key);
+  image.set('optimizedVariants', optimizationResult.optimizedVariants);
+  image.set('optimizationMetadata', optimizationResult.metadata);
+  await image.save();
+}
+```
+
+### Step 3: Serve Optimized Images
+
+```javascript
+async listImages(req, res) {
+  const acceptHeader = req.get('accept');
+  const images = await YourImageClass.findByEntity(entityId);
+  
+  const optimizedImages = await Promise.all(
+    images.map(async (img) => {
+      // Let optimization service handle format selection
+      let imageData = null;
+      
+      if (img.get('s3Key') && this.imageOptimizationService?.enableOptimization) {
+        imageData = await this.imageOptimizationService.getImageWithOptimalFormat(img, acceptHeader);
+      } else {
+        // Fallback for unoptimized images
+        const url = await this.fileStorageService.getPresignedUrl(img.get('s3Key'));
+        imageData = { url };
+      }
+      
+      return {
+        id: img.id,
+        url: imageData.url,
+        fileName: img.get('fileName'),
+        fileSize: img.get('fileSize'),
+        optimizationMetadata: img.get('optimizationMetadata')
+      };
+    })
+  );
+  
+  res.json({ success: true, data: optimizedImages });
+}
+```
+
+### Step 4: Frontend Accept Headers
+
+```javascript
+// In your frontend modal/component
+const headers = {
+  'Accept': 'image/avif;q=1.0,image/webp;q=0.9,image/jpeg;q=0.8,image/*;q=0.5'
+};
+
+const response = await fetch(`/api/yourEntity/${entityId}/images`, { headers });
+```
+
+### Step 5: Frontend Format Detection
+
+```javascript
+// Show format badges in your UI
+const displayFormat = (() => {
+  if (!image.url) return 'ORIGINAL';
+  
+  if (image.url.includes('.avif')) return 'AVIF';
+  if (image.url.includes('.webp')) return 'WEBP';  
+  if (image.url.includes('.jpg') || image.url.includes('.jpeg')) return 'JPEG';
+  return 'ORIGINAL';
+})();
+
+// Show format count
+const metadata = image.optimizationMetadata || {};
+const availableFormats = metadata.formats || metadata.availableFormats || [];
+const optimizedFormats = availableFormats.filter(f => f !== 'original');
+const count = optimizedFormats.length;
+```
+
+### Current Implementations
+
+✅ **Vehicle Images** - Full optimization with unified script support  
+✅ **Experience Images** - Server optimization with format selection  
+🔄 **Ready for any new entity** - Just follow the 5 steps above!
+
+## System Architecture Benefits
+
+### Dual Service Design
+1. **ServerImageOptimizationService** - Handles upload-time optimization
+2. **ImageOptimizationService** - Handles serving with format negotiation
+
+### Universal Compatibility
+- Works with both flat and nested optimization metadata structures
+- Graceful fallback for unoptimized images
+- Browser-based format selection
+- Presigned URL security
+
+### Easy Implementation Pattern
+```javascript
+// Any new controller can use this pattern:
+class ProductImageController {
+  constructor() {
+    this.initOptimization(); // Add the two services
+  }
+  
+  async upload() { 
+    const result = await this.serverOptimizationService.uploadOptimizedImage(/*...*/);
+    // Save with optimization metadata
+  }
+  
+  async list() {
+    const imageData = await this.imageOptimizationService.getImageWithOptimalFormat(/*...*/);
+    // Return optimized URL
+  }
+}
+```
+
 ## Future Enhancements
 
 Potential improvements:
 - [ ] Background processing queue for large images
-- [ ] Size variant generation (thumb, mobile, desktop)
+- [x] ~~Size variant generation (thumb, mobile, desktop)~~ ✅ Implemented
 - [ ] Automatic quality adjustment based on content
 - [ ] Image CDN integration
 - [ ] JPEG XL format support
+- [ ] Generic optimization mixin/trait for controllers
 
 ## Support
 

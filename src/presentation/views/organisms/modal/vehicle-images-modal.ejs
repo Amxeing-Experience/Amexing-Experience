@@ -847,10 +847,20 @@ Features:
                             <i class="ti ti-layers-intersect me-2 text-muted" style="font-size: 0.9rem;"></i>
                             <small class="text-muted">
                                 ${(() => {
-                                    console.log('Rendering formats for image:', image.fileName, 'metadata:', image.optimizationMetadata);
-                                    const metadata = image.optimizationMetadata || {};
-                                    const allFormats = metadata.availableFormats || [];
-                                    console.log('Available formats:', allFormats);
+                                    let metadata = image.optimizationMetadata || {};
+                                    
+                                    // Convert to plain object if needed
+                                    if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
+                                        try {
+                                            const metadataStr = JSON.stringify(metadata);
+                                            metadata = JSON.parse(metadataStr);
+                                        } catch (e) {
+                                            // Silently handle parse errors
+                                        }
+                                    }
+                                    
+                                    // Handle both old and new metadata structures
+                                    const allFormats = metadata.availableFormats || metadata.formats || [];
                                     const optimizedFormats = allFormats.filter(f => f !== 'original');
                                     const optimizedCount = optimizedFormats.length;
                                     
