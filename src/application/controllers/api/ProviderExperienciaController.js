@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 /**
  * ProviderExperienciaController - RESTful API for Provider Experiencias Management.
  *
@@ -21,6 +22,9 @@
 const Parse = require('parse/node');
 const logger = require('../../../infrastructure/logger');
 const ProviderExperiencia = require('../../../domain/models/ProviderExperiencia');
+const FileStorageService = require('../../services/FileStorageService');
+const ImageOptimizationService = require('../../services/ImageOptimizationService');
+const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 
 /**
  * ProviderExperienciaController class implementing RESTful API.
@@ -28,6 +32,31 @@ const ProviderExperiencia = require('../../../domain/models/ProviderExperiencia'
 class ProviderExperienciaController {
   constructor() {
     this.maxExperienciasPerProvider = 50;
+
+    // Initialize FileStorageService for S3 operations
+    this.fileStorageService = new FileStorageService({
+      baseFolder: 'experiences',
+      isPublic: false, // Use presigned URLs with IAM role credentials
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    });
+
+    // Initialize ImageOptimizationService for multi-format support
+    this.imageOptimizationService = new ImageOptimizationService({
+      baseFolder: 'experiences',
+      isPublic: false,
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+      enableOptimization: process.env.ENABLE_IMAGE_OPTIMIZATION !== 'false',
+    });
+
+    // Initialize ServerImageOptimizationService for server-side processing
+    this.serverOptimizationService = new ServerImageOptimizationService({
+      baseFolder: 'experiences',
+      isPublic: false,
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    });
   }
 
   /**
@@ -38,6 +67,7 @@ class ProviderExperienciaController {
    * @example
    * GET /api/provider-experiencias/all
    */
+  // eslint-disable-next-line max-lines-per-function
   async getAllProviderExperiencias(req, res) {
     try {
       if (!req.user) {
@@ -133,8 +163,9 @@ class ProviderExperienciaController {
       // Get experiencias for this provider
       const experiencias = await ProviderExperiencia.findByProvider(providerId);
 
-      // Format response
-      const data = experiencias.map((exp) => this.formatExperienciaForResponse(exp));
+      // Format response with optimized URLs
+      const acceptHeader = req.get('accept') || '';
+      const data = await Promise.all(experiencias.map((exp) => this.formatExperienciaForResponse(exp, acceptHeader)));
 
       return res.json({
         success: true,
@@ -205,7 +236,7 @@ class ProviderExperienciaController {
 
       return res.json({
         success: true,
-        data: this.formatExperienciaForResponse(experiencia),
+        data: await this.formatExperienciaForResponse(experiencia, req.get('accept') || ''),
       });
     } catch (error) {
       logger.error(
@@ -231,6 +262,7 @@ class ProviderExperienciaController {
    * POST /api/providers/abc123/experiencias
    * Body: { name, description, price, duration, min_people, max_people }
    */
+  // eslint-disable-next-line max-lines-per-function, complexity
   async createExperiencia(req, res) {
     try {
       if (!req.user) {
@@ -361,8 +393,16 @@ class ProviderExperienciaController {
           experiencia.unset('advance_booking_time');
         }
       }
+      // Process photos for optimization before saving
       if (photos !== undefined && Array.isArray(photos)) {
-        experiencia.set('photos', photos);
+        const userContext = {
+          userId: req.user.id,
+          email: req.user.get('email'),
+          username: req.user.get('username'),
+        };
+
+        const processedPhotos = await this.processPhotosForOptimization(photos, providerId, userContext);
+        experiencia.set('photos', processedPhotos);
       }
 
       // Set notes fields
@@ -402,7 +442,7 @@ class ProviderExperienciaController {
 
       return res.status(201).json({
         success: true,
-        data: this.formatExperienciaForResponse(experiencia),
+        data: await this.formatExperienciaForResponse(experiencia, req.get('accept') || ''),
         message: 'Experiencia created successfully',
       });
     } catch (error) {
@@ -431,6 +471,7 @@ class ProviderExperienciaController {
    * @example
    * PUT /api/providers/abc123/experiencias/xyz456
    */
+  // eslint-disable-next-line max-lines-per-function, complexity
   async updateExperiencia(req, res) {
     try {
       if (!req.user) {
@@ -564,9 +605,17 @@ class ProviderExperienciaController {
           experiencia.unset('advance_booking_time');
         }
       }
+      // Process photos for optimization before saving
       if (photos !== undefined) {
         if (Array.isArray(photos)) {
-          experiencia.set('photos', photos);
+          const userContext = {
+            userId: req.user.id,
+            email: req.user.get('email'),
+            username: req.user.get('username'),
+          };
+
+          const processedPhotos = await this.processPhotosForOptimization(photos, providerId, userContext);
+          experiencia.set('photos', processedPhotos);
         } else if (photos === null) {
           experiencia.set('photos', []);
         }
@@ -620,7 +669,7 @@ class ProviderExperienciaController {
 
       return res.json({
         success: true,
-        data: this.formatExperienciaForResponse(experiencia),
+        data: await this.formatExperienciaForResponse(experiencia, req.get('accept') || ''),
         message: 'Experiencia updated successfully',
       });
     } catch (error) {
@@ -765,14 +814,190 @@ class ProviderExperienciaController {
   }
 
   /**
-   * Format experiencia for response.
-   * @param {ProviderExperiencia} experiencia - Experiencia object.
-   * @returns {object} Formatted experiencia data.
+   * Process photos array to optimize base64 images and maintain existing optimized images.
+   * @param {Array} photos - Array of photo objects with dataUrl and fileName.
+   * @param {string} providerId - Provider ID for S3 path organization.
+   * @param {object} userContext - User context for logging.
+   * @returns {Promise<Array>} Processed photos array with optimized S3 images.
    * @private
    * @example
-   * const formatted = controller.formatExperienciaForResponse(experiencia);
+   * const processedPhotos = await controller.processPhotosForOptimization(photos, providerId, userContext);
    */
-  formatExperienciaForResponse(experiencia) {
+  // eslint-disable-next-line max-lines-per-function, no-restricted-syntax
+  async processPhotosForOptimization(photos, providerId, userContext) {
+    if (!photos || !Array.isArray(photos) || photos.length === 0) {
+      return [];
+    }
+
+    const processedPhotos = [];
+
+    for (const photo of photos) {
+      try {
+        // Check if photo is a base64 data URL (new upload)
+        if (photo.dataUrl && photo.dataUrl.startsWith('data:')) {
+          // Extract buffer from base64
+          const matches = photo.dataUrl.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            const mimeType = matches[1];
+            const base64Data = matches[2];
+            const buffer = Buffer.from(base64Data, 'base64');
+
+            // Generate unique filename
+            const timestamp = Date.now();
+            const randomString = Math.random().toString(36).substr(2, 9);
+            const originalFileName = photo.fileName || 'image.jpg';
+            const extension = originalFileName.split('.').pop() || 'jpg';
+            const uniqueFileName = `${timestamp}-${randomString}.${extension}`;
+
+            // Use server optimization service to upload and optimize
+            const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
+              buffer,
+              uniqueFileName,
+              mimeType,
+              {
+                entityPath: `providers/${providerId}`,
+                entityId: providerId,
+                userContext,
+              }
+            );
+
+            // Store optimized image data
+            processedPhotos.push({
+              s3Key: optimizationResult.originalS3Key,
+              fileName: originalFileName,
+              originalName: originalFileName,
+              optimizedVariants: optimizationResult.optimizedVariants,
+              optimizationMetadata: optimizationResult.metadata,
+              fileSize: buffer.length,
+              mimeType,
+            });
+
+            logger.info('Photo optimized for provider experiencia', {
+              providerId,
+              fileName: originalFileName,
+              s3Key: optimizationResult.originalS3Key,
+              optimizedFormats: optimizationResult.metadata?.availableFormats || [],
+              userId: userContext?.userId,
+            });
+          } else {
+            logger.warn('Invalid base64 data URL format', { providerId, photoIndex: photos.indexOf(photo) });
+            // Keep the original photo data as fallback
+            processedPhotos.push(photo);
+          }
+        } else {
+          // Keep existing photos (already optimized or other formats)
+          processedPhotos.push(photo);
+        }
+      } catch (error) {
+        logger.error('Error processing photo for optimization', {
+          providerId,
+          error: error.message,
+          photoIndex: photos.indexOf(photo),
+          userId: userContext?.userId,
+        });
+        // Keep the original photo data as fallback
+        processedPhotos.push(photo);
+      }
+    }
+
+    return processedPhotos;
+  }
+
+  /**
+   * Format experiencia for response.
+   * @param {ProviderExperiencia} experiencia - Experiencia object.
+   * @param {string} acceptHeader - Browser Accept header for format negotiation.
+   * @returns {Promise<object>} Formatted experiencia data with optimized URLs for photos.
+   * @private
+   * @example
+   * const formatted = await controller.formatExperienciaForResponse(experiencia, req.get('accept'));
+   */
+  // eslint-disable-next-line no-restricted-syntax
+  async formatExperienciaForResponse(experiencia, acceptHeader = '') {
+    const photos = experiencia.get('photos') || [];
+    const processedPhotos = [];
+
+    // Process each photo to generate presigned URLs
+    for (const photo of photos) {
+      try {
+        const processedPhoto = { ...photo };
+
+        // Check if photo has S3 key (prioritize optimization)
+        if (photo.s3Key && this.imageOptimizationService?.enableOptimization) {
+          try {
+            // Use optimization service to get best format for client
+            const imageData = await this.imageOptimizationService.getImageWithOptimalFormat(photo, acceptHeader);
+            processedPhoto.url = imageData.url;
+            processedPhoto.dataUrl = imageData.url;
+            processedPhoto.optimizationMetadata = imageData.metadata || photo.optimizationMetadata;
+          } catch (optimizationError) {
+            logger.warn('Optimization service failed, falling back to regular presigned URL', {
+              experienciaId: experiencia.id,
+              s3Key: photo.s3Key,
+              error: optimizationError.message,
+            });
+            // Fallback to regular presigned URL
+            const presignedUrl = await this.fileStorageService.getPresignedUrl(photo.s3Key);
+            processedPhoto.url = presignedUrl;
+            processedPhoto.dataUrl = presignedUrl;
+          }
+        } else if (photo.dataUrl && photo.dataUrl.includes('amazonaws.com')) {
+          // Handle legacy presigned URLs (might be expired)
+          // Already a presigned URL, but might be expired - regenerate if we have s3Key
+          if (photo.s3Key || photo.key) {
+            const s3Key = photo.s3Key || photo.key;
+            const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+            processedPhoto.url = presignedUrl;
+            processedPhoto.dataUrl = presignedUrl;
+          } else {
+            // Try to extract s3Key from the existing URL
+            const urlParts = photo.dataUrl.split('?')[0]; // Remove query parameters
+            const s3KeyMatch = urlParts.match(/amazonaws\.com\/(.+)$/);
+            if (s3KeyMatch) {
+              const s3Key = s3KeyMatch[1];
+              const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              processedPhoto.url = presignedUrl;
+              processedPhoto.dataUrl = presignedUrl;
+              // Store the extracted s3Key for future use
+              processedPhoto.s3Key = s3Key;
+            } else {
+              // Can't extract S3 key, keep the original URL (might be expired)
+              processedPhoto.url = photo.dataUrl;
+            }
+          }
+        } else if (photo.s3Key || photo.key) {
+          // Handle S3 keys without optimization
+          const s3Key = photo.s3Key || photo.key;
+          const presignedUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+          processedPhoto.url = presignedUrl;
+          processedPhoto.dataUrl = presignedUrl; // For compatibility with frontend
+        } else if (photo.dataUrl && photo.dataUrl.startsWith('data:')) {
+          // Keep base64 data URLs as-is for new uploads
+          processedPhoto.url = photo.dataUrl;
+        } else if (photo.url) {
+          // Keep other URLs as-is
+          processedPhoto.url = photo.url;
+          processedPhoto.dataUrl = photo.url;
+        }
+
+        // Ensure filename is available for frontend
+        processedPhoto.fileName = photo.fileName || photo.originalName || photo.name || 'image';
+
+        processedPhotos.push(processedPhoto);
+      } catch (error) {
+        logger.error('Error processing photo for experiencia response', {
+          experienciaId: experiencia.id,
+          photo,
+          error: error.message,
+        });
+        // Include photo without URL if there's an error
+        processedPhotos.push({
+          ...photo,
+          fileName: photo.fileName || photo.originalName || photo.name || 'image',
+        });
+      }
+    }
+
     return {
       id: experiencia.id,
       name: experiencia.getName(),
@@ -789,7 +1014,7 @@ class ProviderExperienciaController {
       languages: experiencia.get('languages') || [],
       notincludes: experiencia.get('notincludes') || [],
       advance_booking_time: experiencia.get('advance_booking_time') || null,
-      photos: experiencia.get('photos') || [],
+      photos: processedPhotos,
       internal_notes: experiencia.get('internal_notes') || null,
       client_booking_notes: experiencia.get('client_booking_notes') || null,
       provider_notes: experiencia.get('provider_notes') || null,

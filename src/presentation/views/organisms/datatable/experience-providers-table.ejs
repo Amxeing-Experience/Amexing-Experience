@@ -1327,7 +1327,13 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const photosContainer = $(card).find('.photos-preview-container');
             if (experiencia.photos && experiencia.photos.length > 0) {
                 experiencia.photos.forEach(photo => {
-                    addPhotoPreview(photosContainer, { name: photo.fileName }, photo.dataUrl);
+                    // Backend now provides presigned URLs in dataUrl field
+                    const photoUrl = photo.dataUrl || photo.url;
+                    const fileName = photo.fileName || photo.name || 'image';
+                    
+                    if (photoUrl) {
+                        addPhotoPreview(photosContainer, { name: fileName }, photoUrl);
+                    }
                 });
             }
             
@@ -1948,6 +1954,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $.ajax({
                 url: `/api/providers/${providerId}/experiencias`,
                 type: 'GET',
+                headers: {
+                    'Accept': 'image/avif;q=1.0,image/webp;q=0.9,image/jpeg;q=0.8,image/*;q=0.5,application/json'
+                },
                 success: function(response) {
                     if (response.success && response.data) {
                         providerExperiencias = response.data;
