@@ -311,7 +311,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                    multiple>
                         </div>
                         <div class="form-text">
-                            <small><i class="ti ti-info-circle me-1"></i>Máximo 5 fotos por experiencia • Formatos: JPG, PNG, WebP • Máx. 5MB cada una</small>
+                            <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP • Máx. 10MB cada una</small>
                         </div>
                     </div>
 
@@ -719,7 +719,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                            multiple>
                 </div>
                 <div class="form-text">
-                    <small><i class="ti ti-info-circle me-1"></i>Máximo 5 fotos por experiencia • Formatos: JPG, PNG, WebP • Máx. 5MB cada una</small>
+                    <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP • Máx. 10MB cada una</small>
                 </div>
             </div>
             
@@ -1020,42 +1020,21 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             $(this).closest('.experience-photos-container').find('.experience-photo-input').click();
         });
         
-        // Handle photo upload for quick add modal - now using the new class
+        // Handle photo upload for quick add modal - using optimized photo preview
         $('#quickAddExperienceModal').on('change', '.experience-photo-input', function(e) {
             const files = e.target.files;
             const previewContainer = $(this).closest('.experience-photos-container').find('.photos-preview-container');
             
             Array.from(files).forEach(file => {
-                if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                    alert(`El archivo "${file.name}" excede el tamaño máximo de 5MB`);
+                if (file.size > 10 * 1024 * 1024) { // 10MB limit - increased for better quality
+                    alert(`El archivo "${file.name}" excede el tamaño máximo de 10MB`);
                     return;
                 }
                 
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    const photoId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                    const previewHtml = `
-                        <div class="col-4 photo-preview" data-photo-id="${photoId}"
-                             data-filename="${file.name}" 
-                             data-dataurl="${e.target.result}">
-                            <div class="position-relative">
-                                <img src="${e.target.result}" 
-                                     class="img-fluid rounded border" 
-                                     style="height: 80px; width: 100%; object-fit: cover;">
-                                <button type="button" 
-                                        class="btn btn-danger btn-sm position-absolute top-0 end-0 remove-photo-btn" 
-                                        style="padding: 2px 6px; margin: 2px;">
-                                    <i class="ti ti-x" style="font-size: 12px;"></i>
-                                </button>
-                                <div class="text-center mt-1">
-                                    <small class="text-muted text-truncate d-block" style="font-size: 10px;" title="${file.name}">
-                                        ${file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name}
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    previewContainer.append(previewHtml);
+                    // Use the same addPhotoPreview function for consistency and optimization support
+                    addPhotoPreview(previewContainer, file, e.target.result);
                 };
                 reader.readAsDataURL(file);
             });
@@ -1124,15 +1103,39 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                     .filter(item => item.length > 0)
                 : [];
                 
-            // Collect photos data (similar to main form implementation)
+            // Collect photos data with optimization metadata preservation (same as main modal)
             const photosList = [];
             const photoElements = $('#quickAddExperienceModal .photos-preview-container .photo-preview');
             photoElements.each(function() {
-                const photoData = {
-                    fileName: $(this).data('filename'),
-                    dataUrl: $(this).data('dataurl')
-                };
-                photosList.push(photoData);
+                const img = $(this).find('img');
+                if (img.length > 0) {
+                    const photoElement = $(this);
+                    const photoFullData = photoElement.attr('data-photo-full');
+                    
+                    
+                    // If we have full photo data stored, use it (preserves optimization metadata)
+                    if (photoFullData) {
+                        try {
+                            const fullData = JSON.parse(photoFullData.replace(/&#39;/g, "'"));
+                            // Update the dataUrl in case the image was refreshed with a new presigned URL
+                            fullData.dataUrl = img.attr('src');
+                            photosList.push(fullData);
+                        } catch (e) {
+                            console.warn('Quick Add - Failed to parse photo full data, falling back to basic data:', e);
+                            // Fallback to basic data
+                            photosList.push({
+                                dataUrl: img.attr('src'),
+                                fileName: photoElement.find('small').attr('title') || 'image.jpg'
+                            });
+                        }
+                    } else {
+                        // No full data available (new upload)
+                        photosList.push({
+                            dataUrl: img.attr('src'),
+                            fileName: photoElement.find('small').attr('title') || 'image.jpg'
+                        });
+                    }
+                }
             });
 
             const experienciaData = {
@@ -1159,25 +1162,84 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 team_notes: $('#quickExperienciaTeamNotes').val().trim() || null
             };
             
-            $('#saveQuickExperienceBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
+            // Check if there are images to optimize
+            const hasImagesToOptimize = photosList.some(p => p.dataUrl && p.dataUrl.startsWith('data:'));
+            const totalImages = photosList.filter(p => p.dataUrl && p.dataUrl.startsWith('data:')).length;
+            
+            const initialButtonText = hasImagesToOptimize ? 
+                `<i class="spinner-border spinner-border-sm me-1"></i>Optimizando ${totalImages} imagen${totalImages > 1 ? 'es' : ''}...` : 
+                '<i class="spinner-border spinner-border-sm me-1"></i>Guardando...';
+            
+            $('#saveQuickExperienceBtn').prop('disabled', true).html(initialButtonText);
+            
+            // Show optimization progress if needed
+            if (hasImagesToOptimize) {
+                const progressHtml = `
+                    <div id="quickOptimizationProgress" class="alert alert-info mb-3" role="alert">
+                        <div class="d-flex align-items-center">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Optimizando...</span>
+                            </div>
+                            <div>
+                                <strong>Optimización de imágenes en progreso</strong><br>
+                                <small>Las imágenes están siendo convertidas a formatos AVIF, WebP y JPEG para mejor rendimiento.</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Add progress indicator if not exists
+                if (!$('#quickOptimizationProgress').length) {
+                    $('#quickAddModalAlerts').prepend(progressHtml);
+                }
+            }
             
             $.ajax({
                 url: `/api/providers/${providerId}/experiencias`,
                 type: 'POST',
                 contentType: 'application/json',
                 data: JSON.stringify(experienciaData),
-                success: function(response) {
+                success: async function(response) {
                     if (response.success) {
+                        // Add delay for image processing if needed
+                        if (hasImagesToOptimize) {
+                            $('#saveQuickExperienceBtn').html('<i class="spinner-border spinner-border-sm me-1"></i>Finalizando optimización...');
+                            
+                            // Update progress indicator
+                            $('#quickOptimizationProgress').removeClass('alert-info').addClass('alert-success');
+                            $('#quickOptimizationProgress').html(`
+                                <div class="d-flex align-items-center">
+                                    <i class="ti ti-check-circle me-2" style="font-size: 1.2rem;"></i>
+                                    <div>
+                                        <strong>Optimización completada</strong><br>
+                                        <small>${totalImages} imagen${totalImages > 1 ? 'es optimizadas' : ' optimizada'} exitosamente.</small>
+                                    </div>
+                                </div>
+                            `);
+                            
+                            // Wait a bit for image processing to complete
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            
+                            // Remove progress indicator
+                            $('#quickOptimizationProgress').fadeOut(300, function() { 
+                                $(this).remove(); 
+                            });
+                        }
+                        
                         $('#quickAddExperienceModal').modal('hide');
                         dataTable.ajax.reload(null, false);
                         showSuccessAlert('Experiencia agregada exitosamente');
+                        
+                        // Reset button
+                        $('#saveQuickExperienceBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>Agregar Experiencia');
+                    } else {
+                        showQuickAddModalError('Error al agregar la experiencia');
+                        $('#saveQuickExperienceBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>Agregar Experiencia');
                     }
                 },
                 error: function(xhr) {
                     const errorMessage = xhr.responseJSON?.error || 'Error al agregar la experiencia';
                     showQuickAddModalError(errorMessage);
-                },
-                complete: function() {
                     $('#saveQuickExperienceBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>Agregar Experiencia');
                 }
             });
@@ -1326,13 +1388,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Populate photos if they exist
             const photosContainer = $(card).find('.photos-preview-container');
             if (experiencia.photos && experiencia.photos.length > 0) {
-                experiencia.photos.forEach(photo => {
+                experiencia.photos.forEach((photo, index) => {
+                    
                     // Backend now provides presigned URLs in dataUrl field
                     const photoUrl = photo.dataUrl || photo.url;
                     const fileName = photo.fileName || photo.name || 'image';
                     
                     if (photoUrl) {
-                        addPhotoPreview(photosContainer, { name: fileName }, photoUrl);
+                        // Pass the entire photo object to preserve all data
+                        addPhotoPreview(photosContainer, { name: fileName }, photoUrl, photo);
                     }
                 });
             }
@@ -1392,13 +1456,34 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Collect photos data from card
             const photoElements = card.find('.photo-preview');
             experiencia.photos = [];
-            photoElements.each(function() {
+            photoElements.each(function(idx) {
                 const img = $(this).find('img');
                 if (img.length > 0) {
-                    experiencia.photos.push({
-                        dataUrl: img.attr('src'),
-                        fileName: $(this).find('small').attr('title') || 'image.jpg'
-                    });
+                    // Try to get full photo data first
+                    const fullPhotoData = $(this).attr('data-photo-full');
+                    let photoData = null;
+                    
+                    
+                    if (fullPhotoData && fullPhotoData !== '') {
+                        try {
+                            // Parse the full photo data which includes all fields
+                            photoData = JSON.parse(fullPhotoData);
+                            // Update the URL in case it changed (e.g., new presigned URL)
+                            photoData.dataUrl = img.attr('src');
+                        } catch (e) {
+                            console.error('Error parsing photo data:', e, 'Raw data:', fullPhotoData);
+                        }
+                    }
+                    
+                    // Fallback if no full data available (new uploads)
+                    if (!photoData) {
+                        photoData = {
+                            dataUrl: img.attr('src'),
+                            fileName: $(this).find('small').attr('title') || 'image.jpg'
+                        };
+                    }
+                    
+                    experiencia.photos.push(photoData);
                 }
             });
             
@@ -2003,16 +2088,38 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 // Process advance booking time (minutes only)
                 const advanceBookingTime = parseInt(card.find('.experiencia-advance-minutes-input').val()) || 0;
                 
-                // Collect photos data from card
+                // Collect photos data from card - preserve full photo data including optimization metadata
                 const photoElements = card.find('.photo-preview');
                 const photosList = [];
                 photoElements.each(function() {
                     const img = $(this).find('img');
                     if (img.length > 0) {
-                        photosList.push({
-                            dataUrl: img.attr('src'),
-                            fileName: $(this).find('small').attr('title') || 'image.jpg'
-                        });
+                        const photoElement = $(this);
+                        const photoFullData = photoElement.attr('data-photo-full');
+                        
+                        
+                        // If we have full photo data stored, use it (preserves optimization metadata)
+                        if (photoFullData) {
+                            try {
+                                const fullData = JSON.parse(photoFullData.replace(/&#39;/g, "'"));
+                                // Update the dataUrl in case the image was refreshed with a new presigned URL
+                                fullData.dataUrl = img.attr('src');
+                                photosList.push(fullData);
+                            } catch (e) {
+                                console.warn('Failed to parse photo full data, falling back to basic data:', e);
+                                // Fallback to basic data
+                                photosList.push({
+                                    dataUrl: img.attr('src'),
+                                    fileName: photoElement.find('small').attr('title') || 'image.jpg'
+                                });
+                            }
+                        } else {
+                            // No full data available (new upload or legacy)
+                            photosList.push({
+                                dataUrl: img.attr('src'),
+                                fileName: photoElement.find('small').attr('title') || 'image.jpg'
+                            });
+                        }
                     }
                 });
                 
@@ -2388,7 +2495,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             // Collect all experiencia data from the inline cards
             const experienciasToSave = collectExperienciasFromCards();
 
-            $('#saveProviderBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
+            // Check if there are images to optimize
+            const experienciasToCheck = collectExperienciasFromCards();
+            let hasImagesToOptimize = false;
+            experienciasToCheck.forEach(exp => {
+                if (exp.photos && exp.photos.some(p => p.dataUrl && p.dataUrl.startsWith('data:'))) {
+                    hasImagesToOptimize = true;
+                }
+            });
+            
+            const initialButtonText = hasImagesToOptimize ? 
+                '<i class="spinner-border spinner-border-sm me-1"></i>Preparando optimización...' : 
+                '<i class="spinner-border spinner-border-sm me-1"></i>Guardando...';
+            
+            $('#saveProviderBtn').prop('disabled', true).html(initialButtonText);
 
             $.ajax({
                 url,
@@ -2402,6 +2522,50 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         // Save experiencias for the provider
                         if (actualProviderId && experienciasToSave.length > 0) {
                             try {
+                                // Count total images that need optimization
+                                let totalImages = 0;
+                                let hasNewImages = false;
+                                experienciasToSave.forEach(exp => {
+                                    if (exp.photos && exp.photos.length > 0) {
+                                        exp.photos.forEach(photo => {
+                                            if (photo.dataUrl && photo.dataUrl.startsWith('data:')) {
+                                                totalImages++;
+                                                hasNewImages = true;
+                                            }
+                                        });
+                                    }
+                                });
+                                
+                                // Update button text for experiencias processing
+                                if (hasNewImages) {
+                                    $('#saveProviderBtn').html(`<i class="spinner-border spinner-border-sm me-1"></i>Optimizando ${totalImages} imagen${totalImages > 1 ? 'es' : ''}...`);
+                                } else {
+                                    $('#saveProviderBtn').html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando experiencias...');
+                                }
+                                
+                                // Show a progress alert if we have images to optimize
+                                if (hasNewImages) {
+                                    // Show a progress alert in the modal
+                                    const progressHtml = `
+                                        <div id="optimizationProgress" class="alert alert-info mb-3" role="alert">
+                                            <div class="d-flex align-items-center">
+                                                <div class="spinner-border spinner-border-sm me-2" role="status">
+                                                    <span class="visually-hidden">Optimizando...</span>
+                                                </div>
+                                                <div>
+                                                    <strong>Optimización de imágenes en progreso</strong><br>
+                                                    <small>Las imágenes están siendo convertidas a formatos AVIF, WebP y JPEG para mejor rendimiento.</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                    
+                                    // Add progress indicator if not exists
+                                    if (!$('#optimizationProgress').length) {
+                                        $('#modalAlerts').prepend(progressHtml);
+                                    }
+                                }
+                                
                                 // First, get existing experiencias if editing
                                 let existingExperiencias = [];
                                 if (isEdit) {
@@ -2425,10 +2589,20 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                     }
                                 }
                                 
-                                // Update or create experiencias
+                                // Update button to show progress
+                                let processedCount = 0;
+                                const totalOperations = experienciasToSave.length;
+                                
+                                // Update or create experiencias with progress tracking
                                 for (let i = 0; i < experienciasToSave.length; i++) {
                                     const exp = experienciasToSave[i];
                                     exp.displayOrder = i;
+                                    
+                                    // Update progress text
+                                    const hasImages = exp.photos && exp.photos.some(p => p.dataUrl && p.dataUrl.startsWith('data:'));
+                                    if (hasImages) {
+                                        $('#saveProviderBtn').html(`<i class="spinner-border spinner-border-sm me-1"></i>Procesando experiencia ${i + 1}/${totalOperations}...`);
+                                    }
                                     
                                     if (exp.id) {
                                         // Update existing
@@ -2447,6 +2621,37 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                             data: JSON.stringify(exp)
                                         });
                                     }
+                                    
+                                    processedCount++;
+                                }
+                                
+                                // Final status update
+                                $('#saveProviderBtn').html('<i class="spinner-border spinner-border-sm me-1"></i>Finalizando...');
+                                
+                                // Add a delay to ensure backend processing completes
+                                if (hasNewImages) {
+                                    // Update progress indicator
+                                    $('#optimizationProgress').removeClass('alert-info').addClass('alert-success');
+                                    $('#optimizationProgress').html(`
+                                        <div class="d-flex align-items-center">
+                                            <i class="ti ti-check-circle me-2" style="font-size: 1.2rem;"></i>
+                                            <div>
+                                                <strong>Optimización completada</strong><br>
+                                                <small>${totalImages} imagen${totalImages > 1 ? 'es optimizadas' : ' optimizada'} exitosamente.</small>
+                                            </div>
+                                        </div>
+                                    `);
+                                    
+                                    // Wait a bit longer for image processing to complete
+                                    await new Promise(resolve => setTimeout(resolve, 2000));
+                                    
+                                    // Remove progress indicator
+                                    $('#optimizationProgress').fadeOut(300, function() { 
+                                        $(this).remove(); 
+                                    });
+                                } else {
+                                    // Small delay for regular saves
+                                    await new Promise(resolve => setTimeout(resolve, 500));
                                 }
                             } catch (error) {
                                 console.error('Error saving experiencias:', error);
@@ -2457,13 +2662,17 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         $('#providerModal').modal('hide');
                         dataTable.ajax.reload();
                         showSuccessAlert(isEdit ? 'Proveedor actualizado exitosamente' : 'Proveedor creado exitosamente');
+                        
+                        // Reset button after everything is done
+                        $('#saveProviderBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>' + (isEdit ? 'Guardar Cambios' : 'Crear Proveedor'));
+                    } else {
+                        showModalError('Error al guardar el proveedor');
+                        $('#saveProviderBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>' + (isEdit ? 'Guardar Cambios' : 'Crear Proveedor'));
                     }
                 },
                 error: function(xhr) {
                     const errorMessage = xhr.responseJSON?.error || 'Error al guardar el proveedor';
                     showModalError(errorMessage);
-                },
-                complete: function() {
                     $('#saveProviderBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>' + (isEdit ? 'Guardar Cambios' : 'Crear Proveedor'));
                 }
             });
@@ -2742,21 +2951,14 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 const files = this.files;
                 const previewContainer = card.find('.photos-preview-container');
                 
-                // Check maximum files limit
+                // No photo limit - removed restriction
                 const currentPhotos = previewContainer.find('.photo-preview').length;
-                const maxPhotos = 5;
-                
-                if (currentPhotos + files.length > maxPhotos) {
-                    showErrorAlert(`Máximo ${maxPhotos} fotos permitidas por experiencia`);
-                    this.value = ''; // Clear the input
-                    return;
-                }
 
                 // Process each selected file
                 Array.from(files).forEach(file => {
-                    // Validate file size (5MB max)
-                    if (file.size > 5 * 1024 * 1024) {
-                        showErrorAlert(`La imagen "${file.name}" es muy grande. Máximo 5MB.`);
+                    // Validate file size (10MB max - increased for better quality)
+                    if (file.size > 10 * 1024 * 1024) {
+                        showErrorAlert(`La imagen "${file.name}" es muy grande. Máximo 10MB.`);
                         return;
                     }
 
@@ -2784,14 +2986,101 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             });
         }
 
-        function addPhotoPreview(container, file, dataUrl) {
+        function addPhotoPreview(container, file, dataUrl, photoDataOrMetadata) {
             const photoId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            // Handle both old format (just metadata) and new format (full photo object)
+            let optimizationMetadata = null;
+            let fullPhotoData = null;
+            
+            if (photoDataOrMetadata) {
+                // If it's an object with any of the expected photo properties, it's the full photo object
+                if (typeof photoDataOrMetadata === 'object' && 
+                    (photoDataOrMetadata.s3Key || 
+                     photoDataOrMetadata.optimizationMetadata !== undefined ||
+                     photoDataOrMetadata.optimizedVariants ||
+                     photoDataOrMetadata.fileName)) {
+                    fullPhotoData = photoDataOrMetadata;
+                    optimizationMetadata = photoDataOrMetadata.optimizationMetadata;
+                    
+                } else {
+                    // Otherwise it's just the metadata (for backwards compatibility)
+                    optimizationMetadata = photoDataOrMetadata;
+                }
+            }
+            
+            // Check optimization metadata for format count - ALWAYS show badge
+            let formatBadge = '';
+            let formatInfo = '';
+            let badgeClass = '';
+            let iconClass = '';
+            let tooltipText = '';
+            
+            // Check if it's a new upload (base64 image)
+            if (dataUrl && dataUrl.startsWith('data:')) {
+                formatInfo = 'New - Not saved';
+                badgeClass = 'bg-warning';
+                iconClass = 'ti-alert-circle';
+                tooltipText = 'Will be optimized when saved';
+            } 
+            // Check optimization metadata
+            else if (optimizationMetadata && (optimizationMetadata.availableFormats || optimizationMetadata.formats)) {
+                const availableFormats = optimizationMetadata.availableFormats || 
+                                        optimizationMetadata.formats || 
+                                        [];
+                // Count non-original formats (AVIF, WebP, JPEG)
+                const optimizedFormats = availableFormats.filter(f => f !== 'original');
+                const formatCount = optimizedFormats.length;
+                
+                if (formatCount > 0) {
+                    formatInfo = `${formatCount} formats`;
+                    badgeClass = 'bg-success';
+                    iconClass = 'ti-photo';
+                    tooltipText = `Optimized: ${optimizedFormats.join(', ')}`;
+                } else {
+                    // Has metadata but 0 formats (optimization may have failed or not completed)
+                    formatInfo = '0 formats';
+                    badgeClass = 'bg-danger';
+                    iconClass = 'ti-x';
+                    tooltipText = 'No optimized formats available';
+                }
+            } 
+            // No metadata and not base64 (old image without optimization)
+            else {
+                // Check if it's an S3 URL (legacy upload before optimization)
+                if (dataUrl && (dataUrl.includes('amazonaws.com') || dataUrl.includes('http'))) {
+                    formatInfo = 'Legacy - No optimization';
+                    badgeClass = 'bg-secondary';
+                    iconClass = 'ti-photo-off';
+                    tooltipText = 'Uploaded before optimization was implemented. Re-upload to optimize.';
+                } else {
+                    formatInfo = 'Unknown';
+                    badgeClass = 'bg-dark';
+                    iconClass = 'ti-question-mark';
+                    tooltipText = 'Unknown image format';
+                }
+            }
+            
+            // Always create a badge
+            formatBadge = `
+                <span class="badge ${badgeClass} position-absolute" 
+                      style="top: 2px; left: 2px; font-size: 9px; padding: 2px 4px;"
+                      title="${tooltipText}">
+                    <i class="ti ${iconClass}" style="font-size: 9px;"></i> ${formatInfo}
+                </span>
+            `;
+            
+            // Store full photo data as data attribute to preserve all fields
+            const photoDataJson = fullPhotoData ? JSON.stringify(fullPhotoData) : '';
+            
+            
             const photoHtml = `
-                <div class="col-4 photo-preview" data-photo-id="${photoId}">
+                <div class="col-4 photo-preview" data-photo-id="${photoId}" data-photo-full='${photoDataJson.replace(/'/g, '&#39;')}'>
                     <div class="position-relative">
                         <img src="${dataUrl}" 
                              class="img-fluid rounded border" 
                              style="height: 80px; width: 100%; object-fit: cover;">
+                        ${formatBadge}
                         <button type="button" 
                                 class="btn btn-danger btn-sm position-absolute top-0 end-0 remove-photo-btn" 
                                 style="padding: 2px 6px; margin: 2px;">

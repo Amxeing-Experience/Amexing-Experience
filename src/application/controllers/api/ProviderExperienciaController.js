@@ -884,9 +884,26 @@ class ProviderExperienciaController {
             // Keep the original photo data as fallback
             processedPhotos.push(photo);
           }
-        } else {
-          // Keep existing photos (already optimized or other formats)
+        } else if (photo.s3Key || photo.optimizedVariants || photo.optimizationMetadata) {
+          // Keep existing photos but ensure we preserve all optimization data
+          // If the photo has essential fields, keep it as-is
+          // This handles photos that already have optimization data
           processedPhotos.push(photo);
+          logger.debug('Keeping existing optimized photo', {
+            fileName: photo.fileName,
+            hasS3Key: !!photo.s3Key,
+            hasOptimizationMetadata: !!photo.optimizationMetadata,
+          });
+        } else {
+          // This is likely a photo with just a URL but missing optimization data
+          // It might be from the frontend that lost the metadata
+          // Keep it but log a warning
+          processedPhotos.push(photo);
+          logger.warn('Photo missing optimization data, keeping as-is', {
+            fileName: photo.fileName,
+            providerId,
+            photoIndex: photos.indexOf(photo),
+          });
         }
       } catch (error) {
         logger.error('Error processing photo for optimization', {
