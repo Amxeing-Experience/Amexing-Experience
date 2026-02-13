@@ -1102,11 +1102,9 @@ function registerCloudFunctions() {
 
             // Process batches with proper error handling
             try {
-              console.log(`🔍 STARTING eachBatch for ${className} - about to process batches`);
               await query.eachBatch(
                 // eslint-disable-next-line no-loop-func
                 async (records) => {
-                  console.log(`🎯 eachBatch callback triggered for ${className} with ${records.length} records`);
                   batchCount++;
                   logger.info(`Processing ${className} batch ${batchCount} with ${records.length} records`, {
                     batchId,
@@ -1615,7 +1613,6 @@ function registerCloudFunctions() {
 
           batchId = lastInflation.get('batch_id');
           const processedCount = lastInflation.get('processed_count');
-          console.log(`Reverting most recent inflation batch with records: ${batchId} (${processedCount} records)`);
         }
 
         let totalReverted = 0;

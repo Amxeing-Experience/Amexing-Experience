@@ -123,4 +123,20 @@ router.patch(
   controller.setPrimary.bind(controller)
 );
 
+/**
+ * Serve optimized images with format negotiation
+ * GET /api/vehicles/optimized/:vehicleId/:imageName
+ * Alternative to CloudFront - serves best format based on Accept header.
+ * @access public
+ */
+// Optional: Only enable if image optimization is configured
+if (process.env.ENABLE_IMAGE_OPTIMIZATION === 'true') {
+  try {
+    const { serveOptimizedImageRoute } = require('../../../application/middleware/imageFormatNegotiation');
+    router.get('/optimized/:vehicleId/:imageName', serveOptimizedImageRoute);
+  } catch (error) {
+    console.warn('Image optimization route not enabled:', error.message);
+  }
+}
+
 module.exports = router;

@@ -1,0 +1,131 @@
+<%
+/**
+ * Optimized Image Component
+ * 
+ * Displays images with automatic format selection (AVIF → WebP → JPEG)
+ * Supports responsive sizes and lazy loading
+ * 
+ * @param {Object} image - Image data object
+ * @param {string} image.url - Primary image URL
+ * @param {Object} image.formats - Available format URLs {avif, webp, jpeg}
+ * @param {Object} image.sizes - Size variants {thumb, mobile, desktop}
+ * @param {string} alt - Alt text for accessibility
+ * @param {string} [className] - CSS classes
+ * @param {string} [loading='lazy'] - Loading strategy (lazy|eager)
+ * @param {string} [sizes] - HTML sizes attribute for responsive images
+ * @param {boolean} [priority=false] - High priority image (disables lazy loading)
+ * 
+ * Created by Denisse Maldonado
+ */
+
+// Set default values
+const imageData = typeof image === 'object' ? image : { url: image };
+const formats = imageData.formats || {};
+const sizesData = imageData.sizes || {};
+const altText = alt || 'Image';
+const cssClass = className || 'img-fluid';
+const loadingStrategy = priority ? 'eager' : (loading || 'lazy');
+const sizesAttr = sizes || '(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw';
+
+// Generate srcset for each format
+const generateSrcSet = (format) => {
+  const srcset = [];
+  
+  if (sizesData.thumb && sizesData.thumb[format]) {
+    srcset.push(`${sizesData.thumb[format]} 150w`);
+  }
+  
+  if (sizesData.mobile && sizesData.mobile[format]) {
+    srcset.push(`${sizesData.mobile[format]} 768w`);
+  }
+  
+  if (sizesData.desktop && sizesData.desktop[format]) {
+    srcset.push(`${sizesData.desktop[format]} 1920w`);
+  }
+  
+  // Add original format if available
+  if (formats[format]) {
+    if (srcset.length === 0) {
+      // If no sizes, just use the format URL
+      return formats[format];
+    }
+    // Add as default (no width specified)
+    srcset.push(formats[format]);
+  }
+  
+  return srcset.join(', ');
+};
+
+// Determine fallback URL
+const fallbackUrl = formats.jpeg || formats.jpg || imageData.url || '';
+%>
+
+<picture class="optimized-picture">
+  <% if (formats.avif) { %>
+  <!-- AVIF format for modern browsers (best compression) -->
+  <source 
+    type="image/avif"
+    srcset="<%= generateSrcSet('avif') %>"
+    <% if (sizes) { %>sizes="<%= sizesAttr %>"<% } %>
+  >
+  <% } %>
+  
+  <% if (formats.webp) { %>
+  <!-- WebP format for wide browser support (good compression) -->
+  <source 
+    type="image/webp"
+    srcset="<%= generateSrcSet('webp') %>"
+    <% if (sizes) { %>sizes="<%= sizesAttr %>"<% } %>
+  >
+  <% } %>
+  
+  <!-- JPEG fallback for universal support -->
+  <img 
+    src="<%= fallbackUrl %>"
+    <% if (generateSrcSet('jpeg') || generateSrcSet('jpg')) { %>
+    srcset="<%= generateSrcSet('jpeg') || generateSrcSet('jpg') %>"
+    <% } %>
+    <% if (sizes) { %>sizes="<%= sizesAttr %>"<% } %>
+    alt="<%= altText %>"
+    class="<%= cssClass %>"
+    loading="<%= loadingStrategy %>"
+    decoding="async"
+    onerror="this.onerror=null; this.src='/images/placeholder-vehicle.jpg';"
+  >
+</picture>
+
+<style>
+.optimized-picture {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.optimized-picture img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+}
+
+/* Lazy loading placeholder */
+.optimized-picture img[loading="lazy"] {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* High priority images */
+.optimized-picture img[loading="eager"] {
+  will-change: transform;
+}
+</style>

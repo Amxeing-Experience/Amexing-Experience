@@ -54,6 +54,7 @@
 const Parse = require('parse/node');
 const crypto = require('crypto');
 const logger = require('../../infrastructure/logger');
+const { getEnvironmentRegion } = require('../../infrastructure/aws/awsRegionValidator');
 
 /**
  * AWS S3 Direct Upload File Storage Service
@@ -123,7 +124,7 @@ class FileStorageService {
 
       // Initialize AWS S3 client using credential chain (IAM role, env vars, etc.)
       const AWS = require('aws-sdk');
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion(); // Use validated region
 
       // Configure AWS to use EC2 instance metadata with IMDSv2
       AWS.config.update({
@@ -193,7 +194,7 @@ class FileStorageService {
         s3Key: uploadResult.Key,
         s3Url: uploadResult.Location,
         bucket: uploadResult.Bucket,
-        region: process.env.AWS_REGION || 'us-east-2',
+        region,
         eTag: uploadResult.ETag,
         encryption: uploadParams.ServerSideEncryption,
       };
@@ -277,7 +278,7 @@ class FileStorageService {
   async getPresignedUrl(s3Key, expiresIn = null) {
     try {
       const bucket = process.env.S3_BUCKET;
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion();
 
       // Validate inputs
       if (!bucket) {
@@ -485,7 +486,7 @@ class FileStorageService {
       // Use AWS SDK directly for copy/delete operations
       // Parse.File doesn't support move/copy natively
       const AWS = require('aws-sdk');
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion();
 
       // Configure AWS to use EC2 instance metadata with IMDSv2
       AWS.config.update({
@@ -575,7 +576,7 @@ class FileStorageService {
   async _hardDelete(parseFile, options) {
     try {
       const AWS = require('aws-sdk');
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion();
 
       // Configure AWS to use EC2 instance metadata with IMDSv2
       AWS.config.update({
@@ -636,7 +637,7 @@ class FileStorageService {
   async listFiles(prefix) {
     try {
       const AWS = require('aws-sdk');
-      const region = process.env.AWS_REGION || 'us-east-2';
+      const region = getEnvironmentRegion();
 
       // Configure AWS to use EC2 instance metadata with IMDSv2
       AWS.config.update({

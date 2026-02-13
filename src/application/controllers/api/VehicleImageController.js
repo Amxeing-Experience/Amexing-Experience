@@ -22,6 +22,8 @@ const path = require('path');
 const logger = require('../../../infrastructure/logger');
 const VehicleImage = require('../../../domain/models/VehicleImage');
 const FileStorageService = require('../../services/FileStorageService');
+const ImageOptimizationService = require('../../services/ImageOptimizationService');
+const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 
 /**
  * VehicleImageController class for handling vehicle image operations with S3 storage.
@@ -35,6 +37,23 @@ class VehicleImageController {
     this.fileStorageService = new FileStorageService({
       baseFolder: 'vehicles',
       isPublic: false, // Use presigned URLs with IAM role credentials
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    });
+
+    // Initialize ImageOptimizationService for multi-format support
+    this.imageOptimizationService = new ImageOptimizationService({
+      baseFolder: 'vehicles',
+      isPublic: false,
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+      enableOptimization: process.env.ENABLE_IMAGE_OPTIMIZATION !== 'false',
+    });
+
+    // Initialize ServerImageOptimizationService for server-side processing
+    this.serverOptimizationService = new ServerImageOptimizationService({
+      baseFolder: 'vehicles',
+      isPublic: false,
       deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
       presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
     });
@@ -115,19 +134,25 @@ class VehicleImageController {
       const extension = path.extname(file.originalname).toLowerCase();
       const uniqueFileName = `${vehicleId}-${timestamp}-${randomHex}${extension}`;
 
-      // Upload directly to S3 using AWS SDK with user context for security logging
-      const uploadResult = await this.fileStorageService.uploadFile(file.buffer, uniqueFileName, file.mimetype, {
-        entityId: vehicleId,
-        userContext: {
-          userId: currentUser.id,
-          email: currentUser.get('email'),
-          username: currentUser.get('username'),
-        },
-      });
+      // Use server-side optimization to create multiple format variants
+      const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
+        file.buffer,
+        uniqueFileName,
+        file.mimetype,
+        {
+          entityPath: `vehicles/${vehicleId}`,
+          entityId: vehicleId,
+          userContext: {
+            userId: currentUser.id,
+            email: currentUser.get('email'),
+            username: currentUser.get('username'),
+          },
+        }
+      );
 
-      // Validate upload was successful
-      if (!uploadResult || !uploadResult.s3Key) {
-        throw new Error('Failed to upload file to S3 - upload result is invalid');
+      // Validate optimization was successful
+      if (!optimizationResult || !optimizationResult.success || !optimizationResult.originalS3Key) {
+        throw new Error('Failed to upload and optimize image - result is invalid');
       }
 
       // Create VehicleImage record in database
@@ -135,9 +160,9 @@ class VehicleImageController {
       const vehicleImage = new VehicleImageClass();
 
       vehicleImage.set('vehicleId', vehicle);
-      vehicleImage.set('s3Key', uploadResult.s3Key); // S3 object key
-      vehicleImage.set('s3Bucket', uploadResult.bucket); // S3 bucket name
-      vehicleImage.set('s3Region', uploadResult.region); // AWS region
+      vehicleImage.set('s3Key', optimizationResult.originalS3Key); // Original S3 key
+      vehicleImage.set('s3Bucket', process.env.S3_BUCKET); // S3 bucket name
+      vehicleImage.set('s3Region', process.env.AWS_REGION); // AWS region
       vehicleImage.set('fileName', file.originalname);
       vehicleImage.set('fileSize', file.size);
       vehicleImage.set('mimeType', file.mimetype);
@@ -145,6 +170,10 @@ class VehicleImageController {
       vehicleImage.set('uploadedAt', new Date());
       vehicleImage.set('active', true);
       vehicleImage.set('exists', true);
+
+      // Store optimization metadata
+      vehicleImage.set('optimizedVariants', optimizationResult.optimizedVariants);
+      vehicleImage.set('optimizationMetadata', optimizationResult.metadata);
 
       // Get existing count and set as primary if first
       const existingCount = await VehicleImage.getImageCount(vehicleId);
@@ -180,16 +209,20 @@ class VehicleImageController {
       // Recalculate display order based on creation time
       await VehicleImage.recalculateDisplayOrder(vehicleId);
 
-      // Generate presigned URL for immediate access
-      const presignedUrl = await this.fileStorageService.getPresignedUrl(uploadResult.s3Key);
+      // Generate presigned URL for best available format
+      const bestImageResult = await this.serverOptimizationService.getOptimizedImageUrl(
+        optimizationResult.originalS3Key,
+        req.get('Accept') || '',
+        'original'
+      );
 
       logger.info('Vehicle image uploaded to S3', {
         vehicleId,
         imageId: vehicleImage.id,
         fileName: file.originalname,
         fileSize: file.size,
-        s3Key: uploadResult.s3Key,
-        s3Bucket: uploadResult.bucket,
+        s3Key: optimizationResult.originalS3Key,
+        s3Bucket: process.env.S3_BUCKET,
         uploadedBy: currentUser.id,
       });
 
@@ -204,10 +237,10 @@ class VehicleImageController {
         fileName: file.originalname,
         fileSize: file.size,
         mimeType: file.mimetype,
-        s3Key: uploadResult.s3Key,
-        s3Bucket: uploadResult.bucket,
-        s3Region: uploadResult.region,
-        encryption: uploadResult.encryption,
+        s3Key: optimizationResult.originalS3Key,
+        s3Bucket: process.env.S3_BUCKET,
+        s3Region: process.env.AWS_REGION,
+        optimizedVariants: Object.keys(optimizationResult.optimizedVariants || {}),
         ipAddress: req.ip || req.connection.remoteAddress,
         userAgent: req.get('user-agent'),
         timestamp: new Date().toISOString(),
@@ -217,13 +250,21 @@ class VehicleImageController {
         success: true,
         data: {
           id: vehicleImage.id,
-          url: presignedUrl, // S3 presigned URL
+          url: bestImageResult.url, // Optimized URL
           fileName: vehicleImage.get('fileName'),
           fileSize: vehicleImage.get('fileSize'),
           isPrimary: vehicleImage.get('isPrimary'),
           displayOrder: vehicleImage.get('displayOrder'),
+          optimization: {
+            format: bestImageResult.format,
+            size: bestImageResult.size,
+            optimized: bestImageResult.optimized,
+            availableFormats: Object.keys(optimizationResult.optimizedVariants || {}),
+          },
         },
-        message: 'Imagen subida exitosamente',
+        message: optimizationResult.metadata?.fallback
+          ? 'Imagen subida exitosamente (optimización fallback)'
+          : 'Imagen subida y optimizada exitosamente',
       });
     } catch (error) {
       logger.error('Error uploading vehicle image to S3', {
@@ -277,6 +318,16 @@ class VehicleImageController {
     try {
       const vehicleId = req.params.id;
 
+      // Validate vehicle ID
+      if (!vehicleId || vehicleId === 'null' || vehicleId === 'undefined') {
+        return res.status(400).json({
+          success: false,
+          error: 'ID de vehículo requerido',
+        });
+      }
+
+      const acceptHeader = req.get('accept');
+
       // Verify vehicle exists
       const vehicle = await new Parse.Query('Vehicle').get(vehicleId, {
         useMasterKey: true,
@@ -296,25 +347,61 @@ class VehicleImageController {
           const s3Key = img.get('s3Key');
           const imageFile = img.get('imageFile'); // Legacy Parse.File support
 
-          // Generate presigned URL from s3Key, or fallback to legacy imageFile or url
-          let url = null;
-          if (s3Key) {
-            url = await this.fileStorageService.getPresignedUrl(s3Key);
-          } else if (imageFile) {
-            url = imageFile.url(); // Legacy Parse.File
-          } else {
-            url = img.get('url'); // Very old legacy local path
+          // Debug log
+          console.log('Processing image:', img.get('fileName'), 'optimizationMetadata:', img.get('optimizationMetadata'));
+
+          // Generate optimized URLs if optimization is enabled
+          let imageData = null;
+
+          try {
+            if (s3Key && this.imageOptimizationService && this.imageOptimizationService.enableOptimization) {
+              // Get optimized image with best format for client
+              imageData = await this.imageOptimizationService.getImageWithOptimalFormat(img, acceptHeader);
+            } else {
+              // Fallback to standard presigned URL
+              let url = null;
+              if (s3Key) {
+                url = await this.fileStorageService.getPresignedUrl(s3Key);
+              } else if (imageFile) {
+                url = imageFile.url(); // Legacy Parse.File
+              } else {
+                url = img.get('url'); // Very old legacy local path
+              }
+
+              if (!url) {
+                console.warn('No URL could be generated for image:', img.id);
+                // Create a placeholder or skip this image
+                url = '/images/placeholder-image.svg';
+              }
+
+              imageData = { url };
+            }
+          } catch (error) {
+            console.error('Error generating image URL:', error);
+            imageData = { url: '/images/placeholder-image.svg' };
           }
 
-          return {
+          const optimizationMetadata = img.get('optimizationMetadata') || imageData.metadata || null;
+
+          const result = {
             id: img.id,
-            url,
+            url: imageData.url,
+            formats: imageData.formats || {},
+            sizes: imageData.sizes || {},
             fileName: img.get('fileName'),
             fileSize: img.get('fileSize'),
             isPrimary: img.get('isPrimary'),
             displayOrder: img.get('displayOrder'),
             uploadedAt: img.get('uploadedAt'),
+            optimizationMetadata,
           };
+
+          console.log('Returning image data:', {
+            fileName: result.fileName,
+            optimizationMetadata: result.optimizationMetadata,
+          });
+
+          return result;
         })
       );
 
@@ -341,8 +428,10 @@ class VehicleImageController {
         count: data.length,
       });
     } catch (error) {
+      console.error('Detailed error listing vehicle images:', error);
       logger.error('Error listing vehicle images', {
         error: error.message,
+        stack: error.stack,
         vehicleId: req.params.id,
       });
 

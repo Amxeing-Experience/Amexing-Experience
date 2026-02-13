@@ -143,6 +143,21 @@ class VehicleRatePricesController {
     return res.status(501).json({ success: false, error: 'Not implemented yet' });
   }
 
+  /**
+   * Bulk update multiple vehicle rate prices.
+   * POST /api/vehicle-rate-prices/bulk-update.
+   * @param {object} req - Express request object containing array of price updates.
+   * @param {object} res - Express response object.
+   * @returns {Promise<void>} JSON response with operation status.
+   * @example
+   * // Request body
+   * {
+   *   "updates": [
+   *     { "id": "price1", "price": 150.00 },
+   *     { "id": "price2", "price": 200.00 }
+   *   ]
+   * }
+   */
   async bulkUpdatePrices(req, res) {
     return res.status(501).json({ success: false, error: 'Not implemented yet' });
   }

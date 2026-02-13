@@ -1,0 +1,32 @@
+{
+  "total": 59,
+  "processed": 57,
+  "skipped": 2,
+  "failed": 0,
+  "startTime": 1770680366341,
+  "errors": [],
+  "vehicleImages": {
+    "total": 52,
+    "processed": 52,
+    "skipped": 0,
+    "failed": 0
+  },
+  "experienceImages": {
+    "total": 7,
+    "processed": 5,
+    "skipped": 2,
+    "failed": 0
+  },
+  "duration": 574250,
+  "durationMinutes": 10,
+  "successRate": 97,
+  "timestamp": "2026-02-09T23:49:00.591Z",
+  "environment": "development",
+  "config": {
+    "batchSize": 3,
+    "dryRun": false,
+    "onlyVehicles": false,
+    "onlyExperiences": false,
+    "forceReprocess": false
+  }
+}

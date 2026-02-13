@@ -284,6 +284,11 @@ const formRoutes = require('./api/formRoutes');
 
 router.use('/forms', formRoutes);
 
+// Debug routes (before JWT middleware for troubleshooting)
+const DebugController = require('../../application/controllers/api/DebugController');
+
+router.post('/debug/load-vehicle-images-call', DebugController.logLoadVehicleImagesCall);
+
 // Protected API endpoints - use JWT authentication for API routes
 router.use(jwtMiddleware.authenticateToken);
 
@@ -346,6 +351,8 @@ router.use('/services-new', servicesNewRoutes);
 router.use('/rates', ratesRoutes);
 router.use('/experiences', experiencesRoutes);
 router.use('/experiences', experienceImagesRoutes); // Experience images endpoints
+router.use('/tours', require('./api/tourImagesRoutes'));
+// Tour images endpoints
 router.use('/', providerExperienciasRoutes); // Provider experiencias endpoints
 router.use('/tours', toursRoutes);
 router.use('/audit', auditRoutes); // Audit log endpoints

@@ -15,6 +15,23 @@
 
 const Parse = require('parse/node');
 
+/**
+ * VehicleRatePrices domain model for managing vehicle pricing by rate and service.
+ * Extends Parse.Object to provide structured vehicle rate pricing data with
+ * service, rate, and vehicle type relationships for pricing calculations.
+ * @class VehicleRatePrices
+ * @augments Parse.Object
+ * @author Amexing Development Team
+ * @version 1.0.0
+ * @since 1.0.0
+ * @example
+ * // Create a new vehicle rate price
+ * const vehicleRatePrice = new VehicleRatePrices();
+ * vehicleRatePrice.set('servicePtr', serviceObject);
+ * vehicleRatePrice.set('ratePtr', rateObject);
+ * vehicleRatePrice.set('price', 150.00);
+ * await vehicleRatePrice.save();
+ */
 class VehicleRatePrices extends Parse.Object {
   constructor() {
     super('VehicleRatePrices');
