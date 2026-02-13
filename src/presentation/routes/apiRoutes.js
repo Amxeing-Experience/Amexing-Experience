@@ -351,6 +351,8 @@ router.use('/services-new', servicesNewRoutes);
 router.use('/rates', ratesRoutes);
 router.use('/experiences', experiencesRoutes);
 router.use('/experiences', experienceImagesRoutes); // Experience images endpoints
+router.use('/tours', require('./api/tourImagesRoutes'));
+// Tour images endpoints
 router.use('/', providerExperienciasRoutes); // Provider experiencias endpoints
 router.use('/tours', toursRoutes);
 router.use('/audit', auditRoutes); // Audit log endpoints
