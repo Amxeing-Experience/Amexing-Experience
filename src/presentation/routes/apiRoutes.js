@@ -337,6 +337,8 @@ const vehicleRatePricesRoutes = require('./api/vehicleRatePricesRoutes');
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
 router.use('/users', userManagementRoutes);
+router.use('/profile', require('./api/profileImageRoutes'));
+// Profile image endpoints
 router.use('/amexingusers', amexingUsersRoutes);
 router.use('/clients', clientsRoutes);
 router.use('/employees', employeesRoutes);
