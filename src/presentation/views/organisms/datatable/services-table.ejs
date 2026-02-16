@@ -1041,9 +1041,15 @@ table.dataTable thead th:nth-child(2) select {
                             const sortedPrices = [...row.priceData].sort((a, b) => (a.price || 0) - (b.price || 0));
                             let pricesHtml = sortedPrices.map(p => {
                                 // Get capacity info from price data
-                                const defaultCapacity = p.vehicleType?.defaultCapacity || 4;
+                                let defaultCapacity = p.vehicleType?.defaultCapacity || 4;
                                 const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
                                 const vehicleName = p.vehicleType?.name || p.vehicleCode;
+                                
+                                // Reduce capacity by 1 if guide is active (guide takes a seat)
+                                const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+                                if (includeGuide && defaultCapacity > 1) {
+                                    defaultCapacity = defaultCapacity - 1;
+                                }
                                 
                                 // Display single price (client price if available, otherwise base price)
                                 const priceFormatted = `$${p.price.toLocaleString()} MXN`;
@@ -1627,6 +1633,9 @@ table.dataTable thead th:nth-child(2) select {
         // Store exchange rate data globally
         let currentExchangeRate = 0;
         
+        // Store guide transport rate data globally (hourly rate)
+        let currentGuideRate = 0;
+        
         // Check if current user is department manager or client
         const isDepartmentManager = (typeof userRole !== 'undefined' && userRole === 'department_manager');
         const isClient = (typeof userRole !== 'undefined' && userRole === 'client');
@@ -1800,13 +1809,71 @@ table.dataTable thead th:nth-child(2) select {
                 currency,
                 includeGuide,
                 currentTransferRate,
-                currentAgencyRate
+                currentAgencyRate,
+                currentGuideRate
+            });
+            
+            // Update capacity displays in main table
+            const capacitySelectors = [
+                '.price-item-card .text-muted',
+                '.price-container .text-muted',
+                '.fw-bold ~ .text-muted',
+                '.price-item-card .d-flex .text-muted'
+            ];
+            
+            capacitySelectors.forEach((selector) => {
+                const elements = $(selector);
+                
+                elements.each(function() {
+                    const capacityElement = $(this);
+                    const capacityText = capacityElement.html();
+                    
+                    // Look for user icon in the content
+                    if (capacityText && capacityText.includes('ti-user')) {
+                        // Extract capacity number and update it based on guide state
+                        const capacityMatch = capacityText.match(/(\d+)\s*<i[^>]*class="[^"]*ti-user[^"]*"[^>]*><\/i>/);
+                        if (capacityMatch) {
+                            const currentDisplayCapacity = parseInt(capacityMatch[1]);
+                            
+                            // Get or store the original capacity
+                            let originalCapacity = capacityElement.data('original-capacity');
+                            if (!originalCapacity) {
+                                originalCapacity = includeGuide ? currentDisplayCapacity + 1 : currentDisplayCapacity;
+                                capacityElement.data('original-capacity', originalCapacity);
+                            }
+                            
+                            // Calculate the correct display capacity
+                            let displayCapacity = originalCapacity;
+                            if (includeGuide && originalCapacity > 1) {
+                                displayCapacity = originalCapacity - 1;
+                            }
+                            
+                            // Update the display
+                            const newHtml = capacityText.replace(/(\d+)(\s*<i[^>]*class="[^"]*ti-user[^"]*"[^>]*><\/i>)/, `${displayCapacity}$2`);
+                            capacityElement.html(newHtml);
+                        }
+                    }
+                });
             });
             
             // Update main price column
             $('.price-container').each(function() {
                 const container = $(this);
                 const originalPrices = container.find('.fw-bold');
+                
+                // Get the service row to find the duration
+                const row = container.closest('tr');
+                let routeDuration = 0;
+                
+                // Find duration from the 3rd column (Duración de Trayecto)
+                const durationText = row.find('td:nth-child(3)').text();
+                const durationMatch = durationText.match(/(\d+(?:\.\d+)?)/);
+                if (durationMatch) {
+                    // Duration is in minutes, convert to hours
+                    const durationMinutes = parseFloat(durationMatch[1]);
+                    routeDuration = durationMinutes / 60;
+                    console.log('⏰ Route duration found:', durationMinutes, 'minutes =', routeDuration.toFixed(2), 'hours');
+                }
                 
                 originalPrices.each(function() {
                     const priceElement = $(this);
@@ -1831,6 +1898,21 @@ table.dataTable thead th:nth-child(2) select {
                         finalPrice = applyAgencyRate(finalPrice);
                     }
                     
+                    // Apply guide cost if enabled
+                    if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
+                        // Calculate guide cost: duration * 2 * hourly_rate
+                        const guideCost = routeDuration * 2 * currentGuideRate;
+                        console.log('🚗 Adding guide cost:', guideCost, 'MXN (', routeDuration, '* 2 *', currentGuideRate, ')');
+                        
+                        // Extract numeric value from price string
+                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                        if (priceMatch) {
+                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                            const newPrice = numericPrice + guideCost;
+                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                        }
+                    }
+                    
                     // Always apply currency conversion/formatting
                     finalPrice = applyCurrencyConversion(finalPrice, currency);
                     
@@ -1839,15 +1921,40 @@ table.dataTable thead th:nth-child(2) select {
             });
             
             // Update expanded rates view if open
-            $('.vehicle-option .fw-bold').each(function() {
-                const priceElement = $(this);
-                let originalPrice = priceElement.data('original-price');
+            $('.vehicle-option').each(function() {
+                const vehicleOption = $(this);
+                const priceElement = vehicleOption.find('.fw-bold');
                 
-                if (!originalPrice) {
-                    originalPrice = priceElement.text();
-                    priceElement.data('original-price', originalPrice);
+                // Skip if no price element found
+                if (priceElement.length === 0) return;
+                
+                // Get the service row to find the duration
+                const childRow = vehicleOption.closest('tr.child');
+                if (childRow.length === 0) return; // Not in an expanded row
+                
+                const row = childRow.prev('tr');
+                let routeDuration = 0;
+                
+                // Find duration from the 3rd column (Duración de Trayecto)
+                const durationText = row.find('td:nth-child(3)').text();
+                const durationMatch = durationText.match(/(\d+(?:\.\d+)?)/);
+                if (durationMatch) {
+                    // Duration is in minutes, convert to hours
+                    const durationMinutes = parseFloat(durationMatch[1]);
+                    routeDuration = durationMinutes / 60;
+                    console.log('⏰ [Expanded Update] Route duration:', durationMinutes, 'minutes =', routeDuration.toFixed(2), 'hours');
                 }
                 
+                let originalPrice = priceElement.attr('data-original-price');
+                
+                if (!originalPrice) {
+                    // Store the current text as original if not already stored
+                    originalPrice = priceElement.text();
+                    priceElement.attr('data-original-price', originalPrice);
+                    console.log('💰 [Expanded] Storing original price:', originalPrice);
+                }
+                
+                // Start from the clean original price
                 let finalPrice = originalPrice;
                 
                 // Apply appropriate rate based on payment type
@@ -1858,6 +1965,22 @@ table.dataTable thead th:nth-child(2) select {
                 } else if (paymentType === 'tarjeta') {
                     console.log('💳 [Expanded View] Applying Agency Rate for tarjeta');
                     finalPrice = applyAgencyRate(finalPrice);
+                }
+                
+                // Apply guide cost if enabled
+                if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
+                    // Calculate guide cost: duration * 2 * hourly_rate
+                    const guideCost = routeDuration * 2 * currentGuideRate;
+                    console.log('🚗 [Expanded] Adding guide cost:', guideCost, 'MXN to', finalPrice);
+                    
+                    // Extract numeric value from price string
+                    const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                    if (priceMatch) {
+                        const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                        const newPrice = numericPrice + guideCost;
+                        finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                        console.log('🚗 [Expanded] New price with guide:', finalPrice);
+                    }
                 }
                 
                 // Always apply currency conversion/formatting
@@ -1881,6 +2004,35 @@ table.dataTable thead th:nth-child(2) select {
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             
+            // Option 1: Auto-refresh expanded rows (better UX)
+            // Check if there are any expanded rows
+            const expandedRows = $('.expand-services-prices-btn.expanded');
+            if (expandedRows.length > 0) {
+                console.log('🔄 Refreshing', expandedRows.length, 'expanded rows with new guide state');
+                
+                // Close and re-open each expanded row to get fresh prices
+                expandedRows.each(function() {
+                    const button = $(this);
+                    const rowId = button.data('row-id');
+                    
+                    // Find the DataTable row
+                    const row = dataTable.rows().nodes().to$().filter(function() {
+                        return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
+                    }).first();
+                    
+                    const dtRow = dataTable.row(row);
+                    
+                    // Close the row
+                    dtRow.child.hide();
+                    button.removeClass('expanded');
+                    
+                    // Re-open with updated prices
+                    setTimeout(() => {
+                        button.click();
+                    }, 100);
+                });
+            }
+            
             // Update all prices with new guide state
             updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
         });
@@ -1891,6 +2043,31 @@ table.dataTable thead th:nth-child(2) select {
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
             const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
             console.log('Payment type changed:', selectedPaymentType, 'Guide:', includeGuide);
+            
+            // Auto-refresh expanded rows
+            const expandedRows = $('.expand-services-prices-btn.expanded');
+            if (expandedRows.length > 0) {
+                console.log('🔄 Refreshing', expandedRows.length, 'expanded rows with new payment type');
+                
+                expandedRows.each(function() {
+                    const button = $(this);
+                    const rowId = button.data('row-id');
+                    
+                    const row = dataTable.rows().nodes().to$().filter(function() {
+                        return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
+                    }).first();
+                    
+                    const dtRow = dataTable.row(row);
+                    
+                    // Close and re-open
+                    dtRow.child.hide();
+                    button.removeClass('expanded');
+                    
+                    setTimeout(() => {
+                        button.click();
+                    }, 100);
+                });
+            }
             
             if (selectedPaymentType === 'transferencia') {
                 // Transferencia always uses Transfer Rate
@@ -1919,7 +2096,33 @@ table.dataTable thead th:nth-child(2) select {
         $(`#currencyFilter-${tableId}`).on('change', function() {
             const selectedCurrency = $(this).val();
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
-            console.log('🏪 Services currency changed:', selectedCurrency);
+            const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+            console.log('🏪 Services currency changed:', selectedCurrency, 'Guide:', includeGuide);
+            
+            // Auto-refresh expanded rows
+            const expandedRows = $('.expand-services-prices-btn.expanded');
+            if (expandedRows.length > 0) {
+                console.log('🔄 Refreshing', expandedRows.length, 'expanded rows with new currency');
+                
+                expandedRows.each(function() {
+                    const button = $(this);
+                    const rowId = button.data('row-id');
+                    
+                    const row = dataTable.rows().nodes().to$().filter(function() {
+                        return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
+                    }).first();
+                    
+                    const dtRow = dataTable.row(row);
+                    
+                    // Close and re-open
+                    dtRow.child.hide();
+                    button.removeClass('expanded');
+                    
+                    setTimeout(() => {
+                        button.click();
+                    }, 100);
+                });
+            }
             
             // Call global sync to update all currency dropdowns across tables
             if (typeof window.syncCurrencyDropdowns === 'function') {
@@ -1992,13 +2195,43 @@ table.dataTable thead th:nth-child(2) select {
                 }
             });
         }
+        
+        // Load current guide transport rate from API
+        function loadCurrentGuideRate() {
+            return $.ajax({
+                url: '/api/guide-transport-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentGuideRate = response.data.value || 0;
+                        console.log('✅ Current guide transport rate loaded:', currentGuideRate, 'MXN per hour');
+                    } else {
+                        console.warn('⚠️ No active guide transport rate found');
+                        currentGuideRate = 0;
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading guide transport rate:', error);
+                    currentGuideRate = 0;
+                }
+            });
+        }
 
-        // Load rates on initialization - BOTH rates needed for all users now
-        // Load both transfer and agency rates for ALL users
-        console.log('💰 Loading both Transfer and Agency rates for all users');
+        // Load rates on initialization - ALL rates needed for all users now
+        // Load transfer, agency, exchange and guide rates for ALL users
+        console.log('💰 Loading all rates for all users');
         
         // Load Transfer Rate
         loadCurrentTransferRate();
+        
+        // Load Guide Transport Rate
+        loadCurrentGuideRate();
         
         // Load Agency Rate
         loadCurrentAgencyRate().then(() => {
@@ -2010,7 +2243,7 @@ table.dataTable thead th:nth-child(2) select {
             
             // Note: initializeTable() will be called automatically by rate filter change event
             
-            console.log('💰 Both rates loaded, table initialized');
+            console.log('💰 All rates loaded, table initialized');
         });
 
         // Handle expand/collapse prices functionality
@@ -2085,6 +2318,30 @@ table.dataTable thead th:nth-child(2) select {
                                 pricesByRate[rateName].push(item);
                             });
                             
+                            // Get current filter states
+                            const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+                            const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                            const currentCurrency = $(`#currencyFilter-${tableId}`).val();
+                            let routeDuration = 0;
+                            
+                            // Find duration from the parent row's 3rd column
+                            const durationText = row.find('td:nth-child(3)').text();
+                            const durationMatch = durationText.match(/(\d+(?:\.\d+)?)/);
+                            if (durationMatch) {
+                                // Duration is in minutes, convert to hours
+                                const durationMinutes = parseFloat(durationMatch[1]);
+                                routeDuration = durationMinutes / 60;
+                                console.log('⏰ [Expand] Route duration:', durationMinutes, 'minutes =', routeDuration.toFixed(2), 'hours');
+                            }
+                            
+                            // Calculate guide cost if needed
+                            let guideCost = 0;
+                            if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
+                                guideCost = routeDuration * 2 * currentGuideRate;
+                                console.log('🚗 [Expand] Guide cost to add:', guideCost, 'MXN');
+                            }
+                            
+                            
                             // Generate card-based HTML for all rates
                             let allRatesHtml = '<div class="row g-3 mt-2">';
                             
@@ -2105,11 +2362,48 @@ table.dataTable thead th:nth-child(2) select {
                                 const vehicleOptionsHtml = sortedPrices.map(p => {
                                     const vehicleCode = p.vehicleType?.code || 'N/A';
                                     const vehicleName = p.vehicleType?.name || 'Vehículo';
-                                    const price = p.formattedPrice || `$${p.price || 0}`;
+                                    
+                                    // Apply all price transformations in correct order
+                                    let finalPrice = `$${p.price.toLocaleString()} MXN`;
+                                    
+                                    // 1. Apply payment type rates
+                                    if (currentPaymentType === 'transferencia') {
+                                        finalPrice = applyTransferRate(finalPrice);
+                                    } else if (currentPaymentType === 'tarjeta') {
+                                        finalPrice = applyAgencyRate(finalPrice);
+                                    }
+                                    
+                                    // 2. Apply guide cost
+                                    if (guideCost > 0) {
+                                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                                        if (priceMatch) {
+                                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                                            const newPrice = numericPrice + guideCost;
+                                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                                        }
+                                    }
+                                    
+                                    // 3. Apply currency conversion
+                                    finalPrice = applyCurrencyConversion(finalPrice, currentCurrency);
+                                    
+                                    console.log('💰 [Expand] Price transformation:', {
+                                        vehicle: vehicleName,
+                                        original: `$${p.price.toLocaleString()} MXN`,
+                                        final: finalPrice,
+                                        paymentType: currentPaymentType,
+                                        currency: currentCurrency,
+                                        guideCost: guideCost
+                                    });
                                     
                                     // Get capacity info from database
-                                    const defaultCapacity = p.vehicleType?.defaultCapacity || 4;
+                                    let defaultCapacity = p.vehicleType?.defaultCapacity || 4;
                                     const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
+                                    
+                                    // Reduce capacity by 1 if guide is active (guide takes a seat)
+                                    if (includeGuide && defaultCapacity > 1) {
+                                        defaultCapacity = defaultCapacity - 1;
+                                    }
+                                    
                                     const capacityInfo = `${defaultCapacity} <i class="ti ti-user"></i> ${trunkCapacity} <i class="ti ti-briefcase"></i>`;
                                     
                                     return `
@@ -2125,9 +2419,9 @@ table.dataTable thead th:nth-child(2) select {
                                                 </div>
                                                 <div class="text-end">
                                                     ${(() => {
-                                                        // Display single price with consistent styling
-                                                        const priceFormatted = `$${p.price.toLocaleString()} MXN`;
-                                                        return `<div class="fw-bold small" style="color: ${rateColor}" data-price="${priceFormatted}">${priceFormatted}</div>`;
+                                                        // Store original price and display transformed price
+                                                        const originalPriceFormatted = `$${p.price.toLocaleString()} MXN`;
+                                                        return `<div class="fw-bold small" style="color: ${rateColor}" data-original-price="${originalPriceFormatted}">${finalPrice}</div>`;
                                                     })()}
                                                 </div>
                                             </div>
@@ -3280,7 +3574,16 @@ table.dataTable thead th:nth-child(2) select {
                                             <strong>${vehicleType?.name || 'Vehículo'}</strong>
                                             ${isClientPrice ? '<span class="badge bg-success ms-2">Personalizado</span>' : ''}
                                             <br>
-                                            <small class="text-muted">${vehicleType?.code || ''} - Capacidad: ${vehicleType?.defaultCapacity || 'N/A'} pax</small>
+                                            <small class="text-muted">${vehicleType?.code || ''} - Capacidad: ${(() => {
+                                                let capacity = vehicleType?.defaultCapacity || 'N/A';
+                                                if (capacity !== 'N/A') {
+                                                    const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+                                                    if (includeGuide && capacity > 1) {
+                                                        capacity = capacity - 1;
+                                                    }
+                                                }
+                                                return capacity;
+                                            })()} pax</small>
                                             ${isDevelopment && ratePriceId ? `<br><small class="text-info" style="font-size: 10px;"><i class="ti ti-bug"></i> RatePrices ID: ${ratePriceId}</small>` : ''}
                                         </div>
                                     </div>
