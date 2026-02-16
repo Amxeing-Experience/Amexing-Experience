@@ -66,7 +66,7 @@ const isClient = dtUserRole === 'client';
     text-align: left;
 }
 
-/* Hide any default sorting indicators */
+/* Hide any default sorting indicators and disable cursor */
 table.dataTable thead .sorting::before,
 table.dataTable thead .sorting::after,
 table.dataTable thead .sorting_asc::before,
@@ -74,6 +74,17 @@ table.dataTable thead .sorting_asc::after,
 table.dataTable thead .sorting_desc::before,
 table.dataTable thead .sorting_desc::after {
     display: none !important;
+}
+
+/* Disable cursor and make headers non-clickable */
+#<%= dtTableId %> thead th {
+    cursor: default !important;
+    pointer-events: none; /* Disable all mouse events on headers */
+}
+
+/* Re-enable events on dropdown in header */
+#<%= dtTableId %> thead th select {
+    pointer-events: all !important;
 }
 
 /* Ensure only our button shows */
@@ -702,35 +713,186 @@ table.dataTable thead th:nth-child(2) select {
             }
             
             const filtered = allServicesData.filter(service => {
-                // Get service type from destination POI
+                // Get service type from both origin and destination POI
                 const destinationPOI = service.destinationPOI;
+                const originPOI = service.originPOI;
+                
                 if (!destinationPOI) {
                     console.log(`❌ Service ${service.id} has no destinationPOI`);
                     return false;
                 }
                 
-                const serviceType = destinationPOI.serviceType?.name;
+                // Get service types from both POIs
+                const destServiceType = destinationPOI.serviceType?.name || destinationPOI.serviceType;
+                const originServiceType = originPOI?.serviceType?.name || originPOI?.serviceType;
                 
-                // Check service type match
+                // Get POI names for checking
+                const destName = destinationPOI.name || '';
+                const originName = originPOI?.name || '';
                 
+                // For airport filter, check if either origin or destination is an airport
+                // This handles both directions (Hotel → Airport and Airport → Hotel)
                 let matches = false;
                 switch(type) {
                     case 'airport':
-                        matches = serviceType === 'Aeropuerto';
+                        // STRICT: A service is "airport" ONLY if it has an airport code in parentheses
+                        const airportCodePattern = /\([A-Z]{3,4}\)/;  // Pattern for (MEX), (AIFA), etc.
+                        const hasAirportCode = airportCodePattern.test(destName) || airportCodePattern.test(originName);
+                        
+                        // ONLY include services WITH airport codes
+                        matches = hasAirportCode;
+                        
+                        // Debug logging for troubleshooting
+                        if (!matches && (destServiceType === 'Aeropuerto' || originServiceType === 'Aeropuerto')) {
+                            console.log(`⚠️ EXCLUDED from airport (no code):`, {
+                                route: `${originName || 'None'} → ${destName}`,
+                                hasCode: false
+                            });
+                        }
+                        if (matches && allServicesData.indexOf(service) < 5) {
+                            console.log(`✅ INCLUDED in airport:`, `${originName || 'None'} → ${destName}`);
+                        }
                         break;
                     case 'p2p':
-                        matches = serviceType === 'Punto a Punto';
+                        // P2P (Punto a Punto) services - STRICT criteria:
+                        const p2pAirportPattern = /\([A-Z]{3,4}\)/;
+                        const hasNoAirportCode = !p2pAirportPattern.test(destName) && !p2pAirportPattern.test(originName || '');
+                        const hasOriginAndDest = originPOI && destinationPOI;
+                        const notAirportType = destServiceType !== 'Aeropuerto' && originServiceType !== 'Aeropuerto';
+                        
+                        // VERY STRICT: Must be explicitly Punto a Punto type
+                        const isPuntoAPuntoType = destServiceType === 'Punto a Punto' || originServiceType === 'Punto a Punto';
+                        const isNotLocalType = destServiceType !== 'Local';
+                        
+                        // ULTRA STRICT: Must be explicitly Punto a Punto type AND meet all other criteria
+                        matches = hasOriginAndDest && hasNoAirportCode && notAirportType && isNotLocalType && isPuntoAPuntoType;
+                        
+                        // Debug logging - show what's being included/excluded
+                        const serviceIndex = allServicesData.indexOf(service);
+                        if (serviceIndex < 10) { // Debug first 10 services
+                            const debugInfo = {
+                                route: `${originName || 'NO_ORIGIN'} → ${destName}`,
+                                hasOrigin: !!originPOI,
+                                hasDest: !!destinationPOI,
+                                noAirportCode: hasNoAirportCode,
+                                destType: destServiceType,
+                                originType: originServiceType,
+                                notAirportType: notAirportType,
+                                isNotLocal: isNotLocalType,
+                                RESULT: matches ? '✅ INCLUDED' : '❌ EXCLUDED'
+                            };
+                            
+                            console.log(`P2P Debug [${serviceIndex}]:`, debugInfo);
+                            
+                            if (matches && (destServiceType !== 'Punto a Punto' && originServiceType !== 'Punto a Punto')) {
+                                console.warn(`⚠️ P2P service included but not 'Punto a Punto' type:`, debugInfo);
+                            }
+                        }
                         break;
                     case 'local':
-                        matches = serviceType === 'Local';
+                        // Local services:
+                        // 1. Must NOT have airport codes 
+                        // 2. Typically have NO origin (local tours/trips)
+                        // 3. Should be Local type OR have no origin
+                        const localAirportPattern = /\([A-Z]{3,4}\)/;
+                        const noAirportCodes = !localAirportPattern.test(destName) && !localAirportPattern.test(originName || '');
+                        const hasNoOrigin = !originPOI;
+                        const isNotAirport = destServiceType !== 'Aeropuerto';
+                        
+                        // Local = no origin OR Local type, but never airports
+                        matches = noAirportCodes && isNotAirport && (hasNoOrigin || destServiceType === 'Local');
+                        
+                        // Debug logging
+                        if (matches && allServicesData.indexOf(service) < 5) {
+                            console.log(`✅ Local service: ${destName} (no origin)`);
+                        }
                         break;
                     default:
                         matches = true;
                 }
                 
-                // Log result if needed for debugging
+                // Debug logging for problematic services - only log in development mode
+                if (isDevelopment && type === 'airport' && matches && !destName.includes('(') && !originName?.includes('(')) {
+                    console.log(`⚠️ Service included in airport filter but no airport code:`, {
+                        id: service.id,
+                        dest: destName,
+                        origin: originName,
+                        destType: destServiceType,
+                        originType: originServiceType
+                    });
+                }
+                
                 return matches;
             });
+            
+            // Log filter results with validation
+            console.log(`📋 Filter '${type}' applied: ${filtered.length} services out of ${allServicesData.length} total`);
+            
+            // Validate filter results
+            if (type === 'p2p' || type === 'local') {
+                const airportPattern = /\([A-Z]{3,4}\)/;
+                const servicesWithAirportCodes = filtered.filter(s => {
+                    const dest = s.destinationPOI?.name || '';
+                    const origin = s.originPOI?.name || '';
+                    return airportPattern.test(dest) || airportPattern.test(origin);
+                });
+                
+                if (servicesWithAirportCodes.length > 0) {
+                    console.error(`❌ WARNING: ${servicesWithAirportCodes.length} services with airport codes in '${type}' filter!`);
+                    servicesWithAirportCodes.slice(0, 5).forEach(s => {
+                        console.log(`  ❌ Should be excluded: ${s.originPOI?.name || 'None'} → ${s.destinationPOI?.name}`);
+                    });
+                }
+            }
+            
+            // Enhanced validation for P2P
+            if (type === 'p2p') {
+                console.log('\n🔍 P2P FILTER ANALYSIS:');
+                
+                // Check services without origin
+                const servicesWithoutOrigin = filtered.filter(s => !s.originPOI);
+                if (servicesWithoutOrigin.length > 0) {
+                    console.error(`❌ ERROR: ${servicesWithoutOrigin.length} P2P services without origin!`);
+                    servicesWithoutOrigin.slice(0, 5).forEach(s => {
+                        console.log(`  ❌ Missing origin: ${s.destinationPOI?.name} (Type: ${s.destinationPOI?.serviceType?.name})`);
+                    });
+                }
+                
+                // Check service types in P2P filter
+                const typeBreakdown = {};
+                filtered.forEach(s => {
+                    const type = s.destinationPOI?.serviceType?.name || 'Unknown';
+                    typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
+                });
+                console.log('P2P Service Types:', typeBreakdown);
+                
+                // Show services that are NOT 'Punto a Punto' type
+                const nonP2PTypes = filtered.filter(s => 
+                    s.destinationPOI?.serviceType?.name !== 'Punto a Punto' && 
+                    s.originPOI?.serviceType?.name !== 'Punto a Punto'
+                );
+                
+                if (nonP2PTypes.length > 0) {
+                    console.warn(`⚠️ ${nonP2PTypes.length} services in P2P filter are NOT 'Punto a Punto' type:`);
+                    nonP2PTypes.slice(0, 8).forEach(s => {
+                        console.log(`  ⚠️ ${s.originPOI?.name || 'No origin'} → ${s.destinationPOI?.name} (Dest: ${s.destinationPOI?.serviceType?.name}, Origin: ${s.originPOI?.serviceType?.name || 'None'})`);
+                    });
+                }
+            }
+            
+            // Additional validation for Local  
+            if (type === 'local') {
+                const servicesWithOrigin = filtered.filter(s => s.originPOI);
+                const nonLocalWithOrigin = servicesWithOrigin.filter(s => 
+                    s.destinationPOI?.serviceType?.name !== 'Local'
+                );
+                if (nonLocalWithOrigin.length > 0) {
+                    console.warn(`⚠️ ${nonLocalWithOrigin.length} local services have origin (might be valid for Local type):`);
+                    nonLocalWithOrigin.slice(0, 3).forEach(s => {
+                        console.log(`  ⚠️ ${s.originPOI?.name} → ${s.destinationPOI?.name} (Type: ${s.destinationPOI?.serviceType?.name})`);
+                    });
+                }
+            }
             
             // Return filtered results
             return filtered;
@@ -741,16 +903,28 @@ table.dataTable thead th:nth-child(2) select {
             processing: true,
             serverSide: false, // Changed to client-side
             data: [], // Will be populated after data loads
+            ordering: false, // Disable all interactive column sorting
             columns: [
                 // 1. Ruta (Origin → Destination)
                 {
                     data: null,
-                    orderable: false,
+                    orderable: false, // Disable interactive sorting
                     render: function(data, type, row) {
                         const origin = row.originPOI?.name || null;
                         const destination = row.destinationPOI?.name || 'Destino';
                         
-                        if (type === 'filter' || type === 'sort') {
+                        if (type === 'sort') {
+                            // For sorting, extract the airport code from parentheses
+                            // Priority: destination airport code, then origin airport code
+                            const destMatch = destination.match(/\(([A-Z]+)\)/);
+                            const originMatch = origin ? origin.match(/\(([A-Z]+)\)/) : null;
+                            
+                            // Use destination code if it's an airport, otherwise use origin code if available
+                            const airportCode = destMatch ? destMatch[1] : (originMatch ? originMatch[1] : destination);
+                            return airportCode;
+                        }
+                        
+                        if (type === 'filter') {
                             return `${origin || 'Local'} ${destination}`;
                         }
                         
@@ -1024,8 +1198,7 @@ table.dataTable thead th:nth-child(2) select {
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando traslados...'
             },
             order: [
-                [1, 'asc'],  // 1. Categoría/Tarifa
-                [0, 'asc'],  // 2. Ruta
+                [0, 'asc']  // Sort by Ruta (airport code) alphabetically
             ],
             pageLength: 10,
             searchDelay: 300,
@@ -1055,12 +1228,96 @@ table.dataTable thead th:nth-child(2) select {
         // Initialize data and table
         async function initializeTable() {
             try {
-                // Only load services if we don't have filtered data already
-                // (in case rate filter already loaded the data)
-                if (filteredData.length === 0) {
-                    await loadAllServices();
+                // Get the current active filter (default to 'airport' if none selected)
+                const activeFilter = $('.filter-pill.active').data('filter') || 'airport';
+                
+                console.log(`🔧 initializeTable called with active filter: '${activeFilter}'`);
+                console.log(`🔧 Active filter pill:`, $('.filter-pill.active').length, $('.filter-pill.active').text());
+                
+                // Load all services
+                await loadAllServices();
+                
+                console.log(`📊 Total services loaded: ${allServicesData.length}`);
+                
+                // Apply the active filter to the loaded data
+                filteredData = filterServicesByType(activeFilter);
+                
+                console.log(`📊 After filtering for '${activeFilter}': ${filteredData.length} services`);
+                
+                // Enhanced filter analysis
+                if (activeFilter === 'p2p') {
+                    console.log('\n🔍 DETAILED P2P FILTER RESULTS:');
+                    console.log(`Total P2P services: ${filteredData.length}`);
+                    
+                    // Analyze what got through
+                    const analysis = {
+                        withOrigin: filteredData.filter(s => s.originPOI).length,
+                        withoutOrigin: filteredData.filter(s => !s.originPOI).length,
+                        puntoAPuntoType: filteredData.filter(s => 
+                            s.destinationPOI?.serviceType?.name === 'Punto a Punto' || 
+                            s.originPOI?.serviceType?.name === 'Punto a Punto'
+                        ).length,
+                        otherTypes: filteredData.filter(s => 
+                            s.destinationPOI?.serviceType?.name !== 'Punto a Punto' && 
+                            s.originPOI?.serviceType?.name !== 'Punto a Punto'
+                        ).length
+                    };
+                    
+                    console.log('P2P Analysis:', analysis);
+                    
+                    // Show problematic services
+                    const problematic = filteredData.filter(s => 
+                        !s.originPOI || 
+                        s.destinationPOI?.serviceType?.name === 'Local' ||
+                        s.destinationPOI?.serviceType?.name === 'Aeropuerto'
+                    );
+                    
+                    if (problematic.length > 0) {
+                        console.error(`❌ ${problematic.length} PROBLEMATIC P2P services:`);
+                        problematic.slice(0, 10).forEach(s => {
+                            console.log(`  ❌ ${s.originPOI?.name || 'NO_ORIGIN'} → ${s.destinationPOI?.name} (${s.destinationPOI?.serviceType?.name})`);
+                        });
+                    }
                 }
-                // Data loaded and filtered successfully
+                
+                // Verify airport filter is working correctly
+                if (activeFilter === 'airport') {
+                    const airportCodePattern = /\([A-Z]{3,4}\)/;
+                    
+                    // Check if ALL services have airport codes
+                    const invalidServices = filteredData.filter(service => {
+                        const dest = service.destinationPOI?.name || '';
+                        const origin = service.originPOI?.name || '';
+                        return !airportCodePattern.test(dest) && !airportCodePattern.test(origin);
+                    });
+                    
+                    if (invalidServices.length > 0) {
+                        console.error(`❌ ERROR: ${invalidServices.length} services WITHOUT airport codes in airport filter!`);
+                        console.log('Invalid services (should be removed):');
+                        invalidServices.slice(0, 10).forEach(service => {
+                            console.log(`  ❌ ${service.originPOI?.name || 'None'} → ${service.destinationPOI?.name}`);
+                        });
+                    } else {
+                        console.log('✅ All airport services have valid airport codes');
+                    }
+                    
+                    // Show sample of valid services
+                    const validServices = filteredData.filter(service => {
+                        const dest = service.destinationPOI?.name || '';
+                        const origin = service.originPOI?.name || '';
+                        return airportCodePattern.test(dest) || airportCodePattern.test(origin);
+                    });
+                    
+                    if (validServices.length > 0) {
+                        console.log(`✅ ${validServices.length} valid airport services:`);
+                        validServices.slice(0, 3).forEach(service => {
+                            const dest = service.destinationPOI?.name;
+                            const origin = service.originPOI?.name || 'None';
+                            const code = dest.match(airportCodePattern) || origin.match(airportCodePattern);
+                            console.log(`  ✓ ${origin} → ${dest} [${code}]`);
+                        });
+                    }
+                }
                 
                 // Clear existing data and add filtered data
                 dataTable.clear();
@@ -1134,6 +1391,9 @@ table.dataTable thead th:nth-child(2) select {
             $('.filter-pill[data-filter="airport"], .filter-pill[data-filter="p2p"], .filter-pill[data-filter="local"]').removeClass('active');
             $(this).addClass('active');
             
+            console.log('\n🔄 ==============================');
+            console.log(`🔄 SWITCHING TO: ${filterType.toUpperCase()}`);
+            console.log('🔄 ==============================');
             console.log('Filter pill clicked:', filterType);
             
             // Get the current selected rate to ensure we load data with proper pricing

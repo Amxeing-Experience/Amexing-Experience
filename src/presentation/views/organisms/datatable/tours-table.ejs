@@ -65,7 +65,7 @@ const isClient = dtUserRole === 'client';
     text-align: left;
 }
 
-/* Hide any default sorting indicators */
+/* Hide any default sorting indicators and disable all header clicks */
 table.dataTable thead .sorting::before,
 table.dataTable thead .sorting::after,
 table.dataTable thead .sorting_asc::before,
@@ -73,6 +73,17 @@ table.dataTable thead .sorting_asc::after,
 table.dataTable thead .sorting_desc::before,
 table.dataTable thead .sorting_desc::after {
     display: none !important;
+}
+
+/* Disable cursor and make all headers non-clickable */
+#<%= dtTableId %> thead th {
+    cursor: default !important;
+    pointer-events: none; /* Disable all mouse events on headers */
+}
+
+/* Re-enable events on dropdown in header (if any) */
+#<%= dtTableId %> thead th select {
+    pointer-events: all !important;
 }
 
 /* Ensure only our button shows */
@@ -993,7 +1004,7 @@ table.dataTable tbody tr.hover {
                 {
                     data: null,
                     defaultContent: '',
-                    orderable: false,
+                    orderable: false, // Disable interactive sorting
                     render: function(data, type, row) {
                         // Handle empty/undefined row data gracefully
                         if (!row || typeof row !== 'object') {
@@ -1002,7 +1013,12 @@ table.dataTable tbody tr.hover {
                         
                         const destination = row.destinationPOI?.name || 'Tour';
                         
-                        if (type === 'filter' || type === 'sort') {
+                        // For sorting (initial order), return destination name
+                        if (type === 'sort') {
+                            return destination;
+                        }
+                        
+                        if (type === 'filter') {
                             return destination;
                         }
                         
@@ -1317,9 +1333,8 @@ table.dataTable tbody tr.hover {
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tours...'
             },
-            order: [
-                [0, 'asc'],  // 1. Destino
-            ],
+            order: [], // No initial DataTable ordering - we handle sorting in JavaScript
+            ordering: false, // Disable all interactive column sorting
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
@@ -1378,7 +1393,49 @@ table.dataTable tbody tr.hover {
                 await loadAllTours();
                 // Data loaded successfully
                 
-                // Clear existing data and add filtered data
+                // Sort data alphabetically by destination name using Spanish locale
+                console.log('🔍 BEFORE SORTING - All tours:');
+                filteredData.forEach((tour, index) => {
+                    const name = tour.destinationPOI?.name || 'Tour';
+                    console.log(`  ${index + 1}. "${name}" (length: ${name.length})`);
+                });
+                
+                filteredData.sort((a, b) => {
+                    const nameA = (a.destinationPOI?.name || 'Tour').trim();
+                    const nameB = (b.destinationPOI?.name || 'Tour').trim();
+                    
+                    // Debug specific cases
+                    if (nameA.includes('Prueba') || nameB.includes('Prueba') || 
+                        nameA.includes('San Miguel') || nameB.includes('San Miguel')) {
+                        console.log(`🔍 Comparing: "${nameA}" vs "${nameB}"`);
+                        const result = nameA.localeCompare(nameB, 'es', { 
+                            sensitivity: 'base',
+                            numeric: true,
+                            ignorePunctuation: true 
+                        });
+                        console.log(`🔍 Result: ${result} (${result < 0 ? nameA + ' comes first' : result > 0 ? nameB + ' comes first' : 'equal'})`);
+                        return result;
+                    }
+                    
+                    return nameA.localeCompare(nameB, 'es', { 
+                        sensitivity: 'base',
+                        numeric: true,
+                        ignorePunctuation: true 
+                    });
+                });
+                
+                console.log('🔤 AFTER SORTING - Tours in alphabetical order:');
+                filteredData.forEach((tour, index) => {
+                    const name = tour.destinationPOI?.name || 'Tour';
+                    console.log(`  ${index + 1}. "${name}"`);
+                    
+                    // Highlight the problematic entries
+                    if (name.includes('Prueba') || name.includes('San Miguel')) {
+                        console.log(`    ℹ️ Found: ${name}`);
+                    }
+                });
+                
+                // Clear existing data and add sorted data
                 dataTable.clear();
                 dataTable.rows.add(filteredData);
                 dataTable.draw();
