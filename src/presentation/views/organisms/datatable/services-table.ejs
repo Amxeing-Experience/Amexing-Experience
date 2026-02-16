@@ -87,6 +87,30 @@ table.dataTable thead .sorting_desc::after {
     pointer-events: all !important;
 }
 
+/* Guide Toggle Styling */
+#driverToggle-<%= dtTableId %> {
+    transform: scale(1.1);
+}
+
+#driverToggle-<%= dtTableId %>:checked {
+    background-color: #10b981;
+    border-color: #10b981;
+}
+
+#driverToggle-<%= dtTableId %>:focus {
+    box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
+    border-color: #10b981;
+}
+
+#driverLabel-<%= dtTableId %> {
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+#driverToggle-<%= dtTableId %>:checked + #driverLabel-<%= dtTableId %> {
+    color: #10b981 !important;
+}
+
 /* Ensure only our button shows */
 td.dt-control {
     position: relative;
@@ -209,8 +233,19 @@ table.dataTable thead th:nth-child(2) select {
                 </li>
             </ul>
 
-            <!-- Trailing Dropdowns -->
-            <div class="d-flex gap-2 align-items-center">
+            <!-- Trailing Dropdowns and Controls -->
+            <div class="d-flex gap-3 align-items-center">
+
+                <!-- Guide Toggle -->
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-label mb-0 text-muted">Guía:</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="driverToggle-<%= dtTableId %>">
+                        <label class="form-check-label text-muted" for="driverToggle-<%= dtTableId %>" id="driverLabel-<%= dtTableId %>">
+                            Sin Guía
+                        </label>
+                    </div>
+                </div>
 
                 <!-- Currency Dropdown -->
                 <div class="d-flex align-items-center gap-1">
@@ -828,6 +863,35 @@ table.dataTable thead th:nth-child(2) select {
             // Log filter results with validation
             console.log(`📋 Filter '${type}' applied: ${filtered.length} services out of ${allServicesData.length} total`);
             
+            // Sort filtered data for consistent ordering
+            filtered.sort((a, b) => {
+                const destA = a.destinationPOI?.name || 'Destino';
+                const destB = b.destinationPOI?.name || 'Destino';
+                const originA = a.originPOI?.name || '';
+                const originB = b.originPOI?.name || '';
+                
+                // For airport services, sort by airport code
+                if (type === 'airport') {
+                    // Extract airport code from parentheses - priority: destination, then origin
+                    const destMatchA = destA.match(/\(([A-Z]+)\)/);
+                    const originMatchA = originA.match(/\(([A-Z]+)\)/);
+                    const airportCodeA = destMatchA ? destMatchA[1] : (originMatchA ? originMatchA[1] : destA);
+                    
+                    const destMatchB = destB.match(/\(([A-Z]+)\)/);
+                    const originMatchB = originB.match(/\(([A-Z]+)\)/);
+                    const airportCodeB = destMatchB ? destMatchB[1] : (originMatchB ? originMatchB[1] : destB);
+                    
+                    return airportCodeA.localeCompare(airportCodeB);
+                }
+                
+                // For P2P and local services, sort alphabetically by full route
+                // Create the full route string for comparison
+                const routeA = originA ? `${originA} → ${destA}` : destA;
+                const routeB = originB ? `${originB} → ${destB}` : destB;
+                
+                return routeA.localeCompare(routeB);
+            });
+            
             // Validate filter results
             if (type === 'p2p' || type === 'local') {
                 const airportPattern = /\([A-Z]{3,4}\)/;
@@ -914,14 +978,8 @@ table.dataTable thead th:nth-child(2) select {
                         const destination = row.destinationPOI?.name || 'Destino';
                         
                         if (type === 'sort') {
-                            // For sorting, extract the airport code from parentheses
-                            // Priority: destination airport code, then origin airport code
-                            const destMatch = destination.match(/\(([A-Z]+)\)/);
-                            const originMatch = origin ? origin.match(/\(([A-Z]+)\)/) : null;
-                            
-                            // Use destination code if it's an airport, otherwise use origin code if available
-                            const airportCode = destMatch ? destMatch[1] : (originMatch ? originMatch[1] : destination);
-                            return airportCode;
+                            // For sorting, use the full destination name for more natural ordering
+                            return destination;
                         }
                         
                         if (type === 'filter') {
@@ -1217,7 +1275,8 @@ table.dataTable thead th:nth-child(2) select {
                 const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                 setTimeout(() => {
                     // Always apply currency formatting, even for default MXN
-                    updatePricesForFilters(currentPaymentType, currentCurrency);
+                    const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                    updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                 }, 50);
             }
         });
@@ -1336,7 +1395,8 @@ table.dataTable thead th:nth-child(2) select {
                         console.log('💳 Applying Agency Rate for Tarjeta payment type');
                     }
                     
-                    updatePricesForFilters(currentPaymentType, currentCurrency);
+                    const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                    updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                 }, 200);
                 
                 console.log('✅ DataTable updated with', filteredData.length, 'rows');
@@ -1531,7 +1591,8 @@ table.dataTable thead th:nth-child(2) select {
                     const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                     const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                     if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
-                        updatePricesForFilters(currentPaymentType, currentCurrency);
+                        const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                        updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                     }
                 }, 100);
             } else {
@@ -1550,7 +1611,8 @@ table.dataTable thead th:nth-child(2) select {
                     const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                     const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                     if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
-                        updatePricesForFilters(currentPaymentType, currentCurrency);
+                        const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                        updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                     }
                 }, 100);
             }
@@ -1731,11 +1793,12 @@ table.dataTable thead th:nth-child(2) select {
             }
         }
 
-        // Function to update all displayed prices based on payment type and currency
-        function updatePricesForFilters(paymentType, currency) {
+        // Function to update all displayed prices based on payment type, currency, and guide option
+        function updatePricesForFilters(paymentType, currency, includeGuide = false) {
             console.log('🔄 updatePricesForFilters called with:', { 
                 paymentType, 
                 currency,
+                includeGuide,
                 currentTransferRate,
                 currentAgencyRate
             });
@@ -1804,41 +1867,51 @@ table.dataTable thead th:nth-child(2) select {
             });
         }
 
+        // Guide toggle change handler
+        $(`#driverToggle-${tableId}`).on('change', function() {
+            const includeGuide = $(this).is(':checked');
+            const label = $(`#driverLabel-${tableId}`);
+            
+            // Update label text
+            label.text(includeGuide ? 'Con Guía' : 'Sin Guía');
+            
+            console.log('🚗 Guide toggle changed:', includeGuide ? 'Con Guía' : 'Sin Guía');
+            
+            // Get current filter states
+            const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+            const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
+            
+            // Update all prices with new guide state
+            updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+        });
+        
         // Payment type filter change handler
         $(`#paymentTypeFilter-${tableId}`).on('change', function() {
             const selectedPaymentType = $(this).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
-            console.log('Payment type changed:', selectedPaymentType);
+            const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+            console.log('Payment type changed:', selectedPaymentType, 'Guide:', includeGuide);
             
             if (selectedPaymentType === 'transferencia') {
                 // Transferencia always uses Transfer Rate
                 if (currentTransferRate <= 0) {
                     loadCurrentTransferRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                     });
                 } else {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                 }
             } else if (selectedPaymentType === 'tarjeta') {
                 // Tarjeta always uses Agency Rate
                 if (currentAgencyRate <= 0) {
                     loadCurrentAgencyRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                     });
                 } else {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
-                }
-            } else if (selectedPaymentType === 'tarjeta') {
-                // Tarjeta uses agency rate
-                if (currentAgencyRate <= 0) {
-                    loadCurrentAgencyRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
-                    });
-                } else {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                 }
             } else {
-                updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
             }
         });
 
@@ -1857,10 +1930,10 @@ table.dataTable thead th:nth-child(2) select {
             if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
                 // Try to load exchange rate if not already loaded
                 loadCurrentExchangeRate().then(() => {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                 });
             } else {
-                updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
             }
         });
 
@@ -2106,7 +2179,8 @@ table.dataTable thead th:nth-child(2) select {
                                 const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                                 const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                                 // Always apply current filters to expanded prices
-                                updatePricesForFilters(currentPaymentType, currentCurrency);
+                                const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                                updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                             }, 100);
                         } else {
                             button.html('<i class="ti ti-chevron-down me-1"></i>Error al cargar')
