@@ -311,7 +311,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                    multiple>
                         </div>
                         <div class="form-text">
-                            <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP • Máx. 10MB cada una</small>
+                            <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small>
                         </div>
                     </div>
 
@@ -719,7 +719,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                            multiple>
                 </div>
                 <div class="form-text">
-                    <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP • Máx. 10MB cada una</small>
+                    <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small>
                 </div>
             </div>
             
@@ -1031,10 +1031,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const previewContainer = $(this).closest('.experience-photos-container').find('.photos-preview-container');
             
             Array.from(files).forEach(file => {
-                if (file.size > 10 * 1024 * 1024) { // 10MB limit - increased for better quality
-                    alert(`El archivo "${file.name}" excede el tamaño máximo de 10MB`);
-                    return;
-                }
+                // Removed file size limit - allow any size
                 
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -2961,11 +2958,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                 // Process each selected file
                 Array.from(files).forEach(file => {
-                    // Validate file size (10MB max - increased for better quality)
-                    if (file.size > 10 * 1024 * 1024) {
-                        showErrorAlert(`La imagen "${file.name}" es muy grande. Máximo 10MB.`);
-                        return;
-                    }
+                    // Removed file size limit - allow any size
 
                     // Validate file type
                     if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/)) {

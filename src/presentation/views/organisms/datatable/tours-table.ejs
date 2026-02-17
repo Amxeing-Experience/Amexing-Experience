@@ -611,7 +611,7 @@ table.dataTable tbody tr.hover {
                                    multiple>
                         </div>
                         <div class="form-text">
-                            <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP • Máx. 10MB cada una</small>
+                            <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small>
                         </div>
                     </div>
 
@@ -3247,10 +3247,7 @@ table.dataTable tbody tr.hover {
             const previewContainer = $(this).closest('.tour-photos-container').find('.photos-preview-container');
             
             Array.from(files).forEach(file => {
-                if (file.size > 10 * 1024 * 1024) { // 10MB limit - increased for better quality
-                    alert(`El archivo "${file.name}" excede el tamaño máximo de 10MB`);
-                    return;
-                }
+                // Removed file size limit - allow any size
                 
                 const reader = new FileReader();
                 reader.onload = function(e) {
