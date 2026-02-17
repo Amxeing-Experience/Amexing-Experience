@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "properties": {
+    "currentPage": {
+      "type": "integer",
+      "description": "Current page number",
+      "example": 1
+    },
+    "totalPages": {
+      "type": "integer",
+      "description": "Total number of pages",
+      "example": 10
+    },
+    "totalItems": {
+      "type": "integer",
+      "description": "Total number of items",
+      "example": 250
+    },
+    "pageSize": {
+      "type": "integer",
+      "description": "Number of items per page",
+      "example": 25
+    },
+    "hasNextPage": {
+      "type": "boolean",
+      "description": "Whether there is a next page",
+      "example": true
+    },
+    "hasPreviousPage": {
+      "type": "boolean",
+      "description": "Whether there is a previous page",
+      "example": false
+    }
+  }
+}

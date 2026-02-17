@@ -1,0 +1,9 @@
+{
+  "get": {
+    "tags": ["Service Types"],
+    "summary": "Get active Service Types",
+    "operationId": "getActiveServiceTypes",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Active service types" } }
+  }
+}

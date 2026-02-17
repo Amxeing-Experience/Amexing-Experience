@@ -1,0 +1,16 @@
+{
+  "get": {
+    "tags": ["Rates"],
+    "summary": "Get Rates with DataTables processing",
+    "operationId": "getRates",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Rates list" } }
+  },
+  "post": {
+    "tags": ["Rates"],
+    "summary": "Create new Rate",
+    "operationId": "createRate",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "201": { "description": "Rate created" } }
+  }
+}

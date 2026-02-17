@@ -30,15 +30,14 @@ const cookieParser = require('cookie-parser');
 const methodOverride = require('method-override');
 
 // Infrastructure
-const swaggerUi = require('swagger-ui-express');
 const logger = require('./infrastructure/logger');
 const securityMiddleware = require('./infrastructure/security/securityMiddleware');
 const { initializeParseServer, shutdownParseServer } = require('./infrastructure/server/parseServerInit');
 const { configureStaticFiles } = require('./infrastructure/server/staticFilesConfig');
 const { getHealthCheck, getMetrics } = require('./infrastructure/monitoring/healthCheck');
 
-// Swagger/OpenAPI Documentation
-const { swaggerSpec } = require('./infrastructure/swagger/swagger.config');
+// API Documentation (Redocly)
+const { configureRedoclyDocs } = require('./infrastructure/docs/redoclyServer');
 
 // Routes
 const webRoutes = require('./presentation/routes/webRoutes');
@@ -154,68 +153,9 @@ securityMiddlewares.forEach((middleware) => {
   app.use(middleware);
 });
 
-// Swagger API Documentation (Development and Test only)
-// SECURITY: Disabled in production - configure proper API documentation strategy for production
-if (process.env.NODE_ENV !== 'production') {
-  logger.info('Swagger API Documentation enabled at /api-docs (Development/Test only)');
-
-  app.use(
-    '/api-docs',
-    swaggerUi.serve,
-    swaggerUi.setup(swaggerSpec, {
-      customCss: '.swagger-ui .topbar { display: none }',
-      customSiteTitle: 'AmexingWeb API Documentation',
-      customfavIcon: '/favicon.ico',
-      swaggerOptions: {
-        persistAuthorization: true,
-        displayRequestDuration: true,
-        filter: true,
-        tryItOutEnabled: true,
-        syntaxHighlight: {
-          activate: true,
-          theme: 'monokai',
-        },
-      },
-    })
-  );
-
-  // OpenAPI specification JSON endpoint (Development/Test only)
-  app.get('/api-docs.json', (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
-    res.send(swaggerSpec);
-  });
-
-  // Test endpoint for 429 error (Development/Test only)
-  app.get('/test/429', (req, res, next) => {
-    const error = new Error('Too many requests from this IP, please try again later.');
-    error.status = 429;
-    error.retryAfter = 60; // Retry after 60 seconds
-    next(error);
-  });
-
-  // Test endpoint for 429 API error (Development/Test only)
-  app.get('/api/test/429', (req, res, next) => {
-    const error = new Error('API rate limit exceeded');
-    error.status = 429;
-    error.retryAfter = 30; // Retry after 30 seconds
-    next(error);
-  });
-} else {
-  // In production, return 404 for documentation endpoints
-  app.use('/api-docs', (req, res) => {
-    res.status(404).json({
-      error: 'Not Found',
-      message: 'API documentation is not available in production',
-    });
-  });
-
-  app.get('/api-docs.json', (req, res) => {
-    res.status(404).json({
-      error: 'Not Found',
-      message: 'API documentation is not available in production',
-    });
-  });
-}
+// API Documentation (Redocly - Development and Test only)
+// SECURITY: Disabled in production (PCI DSS 4.0.1 compliant)
+configureRedoclyDocs(app);
 
 // Session health check endpoint (before other routes)
 app.get('/api/session/health', sessionRecovery.sessionHealthEndpoint);

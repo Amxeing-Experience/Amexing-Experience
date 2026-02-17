@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "example": true
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["apple", "corporate"],
+            "example": "apple"
+          },
+          "name": {
+            "type": "string",
+            "example": "Apple"
+          },
+          "enabled": {
+            "type": "boolean",
+            "example": true
+          },
+          "icon": {
+            "type": "string",
+            "description": "Icon URL or CSS class",
+            "example": "fab fa-apple"
+          }
+        }
+      }
+    }
+  }
+}

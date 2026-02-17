@@ -1,0 +1,26 @@
+{
+  "get": {
+    "tags": ["Vehicle Types"],
+    "summary": "Get Vehicle Type by ID",
+    "operationId": "getVehicleTypeById",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Vehicle type details" } }
+  },
+  "put": {
+    "tags": ["Vehicle Types"],
+    "summary": "Update Vehicle Type",
+    "operationId": "updateVehicleType",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Vehicle type updated" } }
+  },
+  "delete": {
+    "tags": ["Vehicle Types"],
+    "summary": "Soft delete Vehicle Type",
+    "operationId": "deleteVehicleType",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Vehicle type deleted" } }
+  }
+}

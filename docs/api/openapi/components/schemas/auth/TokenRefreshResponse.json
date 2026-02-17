@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "example": true
+    },
+    "user": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": "abc123"
+        },
+        "username": {
+          "type": "string",
+          "example": "john.doe"
+        },
+        "role": {
+          "type": "string",
+          "example": "employee"
+        }
+      }
+    }
+  }
+}

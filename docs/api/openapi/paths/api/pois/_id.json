@@ -1,0 +1,35 @@
+{
+  "get": {
+    "tags": ["POIs"],
+    "summary": "Get POI by ID",
+    "operationId": "getPOIById",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": {
+      "200": { "description": "POI details" },
+      "404": { "$ref": "../../../components/responses/NotFoundError.json" }
+    }
+  },
+  "put": {
+    "tags": ["POIs"],
+    "summary": "Update POI",
+    "operationId": "updatePOI",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": {
+      "200": { "description": "POI updated" },
+      "404": { "$ref": "../../../components/responses/NotFoundError.json" }
+    }
+  },
+  "delete": {
+    "tags": ["POIs"],
+    "summary": "Soft delete POI",
+    "operationId": "deletePOI",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": {
+      "200": { "description": "POI deleted" },
+      "404": { "$ref": "../../../components/responses/NotFoundError.json" }
+    }
+  }
+}

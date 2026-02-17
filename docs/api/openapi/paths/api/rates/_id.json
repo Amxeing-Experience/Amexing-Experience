@@ -1,0 +1,26 @@
+{
+  "get": {
+    "tags": ["Rates"],
+    "summary": "Get Rate by ID",
+    "operationId": "getRateById",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Rate details" } }
+  },
+  "put": {
+    "tags": ["Rates"],
+    "summary": "Update Rate",
+    "operationId": "updateRate",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Rate updated" } }
+  },
+  "delete": {
+    "tags": ["Rates"],
+    "summary": "Soft delete Rate",
+    "operationId": "deleteRate",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Rate deleted" } }
+  }
+}

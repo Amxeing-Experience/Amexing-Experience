@@ -1,0 +1,10 @@
+{
+  "patch": {
+    "tags": ["Service Types"],
+    "summary": "Toggle Service Type status",
+    "operationId": "toggleServiceTypeStatus",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Status toggled" } }
+  }
+}

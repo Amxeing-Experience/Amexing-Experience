@@ -1,0 +1,47 @@
+{
+  "post": {
+    "tags": ["Authentication"],
+    "summary": "Register new user account",
+    "operationId": "authRegister",
+    "description": "Create a new user account with email verification.\n\n**Requirements:**\n- Unique email address\n- Password minimum 8 characters\n- First and last name required",
+    "security": [],
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "../../components/schemas/auth/RegisterRequest.json"
+          }
+        }
+      }
+    },
+    "responses": {
+      "201": {
+        "description": "Registration successful",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "400": {
+        "$ref": "../../components/responses/ValidationError.json"
+      },
+      "409": {
+        "description": "Email already exists",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/ErrorResponse.json"
+            }
+          }
+        }
+      },
+      "429": {
+        "$ref": "../../components/responses/RateLimitError.json"
+      }
+    }
+  }
+}

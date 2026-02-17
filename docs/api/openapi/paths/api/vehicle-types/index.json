@@ -1,0 +1,16 @@
+{
+  "get": {
+    "tags": ["Vehicle Types"],
+    "summary": "Get Vehicle Types",
+    "operationId": "getVehicleTypes",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Vehicle types list" } }
+  },
+  "post": {
+    "tags": ["Vehicle Types"],
+    "summary": "Create Vehicle Type",
+    "operationId": "createVehicleType",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "201": { "description": "Vehicle type created" } }
+  }
+}

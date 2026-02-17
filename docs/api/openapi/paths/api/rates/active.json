@@ -1,0 +1,9 @@
+{
+  "get": {
+    "tags": ["Rates"],
+    "summary": "Get active Rates",
+    "operationId": "getActiveRates",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Active rates" } }
+  }
+}

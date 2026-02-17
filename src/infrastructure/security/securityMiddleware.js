@@ -113,7 +113,10 @@ class SecurityMiddleware {
             'https://unpkg.com',
             'https://cdn.jsdelivr.net',
             'https://cdnjs.cloudflare.com',
+            'https://cdn.redoc.ly', // Redocly API documentation (development only)
+            this.isDevelopment ? 'blob:' : '', // Redocly web workers (development only)
           ].filter(Boolean),
+          workerSrc: ["'self'", 'blob:'], // Required for Redocly web workers
           imgSrc: ["'self'", 'data:', 'https:'],
           fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
           connectSrc: [
@@ -125,6 +128,7 @@ class SecurityMiddleware {
             'https://cdn.jsdelivr.net',
             'https://cdnjs.cloudflare.com',
             'https://unpkg.com',
+            'https://cdn.redoc.ly', // Redocly API documentation (development only)
           ],
           objectSrc: ["'none'"],
           mediaSrc: ["'self'"],

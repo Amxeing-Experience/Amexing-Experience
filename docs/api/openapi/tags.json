@@ -1,0 +1,68 @@
+{
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "**PUBLIC** - User authentication endpoints. No authentication required.\n\nIncludes login, registration, password reset, and token refresh."
+    },
+    {
+      "name": "OAuth",
+      "description": "**PUBLIC** - OAuth 2.0 provider integration. No authentication required.\n\nSupports Apple and Corporate OAuth providers."
+    },
+    {
+      "name": "System",
+      "description": "**PUBLIC** - System health and status endpoints. No authentication required.\n\nIncludes health checks, status, and version info."
+    },
+    {
+      "name": "Profile",
+      "description": "**PROTECTED** - User profile management. Requires JWT Bearer token.\n\nManage authenticated user's profile information."
+    },
+    {
+      "name": "Notifications",
+      "description": "**PROTECTED** - User notification management. Requires JWT Bearer token.\n\nList, read, and manage user notifications."
+    },
+    {
+      "name": "Session",
+      "description": "**PROTECTED** - Session health and metrics. Requires JWT Bearer token.\n\nMonitor session status and health."
+    },
+    {
+      "name": "User Management",
+      "description": "**ADMIN** - User CRUD operations. Requires JWT + Admin/SuperAdmin role.\n\nCreate, read, update, delete, and manage user accounts."
+    },
+    {
+      "name": "Roles",
+      "description": "**ADMIN** - Role management. Requires JWT + Admin/SuperAdmin role.\n\nManage user roles and permissions."
+    },
+    {
+      "name": "POIs",
+      "description": "**ADMIN** - Points of Interest management. Requires JWT + Admin/SuperAdmin role.\n\nManage location points for services."
+    },
+    {
+      "name": "Rates",
+      "description": "**ADMIN** - Rate zone management. Requires JWT + Admin/SuperAdmin role.\n\nManage pricing rates by zone."
+    },
+    {
+      "name": "Service Types",
+      "description": "**ADMIN** - Service type catalog. Requires JWT + Admin/SuperAdmin role.\n\nManage available service types."
+    },
+    {
+      "name": "Vehicle Types",
+      "description": "**ADMIN** - Vehicle type catalog. Requires JWT + Admin/SuperAdmin role.\n\nManage available vehicle types."
+    },
+    {
+      "name": "Vehicles",
+      "description": "**ADMIN** - Vehicle management. Requires JWT + Admin/SuperAdmin role.\n\nManage vehicle fleet."
+    },
+    {
+      "name": "Billing",
+      "description": "**ADMIN** - Billing information. Requires JWT + Admin/SuperAdmin role.\n\nManage billing and invoicing data."
+    },
+    {
+      "name": "Audit",
+      "description": "**ADMIN** - Audit log management. Requires JWT + Admin/SuperAdmin role.\n\nAccess audit trails for compliance (PCI DSS)."
+    },
+    {
+      "name": "Payment Info",
+      "description": "**ADMIN** - Payment information. Requires JWT + Admin/SuperAdmin role.\n\nManage payment methods and details."
+    }
+  ]
+}

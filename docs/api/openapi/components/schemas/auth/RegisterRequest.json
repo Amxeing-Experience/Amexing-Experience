@@ -1,0 +1,41 @@
+{
+  "type": "object",
+  "required": ["username", "email", "password", "confirmPassword", "firstName", "lastName"],
+  "properties": {
+    "username": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Unique username",
+      "example": "john.doe"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "User email address",
+      "example": "john.doe@amexing.com"
+    },
+    "password": {
+      "type": "string",
+      "format": "password",
+      "minLength": 8,
+      "description": "Password (minimum 8 characters)",
+      "example": "SecureP@ssw0rd!"
+    },
+    "confirmPassword": {
+      "type": "string",
+      "format": "password",
+      "description": "Password confirmation (must match password)",
+      "example": "SecureP@ssw0rd!"
+    },
+    "firstName": {
+      "type": "string",
+      "description": "User's first name",
+      "example": "John"
+    },
+    "lastName": {
+      "type": "string",
+      "description": "User's last name",
+      "example": "Doe"
+    }
+  }
+}

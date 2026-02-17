@@ -1,0 +1,10 @@
+{
+  "patch": {
+    "tags": ["Rates"],
+    "summary": "Toggle Rate status",
+    "operationId": "toggleRateStatus",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Status toggled" } }
+  }
+}
