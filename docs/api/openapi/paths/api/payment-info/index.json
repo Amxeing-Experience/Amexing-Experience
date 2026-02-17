@@ -1,0 +1,16 @@
+{
+  "get": {
+    "tags": ["Payment Info"],
+    "summary": "Get payment info options",
+    "operationId": "getPaymentInfoList",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Payment info list" } }
+  },
+  "post": {
+    "tags": ["Payment Info"],
+    "summary": "Create payment info",
+    "operationId": "createPaymentInfo",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "201": { "description": "Payment info created" } }
+  }
+}

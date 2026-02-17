@@ -1,0 +1,132 @@
+{
+  "get": {
+    "tags": ["User Management"],
+    "summary": "Get user by ID",
+    "operationId": "getUserById",
+    "description": "Retrieve a single user by their ID.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "User ID"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "User details",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/user/User.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "404": {
+        "$ref": "../../../components/responses/NotFoundError.json"
+      }
+    }
+  },
+  "put": {
+    "tags": ["User Management"],
+    "summary": "Update user",
+    "operationId": "updateUser",
+    "description": "Update an existing user.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "User ID"
+      }
+    ],
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "../../../components/schemas/user/UserUpdateRequest.json"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "User updated successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "400": {
+        "$ref": "../../../components/responses/ValidationError.json"
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "404": {
+        "$ref": "../../../components/responses/NotFoundError.json"
+      }
+    }
+  },
+  "delete": {
+    "tags": ["User Management"],
+    "summary": "Delete user (soft delete)",
+    "operationId": "deleteUser",
+    "description": "Soft delete a user (sets exists=false).",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "User ID"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "User deleted successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "403": {
+        "$ref": "../../../components/responses/ForbiddenError.json"
+      },
+      "404": {
+        "$ref": "../../../components/responses/NotFoundError.json"
+      }
+    }
+  }
+}

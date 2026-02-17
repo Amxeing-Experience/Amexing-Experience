@@ -1,0 +1,26 @@
+{
+  "post": {
+    "tags": ["Authentication"],
+    "summary": "Refresh authentication token",
+    "operationId": "authRefresh",
+    "description": "Refresh JWT access token using refresh token.\n\n**Token Lifetime:**\n- Access Token: 8 hours\n- Refresh Token: 7 days",
+    "security": [
+      { "cookieAuth": [] }
+    ],
+    "responses": {
+      "200": {
+        "description": "Token refreshed successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/auth/TokenRefreshResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../components/responses/UnauthorizedError.json"
+      }
+    }
+  }
+}

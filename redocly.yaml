@@ -1,0 +1,52 @@
+# Redocly CLI Configuration for AmexingWeb API
+# PCI DSS 4.0.1 Compliant API Documentation
+#
+# Commands:
+#   yarn docs:api:bundle  - Bundle modular OpenAPI spec
+#   yarn docs:api:lint    - Lint spec for errors
+#   yarn docs:api:preview - Preview with hot reload
+#   yarn docs:api:build   - Build static HTML
+#   yarn docs:api:stats   - Show statistics
+
+extends:
+  - recommended
+
+apis:
+  main:
+    root: docs/api/openapi/openapi.json
+    output: docs/api/openapi-spec.json
+
+rules:
+  # Security rules (PCI DSS compliance)
+  security-defined: error
+
+  # Documentation quality
+  operation-description: warn
+  operation-operationId: error
+  operation-summary: error
+  tag-description: warn
+
+  # Schema validation
+  no-invalid-schema-examples: warn
+  no-undefined-server-variable: error
+
+  # Path validation
+  path-declaration-must-exist: error
+  path-not-include-query: error
+
+  # Response validation
+  operation-2xx-response: error
+  operation-4xx-response: warn
+
+  # Naming conventions
+  paths-kebab-case: warn
+
+  # Disable noisy rules for initial migration
+  no-path-trailing-slash: warn
+
+  # Allow localhost for development documentation
+  no-server-example.com: off
+
+# Ignore patterns for linting
+ignore:
+  - docs/api/openapi-spec.json  # Bundled output, auto-generated

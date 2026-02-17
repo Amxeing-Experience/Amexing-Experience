@@ -1,0 +1,13 @@
+{
+  "get": {
+    "tags": ["Audit"],
+    "summary": "Get audit logs for entity",
+    "operationId": "getAuditLogsForEntity",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [
+      { "in": "path", "name": "entityType", "required": true, "schema": { "type": "string" } },
+      { "in": "path", "name": "entityId", "required": true, "schema": { "type": "string" } }
+    ],
+    "responses": { "200": { "description": "Entity audit logs" } }
+  }
+}

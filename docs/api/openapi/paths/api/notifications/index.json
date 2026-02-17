@@ -1,0 +1,39 @@
+{
+  "get": {
+    "tags": ["Notifications"],
+    "summary": "Get user notifications",
+    "operationId": "getNotifications",
+    "description": "Retrieve notifications for the authenticated user.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      { "$ref": "../../../components/parameters/PageParameter.json" },
+      { "$ref": "../../../components/parameters/LimitParameter.json" },
+      {
+        "in": "query",
+        "name": "unreadOnly",
+        "schema": {
+          "type": "boolean",
+          "default": false
+        },
+        "description": "Return only unread notifications"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "Notifications list",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/notification/NotificationsResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      }
+    }
+  }
+}

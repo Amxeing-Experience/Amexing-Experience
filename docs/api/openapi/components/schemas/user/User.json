@@ -1,0 +1,90 @@
+{
+  "type": "object",
+  "required": ["id", "email", "firstName", "lastName", "role"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique user identifier (Parse ObjectId)",
+      "example": "abc123def456"
+    },
+    "username": {
+      "type": "string",
+      "description": "User's unique username",
+      "example": "john.doe"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "User's email address",
+      "example": "john.doe@amexing.com"
+    },
+    "firstName": {
+      "type": "string",
+      "description": "User's first name",
+      "example": "John"
+    },
+    "lastName": {
+      "type": "string",
+      "description": "User's last name",
+      "example": "Doe"
+    },
+    "displayName": {
+      "type": "string",
+      "description": "User's full display name",
+      "example": "John Doe"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["superadmin", "admin", "client", "department_manager", "employee", "employee_amexing", "driver", "guest"],
+      "description": "User's role name",
+      "example": "employee"
+    },
+    "roleId": {
+      "type": "string",
+      "description": "Reference to Role object",
+      "example": "role123"
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether user account is active",
+      "example": true
+    },
+    "exists": {
+      "type": "boolean",
+      "description": "Logical deletion flag (false = soft deleted)",
+      "example": true
+    },
+    "emailVerified": {
+      "type": "boolean",
+      "description": "Whether user's email has been verified",
+      "example": true
+    },
+    "organizationId": {
+      "type": "string",
+      "description": "Organization identifier",
+      "example": "org123"
+    },
+    "clientId": {
+      "type": "string",
+      "description": "Client identifier (for client-assigned users)",
+      "example": "client123"
+    },
+    "departmentId": {
+      "type": "string",
+      "description": "Department identifier (for department-assigned users)",
+      "example": "dept123"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "User creation timestamp",
+      "example": "2024-10-01T10:00:00.000Z"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp",
+      "example": "2024-10-01T12:00:00.000Z"
+    }
+  }
+}

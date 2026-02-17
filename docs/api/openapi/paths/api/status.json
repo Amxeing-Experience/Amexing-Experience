@@ -1,0 +1,21 @@
+{
+  "get": {
+    "tags": ["System"],
+    "summary": "Get API status",
+    "operationId": "getApiStatus",
+    "description": "Get current API status and basic information.",
+    "security": [],
+    "responses": {
+      "200": {
+        "description": "API status",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/SystemStatus.json"
+            }
+          }
+        }
+      }
+    }
+  }
+}

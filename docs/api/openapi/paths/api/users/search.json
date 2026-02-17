@@ -1,0 +1,38 @@
+{
+  "get": {
+    "tags": ["User Management"],
+    "summary": "Search users",
+    "operationId": "searchUsers",
+    "description": "Search users by various criteria.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "query",
+        "name": "q",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Search query"
+      },
+      { "$ref": "../../../components/parameters/LimitParameter.json" }
+    ],
+    "responses": {
+      "200": {
+        "description": "Search results",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/user/UserListResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      }
+    }
+  }
+}

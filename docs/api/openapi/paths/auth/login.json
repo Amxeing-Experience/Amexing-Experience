@@ -1,0 +1,54 @@
+{
+  "post": {
+    "tags": ["Authentication"],
+    "summary": "User login with credentials",
+    "operationId": "authLogin",
+    "description": "Authenticate user with email/username and password.\nReturns JWT token in response and sets HTTP-only cookie.\n\n**Security Features:**\n- Rate limited: 50 requests per 15 minutes\n- Account lockout after 5 failed attempts\n- Secure password validation\n- JWT token lifetime: 8 hours",
+    "security": [],
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "../../components/schemas/auth/LoginRequest.json"
+          }
+        },
+        "application/x-www-form-urlencoded": {
+          "schema": {
+            "$ref": "../../components/schemas/auth/LoginRequest.json"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Login successful",
+        "headers": {
+          "Set-Cookie": {
+            "description": "JWT access token (HTTP-only, Secure, SameSite=strict)",
+            "schema": {
+              "type": "string",
+              "example": "accessToken=eyJhbGc...; HttpOnly; Secure; SameSite=strict; Max-Age=28800"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/auth/LoginResponse.json"
+            }
+          }
+        }
+      },
+      "400": {
+        "$ref": "../../components/responses/ValidationError.json"
+      },
+      "401": {
+        "$ref": "../../components/responses/UnauthorizedError.json"
+      },
+      "429": {
+        "$ref": "../../components/responses/RateLimitError.json"
+      }
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "get": {
+    "tags": ["Roles"],
+    "summary": "Get role by ID",
+    "operationId": "getRoleById",
+    "description": "Retrieve a single role by its ID.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Role ID"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "Role details"
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "404": {
+        "$ref": "../../../components/responses/NotFoundError.json"
+      }
+    }
+  },
+  "put": {
+    "tags": ["Roles"],
+    "summary": "Update role displayName",
+    "operationId": "updateRole",
+    "description": "Update a role's display name.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Role ID"
+      }
+    ],
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "properties": {
+              "displayName": {
+                "type": "string",
+                "example": "Administrator"
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Role updated successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "403": {
+        "$ref": "../../../components/responses/ForbiddenError.json"
+      },
+      "404": {
+        "$ref": "../../../components/responses/NotFoundError.json"
+      }
+    }
+  }
+}
