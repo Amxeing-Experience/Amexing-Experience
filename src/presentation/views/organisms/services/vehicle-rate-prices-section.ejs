@@ -82,6 +82,9 @@ const apiEndpoint = typeof vehicleRatesEndpoint !== 'undefined' ? vehicleRatesEn
     </div>
 </div>
 
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadVehicleRates();
@@ -495,16 +498,7 @@ function formatVehicleRatePrice(price, currency) {
     }
 }
 
-// Apply USD rounding rules (same as main tours table)
-function applyVehicleRatesUSDRoundingRules(usdPrice) {
-    if (usdPrice <= 50) {
-        return Math.round(usdPrice);
-    } else if (usdPrice <= 100) {
-        return Math.round(usdPrice / 5) * 5;
-    } else {
-        return Math.round(usdPrice / 10) * 10;
-    }
-}
+// USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
 
 // Convert and format price based on currency and payment type
 function convertVehicleRatePrice(priceInput, currency, paymentType) {
@@ -521,7 +515,7 @@ function convertVehicleRatePrice(priceInput, currency, paymentType) {
     // Then convert currency if needed
     if (currency === 'USD' && vehicleRatesCurrentExchangeRate > 0) {
         const convertedValue = adjustedPrice / vehicleRatesCurrentExchangeRate;
-        const roundedValue = applyVehicleRatesUSDRoundingRules(convertedValue);
+        const roundedValue = PricingUtils.applyUSDRoundingRules(convertedValue);
         return formatVehicleRatePrice(roundedValue, 'USD');
     } else {
         return formatVehicleRatePrice(adjustedPrice, 'MXN');

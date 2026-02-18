@@ -842,6 +842,138 @@ class VehicleImageController {
       });
     }
   }
+
+  /**
+   * Get vehicle images grouped by disposable price combinations.
+   * Follows the chain: DisposablePrices → VehicleType + Rate → Vehicle → VehicleImage.
+   * @param {object} req Express request.
+   * @param {object} res Express response.
+   * @example
+   */
+  async getImagesByDisposableCombinations(req, res) {
+    try {
+      logger.info('Getting vehicle images by disposable combinations');
+
+      // Get all current disposable prices
+      const disposablePricesQuery = new Parse.Query('DisposablePrices');
+      disposablePricesQuery.equalTo('exists', true);
+      disposablePricesQuery.equalTo('active', true);
+      disposablePricesQuery.include(['vehicleType', 'rate']);
+      const disposablePrices = await disposablePricesQuery.find({ useMasterKey: true });
+
+      const imagesCombinations = {};
+
+      // For each disposable price combination, find matching vehicles and their images
+      for (const price of disposablePrices) {
+        const vehicleType = price.get('vehicleType');
+        const rate = price.get('rate');
+
+        if (!vehicleType || !rate) {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+
+        const combinationKey = `${vehicleType.id}_${rate.id}`;
+
+        // Find vehicles that match this vehicleType and rate
+        const vehicleQuery = new Parse.Query('Vehicle');
+        vehicleQuery.equalTo('vehicleTypeId', {
+          __type: 'Pointer',
+          className: 'VehicleType',
+          objectId: vehicleType.id,
+        });
+        vehicleQuery.equalTo('rateId', {
+          __type: 'Pointer',
+          className: 'Rate',
+          objectId: rate.id,
+        });
+        vehicleQuery.equalTo('exists', true);
+        vehicleQuery.equalTo('active', true);
+
+        const vehicles = await vehicleQuery.find({ useMasterKey: true });
+
+        // Get images for all vehicles of this combination
+        const combinationImages = [];
+
+        for (const vehicle of vehicles) {
+          const imageQuery = new Parse.Query('VehicleImage');
+          imageQuery.equalTo('vehicleId', {
+            __type: 'Pointer',
+            className: 'Vehicle',
+            objectId: vehicle.id,
+          });
+          imageQuery.equalTo('exists', true);
+          imageQuery.ascending('order');
+
+          const images = await imageQuery.find({ useMasterKey: true });
+
+          // Format images with optimized URLs
+          for (const image of images) {
+            const s3Key = image.get('s3Key');
+            const imageFile = image.get('imageFile'); // Legacy Parse.File
+
+            let imageUrl = null;
+
+            try {
+              if (s3Key && this.imageOptimizationService && this.imageOptimizationService.enableOptimization) {
+                // Get optimized image with best format
+                const imageData = await this.imageOptimizationService.getImageWithOptimalFormat(image, 'image/webp,image/avif,image/*');
+                imageUrl = imageData.url;
+              } else if (s3Key) {
+                // Fallback to standard presigned URL
+                imageUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+              } else if (imageFile) {
+                imageUrl = imageFile.url(); // Legacy Parse.File
+              } else {
+                imageUrl = image.get('url'); // Very old legacy local path
+              }
+
+              if (!imageUrl) {
+                console.warn('No URL could be generated for image:', image.id);
+                imageUrl = '/images/placeholder-image.svg';
+              }
+            } catch (error) {
+              console.error('Error generating image URL for carousel:', error);
+              imageUrl = '/images/placeholder-image.svg';
+            }
+
+            const imageData = {
+              id: image.id,
+              url: imageUrl,
+              description: image.get('description'),
+              order: image.get('displayOrder') || 0,
+              vehicleId: vehicle.id,
+              vehicleName: `${vehicleType.get('name')} - ${rate.get('name')}`,
+            };
+
+            combinationImages.push(imageData);
+          }
+        }
+
+        // Sort images by order
+        combinationImages.sort((a, b) => a.order - b.order);
+        imagesCombinations[combinationKey] = combinationImages;
+      }
+
+      logger.info(`Retrieved images for ${Object.keys(imagesCombinations).length} combinations`);
+
+      return res.json({
+        success: true,
+        data: imagesCombinations,
+      });
+    } catch (error) {
+      logger.error('Error getting images by disposable combinations', {
+        error: error.message,
+        stack: error.stack,
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: 'Error al obtener las imágenes',
+        message: error.message,
+      });
+    }
+  }
 }
 
 module.exports = VehicleImageController;

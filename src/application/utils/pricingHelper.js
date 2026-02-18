@@ -200,6 +200,41 @@ class PricingHelper {
   }
 
   // ============================================================
+  // CURRENCY ROUNDING UTILITIES
+  // ============================================================
+
+  /**
+   * Apply standardized USD rounding rules across all admin components.
+   * Uses sophisticated multiple-of-5 based rounding with special conditions.
+   *
+   * Rules:
+   * - All prices rounded to nearest multiple of 5
+   * - Numbers ending in 3 or 8 (before decimal) round UP to next multiple of 5
+   * - For remainders: ≤2.7 rounds down, >2.7 rounds up.
+   * @param {number} usdPrice - USD price to round.
+   * @returns {number} Rounded USD price.
+   * @example
+   * pricingHelper.applyUSDRoundingRules(23.45); // Returns: 25 (ends in 3, rounds up)
+   * pricingHelper.applyUSDRoundingRules(26.2);  // Returns: 25 (remainder 1.2 ≤ 2.7)
+   * pricingHelper.applyUSDRoundingRules(27.8);  // Returns: 30 (remainder 2.8 > 2.7)
+   */
+  applyUSDRoundingRules(usdPrice) {
+    const base = Math.floor(usdPrice / 5) * 5;
+    const remainder = usdPrice % 5;
+
+    if (remainder === 0) {
+      const lastDigitBeforeDecimal = Math.floor(usdPrice) % 10;
+      if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
+        return base + 5; // Round up for numbers ending in 3 or 8
+      }
+      return base; // Keep as multiple of 5
+    } if (remainder <= 2.7) {
+      return base; // Round down
+    }
+    return base + 5; // Round up
+  }
+
+  // ============================================================
   // FORMATTING UTILITIES
   // ============================================================
 

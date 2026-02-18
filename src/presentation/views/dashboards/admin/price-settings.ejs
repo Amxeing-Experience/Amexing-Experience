@@ -19,7 +19,8 @@ const menuItems = [
     { label: '% de Inflación', icon: 'trending-up', section: 'inflation', href: '/dashboard/admin/price-settings?section=inflation' },
     { label: '% Tarjetas', icon: 'percentage', section: 'agency', href: '/dashboard/admin/price-settings?section=agency' },
     { label: '% Transferencia', icon: 'credit-card', section: 'transfer', href: '/dashboard/admin/price-settings?section=transfer' },
-    { label: 'Guía+Chofer', icon: 'steering-wheel', section: 'guia-chofer', href: '/dashboard/admin/price-settings?section=guia-chofer' }
+    { label: 'Guía+Chofer', icon: 'steering-wheel', section: 'guia-chofer', href: '/dashboard/admin/price-settings?section=guia-chofer' },
+    { label: 'Guía (Traslados)', icon: 'user-check', section: 'guia-traslados', href: '/dashboard/admin/price-settings?section=guia-traslados' }
 ];
 
 // Section display names
@@ -28,7 +29,8 @@ const sectionNames = {
     'inflation': 'Porcentaje de Inflación',
     'agency': 'Porcentaje de Tarjetas',
     'transfer': 'Porcentaje de Transferencia',
-    'guia-chofer': 'Guía+Chofer'
+    'guia-chofer': 'Guía+Chofer',
+    'guia-traslados': 'Guía (Traslados)'
 };
 
 // Get current section data
@@ -434,6 +436,63 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                                 </div>
                             </div>
                             <% } %>
+                        <!-- Guide Transport Rate Display -->
+                        <% } else if (activeSection === 'guia-traslados') { %>
+                            <% if (typeof currentGuideTransportRate !== 'undefined' && currentGuideTransportRate.value) { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary"><%= currentGuideTransportRate.formatted %></div>
+                                <div class="text-muted">Tarifa Guía (Traslados)</div>
+                            </div>
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date(currentGuideTransportRate.lastUpdated).toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-success">Activo</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } else { %>
+                            <div id="currentValueDisplay" class="text-center py-3">
+                                <div class="display-3 fw-bold text-primary">$400.00 MXN</div>
+                                <div class="text-muted">Tarifa Guía (Traslados) (Valor por defecto)</div>
+                            </div>
+                            <div id="currentValueDetails" class="mt-3">
+                                <hr>
+                                <div class="row text-center">
+                                    <div class="col-6">
+                                        <div class="text-muted small">Efectivo desde</div>
+                                        <div id="effectiveDate" class="fw-semibold">
+                                            <%= new Date().toLocaleDateString('es-MX', { 
+                                                year: 'numeric', 
+                                                month: 'short', 
+                                                day: 'numeric'
+                                            }) %>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="text-muted small">Estado</div>
+                                        <div id="createdBy" class="fw-semibold">
+                                            <span class="badge bg-warning">Por defecto</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <% } %>
                         <% } %>
 
                         <div id="noCurrentValue" class="text-center py-3 text-muted" style="display: none;">
@@ -460,19 +519,21 @@ const currentSection = menuItems.find(item => item.section === activeSection);
                                         Tipo de Cambio (MXN por USD)
                                     <% } else if (activeSection === 'guia-chofer') { %>
                                         Tarifa Guía+Chofer (MXN)
+                                    <% } else if (activeSection === 'guia-traslados') { %>
+                                        Tarifa Guía Traslados (MXN)
                                     <% } else { %>
                                         Porcentaje (%)
                                     <% } %>
                                     <span class="text-danger">*</span>
                                 </label>
                                 <div class="input-group">
-                                    <% if (activeSection === 'exchange-rate' || activeSection === 'guia-chofer') { %>
+                                    <% if (activeSection === 'exchange-rate' || activeSection === 'guia-chofer' || activeSection === 'guia-traslados') { %>
                                         <span class="input-group-text">$</span>
                                     <% } %>
                                     <input type="number" class="form-control" id="adjustmentValue" 
                                            step="0.01" min="0" required
-                                           placeholder="<%= activeSection === 'exchange-rate' ? '18.50' : (activeSection === 'guia-chofer' ? '635.00' : (activeSection === 'transfer' ? '3.00' : '5.25')) %>">
-                                    <% if (activeSection === 'exchange-rate' || activeSection === 'guia-chofer') { %>
+                                           placeholder="<%= activeSection === 'exchange-rate' ? '18.50' : (activeSection === 'guia-chofer' ? '635.00' : (activeSection === 'guia-traslados' ? '400.00' : (activeSection === 'transfer' ? '3.00' : '5.25'))) %>">
+                                    <% if (activeSection === 'exchange-rate' || activeSection === 'guia-chofer' || activeSection === 'guia-traslados') { %>
                                         <span class="input-group-text">MXN</span>
                                     <% } else { %>
                                         <span class="input-group-text">%</span>
@@ -898,6 +959,26 @@ function initializeHistoryTable() {
                 width: '15%'
             }
         ];
+    } else if (currentSection === 'guia-traslados') {
+        apiUrl = '/api/guide-transport-rate/history';
+        columns = [
+            {
+                title: 'Fecha',
+                width: '30%'
+            },
+            {
+                title: 'Valor',
+                width: '25%'
+            },
+            {
+                title: 'Notas',
+                width: '30%'
+            },
+            {
+                title: 'Estado',
+                width: '15%'
+            }
+        ];
     } else {
         // Fallback to price-adjustments for other sections
         apiUrl = `/api/price-adjustments/${currentSection}`;
@@ -947,7 +1028,7 @@ function initializeHistoryTable() {
 
     $('#adjustmentsHistoryTable').DataTable({
         processing: true,
-        serverSide: currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer' || currentSection === 'guia-chofer', // Use server-side for exchange rate, inflation, agency, transfer, and guia-chofer
+        serverSide: currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer' || currentSection === 'guia-chofer' || currentSection === 'guia-traslados', // Use server-side for exchange rate, inflation, agency, transfer, guia-chofer, and guia-traslados
         ajax: {
             url: apiUrl,
             type: 'GET',
@@ -957,10 +1038,10 @@ function initializeHistoryTable() {
                     xhr.setRequestHeader('Authorization', `Bearer ${token}`);
                 }
             },
-            dataSrc: (currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer' || currentSection === 'guia-chofer') ? 'data' : 'data'
+            dataSrc: (currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer' || currentSection === 'guia-chofer' || currentSection === 'guia-traslados') ? 'data' : 'data'
         },
         columns: columns,
-        order: (currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer' || currentSection === 'guia-chofer') ? [[0, 'desc']] : [[1, 'desc']], // Order by date descending
+        order: (currentSection === 'exchange-rate' || currentSection === 'inflation' || currentSection === 'agency' || currentSection === 'transfer' || currentSection === 'guia-chofer' || currentSection === 'guia-traslados') ? [[0, 'desc']] : [[1, 'desc']], // Order by date descending
         language: {
             url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json'
         },
@@ -1029,6 +1110,8 @@ function initializeAdjustmentForm() {
             ? '/api/transfer-rate'
             : currentSection === 'guia-chofer'
             ? '/api/driver-tour-rate'
+            : currentSection === 'guia-traslados'
+            ? '/api/guide-transport-rate'
             : `/api/price-adjustments/${currentSection}`;
         
         fetch(apiUrl, {
@@ -1231,6 +1314,50 @@ function updateCurrentValue() {
                 const effectiveDateElement = document.getElementById('effectiveDate');
                 if (effectiveDateElement) {
                     const date = new Date(rate.lastUpdated || rate.createdAt);
+                    effectiveDateElement.textContent = date.toLocaleDateString('es-MX', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                }
+                
+                // Update the status badge
+                const statusBadgeElement = document.getElementById('createdBy');
+                if (statusBadgeElement) {
+                    statusBadgeElement.innerHTML = '<span class="badge bg-success">Activo</span>';
+                }
+                
+                // Show the current value display if it was hidden
+                document.getElementById('currentValueDisplay').style.display = 'block';
+                document.getElementById('noCurrentValue').style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error updating current value:', error);
+        });
+    } else if (currentSection === 'guia-traslados') {
+        fetch('/api/guide-transport-rate/current', {
+            headers: {
+                'Authorization': `Bearer ${getAccessToken()}`
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const rate = data.data;
+                
+                // Update the display value
+                const displayElement = document.querySelector('#currentValueDisplay .display-3');
+                if (displayElement) {
+                    displayElement.textContent = rate.formatted;
+                }
+                
+                // Update the effective date
+                const effectiveDateElement = document.getElementById('effectiveDate');
+                if (effectiveDateElement) {
+                    const date = new Date(rate.lastUpdated || rate.effectiveDate);
                     effectiveDateElement.textContent = date.toLocaleDateString('es-MX', {
                         year: 'numeric',
                         month: 'short',
