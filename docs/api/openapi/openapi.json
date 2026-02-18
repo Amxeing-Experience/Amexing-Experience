@@ -65,6 +65,7 @@
     "/auth/oauth/{provider}/unlink": { "$ref": "./paths/auth/oauth-unlink.json" },
     "/api/status": { "$ref": "./paths/api/status.json" },
     "/api/version": { "$ref": "./paths/api/version.json" },
+    "/api/auth/logout": { "$ref": "./paths/api/auth/logout.json" },
     "/api/users": { "$ref": "./paths/api/users/index.json" },
     "/api/users/search": { "$ref": "./paths/api/users/search.json" },
     "/api/users/statistics": { "$ref": "./paths/api/users/statistics.json" },
