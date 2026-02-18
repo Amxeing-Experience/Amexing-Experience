@@ -14,6 +14,15 @@ class ItineraryBuilder {
         this.autoSaveTimer = null;
         this.hasUnsavedChanges = false;
         
+        // Store field values for each service type to preserve user input
+        this.serviceTypeFields = {
+            experience: {},
+            tour: {},
+            concepto: {},
+            transport: {}
+        };
+        this.currentServiceType = null;
+        
         // Cache for API data
         this.vehiclesCache = null;
         this.experiencesCache = new Map();
@@ -415,6 +424,9 @@ class ItineraryBuilder {
     }
 
     handleServiceTypeChange(type) {
+        // Save current service type fields before switching
+        this.saveCurrentServiceTypeFields();
+        
         // Hide all content sections
         document.querySelectorAll('.service-content').forEach(content => {
             content.classList.add('d-none');
@@ -564,6 +576,138 @@ class ItineraryBuilder {
         if (contentId) {
             document.getElementById(contentId)?.classList.remove('d-none');
         }
+        
+        // Update current service type and restore fields for the new type
+        this.currentServiceType = type;
+        this.restoreServiceTypeFields(type);
+    }
+    
+    // Save current form values for the current service type
+    saveCurrentServiceTypeFields() {
+        if (!this.currentServiceType) return;
+        
+        const formData = {};
+        
+        // Common fields across all service types
+        const commonFields = [
+            'servicePrice', 'currencySelect', 'priceTypeSelect', 'serviceDescription',
+            'internalNotes', 'clientNotes', 'providerNotes', 'teamNotes'
+        ];
+        
+        // Service type specific fields
+        const serviceSpecificFields = {
+            experience: ['experienceSelect', 'experienceCategory'],
+            tour: ['tourSelect', 'tourCategory', 'transportCategory', 'vehicleSelect', 'includeGuide'],
+            transport: ['transportCategory', 'vehicleSelect', 'includeGuide'],
+            concepto: ['conceptoDescription']
+        };
+        
+        // Save common fields
+        commonFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                if (field.type === 'checkbox') {
+                    formData[fieldId] = field.checked;
+                } else {
+                    formData[fieldId] = field.value;
+                }
+            }
+        });
+        
+        // Save service-specific fields
+        const specificFields = serviceSpecificFields[this.currentServiceType] || [];
+        specificFields.forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                if (field.type === 'checkbox') {
+                    formData[fieldId] = field.checked;
+                } else {
+                    formData[fieldId] = field.value;
+                }
+            }
+        });
+        
+        // Save transport type and trip type for transport services
+        if (this.currentServiceType === 'transport') {
+            const transportType = document.querySelector('input[name="transportType"]:checked');
+            const tripType = document.querySelector('input[name="tripType"]:checked');
+            if (transportType) formData.transportType = transportType.value;
+            if (tripType) formData.tripType = tripType.value;
+        }
+        
+        this.serviceTypeFields[this.currentServiceType] = formData;
+    }
+    
+    // Restore form values for the target service type
+    restoreServiceTypeFields(targetServiceType) {
+        const savedFields = this.serviceTypeFields[targetServiceType];
+        if (!savedFields || Object.keys(savedFields).length === 0) {
+            // Set default values for service types when no saved data exists
+            this.setDefaultValuesForServiceType(targetServiceType);
+            return;
+        }
+        
+        // Restore all saved fields
+        Object.keys(savedFields).forEach(fieldId => {
+            const field = document.getElementById(fieldId);
+            if (field) {
+                if (field.type === 'checkbox') {
+                    field.checked = savedFields[fieldId];
+                } else {
+                    field.value = savedFields[fieldId];
+                }
+            }
+        });
+        
+        // Restore radio buttons for transport
+        if (targetServiceType === 'transport') {
+            if (savedFields.transportType) {
+                const transportTypeRadio = document.querySelector(`input[name="transportType"][value="${savedFields.transportType}"]`);
+                if (transportTypeRadio) transportTypeRadio.checked = true;
+            }
+            if (savedFields.tripType) {
+                const tripTypeRadio = document.querySelector(`input[name="tripType"][value="${savedFields.tripType}"]`);
+                if (tripTypeRadio) tripTypeRadio.checked = true;
+            }
+        }
+    }
+    
+    // Set default values when switching to a service type for the first time
+    setDefaultValuesForServiceType(serviceType) {
+        // Set default values based on service type
+        const priceField = document.getElementById('servicePrice');
+        
+        switch (serviceType) {
+            case 'concepto':
+                // Concepto defaults to empty/0 price (optional pricing)
+                if (priceField) priceField.value = '';
+                break;
+            case 'experience':
+                // Experience requires pricing, but start empty until user selects an experience
+                if (priceField) priceField.value = '';
+                break;
+            case 'tour':
+                // Tour requires pricing, but start empty until user selects a tour
+                if (priceField) priceField.value = '';
+                break;
+            case 'transport':
+                // Transport requires pricing, but start empty until user configures transport
+                if (priceField) priceField.value = '';
+                break;
+        }
+        
+        // Clear description and notes fields for fresh start
+        const descriptionField = document.getElementById('serviceDescription');
+        const internalNotesField = document.getElementById('internalNotes');
+        const clientNotesField = document.getElementById('clientNotes');
+        const providerNotesField = document.getElementById('providerNotes');
+        const teamNotesField = document.getElementById('teamNotes');
+        
+        if (descriptionField) descriptionField.value = '';
+        if (internalNotesField) internalNotesField.value = '';
+        if (clientNotesField) clientNotesField.value = '';
+        if (providerNotesField) providerNotesField.value = '';
+        if (teamNotesField) teamNotesField.value = '';
     }
     
     handleTransportTypeChange() {
