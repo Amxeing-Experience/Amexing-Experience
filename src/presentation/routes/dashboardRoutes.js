@@ -52,6 +52,7 @@ router.get('/admin/vehicles', dashboardAuth.requireRole('admin'), (req, res) => 
 router.get('/admin/price-settings', dashboardAuth.requireRole('admin'), (req, res) => adminController.priceSettings(req, res));
 router.get('/admin/pois', dashboardAuth.requireRole('admin'), (req, res) => adminController.pois(req, res));
 router.get('/admin/services', dashboardAuth.requireRole('admin'), (req, res) => adminController.services(req, res));
+router.get('/admin/a-disposicion', dashboardAuth.requireRole('admin'), (req, res) => adminController.aDisposicion(req, res));
 router.get('/admin/pricing', dashboardAuth.requireRole('admin'), (req, res) => adminController.pricing(req, res));
 router.get('/admin/tours', dashboardAuth.requireRole('admin'), (req, res) => adminController.tours(req, res));
 router.get('/admin/quotes', dashboardAuth.requireRole('admin'), (req, res) => adminController.quotes(req, res));
@@ -156,6 +157,8 @@ router.get('/guest/contact', dashboardAuth.requireRole('guest'), (req, res) => g
 router.get('/data/vehicle-types', dashboardAuth.requireRole('admin'), (req, res) => adminController.vehicleTypesData(req, res));
 router.get('/data/tours', dashboardAuth.requireRole('admin'), (req, res) => adminController.toursData(req, res));
 router.get('/data/experiences', dashboardAuth.requireRole('admin'), (req, res) => adminController.experiencesData(req, res));
+router.get('/data/disposable-prices', dashboardAuth.requireRole('admin'), (req, res) => adminController.disposablePricesData(req, res));
+router.put('/data/disposable-prices/batch-update', dashboardAuth.requireRole('admin'), (req, res) => adminController.disposablePricesBatchUpdate(req, res));
 
 // Default dashboard redirect - redirect to user's role-specific dashboard
 router.get('/', dashboardAuth.requireAuth, (req, res) => {

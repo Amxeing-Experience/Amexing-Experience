@@ -87,6 +87,13 @@ router.post(
 router.get('/:id/images', authenticateToken, controller.listImages.bind(controller));
 
 /**
+ * Get vehicle images grouped by disposable price combinations.
+ * GET /api/vehicles/images/by-disposable-combinations.
+ * @access public
+ */
+router.get('/images/by-disposable-combinations', authenticateToken, controller.getImagesByDisposableCombinations.bind(controller));
+
+/**
  * Delete (soft delete) a vehicle image.
  * DELETE /api/vehicles/:id/images/:imageId.
  * @access public

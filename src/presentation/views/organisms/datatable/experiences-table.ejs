@@ -105,6 +105,17 @@ const isClient = dtUserRole === 'client';
     font-size: 0.65rem;
     padding: 2px 6px;
 }
+
+/* Hide DataTable sorting arrows and disable cursor */
+#<%= dtTableId %> thead .sorting:after,
+#<%= dtTableId %> thead .sorting_asc:after,
+#<%= dtTableId %> thead .sorting_desc:after {
+    display: none !important;
+}
+
+#<%= dtTableId %> thead th {
+    cursor: default !important;
+}
 </style>
 
 <div class="card border-0 shadow-sm">
@@ -532,6 +543,9 @@ const isClient = dtUserRole === 'client';
         </div>
     </div>
 </template>
+
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
 
 <script>
 (function() {
@@ -966,29 +980,7 @@ const isClient = dtUserRole === 'client';
                 });
             }
             
-            // Function to apply USD rounding rules
-            function applyUSDRoundingRules(value) {
-                // Find the base (nearest multiple of 5 below or equal)
-                const base = Math.floor(value / 5) * 5;
-                
-                // Calculate remainder when dividing by 5
-                const remainder = value % 5;
-                
-                if (remainder === 0) {
-                    const lastDigitBeforeDecimal = Math.floor(value) % 10;
-                    if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
-                        return base + 5; // Round up
-                    } else {
-                        return base; // Keep as multiple of 5
-                    }
-                } else if (remainder <= 2.7) {
-                    // Round down to nearest 5
-                    return base;
-                } else {
-                    // Round up to next multiple of 5
-                    return base + 5;
-                }
-            }
+            // USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
             
             // Function to update displayed prices
             function updatePrices(paymentType, currency) {
@@ -1082,7 +1074,7 @@ const isClient = dtUserRole === 'client';
                             finalPrice = finalPrice / exchangeRate;
                             console.log(`💱 Currency conversion: ${beforeConversion} MXN ÷ ${exchangeRate} = ${finalPrice} USD (before rounding)`);
                             
-                            finalPrice = applyUSDRoundingRules(finalPrice);
+                            finalPrice = PricingUtils.applyUSDRoundingRules(finalPrice);
                             console.log(`🎯 Final USD price after rounding: ${finalPrice}`);
                             
                             // Format as USD
@@ -1188,8 +1180,12 @@ const isClient = dtUserRole === 'client';
             columns: [
                 {
                     data: 'name',
-                    orderable: false,
-                    render: function(data) {
+                    orderable: false, // Disable interactive sorting
+                    render: function(data, type, row) {
+                        // For sorting, return plain text for initial order
+                        if (type === 'sort') {
+                            return data || '';
+                        }
                         return `<div class="fw-semibold">${data}</div>`;
                     }
                 },
@@ -1413,7 +1409,8 @@ const isClient = dtUserRole === 'client';
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando experiencias...'
             },
-            order: userRole !== 'department_manager' ? [[6, 'desc']] : [[0, 'asc']], // Sort by updatedAt (Última Act.) or Name
+            order: [[0, 'asc']], // Sort by Name (column 0) alphabetically
+            ordering: false, // Disable all column sorting UI
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',

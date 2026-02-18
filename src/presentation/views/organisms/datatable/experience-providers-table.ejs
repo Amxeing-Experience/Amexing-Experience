@@ -311,7 +311,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                                    multiple>
                         </div>
                         <div class="form-text">
-                            <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP • Máx. 10MB cada una</small>
+                            <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small>
                         </div>
                     </div>
 
@@ -719,7 +719,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                            multiple>
                 </div>
                 <div class="form-text">
-                    <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP • Máx. 10MB cada una</small>
+                    <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small>
                 </div>
             </div>
             
@@ -868,8 +868,12 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             columns: [
                 {
                     data: 'name',
-                    orderable: false,
-                    render: function(data) {
+                    orderable: false, // Disable interactive sorting
+                    render: function(data, type, row) {
+                        // For sorting, return plain text for initial order
+                        if (type === 'sort') {
+                            return data || '';
+                        }
                         return `<div class="fw-semibold">${data || '-'}</div>`;
                     }
                 },
@@ -991,7 +995,8 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando proveedores...'
             },
-            order: [[0, 'asc']],
+            order: [[0, 'asc']], // Sort by Name alphabetically
+            ordering: false, // Disable all column sorting UI
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
@@ -1026,10 +1031,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
             const previewContainer = $(this).closest('.experience-photos-container').find('.photos-preview-container');
             
             Array.from(files).forEach(file => {
-                if (file.size > 10 * 1024 * 1024) { // 10MB limit - increased for better quality
-                    alert(`El archivo "${file.name}" excede el tamaño máximo de 10MB`);
-                    return;
-                }
+                // Removed file size limit - allow any size
                 
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -2956,11 +2958,7 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 
                 // Process each selected file
                 Array.from(files).forEach(file => {
-                    // Validate file size (10MB max - increased for better quality)
-                    if (file.size > 10 * 1024 * 1024) {
-                        showErrorAlert(`La imagen "${file.name}" es muy grande. Máximo 10MB.`);
-                        return;
-                    }
+                    // Removed file size limit - allow any size
 
                     // Validate file type
                     if (!file.type.match(/^image\/(jpeg|jpg|png|webp)$/)) {
@@ -3148,5 +3146,15 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
 .add-photo-btn:hover {
     border-color: #0d6efd;
     background-color: #f8f9ff;
+}
+/* Hide DataTable sorting arrows and disable cursor */
+#<%= dtTableId %> thead .sorting:after,
+#<%= dtTableId %> thead .sorting_asc:after,
+#<%= dtTableId %> thead .sorting_desc:after {
+    display: none !important;
+}
+
+#<%= dtTableId %> thead th {
+    cursor: default !important;
 }
 </style>

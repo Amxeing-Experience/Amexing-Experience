@@ -142,7 +142,7 @@
         const dropzone = new Dropzone('#experience-images-dropzone', {
             url: `/api/experiences/placeholder/images`, // Will be updated dynamically
             paramName: 'image',
-            maxFilesize: 250, // MB
+            maxFilesize: null, // No size limit
             acceptedFiles: '.jpg,.jpeg,.png,.webp',
             addRemoveLinks: true,
             dictDefaultMessage: 'Arrastra archivos aquí o haz clic para seleccionar',
@@ -150,7 +150,7 @@
             dictCancelUpload: 'Cancelar',
             dictUploadCanceled: 'Subida cancelada',
             dictInvalidFileType: 'Tipo de archivo no válido',
-            dictFileTooBig: 'Archivo demasiado grande ({{filesize}}MB). Máximo: {{maxFilesize}}MB.',
+            dictFileTooBig: 'Archivo no válido.',
             dictResponseError: 'Error del servidor: {{statusCode}}',
             headers: {
                 'X-Requested-With': 'XMLHttpRequest',

@@ -404,7 +404,9 @@ const inflationRateRoutes = require('./api/inflationRateRoutes');
 const agencyRateRoutes = require('./api/agencyRateRoutes');
 const transferRateRoutes = require('./api/transferRateRoutes');
 const driverTourRateRoutes = require('./api/driverTourRateRoutes');
+const guideTransportRateRoutes = require('./api/guideTransportRateRoutes');
 const vehicleRatePricesRoutes = require('./api/vehicleRatePricesRoutes');
+const disposablePricesRoutes = require('./api/disposablePricesRoutes');
 // Notifications API controller
 const NotificationsController = require('../../application/controllers/api/NotificationsController');
 
@@ -441,7 +443,9 @@ router.use('/inflation-rate', inflationRateRoutes); // Inflation rate management
 router.use('/agency-rate', agencyRateRoutes); // Agency rate management endpoints
 router.use('/transfer-rate', transferRateRoutes); // Transfer rate management endpoints
 router.use('/driver-tour-rate', driverTourRateRoutes); // Driver tour rate management endpoints
+router.use('/guide-transport-rate', guideTransportRateRoutes); // Guide transport rate management endpoints
 router.use('/vehicle-rate-prices', vehicleRatePricesRoutes); // Vehicle rate prices management endpoints
+router.use('/disposable-prices', disposablePricesRoutes); // Disposable prices (A Disposición) management endpoints
 
 /**
  * Email Test Endpoint - SuperAdmin Only
