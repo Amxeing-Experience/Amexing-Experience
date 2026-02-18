@@ -1,0 +1,515 @@
+<%
+/**
+ * Quote Services Modals - Modal components for the itinerary builder
+ * Created by Denisse Maldonado
+ */
+%>
+
+<!-- Day Modal -->
+<div class="modal fade" id="dayModal" tabindex="-1" aria-labelledby="dayModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title" id="dayModalLabel">
+                    <i class="ti ti-calendar-plus me-2"></i>Agregar Día
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Alert Container for Modal -->
+                <div id="dayModalAlert" class="modal-alert-container"></div>
+                
+                <form id="dayForm">
+                    <div class="mb-3">
+                        <label for="dayTitle" class="form-label">Título del Día <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="dayTitle" placeholder="Ej: Llegada y City Tour" required>
+                        <div class="form-text">Dale un nombre descriptivo a este día del itinerario</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="dayDate" class="form-label">Fecha</label>
+                        <input type="date" class="form-control" id="dayDate">
+                        <div class="form-text">Opcional: Asigna una fecha específica</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="dayDescription" class="form-label">Descripción</label>
+                        <textarea class="form-control" id="dayDescription" rows="3" placeholder="Descripción general del día..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveDayBtn">
+                    <i class="ti ti-device-floppy me-1"></i>Guardar Día
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Service Modal -->
+<div class="modal fade" id="serviceModal" tabindex="-1" aria-labelledby="serviceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title" id="serviceModalLabel">
+                    <i class="ti ti-plus-circle me-2"></i>Agregar Servicio
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Alert Container for Modal -->
+                <div id="serviceModalAlert" class="modal-alert-container"></div>
+                
+                <form id="serviceForm">
+                    <!-- Service Type Selection -->
+                    <div class="service-type-selector mb-3">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <label class="form-label mb-0">Servicio <span class="text-danger">*</span></label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="radio" class="btn-check" name="serviceType" id="typeExperience" value="experience" checked>
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeExperience">
+                                    <i class="ti ti-beach me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Experiencia</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="serviceType" id="typeTour" value="tour">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeTour">
+                                    <i class="ti ti-map-2 me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Tour</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="serviceType" id="typeTransport" value="transport">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeTransport">
+                                    <i class="ti ti-car me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Transporte</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="serviceType" id="typeConcepto" value="concepto">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeConcepto">
+                                    <i class="ti ti-file-text me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Concepto</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transport Type Selection (only visible when transport is selected) -->
+                    <div id="transportTypeSelector" class="mb-3 d-none">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <label class="form-label mb-0">Transporte <span class="text-danger">*</span></label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="radio" class="btn-check" name="transportType" id="transportAeropuerto" value="aeropuerto" checked>
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="transportAeropuerto">
+                                    <i class="ti ti-plane me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Aeropuerto</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="transportType" id="transportPuntoAPunto" value="punto-a-punto">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="transportPuntoAPunto">
+                                    <i class="ti ti-route me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Punto a Punto</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="transportType" id="transportLocal" value="local">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="transportLocal">
+                                    <i class="ti ti-map-pin me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Local</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trip Type Selection (only visible when transport is selected) -->
+                    <div id="tripTypeSelector" class="mb-3 d-none">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <label class="form-label mb-0">Viaje <span class="text-danger">*</span></label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <input type="radio" class="btn-check" name="tripType" id="tripOneWay" value="one-way" checked>
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="tripOneWay">
+                                    <i class="ti ti-arrow-right me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">One Way</span>
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="tripType" id="tripRoundTrip" value="round-trip">
+                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="tripRoundTrip">
+                                    <i class="ti ti-arrows-right-left me-1" style="font-size: 1.1rem;"></i>
+                                    <span style="font-size: 0.9rem;">Round Trip</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Content Based on Service Type -->
+                    <div id="serviceTypeContent">
+                        <!-- Experience/Tour Selection -->
+                        <div id="experienceContent" class="service-content">
+                            <div class="mb-3">
+                                <label for="experienceSelect" class="form-label">Seleccionar Experiencia <span class="text-danger">*</span></label>
+                                <select class="form-select" id="experienceSelect" required>
+                                    <option value="">-- Selecciona una experiencia --</option>
+                                </select>
+                                <div class="form-text">Las experiencias disponibles se cargan según el día seleccionado</div>
+                            </div>
+                            <!-- Experience Details Container -->
+                            <div id="experienceDetails" class="mt-2"></div>
+                        </div>
+
+                        <!-- Tour Selection -->
+                        <div id="tourContent" class="service-content d-none">
+                            <div class="mb-3">
+                                <label for="tourSelect" class="form-label">Seleccionar Tour <span class="text-danger">*</span></label>
+                                <select class="form-select" id="tourSelect" required>
+                                    <option value="">-- Selecciona un tour --</option>
+                                </select>
+                                <small class="form-text text-muted mt-1">
+                                    <i class="ti ti-info-circle me-1"></i>Todos los tours incluyen 1 guía
+                                </small>
+                            </div>
+                            <!-- Tour Details Container -->
+                            <div id="tourDetails" class="mt-2"></div>
+                        </div>
+
+                        <!-- Transport Fields -->
+                        <div id="transportContent" class="service-content d-none">
+                            <!-- One Way Form -->
+                            <div id="oneWayForm" class="transport-trip-form">
+                                <div class="border rounded p-3 bg-light">
+                                    <!-- Arrival/Departure Selection (only for one-way) -->
+                                    <div id="arrivalDepartureSelector" class="mb-3">
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <label class="form-label mb-0">Tipo <span class="text-danger">*</span></label>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <input type="radio" class="btn-check" name="directionType" id="typeArrival" value="arrival" checked>
+                                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeArrival">
+                                                    <i class="ti ti-plane-arrival me-1" style="font-size: 1.1rem;"></i>
+                                                    <span style="font-size: 0.9rem;">Arrival</span>
+                                                </label>
+                                                
+                                                <input type="radio" class="btn-check" name="directionType" id="typeDeparture" value="departure">
+                                                <label class="btn btn-outline-primary d-flex align-items-center px-3" for="typeDeparture">
+                                                    <i class="ti ti-plane-departure me-1" style="font-size: 1.1rem;"></i>
+                                                    <span style="font-size: 0.9rem;">Departure</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Origen <span class="text-danger">*</span></label>
+                                        <!-- Arrival: Dropdown Origin -->
+                                        <select class="form-select transport-origin-arrival" id="transportOriginSelect" required>
+                                            <option value="">-- Seleccionar origen --</option>
+                                            <option value="cancun">Cancún</option>
+                                            <option value="playa-del-carmen">Playa del Carmen</option>
+                                            <option value="tulum">Tulum</option>
+                                            <option value="cozumel">Cozumel</option>
+                                            <option value="merida">Mérida</option>
+                                            <option value="chichen-itza">Chichén Itzá</option>
+                                        </select>
+                                        <!-- Departure: Text Origin -->
+                                        <input type="text" class="form-control transport-origin-departure d-none" id="transportOriginText" placeholder="Ej: Hotel Xcaret, Airbnb Playa">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Destino <span class="text-danger">*</span></label>
+                                        <!-- Arrival: Text Destination -->
+                                        <input type="text" class="form-control transport-destination-arrival" id="transportDestinationText" placeholder="Ej: Hotel Xcaret, Aeropuerto Internacional" required>
+                                        <!-- Departure: Dropdown Destination -->
+                                        <select class="form-select transport-destination-departure d-none" id="transportDestinationSelect">
+                                            <option value="">-- Seleccionar destino --</option>
+                                            <option value="cancun">Cancún</option>
+                                            <option value="playa-del-carmen">Playa del Carmen</option>
+                                            <option value="tulum">Tulum</option>
+                                            <option value="cozumel">Cozumel</option>
+                                            <option value="merida">Mérida</option>
+                                            <option value="chichen-itza">Chichén Itzá</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <!-- Flight Details (only show if Aeropuerto is selected) -->
+                                <div id="flightDetailsSection" class="d-none">
+                                    <hr class="my-2">
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="airline" class="form-label">Aerolínea</label>
+                                            <input type="text" class="form-control" id="airline" placeholder="Ej: American Airlines">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="flightNumber" class="form-label">Número de Vuelo</label>
+                                            <input type="text" class="form-control" id="flightNumber" placeholder="Ej: AA1234">
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="flightTime" class="form-label">Hora de Llegada</label>
+                                            <input type="time" class="form-control" id="flightTime">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="transportPersons" class="form-label">Número de Personas <span class="text-danger">*</span></label>
+                                            <input type="number" class="form-control" id="transportPersons" min="1" max="50" value="1" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Round Trip Form -->
+                            <div id="roundTripForm" class="transport-trip-form d-none">
+                                <!-- Arrival -->
+                                <div class="border rounded p-3 mb-3 bg-light">
+                                    <h6 class="mb-3 text-info">
+                                        <i class="ti ti-plane-arrival me-2"></i>Arrival
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Origen <span class="text-danger">*</span></label>
+                                            <!-- Arrival: Dropdown Origin -->
+                                            <select class="form-select" id="roundTripOriginIdaSelect" required>
+                                                <option value="">-- Seleccionar origen --</option>
+                                                <option value="cancun">Cancún</option>
+                                                <option value="cozumel">Cozumel</option>
+                                                <option value="playa">Playa del Carmen</option>
+                                                <option value="tulum">Tulum</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Destino <span class="text-danger">*</span></label>
+                                            <!-- Arrival: Text Destination -->
+                                            <input type="text" class="form-control" id="roundTripDestinationIda" placeholder="Ej: Hotel Xcaret, Airbnb Playa" required>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="roundTripDateIda" class="form-label">Fecha de Llegada</label>
+                                            <input type="date" class="form-control" id="roundTripDateIda">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="roundTripTimeIda" class="form-label">Hora de Llegada</label>
+                                            <input type="time" class="form-control" id="roundTripTimeIda">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Flight Details for Ida (only show if Aeropuerto is selected) -->
+                                    <div class="roundtrip-flight-details-ida d-none">
+                                        <hr class="my-2">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="roundTripAirlineIda" class="form-label">Aerolínea</label>
+                                                <input type="text" class="form-control" id="roundTripAirlineIda" placeholder="Ej: American Airlines">
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label for="roundTripFlightNumberIda" class="form-label">Número de Vuelo</label>
+                                                <input type="text" class="form-control" id="roundTripFlightNumberIda" placeholder="Ej: AA1234">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Departure -->
+                                <div class="border rounded p-3 bg-light">
+                                    <h6 class="mb-3 text-primary">
+                                        <i class="ti ti-plane-departure me-2"></i>Departure
+                                    </h6>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Origen <span class="text-danger">*</span></label>
+                                            <!-- Departure: Text Origin -->
+                                            <input type="text" class="form-control" id="roundTripOriginVuelta" placeholder="Ej: Hotel Xcaret, Airbnb Playa" required>
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label class="form-label">Destino <span class="text-danger">*</span></label>
+                                            <!-- Departure: Dropdown Destination -->
+                                            <select class="form-select" id="roundTripDestinationVueltaSelect" required>
+                                                <option value="">-- Seleccionar destino --</option>
+                                                <option value="cancun">Cancún</option>
+                                                <option value="cozumel">Cozumel</option>
+                                                <option value="playa">Playa del Carmen</option>
+                                                <option value="tulum">Tulum</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6 mb-3">
+                                            <label for="roundTripDateVuelta" class="form-label">Fecha de Salida</label>
+                                            <input type="date" class="form-control" id="roundTripDateVuelta">
+                                        </div>
+                                        <div class="col-md-6 mb-3">
+                                            <label for="roundTripTimeVuelta" class="form-label">Hora de Salida</label>
+                                            <input type="time" class="form-control" id="roundTripTimeVuelta">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Flight Details for Vuelta (only show if Aeropuerto is selected) -->
+                                    <div class="roundtrip-flight-details-vuelta d-none">
+                                        <hr class="my-2">
+                                        <div class="row">
+                                            <div class="col-md-6 mb-3">
+                                                <label for="roundTripAirlineVuelta" class="form-label">Aerolínea</label>
+                                                <input type="text" class="form-control" id="roundTripAirlineVuelta" placeholder="Ej: American Airlines">
+                                            </div>
+                                            <div class="col-md-6 mb-3">
+                                                <label for="roundTripFlightNumberVuelta" class="form-label">Número de Vuelo</label>
+                                                <input type="text" class="form-control" id="roundTripFlightNumberVuelta" placeholder="Ej: AA5678">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Number of Persons -->
+                                <div class="row mt-3">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="roundTripPersons" class="form-label">Número de Personas <span class="text-danger">*</span></label>
+                                        <input type="number" class="form-control" id="roundTripPersons" min="1" max="50" value="1" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Concepto Fields -->
+                        <div id="conceptoContent" class="service-content d-none">
+                            <div class="mb-3">
+                                <label for="conceptoConcept" class="form-label">Concepto <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="conceptoConcept" placeholder="Describe el servicio...">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Common Fields -->
+                    <hr class="my-4">
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="transportCategory" class="form-label">Categoría <span class="text-danger">*</span></label>
+                            <select class="form-select" id="transportCategory" required>
+                                <option value="">-- Seleccionar categoría --</option>
+                                <option value="economica">Económica</option>
+                                <option value="standard">Estándar</option>
+                                <option value="premium">Premium</option>
+                                <option value="lujo">Lujo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="vehicleSelect" class="form-label">Vehículo</label>
+                            <select class="form-select" id="vehicleSelect">
+                                <option value="">-- Sin vehículo --</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label d-block">Opcional</label>
+                            <div class="d-flex align-items-center justify-content-center" style="min-height: 38px;">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="" id="includeGuide">
+                                    <label class="form-check-label small" for="includeGuide" id="guideLabel" style="font-size: 0.875rem; line-height: 1.2;">
+                                        Guía + Chofer
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="currencySelect" class="form-label">Moneda <span class="text-danger">*</span></label>
+                            <select class="form-select" id="currencySelect" required>
+                                <option value="MXN" selected>MXN</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="priceTypeSelect" class="form-label">Pago <span class="text-danger">*</span></label>
+                            <select class="form-select" id="priceTypeSelect" required>
+                                <option value="efectivo" selected>Efectivo</option>
+                                <option value="transferencia">Transferencia</option>
+                                <option value="tarjeta">Tarjeta de Crédito/Débito</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="servicePrice" class="form-label">Precio Unitario <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="servicePrice" placeholder="0.00" step="0.01" min="0" required>
+                                <span class="input-group-text" id="currencySymbol">MXN</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="serviceQuantity" class="form-label">Cantidad</label>
+                            <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="serviceNotes" class="form-label">Notas Adicionales</label>
+                        <textarea class="form-control" id="serviceNotes" rows="2" placeholder="Información adicional del servicio..."></textarea>
+                    </div>
+
+                    <!-- Preview -->
+                    <div class="service-preview bg-light rounded p-3 d-none">
+                        <h6 class="mb-2">Vista Previa</h6>
+                        <div id="servicePreview">
+                            <!-- Preview content will be generated here -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="saveServiceBtn">
+                    <i class="ti ti-device-floppy me-1"></i>Guardar Servicio
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-bottom bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="ti ti-alert-triangle me-2"></i>Confirmar Eliminación
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p id="deleteConfirmMessage">¿Estás seguro de que deseas eliminar este elemento?</p>
+                <p class="text-muted">Esta acción no se puede deshacer.</p>
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="ti ti-trash me-1"></i>Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header border-bottom">
+                <h5 class="modal-title">
+                    <i class="ti ti-eye me-2"></i>Vista Previa del Itinerario
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="previewContent">
+                <!-- Preview content will be generated here -->
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="exportPdfBtn">
+                    <i class="ti ti-file-download me-1"></i>Exportar PDF
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -85,9 +85,10 @@ class ProviderExperienciaController {
 
       const experiencias = await query.find({ useMasterKey: true });
 
-      // Format response with provider information
+      // Format response with ALL fields from database including extra fields
       const data = experiencias.map((exp) => ({
         id: exp.id,
+        objectId: exp.id,
         name: exp.get('name'),
         description: exp.get('description'),
         price: exp.get('price'),
@@ -97,6 +98,26 @@ class ProviderExperienciaController {
         max_people: exp.get('max_people'),
         availability: exp.get('availability') || null,
         active: exp.get('active'),
+
+        // Additional pricing fields from database
+        price_child: exp.get('price_child'),
+        price_no_alcohol: exp.get('price_no_alcohol'),
+
+        // Include/exclude fields from database
+        includes: exp.get('includes'),
+        notincludes: exp.get('notincludes'),
+        languages: exp.get('languages'),
+
+        // Notes fields from database
+        client_booking_notes: exp.get('client_booking_notes'),
+        provider_notes: exp.get('provider_notes'),
+        team_notes: exp.get('team_notes'),
+        internal_notes: exp.get('internal_notes'),
+
+        // Duration fields from database
+        travel_duration: exp.get('travel_duration'),
+        advance_booking_time: exp.get('advance_booking_time'),
+
         provider: exp.get('provider')
           ? {
             id: exp.get('provider').id,
@@ -106,6 +127,9 @@ class ProviderExperienciaController {
           : null,
         createdAt: exp.createdAt,
         updatedAt: exp.updatedAt,
+
+        // Mark as provider experience for frontend identification
+        type: 'provider_experience',
       }));
 
       return res.json({

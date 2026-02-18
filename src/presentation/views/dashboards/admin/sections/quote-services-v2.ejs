@@ -1,0 +1,472 @@
+<%
+/**
+ * Quote Services Section V2 - Travefy-inspired Itinerary Builder
+ * Clean, modern interface with modal-based forms
+ * Created by Denisse Maldonado
+ */
+%>
+
+<div class="itinerary-builder">
+    <!-- Header with Title and Main Actions -->
+    <div class="itinerary-header mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h4 class="fw-bold mb-1">
+                    <i class="ti ti-route me-2"></i>Itinerario
+                </h4>
+                <p class="text-muted mb-0">Organiza los servicios por día</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-primary" id="previewItineraryBtn">
+                    <i class="ti ti-eye me-1"></i>Vista Previa
+                </button>
+                <button type="button" class="btn btn-primary" id="addNewDayBtn">
+                    <i class="ti ti-plus me-1"></i>Nuevo Día
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="row g-4">
+        <!-- Days Sidebar -->
+        <div class="col-md-3">
+            <div class="days-sidebar sticky-top" style="top: 20px;">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white border-bottom">
+                        <h6 class="mb-0 text-uppercase text-muted" style="font-size: 0.85rem; letter-spacing: 0.5px;">
+                            Días del Itinerario
+                        </h6>
+                    </div>
+                    <div class="card-body p-2">
+                        <div id="daysList" class="days-navigation">
+                            <!-- Days will be dynamically loaded here -->
+                        </div>
+                        
+                        <!-- Add Day Button at Bottom -->
+                        <button type="button" class="btn btn-light w-100 mt-2" id="addDaySidebarBtn">
+                            <i class="ti ti-plus me-1"></i>Agregar Día
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Totals Card -->
+                <div class="card border-0 shadow-sm mt-3">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0 text-white">
+                            <i class="ti ti-calculator me-1 text-white"></i>Resumen de Costos
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Subtotal:</span>
+                            <span class="fw-semibold" id="subtotalAmount">$0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">IVA (16%):</span>
+                            <span class="fw-semibold" id="ivaAmount">$0.00</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="fw-bold">Total:</span>
+                            <span class="fw-bold fs-5 text-primary" id="totalAmount">$0.00</span>
+                        </div>
+                        <div class="bg-light rounded p-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">Por persona:</small>
+                                <span class="fw-semibold text-info" id="perPersonAmount">$0.00</span>
+                            </div>
+                            <small class="text-muted" id="personCount">(0 personas)</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Itinerary Content Area -->
+        <div class="col-md-9">
+            <!-- Empty State -->
+            <div id="emptyStateContainer" class="text-center py-5 d-none">
+                <div class="empty-state-icon mb-3">
+                    <i class="ti ti-calendar-off" style="font-size: 4rem; color: #dee2e6;"></i>
+                </div>
+                <h5 class="text-muted mb-2">Comienza a crear tu itinerario</h5>
+                <p class="text-muted mb-4">Agrega días y servicios para construir el itinerario perfecto</p>
+                <button type="button" class="btn btn-primary" id="emptyStateAddDayBtn">
+                    <i class="ti ti-plus me-1"></i>Agregar Primer Día
+                </button>
+            </div>
+
+            <!-- Days Container -->
+            <div id="daysContainer" class="itinerary-days">
+                <!-- Days will be dynamically loaded here -->
+            </div>
+
+            <!-- Save Status Indicator -->
+            <div class="save-status-bar mt-4 p-3 bg-light rounded d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <div id="saveStatusIndicator" class="me-3">
+                        <span class="badge bg-success">
+                            <i class="ti ti-check me-1"></i>Guardado
+                        </span>
+                    </div>
+                    <small class="text-muted">Los cambios se guardan automáticamente</small>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="undoBtn" disabled>
+                        <i class="ti ti-arrow-back-up me-1"></i>Deshacer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Day Card Template -->
+<template id="dayCardTemplate">
+    <div class="day-card mb-4" data-day-id="">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex align-items-center">
+                        <div class="day-number-badge me-3">
+                            <span class="badge bg-primary rounded-circle" style="width: 35px; height: 35px; display: flex; align-items: center; justify-content: center; font-size: 1rem;">
+                                1
+                            </span>
+                        </div>
+                        <div>
+                            <h5 class="mb-0 day-title">Día 1</h5>
+                            <small class="text-muted day-date">Sin fecha asignada</small>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-light edit-day-btn" title="Editar día">
+                            <i class="ti ti-pencil"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light duplicate-day-btn" title="Duplicar día">
+                            <i class="ti ti-copy"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-light delete-day-btn" title="Eliminar día">
+                            <i class="ti ti-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <!-- Services List -->
+                <div class="services-list">
+                    <!-- Services will be added here -->
+                </div>
+                
+                <!-- Add Service Button -->
+                <button type="button" class="btn btn-outline-primary btn-sm w-100 mt-3 add-service-btn">
+                    <i class="ti ti-plus me-1"></i>Agregar Servicio
+                </button>
+            </div>
+            <div class="card-footer bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Total del día:</span>
+                    <span class="fw-bold day-total">$0.00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Service Item Template -->
+<template id="serviceItemTemplate">
+    <div class="service-item mb-3 p-3 border rounded hover-shadow" data-service-id="">
+        <div class="d-flex justify-content-between align-items-start">
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center mb-2">
+                    <i class="ti ti-point-filled text-primary me-2"></i>
+                    <h6 class="mb-0 service-title">Service Title</h6>
+                    <span class="badge bg-light text-dark ms-2 service-type">Tipo</span>
+                </div>
+                <div class="service-details">
+                    <div class="row g-2 text-muted small">
+                        <div class="col-auto">
+                            <i class="ti ti-clock me-1"></i><span class="service-time">Sin horario</span>
+                        </div>
+                        <div class="col-auto">
+                            <i class="ti ti-car me-1"></i><span class="service-vehicle">Sin vehículo</span>
+                        </div>
+                        <div class="col-auto">
+                            <i class="ti ti-currency-dollar me-1"></i><span class="service-price">$0.00</span>
+                        </div>
+                    </div>
+                    <div class="service-notes mt-2 text-muted small d-none">
+                        <i class="ti ti-notes me-1"></i><span class="notes-text"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="service-actions">
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-light edit-service-btn" title="Editar">
+                        <i class="ti ti-pencil"></i>
+                    </button>
+                    <button type="button" class="btn btn-light duplicate-service-btn" title="Duplicar">
+                        <i class="ti ti-copy"></i>
+                    </button>
+                    <button type="button" class="btn btn-light delete-service-btn" title="Eliminar">
+                        <i class="ti ti-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<!-- Styles for the new interface -->
+<style>
+    .itinerary-builder {
+        min-height: 600px;
+    }
+
+    .days-navigation .day-nav-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        margin-bottom: 0.25rem;
+        border-radius: 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: 2px solid transparent;
+    }
+
+    .days-navigation .day-nav-item:hover {
+        background-color: #f8f9fa;
+    }
+
+    .days-navigation .day-nav-item.active {
+        background-color: #e3f2fd;
+        border-color: #2196f3;
+    }
+
+    .days-navigation .day-nav-number {
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #6c757d;
+        color: white;
+        border-radius: 50%;
+        font-size: 0.875rem;
+        font-weight: 600;
+        margin-right: 0.75rem;
+    }
+
+    .days-navigation .day-nav-item.active .day-nav-number {
+        background: #2196f3;
+    }
+
+    .day-card {
+        scroll-margin-top: 20px;
+        animation: fadeInUp 0.3s ease;
+    }
+
+    .service-item {
+        transition: all 0.2s ease;
+        background: white;
+    }
+
+    .service-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    .hover-shadow {
+        transition: box-shadow 0.2s ease;
+    }
+
+    .save-status-bar {
+        position: sticky;
+        bottom: 20px;
+        z-index: 10;
+        backdrop-filter: blur(10px);
+        background-color: rgba(248, 249, 250, 0.95) !important;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .empty-state-icon {
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+
+    .sticky-top {
+        position: sticky;
+        top: 20px;
+        z-index: 100;
+    }
+
+    @media (max-width: 768px) {
+        .sticky-top {
+            position: static;
+        }
+    }
+
+    /* Drag and Drop Styles */
+    .day-nav-item[draggable="true"],
+    .day-card[draggable="true"] {
+        transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    
+    .day-nav-item[draggable="true"]:hover .ti-grip-vertical,
+    .day-card[draggable="true"]:hover .ti-grip-vertical {
+        opacity: 1 !important;
+        color: #007bff !important;
+    }
+    
+    .day-nav-item.dragging,
+    .day-card.dragging {
+        opacity: 0.5;
+        transform: rotate(2deg) scale(0.95);
+        z-index: 1000;
+    }
+    
+    .drag-active .day-nav-item:not(.dragging),
+    .drag-active .day-card:not(.dragging) {
+        transition: all 0.2s ease;
+    }
+    
+    .drag-active .day-nav-item:not(.dragging):hover,
+    .drag-active .day-card:not(.dragging):hover {
+        transform: translateY(-2px);
+        background-color: #f8f9fa;
+        box-shadow: 0 2px 8px rgba(0,123,255,0.2);
+    }
+    
+    .drag-handle {
+        transition: all 0.2s ease;
+    }
+    
+    .drag-handle:hover {
+        transform: scale(1.1);
+        color: #007bff !important;
+    }
+    
+    .drag-handle:active {
+        transform: scale(0.95);
+    }
+    
+    .drag-placeholder {
+        background: linear-gradient(90deg, #f8f9fa 25%, transparent 25%, transparent 50%, #f8f9fa 50%, #f8f9fa 75%, transparent 75%);
+        background-size: 20px 20px;
+        border: 2px dashed #007bff;
+        border-radius: 8px;
+        opacity: 0.6;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #007bff;
+        font-weight: 500;
+    }
+    
+    /* Drop Indicator Styles */
+    .drop-indicator {
+        position: relative;
+        height: 40px;
+        margin: 8px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: dropIndicatorFade 0.3s ease-in-out;
+        z-index: 10;
+        pointer-events: none; /* Don't interfere with drop events */
+    }
+    
+    .drop-line {
+        position: absolute;
+        top: 50%;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #007bff, #0056b3);
+        border-radius: 2px;
+        box-shadow: 0 0 8px rgba(0, 123, 255, 0.4);
+        animation: dropLinePulse 1.5s ease-in-out infinite;
+    }
+    
+    .drop-line::before,
+    .drop-line::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        width: 8px;
+        height: 8px;
+        background: #007bff;
+        border-radius: 50%;
+        transform: translateY(-50%);
+        box-shadow: 0 0 4px rgba(0, 123, 255, 0.6);
+    }
+    
+    .drop-line::before {
+        left: -4px;
+    }
+    
+    .drop-line::after {
+        right: -4px;
+    }
+    
+    .drop-text {
+        background: #007bff;
+        color: white;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+        z-index: 11;
+        position: relative;
+    }
+    
+    @keyframes dropIndicatorFade {
+        from {
+            opacity: 0;
+            transform: scale(0.8);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+    
+    @keyframes dropLinePulse {
+        0%, 100% {
+            box-shadow: 0 0 8px rgba(0, 123, 255, 0.4);
+        }
+        50% {
+            box-shadow: 0 0 16px rgba(0, 123, 255, 0.8);
+        }
+    }
+</style>
+
+<!-- Initialize the Itinerary Builder -->
+<div data-quote-id="<%= quoteId %>"></div>
+<script>
+    // Pass server-side data to client
+    window.quoteAccessToken = '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
+</script>
+<script src="/dashboards/admin/sections/quote-services-v2.js"></script>
