@@ -15,7 +15,7 @@
  *
  * @idempotent true - Can be run multiple times safely
  * @dependencies None - Must be first seed
- * @version 1.0.0
+ * @version 1.1.0 - Added profile.read and profile.update permissions to authenticated roles
  * @since 2024-10-26
  */
 
