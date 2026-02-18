@@ -544,6 +544,9 @@ const isClient = dtUserRole === 'client';
     </div>
 </template>
 
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+
 <script>
 (function() {
     // Access token for API authentication
@@ -977,29 +980,7 @@ const isClient = dtUserRole === 'client';
                 });
             }
             
-            // Function to apply USD rounding rules
-            function applyUSDRoundingRules(value) {
-                // Find the base (nearest multiple of 5 below or equal)
-                const base = Math.floor(value / 5) * 5;
-                
-                // Calculate remainder when dividing by 5
-                const remainder = value % 5;
-                
-                if (remainder === 0) {
-                    const lastDigitBeforeDecimal = Math.floor(value) % 10;
-                    if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
-                        return base + 5; // Round up
-                    } else {
-                        return base; // Keep as multiple of 5
-                    }
-                } else if (remainder <= 2.7) {
-                    // Round down to nearest 5
-                    return base;
-                } else {
-                    // Round up to next multiple of 5
-                    return base + 5;
-                }
-            }
+            // USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
             
             // Function to update displayed prices
             function updatePrices(paymentType, currency) {
@@ -1093,7 +1074,7 @@ const isClient = dtUserRole === 'client';
                             finalPrice = finalPrice / exchangeRate;
                             console.log(`💱 Currency conversion: ${beforeConversion} MXN ÷ ${exchangeRate} = ${finalPrice} USD (before rounding)`);
                             
-                            finalPrice = applyUSDRoundingRules(finalPrice);
+                            finalPrice = PricingUtils.applyUSDRoundingRules(finalPrice);
                             console.log(`🎯 Final USD price after rounding: ${finalPrice}`);
                             
                             // Format as USD

@@ -1074,6 +1074,45 @@ class AdminController extends RoleBasedController {
   }
 
   /**
+   * Get disposable prices data with session-based authentication
+   * Forwards request to API controller for disposable prices data.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to disposable prices data.
+   * @example
+   */
+  async disposablePricesData(req, res) {
+    try {
+      const DisposablePricesController = require('../api/DisposablePricesController');
+
+      // Forward the request to the API controller
+      // Use getCurrentPrices to get all price combinations for admin management
+      await DisposablePricesController.getCurrentPrices(req, res);
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Batch update disposable prices with session-based authentication
+   * Forwards request to API controller for batch price updates.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to update results.
+   * @example
+   */
+  async disposablePricesBatchUpdate(req, res) {
+    try {
+      const DisposablePricesController = require('../api/DisposablePricesController');
+
+      // Forward the request to the API controller
+      await DisposablePricesController.batchUpdatePrices(req, res);
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Price Settings management page.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
@@ -1287,6 +1326,29 @@ class AdminController extends RoleBasedController {
         requestedFormId,
         pageStyles: [],
         footerScripts: '',
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * A Disposición calculator page.
+   * Hourly vehicle rental pricing calculator with volume discounts.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   * @example
+   * Created by Denisse Maldonado.
+   */
+  async aDisposicion(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'a-disposicion', {
+        title: 'Servicio a Disposición',
+        breadcrumb: null, // Disable automatic breadcrumb
+        pageStyles: [],
+        footerScripts: '',
+        csrfToken: res.locals.csrfToken, // Pass CSRF token to view
       });
     } catch (error) {
       this.handleError(res, error);

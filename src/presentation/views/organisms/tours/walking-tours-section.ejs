@@ -75,6 +75,9 @@ const apiEndpoint = typeof walkingApiEndpoint !== 'undefined' ? walkingApiEndpoi
     </div>
 </div>
 
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     loadWalkingTours();
@@ -487,16 +490,7 @@ function formatWalkingTourPrice(price, currency) {
     }
 }
 
-// Apply USD rounding rules (same as main tours table)
-function applyWalkingUSDRoundingRules(usdPrice) {
-    if (usdPrice <= 50) {
-        return Math.round(usdPrice);
-    } else if (usdPrice <= 100) {
-        return Math.round(usdPrice / 5) * 5;
-    } else {
-        return Math.round(usdPrice / 10) * 10;
-    }
-}
+// USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
 
 // Convert and format price based on currency and payment type
 function convertWalkingTourPrice(priceInput, currency, paymentType) {
@@ -527,7 +521,7 @@ function convertWalkingTourPrice(priceInput, currency, paymentType) {
     // Then convert currency if needed
     if (currency === 'USD' && walkingCurrentExchangeRate > 0) {
         const convertedValue = adjustedPrice / walkingCurrentExchangeRate;
-        const roundedValue = applyWalkingUSDRoundingRules(convertedValue);
+        const roundedValue = PricingUtils.applyUSDRoundingRules(convertedValue);
         return formatWalkingTourPrice(roundedValue, 'USD');
     } else {
         return formatWalkingTourPrice(adjustedPrice, 'MXN');

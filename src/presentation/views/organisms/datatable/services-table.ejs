@@ -193,6 +193,7 @@ table.dataTable thead th:nth-child(2) select {
 }
 </style>
 
+
 <div class="card border-0 shadow-sm">
     <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
         <div class="row align-items-center">
@@ -503,6 +504,9 @@ table.dataTable thead th:nth-child(2) select {
         </div>
     </div>
 </div>
+
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
 
 <script>
 (function() {
@@ -1494,9 +1498,15 @@ table.dataTable thead th:nth-child(2) select {
             }
             
             // Update DataTable
+            console.log(`📊 Updating DataTable with ${filteredData.length} services for filter: ${filterType}`);
             dataTable.clear();
             dataTable.rows.add(filteredData);
             dataTable.draw();
+            
+            // Show/hide table container based on results
+            if (filteredData.length === 0) {
+                console.log('⚠️ No services found for this filter');
+            }
             
             console.log('✅ Filter applied, table updated with', filteredData.length, 'rows');
         });
@@ -1755,7 +1765,7 @@ table.dataTable thead th:nth-child(2) select {
                 const convertedValue = numericValue / currentExchangeRate;
                 
                 // Apply custom USD rounding rules
-                const roundedValue = applyUSDRoundingRules(convertedValue);
+                const roundedValue = PricingUtils.applyUSDRoundingRules(convertedValue);
                 
                 // Debug log for rounding
                 if (console && console.log) {
@@ -1769,38 +1779,7 @@ table.dataTable thead th:nth-child(2) select {
             }
         }
         
-        // Function to apply USD rounding rules
-        function applyUSDRoundingRules(value) {
-            // Find the base (nearest multiple of 5 below or equal)
-            const base = Math.floor(value / 5) * 5;
-            
-            // Calculate remainder when dividing by 5
-            const remainder = value % 5;
-            
-            // Special case: if remainder is 0 and value is not already a multiple of 5
-            // or if remainder is between 0.1 and 2.7, round down to base
-            // if remainder is > 2.7, round up to next multiple of 5
-            
-            if (remainder === 0) {
-                // If exact multiple of 5, keep as is unless it needs adjustment per examples
-                // Based on example $123.0 = $125, we round up when it's .0
-                // But $170.0 stays $170, so this needs special handling
-                
-                // Check if the last digit is 3, 8 (which would make .0 round up)
-                const lastDigitBeforeDecimal = Math.floor(value) % 10;
-                if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
-                    return base + 5; // Round up
-                } else {
-                    return base; // Keep as multiple of 5
-                }
-            } else if (remainder <= 2.7) {
-                // Round down to nearest 5
-                return base;
-            } else {
-                // Round up to next multiple of 5
-                return base + 5;
-            }
-        }
+        // USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
 
         // Function to update all displayed prices based on payment type, currency, and guide option
         function updatePricesForFilters(paymentType, currency, includeGuide = false) {
@@ -3852,6 +3831,7 @@ table.dataTable thead th:nth-child(2) select {
         // Store the function in window scope for modal access
         window._saveAllClientPrices = saveAllClientPrices;
     }
+
 
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {
