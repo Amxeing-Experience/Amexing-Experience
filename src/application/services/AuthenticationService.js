@@ -222,7 +222,6 @@ class AuthenticationService extends AuthenticationServiceCore {
    */
   async refreshToken(refreshToken) {
     try {
-      // Verify refresh token
       const decoded = jwt.verify(refreshToken, this.jwtSecret);
 
       if (decoded.type !== 'refresh') {
@@ -244,13 +243,27 @@ class AuthenticationService extends AuthenticationServiceCore {
         username: user.get('username'),
       });
 
+      // Build safe user response without relying on toSafeJSON
+      // (registerSubclass is disabled for AmexingUser due to set()+save() issues)
+      const safeUser = {
+        id: user.id,
+        username: user.get('username'),
+        email: user.get('email'),
+        firstName: user.get('firstName'),
+        lastName: user.get('lastName'),
+        fullName: `${user.get('firstName') || ''} ${user.get('lastName') || ''}`.trim(),
+        role: user.get('role'),
+        active: user.get('active'),
+        exists: user.get('exists'),
+      };
+
       return {
         success: true,
         tokens,
-        user: user.toSafeJSON(),
+        user: safeUser,
       };
     } catch (error) {
-      logger.error('Token refresh error:', error);
+      logger.error('Token refresh error:', error.message);
       throw new Parse.Error(Parse.Error.INVALID_REQUEST, 'Invalid or expired refresh token');
     }
   }

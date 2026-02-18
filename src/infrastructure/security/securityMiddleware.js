@@ -674,6 +674,12 @@ class SecurityMiddleware {
         // 4. Login CSRF attacks have minimal practical impact (forces login to attacker account)
         // 5. This is a common practice in modern authentication systems
         // All other authenticated endpoints remain CSRF-protected
+        // SECURITY NOTE: /auth/refresh with Bearer token is exempt from CSRF
+        // Mobile apps use Authorization header (not cookies), making CSRF attacks impossible
+        // Bearer tokens are never automatically sent by browsers like cookies are
+        const hasBearerToken = req.headers.authorization?.startsWith('Bearer ');
+        const isRefreshWithBearer = req.path === '/auth/refresh' && hasBearerToken;
+
         if (
           req.method === 'GET'
           || req.method === 'HEAD'
@@ -681,6 +687,7 @@ class SecurityMiddleware {
           || req.path.startsWith('/api/')
           || req.path === '/auth/login'
           || req.path === '/auth/change-password'
+          || isRefreshWithBearer
         ) {
           // Generate CSRF token for forms if session exists
           if (req.session && (req.method === 'GET' || req.method === 'HEAD')) {
