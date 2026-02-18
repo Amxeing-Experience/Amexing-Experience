@@ -1,0 +1,29 @@
+{
+  "get": {
+    "tags": ["User Management"],
+    "summary": "Get user statistics",
+    "operationId": "getUserStatistics",
+    "description": "Get aggregated user statistics.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "responses": {
+      "200": {
+        "description": "User statistics",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/user/UserStatistics.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "403": {
+        "$ref": "../../../components/responses/ForbiddenError.json"
+      }
+    }
+  }
+}

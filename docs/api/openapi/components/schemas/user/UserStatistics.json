@@ -1,0 +1,58 @@
+{
+  "type": "object",
+  "properties": {
+    "totalUsers": {
+      "type": "integer",
+      "description": "Total number of users in the system",
+      "example": 500
+    },
+    "activeUsers": {
+      "type": "integer",
+      "description": "Number of active users",
+      "example": 450
+    },
+    "newThisMonth": {
+      "type": "integer",
+      "description": "Users created this month",
+      "example": 25
+    },
+    "pendingVerification": {
+      "type": "integer",
+      "description": "Users with unverified emails",
+      "example": 10
+    },
+    "roleDistribution": {
+      "type": "object",
+      "description": "User count by role",
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "example": {
+        "superadmin": 2,
+        "admin": 10,
+        "department_manager": 15,
+        "employee": 400,
+        "driver": 50,
+        "client": 20,
+        "guest": 3
+      }
+    },
+    "registrationTrends": {
+      "type": "array",
+      "description": "Monthly registration trends",
+      "items": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "example": "2024-09"
+          },
+          "count": {
+            "type": "integer",
+            "example": 35
+          }
+        }
+      }
+    }
+  }
+}

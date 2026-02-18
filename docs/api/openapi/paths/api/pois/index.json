@@ -1,0 +1,47 @@
+{
+  "get": {
+    "tags": ["POIs"],
+    "summary": "Get POIs with DataTables processing",
+    "operationId": "getPOIs",
+    "description": "Retrieve Points of Interest with pagination and filtering.",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [
+      { "$ref": "../../../components/parameters/PageParameter.json" },
+      { "$ref": "../../../components/parameters/LimitParameter.json" }
+    ],
+    "responses": {
+      "200": { "description": "POIs list" },
+      "401": { "$ref": "../../../components/responses/UnauthorizedError.json" }
+    }
+  },
+  "post": {
+    "tags": ["POIs"],
+    "summary": "Create new POI",
+    "operationId": "createPOI",
+    "description": "Create a new Point of Interest.",
+    "security": [{ "bearerAuth": [] }],
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+              "name": { "type": "string", "example": "Aeropuerto Internacional" },
+              "description": { "type": "string" },
+              "latitude": { "type": "number" },
+              "longitude": { "type": "number" },
+              "active": { "type": "boolean", "default": true }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "201": { "description": "POI created successfully" },
+      "400": { "$ref": "../../../components/responses/ValidationError.json" },
+      "401": { "$ref": "../../../components/responses/UnauthorizedError.json" }
+    }
+  }
+}

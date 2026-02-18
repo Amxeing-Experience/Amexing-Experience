@@ -1,0 +1,9 @@
+{
+  "get": {
+    "tags": ["Vehicle Types"],
+    "summary": "Get active Vehicle Types",
+    "operationId": "getActiveVehicleTypes",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Active vehicle types" } }
+  }
+}

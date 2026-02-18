@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "example": true
+    },
+    "message": {
+      "type": "string",
+      "example": "Users retrieved successfully"
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "$ref": "../user/User.json"
+          }
+        },
+        "pagination": {
+          "$ref": "../common/PaginationInfo.json"
+        }
+      }
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "example": "2024-10-01T12:00:00.000Z"
+    }
+  }
+}

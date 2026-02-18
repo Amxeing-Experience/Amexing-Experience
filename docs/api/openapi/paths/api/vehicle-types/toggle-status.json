@@ -1,0 +1,10 @@
+{
+  "patch": {
+    "tags": ["Vehicle Types"],
+    "summary": "Toggle Vehicle Type status",
+    "operationId": "toggleVehicleTypeStatus",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Status toggled" } }
+  }
+}

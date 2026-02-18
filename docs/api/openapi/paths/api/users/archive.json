@@ -1,0 +1,40 @@
+{
+  "patch": {
+    "tags": ["User Management"],
+    "summary": "Archive user",
+    "operationId": "archiveUser",
+    "description": "Archive a user (soft delete).",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "User ID"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "User archived successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "404": {
+        "$ref": "../../../components/responses/NotFoundError.json"
+      }
+    }
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "post": {
+    "tags": ["Authentication"],
+    "summary": "User login with credentials",
+    "operationId": "authLogin",
+    "description": "Authenticate user with email/username and password.\nReturns JWT tokens in HTTP-only cookies for web clients.\n\n**Mobile App Support:**\nSend header `X-Client-Type: mobile` to receive tokens in response body.\n\n**Security Features:**\n- Rate limited: 50 requests per 15 minutes\n- Account lockout after 5 failed attempts\n- Secure password validation\n- Access token lifetime: 8 hours\n- Refresh token lifetime: 7 days",
+    "security": [],
+    "parameters": [
+      {
+        "name": "X-Client-Type",
+        "in": "header",
+        "description": "Set to 'mobile' to receive tokens in response body instead of cookies only",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": ["mobile"]
+        }
+      }
+    ],
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "../../components/schemas/auth/LoginRequest.json"
+          }
+        },
+        "application/x-www-form-urlencoded": {
+          "schema": {
+            "$ref": "../../components/schemas/auth/LoginRequest.json"
+          }
+        }
+      }
+    },
+    "responses": {
+      "200": {
+        "description": "Login successful",
+        "headers": {
+          "Set-Cookie": {
+            "description": "JWT access token (HTTP-only, Secure, SameSite=strict)",
+            "schema": {
+              "type": "string",
+              "example": "accessToken=eyJhbGc...; HttpOnly; Secure; SameSite=strict; Max-Age=28800"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/auth/LoginResponse.json"
+            }
+          }
+        }
+      },
+      "400": {
+        "$ref": "../../components/responses/ValidationError.json"
+      },
+      "401": {
+        "$ref": "../../components/responses/UnauthorizedError.json"
+      },
+      "429": {
+        "$ref": "../../components/responses/RateLimitError.json"
+      }
+    }
+  }
+}

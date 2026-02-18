@@ -1,0 +1,106 @@
+{
+  "get": {
+    "tags": ["User Management"],
+    "summary": "Get list of users",
+    "operationId": "getUsers",
+    "description": "Retrieve paginated list of users with filtering options.\n\n**Access Control:**\n- Requires 'users.list' permission\n- SuperAdmin/Admin: See all users\n- DepartmentManager: See users in their department",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      { "$ref": "../../../components/parameters/PageParameter.json" },
+      { "$ref": "../../../components/parameters/LimitParameter.json" },
+      { "$ref": "../../../components/parameters/SortFieldParameter.json" },
+      { "$ref": "../../../components/parameters/SortDirectionParameter.json" },
+      {
+        "in": "query",
+        "name": "role",
+        "schema": {
+          "type": "string",
+          "enum": ["superadmin", "admin", "client", "department_manager", "employee", "employee_amexing", "driver", "guest"]
+        },
+        "description": "Filter by user role"
+      },
+      {
+        "in": "query",
+        "name": "active",
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "Filter by active status"
+      },
+      {
+        "in": "query",
+        "name": "search",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Search in name, email, username"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "Users retrieved successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/user/UserListResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "403": {
+        "$ref": "../../../components/responses/ForbiddenError.json"
+      },
+      "429": {
+        "$ref": "../../../components/responses/RateLimitError.json"
+      }
+    }
+  },
+  "post": {
+    "tags": ["User Management"],
+    "summary": "Create new user",
+    "operationId": "createUser",
+    "description": "Create a new user account.\n\n**Access Control:**\n- Requires 'users.create' permission",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "requestBody": {
+      "required": true,
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "../../../components/schemas/user/UserCreateRequest.json"
+          }
+        }
+      }
+    },
+    "responses": {
+      "201": {
+        "description": "User created successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "400": {
+        "$ref": "../../../components/responses/ValidationError.json"
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      },
+      "403": {
+        "$ref": "../../../components/responses/ForbiddenError.json"
+      },
+      "409": {
+        "description": "Email already exists"
+      }
+    }
+  }
+}

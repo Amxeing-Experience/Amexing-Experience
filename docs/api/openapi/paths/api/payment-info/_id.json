@@ -1,0 +1,26 @@
+{
+  "get": {
+    "tags": ["Payment Info"],
+    "summary": "Get payment info by ID",
+    "operationId": "getPaymentInfoById",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Payment info details" } }
+  },
+  "put": {
+    "tags": ["Payment Info"],
+    "summary": "Update payment info",
+    "operationId": "updatePaymentInfo",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Payment info updated" } }
+  },
+  "delete": {
+    "tags": ["Payment Info"],
+    "summary": "Delete payment info",
+    "operationId": "deletePaymentInfo",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Payment info deleted" } }
+  }
+}

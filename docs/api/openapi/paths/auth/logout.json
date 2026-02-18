@@ -1,0 +1,27 @@
+{
+  "post": {
+    "tags": ["Authentication"],
+    "summary": "Logout current user",
+    "operationId": "authLogout",
+    "description": "Invalidate current session and clear authentication cookies.",
+    "security": [
+      { "bearerAuth": [] },
+      { "cookieAuth": [] }
+    ],
+    "responses": {
+      "200": {
+        "description": "Logout successful",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../components/responses/UnauthorizedError.json"
+      }
+    }
+  }
+}

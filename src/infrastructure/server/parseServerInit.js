@@ -32,11 +32,16 @@ const initializeParseServer = async () => {
     logger.info('Skipping Parse Server initialization in test mode');
     logger.info('Using Parse Server from test globalSetup');
 
-    // Just configure Parse SDK to connect to test server
-    Parse.initialize(parseServerConfig.appId, null, parseServerConfig.masterKey);
-    Parse.serverURL = parseServerConfig.serverURL;
+    // Configure Parse SDK to connect to TEST server (not dev/prod)
+    // These values match what globalSetup.js uses
+    const testAppId = 'test-app-id';
+    const testMasterKey = 'test-master-key';
+    const testServerURL = 'http://localhost:1339/parse';
 
-    logger.info('Parse SDK configured for test environment:', parseServerConfig.serverURL);
+    Parse.initialize(testAppId, null, testMasterKey);
+    Parse.serverURL = testServerURL;
+
+    logger.info('Parse SDK configured for test environment:', testServerURL);
 
     // Return null to indicate no local Parse Server instance
     return null;

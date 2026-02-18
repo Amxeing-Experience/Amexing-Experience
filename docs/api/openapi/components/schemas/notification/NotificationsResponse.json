@@ -1,0 +1,34 @@
+{
+  "type": "object",
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "example": true
+    },
+    "message": {
+      "type": "string",
+      "example": "Notifications retrieved successfully"
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "notifications": {
+          "type": "array",
+          "items": {
+            "$ref": "./Notification.json"
+          }
+        },
+        "unreadCount": {
+          "type": "integer",
+          "description": "Number of unread notifications",
+          "example": 5
+        },
+        "totalCount": {
+          "type": "integer",
+          "description": "Total number of notifications",
+          "example": 50
+        }
+      }
+    }
+  }
+}

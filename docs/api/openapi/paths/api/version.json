@@ -1,0 +1,21 @@
+{
+  "get": {
+    "tags": ["System"],
+    "summary": "Get API version",
+    "operationId": "getApiVersion",
+    "description": "Get current API version and environment information.",
+    "security": [],
+    "responses": {
+      "200": {
+        "description": "API version info",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/VersionInfo.json"
+            }
+          }
+        }
+      }
+    }
+  }
+}

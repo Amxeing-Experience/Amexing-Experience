@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "required": ["identifier", "password"],
+  "properties": {
+    "identifier": {
+      "type": "string",
+      "description": "Email or username",
+      "example": "john.doe@amexing.com"
+    },
+    "password": {
+      "type": "string",
+      "format": "password",
+      "description": "User password",
+      "example": "SecureP@ssw0rd!"
+    },
+    "returnTo": {
+      "type": "string",
+      "description": "Redirect URL after successful login (for web forms)",
+      "example": "/dashboard/employee"
+    }
+  }
+}

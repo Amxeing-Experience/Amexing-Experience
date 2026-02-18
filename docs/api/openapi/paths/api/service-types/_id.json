@@ -1,0 +1,26 @@
+{
+  "get": {
+    "tags": ["Service Types"],
+    "summary": "Get Service Type by ID",
+    "operationId": "getServiceTypeById",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Service type details" } }
+  },
+  "put": {
+    "tags": ["Service Types"],
+    "summary": "Update Service Type",
+    "operationId": "updateServiceType",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Service type updated" } }
+  },
+  "delete": {
+    "tags": ["Service Types"],
+    "summary": "Soft delete Service Type",
+    "operationId": "deleteServiceType",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Service type deleted" } }
+  }
+}

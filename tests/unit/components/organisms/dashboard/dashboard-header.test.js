@@ -104,8 +104,7 @@ describe('Dashboard Header Organism - Baseline Tests', () => {
       });
 
       expect(html).toContain('My Profile');
-      expect(html).toContain('Settings');
-      // Help & Support removed from menu
+      // Settings removed in component refactoring (simplified menu)
       expect(html).toContain('Sign Out');
     });
 
@@ -115,8 +114,7 @@ describe('Dashboard Header Organism - Baseline Tests', () => {
       });
 
       expect(html).toContain('/dashboard/admin/profile');
-      expect(html).toContain('/dashboard/admin/settings');
-      // Help & Support link removed from menu
+      // Settings link removed in component refactoring
       expect(html).toContain('/logout');
     });
   });
