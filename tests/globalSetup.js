@@ -80,6 +80,15 @@ module.exports = async () => {
   console.log('\n🚀 Starting Global Test Setup...\n');
 
   try {
+    // Set environment variables BEFORE any module loading
+    // This is critical because globalSetup runs before jest.env.js (setupFiles)
+    process.env.NODE_ENV = 'test';
+    process.env.JWT_SECRET = 'test-jwt-secret-at-least-32-characters-long-for-testing';
+    process.env.PARSE_APP_ID = 'test-app-id';
+    process.env.PARSE_MASTER_KEY = 'test-master-key';
+    process.env.PARSE_SERVER_URL = 'http://localhost:1339/parse';
+    console.log('   ✅ Test environment variables set (NODE_ENV, JWT_SECRET, PARSE_*)');
+
     // ALWAYS use Memory Server for tests (even if TEST_DATABASE_URI is set)
     console.log('📦 Starting MongoDB Memory Server...');
 

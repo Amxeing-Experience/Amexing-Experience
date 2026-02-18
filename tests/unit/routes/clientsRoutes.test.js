@@ -208,6 +208,7 @@ describe('ClientsRoutes - Middleware & Permissions', () => {
     testCases.forEach(({ role, shouldAccess, description }) => {
       it(description, async () => {
         mockReq.userRole = role;
+        mockReq.originalUrl = '/api/clients'; // Set originalUrl for middleware checks
         mockReq.user = {
           id: `${role}-user-123`,
           hasPermission: jest.fn().mockResolvedValue(shouldAccess === 'conditional'),
@@ -243,11 +244,17 @@ describe('ClientsRoutes - Middleware & Permissions', () => {
       const { validateClientAccess } = require('../../../src/presentation/routes/api/clientsRoutes');
 
       if (validateClientAccess) {
-        try {
-          await validateClientAccess(mockReq, mockRes, mockNext);
-        } catch (error) {
-          expect(error.message).toContain('Permission check failed');
-        }
+        // The middleware catches errors and returns 500, it doesn't throw
+        await validateClientAccess(mockReq, mockRes, mockNext);
+
+        expect(mockRes.status).toHaveBeenCalledWith(500);
+        expect(mockRes.json).toHaveBeenCalledWith(
+          expect.objectContaining({
+            success: false,
+            error: expect.stringContaining('Internal server error'),
+          })
+        );
+        expect(mockNext).not.toHaveBeenCalled();
       }
     });
   });
