@@ -1,0 +1,9 @@
+{
+  "get": {
+    "tags": ["Audit"],
+    "summary": "Get audit statistics",
+    "operationId": "getAuditStatistics",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Audit statistics" } }
+  }
+}

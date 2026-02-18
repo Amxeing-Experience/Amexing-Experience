@@ -1,0 +1,16 @@
+{
+  "get": {
+    "tags": ["Service Types"],
+    "summary": "Get Service Types",
+    "operationId": "getServiceTypes",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Service types list" } }
+  },
+  "post": {
+    "tags": ["Service Types"],
+    "summary": "Create Service Type",
+    "operationId": "createServiceType",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "201": { "description": "Service type created" } }
+  }
+}

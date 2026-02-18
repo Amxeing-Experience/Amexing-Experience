@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "API version",
+      "example": "0.6.0"
+    },
+    "environment": {
+      "type": "string",
+      "enum": ["development", "staging", "production"],
+      "example": "development"
+    },
+    "nodeVersion": {
+      "type": "string",
+      "example": "20.0.0"
+    }
+  }
+}

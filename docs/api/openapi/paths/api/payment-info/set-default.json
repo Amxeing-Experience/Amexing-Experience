@@ -1,0 +1,10 @@
+{
+  "post": {
+    "tags": ["Payment Info"],
+    "summary": "Set payment info as default",
+    "operationId": "setDefaultPaymentInfo",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "Default set successfully" } }
+  }
+}

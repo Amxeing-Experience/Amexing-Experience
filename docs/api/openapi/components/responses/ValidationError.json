@@ -1,0 +1,25 @@
+{
+  "description": "Request validation failed",
+  "content": {
+    "application/json": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Validation failed: Email is required, Password must be at least 8 characters"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-01T12:00:00.000Z"
+          }
+        }
+      }
+    }
+  }
+}

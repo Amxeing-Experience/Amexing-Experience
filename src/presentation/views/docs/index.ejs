@@ -26,10 +26,14 @@
             font-size: 3rem;
             margin-bottom: 1rem;
         }
-        .swagger-color { color: #85ea2d; }
         .redoc-color { color: #8cc8ff; }
         .json-color { color: #ff6b6b; }
-        .yaml-color { color: #ffd93d; }
+        .production-notice {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a5a 100%);
+            color: white;
+            padding: 40px 0;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -44,7 +48,7 @@
             </p>
             <div class="mt-4">
                 <span class="badge bg-success me-2">
-                    <i class="fas fa-shield-alt"></i> PCI DSS Compliant
+                    <i class="fas fa-shield-alt"></i> PCI DSS 4.0.1 Compliant
                 </span>
                 <span class="badge bg-info me-2">
                     <i class="fas fa-lock"></i> Secure
@@ -56,73 +60,50 @@
         </div>
     </div>
 
+    <% if (isProduction) { %>
+    <div class="production-notice">
+        <div class="container">
+            <i class="fas fa-exclamation-triangle fa-2x mb-3"></i>
+            <h3>API Documentation Not Available</h3>
+            <p class="mb-0">
+                API documentation is disabled in production for security compliance (PCI DSS 4.0.1).
+                <br>
+                Please access documentation in the development environment.
+            </p>
+        </div>
+    </div>
+    <% } else { %>
     <div class="container my-5">
-        <div class="row">
-            <div class="col-md-6 mb-4">
-                <div class="card doc-card h-100 text-center p-4">
-                    <div class="card-body">
-                        <i class="fas fa-file-code doc-icon swagger-color"></i>
-                        <h3 class="card-title">Swagger UI Documentation</h3>
-                        <p class="card-text">
-                            Interactive API documentation with try-it-out functionality. 
-                            Test endpoints directly from your browser.
-                        </p>
-                        <a href="<%= apiDocsUrl %>" class="btn btn-success btn-lg">
-                            <i class="fas fa-external-link-alt"></i>
-                            Open Swagger UI
-                        </a>
-                    </div>
-                </div>
-            </div>
-            
+        <div class="row justify-content-center">
             <div class="col-md-6 mb-4">
                 <div class="card doc-card h-100 text-center p-4">
                     <div class="card-body">
                         <i class="fas fa-book doc-icon redoc-color"></i>
-                        <h3 class="card-title">ReDoc Documentation</h3>
+                        <h3 class="card-title">API Documentation</h3>
                         <p class="card-text">
-                            Beautiful, responsive documentation with detailed descriptions 
-                            and examples for all API endpoints.
+                            Interactive API documentation powered by Redocly with detailed descriptions,
+                            request/response examples, and comprehensive endpoint information.
                         </p>
-                        <a href="<%= redocUrl %>" class="btn btn-info btn-lg">
+                        <a href="<%= apiDocsUrl %>" class="btn btn-primary btn-lg">
                             <i class="fas fa-external-link-alt"></i>
-                            Open ReDoc
+                            Open API Docs
                         </a>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="row mt-4">
             <div class="col-md-6 mb-4">
                 <div class="card doc-card h-100 text-center p-4">
                     <div class="card-body">
                         <i class="fas fa-file-alt doc-icon json-color"></i>
-                        <h3 class="card-title">OpenAPI JSON</h3>
+                        <h3 class="card-title">OpenAPI Specification</h3>
                         <p class="card-text">
-                            Download the complete OpenAPI specification in JSON format 
-                            for code generation and tooling.
+                            Download the complete OpenAPI 3.0 specification in JSON format
+                            for code generation, testing tools, and API client development.
                         </p>
                         <a href="<%= specJsonUrl %>" class="btn btn-danger btn-lg" download>
                             <i class="fas fa-download"></i>
                             Download JSON
-                        </a>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="col-md-6 mb-4">
-                <div class="card doc-card h-100 text-center p-4">
-                    <div class="card-body">
-                        <i class="fas fa-file-code doc-icon yaml-color"></i>
-                        <h3 class="card-title">OpenAPI YAML</h3>
-                        <p class="card-text">
-                            Download the complete OpenAPI specification in YAML format 
-                            for human-readable documentation.
-                        </p>
-                        <a href="<%= specYamlUrl %>" class="btn btn-warning btn-lg" download>
-                            <i class="fas fa-download"></i>
-                            Download YAML
                         </a>
                     </div>
                 </div>
@@ -142,17 +123,50 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <h5><i class="fas fa-key text-warning"></i> Authentication</h5>
-                                <p>This API uses session-based authentication. Include your session token in the <code>X-Parse-Session-Token</code> header.</p>
-                                
+                                <p>This API uses JWT Bearer tokens for authentication. Include your token in the <code>Authorization: Bearer &lt;token&gt;</code> header.</p>
+
                                 <h5><i class="fas fa-shield-alt text-success"></i> Security</h5>
-                                <p>All endpoints enforce HTTPS in production and include comprehensive security headers for PCI DSS compliance.</p>
+                                <p>All endpoints enforce HTTPS in production and include comprehensive security headers for PCI DSS 4.0.1 compliance.</p>
                             </div>
                             <div class="col-md-6">
                                 <h5><i class="fas fa-tachometer-alt text-info"></i> Rate Limiting</h5>
                                 <p>API endpoints are rate-limited to prevent abuse. Check response headers for rate limit information.</p>
-                                
-                                <h5><i class="fas fa-question-circle text-secondary"></i> Support</h5>
-                                <p>For questions or support, please contact our development team or check our GitHub repository.</p>
+
+                                <h5><i class="fas fa-terminal text-secondary"></i> Code Samples</h5>
+                                <p>The API documentation includes code samples in cURL and JavaScript for quick integration.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card border-info">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-terminal"></i>
+                            Development Commands
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <code class="d-block mb-2">yarn docs:api:bundle</code>
+                                <small class="text-muted">Bundle modular OpenAPI spec</small>
+                            </div>
+                            <div class="col-md-6">
+                                <code class="d-block mb-2">yarn docs:api:lint</code>
+                                <small class="text-muted">Lint spec for errors</small>
+                            </div>
+                            <div class="col-md-6 mt-3">
+                                <code class="d-block mb-2">yarn docs:api:preview</code>
+                                <small class="text-muted">Preview with hot reload (port 8080)</small>
+                            </div>
+                            <div class="col-md-6 mt-3">
+                                <code class="d-block mb-2">yarn docs:api:stats</code>
+                                <small class="text-muted">Show specification statistics</small>
                             </div>
                         </div>
                     </div>
@@ -160,13 +174,14 @@
             </div>
         </div>
     </div>
+    <% } %>
 
     <footer class="bg-dark text-white text-center py-4 mt-5">
         <div class="container">
             <p>&copy; 2025 AmexingWeb. All rights reserved.</p>
             <p>
                 <i class="fas fa-code"></i>
-                Built with Express.js, Parse Server, and ❤️
+                Built with Express.js, Parse Server, and Redocly
             </p>
         </div>
     </footer>

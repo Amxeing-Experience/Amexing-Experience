@@ -1,0 +1,13 @@
+{
+  "get": {
+    "tags": ["POIs"],
+    "summary": "Get active POIs for dropdowns",
+    "operationId": "getActivePOIs",
+    "description": "Retrieve only active POIs for dropdown selection.",
+    "security": [{ "bearerAuth": [] }],
+    "responses": {
+      "200": { "description": "Active POIs list" },
+      "401": { "$ref": "../../../components/responses/UnauthorizedError.json" }
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "post": {
+    "tags": ["OAuth"],
+    "summary": "Link OAuth account",
+    "operationId": "linkOAuthAccount",
+    "description": "Link OAuth provider to existing user account.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "provider",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": ["apple", "corporate"]
+        },
+        "description": "OAuth provider name"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "Account linked successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/SuccessResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../components/responses/UnauthorizedError.json"
+      },
+      "409": {
+        "description": "Provider already linked",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/ErrorResponse.json"
+            }
+          }
+        }
+      }
+    }
+  }
+}

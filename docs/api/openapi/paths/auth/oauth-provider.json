@@ -1,0 +1,53 @@
+{
+  "get": {
+    "tags": ["OAuth"],
+    "summary": "Initiate OAuth flow",
+    "operationId": "initiateOAuth",
+    "description": "Redirect to OAuth provider for authentication.",
+    "security": [],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "provider",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": ["apple", "corporate"]
+        },
+        "description": "OAuth provider name"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "OAuth URL returned (API mode for client-side redirect)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "authUrl": {
+                  "type": "string",
+                  "format": "uri",
+                  "description": "OAuth provider authorization URL"
+                }
+              }
+            }
+          }
+        }
+      },
+      "302": {
+        "description": "Redirect to OAuth provider (browser mode)"
+      },
+      "400": {
+        "description": "Invalid provider",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/ErrorResponse.json"
+            }
+          }
+        }
+      }
+    }
+  }
+}

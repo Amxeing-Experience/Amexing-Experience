@@ -1,0 +1,16 @@
+{
+  "get": {
+    "tags": ["Vehicles"],
+    "summary": "Get Vehicles",
+    "operationId": "getVehicles",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Vehicles list" } }
+  },
+  "post": {
+    "tags": ["Vehicles"],
+    "summary": "Create Vehicle",
+    "operationId": "createVehicle",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "201": { "description": "Vehicle created" } }
+  }
+}

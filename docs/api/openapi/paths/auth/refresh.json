@@ -1,0 +1,39 @@
+{
+  "post": {
+    "tags": ["Authentication"],
+    "summary": "Refresh authentication token",
+    "operationId": "authRefresh",
+    "description": "Refresh JWT access token using refresh token.\n\n**Web Clients:** Send refresh token via cookie (automatic).\n\n**Mobile Apps:** Send refresh token via `Authorization: Bearer <refreshToken>` header and set `X-Client-Type: mobile` to receive new tokens in response body.\n\n**Token Lifetime:**\n- Access Token: 8 hours\n- Refresh Token: 7 days",
+    "security": [
+      { "cookieAuth": [] },
+      { "bearerAuth": [] }
+    ],
+    "parameters": [
+      {
+        "name": "X-Client-Type",
+        "in": "header",
+        "description": "Set to 'mobile' to receive tokens in response body",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": ["mobile"]
+        }
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "Token refreshed successfully",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/auth/TokenRefreshResponse.json"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../components/responses/UnauthorizedError.json"
+      }
+    }
+  }
+}

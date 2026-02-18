@@ -1,0 +1,9 @@
+{
+  "get": {
+    "tags": ["Payment Info"],
+    "summary": "Get default payment info",
+    "operationId": "getDefaultPaymentInfo",
+    "security": [{ "bearerAuth": [] }],
+    "responses": { "200": { "description": "Default payment info" } }
+  }
+}

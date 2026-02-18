@@ -1,0 +1,24 @@
+{
+  "description": "Rate limit exceeded",
+  "content": {
+    "application/json": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Too many requests, please try again later"
+          },
+          "retryAfter": {
+            "type": "string",
+            "example": "15 minutes"
+          }
+        }
+      }
+    }
+  }
+}

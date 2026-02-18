@@ -1,0 +1,45 @@
+{
+  "get": {
+    "tags": ["System"],
+    "summary": "Get server metrics",
+    "operationId": "getMetrics",
+    "description": "Get detailed server metrics including memory usage, uptime, and request statistics.",
+    "security": [],
+    "responses": {
+      "200": {
+        "description": "Server metrics",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "uptime": {
+                  "type": "number",
+                  "description": "Server uptime in seconds",
+                  "example": 86400
+                },
+                "memory": {
+                  "type": "object",
+                  "properties": {
+                    "heapUsed": {
+                      "type": "number",
+                      "example": 50000000
+                    },
+                    "heapTotal": {
+                      "type": "number",
+                      "example": 100000000
+                    }
+                  }
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
