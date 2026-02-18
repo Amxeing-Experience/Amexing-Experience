@@ -1,5 +1,6 @@
 {
   "type": "object",
+  "required": ["success", "user", "message"],
   "properties": {
     "success": {
       "type": "boolean",
@@ -27,6 +28,31 @@
         "name": {
           "type": "string",
           "example": "John Doe"
+        }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "description": "JWT tokens (only returned when X-Client-Type: mobile header is sent)",
+      "properties": {
+        "accessToken": {
+          "type": "string",
+          "description": "JWT access token (8 hours validity)",
+          "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        },
+        "refreshToken": {
+          "type": "string",
+          "description": "JWT refresh token (7 days validity)",
+          "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        },
+        "tokenType": {
+          "type": "string",
+          "example": "Bearer"
+        },
+        "expiresIn": {
+          "type": "string",
+          "description": "Access token expiration time",
+          "example": "8h"
         }
       }
     }

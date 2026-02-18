@@ -109,8 +109,22 @@
         ],
         "summary": "User login with credentials",
         "operationId": "authLogin",
-        "description": "Authenticate user with email/username and password.\nReturns JWT token in response and sets HTTP-only cookie.\n\n**Security Features:**\n- Rate limited: 50 requests per 15 minutes\n- Account lockout after 5 failed attempts\n- Secure password validation\n- JWT token lifetime: 8 hours",
+        "description": "Authenticate user with email/username and password.\nReturns JWT tokens in HTTP-only cookies for web clients.\n\n**Mobile App Support:**\nSend header `X-Client-Type: mobile` to receive tokens in response body.\n\n**Security Features:**\n- Rate limited: 50 requests per 15 minutes\n- Account lockout after 5 failed attempts\n- Secure password validation\n- Access token lifetime: 8 hours\n- Refresh token lifetime: 7 days",
         "security": [],
+        "parameters": [
+          {
+            "name": "X-Client-Type",
+            "in": "header",
+            "description": "Set to 'mobile' to receive tokens in response body instead of cookies only",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mobile"
+              ]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -247,10 +261,27 @@
         ],
         "summary": "Refresh authentication token",
         "operationId": "authRefresh",
-        "description": "Refresh JWT access token using refresh token.\n\n**Token Lifetime:**\n- Access Token: 8 hours\n- Refresh Token: 7 days",
+        "description": "Refresh JWT access token using refresh token.\n\n**Web Clients:** Send refresh token via cookie (automatic).\n\n**Mobile Apps:** Send refresh token via `Authorization: Bearer <refreshToken>` header and set `X-Client-Type: mobile` to receive new tokens in response body.\n\n**Token Lifetime:**\n- Access Token: 8 hours\n- Refresh Token: 7 days",
         "security": [
           {
             "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Client-Type",
+            "in": "header",
+            "description": "Set to 'mobile' to receive tokens in response body",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mobile"
+              ]
+            }
           }
         ],
         "responses": {
@@ -2881,6 +2912,11 @@
       },
       "LoginResponse": {
         "type": "object",
+        "required": [
+          "success",
+          "user",
+          "message"
+        ],
         "properties": {
           "success": {
             "type": "boolean",
@@ -2908,6 +2944,31 @@
               "name": {
                 "type": "string",
                 "example": "John Doe"
+              }
+            }
+          },
+          "tokens": {
+            "type": "object",
+            "description": "JWT tokens (only returned when X-Client-Type: mobile header is sent)",
+            "properties": {
+              "accessToken": {
+                "type": "string",
+                "description": "JWT access token (8 hours validity)",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "refreshToken": {
+                "type": "string",
+                "description": "JWT refresh token (7 days validity)",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "tokenType": {
+                "type": "string",
+                "example": "Bearer"
+              },
+              "expiresIn": {
+                "type": "string",
+                "description": "Access token expiration time",
+                "example": "8h"
               }
             }
           }
@@ -3072,6 +3133,10 @@
       },
       "TokenRefreshResponse": {
         "type": "object",
+        "required": [
+          "success",
+          "user"
+        ],
         "properties": {
           "success": {
             "type": "boolean",
@@ -3091,6 +3156,31 @@
               "role": {
                 "type": "string",
                 "example": "employee"
+              }
+            }
+          },
+          "tokens": {
+            "type": "object",
+            "description": "JWT tokens (only returned when X-Client-Type: mobile header is sent)",
+            "properties": {
+              "accessToken": {
+                "type": "string",
+                "description": "JWT access token (8 hours validity)",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "refreshToken": {
+                "type": "string",
+                "description": "JWT refresh token (7 days validity)",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "tokenType": {
+                "type": "string",
+                "example": "Bearer"
+              },
+              "expiresIn": {
+                "type": "string",
+                "description": "Access token expiration time",
+                "example": "8h"
               }
             }
           }

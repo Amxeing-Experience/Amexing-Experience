@@ -3,8 +3,20 @@
     "tags": ["Authentication"],
     "summary": "User login with credentials",
     "operationId": "authLogin",
-    "description": "Authenticate user with email/username and password.\nReturns JWT token in response and sets HTTP-only cookie.\n\n**Security Features:**\n- Rate limited: 50 requests per 15 minutes\n- Account lockout after 5 failed attempts\n- Secure password validation\n- JWT token lifetime: 8 hours",
+    "description": "Authenticate user with email/username and password.\nReturns JWT tokens in HTTP-only cookies for web clients.\n\n**Mobile App Support:**\nSend header `X-Client-Type: mobile` to receive tokens in response body.\n\n**Security Features:**\n- Rate limited: 50 requests per 15 minutes\n- Account lockout after 5 failed attempts\n- Secure password validation\n- Access token lifetime: 8 hours\n- Refresh token lifetime: 7 days",
     "security": [],
+    "parameters": [
+      {
+        "name": "X-Client-Type",
+        "in": "header",
+        "description": "Set to 'mobile' to receive tokens in response body instead of cookies only",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "enum": ["mobile"]
+        }
+      }
+    ],
     "requestBody": {
       "required": true,
       "content": {
