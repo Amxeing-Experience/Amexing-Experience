@@ -379,6 +379,8 @@ const serviceTypesRoutes = require('./api/serviceTypesRoutes');
 const servicesRoutes = require('./api/servicesRoutes');
 const servicesNewRoutes = require('./api/servicesNewRoutes');
 const ratesRoutes = require('./api/ratesRoutes');
+// Greeter Services Management API routes
+const greeterRoutes = require('./api/greeterRoutes');
 // Experience Management API routes
 const experiencesRoutes = require('./api/experiencesRoutes');
 const experienceImagesRoutes = require('./api/experienceImagesRoutes');
@@ -425,6 +427,7 @@ router.use('/service-types', serviceTypesRoutes);
 router.use('/services', servicesRoutes);
 router.use('/services-new', servicesNewRoutes);
 router.use('/rates', ratesRoutes);
+router.use('/greeter', greeterRoutes);
 router.use('/experiences', experiencesRoutes);
 router.use('/experiences', experienceImagesRoutes); // Experience images endpoints
 router.use('/tours', require('./api/tourImagesRoutes'));

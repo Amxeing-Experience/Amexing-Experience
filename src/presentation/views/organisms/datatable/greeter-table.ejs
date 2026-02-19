@@ -1,0 +1,1022 @@
+<%
+/**
+ * Greeter Services DataTable Organism
+ * DataTable component for greeter services management
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ * 
+ * Created by Denisse Maldonado
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'greeter-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/greeter';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : true;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+
+const canEdit = ['superadmin', 'admin'].includes(dtUserRole);
+const canDelete = ['superadmin', 'admin'].includes(dtUserRole);
+const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #0891b2 0%, #06b6d4 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-user-plus me-2"></i>Servicios de Greeter
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Gestión de servicios de recepción y asistencia</small>
+            </div>
+            <div class="col-auto">
+                <% if (canCreate) { %>
+                    <button type="button" class="btn btn-light btn-sm" id="createGreeterBtn">
+                        <i class="ti ti-plus me-1"></i>Nuevo Servicio Greeter
+                    </button>
+                <% } %>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment and Currency Filters -->
+    <div class="card-body border-bottom py-2" style="background-color: #f8f9fa;">
+        <div class="d-flex justify-content-end align-items-center">
+            <div class="d-flex gap-2 align-items-center">
+            <!-- Currency Dropdown -->
+            <div class="d-flex align-items-center gap-1">
+                <label for="currencyFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Moneda:</label>
+                <select class="form-select" id="currencyFilter-<%= dtTableId %>" style="min-width: 100px;">
+                    <option value="MXN" selected>MXN</option>
+                    <option value="USD">USD</option>
+                </select>
+            </div>
+            <!-- Payment Type Dropdown -->
+            <div class="d-flex align-items-center gap-1">
+                <label for="paymentTypeFilter-<%= dtTableId %>" class="form-label mb-0 text-muted">Pago:</label>
+                <select class="form-select" id="paymentTypeFilter-<%= dtTableId %>" style="min-width: 140px;">
+                    <option value="efectivo" selected>Efectivo</option>
+                    <option value="transferencia">Transferencia</option>
+                    <option value="tarjeta">Tarjeta Crédito/Débito</option>
+                </select>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" id="greeter-content">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ubicación</th>
+                        <th>Precio</th>
+                        <th>Duración</th>
+                        <th>Capacidad</th>
+                        <th>Estado</th>
+                        <% if (dtShowActions) { %>
+                            <th class="text-center">Acciones</th>
+                        <% } %>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Greeter Service Modal -->
+<div class="modal fade" id="greeterModal" tabindex="-1" aria-labelledby="greeterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title text-white" id="greeterModalLabel">
+                    <i class="ti ti-user-plus me-2"></i><span id="modalTitle">Crear Nuevo Servicio Greeter</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Alert container for modal-specific errors -->
+                <div id="greeterModalAlerts"></div>
+
+                <form id="greeterForm">
+                    <input type="hidden" id="greeterId">
+
+                    <!-- Sección: Información del Servicio -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-info-circle me-1"></i>
+                            Información del Servicio
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="poi" class="form-label">Ubicación <span class="text-danger">*</span></label>
+                                <select class="form-select" id="poi" name="poi" required>
+                                    <option value="">Seleccionar ubicación...</option>
+                                    <!-- Options loaded dynamically from API -->
+                                </select>
+                                <div class="form-text">Ubicación donde se presta el servicio</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="price" class="form-label">Precio <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="price" name="price" required min="0" step="0.01" placeholder="250.00">
+                                </div>
+                                <div class="form-text">Precio del servicio en pesos mexicanos</div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label for="name" class="form-label">Nombre del Servicio</label>
+                                <input type="text" class="form-control" id="name" name="name" maxlength="100" placeholder="Ej: Recepción VIP Aeropuerto">
+                                <div class="form-text">Nombre descriptivo del servicio (opcional)</div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Descripción</label>
+                            <textarea class="form-control" id="description" name="description" rows="3" maxlength="500" placeholder="Descripción detallada del servicio..."></textarea>
+                            <div class="form-text">Descripción opcional del servicio</div>
+                        </div>
+                    </div>
+
+                    <!-- Sección: Configuración Adicional -->
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">
+                            <i class="ti ti-settings me-1"></i>
+                            Configuración Adicional
+                        </h6>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="duration" class="form-label">Duración (minutos)</label>
+                                <input type="number" class="form-control" id="duration" name="duration" min="1" max="480" placeholder="60">
+                                <div class="form-text">Duración estimada del servicio</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="capacity" class="form-label">Capacidad (personas)</label>
+                                <input type="number" class="form-control" id="capacity" name="capacity" min="1" max="50" placeholder="10">
+                                <div class="form-text">Número máximo de personas</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alert informativo -->
+                    <div class="alert alert-info d-flex align-items-start" role="alert">
+                        <i class="ti ti-info-circle me-2 fs-5 mt-1"></i>
+                        <div>
+                            <strong>Servicio de Greeter:</strong>
+                            <p class="mb-0 mt-1">Una vez registrado, el servicio estará disponible para reservaciones y cotizaciones.</p>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="ti ti-x me-1"></i>Cancelar
+                </button>
+                <button type="button" class="btn btn-primary" id="saveGreeterBtn">
+                    <i class="ti ti-check me-1"></i><span id="saveButtonText">Crear Servicio</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+
+<!-- Custom styles to hide DataTable sorting arrows -->
+<style>
+/* Hide ALL DataTables sorting indicators including arrows */
+#<%= dtTableId %> thead th:after,
+#<%= dtTableId %> thead th:before,
+table.dataTable thead .sorting:after,
+table.dataTable thead .sorting:before,
+table.dataTable thead .sorting_asc:after,
+table.dataTable thead .sorting_asc:before,
+table.dataTable thead .sorting_desc:after,
+table.dataTable thead .sorting_desc:before,
+table.dataTable thead .sorting_asc_disabled:after,
+table.dataTable thead .sorting_asc_disabled:before,
+table.dataTable thead .sorting_desc_disabled:after,
+table.dataTable thead .sorting_desc_disabled:before {
+    display: none !important;
+    content: "" !important;
+    opacity: 0 !important;
+}
+
+/* Remove sorting classes background images */
+table.dataTable thead .sorting,
+table.dataTable thead .sorting_asc,
+table.dataTable thead .sorting_desc,
+table.dataTable thead .sorting_asc_disabled,
+table.dataTable thead .sorting_desc_disabled {
+    background-image: none !important;
+    cursor: default !important;
+}
+
+/* Ensure header text doesn't have extra padding where arrows would be */
+#<%= dtTableId %> thead th {
+    padding-right: 12px !important;
+}
+
+/* Remove any potential sorting icons from specific DataTables themes */
+.dataTables_wrapper .dataTables_sort_icon,
+.dataTables_wrapper .sorting:after,
+.dataTables_wrapper .sorting:before,
+.dataTables_wrapper .sorting_asc:after,
+.dataTables_wrapper .sorting_asc:before,
+.dataTables_wrapper .sorting_desc:after,
+.dataTables_wrapper .sorting_desc:before {
+    display: none !important;
+}
+</style>
+
+<script>
+(function() {
+    function initWhenReady() {
+        if (typeof jQuery === 'undefined') {
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+        if (!jQuery.fn.dataTable) {
+            setTimeout(initWhenReady, 100);
+            return;
+        }
+        
+        initGreeterTable();
+    }
+
+    function initGreeterTable() {
+        const tableId = '<%= dtTableId %>';
+        const apiEndpoint = '<%= dtApiEndpoint %>';
+        const showActions = <%= dtShowActions %>;
+        const canEdit = <%= canEdit %>;
+        const canDelete = <%= canDelete %>;
+
+        // Get JWT token from localStorage or cookies
+        function getAccessToken() {
+            // First try localStorage (used by other parts of the app)
+            const tokenFromStorage = localStorage.getItem('accessToken');
+            if (tokenFromStorage) {
+                return tokenFromStorage;
+            }
+            
+            // Fallback to cookies (httpOnly cookies won't work, but try anyway)
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                const [name, value] = cookie.trim().split('=');
+                if (name === 'accessToken') {
+                    return value;
+                }
+            }
+            return null;
+        }
+
+        // Setup global AJAX configuration to include JWT token
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                const token = getAccessToken();
+                if (token) {
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                }
+            }
+        });
+
+        // Pricing variables
+        let currentTransferRate = 0;
+        let currentAgencyRate = 0;
+        let currentExchangeRate = 0;
+
+        // Use global PricingUtils (loaded from /public/dashboard/js/utils/pricing-utils.js)
+
+        // Load current transfer rate from API
+        function loadCurrentTransferRate() {
+            return $.ajax({
+                url: '/api/transfer-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentTransferRate = response.data.value || 0;
+                        console.log('✅ Current transfer rate loaded:', currentTransferRate + '%');
+                    } else {
+                        console.warn('⚠️ No active transfer rate found');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading transfer rate:', error);
+                    currentTransferRate = 0;
+                }
+            });
+        }
+        
+        // Load current agency rate from API
+        function loadCurrentAgencyRate() {
+            return $.ajax({
+                url: '/api/agency-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentAgencyRate = response.data.value || 0;
+                        console.log('✅ Current agency rate loaded:', currentAgencyRate + '%');
+                    } else {
+                        console.warn('⚠️ No active agency rate found');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading agency rate:', error);
+                    currentAgencyRate = 0;
+                }
+            });
+        }
+        
+        // Load current exchange rate from API
+        function loadCurrentExchangeRate() {
+            return $.ajax({
+                url: '/api/exchange-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentExchangeRate = response.data.value || 0;
+                        console.log('✅ Current exchange rate loaded:', currentExchangeRate);
+                    } else {
+                        console.warn('⚠️ No active exchange rate found');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading exchange rate:', error);
+                    currentExchangeRate = 0;
+                }
+            });
+        }
+
+        // Function to update displayed prices
+        function updatePrices(paymentType, currency) {
+            console.log('🔄 updatePrices called with:', { 
+                paymentType, 
+                currency, 
+                tableId,
+                currentTransferRate,
+                currentAgencyRate,
+                currentExchangeRate
+            });
+            
+            const table = $(`#${tableId}`);
+            if (!table.length) {
+                console.warn('⚠️ Table not found:', tableId);
+                return;
+            }
+
+            // Find all price cells
+            table.find('tbody tr').each(function() {
+                const row = $(this);
+                const priceCell = row.find('[data-original-price]');
+                
+                if (priceCell.length) {
+                    const originalPrice = parseFloat(priceCell.data('original-price'));
+                    
+                    if (originalPrice && originalPrice > 0) {
+                        let finalPrice = originalPrice;
+                        
+                        // Apply payment type rates
+                        console.log(`🧮 Original price: ${originalPrice}, payment type: ${paymentType}`);
+                        
+                        if (paymentType === 'transferencia') {
+                            if (currentTransferRate > 0) {
+                                const oldPrice = finalPrice;
+                                finalPrice = finalPrice * (1 + currentTransferRate / 100);
+                                console.log(`📈 Applied transfer rate ${currentTransferRate}%: ${oldPrice} → ${finalPrice}`);
+                            } else {
+                                console.log('⚠️ Transfer rate not loaded or is 0');
+                            }
+                        } else if (paymentType === 'tarjeta') {
+                            if (currentAgencyRate > 0) {
+                                const oldPrice = finalPrice;
+                                finalPrice = finalPrice * (1 + currentAgencyRate / 100);
+                                console.log(`💳 Applied agency rate ${currentAgencyRate}%: ${oldPrice} → ${finalPrice}`);
+                            } else {
+                                console.log('⚠️ Agency rate not loaded or is 0');
+                            }
+                        } else {
+                            console.log('💵 No rate applied for payment type:', paymentType);
+                        }
+                        
+                        // Apply currency conversion
+                        if (currency === 'USD') {
+                            const exchangeRate = currentExchangeRate > 0 ? currentExchangeRate : 17.5;
+                            const beforeConversion = finalPrice;
+                            finalPrice = finalPrice / exchangeRate;
+                            console.log(`💱 Currency conversion: ${beforeConversion} MXN ÷ ${exchangeRate} = ${finalPrice} USD (before rounding)`);
+                            
+                            finalPrice = window.PricingUtils ? window.PricingUtils.applyUSDRoundingRules(finalPrice) : Math.round(finalPrice / 5) * 5;
+                            console.log(`🎯 Final USD price after rounding: ${finalPrice}`);
+                            
+                            // Format as USD
+                            const formatted = new Intl.NumberFormat('en-US', {
+                                style: 'currency',
+                                currency: 'USD',
+                                minimumFractionDigits: 0,
+                                maximumFractionDigits: 0
+                            }).format(finalPrice);
+                            
+                            console.log(`✅ Updating cell with formatted USD: ${formatted}`);
+                            
+                            // Update cell HTML structure
+                            priceCell.html(`
+                                <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                    ${formatted}
+                                </div>
+                            `);
+                        } else {
+                            // MXN formatting
+                            console.log(`🎯 Final MXN price: ${finalPrice}`);
+                            
+                            const formatted = new Intl.NumberFormat('es-MX', {
+                                style: 'currency',
+                                currency: 'MXN'
+                            }).format(finalPrice);
+                            
+                            console.log(`✅ Updating cell with formatted MXN: ${formatted}`);
+                            
+                            // Update cell HTML structure
+                            priceCell.html(`
+                                <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                    ${formatted}
+                                </div>
+                            `);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Setup greeter filters
+        function setupGreeterFilters() {
+            // Currency filter change handler
+            $(`#currencyFilter-${tableId}`).on('change', function() {
+                const selectedCurrency = $(this).val();
+                const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                
+                // Load exchange rate if USD is selected
+                if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
+                    loadCurrentExchangeRate().then(() => {
+                        updatePrices(selectedPaymentType, selectedCurrency);
+                    });
+                } else {
+                    updatePrices(selectedPaymentType, selectedCurrency);
+                }
+            });
+            
+            // Payment type filter change handler
+            $(`#paymentTypeFilter-${tableId}`).on('change', function() {
+                const selectedPaymentType = $(this).val();
+                const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
+                
+                if (selectedPaymentType === 'transferencia') {
+                    // Load transfer rate if not already loaded
+                    if (currentTransferRate <= 0) {
+                        loadCurrentTransferRate().then(() => {
+                            updatePrices(selectedPaymentType, selectedCurrency);
+                        });
+                    } else {
+                        updatePrices(selectedPaymentType, selectedCurrency);
+                    }
+                } else if (selectedPaymentType === 'tarjeta') {
+                    // Load agency rate if not already loaded
+                    if (currentAgencyRate <= 0) {
+                        loadCurrentAgencyRate().then(() => {
+                            updatePrices(selectedPaymentType, selectedCurrency);
+                        });
+                    } else {
+                        updatePrices(selectedPaymentType, selectedCurrency);
+                    }
+                } else {
+                    updatePrices(selectedPaymentType, selectedCurrency);
+                }
+            });
+        }
+
+        const dataTable = $(`#${tableId}`).DataTable({
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: apiEndpoint,
+                type: 'GET',
+                dataSrc: function(json) {
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Error loading greeter services:', error);
+                }
+            },
+            columns: [
+                // Ubicación column
+                {
+                    data: 'poi',
+                    render: function(data, type, row) {
+                        if (data && data.name) {
+                            return `<span>${data.name}</span>`;
+                        }
+                        return '<span class="text-muted">-</span>';
+                    }
+                },
+                // Precio column - Dynamic pricing based on payment type and currency
+                {
+                    data: 'price',
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        const baseCost = parseFloat(data);
+                        if (!baseCost || baseCost <= 0) {
+                            return '<span class="text-muted">$0.00</span>';
+                        }
+                        
+                        // Format as MXN by default (will be updated by updatePrices function)
+                        const formatMXN = (amount) => new Intl.NumberFormat('es-MX', {
+                            style: 'currency',
+                            currency: 'MXN'
+                        }).format(amount);
+                        return `
+                            <div class="text-center" data-original-price="${baseCost}">
+                                <div class="fw-bold text-primary" style="font-size: 1rem;">
+                                    ${formatMXN(baseCost)}
+                                </div>
+                            </div>
+                        `;
+                    }
+                },
+                // Duración column
+                {
+                    data: 'duration',
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        if (data && data > 0) {
+                            return `<span class="badge bg-secondary">${data} min</span>`;
+                        }
+                        return '<span class="text-muted">-</span>';
+                    }
+                },
+                // Capacidad column
+                {
+                    data: 'capacity',
+                    className: 'text-center',
+                    render: function(data, type, row) {
+                        if (data && data > 0) {
+                            return `<span class="badge bg-info">${data} personas</span>`;
+                        }
+                        return '<span class="text-muted">-</span>';
+                    }
+                },
+                // Estado column
+                {
+                    data: 'active',
+                    render: function(data) {
+                        return data
+                            ? '<span class="badge bg-success">Activo</span>'
+                            : '<span class="badge bg-secondary">Inactivo</span>';
+                    }
+                }
+            ].concat(showActions ? [{
+                data: null,
+                orderable: false,
+                searchable: false,
+                className: 'text-center',
+                render: function(data) {
+                    let actions = '<div class="btn-group btn-group-sm" role="group">';
+                    if (canEdit) {
+                        // Edit button
+                        actions += `<button type="button"
+                                        class="btn btn-primary edit-greeter-btn"
+                                        data-id="${data.objectId || data.id}"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Editar Servicio">
+                                        <i class="ti ti-edit"></i>
+                                    </button>`;
+
+                        // Toggle status button
+                        const statusIcon = data.active ? 'ti-archive' : 'ti-archive-off';
+                        const statusTitle = data.active ? 'Desactivar Servicio' : 'Activar Servicio';
+                        const statusClass = data.active ? 'btn-warning' : 'btn-success';
+
+                        actions += `<button type="button"
+                                        class="btn ${statusClass} toggle-greeter-status-btn"
+                                        data-id="${data.objectId || data.id}"
+                                        data-current-status="${data.active}"
+                                        data-name="${data.name}"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="${statusTitle}">
+                                        <i class="ti ${statusIcon}"></i>
+                                    </button>`;
+                    }
+                    if (canDelete) {
+                        // Delete button
+                        actions += `<button type="button"
+                                        class="btn btn-danger delete-greeter-btn"
+                                        data-id="${data.objectId || data.id}"
+                                        data-name="${data.name}"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
+                                        title="Eliminar Servicio">
+                                        <i class="ti ti-trash"></i>
+                                    </button>`;
+                    }
+                    actions += '</div>';
+                    return actions;
+                }
+            }] : []),
+            language: {
+                url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
+                processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando servicios...'
+            },
+            ordering: false, // Disable sorting completely
+            order: [], // No default sorting
+            pageLength: 10,
+            searchDelay: 300,
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>><"row"<"col-sm-12"tr>><"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+            drawCallback: function() {
+                // Reinitialize tooltips after table redraw
+                const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                tooltipTriggerList.map(function (tooltipTriggerEl) {
+                    return new bootstrap.Tooltip(tooltipTriggerEl);
+                });
+                
+                // Update prices after data is drawn
+                const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val() || 'efectivo';
+                const selectedCurrency = $(`#currencyFilter-${tableId}`).val() || 'MXN';
+                
+                // Small delay to ensure DOM is ready
+                setTimeout(() => {
+                    updatePrices(selectedPaymentType, selectedCurrency);
+                }, 100);
+            }
+        });
+
+        // Setup filter functionality for Moneda and Pago dropdowns
+        setupGreeterFilters();
+
+        // Event handlers
+        $('#createGreeterBtn').on('click', function() { openGreeterModal(); });
+        $(`#${tableId}`).on('click', '.edit-greeter-btn', function() { loadGreeterData($(this).data('id')); });
+        $(`#${tableId}`).on('click', '.toggle-greeter-status-btn', function() {
+            toggleGreeterStatus($(this).data('id'), $(this).data('current-status'), $(this).data('name'));
+        });
+        $(`#${tableId}`).on('click', '.delete-greeter-btn', function() { deleteGreeter($(this).data('id'), $(this).data('name')); });
+        $('#saveGreeterBtn').on('click', function() { saveGreeter(); });
+
+
+        // Load POIs for modal dropdown
+        function loadPOIsModal() {
+            return $.ajax({
+                url: '/api/pois/active',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const select = $('#poi');
+                        select.find('option:not(:first)').remove();
+                        response.data.forEach(function(poi) {
+                            const serviceTypeName = poi.serviceType ? poi.serviceType.name : '';
+                            const displayText = serviceTypeName ? `${poi.label} (${serviceTypeName})` : poi.label;
+                            select.append(`<option value="${poi.value}">${displayText}</option>`);
+                        });
+                    }
+                },
+                error: function(xhr) { showErrorAlert('Error al cargar las ubicaciones'); }
+            });
+        }
+
+
+        function openGreeterModal(isEdit = false) {
+            // Clear any previous modal alerts
+            const alertsContainer = document.getElementById('greeterModalAlerts');
+            if (alertsContainer) {
+                alertsContainer.querySelectorAll('.alert').forEach(el => el.remove());
+            }
+
+            $('#greeterModal').modal('show');
+            $('#greeterForm')[0].reset();
+            $('#greeterId').val('');
+            $('#modalTitle').text(isEdit ? 'Editar Servicio Greeter' : 'Crear Nuevo Servicio Greeter');
+            $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Servicio');
+            loadPOIsModal();
+        }
+
+        function loadGreeterData(greeterId) {
+            // Open modal first (this resets form)
+            openGreeterModal(true);
+
+            // Then load data via AJAX
+            $.ajax({
+                url: `${apiEndpoint}/${greeterId}`,
+                type: 'GET',
+                success: function(response) {
+                    if (response.success && response.data) {
+                        const greeter = response.data;
+                        // Now populate the form after it's been reset
+                        $('#greeterId').val(greeter.id);
+                        $('#name').val(greeter.name);
+                        $('#price').val(greeter.price);
+                        $('#description').val(greeter.description || '');
+                        $('#duration').val(greeter.duration || '');
+                        $('#capacity').val(greeter.capacity || '');
+                        
+                        // Load POIs and then set the selected one
+                        $.when(loadPOIsModal()).done(function() {
+                            $('#poi').val(greeter.poiId || '');
+                        });
+                    } else {
+                        showErrorAlert('Formato de respuesta inválido');
+                    }
+                },
+                error: function(xhr) {
+                    showModalError(xhr.responseJSON?.error || 'Error al cargar el servicio');
+                }
+            });
+        }
+
+        function saveGreeter() {
+            const form = $('#greeterForm');
+            
+            if (!form[0].checkValidity()) {
+                form[0].reportValidity();
+                return;
+            }
+
+            const greeterId = $('#greeterId').val();
+            const isEdit = !!greeterId;
+
+            const greeterData = {
+                name: $('#name').val().trim() || null,
+                poiId: $('#poi').val(),
+                price: parseFloat($('#price').val()),
+                description: $('#description').val().trim() || null,
+                duration: $('#duration').val() ? parseInt($('#duration').val()) : null,
+                capacity: $('#capacity').val() ? parseInt($('#capacity').val()) : null
+            };
+
+            const url = isEdit ? `${apiEndpoint}/${greeterId}` : apiEndpoint;
+            const method = isEdit ? 'PUT' : 'POST';
+            
+            $('#saveGreeterBtn').prop('disabled', true).html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
+
+            $.ajax({
+                url, type: method,
+                contentType: 'application/json',
+                data: JSON.stringify(greeterData),
+                success: function(response) {
+                    if (response.success) {
+                        $('#greeterModal').modal('hide');
+                        dataTable.ajax.reload();
+                        showSuccessAlert(isEdit ? 'Servicio actualizado exitosamente' : 'Servicio creado exitosamente');
+                    }
+                },
+                error: function(xhr) {
+                    const errorMessage = xhr.responseJSON?.error || 'Error al guardar el servicio';
+                    showModalError(errorMessage);
+                },
+                complete: function() {
+                    $('#saveGreeterBtn').prop('disabled', false).html('<i class="ti ti-check me-1"></i>' + (isEdit ? 'Guardar Cambios' : 'Crear Servicio'));
+                }
+            });
+        }
+
+        function toggleGreeterStatus(greeterId, currentStatus, greeterName) {
+            const newStatus = !currentStatus;
+            const action = newStatus ? 'activar' : 'desactivar';
+            const actionTitle = newStatus ? 'Activar' : 'Desactivar';
+            const btnClass = newStatus ? 'btn-success' : 'btn-warning';
+
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmToggleGreeterModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">${actionTitle} Servicio</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas ${action} el servicio <strong>"${greeterName}"</strong>?</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn ${btnClass}" id="confirmToggleGreeterBtn">${actionTitle}</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmToggleGreeterModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmToggleGreeterModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmToggleGreeterBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${greeterId}`,
+                    type: 'PUT',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ active: newStatus }),
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showAlert('success', `Servicio ${newStatus ? 'activado' : 'desactivado'} exitosamente`);
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al cambiar el estado del servicio';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        function deleteGreeter(greeterId, greeterName) {
+            // Create confirmation modal
+            const modalHtml = `
+                <div class="modal fade" id="confirmDeleteGreeterModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header bg-danger text-white">
+                                <h5 class="modal-title text-white">Eliminar Servicio</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>¿Estás seguro de que deseas eliminar el servicio <strong>"${greeterName}"</strong>?</p>
+                                <p class="text-muted mb-0">Esta acción no se puede deshacer.</p>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                <button type="button" class="btn btn-danger" id="confirmDeleteGreeterBtn">Eliminar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove existing modal if any
+            $('#confirmDeleteGreeterModal').remove();
+
+            // Add modal to body
+            $('body').append(modalHtml);
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeleteGreeterModal'));
+            modal.show();
+
+            // Handle confirmation
+            $('#confirmDeleteGreeterBtn').on('click', function() {
+                $.ajax({
+                    url: `${apiEndpoint}/${greeterId}`,
+                    type: 'DELETE',
+                    success: function(response) {
+                        if (response.success) {
+                            modal.hide();
+                            dataTable.ajax.reload(null, false);
+                            showAlert('success', 'Servicio eliminado exitosamente');
+                        }
+                    },
+                    error: function(xhr) {
+                        modal.hide();
+                        const error = xhr.responseJSON?.error || 'Error al eliminar el servicio';
+                        showAlert('danger', error);
+                    }
+                });
+            });
+        }
+
+        /**
+         * Show error alert inside modal
+         * @param {string} message - Error message to display
+         */
+        function showModalError(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            const container = document.getElementById('greeterModalAlerts');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 8000);
+            }
+        }
+
+        /**
+         * Show success alert message
+         * @param {string} message - Success message to display
+         */
+        function showSuccessAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="ti ti-check-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            // Remove existing alerts from this specific section
+            const container = document.getElementById('greeter-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+
+                // Insert new alert at the beginning of the content
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+
+                // Auto-dismiss after 5 seconds
+                setTimeout(() => {
+                    container.querySelectorAll('.alert').forEach(el => {
+                        el.classList.remove('show');
+                        setTimeout(() => el.remove(), 150);
+                    });
+                }, 5000);
+            }
+        }
+
+        /**
+         * Show error alert message
+         * @param {string} message - Error message to display
+         */
+        function showErrorAlert(message) {
+            const alertHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="ti ti-alert-circle me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+
+            // Remove existing alerts from this specific section
+            const container = document.getElementById('greeter-content');
+            if (container) {
+                container.querySelectorAll('.alert').forEach(el => el.remove());
+
+                // Insert new alert at the beginning of the content
+                container.insertAdjacentHTML('afterbegin', alertHtml);
+            }
+        }
+
+        // Legacy function for backward compatibility
+        function showAlert(type, message) {
+            if (type === 'success') {
+                showSuccessAlert(message);
+            } else {
+                showErrorAlert(message);
+            }
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initWhenReady);
+    } else {
+        initWhenReady();
+    }
+})();
+</script>
