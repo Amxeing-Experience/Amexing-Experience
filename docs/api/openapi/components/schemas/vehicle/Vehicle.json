@@ -1,0 +1,82 @@
+{
+  "type": "object",
+  "description": "Vehicle information with embedded type and rate data",
+  "required": ["id", "brand", "model", "licensePlate"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique vehicle identifier (Parse ObjectId)",
+      "example": "abc123def456"
+    },
+    "brand": {
+      "type": "string",
+      "description": "Vehicle brand/manufacturer",
+      "example": "Mercedes-Benz"
+    },
+    "model": {
+      "type": "string",
+      "description": "Vehicle model",
+      "example": "Sprinter"
+    },
+    "year": {
+      "type": "integer",
+      "description": "Vehicle year",
+      "example": 2023
+    },
+    "licensePlate": {
+      "type": "string",
+      "description": "Vehicle license plate number",
+      "example": "ABC-123"
+    },
+    "capacity": {
+      "type": "integer",
+      "description": "Passenger capacity",
+      "example": 14
+    },
+    "luggageCapacity": {
+      "type": "integer",
+      "description": "Luggage capacity (number of bags)",
+      "example": 10
+    },
+    "color": {
+      "type": "string",
+      "description": "Vehicle color",
+      "example": "Blanco"
+    },
+    "maintenanceStatus": {
+      "type": "string",
+      "enum": ["operational", "maintenance", "out_of_service"],
+      "description": "Current maintenance status",
+      "example": "operational"
+    },
+    "active": {
+      "type": "boolean",
+      "description": "Whether the vehicle is active",
+      "example": true
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Primary image URL (presigned S3 URL, expires in 24h)",
+      "example": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/image.jpg?..."
+    },
+    "vehicleTypeId": {
+      "$ref": "./VehicleTypeInfo.json"
+    },
+    "rateId": {
+      "$ref": "./RateInfo.json"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp",
+      "example": "2024-01-15T10:00:00.000Z"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last update timestamp",
+      "example": "2024-02-01T14:30:00.000Z"
+    }
+  }
+}
