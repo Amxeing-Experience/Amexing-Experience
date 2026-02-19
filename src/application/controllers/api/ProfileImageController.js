@@ -27,6 +27,14 @@ const upload = multer({
   },
 });
 
+/**
+ * ProfileImageController - Handles profile image upload and optimization operations.
+ * Provides API endpoints for managing user profile images with S3 storage.
+ * @class ProfileImageController
+ * @example
+ * const controller = new ProfileImageController();
+ * controller.uploadProfileImage(req, res);
+ */
 class ProfileImageController {
   constructor() {
     this.fileStorageService = new FileStorageService();
