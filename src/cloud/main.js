@@ -6,6 +6,7 @@ const logger = require('../infrastructure/logger');
 
 // Import models and services
 const AmexingUser = require('../domain/models/AmexingUser');
+// Greeter model removed - using Parse.Object.extend directly in controller
 const AuthenticationService = require('../application/services/AuthenticationService');
 const OAuthService = require('../application/services/OAuthService');
 
