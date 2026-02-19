@@ -113,7 +113,7 @@ class ApiController {
    */
   async getUserProfile(req, res, next) {
     try {
-      const { user } = req;
+      const { user, roleObject, userRole } = req;
 
       if (!user) {
         return res.status(401).json({
@@ -122,6 +122,17 @@ class ApiController {
         });
       }
 
+      // Build role and permissions info
+      const roleInfo = {
+        name: userRole || null,
+        level: roleObject?.getLevel?.() || null,
+        displayName: roleObject?.get?.('displayName') || null,
+        scope: roleObject?.get?.('scope') || null,
+      };
+
+      // Get permissions from role object
+      const permissions = roleObject?.get?.('basePermissions') || [];
+
       res.json({
         id: user.id,
         username: user.get('username'),
@@ -129,6 +140,8 @@ class ApiController {
         emailVerified: user.get('emailVerified'),
         createdAt: user.get('createdAt'),
         lastLoginAt: user.get('lastLoginAt'),
+        role: roleInfo,
+        permissions,
       });
     } catch (error) {
       logger.error('Error getting user profile:', error);

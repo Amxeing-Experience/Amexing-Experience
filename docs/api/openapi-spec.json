@@ -1381,7 +1381,7 @@
         ],
         "summary": "Get current user profile",
         "operationId": "getUserProfile",
-        "description": "Retrieve the authenticated user's profile information.",
+        "description": "Retrieve the authenticated user's profile information including role and permissions.\n\n**Mobile App Usage:** Use this endpoint after login to get the user's permissions array and determine what features to enable in the app UI.",
         "security": [
           {
             "bearerAuth": []
@@ -1389,11 +1389,11 @@
         ],
         "responses": {
           "200": {
-            "description": "User profile",
+            "description": "User profile with role and permissions",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/User"
+                  "$ref": "#/components/schemas/UserProfileResponse"
                 }
               }
             }
@@ -3767,6 +3767,109 @@
           "nodeVersion": {
             "type": "string",
             "example": "20.0.0"
+          }
+        }
+      },
+      "UserProfileResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "email"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique user identifier (Parse ObjectId)",
+            "example": "abc123def456"
+          },
+          "username": {
+            "type": "string",
+            "description": "User's unique username",
+            "example": "john.doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address",
+            "example": "john.doe@amexing.com"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Whether user's email has been verified",
+            "example": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "User creation timestamp",
+            "example": "2024-10-01T10:00:00.000Z"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last login timestamp",
+            "example": "2025-02-18T10:00:00.000Z"
+          },
+          "role": {
+            "type": "object",
+            "description": "User's role information",
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "superadmin",
+                  "admin",
+                  "client",
+                  "department_manager",
+                  "employee",
+                  "employee_amexing",
+                  "driver",
+                  "guest"
+                ],
+                "description": "Role identifier name",
+                "example": "employee"
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 7,
+                "description": "Role hierarchy level (1=lowest, 7=superadmin)",
+                "example": 3
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Human-readable role name",
+                "example": "Employee"
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "system",
+                  "organization",
+                  "department",
+                  "operations",
+                  "public"
+                ],
+                "description": "Role access scope",
+                "example": "department"
+              }
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "description": "Array of permission strings granted to this user",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "profile.read",
+              "profile.update",
+              "bookings.read",
+              "bookings.create",
+              "services.read",
+              "pricing.read"
+            ]
           }
         }
       }
