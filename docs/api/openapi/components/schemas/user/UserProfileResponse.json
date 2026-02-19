@@ -18,10 +18,29 @@
       "description": "User's email address",
       "example": "john.doe@amexing.com"
     },
+    "firstName": {
+      "type": "string",
+      "nullable": true,
+      "description": "User's first name",
+      "example": "John"
+    },
+    "lastName": {
+      "type": "string",
+      "nullable": true,
+      "description": "User's last name",
+      "example": "Doe"
+    },
     "emailVerified": {
       "type": "boolean",
       "description": "Whether user's email has been verified",
       "example": true
+    },
+    "profilePicture": {
+      "type": "string",
+      "format": "uri",
+      "nullable": true,
+      "description": "Profile picture URL (presigned S3 URL, expires in 24h). Null if no image uploaded.",
+      "example": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?X-Amz-..."
     },
     "createdAt": {
       "type": "string",

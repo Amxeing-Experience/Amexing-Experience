@@ -1,0 +1,34 @@
+{
+  "type": "object",
+  "description": "Paginated vehicle list response (DataTables compatible)",
+  "required": ["success", "data"],
+  "properties": {
+    "success": {
+      "type": "boolean",
+      "description": "Operation success status",
+      "example": true
+    },
+    "draw": {
+      "type": "integer",
+      "description": "DataTables draw counter (echo back for async requests)",
+      "example": 1
+    },
+    "recordsTotal": {
+      "type": "integer",
+      "description": "Total number of vehicles (without filters)",
+      "example": 50
+    },
+    "recordsFiltered": {
+      "type": "integer",
+      "description": "Number of vehicles after filtering",
+      "example": 25
+    },
+    "data": {
+      "type": "array",
+      "description": "Array of vehicle objects",
+      "items": {
+        "$ref": "./Vehicle.json"
+      }
+    }
+  }
+}

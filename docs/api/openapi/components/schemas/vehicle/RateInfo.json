@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "description": "Embedded rate/segment information",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Rate ID",
+      "example": "rate123"
+    },
+    "name": {
+      "type": "string",
+      "description": "Rate/segment name",
+      "example": "Premium"
+    },
+    "color": {
+      "type": "string",
+      "description": "Color code for UI display",
+      "example": "#6366F1"
+    }
+  }
+}

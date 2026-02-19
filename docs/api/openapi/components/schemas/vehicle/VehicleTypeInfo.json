@@ -1,0 +1,31 @@
+{
+  "type": "object",
+  "description": "Embedded vehicle type information",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Vehicle type ID",
+      "example": "vehicleType123"
+    },
+    "name": {
+      "type": "string",
+      "description": "Vehicle type name",
+      "example": "Van"
+    },
+    "code": {
+      "type": "string",
+      "description": "Vehicle type code",
+      "example": "VAN"
+    },
+    "icon": {
+      "type": "string",
+      "description": "Icon identifier for UI",
+      "example": "van"
+    },
+    "trunkCapacity": {
+      "type": "integer",
+      "description": "Trunk/luggage capacity",
+      "example": 10
+    }
+  }
+}
