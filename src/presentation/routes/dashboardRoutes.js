@@ -96,6 +96,8 @@ router.get('/client/vehicles', dashboardAuth.requireRole('client'), (req, res) =
 router.get('/client/services', dashboardAuth.requireRole('client'), (req, res) => clientController.services(req, res));
 router.get('/client/experiences', dashboardAuth.requireRole('client'), (req, res) => clientController.experiences(req, res));
 router.get('/client/tours', dashboardAuth.requireRole('client'), (req, res) => clientController.tours(req, res));
+router.get('/client/a-disposicion', dashboardAuth.requireRole('client'), (req, res) => clientController.aDisposicion(req, res));
+router.get('/client/greeter', dashboardAuth.requireRole('client'), (req, res) => clientController.greeter(req, res));
 
 // Department Manager Routes
 router.get('/department_manager', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.index(req, res));
@@ -115,6 +117,8 @@ router.get('/department_manager/vehicles', dashboardAuth.requireRole('department
 router.get('/department_manager/services', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.services(req, res));
 router.get('/department_manager/experiences', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.experiences(req, res));
 router.get('/department_manager/tours', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.tours(req, res));
+router.get('/department_manager/a-disposicion', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.aDisposicion(req, res));
+router.get('/department_manager/greeter', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.greeter(req, res));
 router.get('/department_manager/reports', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.reports(req, res));
 router.get('/department_manager/policies', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));
 router.get('/department_manager/permissions', dashboardAuth.requireRole('department_manager'), (req, res) => departmentManagerController.team(req, res));

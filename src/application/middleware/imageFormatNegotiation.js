@@ -85,10 +85,12 @@ async function findOptimizedImage(originalPath, format, bucket) {
     const optimizedKey = `optimized/${format}/${dir}/${name}.${format}`;
 
     // Check if object exists in S3
-    await s3.headObject({
-      Bucket: bucket,
-      Key: optimizedKey,
-    }).promise();
+    await s3
+      .headObject({
+        Bucket: bucket,
+        Key: optimizedKey,
+      })
+      .promise();
 
     return optimizedKey;
   } catch (error) {
@@ -130,10 +132,12 @@ async function serveOptimizedImage(res, s3Key, bucket, options) {
       throw new Error('AWS SDK not available');
     }
     // Get image from S3
-    const s3Object = await s3.getObject({
-      Bucket: bucket,
-      Key: s3Key,
-    }).promise();
+    const s3Object = await s3
+      .getObject({
+        Bucket: bucket,
+        Key: s3Key,
+      })
+      .promise();
 
     // Set appropriate headers
     res.set({
@@ -185,11 +189,7 @@ function imageFormatNegotiation(options = {}) {
       const originalPath = req.path.replace(/^\/images\//, '');
 
       // Check if optimized version exists
-      const optimizedPath = await findOptimizedImage(
-        originalPath,
-        preferredFormat,
-        bucket
-      );
+      const optimizedPath = await findOptimizedImage(originalPath, preferredFormat, bucket);
 
       if (optimizedPath) {
         // Serve optimized image
@@ -261,10 +261,12 @@ async function serveOptimizedImageRoute(req, res) {
 
     for (const fmt of formats) {
       try {
-        const s3Object = await s3.getObject({
-          Bucket: process.env.S3_BUCKET,
-          Key: keys[fmt],
-        }).promise();
+        const s3Object = await s3
+          .getObject({
+            Bucket: process.env.S3_BUCKET,
+            Key: keys[fmt],
+          })
+          .promise();
 
         res.set({
           'Content-Type': getContentType(fmt),

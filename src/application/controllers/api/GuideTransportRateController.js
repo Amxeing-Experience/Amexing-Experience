@@ -109,10 +109,12 @@ class GuideTransportRateController {
           createdAt: currentRate.get('createdAt'),
           updatedAt: currentRate.get('updatedAt'),
           lastUpdated: currentRate.get('effectiveDate'), // For compatibility with frontend
-          createdBy: createdBy ? {
-            id: createdBy.id,
-            name: createdBy.get('name') || createdBy.get('email') || 'Sistema',
-          } : null,
+          createdBy: createdBy
+            ? {
+              id: createdBy.id,
+              name: createdBy.get('name') || createdBy.get('email') || 'Sistema',
+            }
+            : null,
         },
       });
     } catch (error) {
@@ -162,12 +164,7 @@ class GuideTransportRateController {
       const parsedEffectiveDate = effectiveDate ? new Date(effectiveDate) : new Date();
 
       // Create new guide transport rate
-      const newRate = await GuideTransportRate.createRate(
-        numValue,
-        parsedEffectiveDate,
-        user,
-        notes || ''
-      );
+      const newRate = await GuideTransportRate.createRate(numValue, parsedEffectiveDate, user, notes || '');
 
       logger.info(`Guide transport rate created: ${newRate.getFormattedValue()}`, {
         userId: user?.id,

@@ -36,11 +36,7 @@ router.post(
   (req, res) => controller.uploadImage(req, res)
 );
 
-router.get(
-  '/:tourId/images',
-  authenticateToken,
-  (req, res) => controller.getImages(req, res)
-);
+router.get('/:tourId/images', authenticateToken, (req, res) => controller.getImages(req, res));
 
 router.delete(
   '/:tourId/images/:imageId',

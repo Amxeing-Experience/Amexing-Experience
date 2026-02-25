@@ -1279,7 +1279,9 @@ class AdminController extends RoleBasedController {
         currentGuideTransportRate: {
           value: guideTransportValue,
           formatted: currentGuideTransportRate ? currentGuideTransportRate.getFormattedValue() : '$400.00 MXN',
-          lastUpdated: currentGuideTransportRate ? (currentGuideTransportRate.get('effectiveDate') || currentGuideTransportRate.get('createdAt')) : new Date(),
+          lastUpdated: currentGuideTransportRate
+            ? currentGuideTransportRate.get('effectiveDate') || currentGuideTransportRate.get('createdAt')
+            : new Date(),
           id: currentGuideTransportRate ? currentGuideTransportRate.id : null,
         },
         breadcrumb: null, // Disable automatic breadcrumb

@@ -2167,9 +2167,7 @@ class ToursController {
     );
 
     // Filter out any null results and sort by displayOrder
-    return formattedImages
-      .filter((img) => img !== null)
-      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    return formattedImages.filter((img) => img !== null).sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
   }
 
   /**

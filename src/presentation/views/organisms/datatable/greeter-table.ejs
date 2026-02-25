@@ -77,7 +77,9 @@ const canCreate = ['superadmin', 'admin'].includes(dtUserRole);
                         <th>Precio</th>
                         <th>Duración</th>
                         <th>Capacidad</th>
-                        <th>Estado</th>
+                        <% if (['superadmin', 'admin'].includes(dtUserRole)) { %>
+                            <th>Estado</th>
+                        <% } %>
                         <% if (dtShowActions) { %>
                             <th class="text-center">Acciones</th>
                         <% } %>
@@ -266,25 +268,68 @@ table.dataTable thead .sorting_desc_disabled {
 
         // Get JWT token from localStorage or cookies
         function getAccessToken() {
-            // First try localStorage (used by other parts of the app)
-            const tokenFromStorage = localStorage.getItem('accessToken');
-            if (tokenFromStorage) {
-                return tokenFromStorage;
+            // Try different possible token keys in localStorage (used by different parts of the app)
+            const possibleKeys = ['authToken', 'accessToken', 'token'];
+            for (const key of possibleKeys) {
+                const token = localStorage.getItem(key);
+                if (token) {
+                    console.log(`Found token in localStorage with key: ${key}`);
+                    return token;
+                }
             }
             
             // Fallback to cookies (httpOnly cookies won't work, but try anyway)
             const cookies = document.cookie.split(';');
             for (let cookie of cookies) {
                 const [name, value] = cookie.trim().split('=');
-                if (name === 'accessToken') {
+                if (['authToken', 'accessToken', 'token'].includes(name)) {
+                    console.log(`Found token in cookies with key: ${name}`);
                     return value;
                 }
             }
+            
+            console.warn('No authentication token found in localStorage or cookies');
             return null;
         }
 
-        // Setup global AJAX configuration to include JWT token
+        // Test authentication before setting up DataTable
+        async function testAuthentication() {
+            console.log('🔍 Testing authentication before loading greeter data...');
+            
+            try {
+                const response = await $.ajax({
+                    url: '/api/exchange-rate/current', // This endpoint should work for level 2+
+                    type: 'GET',
+                    xhrFields: { withCredentials: true },
+                    beforeSend: function(xhr) {
+                        const token = getAccessToken();
+                        if (token) {
+                            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                            console.log('✅ Auth test - Using token:', token.substring(0, 20) + '...');
+                        } else {
+                            console.log('⚠️ Auth test - No token, relying on cookies');
+                        }
+                        console.log('📋 Auth test - Available cookies:', document.cookie);
+                    }
+                });
+                
+                console.log('✅ Authentication test passed:', response);
+                return true;
+            } catch (error) {
+                console.error('❌ Authentication test failed:', {
+                    status: error.status,
+                    statusText: error.statusText,
+                    response: error.responseJSON || error.responseText
+                });
+                return false;
+            }
+        }
+
+        // Setup global AJAX configuration to include JWT token and credentials
         $.ajaxSetup({
+            xhrFields: {
+                withCredentials: true // Ensure cookies are sent with all AJAX requests
+            },
             beforeSend: function(xhr) {
                 const token = getAccessToken();
                 if (token) {
@@ -524,17 +569,87 @@ table.dataTable thead .sorting_desc_disabled {
             });
         }
 
-        const dataTable = $(`#${tableId}`).DataTable({
+        // Initialize DataTable with authentication test
+        async function initializeGreeterTable() {
+            const authPassed = await testAuthentication();
+            if (!authPassed) {
+                showErrorAlert('Error de autenticación inicial. Por favor, recarga la página e inicia sesión nuevamente.');
+                return;
+            }
+            
+            // Continue with DataTable initialization if auth test passed
+            initDataTable();
+        }
+        
+        function initDataTable() {
+            const dataTable = $(`#${tableId}`).DataTable({
             processing: true,
             serverSide: true,
             ajax: {
                 url: apiEndpoint,
                 type: 'GET',
+                xhrFields: {
+                    withCredentials: true // Ensure cookies are sent with the request
+                },
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                        console.log('Sending request with Authorization header');
+                    } else {
+                        console.warn('No authentication token available - relying on session cookies');
+                    }
+                    // Debug: log all available cookies
+                    console.log('Available cookies:', document.cookie);
+                },
                 dataSrc: function(json) {
                     return json.data || [];
                 },
                 error: function(xhr, error, thrown) {
-                    console.error('Error loading greeter services:', error);
+                    console.error('Error loading greeter services:', {
+                        status: xhr.status,
+                        statusText: xhr.statusText,
+                        error: error,
+                        thrown: thrown,
+                        response: xhr.responseJSON || xhr.responseText
+                    });
+                    
+                    if (xhr.status === 401) {
+                        console.error('Authentication failed - token may be missing or expired');
+                        // Enhanced debugging for auth issues
+                        console.error('Request headers:', xhr.getAllResponseHeaders());
+                        console.error('Request cookies:', document.cookie);
+                        console.error('LocalStorage tokens:', {
+                            authToken: localStorage.getItem('authToken'),
+                            accessToken: localStorage.getItem('accessToken'),
+                            token: localStorage.getItem('token')
+                        });
+                        
+                        // Show user-friendly error message
+                        const message = 'Error de autenticación. Por favor, recarga la página e inicia sesión nuevamente.';
+                        if (typeof showErrorAlert === 'function') {
+                            showErrorAlert(message);
+                        } else {
+                            // Fallback to basic alert or console
+                            console.error('showErrorAlert function not found, using alert fallback');
+                            alert(message);
+                        }
+                    } else if (xhr.status === 403) {
+                        console.error('Access forbidden - insufficient permissions');
+                        const message = 'No tienes permisos para ver los servicios de greeter.';
+                        if (typeof showErrorAlert === 'function') {
+                            showErrorAlert(message);
+                        } else {
+                            alert(message);
+                        }
+                    } else {
+                        const message = 'Error al cargar los servicios de greeter. Por favor, intenta nuevamente.';
+                        if (typeof showErrorAlert === 'function') {
+                            showErrorAlert(message);
+                        } else {
+                            alert(message);
+                        }
+                    }
                 }
             },
             columns: [
@@ -593,8 +708,9 @@ table.dataTable thead .sorting_desc_disabled {
                         }
                         return '<span class="text-muted">-</span>';
                     }
-                },
-                // Estado column
+                }
+            ].concat((<%= JSON.stringify(['superadmin', 'admin'].includes(dtUserRole)) %>) ? [
+                // Estado column (only for admin roles)
                 {
                     data: 'active',
                     render: function(data) {
@@ -603,7 +719,7 @@ table.dataTable thead .sorting_desc_disabled {
                             : '<span class="badge bg-secondary">Inactivo</span>';
                     }
                 }
-            ].concat(showActions ? [{
+            ] : []).concat(showActions ? [{
                 data: null,
                 orderable: false,
                 searchable: false,
@@ -682,6 +798,8 @@ table.dataTable thead .sorting_desc_disabled {
 
         // Setup filter functionality for Moneda and Pago dropdowns
         setupGreeterFilters();
+
+        } // End initDataTable function
 
         // Event handlers
         $('#createGreeterBtn').on('click', function() { openGreeterModal(); });
@@ -1011,6 +1129,9 @@ table.dataTable thead .sorting_desc_disabled {
                 showErrorAlert(message);
             }
         }
+        
+        // Initialize the DataTable with authentication test
+        initializeGreeterTable();
     }
 
     if (document.readyState === 'loading') {

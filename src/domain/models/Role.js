@@ -526,7 +526,14 @@ class Role extends BaseModel {
         level: 3,
         scope: 'department',
         organization: 'client',
-        basePermissions: ['profile.read', 'profile.update', 'bookings.read', 'bookings.create', 'services.read', 'pricing.read'],
+        basePermissions: [
+          'profile.read',
+          'profile.update',
+          'bookings.read',
+          'bookings.create',
+          'services.read',
+          'pricing.read',
+        ],
         delegatable: false,
         isSystemRole: true,
         conditions: {

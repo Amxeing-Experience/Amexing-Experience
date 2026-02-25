@@ -2,7 +2,8 @@
  * GreeterController - RESTful API for Greeter Services Management.
  *
  * Provides Ajax-ready endpoints for managing greeter services catalog.
- * Restricted to Admin and SuperAdmin roles.
+ * Read access: Client level and above (client, department_manager, admin, superadmin).
+ * Write access: Admin and SuperAdmin roles only.
  *
  * Features:
  * - RESTful API design (GET, POST, PUT, DELETE)
@@ -15,10 +16,10 @@
  * @version 1.0.0
  * @since 1.0.0
  * @example
- * GET /api/greeter - List greeter services with DataTables
- * POST /api/greeter - Create greeter service
- * PUT /api/greeter/:id - Update greeter service
- * DELETE /api/greeter/:id - Soft delete greeter service
+ * GET /api/greeter - List greeter services with DataTables (client+)
+ * POST /api/greeter - Create greeter service (admin+)
+ * PUT /api/greeter/:id - Update greeter service (admin+)
+ * DELETE /api/greeter/:id - Soft delete greeter service (admin+)
  */
 
 const Parse = require('parse/node');
@@ -52,7 +53,11 @@ class GreeterController {
       const poiId = req.query.poiId || null;
 
       logger.info('Fetching greeter services', {
-        draw, start, length, searchValue, poiId,
+        draw,
+        start,
+        length,
+        searchValue,
+        poiId,
       });
 
       // Build query
@@ -90,9 +95,7 @@ class GreeterController {
         }
       }
 
-      const recordsTotal = await new Parse.Query('Greeter')
-        .equalTo('exists', true)
-        .count({ useMasterKey: true });
+      const recordsTotal = await new Parse.Query('Greeter').equalTo('exists', true).count({ useMasterKey: true });
 
       const recordsFiltered = await totalQuery.count({ useMasterKey: true });
 
@@ -108,10 +111,12 @@ class GreeterController {
         id: greeter.id,
         objectId: greeter.id,
         name: greeter.get('name') || '-',
-        poi: greeter.get('poi') ? {
-          id: greeter.get('poi').id,
-          name: greeter.get('poi').get('name') || '-',
-        } : null,
+        poi: greeter.get('poi')
+          ? {
+            id: greeter.get('poi').id,
+            name: greeter.get('poi').get('name') || '-',
+          }
+          : null,
         price: greeter.get('price') || 0,
         description: greeter.get('description') || '-',
         duration: greeter.get('duration') || null,
@@ -174,10 +179,12 @@ class GreeterController {
         active: greeter.get('active'),
         createdAt: greeter.get('createdAt'),
         updatedAt: greeter.get('updatedAt'),
-        poi: greeter.get('poi') ? {
-          id: greeter.get('poi').id,
-          name: greeter.get('poi').get('name'),
-        } : null,
+        poi: greeter.get('poi')
+          ? {
+            id: greeter.get('poi').id,
+            name: greeter.get('poi').get('name'),
+          }
+          : null,
       };
 
       res.json({
@@ -317,10 +324,12 @@ class GreeterController {
           duration: createdGreeter.get('duration') || null,
           capacity: createdGreeter.get('capacity') || null,
           active: createdGreeter.get('active'),
-          poi: poiData ? {
-            id: poiData.id,
-            name: poiData.get('name'),
-          } : null,
+          poi: poiData
+            ? {
+              id: poiData.id,
+              name: poiData.get('name'),
+            }
+            : null,
         },
       });
     } catch (error) {
@@ -348,7 +357,10 @@ class GreeterController {
       } = req.body;
 
       logger.info('Updating greeter service:', {
-        id, name, poiId, price,
+        id,
+        name,
+        poiId,
+        price,
       });
 
       // Get existing greeter service
@@ -440,10 +452,12 @@ class GreeterController {
           duration: updatedGreeter.get('duration'),
           capacity: updatedGreeter.get('capacity'),
           active: updatedGreeter.get('active'),
-          poi: updatedGreeter.get('poi') ? {
-            id: updatedGreeter.get('poi').id,
-            name: updatedGreeter.get('poi').get('name'),
-          } : null,
+          poi: updatedGreeter.get('poi')
+            ? {
+              id: updatedGreeter.get('poi').id,
+              name: updatedGreeter.get('poi').get('name'),
+            }
+            : null,
         },
       });
     } catch (error) {

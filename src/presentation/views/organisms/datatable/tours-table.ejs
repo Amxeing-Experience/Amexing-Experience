@@ -3162,6 +3162,11 @@ table.dataTable tbody tr.hover {
                                 });
 
                                 updateNoDaysMessage();
+                                // Update the availability status text to show selected days
+                                updateTourAvailabilityStatus();
+                            } else {
+                                // No specific days selected, update status to show "all days"
+                                updateTourAvailabilityStatus();
                             }
 
                             // Load base pricing for editing

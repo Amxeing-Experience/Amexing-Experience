@@ -17,22 +17,22 @@ const greeterController = new GreeterController();
 /**
  * GET /api/greeter
  * Get all greeter services with DataTables server-side processing.
- * Access: Admin, SuperAdmin.
+ * Access: Client level and above (includes client, department_manager, admin, superadmin).
  */
 router.get(
   '/',
-  jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
+  jwtMiddleware.requireRoleLevel(2), // Client level and above
   (req, res) => greeterController.getGreeterServices(req, res)
 );
 
 /**
  * GET /api/greeter/:id
  * Get single greeter service by ID.
- * Access: Admin, SuperAdmin.
+ * Access: Client level and above (includes client, department_manager, admin, superadmin).
  */
 router.get(
   '/:id',
-  jwtMiddleware.requireRoleLevel(6), // Admin or SuperAdmin
+  jwtMiddleware.requireRoleLevel(2), // Client level and above
   (req, res) => greeterController.getGreeterService(req, res)
 );
 
