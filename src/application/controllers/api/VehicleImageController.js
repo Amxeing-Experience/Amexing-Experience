@@ -348,7 +348,12 @@ class VehicleImageController {
           const imageFile = img.get('imageFile'); // Legacy Parse.File support
 
           // Debug log
-          console.log('Processing image:', img.get('fileName'), 'optimizationMetadata:', img.get('optimizationMetadata'));
+          console.log(
+            'Processing image:',
+            img.get('fileName'),
+            'optimizationMetadata:',
+            img.get('optimizationMetadata')
+          );
 
           // Generate optimized URLs if optimization is enabled
           let imageData = null;
@@ -917,7 +922,10 @@ class VehicleImageController {
             try {
               if (s3Key && this.imageOptimizationService && this.imageOptimizationService.enableOptimization) {
                 // Get optimized image with best format
-                const imageData = await this.imageOptimizationService.getImageWithOptimalFormat(image, 'image/webp,image/avif,image/*');
+                const imageData = await this.imageOptimizationService.getImageWithOptimalFormat(
+                  image,
+                  'image/webp,image/avif,image/*'
+                );
                 imageUrl = imageData.url;
               } else if (s3Key) {
                 // Fallback to standard presigned URL

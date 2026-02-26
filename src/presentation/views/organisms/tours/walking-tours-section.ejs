@@ -552,11 +552,26 @@ function updateWalkingToursPrices(paymentType, currency) {
     });
 }
 
-// Initialize walking tours filters when document is ready
-$(document).ready(function() {
-    // Load rates for walking tours (these are global and can be loaded immediately)
-    loadWalkingTransferRate();
-    loadWalkingAgencyRate();
-    loadWalkingExchangeRate();
-});
+// Initialize walking tours filters when document and jQuery are ready
+function initWalkingToursWhenReady() {
+    if (typeof $ === 'undefined') {
+        // jQuery not loaded yet, wait and try again
+        setTimeout(initWalkingToursWhenReady, 100);
+        return;
+    }
+    
+    // jQuery is available, proceed with initialization
+    $(document).ready(function() {
+        // Load rates for walking tours (these are global and can be loaded immediately)
+        loadWalkingTransferRate();
+        loadWalkingAgencyRate();
+        loadWalkingExchangeRate();
+        
+        // Initialize walking tours functionality
+        initWalkingToursFilters();
+    });
+}
+
+// Start the initialization process
+initWalkingToursWhenReady();
 </script>

@@ -85,28 +85,144 @@ class ProviderExperienciaController {
 
       const experiencias = await query.find({ useMasterKey: true });
 
-      // Format response with provider information
-      const data = experiencias.map((exp) => ({
-        id: exp.id,
-        name: exp.get('name'),
-        description: exp.get('description'),
-        price: exp.get('price'),
-        tipo: exp.get('tipo'),
-        duration: exp.get('duration'),
-        min_people: exp.get('min_people'),
-        max_people: exp.get('max_people'),
-        availability: exp.get('availability') || null,
-        active: exp.get('active'),
-        provider: exp.get('provider')
-          ? {
-            id: exp.get('provider').id,
-            name: exp.get('provider').get('name'),
-            type: exp.get('provider').get('type'),
+      // Format response with provider information and optimized photos
+      const acceptHeader = req.get('accept') || '';
+      const startTime = Date.now();
+      const data = await Promise.all(experiencias.map(async (exp) => {
+        // Process photos with optimization
+        const photos = exp.get('photos') || [];
+        const processedPhotos = [];
+
+        // Process each photo to generate optimized URLs
+        for (const photo of photos) {
+          try {
+            const processedPhoto = { ...photo };
+
+            // Debug: log photo structure
+            if (photos.indexOf(photo) === 0) {
+              console.log('Provider photo structure:', {
+                hasS3Key: !!photo.s3Key,
+                hasFormats: !!photo.formats,
+                hasOptimizedVariants: !!photo.optimizedVariants,
+                formats: photo.formats ? Object.keys(photo.formats) : [],
+                formatsValues: photo.formats,
+              });
+            }
+
+            // Check if photo has S3 key (prioritize optimization)
+            if (photo.s3Key && this.imageOptimizationService?.enableOptimization) {
+              // Always generate fresh URLs to avoid 403 errors from expired signatures
+              // Never use cached URLs as they expire after 24 hours
+              try {
+                // Create a mock Parse object to pass to optimization service
+                const mockImageObj = {
+                  get: (field) => {
+                    if (field === 's3Key') return photo.s3Key;
+                    // Check for optimizedVariants or formats (provider experiences use 'formats')
+                    if (field === 'optimizedVariants') return photo.optimizedVariants || photo.formats;
+                    if (field === 'optimizationMetadata') return photo.optimizationMetadata;
+                    return photo[field];
+                  },
+                };
+
+                // Use optimization service to get best format for client
+                const imageData = await this.imageOptimizationService.getImageWithOptimalFormat(
+                  mockImageObj,
+                  acceptHeader
+                );
+                processedPhoto.url = imageData.url;
+                processedPhoto.formats = imageData.formats || {};
+                processedPhoto.optimizationMetadata = imageData.metadata || photo.optimizationMetadata;
+
+                // Debug logging
+                if (processedPhoto.formats && Object.keys(processedPhoto.formats).length > 0) {
+                  console.log('Provider experience photo formats:', {
+                    hasAvif: !!processedPhoto.formats.avif,
+                    hasWebp: !!processedPhoto.formats.webp,
+                    hasJpeg: !!processedPhoto.formats.jpeg,
+                    formats: Object.keys(processedPhoto.formats),
+                  });
+                }
+
+                // Also check if we have optimizationMetadata with formats
+                if (photo.optimizationMetadata && photo.optimizationMetadata.formats) {
+                  // Extract URLs from optimizationMetadata.formats structure
+                  const formats = {};
+                  for (const format of Object.keys(photo.optimizationMetadata.formats)) {
+                    if (photo.optimizationMetadata.formats[format] && photo.optimizationMetadata.formats[format].url) {
+                      formats[format] = photo.optimizationMetadata.formats[format].url;
+                    }
+                  }
+                  // Merge with existing formats
+                  processedPhoto.formats = { ...formats, ...processedPhoto.formats };
+                }
+
+                // Also check if photo already has formats directly (provider experiences often do)
+                if (photo.formats && typeof photo.formats === 'object') {
+                  // Merge any existing formats (they might be direct URL strings)
+                  processedPhoto.formats = { ...photo.formats, ...processedPhoto.formats };
+                }
+              } catch (optimizationError) {
+                console.warn('Optimization failed for provider experience photo:', optimizationError.message);
+                // Fallback to regular presigned URL
+                if (photo.s3Key) {
+                  const presignedUrl = await this.fileStorageService.getPresignedUrl(photo.s3Key);
+                  processedPhoto.url = presignedUrl;
+                }
+              }
+            } else if (photo.url) {
+              // Keep existing URL as-is
+              processedPhoto.url = photo.url;
+            }
+
+            // Debug: log processed photo result
+            if (photos.indexOf(photo) === 0) {
+              console.log('Processed provider photo:', {
+                hasUrl: !!processedPhoto.url,
+                hasFormats: !!processedPhoto.formats,
+                formatsKeys: processedPhoto.formats ? Object.keys(processedPhoto.formats) : [],
+                avifUrl: processedPhoto.formats?.avif ? processedPhoto.formats.avif.substring(0, 100) : null,
+              });
+            }
+
+            processedPhotos.push(processedPhoto);
+          } catch (error) {
+            console.error('Error processing provider experience photo:', error.message);
+            // Keep the original photo data as fallback
+            processedPhotos.push(photo);
           }
-          : null,
-        createdAt: exp.createdAt,
-        updatedAt: exp.updatedAt,
+        }
+
+        return {
+          id: exp.id,
+          name: exp.get('name'),
+          description: exp.get('description'),
+          price: exp.get('price'),
+          price_child: exp.get('price_child') || 0,
+          price_no_alcohol: exp.get('price_no_alcohol') || 0,
+          tipo: exp.get('tipo'),
+          duration: exp.get('duration'),
+          min_people: exp.get('min_people'),
+          max_people: exp.get('max_people'),
+          availability: exp.get('availability') || null,
+          advance_booking_time: exp.get('advance_booking_time') || null,
+          photos: processedPhotos,
+          images: processedPhotos, // Alias for compatibility
+          active: exp.get('active'),
+          provider: exp.get('provider')
+            ? {
+              id: exp.get('provider').id,
+              name: exp.get('provider').get('name'),
+              type: exp.get('provider').get('type'),
+            }
+            : null,
+          createdAt: exp.createdAt,
+          updatedAt: exp.updatedAt,
+        };
       }));
+
+      const processingTime = Date.now() - startTime;
+      console.log(`Provider experiences processed in ${processingTime}ms for ${data.length} experiences`);
 
       return res.json({
         success: true,
@@ -114,20 +230,15 @@ class ProviderExperienciaController {
         count: data.length,
       });
     } catch (error) {
-      logger.error(
-        'Error in ProviderExperienciaController.getAllProviderExperiencias',
-        {
-          error: error.message,
-          stack: error.stack,
-          userId: req.user?.id,
-        }
-      );
+      logger.error('Error in ProviderExperienciaController.getAllProviderExperiencias', {
+        error: error.message,
+        stack: error.stack,
+        userId: req.user?.id,
+      });
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development'
-          ? `Error: ${error.message}`
-          : 'Failed to retrieve provider experiencias',
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve provider experiencias',
         500
       );
     }
@@ -178,21 +289,16 @@ class ProviderExperienciaController {
         },
       });
     } catch (error) {
-      logger.error(
-        'Error in ProviderExperienciaController.getProviderExperiencias',
-        {
-          error: error.message,
-          stack: error.stack,
-          providerId: req.params.providerId,
-          userId: req.user?.id,
-        }
-      );
+      logger.error('Error in ProviderExperienciaController.getProviderExperiencias', {
+        error: error.message,
+        stack: error.stack,
+        providerId: req.params.providerId,
+        userId: req.user?.id,
+      });
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development'
-          ? `Error: ${error.message}`
-          : 'Failed to retrieve experiencias',
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to retrieve experiencias',
         500
       );
     }
@@ -227,11 +333,7 @@ class ProviderExperienciaController {
 
       // Verify it belongs to the specified provider
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(
-          res,
-          'Experiencia does not belong to this provider',
-          403
-        );
+        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
       }
 
       return res.json({
@@ -239,15 +341,12 @@ class ProviderExperienciaController {
         data: await this.formatExperienciaForResponse(experiencia, req.get('accept') || ''),
       });
     } catch (error) {
-      logger.error(
-        'Error in ProviderExperienciaController.getExperienciaById',
-        {
-          error: error.message,
-          providerId: req.params.providerId,
-          experienciaId: req.params.id,
-          userId: req.user?.id,
-        }
-      );
+      logger.error('Error in ProviderExperienciaController.getExperienciaById', {
+        error: error.message,
+        providerId: req.params.providerId,
+        experienciaId: req.params.id,
+        userId: req.user?.id,
+      });
 
       return this.sendError(res, 'Failed to retrieve experiencia', 500);
     }
@@ -313,21 +412,13 @@ class ProviderExperienciaController {
       // Check experiencias limit
       const count = await ProviderExperiencia.countByProvider(providerId);
       if (count >= this.maxExperienciasPerProvider) {
-        return this.sendError(
-          res,
-          `Maximum ${this.maxExperienciasPerProvider} experiencias per provider`,
-          400
-        );
+        return this.sendError(res, `Maximum ${this.maxExperienciasPerProvider} experiencias per provider`, 400);
       }
 
       // Check name uniqueness for this provider
       const isUnique = await ProviderExperiencia.isNameUnique(providerId, name);
       if (!isUnique) {
-        return this.sendError(
-          res,
-          'An experiencia with this name already exists for this provider',
-          409
-        );
+        return this.sendError(res, 'An experiencia with this name already exists for this provider', 409);
       }
 
       // Create new experiencia
@@ -455,9 +546,7 @@ class ProviderExperienciaController {
 
       return this.sendError(
         res,
-        process.env.NODE_ENV === 'development'
-          ? `Error: ${error.message}`
-          : 'Failed to create experiencia',
+        process.env.NODE_ENV === 'development' ? `Error: ${error.message}` : 'Failed to create experiencia',
         500
       );
     }
@@ -518,28 +607,16 @@ class ProviderExperienciaController {
 
       // Verify it belongs to the specified provider
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(
-          res,
-          'Experiencia does not belong to this provider',
-          403
-        );
+        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
       }
 
       // Update fields
       if (name !== undefined) {
         // Check name uniqueness if changing
         if (name !== experiencia.getName()) {
-          const isUnique = await ProviderExperiencia.isNameUnique(
-            providerId,
-            name,
-            id
-          );
+          const isUnique = await ProviderExperiencia.isNameUnique(providerId, name, id);
           if (!isUnique) {
-            return this.sendError(
-              res,
-              'An experiencia with this name already exists for this provider',
-              409
-            );
+            return this.sendError(res, 'An experiencia with this name already exists for this provider', 409);
           }
         }
         experiencia.setName(name);
@@ -714,11 +791,7 @@ class ProviderExperienciaController {
 
       // Verify it belongs to the specified provider
       if (experiencia.get('provider')?.id !== providerId) {
-        return this.sendError(
-          res,
-          'Experiencia does not belong to this provider',
-          403
-        );
+        return this.sendError(res, 'Experiencia does not belong to this provider', 403);
       }
 
       // Soft delete
@@ -773,9 +846,7 @@ class ProviderExperienciaController {
 
       // Get all experiencias for this provider
       const providerExperiencias = await ProviderExperiencia.findByProvider(providerId);
-      const experienciaMap = new Map(
-        providerExperiencias.map((exp) => [exp.id, exp])
-      );
+      const experienciaMap = new Map(providerExperiencias.map((exp) => [exp.id, exp]));
 
       // Update display order for each experiencia
       const updates = experiencias.map((item) => {
@@ -800,14 +871,11 @@ class ProviderExperienciaController {
         message: 'Experiencias reordered successfully',
       });
     } catch (error) {
-      logger.error(
-        'Error in ProviderExperienciaController.reorderExperiencias',
-        {
-          error: error.message,
-          providerId: req.params.providerId,
-          userId: req.user?.id,
-        }
-      );
+      logger.error('Error in ProviderExperienciaController.reorderExperiencias', {
+        error: error.message,
+        providerId: req.params.providerId,
+        userId: req.user?.id,
+      });
 
       return this.sendError(res, 'Failed to reorder experiencias', 500);
     }
@@ -1060,6 +1128,56 @@ class ProviderExperienciaController {
       error: message,
       timestamp: new Date().toISOString(),
     });
+  }
+
+  /**
+   * Check if a presigned URL is still fresh (not expired).
+   * @param url
+   * @param maxAgeMs
+   * @example
+   */
+  isUrlFresh(url, maxAgeMs = 12 * 60 * 60 * 1000) {
+    try {
+      const match = url.match(/X-Amz-Date=(\d{8}T\d{6}Z)/);
+      if (match) {
+        const dateStr = match[1];
+        const urlDate = new Date(dateStr.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).getTime();
+        return (Date.now() - urlDate) < maxAgeMs;
+      }
+    } catch (error) {
+      // If we can't parse the date, assume it's expired
+    }
+    return false;
+  }
+
+  /**
+   * Select the best format URL based on Accept header.
+   * @param formats
+   * @param acceptHeader
+   * @example
+   */
+  selectBestFormatUrl(formats, acceptHeader = '') {
+    // Detect preferred format from Accept header
+    const preferredFormat = this.detectPreferredFormat(acceptHeader);
+
+    // Return the preferred format if available
+    if (preferredFormat === 'avif' && formats.avif) return formats.avif;
+    if (preferredFormat === 'webp' && formats.webp) return formats.webp;
+    if (preferredFormat === 'jpeg' && formats.jpeg) return formats.jpeg;
+
+    // Fallback chain
+    return formats.avif || formats.webp || formats.jpeg || null;
+  }
+
+  /**
+   * Detect preferred image format from Accept header.
+   * @param acceptHeader
+   * @example
+   */
+  detectPreferredFormat(acceptHeader) {
+    if (acceptHeader.includes('image/avif')) return 'avif';
+    if (acceptHeader.includes('image/webp')) return 'webp';
+    return 'jpeg';
   }
 }
 

@@ -89,10 +89,7 @@ class ImageOptimizationService extends FileStorageService {
     // Modify path to use originals folder
     // eslint-disable-next-line no-underscore-dangle
     const originalFileName = this._generateFileName(fileName, entityId);
-    const s3Key = originalFileName.replace(
-      `${this.baseFolder}/`,
-      `${this.baseFolder}/originals/`
-    );
+    const s3Key = originalFileName.replace(`${this.baseFolder}/`, `${this.baseFolder}/originals/`);
 
     // Add environment prefix
     const s3Prefix = process.env.S3_PREFIX || '';
@@ -264,10 +261,12 @@ class ImageOptimizationService extends FileStorageService {
       const optimizedKey = `${env}/optimized/${format}/vehicles/${fileName}.${format}`;
 
       try {
-        await s3.headObject({
-          Bucket: bucket,
-          Key: optimizedKey,
-        }).promise();
+        await s3
+          .headObject({
+            Bucket: bucket,
+            Key: optimizedKey,
+          })
+          .promise();
 
         formats[format] = true;
       } catch (error) {
@@ -312,7 +311,8 @@ class ImageOptimizationService extends FileStorageService {
       if (this.cdnDomain) {
         // Generic CDN (could be Cloudflare, Fastly, etc.)
         return `https://${this.cdnDomain}/${optimizedKey}`;
-      } if (this.useDirectS3) {
+      }
+      if (this.useDirectS3) {
         // Direct S3 URL (requires public bucket or public ACL)
         const bucket = process.env.S3_BUCKET;
         const region = getEnvironmentRegion();
@@ -515,7 +515,7 @@ class ImageOptimizationService extends FileStorageService {
           url: bestUrl,
           format: bestFormat,
           optimized: bestUrl !== null,
-          formats: this.buildFormatsObject(optimizedVariants),
+          formats: await this.buildFormatsObject(optimizedVariants),
           sizes: this.buildSizesObject(optimizedVariants, bestFormat),
           metadata: {
             preferredFormat,
@@ -686,16 +686,87 @@ class ImageOptimizationService extends FileStorageService {
    * @param optimizedVariants
    * @example
    */
-  buildFormatsObject(optimizedVariants) {
+  async buildFormatsObject(optimizedVariants) {
     const formats = {};
 
+    if (!optimizedVariants) {
+      return formats;
+    }
+
+    // Create FileStorageService instance for generating fresh presigned URLs
+    const BaseFileStorageService = require('./FileStorageService');
+    const fileService = new BaseFileStorageService({
+      baseFolder: 'experiences',
+      isPublic: false,
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    });
+
+    // Handle different structures of optimized variants
     for (const format of Object.keys(optimizedVariants)) {
-      if (optimizedVariants[format] && optimizedVariants[format].original) {
-        formats[format] = optimizedVariants[format].original.url;
+      const variant = optimizedVariants[format];
+
+      if (variant) {
+        // Check different structures:
+        // 1. Direct string URL (provider experiences with fresh URLs)
+        if (typeof variant === 'string' && variant.includes('amazonaws.com')) {
+          formats[format] = variant;
+        } else if (variant.original) {
+          if (variant.original.url && variant.original.url.includes('amazonaws.com')) {
+            // Check if URL might be expired (contains old date)
+            const urlDate = this.extractDateFromPresignedUrl(variant.original.url);
+            const isExpired = urlDate && (Date.now() - urlDate > 12 * 60 * 60 * 1000); // 12 hours (more aggressive)
+
+            if (isExpired && variant.original.s3Key) {
+              // Generate fresh presigned URL
+              try {
+                formats[format] = await fileService.getPresignedUrl(variant.original.s3Key);
+              } catch (error) {
+                console.warn('Failed to generate fresh presigned URL for', format, error.message);
+                formats[format] = variant.original.url; // Fallback to existing URL
+              }
+            } else {
+              // Use existing URL if not expired
+              formats[format] = variant.original.url;
+            }
+          } else if (variant.original.s3Key) {
+            // Generate presigned URL from s3Key
+            try {
+              formats[format] = await fileService.getPresignedUrl(variant.original.s3Key);
+            } catch (error) {
+              console.warn('Failed to generate presigned URL for', format, error.message);
+            }
+          }
+        } else if (variant.url) {
+          formats[format] = variant.url;
+        } else if (variant.s3Key) {
+          try {
+            formats[format] = await fileService.getPresignedUrl(variant.s3Key);
+          } catch (error) {
+            console.warn('Failed to generate presigned URL for', format, error.message);
+          }
+        }
       }
     }
 
     return formats;
+  }
+
+  /**
+   * Extract date from presigned URL to check if it's expired.
+   * @param url
+   * @example
+   */
+  extractDateFromPresignedUrl(url) {
+    try {
+      const match = url.match(/X-Amz-Date=(\d{8}T\d{6}Z)/);
+      if (match) {
+        const dateStr = match[1];
+        return new Date(dateStr.replace(/(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z/, '$1-$2-$3T$4:$5:$6Z')).getTime();
+      }
+    } catch (error) {
+      // Ignore parsing errors
+    }
+    return null;
   }
 
   /**

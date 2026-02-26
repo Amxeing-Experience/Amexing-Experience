@@ -30,7 +30,8 @@ const logger = require('../../../infrastructure/logger');
  * router.get('/pricing-progress/:processId', ClientPricesController.getProgressUpdates);
  */
 class ClientPricesController {
-  constructor() { // Bind methods to preserve context
+  constructor() {
+    // Bind methods to preserve context
     this.bulkApplyPricing = this.bulkApplyPricing.bind(this);
     this.bulkApplyPricingWithProgress = this.bulkApplyPricingWithProgress.bind(this);
     this.getProgressUpdates = this.getProgressUpdates.bind(this);
@@ -94,7 +95,8 @@ class ClientPricesController {
           success: false,
           error: 'Client not found',
         });
-      } const results = {
+      }
+      const results = {
         servicesCreated: 0,
         servicesUpdated: 0,
         toursCreated: 0,
@@ -826,7 +828,9 @@ class ClientPricesController {
         for (let i = 0; i < toCreate.length; i += chunkSize) {
           const chunk = toCreate.slice(i, i + chunkSize);
           await Parse.Object.saveAll(chunk, { useMasterKey: true });
-          console.log(`💾 Saved tour chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(toCreate.length / chunkSize)} (${chunk.length} items)`);
+          console.log(
+            `💾 Saved tour chunk ${Math.floor(i / chunkSize) + 1}/${Math.ceil(toCreate.length / chunkSize)} (${chunk.length} items)`
+          );
         }
       }
     } catch (error) {

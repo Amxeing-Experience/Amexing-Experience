@@ -1,27 +1,27 @@
 <%
 /**
- * Department Manager Tours Management Page
- * View-only access to tour packages and itineraries
+ * Department Manager Greeter Management Page
+ * View-only greeter services for department manager role
  *
  * Layout Structure:
  * - Direct row/column structure
  * - Container-fluid from Flexy Bootstrap
- * - DataTables for tours listing
+ * - DataTables for greeter services listing (view-only)
  *
  * Note: DataTables CSS/JS libraries are loaded via controller
- * Department managers can view tours but cannot modify them
+ * Created by Denisse Maldonado
  */
 
 // Page configuration
 const currentUserRole = typeof userRole !== 'undefined' ? userRole : 'department_manager';
-const currentPath = '/dashboard/department_manager/tours';
+const currentPath = '/dashboard/department_manager/greeter';
 %>
 
 <!-- Page Header with Breadcrumb -->
 <div class="row">
     <div class="col-12">
         <div class="mb-4">
-            <h2 class="mb-1 fw-bold">Tours</h2>
+            <h2 class="mb-1 fw-bold">Greeter</h2>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-0">
                     <li class="breadcrumb-item">
@@ -30,7 +30,7 @@ const currentPath = '/dashboard/department_manager/tours';
                         </a>
                     </li>
                     <li class="breadcrumb-item active" aria-current="page">
-                        <i class="ti ti-map me-1"></i>Tours
+                        <i class="ti ti-user-plus me-1"></i>Greeter
                     </li>
                 </ol>
             </nav>
@@ -38,26 +38,14 @@ const currentPath = '/dashboard/department_manager/tours';
     </div>
 </div>
 
-<!-- Walking Tours Section -->
+<!-- Greeter Services DataTable -->
 <div class="row">
     <div class="col-12">
-        <%- include('../../organisms/tours/walking-tours-section', {
-            walkingToursId: 'department-walking-tours',
-            walkingApiEndpoint: '/api/tours'
-        }) %>
-    </div>
-</div>
-
-<!-- Vehicle Tours Cards -->
-<div class="row">
-    <div class="col-12">
-        <%- include('../../organisms/tours/tours-cards', {
-            tableId: 'tours-cards',
-            apiEndpoint: '/api/tours',
+        <%- include('../../organisms/datatable/greeter-table', {
+            tableId: 'greeter-table',
+            apiEndpoint: '/api/greeter',
             userRole: currentUserRole,
-            showActions: false,
-            showClientPricing: false,
-            clientId: typeof clientId !== 'undefined' ? clientId : null
+            showActions: false
         }) %>
     </div>
 </div>

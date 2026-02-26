@@ -1,0 +1,224 @@
+<%
+/**
+ * Provider Experiencias DataTable Organism
+ * Raw DataTable component for displaying provider experiences
+ *
+ * Atomic Design Level: Organism
+ * Category: Dashboard Data Tables
+ *
+ * @param {string} tableId - Unique table identifier
+ * @param {string} apiEndpoint - API endpoint for data loading
+ * @param {string} userRole - Current user role
+ * @param {boolean} showActions - Whether to show action buttons
+ * 
+ * Created by Denisse Maldonado
+ */
+
+const dtTableId = typeof tableId !== 'undefined' ? tableId : 'provider-experiencias-table';
+const dtApiEndpoint = typeof apiEndpoint !== 'undefined' ? apiEndpoint : '/api/provider-experiencias/all';
+const dtShowActions = typeof showActions !== 'undefined' ? showActions : false;
+const dtUserRole = typeof userRole !== 'undefined' ? userRole : 'admin';
+%>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); border: none;">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="card-title mb-0 text-white">
+                    <i class="ti ti-building-store me-2"></i>Experiencias de Proveedores
+                </h5>
+                <small class="text-white" style="opacity: 0.9;">Listado de experiencias ofrecidas por proveedores externos</small>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body">
+        <div class="table-responsive">
+            <table id="<%= dtTableId %>" class="table table-hover" style="width:100%">
+                <thead class="table-light">
+                    <tr>
+                        <th>Proveedor</th>
+                        <th>Experiencia</th>
+                        <th>Tipo</th>
+                        <th>Duración</th>
+                        <th>Precio</th>
+                        <th>Capacidad</th>
+                        <th>Descripción</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+// Function to initialize the table when libraries are ready
+function initProviderExperienciasTable_<%= dtTableId.replace(/-/g, '_') %>() {
+    // Check if required libraries are loaded
+    if (typeof jQuery === 'undefined' || typeof jQuery.fn.DataTable === 'undefined') {
+        // Try again in 100ms
+        setTimeout(function() {
+            initProviderExperienciasTable_<%= dtTableId.replace(/-/g, '_') %>();
+        }, 100);
+        return;
+    }
+    
+    jQuery(function($) {
+        // Check if table is already initialized
+        if ($.fn.DataTable.isDataTable('#<%= dtTableId %>')) {
+            console.log('Provider Experiencias table already initialized');
+            return;
+        }
+
+        // Get authentication token
+        const getAuthToken = () => {
+            const token = localStorage.getItem('authToken') || 
+                         localStorage.getItem('accessToken') || 
+                         localStorage.getItem('token') ||
+                         '<%= typeof accessToken !== "undefined" ? accessToken : "" %>';
+            
+            if (!token) {
+                console.warn('No authentication token found for Provider Experiencias');
+            }
+            return token;
+        };
+
+        // Initialize DataTable
+        const table = $('#<%= dtTableId %>').DataTable({
+            processing: true,
+            serverSide: false,
+            ajax: {
+                url: '<%= dtApiEndpoint %>',
+                type: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + getAuthToken()
+                },
+                xhrFields: {
+                    withCredentials: true
+                },
+                dataSrc: function(json) {
+                    console.log('Provider Experiencias response:', json);
+                    if (!json.success) {
+                        console.error('Error loading Provider Experiencias:', json.error);
+                        return [];
+                    }
+                    return json.data || [];
+                },
+                error: function(xhr, error, thrown) {
+                    console.error('Provider Experiencias AJAX error:', {
+                        status: xhr.status,
+                        error: error,
+                        thrown: thrown,
+                        response: xhr.responseText
+                    });
+                    
+                    if (xhr.status === 401) {
+                        alert('Error de autenticación. Por favor, recarga la página e inicia sesión nuevamente.');
+                    } else if (xhr.status === 403) {
+                        alert('No tienes permisos para ver esta información.');
+                    } else {
+                        alert('Error al cargar las experiencias de proveedores. Por favor, intenta de nuevo.');
+                    }
+                }
+            },
+            columns: [
+                { 
+                    data: 'provider',
+                    defaultContent: '-',
+                    render: function(data) {
+                        return data && data.name ? data.name : '-';
+                    }
+                },
+                { 
+                    data: 'name',
+                    defaultContent: '-',
+                    render: function(data) {
+                        return data || '-';
+                    }
+                },
+                { 
+                    data: 'tipo',
+                    defaultContent: '-',
+                    render: function(data) {
+                        if (!data) return '-';
+                        const badges = {
+                            'tour': '<span class="badge bg-primary">Tour</span>',
+                            'actividad': '<span class="badge bg-success">Actividad</span>',
+                            'experiencia': '<span class="badge bg-info">Experiencia</span>',
+                            'otro': '<span class="badge bg-secondary">Otro</span>'
+                        };
+                        return badges[data.toLowerCase()] || `<span class="badge bg-secondary">${data}</span>`;
+                    }
+                },
+                { 
+                    data: 'duration',
+                    defaultContent: '-',
+                    render: function(data) {
+                        if (!data) return '-';
+                        return data + ' min';
+                    }
+                },
+                { 
+                    data: 'price',
+                    defaultContent: '-',
+                    render: function(data) {
+                        if (!data && data !== 0) return '-';
+                        return '$' + parseFloat(data).toLocaleString('es-MX', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                        });
+                    }
+                },
+                { 
+                    data: null,
+                    defaultContent: '-',
+                    render: function(data) {
+                        const min = data.min_people || 0;
+                        const max = data.max_people || 0;
+                        if (!min && !max) return '-';
+                        if (min && max) return `${min}-${max} personas`;
+                        if (min) return `Min: ${min} personas`;
+                        if (max) return `Max: ${max} personas`;
+                    }
+                },
+                { 
+                    data: 'description',
+                    defaultContent: '-',
+                    render: function(data) {
+                        if (!data) return '-';
+                        // Truncate long descriptions
+                        return data.length > 100 ? data.substring(0, 100) + '...' : data;
+                    }
+                },
+                { 
+                    data: 'active',
+                    render: function(data) {
+                        return data ? 
+                            '<span class="badge bg-success">Activo</span>' : 
+                            '<span class="badge bg-secondary">Inactivo</span>';
+                    }
+                }
+            ],
+            language: {
+                url: '/public/js/dataTables.spanish.json'
+            },
+            responsive: true,
+            pageLength: 25,
+            lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'Todos']],
+            order: [[0, 'asc'], [1, 'asc']],
+            dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rtip',
+            initComplete: function() {
+                console.log('Provider Experiencias table initialized successfully');
+            }
+        });
+
+        // Store table reference globally for debugging
+        window.providerExperienciasTable_<%= dtTableId.replace(/-/g, '_') %> = table;
+    });
+}
+
+// Start initialization
+initProviderExperienciasTable_<%= dtTableId.replace(/-/g, '_') %>();
+</script>

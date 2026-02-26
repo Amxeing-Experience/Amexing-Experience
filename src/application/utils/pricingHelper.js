@@ -228,7 +228,8 @@ class PricingHelper {
         return base + 5; // Round up for numbers ending in 3 or 8
       }
       return base; // Keep as multiple of 5
-    } if (remainder <= 2.7) {
+    }
+    if (remainder <= 2.7) {
       return base; // Round down
     }
     return base + 5; // Round up

@@ -550,7 +550,7 @@ class ToursController {
    * @example
    */
   async updateTour(req, res) {
-    console.log('🔥 UPDATE TOUR CALLED 🔥', {
+    logger.debug('Tour update requested', {
       method: req.method,
       url: req.url,
       tourId: req.params.id,
@@ -558,7 +558,7 @@ class ToursController {
     });
 
     try {
-      console.log('updateTour called:', {
+      logger.debug('Tour update details', {
         tourId: req.params.id,
         hasPhotos: !!req.body.photos,
         photoCount: req.body.photos ? req.body.photos.length : 0,
@@ -712,13 +712,49 @@ class ToursController {
         if (languages === null || !Array.isArray(languages)) tour.set('languages', []);
         else tour.set('languages', languages);
       }
-      // Process photos - create TourImage objects for new uploads
+      // Process photos - handle both additions and deletions
       if (photos !== undefined && Array.isArray(photos)) {
         const userContext = {
           userId: currentUser.id,
           email: currentUser.get('email'),
           username: currentUser.get('username'),
         };
+
+        // Get existing TourImage records
+        const existingImages = await TourImage.getImagesForTour(tour.id);
+        logger.debug('Tour image management - existing images', {
+          tourId: tour.id,
+          existingImageCount: existingImages.length,
+          existingImages: existingImages.map((img) => ({ id: img.id, fileName: img.get('fileName') })),
+        });
+
+        // Get IDs of photos that should remain (from the modal)
+        const remainingPhotoIds = photos
+          .filter((photo) => photo.id) // Only existing photos have IDs
+          .map((photo) => photo.id);
+        logger.debug('Tour image management - remaining photos', {
+          tourId: tour.id,
+          remainingPhotoIds,
+          remainingCount: remainingPhotoIds.length,
+        });
+
+        // Delete TourImage records that are no longer in the photos array
+        for (const existingImage of existingImages) {
+          if (!remainingPhotoIds.includes(existingImage.id)) {
+            logger.info('Tour image removed', {
+              tourId: tour.id,
+              imageId: existingImage.id,
+              fileName: existingImage.get('fileName'),
+              userId: userContext.userId,
+            });
+
+            // Soft delete the TourImage record
+            existingImage.set('exists', false);
+            existingImage.set('deletedAt', new Date());
+            existingImage.set('deletedBy', Parse.User.createWithoutData(userContext.userId));
+            await existingImage.save(null, { useMasterKey: true });
+          }
+        }
 
         // Handle new photo uploads as TourImage objects
         for (let i = 0; i < photos.length; i++) {
@@ -728,6 +764,11 @@ class ToursController {
           if (!photo.id) {
             // Create new TourImage for new uploads
             if (photo.dataUrl || photo.buffer || photo.s3Key) {
+              logger.info('Tour image upload', {
+                tourId: tour.id,
+                fileName: photo.fileName,
+                userId: userContext.userId,
+              });
               await this.createTourImageFromUpload(photo, tour, userContext, i);
             }
           }
@@ -1016,7 +1057,7 @@ class ToursController {
       });
 
       // Format the tour response data with price information
-      const toursWithPrices = tours.map((tour) => {
+      const toursWithPrices = await Promise.all(tours.map(async (tour) => {
         const destinationPOI = tour.get('destinationPOI');
         const tourId = tour.id;
         const priceData = pricesMap[tourId] || [];
@@ -1039,6 +1080,136 @@ class ToursController {
           });
         }
 
+        // Get tour photos with optimization - just the primary/first photo for card display
+        let primaryPhoto = null;
+        try {
+          // Try to get images from TourImage table first
+          const tourImages = await TourImage.getImagesForTour(tour.id);
+          if (tourImages && tourImages.length > 0) {
+            // Get the primary image or first image
+            const primaryImage = tourImages.find((img) => img.get('isPrimary')) || tourImages[0];
+            if (primaryImage) {
+              const s3Key = primaryImage.get('s3Key');
+              const optimizationMetadata = primaryImage.get('optimizationMetadata');
+
+              if (s3Key && this.fileStorageService) {
+                // Build optimized image data with all formats
+                primaryPhoto = {
+                  s3Key,
+                  fileName: primaryImage.get('fileName'),
+                  isPrimary: true,
+                  optimizationMetadata,
+                };
+
+                // Generate presigned URLs for optimized formats if metadata exists
+                // The ServerImageOptimizationService creates files with the same path but different extensions
+                if (optimizationMetadata?.formats && s3Key) {
+                  const variants = {};
+                  const basePath = s3Key.replace(/\.[^.]+$/, ''); // Remove extension
+
+                  // Check each format from metadata
+                  for (const formatName in optimizationMetadata.formats) {
+                    if (Object.prototype.hasOwnProperty.call(optimizationMetadata.formats, formatName)) {
+                      const formatData = optimizationMetadata.formats[formatName];
+                      if (formatData && formatData.s3Key) {
+                        try {
+                          const url = await this.fileStorageService.getPresignedUrl(formatData.s3Key);
+                          variants[formatName] = {
+                            s3Key: formatData.s3Key,
+                            format: formatName,
+                            url,
+                          };
+                        } catch (error) {
+                        // If variant doesn't exist, try the simple pattern
+                          const simpleKey = `${basePath}.${formatName}`;
+                          try {
+                            const url = await this.fileStorageService.getPresignedUrl(simpleKey);
+                            variants[formatName] = {
+                              s3Key: simpleKey,
+                              format: formatName,
+                              url,
+                            };
+                          } catch (innerError) {
+                          // Variant doesn't exist, skip silently
+                          }
+                        }
+                      }
+                    }
+                  }
+
+                  // Only add variants if we found at least one
+                  if (Object.keys(variants).length > 0) {
+                    primaryPhoto.optimizedVariants = variants;
+                  }
+                }
+
+                // Fallback original URL
+                primaryPhoto.url = await this.fileStorageService.getPresignedUrl(s3Key);
+              }
+            }
+          }
+
+          // Fallback to legacy photos array if no TourImage found
+          if (!primaryPhoto) {
+            const photos = tour.get('photos');
+            if (photos && photos.length > 0) {
+              const firstPhoto = photos[0];
+              if (firstPhoto.s3Key && this.fileStorageService) {
+                primaryPhoto = {
+                  s3Key: firstPhoto.s3Key,
+                  fileName: firstPhoto.fileName,
+                  isPrimary: true,
+                  optimizationMetadata: firstPhoto.optimizationMetadata,
+                };
+
+                // For now, skip optimization check since images aren't optimized yet
+                // TODO: Re-enable this once images are optimized
+                /*
+                // Generate presigned URLs for optimized formats if metadata exists
+                if (firstPhoto.optimizationMetadata?.formats && firstPhoto.s3Key) {
+                  const variants = {};
+                  // Extract env prefix and path components from original key
+                  const keyParts = firstPhoto.s3Key.split('/');
+                  const env = keyParts[0]; // staging, dev, or prod
+                  const fileName = keyParts[keyParts.length - 1].replace(/\.[^.]+$/, ''); // filename without extension
+
+                  // Build variant URLs for each format
+                  // Pattern: {env}/optimized/{format}/files/{filename}.{format}
+                  for (const format of firstPhoto.optimizationMetadata.formats) {
+                    const variantKey = `${env}/optimized/${format}/files/${fileName}.${format}`;
+                    try {
+                      // Check if file exists first
+                      await this.fileStorageService.checkFileExists(variantKey);
+                      const url = await this.fileStorageService.getPresignedUrl(variantKey);
+                      variants[format] = {
+                        s3Key: variantKey,
+                        format,
+                        url
+                      };
+                    } catch (error) {
+                      // If variant doesn't exist, skip it silently
+                    }
+                  }
+
+                  // Only add variants if we found at least one
+                  if (Object.keys(variants).length > 0) {
+                    primaryPhoto.optimizedVariants = variants;
+                  }
+                }
+                */
+
+                // Fallback original URL
+                primaryPhoto.url = await this.fileStorageService.getPresignedUrl(firstPhoto.s3Key);
+              }
+            }
+          }
+        } catch (error) {
+          logger.warn('Error getting tour photo:', {
+            tourId: tour.id,
+            error: error.message,
+          });
+        }
+
         return {
           id: tour.id,
           objectId: tour.id,
@@ -1051,6 +1222,10 @@ class ToursController {
             : null,
           time: tour.get('time'),
           availability: tour.get('availability'),
+          availableDays: tour.get('availableDays'),
+          advance_booking_time: tour.get('advance_booking_time'),
+          description: tour.get('notes') || tour.get('description'),
+          primaryPhoto,
           active: tour.get('active'),
           exists: tour.get('exists'),
           createdAt: tour.get('createdAt'),
@@ -1068,7 +1243,7 @@ class ToursController {
           hasClientPrices,
           clientPrices,
         };
-      });
+      }));
 
       return res.json({
         success: true,
@@ -1905,7 +2080,8 @@ class ToursController {
    */
   async createTourImageFromUpload(photo, tour, userContext, displayOrder) {
     try {
-      console.log(`🔧 createTourImageFromUpload: Starting for tour ${tour.id}`, {
+      logger.debug('Creating tour image upload', {
+        tourId: tour.id,
         hasDataUrl: !!photo.dataUrl,
         fileName: photo.fileName,
         displayOrder,
@@ -2167,9 +2343,7 @@ class ToursController {
     );
 
     // Filter out any null results and sort by displayOrder
-    return formattedImages
-      .filter((img) => img !== null)
-      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+    return formattedImages.filter((img) => img !== null).sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
   }
 
   /**

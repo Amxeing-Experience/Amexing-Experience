@@ -128,11 +128,11 @@ class ExperienceImageController {
         });
       }
 
-      // Generate unique filename for S3
+      // Generate unique filename for S3 (without experienceId since it's in the path)
       const timestamp = Date.now();
-      const randomHex = crypto.randomBytes(8).toString('hex');
+      const randomHex = crypto.randomBytes(4).toString('hex');
       const extension = path.extname(file.originalname).toLowerCase();
-      const uniqueFileName = `${experienceId}-${timestamp}-${randomHex}${extension}`;
+      const uniqueFileName = `${timestamp}-${randomHex}${extension}`;
 
       // Use server-side optimization to create multiple format variants
       const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
@@ -344,23 +344,101 @@ class ExperienceImageController {
 
       const data = await Promise.all(
         images.map(async (img) => {
-          const s3Key = img.get('s3Key');
+          let s3Key = img.get('s3Key');
           const imageFile = img.get('imageFile'); // Legacy Parse.File support
+          const optimizedVariants = img.get('optimizedVariants');
+
+          // Fix environment mismatch in S3 keys (staging vs dev)
+          const currentPrefix = process.env.S3_PREFIX || 'dev/';
+          if (s3Key && !s3Key.startsWith(currentPrefix)) {
+            // Extract filename from the key and prepend correct environment prefix
+            const filename = s3Key.split('/').pop();
+            const pathParts = s3Key.split('/');
+            // Keep the resource type (e.g., 'experiences') and filename
+            if (pathParts.length >= 2) {
+              const resourceType = pathParts[pathParts.length - 2];
+              s3Key = `${currentPrefix}${resourceType}/${filename}`;
+              console.log(`Fixed S3 key environment mismatch: ${img.get('s3Key')} -> ${s3Key}`);
+            }
+          }
 
           // Debug log
-          console.log('Processing experience image:', img.get('fileName'), 'optimizationMetadata:', img.get('optimizationMetadata'));
+          console.log(
+            'Processing experience image:',
+            img.get('fileName'),
+            's3Key:',
+            s3Key,
+            'optimizationMetadata:',
+            img.get('optimizationMetadata')
+          );
 
           // Generate optimized URLs if optimization is enabled
           let imageData = null;
 
           try {
+            // Always generate fresh URLs to avoid 403 errors from expired signatures
             if (s3Key && this.imageOptimizationService && this.imageOptimizationService.enableOptimization) {
-              // Get optimized image with best format for client
-              imageData = await this.imageOptimizationService.getImageWithOptimalFormat(img, acceptHeader);
+              // Check if we have optimized variants stored
+              if (optimizedVariants && Object.keys(optimizedVariants).length > 0) {
+                // Generate fresh presigned URLs for all optimized formats
+                const formats = {};
+
+                // Generate fresh URLs for each format
+                for (const format of ['avif', 'webp', 'jpeg']) {
+                  if (optimizedVariants[format] && optimizedVariants[format].s3Key) {
+                    try {
+                      // Fix environment prefix for optimized variants as well
+                      let variantKey = optimizedVariants[format].s3Key;
+                      if (!variantKey.startsWith(currentPrefix)) {
+                        const filename = variantKey.split('/').pop();
+                        const pathParts = variantKey.split('/');
+                        if (pathParts.length >= 2) {
+                          const resourceType = pathParts[pathParts.length - 2];
+                          variantKey = `${currentPrefix}${resourceType}/${filename}`;
+                        }
+                      }
+                      // Try to generate URL, but handle if file doesn't exist
+                      formats[format] = await this.fileStorageService.getPresignedUrl(variantKey);
+                    } catch (err) {
+                      // File might not exist in S3, skip this format
+                      console.warn(`Failed to generate URL for ${format} format (file may not exist):`, err.message);
+                    }
+                  }
+                }
+
+                // Also generate fresh URL for original
+                let originalUrl = null;
+                try {
+                  originalUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+                } catch (err) {
+                  console.warn('Failed to generate original URL (file may not exist in S3):', s3Key);
+                  // Will fall back to placeholder
+                }
+
+                // Select best format for the Accept header
+                let bestUrl = originalUrl || '/images/placeholder-image.svg';
+                if (acceptHeader && acceptHeader.includes('image/avif') && formats.avif) {
+                  bestUrl = formats.avif;
+                } else if (acceptHeader && acceptHeader.includes('image/webp') && formats.webp) {
+                  bestUrl = formats.webp;
+                } else if (formats.jpeg) {
+                  bestUrl = formats.jpeg;
+                }
+
+                imageData = {
+                  url: bestUrl,
+                  formats,
+                  metadata: img.get('optimizationMetadata'),
+                };
+              } else {
+                // No optimized variants, get standard image with format detection
+                imageData = await this.imageOptimizationService.getImageWithOptimalFormat(img, acceptHeader);
+              }
             } else {
-              // Fallback to standard presigned URL
+              // Fallback to standard presigned URL (always fresh)
               let url = null;
               if (s3Key) {
+                // Always generate a fresh presigned URL to avoid expiration issues
                 url = await this.fileStorageService.getPresignedUrl(s3Key);
               } else if (imageFile) {
                 url = imageFile.url(); // Legacy Parse.File

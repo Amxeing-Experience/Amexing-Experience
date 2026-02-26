@@ -118,7 +118,9 @@ function getValidatedRegion(region, defaultRegion = 'us-east-2') {
   }
 
   // If even the default is invalid, throw an error
-  throw new Error(`Invalid AWS region configuration. Both provided region '${region}' and default region '${defaultRegion}' are invalid.`);
+  throw new Error(
+    `Invalid AWS region configuration. Both provided region '${region}' and default region '${defaultRegion}' are invalid.`
+  );
 }
 
 /**

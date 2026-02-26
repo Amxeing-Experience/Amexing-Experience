@@ -69,7 +69,7 @@ router.use(experienceApiLimiter);
 router.get(
   '/',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(3), // Client and above (read access)
   (req, res) => ExperienceController.getExperiences(req, res)
 );
 
@@ -84,7 +84,7 @@ router.get(
 router.get(
   '/:id/dependencies',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(3), // Client and above (read access)
   (req, res) => ExperienceController.checkDependencies(req, res)
 );
 
@@ -112,7 +112,7 @@ router.get(
 router.get(
   '/:id',
   jwtMiddleware.authenticateToken,
-  jwtMiddleware.requireRoleLevel(4), // Department Manager and above
+  jwtMiddleware.requireRoleLevel(3), // Client and above (read access)
   (req, res) => ExperienceController.getExperienceById(req, res)
 );
 

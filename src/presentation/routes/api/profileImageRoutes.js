@@ -30,27 +30,18 @@ router.post(
  * GET /api/profile/image
  * Get optimized profile image URL for current user.
  */
-router.get(
-  '/image',
-  profileImageController.getProfileImage.bind(profileImageController)
-);
+router.get('/image', profileImageController.getProfileImage.bind(profileImageController));
 
 /**
  * GET /api/profile/:userId/image
  * Get optimized profile image URL for specific user.
  */
-router.get(
-  '/:userId/image',
-  profileImageController.getProfileImage.bind(profileImageController)
-);
+router.get('/:userId/image', profileImageController.getProfileImage.bind(profileImageController));
 
 /**
  * DELETE /api/profile/image
  * Delete profile image for current user.
  */
-router.delete(
-  '/image',
-  profileImageController.deleteProfileImage.bind(profileImageController)
-);
+router.delete('/image', profileImageController.deleteProfileImage.bind(profileImageController));
 
 module.exports = router;

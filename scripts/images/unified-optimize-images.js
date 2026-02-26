@@ -52,8 +52,8 @@ const CONFIG = {
   formats: ['avif', 'webp', 'jpeg'],
   quality: {
     avif: 85,
-    webp: 85,
-    jpeg: 85,
+    webp: 90,
+    jpeg: 92,
   },
   s3Bucket: process.env.S3_BUCKET || 'amexing-bucket',
   s3Prefix: process.env.S3_PREFIX || (process.env.NODE_ENV === 'production' ? 'prod/' : 'dev/'),
@@ -246,7 +246,7 @@ async function optimizeImage(image, imageType = 'vehicle') {
         } else if (format === 'webp') {
           pipeline = pipeline.webp({ quality: CONFIG.quality.webp });
         } else if (format === 'jpeg') {
-          pipeline = pipeline.jpeg({ quality: CONFIG.quality.jpeg, progressive: true });
+          pipeline = pipeline.jpeg({ quality: CONFIG.quality.jpeg, progressive: true, mozjpeg: true });
         }
         
         await pipeline.toFile(optimizedPath);
@@ -255,13 +255,10 @@ async function optimizeImage(image, imageType = 'vehicle') {
         const optimizedStats = await fs.stat(optimizedPath);
         const optimizedSize = optimizedStats.size;
         
-        // Upload to S3 in optimized subfolder - handle both vehicles and experiences
+        // Upload to S3 in the same folder as original (matching admin upload behavior)
         let optimizedS3Key;
-        if (imageType === 'vehicle') {
-          optimizedS3Key = s3Key.replace('/vehicles/', '/vehicles/optimized/').replace(path.extname(s3Key), `.${format === 'jpeg' ? 'jpg' : format}`);
-        } else {
-          optimizedS3Key = s3Key.replace('/experiences/', '/experiences/optimized/').replace(path.extname(s3Key), `.${format === 'jpeg' ? 'jpg' : format}`);
-        }
+        const basePath = s3Key.substring(0, s3Key.lastIndexOf('.'));
+        optimizedS3Key = `${basePath}.${format === 'jpeg' ? 'jpg' : format}`;
         
         if (!CONFIG.dryRun) {
           console.log(`    ⬆️  Uploading ${format.toUpperCase()} to S3...`);

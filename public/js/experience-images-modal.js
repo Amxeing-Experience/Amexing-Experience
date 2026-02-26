@@ -20,6 +20,8 @@
     let sortableInstance = null;
     let imagesCarousel = null;
     let isViewOnlyMode = false;
+    let listenersInitialized = false;
+    let failedImageUrls = new Set(); // Track failed URLs to avoid retry loops
 
     /**
      * Load Dropzone library dynamically
@@ -227,8 +229,16 @@
      * Initialize experience images modal
      */
     async function initExperienceImagesModal() {
-        // Initialize Dropzone
-        experienceImagesDropzone = await initDropzone();
+        // Initialize Dropzone only if not already initialized
+        if (!experienceImagesDropzone) {
+            experienceImagesDropzone = await initDropzone();
+        }
+
+        // Only add listeners once
+        if (listenersInitialized) {
+            return;
+        }
+        listenersInitialized = true;
 
         // Set up event listeners
         document.getElementById('carousel-close-btn')?.addEventListener('click', closeCarousel);
@@ -288,10 +298,24 @@
 
         // Event delegation for image error handling
         document.addEventListener('error', function(event) {
-            if (event.target.classList.contains('image-preview')) {
-                const errorUrl = event.target.getAttribute('data-error-url');
-                event.target.src = '/images/placeholder.jpg';
-                console.error('Failed to load image:', errorUrl);
+            if (event.target.classList && event.target.classList.contains('image-preview')) {
+                const currentSrc = event.target.src;
+                
+                // Check if we've already tried to fix this image
+                if (failedImageUrls.has(currentSrc)) {
+                    return; // Don't retry failed images
+                }
+                
+                // Add to failed set
+                failedImageUrls.add(currentSrc);
+                
+                // Only log once per URL
+                console.error('Failed to load image:', currentSrc);
+                
+                // Set placeholder only if not already a placeholder
+                if (!event.target.src.includes('/images/placeholder')) {
+                    event.target.src = '/images/placeholder.jpg';
+                }
             }
         }, true); // Use capture phase to catch image load errors
 
@@ -349,7 +373,17 @@
      */
     async function loadExperienceImages() {
         try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            // Try to get token from multiple sources
+            let token = await getAuthToken();
+            
+            if (!token) {
+                // Fallback to localStorage/sessionStorage
+                token = localStorage.getItem('token') || 
+                       sessionStorage.getItem('token') ||
+                       localStorage.getItem('accessToken') ||
+                       sessionStorage.getItem('accessToken');
+            }
+            
             const headers = {
                 'Content-Type': 'application/json',
                 // Prioritize AVIF with highest quality, then WebP, then other formats
@@ -358,9 +392,19 @@
             
             if (token) {
                 headers['Authorization'] = 'Bearer ' + token;
+            } else {
+                console.warn('No authentication token found, request may fail');
             }
 
-            const response = await fetch(`/api/experiences/${currentExperienceId}/images`, { headers });
+            const response = await fetch(`/api/experiences/${currentExperienceId}/images`, { 
+                headers,
+                credentials: 'include' // Include cookies for session-based auth
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const data = await response.json();
 
             hideModalLoader('experienceImagesModal');
@@ -369,13 +413,22 @@
                 renderImages(data.data);
                 updateImagesCount(data.count);
             } else {
+                console.error('API returned error:', data.error);
                 showErrorAlert(data.error || 'Error al cargar las imágenes');
                 renderImages([]);
             }
         } catch (error) {
             hideModalLoader('experienceImagesModal');
             console.error('Error loading experience images:', error);
-            showErrorAlert('Error de conexión al cargar las imágenes');
+            
+            // More specific error messages
+            if (error.message && error.message.includes('401')) {
+                showErrorAlert('Error de autenticación. Por favor, recarga la página e intenta de nuevo.');
+            } else if (error.message && error.message.includes('404')) {
+                showErrorAlert('La experiencia no fue encontrada.');
+            } else {
+                showErrorAlert('Error de conexión al cargar las imágenes. Por favor, intenta de nuevo.');
+            }
             renderImages([]);
         }
     }
@@ -483,11 +536,27 @@
                                 <i class="ti ti-weight"></i> ${formatFileSize(image.fileSize)}
                                 ${(() => {
                                     const metadata = image.optimizationMetadata || {};
-                                    // ServerImageOptimizationService uses 'formats' not 'availableFormats'
-                                    const availableFormats = metadata.formats || metadata.availableFormats || [];
-                                    const optimizedFormats = availableFormats.filter(f => f !== 'original');
-                                    const count = optimizedFormats.length;
-                                    return count > 0 ? `<br><i class="ti ti-versions"></i> ${count} formato${count > 1 ? 's' : ''}` : '<br><i class="ti ti-versions"></i> 0 formatos';
+                                    // Get formats from optimizedVariants or metadata.formats
+                                    let formatCount = 0;
+                                    
+                                    if (image.optimizedVariants) {
+                                        // Count non-null variants
+                                        formatCount = Object.keys(image.optimizedVariants).filter(key => 
+                                            image.optimizedVariants[key] && key !== 'original'
+                                        ).length;
+                                    } else if (metadata.formats) {
+                                        // Count formats in metadata (object with avif, webp, jpeg keys)
+                                        formatCount = Object.keys(metadata.formats).filter(key => 
+                                            metadata.formats[key] && key !== 'original'
+                                        ).length;
+                                    } else if (metadata.availableFormats && Array.isArray(metadata.availableFormats)) {
+                                        // Legacy array format
+                                        formatCount = metadata.availableFormats.filter(f => f !== 'original').length;
+                                    }
+                                    
+                                    return formatCount > 0 ? 
+                                        `<br><i class="ti ti-versions"></i> ${formatCount} formato${formatCount > 1 ? 's' : ''}` : 
+                                        '<br><i class="ti ti-versions"></i> Sin optimización';
                                 })()}
                             </small>
                         </div>
@@ -629,6 +698,20 @@
             if (data.success) {
                 showSuccessAlert(data.message || 'Imagen principal actualizada');
                 loadExperienceImages();
+                
+                // Notify the parent page to refresh the experience card images
+                if (window.parent && window.parent.refreshExperienceImages) {
+                    window.parent.refreshExperienceImages(currentExperienceId);
+                } else if (window.refreshExperienceImages) {
+                    window.refreshExperienceImages(currentExperienceId);
+                }
+                
+                // Also try dispatching a custom event for card layouts to listen to
+                const event = new CustomEvent('experienceImageChanged', {
+                    detail: { experienceId: currentExperienceId }
+                });
+                window.dispatchEvent(event);
+                
             } else {
                 showErrorAlert(data.error || 'Error al establecer imagen principal');
             }
@@ -834,6 +917,9 @@
         currentExperienceInfo = null;
         document.getElementById('images-grid').innerHTML = '';
         document.getElementById('experience-images-alerts').innerHTML = '';
+        
+        // Clear failed image URLs to prevent memory leak
+        failedImageUrls.clear();
 
         // Reset carousel
         closeCarousel();
