@@ -89,7 +89,8 @@ const menuItems = [
         <% if (activeSection === 'information') { %>
             <%- include('./sections/quote-information', { quoteId: quoteId, userRole: userRole }) %>
         <% } else if (activeSection === 'services') { %>
-            <%- include('./sections/quote-services', { quoteId: quoteId }) %>
+            <%- include('./sections/quote-services-v2', { quoteId: quoteId }) %>
+            <%- include('./sections/quote-services-modals') %>
         <% } else if (activeSection === 'summary') { %>
             <%- include('./sections/quote-summary') %>
         <% } else { %>
@@ -228,6 +229,18 @@ const menuItems = [
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Set up global access token for itinerary builder
+    const token = document.cookie.split('; ')
+        .find(row => row.startsWith('accessToken='))
+        ?.split('=')[1];
+    
+    if (token) {
+        window.quoteAccessToken = token;
+        console.log('🔑 Access token set for itinerary builder');
+    } else {
+        console.warn('⚠️ No access token found in cookies');
+    }
+    
     const menuToggle = document.getElementById('menuToggle');
     const verticalMenu = document.querySelector('.vertical-menu');
     const menuColumn = document.getElementById('menuColumn');

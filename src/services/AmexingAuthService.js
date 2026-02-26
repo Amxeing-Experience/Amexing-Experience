@@ -685,9 +685,15 @@ class AmexingAuthService {
       // Verify refresh token
       const decoded = jwt.verify(refreshToken, this.jwtRefreshSecret);
 
+      // Handle both 'sub' (JWT standard) and 'userId' (legacy) formats
+      const userId = decoded.sub || decoded.userId;
+      if (!userId) {
+        throw new Error('Invalid token format - missing user identifier');
+      }
+
       // Check if refresh token exists in database using Parse Objects
       const query = new Parse.Query('RefreshToken');
-      query.equalTo('userId', decoded.sub);
+      query.equalTo('userId', userId);
       query.equalTo('jti', decoded.jti);
       query.equalTo('active', true);
       const storedToken = await query.first({ useMasterKey: true });
@@ -697,7 +703,7 @@ class AmexingAuthService {
       }
 
       // Get user
-      const user = await this.findUserById(decoded.sub);
+      const user = await this.findUserById(userId);
       if (!user || !user.active) {
         throw new Error('User not found or inactive');
       }

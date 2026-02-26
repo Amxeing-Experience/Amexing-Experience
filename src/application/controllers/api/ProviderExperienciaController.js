@@ -85,7 +85,7 @@ class ProviderExperienciaController {
 
       const experiencias = await query.find({ useMasterKey: true });
 
-      // Format response with provider information and optimized photos
+      // Format response with ALL fields from database including extra fields AND optimized photos
       const acceptHeader = req.get('accept') || '';
       const startTime = Date.now();
       const data = await Promise.all(experiencias.map(async (exp) => {
@@ -195,20 +195,40 @@ class ProviderExperienciaController {
 
         return {
           id: exp.id,
+          objectId: exp.id,
           name: exp.get('name'),
           description: exp.get('description'),
           price: exp.get('price'),
-          price_child: exp.get('price_child') || 0,
-          price_no_alcohol: exp.get('price_no_alcohol') || 0,
           tipo: exp.get('tipo'),
           duration: exp.get('duration'),
           min_people: exp.get('min_people'),
           max_people: exp.get('max_people'),
           availability: exp.get('availability') || null,
-          advance_booking_time: exp.get('advance_booking_time') || null,
+          active: exp.get('active'),
+
+          // Additional pricing fields from database
+          price_child: exp.get('price_child'),
+          price_no_alcohol: exp.get('price_no_alcohol'),
+
+          // Include/exclude fields from database
+          includes: exp.get('includes'),
+          notincludes: exp.get('notincludes'),
+          languages: exp.get('languages'),
+
+          // Notes fields from database
+          client_booking_notes: exp.get('client_booking_notes'),
+          provider_notes: exp.get('provider_notes'),
+          team_notes: exp.get('team_notes'),
+          internal_notes: exp.get('internal_notes'),
+
+          // Duration fields from database
+          travel_duration: exp.get('travel_duration'),
+          advance_booking_time: exp.get('advance_booking_time'),
+
+          // Optimized photos from release-0.8.4
           photos: processedPhotos,
           images: processedPhotos, // Alias for compatibility
-          active: exp.get('active'),
+
           provider: exp.get('provider')
             ? {
               id: exp.get('provider').id,
@@ -218,6 +238,9 @@ class ProviderExperienciaController {
             : null,
           createdAt: exp.createdAt,
           updatedAt: exp.updatedAt,
+
+          // Mark as provider experience for frontend identification
+          type: 'provider_experience',
         };
       }));
 
