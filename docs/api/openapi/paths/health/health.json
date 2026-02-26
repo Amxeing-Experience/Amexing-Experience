@@ -1,0 +1,31 @@
+{
+  "get": {
+    "tags": ["System"],
+    "summary": "Health check endpoint",
+    "operationId": "healthCheck",
+    "description": "Check if the API server is running and healthy.",
+    "security": [],
+    "responses": {
+      "200": {
+        "description": "Server is healthy",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/SystemStatus.json"
+            }
+          }
+        }
+      },
+      "503": {
+        "description": "Server is unhealthy",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/common/SystemStatus.json"
+            }
+          }
+        }
+      }
+    }
+  }
+}

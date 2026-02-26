@@ -1,0 +1,25 @@
+{
+  "description": "Insufficient permissions to access this resource",
+  "content": {
+    "application/json": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Insufficient permissions"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2025-10-01T12:00:00.000Z"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "patch": {
+    "tags": ["POIs"],
+    "summary": "Toggle POI active status",
+    "operationId": "togglePOIStatus",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "id", "required": true, "schema": { "type": "string" } }],
+    "responses": {
+      "200": { "description": "Status toggled" },
+      "404": { "$ref": "../../../components/responses/NotFoundError.json" }
+    }
+  }
+}

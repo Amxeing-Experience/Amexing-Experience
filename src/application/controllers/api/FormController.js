@@ -163,16 +163,6 @@ class FormController {
       // dashboardAuthMiddleware sets the role in req.user.role
       const userRole = req.user?.role || req.userRole || 'guest';
 
-      // Debug logging
-      console.log('SaveTemplate - User:', user ? user.id || user.objectId : 'no user');
-      console.log('SaveTemplate - UserRole:', userRole);
-      console.log('SaveTemplate - Request body:', {
-        formId,
-        title,
-        description,
-        fieldsCount: fields?.length,
-      });
-
       if (!user) {
         console.error('SaveTemplate - No user found in request');
         return res.status(401).json({
@@ -218,9 +208,6 @@ class FormController {
         };
         template.set('createdBy', createdByPointer);
         template.set('status', 'active');
-        console.log(`Creating new template for type: ${formId}`);
-      } else {
-        console.log(`Updating existing template for type: ${formId}`);
       }
 
       // Map title to name (schema expects 'name' field)
@@ -459,19 +446,15 @@ class FormController {
    * Load record data for editing.
    * @param {string} formId - Form ID.
    * @param {string} recordId - Record ID.
+   * @param _formId
+   * @param _recordId
    * @returns {Promise<object>} Record data.
    * @example
    */
-  async loadRecordData(formId, recordId) {
-    try {
-      // This would load data from the appropriate table based on formId
-      // For now, returning empty object
-      console.log(`Loading record ${recordId} for form ${formId}`);
-      return {};
-    } catch (error) {
-      console.error('Error loading record data:', error);
-      throw error;
-    }
+  async loadRecordData(_formId, _recordId) {
+    // This would load data from the appropriate table based on formId
+    // For now, returning empty object
+    return {};
   }
 
   /**

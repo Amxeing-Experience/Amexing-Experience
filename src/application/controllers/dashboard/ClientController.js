@@ -540,6 +540,60 @@ class ClientController extends RoleBasedController {
   }
 
   /**
+   * A Disposición calculator page for clients.
+   * Hourly vehicle rental pricing calculator with volume discounts.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   * @example
+   * Created by Denisse Maldonado.
+   */
+  async aDisposicion(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'a-disposicion', {
+        title: 'Servicio a Disposición',
+        breadcrumb: null, // Disable automatic breadcrumb
+        pageStyles: [],
+        footerScripts: '',
+        csrfToken: res.locals.csrfToken, // Pass CSRF token to view
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Greeter services management page for clients.
+   * Manages greeter services with currency and payment type filters.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   * @example
+   * Created by Denisse Maldonado.
+   */
+  async greeter(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'greeter', {
+        title: 'Gestión de Greeter',
+        breadcrumb: null, // Disable automatic breadcrumb
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <!-- DataTables Core -->
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Client profile page.
    * @function profile
    * @param {object} req - Express request object.

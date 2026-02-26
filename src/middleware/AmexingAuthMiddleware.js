@@ -121,8 +121,17 @@ class AmexingAuthMiddleware {
       // Verify JWT token
       const decoded = jwt.verify(token, this.jwtSecret);
 
-      // Load user from database
-      const user = await this.authService.findUserById(decoded.sub);
+      // Load user from database - handle both 'sub' (JWT standard) and 'userId' (legacy)
+      const userId = decoded.sub || decoded.userId;
+      if (!userId) {
+        return res.status(401).json({
+          success: false,
+          error: 'Invalid token format - missing user identifier',
+          code: 'INVALID_TOKEN_FORMAT',
+        });
+      }
+
+      const user = await this.authService.findUserById(userId);
 
       if (!user || !user.active || user.deleted) {
         return res.status(401).json({

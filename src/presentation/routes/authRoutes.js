@@ -13,9 +13,8 @@
 const Parse = require('parse/node');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
-const jwt = require('jsonwebtoken');
 // bcrypt is handled by AmexingUser model, not needed here
-// const AuthenticationService = require('../../application/services/AuthenticationService'); // Unused import
+const AuthenticationService = require('../../application/services/AuthenticationService');
 // const OAuthService = require('../../application/services/OAuthService'); // Unused import
 const jwtMiddleware = require('../../application/middleware/jwtMiddleware');
 const dashboardAuthMiddleware = require('../../application/middleware/dashboardAuthMiddleware');
@@ -390,7 +389,10 @@ router.post('/login', async (req, res) => {
     // Create standardized JWT token for authenticated user
     // Check if user was successfully authenticated
     if (authenticatedUser) {
+      const jwt = require('jsonwebtoken');
       const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+
+      // Create access token with already-resolved role from authenticatedUser
       const accessToken = jwt.sign(
         {
           userId: authenticatedUser.id,
@@ -400,14 +402,30 @@ router.post('/login', async (req, res) => {
           roleId: authenticatedUser.roleId,
           clientId: authenticatedUser.clientId,
           organizationId: authenticatedUser.organizationId,
-          name: authenticatedUser.name,
           iat: Math.floor(Date.now() / 1000),
         },
         jwtSecret,
         { expiresIn: '8h' }
       );
 
-      // Set secure HTTP-only cookie for JWT token
+      // Create refresh token
+      const refreshToken = jwt.sign(
+        {
+          userId: authenticatedUser.id,
+          username: authenticatedUser.username,
+          email: authenticatedUser.email,
+          role: authenticatedUser.role,
+          roleId: authenticatedUser.roleId,
+          clientId: authenticatedUser.clientId,
+          organizationId: authenticatedUser.organizationId,
+          iat: Math.floor(Date.now() / 1000),
+          type: 'refresh',
+        },
+        jwtSecret,
+        { expiresIn: '7d' }
+      );
+
+      // Set secure HTTP-only cookies for both tokens
       res.cookie('accessToken', accessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -415,7 +433,14 @@ router.post('/login', async (req, res) => {
         maxAge: 8 * 60 * 60 * 1000, // 8 hours
       });
 
-      logger.info('JWT token created for user', {
+      res.cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      logger.info('JWT tokens created for user', {
         userId: authenticatedUser.id,
         role: authenticatedUser.role,
       });
@@ -433,7 +458,30 @@ router.post('/login', async (req, res) => {
         return res.redirect(redirectUrl);
       }
 
-      // For API calls, return JSON
+      // Detect mobile client via X-Client-Type header
+      const isMobileClient = req.headers['x-client-type'] === 'mobile';
+
+      // For mobile apps: return tokens in response body
+      if (isMobileClient) {
+        return res.json({
+          success: true,
+          user: {
+            id: authenticatedUser.id,
+            username: authenticatedUser.username,
+            role: authenticatedUser.role,
+            name: authenticatedUser.name,
+          },
+          tokens: {
+            accessToken,
+            refreshToken,
+            tokenType: 'Bearer',
+            expiresIn: '8h',
+          },
+          message: 'Login successful',
+        });
+      }
+
+      // For web API calls: return JSON without tokens (cookies only)
       return res.json({
         success: true,
         user: {
@@ -581,7 +629,25 @@ router.post('/register', async (req, res) => {
       return res.redirect(`/dashboard/${userRole}`);
     }
 
-    // For API calls, return JSON
+    // Detect mobile client via X-Client-Type header
+    const isMobileClient = req.headers['x-client-type'] === 'mobile';
+
+    // For mobile apps: return tokens in response body
+    if (isMobileClient) {
+      return res.status(201).json({
+        success: true,
+        user: result.user,
+        tokens: {
+          accessToken: result.tokens.accessToken,
+          refreshToken: result.tokens.refreshToken,
+          tokenType: 'Bearer',
+          expiresIn: result.tokens.expiresIn,
+        },
+        message: result.message,
+      });
+    }
+
+    // For web API calls: return JSON without tokens (cookies only)
     res.status(201).json({
       success: true,
       user: result.user,
@@ -685,7 +751,18 @@ router.post('/logout', async (req, res) => {
 // Token refresh endpoint
 router.post('/refresh', async (req, res) => {
   try {
-    const { refreshToken } = req.cookies;
+    // Get refreshToken from Authorization header OR from cookie
+    const { authorization: authHeader } = req.headers;
+    const { refreshToken: cookieRefreshToken } = req.cookies;
+
+    // First try from Authorization header (for mobile apps)
+    // If not in header, fall back to cookie (for web)
+    let refreshToken = null;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      refreshToken = authHeader.substring(7);
+    } else if (cookieRefreshToken) {
+      refreshToken = cookieRefreshToken;
+    }
 
     // Check if refresh token is missing
     if (!refreshToken) {
@@ -712,6 +789,24 @@ router.post('/refresh', async (req, res) => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
+    // Detect mobile client via X-Client-Type header
+    const isMobileClient = req.headers['x-client-type'] === 'mobile';
+
+    // For mobile apps: return tokens in response body
+    if (isMobileClient) {
+      return res.json({
+        success: true,
+        user: result.user,
+        tokens: {
+          accessToken: result.tokens.accessToken,
+          refreshToken: result.tokens.refreshToken,
+          tokenType: 'Bearer',
+          expiresIn: result.tokens.expiresIn,
+        },
+      });
+    }
+
+    // For web: return JSON without tokens (cookies only)
     res.json({
       success: true,
       user: result.user,
@@ -934,7 +1029,6 @@ router.post('/change-password', dashboardAuthMiddleware.requireAuth, async (req,
 
     // Call AuthenticationService directly instead of cloud function
     // since we already have the authenticated user from middleware
-    const AuthenticationService = require('../../application/services/AuthenticationService');
     const result = await AuthenticationService.changePassword(user.id, currentPassword, newPassword);
 
     res.json(result);

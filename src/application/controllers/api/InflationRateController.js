@@ -264,8 +264,6 @@ class InflationRateController {
       const { percentage } = req.body;
       const { user } = req;
 
-      console.log('🔥 INFLATION CONTROLLER CALLED!', { percentage, userId: user?.id });
-
       if (!percentage || typeof percentage !== 'number') {
         return res.status(400).json({
           success: false,

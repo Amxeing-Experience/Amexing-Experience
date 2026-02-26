@@ -1,4 +1,5 @@
 /* eslint-disable max-lines */
+/* eslint-disable brace-style */
 /**
  * OAuth Service - Handles OAuth 2.0 authentication with multiple providers
  * Production implementation with Google, Microsoft, and Apple OAuth integration.
@@ -736,13 +737,11 @@ class OAuthService {
           tokens,
           isNewUser: !corporateResult.user.existed(),
           isCorporateUser: true,
-          client: corporateResult.client
-            ? {
-              id: corporateResult.client.id,
-              name: corporateResult.client.get('name'),
-              type: corporateResult.client.get('type'),
-            }
-            : null,
+          client: corporateResult.client ? {
+            id: corporateResult.client.id,
+            name: corporateResult.client.get('name'),
+            type: corporateResult.client.get('type'),
+          } : null,
           message: corporateResult.user.existed()
             ? 'Corporate OAuth login successful'
             : 'Corporate OAuth account created and login successful',

@@ -1,0 +1,69 @@
+{
+  "get": {
+    "tags": ["Rates"],
+    "summary": "Get active rates for filters",
+    "operationId": "getActiveRates",
+    "description": "Get all active rates/segments formatted for dropdown select options.\n\n**Mobile App Usage:** Call this endpoint to populate the segment filter dropdown in vehicle list screens.\n\n**Use Case:** Filter vehicles by segment (Premium, Standard, etc.)",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "responses": {
+      "200": {
+        "description": "Active rates list formatted for select options",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "description": "Array of rate options for dropdown",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "description": "Rate ID (use this for filtering)",
+                        "example": "rate001"
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Display name for the dropdown",
+                        "example": "Premium"
+                      },
+                      "color": {
+                        "type": "string",
+                        "description": "Color code for UI badges",
+                        "example": "#6366F1"
+                      }
+                    }
+                  }
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Active Rates retrieved successfully"
+                }
+              }
+            },
+            "example": {
+              "success": true,
+              "data": [
+                { "value": "rate001", "label": "Premium", "color": "#6366F1" },
+                { "value": "rate002", "label": "Standard", "color": "#10B981" },
+                { "value": "rate003", "label": "Economy", "color": "#F59E0B" }
+              ],
+              "message": "Active Rates retrieved successfully"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      }
+    }
+  }
+}

@@ -22,6 +22,8 @@ const path = require('path');
 const logger = require('../../../infrastructure/logger');
 const ExperienceImage = require('../../../domain/models/ExperienceImage');
 const FileStorageService = require('../../services/FileStorageService');
+const ImageOptimizationService = require('../../services/ImageOptimizationService');
+const ServerImageOptimizationService = require('../../services/ServerImageOptimizationService');
 
 /**
  * ExperienceImageController class for handling experience image operations with S3 storage.
@@ -35,6 +37,23 @@ class ExperienceImageController {
     this.fileStorageService = new FileStorageService({
       baseFolder: 'experiences',
       isPublic: false, // Use presigned URLs with IAM role credentials
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+    });
+
+    // Initialize ImageOptimizationService for multi-format support
+    this.imageOptimizationService = new ImageOptimizationService({
+      baseFolder: 'experiences',
+      isPublic: false,
+      deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
+      presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
+      enableOptimization: process.env.ENABLE_IMAGE_OPTIMIZATION !== 'false',
+    });
+
+    // Initialize ServerImageOptimizationService for server-side processing
+    this.serverOptimizationService = new ServerImageOptimizationService({
+      baseFolder: 'experiences',
+      isPublic: false,
       deletionStrategy: process.env.S3_DELETION_STRATEGY || 'move',
       presignedUrlExpires: parseInt(process.env.S3_PRESIGNED_URL_EXPIRES, 10) || 86400,
     });
@@ -109,25 +128,31 @@ class ExperienceImageController {
         });
       }
 
-      // Generate unique filename for S3
+      // Generate unique filename for S3 (without experienceId since it's in the path)
       const timestamp = Date.now();
-      const randomHex = crypto.randomBytes(8).toString('hex');
+      const randomHex = crypto.randomBytes(4).toString('hex');
       const extension = path.extname(file.originalname).toLowerCase();
-      const uniqueFileName = `${experienceId}-${timestamp}-${randomHex}${extension}`;
+      const uniqueFileName = `${timestamp}-${randomHex}${extension}`;
 
-      // Upload directly to S3 using AWS SDK with user context for security logging
-      const uploadResult = await this.fileStorageService.uploadFile(file.buffer, uniqueFileName, file.mimetype, {
-        entityId: experienceId,
-        userContext: {
-          userId: currentUser.id,
-          email: currentUser.get('email'),
-          username: currentUser.get('username'),
-        },
-      });
+      // Use server-side optimization to create multiple format variants
+      const optimizationResult = await this.serverOptimizationService.uploadOptimizedImage(
+        file.buffer,
+        uniqueFileName,
+        file.mimetype,
+        {
+          entityPath: `experiences/${experienceId}`,
+          entityId: experienceId,
+          userContext: {
+            userId: currentUser.id,
+            email: currentUser.get('email'),
+            username: currentUser.get('username'),
+          },
+        }
+      );
 
-      // Validate upload was successful
-      if (!uploadResult || !uploadResult.s3Key) {
-        throw new Error('Failed to upload file to S3 - upload result is invalid');
+      // Validate optimization was successful
+      if (!optimizationResult || !optimizationResult.success || !optimizationResult.originalS3Key) {
+        throw new Error('Failed to upload and optimize image - result is invalid');
       }
 
       // Create ExperienceImage record in database
@@ -135,9 +160,9 @@ class ExperienceImageController {
       const experienceImage = new ExperienceImageClass();
 
       experienceImage.set('experienceId', experience);
-      experienceImage.set('s3Key', uploadResult.s3Key); // S3 object key
-      experienceImage.set('s3Bucket', uploadResult.bucket); // S3 bucket name
-      experienceImage.set('s3Region', uploadResult.region); // AWS region
+      experienceImage.set('s3Key', optimizationResult.originalS3Key); // Original S3 key
+      experienceImage.set('s3Bucket', process.env.S3_BUCKET); // S3 bucket name
+      experienceImage.set('s3Region', process.env.AWS_REGION); // AWS region
       experienceImage.set('fileName', file.originalname);
       experienceImage.set('fileSize', file.size);
       experienceImage.set('mimeType', file.mimetype);
@@ -145,6 +170,10 @@ class ExperienceImageController {
       experienceImage.set('uploadedAt', new Date());
       experienceImage.set('active', true);
       experienceImage.set('exists', true);
+
+      // Store optimization metadata
+      experienceImage.set('optimizedVariants', optimizationResult.optimizedVariants);
+      experienceImage.set('optimizationMetadata', optimizationResult.metadata);
 
       // Get existing count and set as primary if first
       const existingCount = await ExperienceImage.getImageCount(experienceId);
@@ -180,16 +209,20 @@ class ExperienceImageController {
       // Recalculate display order based on creation time
       await ExperienceImage.recalculateDisplayOrder(experienceId);
 
-      // Generate presigned URL for immediate access
-      const presignedUrl = await this.fileStorageService.getPresignedUrl(uploadResult.s3Key);
+      // Generate presigned URL for best available format
+      const bestImageResult = await this.serverOptimizationService.getOptimizedImageUrl(
+        optimizationResult.originalS3Key,
+        req.get('Accept') || '',
+        'original'
+      );
 
       logger.info('Experience image uploaded to S3', {
         experienceId,
         imageId: experienceImage.id,
         fileName: file.originalname,
         fileSize: file.size,
-        s3Key: uploadResult.s3Key,
-        s3Bucket: uploadResult.bucket,
+        s3Key: optimizationResult.originalS3Key,
+        s3Bucket: process.env.S3_BUCKET,
         uploadedBy: currentUser.id,
       });
 
@@ -204,10 +237,10 @@ class ExperienceImageController {
         fileName: file.originalname,
         fileSize: file.size,
         mimeType: file.mimetype,
-        s3Key: uploadResult.s3Key,
-        s3Bucket: uploadResult.bucket,
-        s3Region: uploadResult.region,
-        encryption: uploadResult.encryption,
+        s3Key: optimizationResult.originalS3Key,
+        s3Bucket: process.env.S3_BUCKET,
+        s3Region: process.env.AWS_REGION,
+        optimizedVariants: Object.keys(optimizationResult.optimizedVariants || {}),
         ipAddress: req.ip || req.connection.remoteAddress,
         userAgent: req.get('user-agent'),
         timestamp: new Date().toISOString(),
@@ -217,13 +250,21 @@ class ExperienceImageController {
         success: true,
         data: {
           id: experienceImage.id,
-          url: presignedUrl, // S3 presigned URL
+          url: bestImageResult.url, // Optimized URL
           fileName: experienceImage.get('fileName'),
           fileSize: experienceImage.get('fileSize'),
           isPrimary: experienceImage.get('isPrimary'),
           displayOrder: experienceImage.get('displayOrder'),
+          optimization: {
+            format: bestImageResult.format,
+            size: bestImageResult.size,
+            optimized: bestImageResult.optimized,
+            availableFormats: Object.keys(optimizationResult.optimizedVariants || {}),
+          },
         },
-        message: 'Imagen subida exitosamente',
+        message: optimizationResult.metadata?.fallback
+          ? 'Imagen subida exitosamente (optimización fallback)'
+          : 'Imagen subida y optimizada exitosamente',
       });
     } catch (error) {
       logger.error('Error uploading experience image to S3', {
@@ -277,6 +318,16 @@ class ExperienceImageController {
     try {
       const experienceId = req.params.id;
 
+      // Validate experience ID
+      if (!experienceId || experienceId === 'null' || experienceId === 'undefined') {
+        return res.status(400).json({
+          success: false,
+          error: 'ID de experiencia requerido',
+        });
+      }
+
+      const acceptHeader = req.get('accept');
+
       // Verify experience exists
       const experience = await new Parse.Query('Experience').get(experienceId, {
         useMasterKey: true,
@@ -293,28 +344,142 @@ class ExperienceImageController {
 
       const data = await Promise.all(
         images.map(async (img) => {
-          const s3Key = img.get('s3Key');
+          let s3Key = img.get('s3Key');
           const imageFile = img.get('imageFile'); // Legacy Parse.File support
+          const optimizedVariants = img.get('optimizedVariants');
 
-          // Generate presigned URL from s3Key, or fallback to legacy imageFile or url
-          let url = null;
-          if (s3Key) {
-            url = await this.fileStorageService.getPresignedUrl(s3Key);
-          } else if (imageFile) {
-            url = imageFile.url(); // Legacy Parse.File
-          } else {
-            url = img.get('url'); // Very old legacy local path
+          // Fix environment mismatch in S3 keys (staging vs dev)
+          const currentPrefix = process.env.S3_PREFIX || 'dev/';
+          if (s3Key && !s3Key.startsWith(currentPrefix)) {
+            // Extract filename from the key and prepend correct environment prefix
+            const filename = s3Key.split('/').pop();
+            const pathParts = s3Key.split('/');
+            // Keep the resource type (e.g., 'experiences') and filename
+            if (pathParts.length >= 2) {
+              const resourceType = pathParts[pathParts.length - 2];
+              s3Key = `${currentPrefix}${resourceType}/${filename}`;
+              console.log(`Fixed S3 key environment mismatch: ${img.get('s3Key')} -> ${s3Key}`);
+            }
           }
 
-          return {
+          // Debug log
+          console.log(
+            'Processing experience image:',
+            img.get('fileName'),
+            's3Key:',
+            s3Key,
+            'optimizationMetadata:',
+            img.get('optimizationMetadata')
+          );
+
+          // Generate optimized URLs if optimization is enabled
+          let imageData = null;
+
+          try {
+            // Always generate fresh URLs to avoid 403 errors from expired signatures
+            if (s3Key && this.imageOptimizationService && this.imageOptimizationService.enableOptimization) {
+              // Check if we have optimized variants stored
+              if (optimizedVariants && Object.keys(optimizedVariants).length > 0) {
+                // Generate fresh presigned URLs for all optimized formats
+                const formats = {};
+
+                // Generate fresh URLs for each format
+                for (const format of ['avif', 'webp', 'jpeg']) {
+                  if (optimizedVariants[format] && optimizedVariants[format].s3Key) {
+                    try {
+                      // Fix environment prefix for optimized variants as well
+                      let variantKey = optimizedVariants[format].s3Key;
+                      if (!variantKey.startsWith(currentPrefix)) {
+                        const filename = variantKey.split('/').pop();
+                        const pathParts = variantKey.split('/');
+                        if (pathParts.length >= 2) {
+                          const resourceType = pathParts[pathParts.length - 2];
+                          variantKey = `${currentPrefix}${resourceType}/${filename}`;
+                        }
+                      }
+                      // Try to generate URL, but handle if file doesn't exist
+                      formats[format] = await this.fileStorageService.getPresignedUrl(variantKey);
+                    } catch (err) {
+                      // File might not exist in S3, skip this format
+                      console.warn(`Failed to generate URL for ${format} format (file may not exist):`, err.message);
+                    }
+                  }
+                }
+
+                // Also generate fresh URL for original
+                let originalUrl = null;
+                try {
+                  originalUrl = await this.fileStorageService.getPresignedUrl(s3Key);
+                } catch (err) {
+                  console.warn('Failed to generate original URL (file may not exist in S3):', s3Key);
+                  // Will fall back to placeholder
+                }
+
+                // Select best format for the Accept header
+                let bestUrl = originalUrl || '/images/placeholder-image.svg';
+                if (acceptHeader && acceptHeader.includes('image/avif') && formats.avif) {
+                  bestUrl = formats.avif;
+                } else if (acceptHeader && acceptHeader.includes('image/webp') && formats.webp) {
+                  bestUrl = formats.webp;
+                } else if (formats.jpeg) {
+                  bestUrl = formats.jpeg;
+                }
+
+                imageData = {
+                  url: bestUrl,
+                  formats,
+                  metadata: img.get('optimizationMetadata'),
+                };
+              } else {
+                // No optimized variants, get standard image with format detection
+                imageData = await this.imageOptimizationService.getImageWithOptimalFormat(img, acceptHeader);
+              }
+            } else {
+              // Fallback to standard presigned URL (always fresh)
+              let url = null;
+              if (s3Key) {
+                // Always generate a fresh presigned URL to avoid expiration issues
+                url = await this.fileStorageService.getPresignedUrl(s3Key);
+              } else if (imageFile) {
+                url = imageFile.url(); // Legacy Parse.File
+              } else {
+                url = img.get('url'); // Very old legacy local path
+              }
+
+              if (!url) {
+                console.warn('No URL could be generated for experience image:', img.id);
+                // Create a placeholder or skip this image
+                url = '/images/placeholder-image.svg';
+              }
+
+              imageData = { url };
+            }
+          } catch (error) {
+            console.error('Error generating experience image URL:', error);
+            imageData = { url: '/images/placeholder-image.svg' };
+          }
+
+          const optimizationMetadata = img.get('optimizationMetadata') || imageData.metadata || null;
+
+          const result = {
             id: img.id,
-            url,
+            url: imageData.url,
+            formats: imageData.formats || {},
+            sizes: imageData.sizes || {},
             fileName: img.get('fileName'),
             fileSize: img.get('fileSize'),
             isPrimary: img.get('isPrimary'),
             displayOrder: img.get('displayOrder'),
             uploadedAt: img.get('uploadedAt'),
+            optimizationMetadata,
           };
+
+          console.log('Returning experience image data:', {
+            fileName: result.fileName,
+            optimizationMetadata: result.optimizationMetadata,
+          });
+
+          return result;
         })
       );
 

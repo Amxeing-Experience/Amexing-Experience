@@ -1,0 +1,5069 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AmexingWeb API",
+    "version": "0.6.0",
+    "description": "# AmexingWeb E-Commerce Platform API\n\nPCI DSS Level 1 compliant e-commerce platform with comprehensive security features.\n\n## Quick Links - API by Access Level\n\n| Category | Description | Link |\n|----------|-------------|------|\n| **Public API** | No authentication required (login, register, OAuth) | [View Public API](/api-docs/public) |\n| **Protected API** | Requires JWT token (profile, notifications) | [View Protected API](/api-docs/protected) |\n| **Admin API** | Requires JWT + Admin role (user management, catalogs) | [View Admin API](/api-docs/admin) |\n\n> **For Mobile App Team**: Use the links above to view only the endpoints relevant to your integration.\n\n---\n\n## Features\n- **Authentication**: Multi-provider OAuth 2.0 (Username/Password, Apple, Corporate)\n- **Security**: JWT Bearer tokens with secure HTTP-only cookies\n- **Authorization**: Role-based access control (RBAC) with 7 role levels\n- **Data Protection**: Encryption at rest and in transit\n- **Audit Logging**: Comprehensive audit trails for all operations\n\n## Security Standards\n- PCI DSS 4.0.1 Compliant\n- OWASP Top 10 Protection\n- Rate Limiting on all endpoints\n- CSRF Protection for state-changing operations\n- Security Headers (Helmet.js)\n\n## Authentication Flow\n1. Obtain JWT token via `/auth/login` or OAuth providers\n2. Include token in `Authorization: Bearer <token>` header\n3. Token lifetime: 8 hours (access), 7 days (refresh)\n4. Use `/auth/refresh` to renew tokens before expiration\n\n## Rate Limiting\n- Authentication endpoints: 50 requests / 15 minutes\n- API endpoints: 100 requests / 15 minutes\n- Write operations: 30 requests / 15 minutes\n- Password reset: 10 requests / 5 minutes\n\n## Download Specs\n- [Complete API Spec (JSON)](/api-docs.json)\n- [Public API Spec (JSON)](/api-docs/public.json)\n- [Protected API Spec (JSON)](/api-docs/protected.json)\n- [Admin API Spec (JSON)](/api-docs/admin.json)\n\n## Support\nFor API support, contact the Amexing Development Team.",
+    "contact": {
+      "name": "Amexing Development Team",
+      "email": "dev@amexing.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:1337",
+      "description": "Development server"
+    },
+    {
+      "url": "https://staging-api.amexing.com",
+      "description": "Staging server"
+    },
+    {
+      "url": "https://quotes.amexingexperience.com",
+      "description": "Production server"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    },
+    {
+      "cookieAuth": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "**PUBLIC** - User authentication endpoints. No authentication required.\n\nIncludes login, registration, password reset, and token refresh."
+    },
+    {
+      "name": "OAuth",
+      "description": "**PUBLIC** - OAuth 2.0 provider integration. No authentication required.\n\nSupports Apple and Corporate OAuth providers."
+    },
+    {
+      "name": "System",
+      "description": "**PUBLIC** - System health and status endpoints. No authentication required.\n\nIncludes health checks, status, and version info."
+    },
+    {
+      "name": "Profile",
+      "description": "**PROTECTED** - User profile management. Requires JWT Bearer token.\n\nManage authenticated user's profile information."
+    },
+    {
+      "name": "Notifications",
+      "description": "**PROTECTED** - User notification management. Requires JWT Bearer token.\n\nList, read, and manage user notifications."
+    },
+    {
+      "name": "Session",
+      "description": "**PROTECTED** - Session health and metrics. Requires JWT Bearer token.\n\nMonitor session status and health."
+    },
+    {
+      "name": "User Management",
+      "description": "**ADMIN** - User CRUD operations. Requires JWT + Admin/SuperAdmin role.\n\nCreate, read, update, delete, and manage user accounts."
+    },
+    {
+      "name": "Roles",
+      "description": "**ADMIN** - Role management. Requires JWT + Admin/SuperAdmin role.\n\nManage user roles and permissions."
+    },
+    {
+      "name": "POIs",
+      "description": "**ADMIN** - Points of Interest management. Requires JWT + Admin/SuperAdmin role.\n\nManage location points for services."
+    },
+    {
+      "name": "Rates",
+      "description": "**ADMIN** - Rate zone management. Requires JWT + Admin/SuperAdmin role.\n\nManage pricing rates by zone."
+    },
+    {
+      "name": "Service Types",
+      "description": "**ADMIN** - Service type catalog. Requires JWT + Admin/SuperAdmin role.\n\nManage available service types."
+    },
+    {
+      "name": "Vehicle Types",
+      "description": "**ADMIN** - Vehicle type catalog. Requires JWT + Admin/SuperAdmin role.\n\nManage available vehicle types."
+    },
+    {
+      "name": "Vehicles",
+      "description": "**ADMIN** - Vehicle management. Requires JWT + Admin/SuperAdmin role.\n\nManage vehicle fleet."
+    },
+    {
+      "name": "Billing",
+      "description": "**ADMIN** - Billing information. Requires JWT + Admin/SuperAdmin role.\n\nManage billing and invoicing data."
+    },
+    {
+      "name": "Audit",
+      "description": "**ADMIN** - Audit log management. Requires JWT + Admin/SuperAdmin role.\n\nAccess audit trails for compliance (PCI DSS)."
+    },
+    {
+      "name": "Payment Info",
+      "description": "**ADMIN** - Payment information. Requires JWT + Admin/SuperAdmin role.\n\nManage payment methods and details."
+    }
+  ],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "User login with credentials",
+        "operationId": "authLogin",
+        "description": "Authenticate user with email/username and password.\nReturns JWT tokens in HTTP-only cookies for web clients.\n\n**Mobile App Support:**\nSend header `X-Client-Type: mobile` to receive tokens in response body.\n\n**Security Features:**\n- Rate limited: 50 requests per 15 minutes\n- Account lockout after 5 failed attempts\n- Secure password validation\n- Access token lifetime: 8 hours\n- Refresh token lifetime: 7 days",
+        "security": [],
+        "parameters": [
+          {
+            "name": "X-Client-Type",
+            "in": "header",
+            "description": "Set to 'mobile' to receive tokens in response body instead of cookies only",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mobile"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful",
+            "headers": {
+              "Set-Cookie": {
+                "description": "JWT access token (HTTP-only, Secure, SameSite=strict)",
+                "schema": {
+                  "type": "string",
+                  "example": "accessToken=eyJhbGc...; HttpOnly; Secure; SameSite=strict; Max-Age=28800"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Register new user account",
+        "operationId": "authRegister",
+        "description": "Create a new user account with email verification.\n\n**Requirements:**\n- Unique email address\n- Password minimum 8 characters\n- First and last name required",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registration successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "409": {
+            "description": "Email already exists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Logout current user",
+        "operationId": "authLogout",
+        "description": "Invalidate current session and clear authentication cookies.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logout successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Refresh authentication token",
+        "operationId": "authRefresh",
+        "description": "Refresh JWT access token using refresh token.\n\n**Web Clients:** Send refresh token via cookie (automatic).\n\n**Mobile Apps:** Send refresh token via `Authorization: Bearer <refreshToken>` header and set `X-Client-Type: mobile` to receive new tokens in response body.\n\n**Token Lifetime:**\n- Access Token: 8 hours\n- Refresh Token: 7 days",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Client-Type",
+            "in": "header",
+            "description": "Set to 'mobile' to receive tokens in response body",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "mobile"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token refreshed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenRefreshResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Request password reset",
+        "operationId": "authForgotPassword",
+        "description": "Send password reset email to user.\n\n**Rate Limited:** 10 requests per 5 minutes",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reset email sent (if email exists)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          }
+        }
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Reset password with token",
+        "operationId": "authResetPassword",
+        "description": "Reset user password using token from email.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "description": "Invalid or expired token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/change-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Change current password",
+        "operationId": "authChangePassword",
+        "description": "Change password for authenticated user.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/auth/oauth/providers": {
+      "get": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Get available OAuth providers",
+        "operationId": "getOAuthProviders",
+        "description": "List all available OAuth authentication providers.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OAuth providers list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthProvidersResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}": {
+      "get": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Initiate OAuth flow",
+        "operationId": "initiateOAuth",
+        "description": "Redirect to OAuth provider for authentication.",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apple",
+                "corporate"
+              ]
+            },
+            "description": "OAuth provider name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth URL returned (API mode for client-side redirect)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "authUrl": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "OAuth provider authorization URL"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect to OAuth provider (browser mode)"
+          },
+          "400": {
+            "description": "Invalid provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}/callback": {
+      "get": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "OAuth callback handler",
+        "operationId": "oauthCallback",
+        "description": "Handle OAuth provider callback after authentication.",
+        "security": [],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apple",
+                "corporate"
+              ]
+            },
+            "description": "OAuth provider name"
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Authorization code from provider"
+          },
+          {
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            },
+            "description": "State parameter for CSRF protection"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth callback processed successfully (API mode)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                }
+              }
+            }
+          },
+          "302": {
+            "description": "Redirect to dashboard on success (browser mode)"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}/link": {
+      "post": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Link OAuth account",
+        "operationId": "linkOAuthAccount",
+        "description": "Link OAuth provider to existing user account.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apple",
+                "corporate"
+              ]
+            },
+            "description": "OAuth provider name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account linked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "409": {
+            "description": "Provider already linked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/oauth/{provider}/unlink": {
+      "delete": {
+        "tags": [
+          "OAuth"
+        ],
+        "summary": "Unlink OAuth account",
+        "operationId": "unlinkOAuthAccount",
+        "description": "Remove OAuth provider link from user account.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "apple",
+                "corporate"
+              ]
+            },
+            "description": "OAuth provider name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Account unlinked successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cannot unlink only authentication method",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Get API status",
+        "operationId": "getApiStatus",
+        "description": "Get current API status and basic information.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/version": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Get API version",
+        "operationId": "getApiVersion",
+        "description": "Get current API version and environment information.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API version info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Logout user session (API/Mobile)",
+        "operationId": "apiAuthLogout",
+        "description": "Invalidate current session and clear authentication cookies. This endpoint is designed for API clients (mobile apps) that don't use CSRF tokens.\n\n**No CSRF Required** - Uses Bearer token authentication only.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Logout successful",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Logged out successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "500": {
+            "$ref": "#/components/responses/ServerError"
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Get list of users",
+        "operationId": "getUsers",
+        "description": "Retrieve paginated list of users with filtering options.\n\n**Access Control:**\n- Requires 'users.list' permission\n- SuperAdmin/Admin: See all users\n- DepartmentManager: See users in their department",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageParameter"
+          },
+          {
+            "$ref": "#/components/parameters/LimitParameter"
+          },
+          {
+            "$ref": "#/components/parameters/SortFieldParameter"
+          },
+          {
+            "$ref": "#/components/parameters/SortDirectionParameter"
+          },
+          {
+            "in": "query",
+            "name": "role",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superadmin",
+                "admin",
+                "client",
+                "department_manager",
+                "employee",
+                "employee_amexing",
+                "driver",
+                "guest"
+              ]
+            },
+            "description": "Filter by user role"
+          },
+          {
+            "in": "query",
+            "name": "active",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter by active status"
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search in name, email, username"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimitError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Create new user",
+        "operationId": "createUser",
+        "description": "Create a new user account.\n\n**Access Control:**\n- Requires 'users.create' permission",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "409": {
+            "description": "Email already exists"
+          }
+        }
+      }
+    },
+    "/api/users/search": {
+      "get": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Search users",
+        "operationId": "searchUsers",
+        "description": "Search users by various criteria.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Search query"
+          },
+          {
+            "$ref": "#/components/parameters/LimitParameter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/users/statistics": {
+      "get": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Get user statistics",
+        "operationId": "getUserStatistics",
+        "description": "Get aggregated user statistics.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User statistics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserStatistics"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}": {
+      "get": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Get user by ID",
+        "operationId": "getUserById",
+        "description": "Retrieve a single user by their ID.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/User"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Update user",
+        "operationId": "updateUser",
+        "description": "Update an existing user.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Delete user (soft delete)",
+        "operationId": "deleteUser",
+        "description": "Soft delete a user (sets exists=false).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/reactivate": {
+      "put": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Reactivate user",
+        "operationId": "reactivateUser",
+        "description": "Reactivate a soft-deleted user (sets exists=true).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User reactivated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/toggle-status": {
+      "patch": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Toggle user active status",
+        "operationId": "toggleUserStatus",
+        "description": "Toggle user's active status.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status toggled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/users/{id}/archive": {
+      "patch": {
+        "tags": [
+          "User Management"
+        ],
+        "summary": "Archive user",
+        "operationId": "archiveUser",
+        "description": "Archive a user (soft delete).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "User ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User archived successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Get user notifications",
+        "operationId": "getNotifications",
+        "description": "Retrieve notifications for the authenticated user.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageParameter"
+          },
+          {
+            "$ref": "#/components/parameters/LimitParameter"
+          },
+          {
+            "in": "query",
+            "name": "unreadOnly",
+            "schema": {
+              "type": "boolean",
+              "default": false
+            },
+            "description": "Return only unread notifications"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NotificationsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/notifications/{notificationId}/read": {
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark notification as read",
+        "operationId": "markNotificationRead",
+        "description": "Mark a specific notification as read.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "notificationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Notification ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/notifications/mark-all-read": {
+      "patch": {
+        "tags": [
+          "Notifications"
+        ],
+        "summary": "Mark all notifications as read",
+        "operationId": "markAllNotificationsRead",
+        "description": "Mark all notifications for the authenticated user as read.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All notifications marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/user/profile": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get current user profile",
+        "operationId": "getUserProfile",
+        "description": "Retrieve the authenticated user's profile information including role and permissions.\n\n**Mobile App Usage:** Use this endpoint after login to get the user's permissions array and determine what features to enable in the app UI.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile with role and permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfileResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Update current user profile",
+        "operationId": "updateUserProfile",
+        "description": "Update the authenticated user's profile information.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/profile/image": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Get current user's profile image",
+        "operationId": "getProfileImage",
+        "description": "Get the optimized profile image URL for the authenticated user.\n\n**Mobile App Usage:** Call this endpoint after login to get the user's profile picture URL. The URL is a presigned S3 URL valid for 24 hours.\n\n**Image Optimization:** The API automatically returns the best format based on Accept header (WebP, AVIF, or original).",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile image URL or null if no image",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri",
+                          "nullable": true,
+                          "description": "Presigned S3 URL (expires in 24h) or null if no image",
+                          "example": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?X-Amz-..."
+                        },
+                        "hasProfileImage": {
+                          "type": "boolean",
+                          "description": "Whether user has uploaded a profile image",
+                          "example": true
+                        },
+                        "optimization": {
+                          "type": "object",
+                          "description": "Image optimization metadata",
+                          "properties": {
+                            "format": {
+                              "type": "string",
+                              "description": "Served format",
+                              "example": "webp"
+                            },
+                            "availableFormats": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "example": [
+                                "webp",
+                                "avif",
+                                "jpeg"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "examples": {
+                  "with_image": {
+                    "summary": "User has profile image",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "url": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?...",
+                        "hasProfileImage": true,
+                        "optimization": {
+                          "format": "webp",
+                          "availableFormats": [
+                            "webp",
+                            "avif",
+                            "jpeg"
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "no_image": {
+                    "summary": "User has no profile image",
+                    "value": {
+                      "success": true,
+                      "data": {
+                        "url": null,
+                        "hasProfileImage": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Upload profile image",
+        "operationId": "uploadProfileImage",
+        "description": "Upload and optimize a new profile image for the authenticated user.\n\n**Mobile App Usage:** Use multipart/form-data to upload the image. The API automatically optimizes the image into multiple formats (WebP, AVIF) for best performance.\n\n**Supported formats:** JPEG, PNG, GIF, WebP, AVIF\n**Max file size:** 10MB",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "profileImage"
+                ],
+                "properties": {
+                  "profileImage": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Image file to upload (JPEG, PNG, GIF, WebP, AVIF)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Image uploaded and optimized successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri",
+                          "description": "New profile image URL",
+                          "example": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?..."
+                        },
+                        "optimization": {
+                          "type": "object",
+                          "properties": {
+                            "originalSize": {
+                              "type": "integer",
+                              "description": "Original file size in bytes",
+                              "example": 2048000
+                            },
+                            "optimizedSize": {
+                              "type": "integer",
+                              "description": "Optimized file size in bytes",
+                              "example": 512000
+                            },
+                            "savedPercentage": {
+                              "type": "number",
+                              "description": "Size reduction percentage",
+                              "example": 75
+                            },
+                            "availableFormats": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "example": [
+                                "webp",
+                                "avif",
+                                "jpeg"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Profile image uploaded successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Delete profile image",
+        "operationId": "deleteProfileImage",
+        "description": "Delete the profile image for the authenticated user.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profile image deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Profile image deleted successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/roles": {
+      "get": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Get all system roles",
+        "operationId": "getRoles",
+        "description": "Retrieve all available system roles.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Roles list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "example": "role123"
+                          },
+                          "name": {
+                            "type": "string",
+                            "example": "admin"
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "example": "Administrator"
+                          },
+                          "level": {
+                            "type": "integer",
+                            "example": 2
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/roles/{id}": {
+      "get": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Get role by ID",
+        "operationId": "getRoleById",
+        "description": "Retrieve a single role by its ID.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Role ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Role details"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Roles"
+        ],
+        "summary": "Update role displayName",
+        "operationId": "updateRole",
+        "description": "Update a role's display name.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Role ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "example": "Administrator"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Role updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/pois": {
+      "get": {
+        "tags": [
+          "POIs"
+        ],
+        "summary": "Get POIs with DataTables processing",
+        "operationId": "getPOIs",
+        "description": "Retrieve Points of Interest with pagination and filtering.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageParameter"
+          },
+          {
+            "$ref": "#/components/parameters/LimitParameter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "POIs list"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "POIs"
+        ],
+        "summary": "Create new POI",
+        "operationId": "createPOI",
+        "description": "Create a new Point of Interest.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "example": "Aeropuerto Internacional"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "latitude": {
+                    "type": "number"
+                  },
+                  "longitude": {
+                    "type": "number"
+                  },
+                  "active": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "POI created successfully"
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/pois/active": {
+      "get": {
+        "tags": [
+          "POIs"
+        ],
+        "summary": "Get active POIs for dropdowns",
+        "operationId": "getActivePOIs",
+        "description": "Retrieve only active POIs for dropdown selection.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active POIs list"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/pois/{id}": {
+      "get": {
+        "tags": [
+          "POIs"
+        ],
+        "summary": "Get POI by ID",
+        "operationId": "getPOIById",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "POI details"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "POIs"
+        ],
+        "summary": "Update POI",
+        "operationId": "updatePOI",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "POI updated"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "POIs"
+        ],
+        "summary": "Soft delete POI",
+        "operationId": "deletePOI",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "POI deleted"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/pois/{id}/toggle-status": {
+      "patch": {
+        "tags": [
+          "POIs"
+        ],
+        "summary": "Toggle POI active status",
+        "operationId": "togglePOIStatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status toggled"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/rates": {
+      "get": {
+        "tags": [
+          "Rates"
+        ],
+        "summary": "Get Rates with DataTables processing",
+        "operationId": "getRates",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rates list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Rates"
+        ],
+        "summary": "Create new Rate",
+        "operationId": "createRate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Rate created"
+          }
+        }
+      }
+    },
+    "/api/rates/active": {
+      "get": {
+        "tags": [
+          "Rates"
+        ],
+        "summary": "Get active rates for filters",
+        "operationId": "getActiveRates",
+        "description": "Get all active rates/segments formatted for dropdown select options.\n\n**Mobile App Usage:** Call this endpoint to populate the segment filter dropdown in vehicle list screens.\n\n**Use Case:** Filter vehicles by segment (Premium, Standard, etc.)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active rates list formatted for select options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "Array of rate options for dropdown",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "Rate ID (use this for filtering)",
+                            "example": "rate001"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Display name for the dropdown",
+                            "example": "Premium"
+                          },
+                          "color": {
+                            "type": "string",
+                            "description": "Color code for UI badges",
+                            "example": "#6366F1"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Active Rates retrieved successfully"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "value": "rate001",
+                      "label": "Premium",
+                      "color": "#6366F1"
+                    },
+                    {
+                      "value": "rate002",
+                      "label": "Standard",
+                      "color": "#10B981"
+                    },
+                    {
+                      "value": "rate003",
+                      "label": "Economy",
+                      "color": "#F59E0B"
+                    }
+                  ],
+                  "message": "Active Rates retrieved successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/rates/{id}": {
+      "get": {
+        "tags": [
+          "Rates"
+        ],
+        "summary": "Get Rate by ID",
+        "operationId": "getRateById",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rate details"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Rates"
+        ],
+        "summary": "Update Rate",
+        "operationId": "updateRate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rate updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Rates"
+        ],
+        "summary": "Soft delete Rate",
+        "operationId": "deleteRate",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rate deleted"
+          }
+        }
+      }
+    },
+    "/api/rates/{id}/toggle-status": {
+      "patch": {
+        "tags": [
+          "Rates"
+        ],
+        "summary": "Toggle Rate status",
+        "operationId": "toggleRateStatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status toggled"
+          }
+        }
+      }
+    },
+    "/api/service-types": {
+      "get": {
+        "tags": [
+          "Service Types"
+        ],
+        "summary": "Get Service Types",
+        "operationId": "getServiceTypes",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service types list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Service Types"
+        ],
+        "summary": "Create Service Type",
+        "operationId": "createServiceType",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Service type created"
+          }
+        }
+      }
+    },
+    "/api/service-types/active": {
+      "get": {
+        "tags": [
+          "Service Types"
+        ],
+        "summary": "Get active Service Types",
+        "operationId": "getActiveServiceTypes",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active service types"
+          }
+        }
+      }
+    },
+    "/api/service-types/{id}": {
+      "get": {
+        "tags": [
+          "Service Types"
+        ],
+        "summary": "Get Service Type by ID",
+        "operationId": "getServiceTypeById",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service type details"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Service Types"
+        ],
+        "summary": "Update Service Type",
+        "operationId": "updateServiceType",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service type updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Service Types"
+        ],
+        "summary": "Soft delete Service Type",
+        "operationId": "deleteServiceType",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Service type deleted"
+          }
+        }
+      }
+    },
+    "/api/service-types/{id}/toggle-status": {
+      "patch": {
+        "tags": [
+          "Service Types"
+        ],
+        "summary": "Toggle Service Type status",
+        "operationId": "toggleServiceTypeStatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status toggled"
+          }
+        }
+      }
+    },
+    "/api/vehicle-types": {
+      "get": {
+        "tags": [
+          "Vehicle Types"
+        ],
+        "summary": "Get Vehicle Types",
+        "operationId": "getVehicleTypes",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle types list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicle Types"
+        ],
+        "summary": "Create Vehicle Type",
+        "operationId": "createVehicleType",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Vehicle type created"
+          }
+        }
+      }
+    },
+    "/api/vehicle-types/active": {
+      "get": {
+        "tags": [
+          "Vehicle Types"
+        ],
+        "summary": "Get active vehicle types for filters",
+        "operationId": "getActiveVehicleTypes",
+        "description": "Get all active vehicle types formatted for dropdown select options.\n\n**Mobile App Usage:** Call this endpoint to populate the vehicle type filter dropdown.\n\n**Use Case:** Filter vehicles by type (Van, SUV, Sedan, etc.)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Active vehicle types list formatted for select options",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "Array of vehicle type options for dropdown",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "value": {
+                            "type": "string",
+                            "description": "Vehicle Type ID (use this for filtering)",
+                            "example": "type001"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "Display name for the dropdown",
+                            "example": "Van"
+                          },
+                          "code": {
+                            "type": "string",
+                            "description": "Short code identifier",
+                            "example": "VAN"
+                          },
+                          "capacity": {
+                            "type": "integer",
+                            "description": "Default passenger capacity",
+                            "example": 14
+                          },
+                          "trunkCapacity": {
+                            "type": "integer",
+                            "description": "Default luggage capacity",
+                            "example": 10
+                          },
+                          "icon": {
+                            "type": "string",
+                            "description": "Icon identifier for UI",
+                            "example": "van"
+                          }
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Active vehicle types retrieved successfully"
+                    }
+                  }
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "value": "type001",
+                      "label": "Van",
+                      "code": "VAN",
+                      "capacity": 14,
+                      "trunkCapacity": 10,
+                      "icon": "van"
+                    },
+                    {
+                      "value": "type002",
+                      "label": "SUV",
+                      "code": "SUV",
+                      "capacity": 6,
+                      "trunkCapacity": 4,
+                      "icon": "suv"
+                    },
+                    {
+                      "value": "type003",
+                      "label": "Sedan",
+                      "code": "SEDAN",
+                      "capacity": 4,
+                      "trunkCapacity": 2,
+                      "icon": "car"
+                    }
+                  ],
+                  "message": "Active vehicle types retrieved successfully"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    },
+    "/api/vehicle-types/{id}": {
+      "get": {
+        "tags": [
+          "Vehicle Types"
+        ],
+        "summary": "Get Vehicle Type by ID",
+        "operationId": "getVehicleTypeById",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle type details"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Vehicle Types"
+        ],
+        "summary": "Update Vehicle Type",
+        "operationId": "updateVehicleType",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle type updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Vehicle Types"
+        ],
+        "summary": "Soft delete Vehicle Type",
+        "operationId": "deleteVehicleType",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle type deleted"
+          }
+        }
+      }
+    },
+    "/api/vehicle-types/{id}/toggle-status": {
+      "patch": {
+        "tags": [
+          "Vehicle Types"
+        ],
+        "summary": "Toggle Vehicle Type status",
+        "operationId": "toggleVehicleTypeStatus",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Status toggled"
+          }
+        }
+      }
+    },
+    "/api/vehicles": {
+      "get": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Get vehicles list",
+        "operationId": "getVehicles",
+        "description": "Get vehicles with optional filtering and pagination. Supports DataTables server-side processing.\n\n**Mobile App Usage:**\n- Use `rateId` to filter by segment (Premium, Standard, etc.)\n- Use `search[value]` for text search across brand, model, and license plate\n- Pagination via `start` and `length` parameters\n\n**Available Filters in Response:**\n- `vehicleTypeId.name` - Vehicle type (Van, SUV, Sedan, etc.)\n- `rateId.name` - Segment/rate name\n- `rateId.color` - Color code for UI badges",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rateId",
+            "in": "query",
+            "description": "Filter by Rate ID (segment). Get available rates from GET /api/rates/active",
+            "schema": {
+              "type": "string",
+              "example": "rate123"
+            }
+          },
+          {
+            "name": "vehicleTypeId",
+            "in": "query",
+            "description": "Filter by Vehicle Type ID. Get available types from GET /api/vehicle-types/active",
+            "schema": {
+              "type": "string",
+              "example": "vehicleType123"
+            }
+          },
+          {
+            "name": "search[value]",
+            "in": "query",
+            "description": "Text search across brand, model, and license plate",
+            "schema": {
+              "type": "string",
+              "example": "Mercedes"
+            }
+          },
+          {
+            "name": "draw",
+            "in": "query",
+            "description": "DataTables draw counter (echoed back in response)",
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "description": "Pagination offset (default: 0)",
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "example": 0
+            }
+          },
+          {
+            "name": "length",
+            "in": "query",
+            "description": "Results per page (default: 25, max: 100)",
+            "schema": {
+              "type": "integer",
+              "default": 25,
+              "maximum": 100,
+              "example": 25
+            }
+          },
+          {
+            "name": "order[0][column]",
+            "in": "query",
+            "description": "Column index for sorting (DataTables format)",
+            "schema": {
+              "type": "integer",
+              "example": 0
+            }
+          },
+          {
+            "name": "order[0][dir]",
+            "in": "query",
+            "description": "Sort direction",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "example": "asc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated vehicles list with embedded type and rate information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleListResponse"
+                },
+                "example": {
+                  "success": true,
+                  "draw": 1,
+                  "recordsTotal": 50,
+                  "recordsFiltered": 12,
+                  "data": [
+                    {
+                      "id": "vehicle001",
+                      "brand": "Mercedes-Benz",
+                      "model": "Sprinter",
+                      "year": 2023,
+                      "licensePlate": "ABC-123",
+                      "capacity": 14,
+                      "luggageCapacity": 10,
+                      "color": "Blanco",
+                      "maintenanceStatus": "operational",
+                      "active": true,
+                      "image": "https://amexing-bucket.s3.amazonaws.com/vehicles/vehicle001/cover.jpg?...",
+                      "vehicleTypeId": {
+                        "id": "type001",
+                        "name": "Van",
+                        "code": "VAN",
+                        "icon": "van",
+                        "trunkCapacity": 10
+                      },
+                      "rateId": {
+                        "id": "rate001",
+                        "name": "Premium",
+                        "color": "#6366F1"
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Create vehicle",
+        "operationId": "createVehicle",
+        "description": "Create a new vehicle. Requires admin or department_manager role.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "brand",
+                  "model",
+                  "licensePlate",
+                  "vehicleTypeId"
+                ],
+                "properties": {
+                  "brand": {
+                    "type": "string",
+                    "description": "Vehicle brand/manufacturer",
+                    "example": "Mercedes-Benz"
+                  },
+                  "model": {
+                    "type": "string",
+                    "description": "Vehicle model",
+                    "example": "Sprinter"
+                  },
+                  "year": {
+                    "type": "integer",
+                    "description": "Vehicle year",
+                    "example": 2023
+                  },
+                  "licensePlate": {
+                    "type": "string",
+                    "description": "License plate number (unique)",
+                    "example": "ABC-123"
+                  },
+                  "capacity": {
+                    "type": "integer",
+                    "description": "Passenger capacity",
+                    "example": 14
+                  },
+                  "luggageCapacity": {
+                    "type": "integer",
+                    "description": "Luggage capacity",
+                    "example": 10
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "Vehicle color",
+                    "example": "Blanco"
+                  },
+                  "vehicleTypeId": {
+                    "type": "string",
+                    "description": "Vehicle Type ID (required)",
+                    "example": "vehicleType123"
+                  },
+                  "rateId": {
+                    "type": "string",
+                    "description": "Rate/Segment ID",
+                    "example": "rate123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Vehicle created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Vehicle"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Vehicle created successfully"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/api/vehicles/{id}": {
+      "get": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Get Vehicle by ID",
+        "operationId": "getVehicleById",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle details"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Update Vehicle",
+        "operationId": "updateVehicle",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Soft delete Vehicle",
+        "operationId": "deleteVehicle",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle deleted"
+          }
+        }
+      }
+    },
+    "/api/vehicles/{id}/images": {
+      "get": {
+        "tags": [
+          "Vehicles"
+        ],
+        "summary": "Get vehicle images",
+        "operationId": "getVehicleImages",
+        "description": "Get all images for a specific vehicle. Returns presigned S3 URLs valid for 24 hours.\n\n**Mobile App Usage:** Call this endpoint to load image galleries for vehicles. Cache the URLs but refresh when expired.\n\n**Note:** The `isPrimary` field indicates the main/cover image. Use `displayOrder` for sorting.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Vehicle ID (Parse ObjectId)",
+            "schema": {
+              "type": "string",
+              "example": "abc123def456"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Vehicle images list with presigned S3 URLs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VehicleImagesResponse"
+                },
+                "example": {
+                  "success": true,
+                  "data": [
+                    {
+                      "id": "img001",
+                      "url": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/front.jpg?X-Amz-...",
+                      "fileName": "front.jpg",
+                      "fileSize": 1024000,
+                      "isPrimary": true,
+                      "displayOrder": 0,
+                      "uploadedAt": "2024-01-15T10:00:00.000Z"
+                    },
+                    {
+                      "id": "img002",
+                      "url": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/interior.jpg?X-Amz-...",
+                      "fileName": "interior.jpg",
+                      "fileSize": 850000,
+                      "isPrimary": false,
+                      "displayOrder": 1,
+                      "uploadedAt": "2024-01-15T10:05:00.000Z"
+                    }
+                  ],
+                  "count": 2
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/api/billing/get": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Get user billing information",
+        "operationId": "getBilling",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Billing information"
+          }
+        }
+      }
+    },
+    "/api/billing/save": {
+      "post": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Save billing information",
+        "operationId": "saveBilling",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Billing information saved"
+          }
+        }
+      }
+    },
+    "/api/billing/get-user/{userId}": {
+      "get": {
+        "tags": [
+          "Billing"
+        ],
+        "summary": "Get billing info for specific user",
+        "operationId": "getBillingForUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User billing information"
+          }
+        }
+      }
+    },
+    "/api/audit/logs": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Get audit logs",
+        "operationId": "getAuditLogs",
+        "description": "Retrieve audit logs with filtering and pagination.\n\n**PCI DSS Compliance:** Audit logs are retained for 90 days minimum.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PageParameter"
+          },
+          {
+            "$ref": "#/components/parameters/LimitParameter"
+          },
+          {
+            "in": "query",
+            "name": "action",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by action type"
+          },
+          {
+            "in": "query",
+            "name": "startDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "endDate",
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit logs"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/api/audit/user/{userId}": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Get audit logs for user",
+        "operationId": "getAuditLogsForUser",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "userId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User audit logs"
+          }
+        }
+      }
+    },
+    "/api/audit/entity/{entityType}/{entityId}": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Get audit logs for entity",
+        "operationId": "getAuditLogsForEntity",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entityType",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "entityId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity audit logs"
+          }
+        }
+      }
+    },
+    "/api/audit/statistics": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Get audit statistics",
+        "operationId": "getAuditStatistics",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit statistics"
+          }
+        }
+      }
+    },
+    "/api/payment-info": {
+      "get": {
+        "tags": [
+          "Payment Info"
+        ],
+        "summary": "Get payment info options",
+        "operationId": "getPaymentInfoList",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment info list"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Payment Info"
+        ],
+        "summary": "Create payment info",
+        "operationId": "createPaymentInfo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Payment info created"
+          }
+        }
+      }
+    },
+    "/api/payment-info/default": {
+      "get": {
+        "tags": [
+          "Payment Info"
+        ],
+        "summary": "Get default payment info",
+        "operationId": "getDefaultPaymentInfo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default payment info"
+          }
+        }
+      }
+    },
+    "/api/payment-info/{id}": {
+      "get": {
+        "tags": [
+          "Payment Info"
+        ],
+        "summary": "Get payment info by ID",
+        "operationId": "getPaymentInfoById",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment info details"
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Payment Info"
+        ],
+        "summary": "Update payment info",
+        "operationId": "updatePaymentInfo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment info updated"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Payment Info"
+        ],
+        "summary": "Delete payment info",
+        "operationId": "deletePaymentInfo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment info deleted"
+          }
+        }
+      }
+    },
+    "/api/payment-info/{id}/set-default": {
+      "post": {
+        "tags": [
+          "Payment Info"
+        ],
+        "summary": "Set payment info as default",
+        "operationId": "setDefaultPaymentInfo",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default set successfully"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Health check endpoint",
+        "operationId": "healthCheck",
+        "description": "Check if the API server is running and healthy.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatus"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server is unhealthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemStatus"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": [
+          "System"
+        ],
+        "summary": "Get server metrics",
+        "operationId": "getMetrics",
+        "description": "Get detailed server metrics including memory usage, uptime, and request statistics.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Server metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "uptime": {
+                      "type": "number",
+                      "description": "Server uptime in seconds",
+                      "example": 86400
+                    },
+                    "memory": {
+                      "type": "object",
+                      "properties": {
+                        "heapUsed": {
+                          "type": "number",
+                          "example": 50000000
+                        },
+                        "heapTotal": {
+                          "type": "number",
+                          "example": 100000000
+                        }
+                      }
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT Bearer token authentication.\n\n**Token Lifetime (PCI DSS Compliant):**\n- Access Token: 8 hours\n- Refresh Token: 7 days\n\n**How to obtain a token:**\n1. Use `POST /auth/login` with credentials\n2. Or authenticate via OAuth providers\n3. Token will be returned in response and set as HTTP-only cookie\n\n**Token includes:**\n- userId: User unique identifier\n- username: Username\n- email: User email\n- role: User role (superadmin, admin, client, etc.)\n- roleId: Role object ID\n- organizationId: Organization identifier\n- name: User display name\n\n**Security Features:**\n- Tokens are signed with HS256 algorithm\n- HTTP-only cookies prevent XSS attacks\n- Secure flag in production (HTTPS only)\n- SameSite=strict prevents CSRF"
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "accessToken",
+        "description": "HTTP-only cookie containing JWT access token.\n\n**Security Features:**\n- HttpOnly: Cannot be accessed via JavaScript\n- Secure: Only transmitted over HTTPS in production\n- SameSite=strict: Prevents CSRF attacks\n- Max-Age: 8 hours\n\nThis is automatically set by the server upon successful authentication."
+      }
+    },
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": [
+          "identifier",
+          "password"
+        ],
+        "properties": {
+          "identifier": {
+            "type": "string",
+            "description": "Email or username",
+            "example": "john.doe@amexing.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "description": "User password",
+            "example": "SecureP@ssw0rd!"
+          },
+          "returnTo": {
+            "type": "string",
+            "description": "Redirect URL after successful login (for web forms)",
+            "example": "/dashboard/employee"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "user",
+          "message"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Login successful"
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "abc123"
+              },
+              "username": {
+                "type": "string",
+                "example": "john.doe"
+              },
+              "role": {
+                "type": "string",
+                "example": "employee"
+              },
+              "name": {
+                "type": "string",
+                "example": "John Doe"
+              }
+            }
+          },
+          "tokens": {
+            "type": "object",
+            "description": "JWT tokens (only returned when X-Client-Type: mobile header is sent)",
+            "properties": {
+              "accessToken": {
+                "type": "string",
+                "description": "JWT access token (8 hours validity)",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "refreshToken": {
+                "type": "string",
+                "description": "JWT refresh token (7 days validity)",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "tokenType": {
+                "type": "string",
+                "example": "Bearer"
+              },
+              "expiresIn": {
+                "type": "string",
+                "description": "Access token expiration time",
+                "example": "8h"
+              }
+            }
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": [
+          "username",
+          "email",
+          "password",
+          "confirmPassword",
+          "firstName",
+          "lastName"
+        ],
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "description": "Unique username",
+            "example": "john.doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User email address",
+            "example": "john.doe@amexing.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "description": "Password (minimum 8 characters)",
+            "example": "SecureP@ssw0rd!"
+          },
+          "confirmPassword": {
+            "type": "string",
+            "format": "password",
+            "description": "Password confirmation (must match password)",
+            "example": "SecureP@ssw0rd!"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "User's first name",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "User's last name",
+            "example": "Doe"
+          }
+        }
+      },
+      "ForgotPasswordRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email address for password reset",
+            "example": "john.doe@amexing.com"
+          }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": [
+          "token",
+          "password",
+          "confirmPassword"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Password reset token (received via email)",
+            "example": "reset_token_abc123"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "description": "New password",
+            "example": "NewSecureP@ssw0rd!"
+          },
+          "confirmPassword": {
+            "type": "string",
+            "format": "password",
+            "description": "Password confirmation",
+            "example": "NewSecureP@ssw0rd!"
+          }
+        }
+      },
+      "ChangePasswordRequest": {
+        "type": "object",
+        "required": [
+          "currentPassword",
+          "newPassword",
+          "confirmPassword"
+        ],
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "format": "password",
+            "description": "Current password for verification",
+            "example": "CurrentP@ssw0rd!"
+          },
+          "newPassword": {
+            "type": "string",
+            "format": "password",
+            "minLength": 8,
+            "description": "New password",
+            "example": "NewSecureP@ssw0rd!"
+          },
+          "confirmPassword": {
+            "type": "string",
+            "format": "password",
+            "description": "New password confirmation",
+            "example": "NewSecureP@ssw0rd!"
+          }
+        }
+      },
+      "OAuthProvidersResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "enum": [
+                    "apple",
+                    "corporate"
+                  ],
+                  "example": "apple"
+                },
+                "name": {
+                  "type": "string",
+                  "example": "Apple"
+                },
+                "enabled": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "icon": {
+                  "type": "string",
+                  "description": "Icon URL or CSS class",
+                  "example": "fab fa-apple"
+                }
+              }
+            }
+          }
+        }
+      },
+      "TokenRefreshResponse": {
+        "type": "object",
+        "required": [
+          "success",
+          "user"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "user": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "abc123"
+              },
+              "username": {
+                "type": "string",
+                "example": "john.doe"
+              },
+              "role": {
+                "type": "string",
+                "example": "employee"
+              }
+            }
+          },
+          "tokens": {
+            "type": "object",
+            "description": "JWT tokens (only returned when X-Client-Type: mobile header is sent)",
+            "properties": {
+              "accessToken": {
+                "type": "string",
+                "description": "JWT access token (8 hours validity)",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "refreshToken": {
+                "type": "string",
+                "description": "JWT refresh token (7 days validity)",
+                "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              },
+              "tokenType": {
+                "type": "string",
+                "example": "Bearer"
+              },
+              "expiresIn": {
+                "type": "string",
+                "description": "Access token expiration time",
+                "example": "8h"
+              }
+            }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "firstName",
+          "lastName",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique user identifier (Parse ObjectId)",
+            "example": "abc123def456"
+          },
+          "username": {
+            "type": "string",
+            "description": "User's unique username",
+            "example": "john.doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address",
+            "example": "john.doe@amexing.com"
+          },
+          "firstName": {
+            "type": "string",
+            "description": "User's first name",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "User's last name",
+            "example": "Doe"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "User's full display name",
+            "example": "John Doe"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "superadmin",
+              "admin",
+              "client",
+              "department_manager",
+              "employee",
+              "employee_amexing",
+              "driver",
+              "guest"
+            ],
+            "description": "User's role name",
+            "example": "employee"
+          },
+          "roleId": {
+            "type": "string",
+            "description": "Reference to Role object",
+            "example": "role123"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether user account is active",
+            "example": true
+          },
+          "exists": {
+            "type": "boolean",
+            "description": "Logical deletion flag (false = soft deleted)",
+            "example": true
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Whether user's email has been verified",
+            "example": true
+          },
+          "organizationId": {
+            "type": "string",
+            "description": "Organization identifier",
+            "example": "org123"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Client identifier (for client-assigned users)",
+            "example": "client123"
+          },
+          "departmentId": {
+            "type": "string",
+            "description": "Department identifier (for department-assigned users)",
+            "example": "dept123"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "User creation timestamp",
+            "example": "2024-10-01T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp",
+            "example": "2024-10-01T12:00:00.000Z"
+          }
+        }
+      },
+      "UserCreateRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "firstName",
+          "lastName",
+          "role"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address (must be unique)",
+            "example": "new.user@amexing.com"
+          },
+          "firstName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User's first name",
+            "example": "Jane"
+          },
+          "lastName": {
+            "type": "string",
+            "minLength": 1,
+            "description": "User's last name",
+            "example": "Smith"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "client",
+              "department_manager",
+              "employee",
+              "employee_amexing",
+              "driver",
+              "guest"
+            ],
+            "description": "User's role (superadmin can only be created by another superadmin)",
+            "example": "employee"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "description": "Initial password (if not provided, a secure password will be generated)",
+            "example": "SecureP@ssw0rd!"
+          },
+          "roleId": {
+            "type": "string",
+            "description": "Role object ID (alternative to role string)",
+            "example": "role123"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Assign user to specific client",
+            "example": "client123"
+          },
+          "departmentId": {
+            "type": "string",
+            "description": "Assign user to specific department",
+            "example": "dept123"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Set email verification status",
+            "example": false,
+            "default": false
+          }
+        }
+      },
+      "UserUpdateRequest": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "description": "Update first name",
+            "example": "Jane"
+          },
+          "lastName": {
+            "type": "string",
+            "description": "Update last name",
+            "example": "Smith"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Update email address",
+            "example": "updated.email@amexing.com"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "client",
+              "department_manager",
+              "employee",
+              "employee_amexing",
+              "driver",
+              "guest"
+            ],
+            "description": "Update user role (requires appropriate permissions)",
+            "example": "department_manager"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Update active status",
+            "example": true
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "description": "Update password",
+            "example": "NewSecureP@ssw0rd!"
+          },
+          "clientId": {
+            "type": "string",
+            "description": "Update client assignment",
+            "example": "client456"
+          },
+          "departmentId": {
+            "type": "string",
+            "description": "Update department assignment",
+            "example": "dept456"
+          }
+        }
+      },
+      "UserListResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Users retrieved successfully"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "users": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/User"
+                }
+              },
+              "pagination": {
+                "$ref": "#/components/schemas/PaginationInfo"
+              }
+            }
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-10-01T12:00:00.000Z"
+          }
+        }
+      },
+      "UserStatistics": {
+        "type": "object",
+        "properties": {
+          "totalUsers": {
+            "type": "integer",
+            "description": "Total number of users in the system",
+            "example": 500
+          },
+          "activeUsers": {
+            "type": "integer",
+            "description": "Number of active users",
+            "example": 450
+          },
+          "newThisMonth": {
+            "type": "integer",
+            "description": "Users created this month",
+            "example": 25
+          },
+          "pendingVerification": {
+            "type": "integer",
+            "description": "Users with unverified emails",
+            "example": 10
+          },
+          "roleDistribution": {
+            "type": "object",
+            "description": "User count by role",
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "example": {
+              "superadmin": 2,
+              "admin": 10,
+              "department_manager": 15,
+              "employee": 400,
+              "driver": 50,
+              "client": 20,
+              "guest": 3
+            }
+          },
+          "registrationTrends": {
+            "type": "array",
+            "description": "Monthly registration trends",
+            "items": {
+              "type": "object",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "example": "2024-09"
+                },
+                "count": {
+                  "type": "integer",
+                  "example": 35
+                }
+              }
+            }
+          }
+        }
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Notification unique identifier",
+            "example": "notif123"
+          },
+          "userId": {
+            "type": "string",
+            "description": "Target user ID",
+            "example": "user123"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning",
+              "error",
+              "success"
+            ],
+            "description": "Notification type",
+            "example": "info"
+          },
+          "title": {
+            "type": "string",
+            "description": "Notification title",
+            "example": "New Message"
+          },
+          "message": {
+            "type": "string",
+            "description": "Notification content",
+            "example": "You have a new message from admin"
+          },
+          "read": {
+            "type": "boolean",
+            "description": "Whether notification has been read",
+            "example": false
+          },
+          "data": {
+            "type": "object",
+            "description": "Additional notification data",
+            "additionalProperties": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Notification creation timestamp",
+            "example": "2024-10-01T10:00:00.000Z"
+          }
+        }
+      },
+      "NotificationsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Notifications retrieved successfully"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "notifications": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              },
+              "unreadCount": {
+                "type": "integer",
+                "description": "Number of unread notifications",
+                "example": 5
+              },
+              "totalCount": {
+                "type": "integer",
+                "description": "Total number of notifications",
+                "example": 50
+              }
+            }
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Operation successful"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-10-01T12:00:00.000Z"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "error": {
+            "type": "string",
+            "example": "Error message"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-10-01T12:00:00.000Z"
+          }
+        }
+      },
+      "PaginationInfo": {
+        "type": "object",
+        "properties": {
+          "currentPage": {
+            "type": "integer",
+            "description": "Current page number",
+            "example": 1
+          },
+          "totalPages": {
+            "type": "integer",
+            "description": "Total number of pages",
+            "example": 10
+          },
+          "totalItems": {
+            "type": "integer",
+            "description": "Total number of items",
+            "example": 250
+          },
+          "pageSize": {
+            "type": "integer",
+            "description": "Number of items per page",
+            "example": 25
+          },
+          "hasNextPage": {
+            "type": "boolean",
+            "description": "Whether there is a next page",
+            "example": true
+          },
+          "hasPreviousPage": {
+            "type": "boolean",
+            "description": "Whether there is a previous page",
+            "example": false
+          }
+        }
+      },
+      "SystemStatus": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "healthy",
+              "degraded",
+              "down"
+            ],
+            "example": "healthy"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2024-10-01T12:00:00.000Z"
+          },
+          "services": {
+            "type": "object",
+            "properties": {
+              "database": {
+                "type": "string",
+                "enum": [
+                  "connected",
+                  "disconnected"
+                ],
+                "example": "connected"
+              },
+              "parseServer": {
+                "type": "string",
+                "enum": [
+                  "running",
+                  "stopped"
+                ],
+                "example": "running"
+              }
+            }
+          }
+        }
+      },
+      "VersionInfo": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "API version",
+            "example": "0.6.0"
+          },
+          "environment": {
+            "type": "string",
+            "enum": [
+              "development",
+              "staging",
+              "production"
+            ],
+            "example": "development"
+          },
+          "nodeVersion": {
+            "type": "string",
+            "example": "20.0.0"
+          }
+        }
+      },
+      "UserProfileResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "username",
+          "email"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique user identifier (Parse ObjectId)",
+            "example": "abc123def456"
+          },
+          "username": {
+            "type": "string",
+            "description": "User's unique username",
+            "example": "john.doe"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "User's email address",
+            "example": "john.doe@amexing.com"
+          },
+          "firstName": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's first name",
+            "example": "John"
+          },
+          "lastName": {
+            "type": "string",
+            "nullable": true,
+            "description": "User's last name",
+            "example": "Doe"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Whether user's email has been verified",
+            "example": true
+          },
+          "profilePicture": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "description": "Profile picture URL (presigned S3 URL, expires in 24h). Null if no image uploaded.",
+            "example": "https://amexing-bucket.s3.amazonaws.com/profiles/user123/avatar.webp?X-Amz-..."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "User creation timestamp",
+            "example": "2024-10-01T10:00:00.000Z"
+          },
+          "lastLoginAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last login timestamp",
+            "example": "2025-02-18T10:00:00.000Z"
+          },
+          "role": {
+            "type": "object",
+            "description": "User's role information",
+            "properties": {
+              "name": {
+                "type": "string",
+                "enum": [
+                  "superadmin",
+                  "admin",
+                  "client",
+                  "department_manager",
+                  "employee",
+                  "employee_amexing",
+                  "driver",
+                  "guest"
+                ],
+                "description": "Role identifier name",
+                "example": "employee"
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 7,
+                "description": "Role hierarchy level (1=lowest, 7=superadmin)",
+                "example": 3
+              },
+              "displayName": {
+                "type": "string",
+                "description": "Human-readable role name",
+                "example": "Employee"
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "system",
+                  "organization",
+                  "department",
+                  "operations",
+                  "public"
+                ],
+                "description": "Role access scope",
+                "example": "department"
+              }
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "description": "Array of permission strings granted to this user",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "profile.read",
+              "profile.update",
+              "bookings.read",
+              "bookings.create",
+              "services.read",
+              "pricing.read"
+            ]
+          }
+        }
+      },
+      "VehicleTypeInfo": {
+        "type": "object",
+        "description": "Embedded vehicle type information",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Vehicle type ID",
+            "example": "vehicleType123"
+          },
+          "name": {
+            "type": "string",
+            "description": "Vehicle type name",
+            "example": "Van"
+          },
+          "code": {
+            "type": "string",
+            "description": "Vehicle type code",
+            "example": "VAN"
+          },
+          "icon": {
+            "type": "string",
+            "description": "Icon identifier for UI",
+            "example": "van"
+          },
+          "trunkCapacity": {
+            "type": "integer",
+            "description": "Trunk/luggage capacity",
+            "example": 10
+          }
+        }
+      },
+      "RateInfo": {
+        "type": "object",
+        "description": "Embedded rate/segment information",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Rate ID",
+            "example": "rate123"
+          },
+          "name": {
+            "type": "string",
+            "description": "Rate/segment name",
+            "example": "Premium"
+          },
+          "color": {
+            "type": "string",
+            "description": "Color code for UI display",
+            "example": "#6366F1"
+          }
+        }
+      },
+      "Vehicle": {
+        "type": "object",
+        "description": "Vehicle information with embedded type and rate data",
+        "required": [
+          "id",
+          "brand",
+          "model",
+          "licensePlate"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique vehicle identifier (Parse ObjectId)",
+            "example": "abc123def456"
+          },
+          "brand": {
+            "type": "string",
+            "description": "Vehicle brand/manufacturer",
+            "example": "Mercedes-Benz"
+          },
+          "model": {
+            "type": "string",
+            "description": "Vehicle model",
+            "example": "Sprinter"
+          },
+          "year": {
+            "type": "integer",
+            "description": "Vehicle year",
+            "example": 2023
+          },
+          "licensePlate": {
+            "type": "string",
+            "description": "Vehicle license plate number",
+            "example": "ABC-123"
+          },
+          "capacity": {
+            "type": "integer",
+            "description": "Passenger capacity",
+            "example": 14
+          },
+          "luggageCapacity": {
+            "type": "integer",
+            "description": "Luggage capacity (number of bags)",
+            "example": 10
+          },
+          "color": {
+            "type": "string",
+            "description": "Vehicle color",
+            "example": "Blanco"
+          },
+          "maintenanceStatus": {
+            "type": "string",
+            "enum": [
+              "operational",
+              "maintenance",
+              "out_of_service"
+            ],
+            "description": "Current maintenance status",
+            "example": "operational"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether the vehicle is active",
+            "example": true
+          },
+          "image": {
+            "type": "string",
+            "format": "uri",
+            "description": "Primary image URL (presigned S3 URL, expires in 24h)",
+            "example": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/image.jpg?..."
+          },
+          "vehicleTypeId": {
+            "$ref": "#/components/schemas/VehicleTypeInfo"
+          },
+          "rateId": {
+            "$ref": "#/components/schemas/RateInfo"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Creation timestamp",
+            "example": "2024-01-15T10:00:00.000Z"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Last update timestamp",
+            "example": "2024-02-01T14:30:00.000Z"
+          }
+        }
+      },
+      "VehicleListResponse": {
+        "type": "object",
+        "description": "Paginated vehicle list response (DataTables compatible)",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation success status",
+            "example": true
+          },
+          "draw": {
+            "type": "integer",
+            "description": "DataTables draw counter (echo back for async requests)",
+            "example": 1
+          },
+          "recordsTotal": {
+            "type": "integer",
+            "description": "Total number of vehicles (without filters)",
+            "example": 50
+          },
+          "recordsFiltered": {
+            "type": "integer",
+            "description": "Number of vehicles after filtering",
+            "example": 25
+          },
+          "data": {
+            "type": "array",
+            "description": "Array of vehicle objects",
+            "items": {
+              "$ref": "#/components/schemas/Vehicle"
+            }
+          }
+        }
+      },
+      "VehicleImage": {
+        "type": "object",
+        "description": "Vehicle image with S3 presigned URL",
+        "required": [
+          "id",
+          "url"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Image record ID",
+            "example": "image123"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Presigned S3 URL (expires in 24 hours)",
+            "example": "https://amexing-bucket.s3.amazonaws.com/vehicles/abc123/image.jpg?X-Amz-Algorithm=..."
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Original file name",
+            "example": "mercedes-sprinter-front.jpg"
+          },
+          "fileSize": {
+            "type": "integer",
+            "description": "File size in bytes",
+            "example": 1024000
+          },
+          "isPrimary": {
+            "type": "boolean",
+            "description": "Whether this is the primary/cover image",
+            "example": true
+          },
+          "displayOrder": {
+            "type": "integer",
+            "description": "Display order (0 = first)",
+            "example": 0
+          },
+          "uploadedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Upload timestamp",
+            "example": "2024-01-15T10:00:00.000Z"
+          }
+        }
+      },
+      "VehicleImagesResponse": {
+        "type": "object",
+        "description": "Vehicle images list response",
+        "required": [
+          "success",
+          "data"
+        ],
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation success status",
+            "example": true
+          },
+          "data": {
+            "type": "array",
+            "description": "Array of vehicle images",
+            "items": {
+              "$ref": "#/components/schemas/VehicleImage"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "description": "Total number of images",
+            "example": 5
+          }
+        }
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Authentication required or token invalid/expired",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Authentication required"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ForbiddenError": {
+        "description": "Insufficient permissions to access this resource",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Insufficient permissions"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotFoundError": {
+        "description": "Resource not found or access denied",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Resource not found"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Request validation failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Validation failed: Email is required, Password must be at least 8 characters"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RateLimitError": {
+        "description": "Rate limit exceeded",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Too many requests, please try again later"
+                },
+                "retryAfter": {
+                  "type": "string",
+                  "example": "15 minutes"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Internal server error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": false
+                },
+                "error": {
+                  "type": "string",
+                  "example": "Internal server error"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2025-10-01T12:00:00.000Z"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "PageParameter": {
+        "in": "query",
+        "name": "page",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "description": "Page number for pagination"
+      },
+      "LimitParameter": {
+        "in": "query",
+        "name": "limit",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 25
+        },
+        "description": "Number of items per page (max: 100)"
+      },
+      "SortFieldParameter": {
+        "in": "query",
+        "name": "sortField",
+        "schema": {
+          "type": "string",
+          "default": "lastName"
+        },
+        "description": "Field to sort by"
+      },
+      "SortDirectionParameter": {
+        "in": "query",
+        "name": "sortDirection",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "default": "asc"
+        },
+        "description": "Sort direction"
+      }
+    }
+  },
+  "x-tagGroups": [
+    {
+      "name": "Public API",
+      "tags": [
+        "Authentication",
+        "OAuth",
+        "System"
+      ]
+    },
+    {
+      "name": "Protected API",
+      "tags": [
+        "Profile",
+        "Notifications",
+        "Session"
+      ]
+    },
+    {
+      "name": "Admin API",
+      "tags": [
+        "User Management",
+        "Roles",
+        "POIs",
+        "Rates",
+        "Service Types",
+        "Vehicle Types",
+        "Vehicles",
+        "Billing",
+        "Audit",
+        "Payment Info"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "type": "http",
+  "scheme": "bearer",
+  "bearerFormat": "JWT",
+  "description": "JWT Bearer token authentication.\n\n**Token Lifetime (PCI DSS Compliant):**\n- Access Token: 8 hours\n- Refresh Token: 7 days\n\n**How to obtain a token:**\n1. Use `POST /auth/login` with credentials\n2. Or authenticate via OAuth providers\n3. Token will be returned in response and set as HTTP-only cookie\n\n**Token includes:**\n- userId: User unique identifier\n- username: Username\n- email: User email\n- role: User role (superadmin, admin, client, etc.)\n- roleId: Role object ID\n- organizationId: Organization identifier\n- name: User display name\n\n**Security Features:**\n- Tokens are signed with HS256 algorithm\n- HTTP-only cookies prevent XSS attacks\n- Secure flag in production (HTTPS only)\n- SameSite=strict prevents CSRF"
+}

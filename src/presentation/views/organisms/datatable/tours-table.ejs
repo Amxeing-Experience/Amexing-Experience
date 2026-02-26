@@ -65,7 +65,7 @@ const isClient = dtUserRole === 'client';
     text-align: left;
 }
 
-/* Hide any default sorting indicators */
+/* Hide any default sorting indicators and disable all header clicks */
 table.dataTable thead .sorting::before,
 table.dataTable thead .sorting::after,
 table.dataTable thead .sorting_asc::before,
@@ -73,6 +73,17 @@ table.dataTable thead .sorting_asc::after,
 table.dataTable thead .sorting_desc::before,
 table.dataTable thead .sorting_desc::after {
     display: none !important;
+}
+
+/* Disable cursor and make all headers non-clickable */
+#<%= dtTableId %> thead th {
+    cursor: default !important;
+    pointer-events: none; /* Disable all mouse events on headers */
+}
+
+/* Re-enable events on dropdown in header (if any) */
+#<%= dtTableId %> thead th select {
+    pointer-events: all !important;
 }
 
 /* Ensure only our button shows */
@@ -600,7 +611,7 @@ table.dataTable tbody tr.hover {
                                    multiple>
                         </div>
                         <div class="form-text">
-                            <small><i class="ti ti-info-circle me-1"></i>Máximo 5 fotos por tour • Formatos: JPG, PNG, WebP • Máx. 5MB cada una</small>
+                            <small><i class="ti ti-info-circle me-1"></i>Formatos: JPG, PNG, WebP</small>
                         </div>
                     </div>
 
@@ -743,6 +754,9 @@ table.dataTable tbody tr.hover {
         </div>
     </div>
 </template>
+
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
 
 <script>
 (function() {
@@ -965,6 +979,13 @@ table.dataTable tbody tr.hover {
                             
                             console.log(`📊 Filtered ${newToursData.length - vehicleOnlyTours.length} walking tours out of ${newToursData.length} total tours`);
                             
+                            // Sort data alphabetically by destination name
+                            vehicleOnlyTours.sort((a, b) => {
+                                const nameA = (a.destinationPOI?.name || 'Tour').trim();
+                                const nameB = (b.destinationPOI?.name || 'Tour').trim();
+                                return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+                            });
+                            
                             allToursData = vehicleOnlyTours;
                             filteredData = allToursData; // Show filtered vehicle tours by default
                             
@@ -993,7 +1014,7 @@ table.dataTable tbody tr.hover {
                 {
                     data: null,
                     defaultContent: '',
-                    orderable: false,
+                    orderable: false, // Disable interactive sorting
                     render: function(data, type, row) {
                         // Handle empty/undefined row data gracefully
                         if (!row || typeof row !== 'object') {
@@ -1002,7 +1023,12 @@ table.dataTable tbody tr.hover {
                         
                         const destination = row.destinationPOI?.name || 'Tour';
                         
-                        if (type === 'filter' || type === 'sort') {
+                        // For sorting (initial order), return destination name
+                        if (type === 'sort') {
+                            return destination;
+                        }
+                        
+                        if (type === 'filter') {
                             return destination;
                         }
                         
@@ -1317,9 +1343,8 @@ table.dataTable tbody tr.hover {
                 url: 'https://cdn.datatables.net/plug-ins/1.13.7/i18n/es-MX.json',
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando tours...'
             },
-            order: [
-                [0, 'asc'],  // 1. Destino
-            ],
+            order: [], // No initial DataTable ordering - we handle sorting in JavaScript
+            ordering: false, // Disable all interactive column sorting
             pageLength: 10,
             searchDelay: 300,
             dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
@@ -1378,7 +1403,49 @@ table.dataTable tbody tr.hover {
                 await loadAllTours();
                 // Data loaded successfully
                 
-                // Clear existing data and add filtered data
+                // Sort data alphabetically by destination name using Spanish locale
+                console.log('🔍 BEFORE SORTING - All tours:');
+                filteredData.forEach((tour, index) => {
+                    const name = tour.destinationPOI?.name || 'Tour';
+                    console.log(`  ${index + 1}. "${name}" (length: ${name.length})`);
+                });
+                
+                filteredData.sort((a, b) => {
+                    const nameA = (a.destinationPOI?.name || 'Tour').trim();
+                    const nameB = (b.destinationPOI?.name || 'Tour').trim();
+                    
+                    // Debug specific cases
+                    if (nameA.includes('Prueba') || nameB.includes('Prueba') || 
+                        nameA.includes('San Miguel') || nameB.includes('San Miguel')) {
+                        console.log(`🔍 Comparing: "${nameA}" vs "${nameB}"`);
+                        const result = nameA.localeCompare(nameB, 'es', { 
+                            sensitivity: 'base',
+                            numeric: true,
+                            ignorePunctuation: true 
+                        });
+                        console.log(`🔍 Result: ${result} (${result < 0 ? nameA + ' comes first' : result > 0 ? nameB + ' comes first' : 'equal'})`);
+                        return result;
+                    }
+                    
+                    return nameA.localeCompare(nameB, 'es', { 
+                        sensitivity: 'base',
+                        numeric: true,
+                        ignorePunctuation: true 
+                    });
+                });
+                
+                console.log('🔤 AFTER SORTING - Tours in alphabetical order:');
+                filteredData.forEach((tour, index) => {
+                    const name = tour.destinationPOI?.name || 'Tour';
+                    console.log(`  ${index + 1}. "${name}"`);
+                    
+                    // Highlight the problematic entries
+                    if (name.includes('Prueba') || name.includes('San Miguel')) {
+                        console.log(`    ℹ️ Found: ${name}`);
+                    }
+                });
+                
+                // Clear existing data and add sorted data
                 dataTable.clear();
                 dataTable.rows.add(filteredData);
                 dataTable.draw();
@@ -1511,7 +1578,7 @@ table.dataTable tbody tr.hover {
                 const convertedValue = numericValue / currentExchangeRate;
                 
                 // Apply custom USD rounding rules
-                const roundedValue = applyUSDRoundingRules(convertedValue);
+                const roundedValue = PricingUtils.applyUSDRoundingRules(convertedValue);
                 
                 return formatPriceWithCurrency(roundedValue, 'USD');
             } else {
@@ -1520,29 +1587,7 @@ table.dataTable tbody tr.hover {
             }
         }
         
-        // Function to apply USD rounding rules
-        function applyUSDRoundingRules(value) {
-            // Find the base (nearest multiple of 5 below or equal)
-            const base = Math.floor(value / 5) * 5;
-            
-            // Calculate remainder when dividing by 5
-            const remainder = value % 5;
-            
-            if (remainder === 0) {
-                const lastDigitBeforeDecimal = Math.floor(value) % 10;
-                if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
-                    return base + 5; // Round up
-                } else {
-                    return base; // Keep as multiple of 5
-                }
-            } else if (remainder <= 2.7) {
-                // Round down to nearest 5
-                return base;
-            } else {
-                // Round up to next multiple of 5
-                return base + 5;
-            }
-        }
+        // USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
 
         // DEPRECATED: Function replaced by updateToursDisplay()
         function updatePricesForFilters(paymentType, currency, includeDriver = false) {
@@ -1789,6 +1834,14 @@ table.dataTable tbody tr.hover {
                         
                         // Update the data with price information (walking tours excluded)
                         allToursData = vehicleOnlyTours;
+                        
+                        // Sort data alphabetically by destination name
+                        allToursData.sort((a, b) => {
+                            const nameA = (a.destinationPOI?.name || 'Tour').trim();
+                            const nameB = (b.destinationPOI?.name || 'Tour').trim();
+                            return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+                        });
+                        
                         filteredData = allToursData;
                         
                         // Update table
@@ -2322,6 +2375,9 @@ table.dataTable tbody tr.hover {
             $('#modalTitle').text(isEdit ? 'Editar Tour' : 'Crear Nuevo Tour');
             $('#saveButtonText').text(isEdit ? 'Guardar Cambios' : 'Crear Tour');
             
+            // Reset save button state (ensure it's not disabled from previous operations)
+            $('#saveTourBtn').prop('disabled', false);
+            
             // Clear photos preview
             $('#tourModal .photos-preview-container').empty();
             
@@ -2399,6 +2455,139 @@ table.dataTable tbody tr.hover {
                 console.error('Error loading base pricing:', error);
                 $('#basePricingSection').hide();
                 showModalError('Error al cargar los precios base: ' + error.message);
+            }
+        }
+
+        // Tour photo preview function with optimization support - moved here to be available before usage
+        function addTourPhotoPreview(container, file, dataUrl, photoDataOrMetadata) {
+            const photoId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            
+            // Handle both old format (just metadata) and new format (full photo object)
+            let optimizationMetadata = null;
+            let fullPhotoData = null;
+            
+            if (photoDataOrMetadata) {
+                // If it's an object with any of the expected photo properties, it's the full photo object
+                if (typeof photoDataOrMetadata === 'object' && 
+                    (photoDataOrMetadata.s3Key || 
+                     photoDataOrMetadata.optimizationMetadata !== undefined ||
+                     photoDataOrMetadata.optimizedVariants ||
+                     photoDataOrMetadata.fileName)) {
+                    fullPhotoData = photoDataOrMetadata;
+                    optimizationMetadata = photoDataOrMetadata.optimizationMetadata;
+                } else {
+                    // Otherwise it's just the metadata (for backwards compatibility)
+                    optimizationMetadata = photoDataOrMetadata;
+                }
+            }
+            
+            // Check optimization metadata for format count - ALWAYS show badge
+            let formatBadge = '';
+            let formatInfo = '';
+            let badgeClass = '';
+            let iconClass = '';
+            let tooltipText = '';
+            
+            // Check if it's a new upload (base64 image)
+            if (dataUrl && dataUrl.startsWith('data:')) {
+                formatInfo = 'New - Not saved';
+                badgeClass = 'bg-warning';
+                iconClass = 'ti-alert-circle';
+                tooltipText = 'Will be optimized when saved';
+            } 
+            // Check optimization metadata
+            else if (optimizationMetadata && (optimizationMetadata.availableFormats || optimizationMetadata.formats)) {
+                let availableFormats = optimizationMetadata.availableFormats || 
+                                     optimizationMetadata.formats || 
+                                     [];
+                
+                // Handle case where formats is an object instead of array
+                if (typeof availableFormats === 'object' && !Array.isArray(availableFormats)) {
+                    availableFormats = Object.keys(availableFormats);
+                }
+                
+                // Ensure it's an array
+                if (!Array.isArray(availableFormats)) {
+                    availableFormats = [];
+                }
+                
+                // Count non-original formats (AVIF, WebP, JPEG)
+                const optimizedFormats = availableFormats.filter(f => f !== 'original');
+                const formatCount = optimizedFormats.length;
+                
+                if (formatCount > 0) {
+                    formatInfo = `${formatCount} formats`;
+                    badgeClass = 'bg-success';
+                    iconClass = 'ti-photo';
+                    tooltipText = `Optimized: ${optimizedFormats.join(', ')}`;
+                } else {
+                    // Has metadata but 0 formats (optimization may have failed or not completed)
+                    formatInfo = '0 formats';
+                    badgeClass = 'bg-danger';
+                    iconClass = 'ti-x';
+                    tooltipText = 'No optimized formats available';
+                }
+            } 
+            // No metadata and not base64 (old image without optimization)
+            else {
+                // Check if it's an S3 URL (legacy upload before optimization)
+                if (dataUrl && (dataUrl.includes('amazonaws.com') || dataUrl.includes('http'))) {
+                    formatInfo = 'Legacy - No optimization';
+                    badgeClass = 'bg-secondary';
+                    iconClass = 'ti-photo-off';
+                    tooltipText = 'Uploaded before optimization was implemented. Re-upload to optimize.';
+                } else {
+                    formatInfo = 'Unknown';
+                    badgeClass = 'bg-dark';
+                    iconClass = 'ti-question-mark';
+                    tooltipText = 'Unknown image format';
+                }
+            }
+            
+            // Always create a badge
+            formatBadge = `
+                <span class="badge ${badgeClass} position-absolute" 
+                      style="top: 2px; left: 2px; font-size: 9px; padding: 2px 4px;"
+                      title="${tooltipText}">
+                    <i class="ti ${iconClass}" style="font-size: 9px;"></i> ${formatInfo}
+                </span>
+            `;
+            
+            // Store full photo data as data attribute to preserve all fields
+            const photoDataJson = fullPhotoData ? JSON.stringify(fullPhotoData) : '';
+            
+            const photoHtml = `
+                <div class="col-4 photo-preview" data-photo-id="${photoId}" data-photo-full='${photoDataJson.replace(/'/g, '&#39;')}'>
+                    <div class="position-relative">
+                        <img src="${dataUrl}" 
+                             class="img-fluid rounded border" 
+                             style="height: 80px; width: 100%; object-fit: cover;">
+                        ${formatBadge}
+                        <button type="button" 
+                                class="btn btn-danger btn-sm position-absolute top-0 end-0 remove-photo-btn" 
+                                style="padding: 2px 6px; margin: 2px;">
+                            <i class="ti ti-x" style="font-size: 12px;"></i>
+                        </button>
+                        <div class="text-center mt-1">
+                            <small class="text-muted text-truncate d-block" style="font-size: 10px;" title="${file.name}">
+                                ${file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Ensure container is a valid jQuery object
+            if (!container || typeof container.append !== 'function') {
+                console.error('❌ Invalid container for photo preview:', container);
+                return;
+            }
+            
+            try {
+                container.append(photoHtml);
+                console.log('✅ Photo HTML appended to container successfully');
+            } catch (error) {
+                console.error('❌ Error appending photo HTML to container:', error);
             }
         }
 
@@ -2941,24 +3130,46 @@ table.dataTable tbody tr.hover {
                             
                             // Load photos if they exist
                             if (tour.photos && Array.isArray(tour.photos) && tour.photos.length > 0) {
+                                console.log('📸 Loading photos into modal:', tour.photos.length, 'photos');
+                                
+                                // Ensure jQuery is available and modal exists
+                                if (typeof $ === 'undefined') {
+                                    console.error('❌ jQuery not available for photo loading');
+                                    return;
+                                }
+                                
                                 const photosContainer = $('#tourModal .photos-preview-container');
+                                if (photosContainer.length === 0) {
+                                    console.error('❌ Photos container not found in modal');
+                                    return;
+                                }
+                                
+                                console.log('📸 Photos container found, clearing and loading photos');
                                 photosContainer.empty();
                                 
-                                tour.photos.forEach(photo => {
-                                    const photoId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                                    const photoHtml = `
-                                        <div class="col-3 photo-preview" data-filename="${photo.fileName || 'image.jpg'}" data-dataurl="${photo.dataUrl}">
-                                            <div class="position-relative">
-                                                <img src="${photo.dataUrl}" alt="${photo.fileName}" class="img-fluid rounded">
-                                                <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 remove-photo-btn" title="Eliminar foto">
-                                                    <i class="ti ti-x"></i>
-                                                </button>
-                                                <small class="d-block text-center text-muted mt-1" title="${photo.fileName}">${photo.fileName ? (photo.fileName.length > 15 ? photo.fileName.substring(0, 15) + '...' : photo.fileName) : 'image.jpg'}</small>
-                                            </div>
-                                        </div>
-                                    `;
-                                    photosContainer.append(photoHtml);
+                                tour.photos.forEach((photo, index) => {
+                                    // Backend now provides presigned URLs in dataUrl field
+                                    const photoUrl = photo.dataUrl || photo.url;
+                                    const fileName = photo.fileName || photo.name || 'image';
+                                    
+                                    console.log(`📸 Processing photo ${index + 1}:`, { 
+                                        fileName, 
+                                        hasUrl: !!photoUrl,
+                                        urlType: photoUrl ? (photoUrl.startsWith('data:') ? 'base64' : 'url') : 'none'
+                                    });
+                                    
+                                    if (photoUrl) {
+                                        try {
+                                            // Pass the entire photo object to preserve all data
+                                            addTourPhotoPreview(photosContainer, { name: fileName }, photoUrl, photo);
+                                            console.log(`📸 Successfully added photo ${index + 1} to preview`);
+                                        } catch (error) {
+                                            console.error(`❌ Error adding photo ${index + 1} to preview:`, error);
+                                        }
+                                    }
                                 });
+                            } else {
+                                console.log('📸 No photos to load or photos array is empty');
                             }
 
                             // Set availability (NEW FORMAT: array of day schedules)
@@ -2977,6 +3188,11 @@ table.dataTable tbody tr.hover {
                                 });
 
                                 updateNoDaysMessage();
+                                // Update the availability status text to show selected days
+                                updateTourAvailabilityStatus();
+                            } else {
+                                // No specific days selected, update status to show "all days"
+                                updateTourAvailabilityStatus();
                             }
 
                             // Load base pricing for editing
@@ -3037,42 +3253,18 @@ table.dataTable tbody tr.hover {
             $(this).closest('.tour-photos-container').find('.tour-photo-input').click();
         });
         
-        // Handle photo upload for tour modal
+        // Handle photo upload for tour modal - with optimization support
         $('#tourModal').on('change', '.tour-photo-input', function(e) {
             const files = e.target.files;
             const previewContainer = $(this).closest('.tour-photos-container').find('.photos-preview-container');
             
             Array.from(files).forEach(file => {
-                if (file.size > 5 * 1024 * 1024) { // 5MB limit
-                    alert(`El archivo "${file.name}" excede el tamaño máximo de 5MB`);
-                    return;
-                }
+                // Removed file size limit - allow any size
                 
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    const photoId = Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-                    const previewHtml = `
-                        <div class="col-4 photo-preview" data-photo-id="${photoId}"
-                             data-filename="${file.name}" 
-                             data-dataurl="${e.target.result}">
-                            <div class="position-relative">
-                                <img src="${e.target.result}" 
-                                     class="img-fluid rounded border" 
-                                     style="height: 80px; width: 100%; object-fit: cover;">
-                                <button type="button" 
-                                        class="btn btn-danger btn-sm position-absolute top-0 end-0 remove-photo-btn" 
-                                        style="padding: 2px 6px; margin: 2px;">
-                                    <i class="ti ti-x" style="font-size: 12px;"></i>
-                                </button>
-                                <div class="text-center mt-1">
-                                    <small class="text-muted text-truncate d-block" style="font-size: 10px;" title="${file.name}">
-                                        ${file.name.length > 15 ? file.name.substring(0, 15) + '...' : file.name}
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    previewContainer.append(previewHtml);
+                    // Use the same addPhotoPreview function for consistency and optimization support
+                    addTourPhotoPreview(previewContainer, file, e.target.result);
                 };
                 reader.readAsDataURL(file);
             });
@@ -3147,15 +3339,38 @@ table.dataTable tbody tr.hover {
                         .filter(item => item.length > 0)
                     : [];
                     
-                // Collect photos data
+                // Collect photos data with optimization metadata preservation (same as experience modal)
                 const photosList = [];
                 const photoElements = $('#tourModal .photos-preview-container .photo-preview');
                 photoElements.each(function() {
-                    const photoData = {
-                        fileName: $(this).data('filename'),
-                        dataUrl: $(this).data('dataurl')
-                    };
-                    photosList.push(photoData);
+                    const img = $(this).find('img');
+                    if (img.length > 0) {
+                        const photoElement = $(this);
+                        const photoFullData = photoElement.attr('data-photo-full');
+                        
+                        // If we have full photo data stored, use it (preserves optimization metadata)
+                        if (photoFullData) {
+                            try {
+                                const fullData = JSON.parse(photoFullData.replace(/&#39;/g, "'"));
+                                // Update the dataUrl in case the image was refreshed with a new presigned URL
+                                fullData.dataUrl = img.attr('src');
+                                photosList.push(fullData);
+                            } catch (e) {
+                                console.warn('Tour - Failed to parse photo full data, falling back to basic data:', e);
+                                // Fallback to basic data
+                                photosList.push({
+                                    dataUrl: img.attr('src'),
+                                    fileName: photoElement.find('small').attr('title') || 'image.jpg'
+                                });
+                            }
+                        } else {
+                            // No full data available (new upload)
+                            photosList.push({
+                                dataUrl: img.attr('src'),
+                                fileName: photoElement.find('small').attr('title') || 'image.jpg'
+                            });
+                        }
+                    }
                 });
 
                 // Get duration in hours
@@ -3247,11 +3462,42 @@ table.dataTable tbody tr.hover {
                 console.log(`🚀 Making tour ${method} request to: ${url}`);
                 console.log(`📤 Tour data being sent:`, tourData);
 
+                // Check if there are images to optimize
+                const hasImagesToOptimize = photosList.some(p => p.dataUrl && p.dataUrl.startsWith('data:'));
+                const totalImages = photosList.filter(p => p.dataUrl && p.dataUrl.startsWith('data:')).length;
+                
                 // Show loading state
                 const $saveBtn = $('#saveTourBtn');
                 const originalText = $('#saveButtonText').text();
                 $saveBtn.prop('disabled', true);
-                $('#saveButtonText').html('<i class="spinner-border spinner-border-sm me-1"></i>Guardando...');
+                
+                const initialButtonText = hasImagesToOptimize ? 
+                    `<i class="spinner-border spinner-border-sm me-1"></i>Optimizando ${totalImages} imagen${totalImages > 1 ? 'es' : ''}...` : 
+                    '<i class="spinner-border spinner-border-sm me-1"></i>Guardando...';
+                
+                $('#saveButtonText').html(initialButtonText);
+                
+                // Show optimization progress if needed
+                if (hasImagesToOptimize) {
+                    const progressHtml = `
+                        <div id="tourOptimizationProgress" class="alert alert-info mb-3" role="alert">
+                            <div class="d-flex align-items-center">
+                                <div class="spinner-border spinner-border-sm me-2" role="status">
+                                    <span class="visually-hidden">Optimizando...</span>
+                                </div>
+                                <div>
+                                    <strong>Optimización de imágenes en progreso</strong><br>
+                                    <small>Las imágenes están siendo convertidas a formatos AVIF, WebP y JPEG para mejor rendimiento.</small>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add progress indicator if not exists
+                    if (!$('#tourOptimizationProgress').length) {
+                        $('#tourModalAlerts').prepend(progressHtml);
+                    }
+                }
 
                 // Function to restore button state
                 function restoreButtonState() {
@@ -3292,6 +3538,31 @@ table.dataTable tbody tr.hover {
                                 if (!$('#basePricingSection').is(':visible')) {
                                     console.log('ℹ️  Pricing section not visible, skipping pricing save');
                                 }
+                            }
+                            
+                            // Handle image optimization completion feedback
+                            if (hasImagesToOptimize) {
+                                $('#saveButtonText').html('<i class="spinner-border spinner-border-sm me-1"></i>Finalizando optimización...');
+                                
+                                // Update progress indicator
+                                $('#tourOptimizationProgress').removeClass('alert-info').addClass('alert-success');
+                                $('#tourOptimizationProgress').html(`
+                                    <div class="d-flex align-items-center">
+                                        <i class="ti ti-check-circle me-2" style="font-size: 1.2rem;"></i>
+                                        <div>
+                                            <strong>Optimización completada</strong><br>
+                                            <small>${totalImages} imagen${totalImages > 1 ? 'es optimizadas' : ' optimizada'} exitosamente.</small>
+                                        </div>
+                                    </div>
+                                `);
+                                
+                                // Wait a bit for image processing to complete
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                
+                                // Remove progress indicator
+                                $('#tourOptimizationProgress').fadeOut(300, function() { 
+                                    $(this).remove(); 
+                                });
                             }
                             
                             $('#tourModal').modal('hide');
@@ -3338,6 +3609,36 @@ table.dataTable tbody tr.hover {
                                             : 'Tour actualizado exitosamente';
                                         showSuccessAlert(successMessage);
                                         console.log('✅ Targeted row update completed successfully');
+                                        
+                                        // Reload tour data in modal to show optimized photos
+                                        if ($('#tourModal').hasClass('show') && tourId) {
+                                            console.log('🔄 Reloading tour data in modal to show optimized photos');
+                                            setTimeout(async () => {
+                                                try {
+                                                    const response = await $.ajax({
+                                                        url: `${apiEndpoint}/${tourId}`,
+                                                        type: 'GET'
+                                                    });
+                                                    
+                                                    if (response.success && response.data.tour.photos) {
+                                                        const photosContainer = $('#tourModal .photos-preview-container');
+                                                        photosContainer.empty();
+                                                        
+                                                        response.data.tour.photos.forEach((photo, index) => {
+                                                            const photoUrl = photo.dataUrl || photo.url;
+                                                            const fileName = photo.fileName || photo.name || 'image';
+                                                            
+                                                            if (photoUrl) {
+                                                                addTourPhotoPreview(photosContainer, { name: fileName }, photoUrl, photo);
+                                                            }
+                                                        });
+                                                        console.log('✅ Tour photos reloaded in modal');
+                                                    }
+                                                } catch (error) {
+                                                    console.warn('Failed to reload tour photos in modal:', error);
+                                                }
+                                            }, 1000); // Give time for S3 upload to complete
+                                        }
                                     } else {
                                         console.log('⚠️ Targeted row update failed, falling back to full table reload');
                                         showLoadingIndicator('Actualizando tabla...');

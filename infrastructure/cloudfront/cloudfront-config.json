@@ -1,0 +1,182 @@
+{
+  "DistributionConfig": {
+    "CallerReference": "amexing-vehicle-images-distribution",
+    "Comment": "CloudFront distribution for Amexing vehicle images with format negotiation",
+    "Enabled": true,
+    "Origins": {
+      "Quantity": 1,
+      "Items": [
+        {
+          "Id": "S3-amexing-bucket",
+          "DomainName": "amexing-bucket.s3.us-east-2.amazonaws.com",
+          "S3OriginConfig": {
+            "OriginAccessIdentity": "origin-access-identity/cloudfront/ABCDEFG1234567"
+          },
+          "ConnectionAttempts": 3,
+          "ConnectionTimeout": 10,
+          "OriginShield": {
+            "Enabled": true,
+            "OriginShieldRegion": "us-east-2"
+          }
+        }
+      ]
+    },
+    "DefaultRootObject": "",
+    "CacheBehaviors": {
+      "Quantity": 3,
+      "Items": [
+        {
+          "PathPattern": "*/optimized/avif/*",
+          "TargetOriginId": "S3-amexing-bucket",
+          "ViewerProtocolPolicy": "https-only",
+          "AllowedMethods": {
+            "Quantity": 2,
+            "Items": ["GET", "HEAD"],
+            "CachedMethods": {
+              "Quantity": 2,
+              "Items": ["GET", "HEAD"]
+            }
+          },
+          "ForwardedValues": {
+            "QueryString": false,
+            "Headers": {
+              "Quantity": 1,
+              "Items": ["Accept"]
+            },
+            "Cookies": {
+              "Forward": "none"
+            }
+          },
+          "TrustedSigners": {
+            "Enabled": false,
+            "Quantity": 0
+          },
+          "MinTTL": 86400,
+          "DefaultTTL": 31536000,
+          "MaxTTL": 31536000,
+          "Compress": false,
+          "ResponseHeadersPolicy": "avif-headers-policy"
+        },
+        {
+          "PathPattern": "*/optimized/webp/*",
+          "TargetOriginId": "S3-amexing-bucket",
+          "ViewerProtocolPolicy": "https-only",
+          "AllowedMethods": {
+            "Quantity": 2,
+            "Items": ["GET", "HEAD"],
+            "CachedMethods": {
+              "Quantity": 2,
+              "Items": ["GET", "HEAD"]
+            }
+          },
+          "ForwardedValues": {
+            "QueryString": false,
+            "Headers": {
+              "Quantity": 1,
+              "Items": ["Accept"]
+            },
+            "Cookies": {
+              "Forward": "none"
+            }
+          },
+          "TrustedSigners": {
+            "Enabled": false,
+            "Quantity": 0
+          },
+          "MinTTL": 86400,
+          "DefaultTTL": 31536000,
+          "MaxTTL": 31536000,
+          "Compress": false,
+          "ResponseHeadersPolicy": "webp-headers-policy"
+        },
+        {
+          "PathPattern": "*/vehicles/originals/*",
+          "TargetOriginId": "S3-amexing-bucket",
+          "ViewerProtocolPolicy": "https-only",
+          "AllowedMethods": {
+            "Quantity": 2,
+            "Items": ["GET", "HEAD"],
+            "CachedMethods": {
+              "Quantity": 2,
+              "Items": ["GET", "HEAD"]
+            }
+          },
+          "ForwardedValues": {
+            "QueryString": false,
+            "Headers": {
+              "Quantity": 0
+            },
+            "Cookies": {
+              "Forward": "none"
+            }
+          },
+          "TrustedSigners": {
+            "Enabled": false,
+            "Quantity": 0
+          },
+          "MinTTL": 0,
+          "DefaultTTL": 86400,
+          "MaxTTL": 86400,
+          "Compress": true
+        }
+      ]
+    },
+    "DefaultCacheBehavior": {
+      "TargetOriginId": "S3-amexing-bucket",
+      "ViewerProtocolPolicy": "redirect-to-https",
+      "AllowedMethods": {
+        "Quantity": 2,
+        "Items": ["GET", "HEAD"],
+        "CachedMethods": {
+          "Quantity": 2,
+          "Items": ["GET", "HEAD"]
+        }
+      },
+      "ForwardedValues": {
+        "QueryString": false,
+        "Headers": {
+          "Quantity": 1,
+          "Items": ["Accept"]
+        },
+        "Cookies": {
+          "Forward": "none"
+        }
+      },
+      "TrustedSigners": {
+        "Enabled": false,
+        "Quantity": 0
+      },
+      "MinTTL": 0,
+      "DefaultTTL": 86400,
+      "MaxTTL": 31536000,
+      "Compress": true,
+      "FunctionAssociations": {
+        "Quantity": 1,
+        "Items": [
+          {
+            "EventType": "viewer-request",
+            "FunctionARN": "arn:aws:cloudfront::123456789012:function/format-negotiation"
+          }
+        ]
+      }
+    },
+    "CustomErrorResponses": {
+      "Quantity": 0
+    },
+    "Logging": {
+      "Enabled": true,
+      "IncludeCookies": false,
+      "Bucket": "amexing-logs.s3.amazonaws.com",
+      "Prefix": "cloudfront/vehicle-images/"
+    },
+    "PriceClass": "PriceClass_100",
+    "ViewerCertificate": {
+      "CloudFrontDefaultCertificate": true,
+      "MinimumProtocolVersion": "TLSv1.2_2021",
+      "CertificateSource": "cloudfront"
+    },
+    "HttpVersion": "http2and3",
+    "IsIPV6Enabled": true,
+    "WebACLId": ""
+  }
+}

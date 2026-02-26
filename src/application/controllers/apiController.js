@@ -1,5 +1,6 @@
 const Parse = require('parse/node');
 const logger = require('../../infrastructure/logger');
+const FileStorageService = require('../services/FileStorageService');
 
 /**
  * API Controller - Handles REST API endpoints for status, user profiles, and system information.
@@ -113,7 +114,7 @@ class ApiController {
    */
   async getUserProfile(req, res, next) {
     try {
-      const { user } = req;
+      const { user, roleObject, userRole } = req;
 
       if (!user) {
         return res.status(401).json({
@@ -122,13 +123,44 @@ class ApiController {
         });
       }
 
+      // Build role and permissions info
+      const roleInfo = {
+        name: userRole || null,
+        level: roleObject?.getLevel?.() || null,
+        displayName: roleObject?.get?.('displayName') || null,
+        scope: roleObject?.get?.('scope') || null,
+      };
+
+      // Get permissions from role object
+      const permissions = roleObject?.get?.('basePermissions') || [];
+
+      // Get profile picture URL if available
+      let profilePicture = null;
+      const s3Key = user.get('profilePictureS3Key');
+      if (s3Key) {
+        try {
+          const fileStorageService = new FileStorageService();
+          profilePicture = await fileStorageService.getPresignedUrl(s3Key);
+        } catch (imgError) {
+          logger.warn('Failed to get profile picture URL', {
+            userId: user.id,
+            error: imgError.message,
+          });
+        }
+      }
+
       res.json({
         id: user.id,
         username: user.get('username'),
         email: user.get('email'),
+        firstName: user.get('firstName') || null,
+        lastName: user.get('lastName') || null,
         emailVerified: user.get('emailVerified'),
+        profilePicture,
         createdAt: user.get('createdAt'),
         lastLoginAt: user.get('lastLoginAt'),
+        role: roleInfo,
+        permissions,
       });
     } catch (error) {
       logger.error('Error getting user profile:', error);

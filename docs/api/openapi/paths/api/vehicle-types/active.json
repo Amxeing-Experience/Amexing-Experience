@@ -1,0 +1,84 @@
+{
+  "get": {
+    "tags": ["Vehicle Types"],
+    "summary": "Get active vehicle types for filters",
+    "operationId": "getActiveVehicleTypes",
+    "description": "Get all active vehicle types formatted for dropdown select options.\n\n**Mobile App Usage:** Call this endpoint to populate the vehicle type filter dropdown.\n\n**Use Case:** Filter vehicles by type (Van, SUV, Sedan, etc.)",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "responses": {
+      "200": {
+        "description": "Active vehicle types list formatted for select options",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "description": "Array of vehicle type options for dropdown",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "value": {
+                        "type": "string",
+                        "description": "Vehicle Type ID (use this for filtering)",
+                        "example": "type001"
+                      },
+                      "label": {
+                        "type": "string",
+                        "description": "Display name for the dropdown",
+                        "example": "Van"
+                      },
+                      "code": {
+                        "type": "string",
+                        "description": "Short code identifier",
+                        "example": "VAN"
+                      },
+                      "capacity": {
+                        "type": "integer",
+                        "description": "Default passenger capacity",
+                        "example": 14
+                      },
+                      "trunkCapacity": {
+                        "type": "integer",
+                        "description": "Default luggage capacity",
+                        "example": 10
+                      },
+                      "icon": {
+                        "type": "string",
+                        "description": "Icon identifier for UI",
+                        "example": "van"
+                      }
+                    }
+                  }
+                },
+                "message": {
+                  "type": "string",
+                  "example": "Active vehicle types retrieved successfully"
+                }
+              }
+            },
+            "example": {
+              "success": true,
+              "data": [
+                { "value": "type001", "label": "Van", "code": "VAN", "capacity": 14, "trunkCapacity": 10, "icon": "van" },
+                { "value": "type002", "label": "SUV", "code": "SUV", "capacity": 6, "trunkCapacity": 4, "icon": "suv" },
+                { "value": "type003", "label": "Sedan", "code": "SEDAN", "capacity": 4, "trunkCapacity": 2, "icon": "car" }
+              ],
+              "message": "Active vehicle types retrieved successfully"
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      }
+    }
+  }
+}

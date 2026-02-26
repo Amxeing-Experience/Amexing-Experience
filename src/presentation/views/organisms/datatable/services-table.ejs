@@ -66,7 +66,7 @@ const isClient = dtUserRole === 'client';
     text-align: left;
 }
 
-/* Hide any default sorting indicators */
+/* Hide any default sorting indicators and disable cursor */
 table.dataTable thead .sorting::before,
 table.dataTable thead .sorting::after,
 table.dataTable thead .sorting_asc::before,
@@ -74,6 +74,41 @@ table.dataTable thead .sorting_asc::after,
 table.dataTable thead .sorting_desc::before,
 table.dataTable thead .sorting_desc::after {
     display: none !important;
+}
+
+/* Disable cursor and make headers non-clickable */
+#<%= dtTableId %> thead th {
+    cursor: default !important;
+    pointer-events: none; /* Disable all mouse events on headers */
+}
+
+/* Re-enable events on dropdown in header */
+#<%= dtTableId %> thead th select {
+    pointer-events: all !important;
+}
+
+/* Guide Toggle Styling */
+#driverToggle-<%= dtTableId %> {
+    transform: scale(1.1);
+}
+
+#driverToggle-<%= dtTableId %>:checked {
+    background-color: #10b981;
+    border-color: #10b981;
+}
+
+#driverToggle-<%= dtTableId %>:focus {
+    box-shadow: 0 0 0 0.25rem rgba(16, 185, 129, 0.25);
+    border-color: #10b981;
+}
+
+#driverLabel-<%= dtTableId %> {
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+#driverToggle-<%= dtTableId %>:checked + #driverLabel-<%= dtTableId %> {
+    color: #10b981 !important;
 }
 
 /* Ensure only our button shows */
@@ -158,6 +193,7 @@ table.dataTable thead th:nth-child(2) select {
 }
 </style>
 
+
 <div class="card border-0 shadow-sm">
     <div class="card-header text-white" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none;">
         <div class="row align-items-center">
@@ -198,8 +234,19 @@ table.dataTable thead th:nth-child(2) select {
                 </li>
             </ul>
 
-            <!-- Trailing Dropdowns -->
-            <div class="d-flex gap-2 align-items-center">
+            <!-- Trailing Dropdowns and Controls -->
+            <div class="d-flex gap-3 align-items-center">
+
+                <!-- Guide Toggle -->
+                <div class="d-flex align-items-center gap-2">
+                    <label class="form-label mb-0 text-muted">Guía:</label>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="driverToggle-<%= dtTableId %>">
+                        <label class="form-check-label text-muted" for="driverToggle-<%= dtTableId %>" id="driverLabel-<%= dtTableId %>">
+                            Sin Guía
+                        </label>
+                    </div>
+                </div>
 
                 <!-- Currency Dropdown -->
                 <div class="d-flex align-items-center gap-1">
@@ -458,6 +505,9 @@ table.dataTable thead th:nth-child(2) select {
     </div>
 </div>
 
+<!-- Load centralized pricing utilities -->
+<script src="/dashboard/js/utils/pricing-utils.js"></script>
+
 <script>
 (function() {
     // Development mode flag for debugging
@@ -702,35 +752,215 @@ table.dataTable thead th:nth-child(2) select {
             }
             
             const filtered = allServicesData.filter(service => {
-                // Get service type from destination POI
+                // Get service type from both origin and destination POI
                 const destinationPOI = service.destinationPOI;
+                const originPOI = service.originPOI;
+                
                 if (!destinationPOI) {
                     console.log(`❌ Service ${service.id} has no destinationPOI`);
                     return false;
                 }
                 
-                const serviceType = destinationPOI.serviceType?.name;
+                // Get service types from both POIs
+                const destServiceType = destinationPOI.serviceType?.name || destinationPOI.serviceType;
+                const originServiceType = originPOI?.serviceType?.name || originPOI?.serviceType;
                 
-                // Check service type match
+                // Get POI names for checking
+                const destName = destinationPOI.name || '';
+                const originName = originPOI?.name || '';
                 
+                // For airport filter, check if either origin or destination is an airport
+                // This handles both directions (Hotel → Airport and Airport → Hotel)
                 let matches = false;
                 switch(type) {
                     case 'airport':
-                        matches = serviceType === 'Aeropuerto';
+                        // STRICT: A service is "airport" ONLY if it has an airport code in parentheses
+                        const airportCodePattern = /\([A-Z]{3,4}\)/;  // Pattern for (MEX), (AIFA), etc.
+                        const hasAirportCode = airportCodePattern.test(destName) || airportCodePattern.test(originName);
+                        
+                        // ONLY include services WITH airport codes
+                        matches = hasAirportCode;
+                        
+                        // Debug logging for troubleshooting
+                        if (!matches && (destServiceType === 'Aeropuerto' || originServiceType === 'Aeropuerto')) {
+                            console.log(`⚠️ EXCLUDED from airport (no code):`, {
+                                route: `${originName || 'None'} → ${destName}`,
+                                hasCode: false
+                            });
+                        }
+                        if (matches && allServicesData.indexOf(service) < 5) {
+                            console.log(`✅ INCLUDED in airport:`, `${originName || 'None'} → ${destName}`);
+                        }
                         break;
                     case 'p2p':
-                        matches = serviceType === 'Punto a Punto';
+                        // P2P (Punto a Punto) services - STRICT criteria:
+                        const p2pAirportPattern = /\([A-Z]{3,4}\)/;
+                        const hasNoAirportCode = !p2pAirportPattern.test(destName) && !p2pAirportPattern.test(originName || '');
+                        const hasOriginAndDest = originPOI && destinationPOI;
+                        const notAirportType = destServiceType !== 'Aeropuerto' && originServiceType !== 'Aeropuerto';
+                        
+                        // VERY STRICT: Must be explicitly Punto a Punto type
+                        const isPuntoAPuntoType = destServiceType === 'Punto a Punto' || originServiceType === 'Punto a Punto';
+                        const isNotLocalType = destServiceType !== 'Local';
+                        
+                        // ULTRA STRICT: Must be explicitly Punto a Punto type AND meet all other criteria
+                        matches = hasOriginAndDest && hasNoAirportCode && notAirportType && isNotLocalType && isPuntoAPuntoType;
+                        
+                        // Debug logging - show what's being included/excluded
+                        const serviceIndex = allServicesData.indexOf(service);
+                        if (serviceIndex < 10) { // Debug first 10 services
+                            const debugInfo = {
+                                route: `${originName || 'NO_ORIGIN'} → ${destName}`,
+                                hasOrigin: !!originPOI,
+                                hasDest: !!destinationPOI,
+                                noAirportCode: hasNoAirportCode,
+                                destType: destServiceType,
+                                originType: originServiceType,
+                                notAirportType: notAirportType,
+                                isNotLocal: isNotLocalType,
+                                RESULT: matches ? '✅ INCLUDED' : '❌ EXCLUDED'
+                            };
+                            
+                            console.log(`P2P Debug [${serviceIndex}]:`, debugInfo);
+                            
+                            if (matches && (destServiceType !== 'Punto a Punto' && originServiceType !== 'Punto a Punto')) {
+                                console.warn(`⚠️ P2P service included but not 'Punto a Punto' type:`, debugInfo);
+                            }
+                        }
                         break;
                     case 'local':
-                        matches = serviceType === 'Local';
+                        // Local services:
+                        // 1. Must NOT have airport codes 
+                        // 2. Typically have NO origin (local tours/trips)
+                        // 3. Should be Local type OR have no origin
+                        const localAirportPattern = /\([A-Z]{3,4}\)/;
+                        const noAirportCodes = !localAirportPattern.test(destName) && !localAirportPattern.test(originName || '');
+                        const hasNoOrigin = !originPOI;
+                        const isNotAirport = destServiceType !== 'Aeropuerto';
+                        
+                        // Local = no origin OR Local type, but never airports
+                        matches = noAirportCodes && isNotAirport && (hasNoOrigin || destServiceType === 'Local');
+                        
+                        // Debug logging
+                        if (matches && allServicesData.indexOf(service) < 5) {
+                            console.log(`✅ Local service: ${destName} (no origin)`);
+                        }
                         break;
                     default:
                         matches = true;
                 }
                 
-                // Log result if needed for debugging
+                // Debug logging for problematic services - only log in development mode
+                if (isDevelopment && type === 'airport' && matches && !destName.includes('(') && !originName?.includes('(')) {
+                    console.log(`⚠️ Service included in airport filter but no airport code:`, {
+                        id: service.id,
+                        dest: destName,
+                        origin: originName,
+                        destType: destServiceType,
+                        originType: originServiceType
+                    });
+                }
+                
                 return matches;
             });
+            
+            // Log filter results with validation
+            console.log(`📋 Filter '${type}' applied: ${filtered.length} services out of ${allServicesData.length} total`);
+            
+            // Sort filtered data for consistent ordering
+            filtered.sort((a, b) => {
+                const destA = a.destinationPOI?.name || 'Destino';
+                const destB = b.destinationPOI?.name || 'Destino';
+                const originA = a.originPOI?.name || '';
+                const originB = b.originPOI?.name || '';
+                
+                // For airport services, sort by airport code
+                if (type === 'airport') {
+                    // Extract airport code from parentheses - priority: destination, then origin
+                    const destMatchA = destA.match(/\(([A-Z]+)\)/);
+                    const originMatchA = originA.match(/\(([A-Z]+)\)/);
+                    const airportCodeA = destMatchA ? destMatchA[1] : (originMatchA ? originMatchA[1] : destA);
+                    
+                    const destMatchB = destB.match(/\(([A-Z]+)\)/);
+                    const originMatchB = originB.match(/\(([A-Z]+)\)/);
+                    const airportCodeB = destMatchB ? destMatchB[1] : (originMatchB ? originMatchB[1] : destB);
+                    
+                    return airportCodeA.localeCompare(airportCodeB);
+                }
+                
+                // For P2P and local services, sort alphabetically by full route
+                // Create the full route string for comparison
+                const routeA = originA ? `${originA} → ${destA}` : destA;
+                const routeB = originB ? `${originB} → ${destB}` : destB;
+                
+                return routeA.localeCompare(routeB);
+            });
+            
+            // Validate filter results
+            if (type === 'p2p' || type === 'local') {
+                const airportPattern = /\([A-Z]{3,4}\)/;
+                const servicesWithAirportCodes = filtered.filter(s => {
+                    const dest = s.destinationPOI?.name || '';
+                    const origin = s.originPOI?.name || '';
+                    return airportPattern.test(dest) || airportPattern.test(origin);
+                });
+                
+                if (servicesWithAirportCodes.length > 0) {
+                    console.error(`❌ WARNING: ${servicesWithAirportCodes.length} services with airport codes in '${type}' filter!`);
+                    servicesWithAirportCodes.slice(0, 5).forEach(s => {
+                        console.log(`  ❌ Should be excluded: ${s.originPOI?.name || 'None'} → ${s.destinationPOI?.name}`);
+                    });
+                }
+            }
+            
+            // Enhanced validation for P2P
+            if (type === 'p2p') {
+                console.log('\n🔍 P2P FILTER ANALYSIS:');
+                
+                // Check services without origin
+                const servicesWithoutOrigin = filtered.filter(s => !s.originPOI);
+                if (servicesWithoutOrigin.length > 0) {
+                    console.error(`❌ ERROR: ${servicesWithoutOrigin.length} P2P services without origin!`);
+                    servicesWithoutOrigin.slice(0, 5).forEach(s => {
+                        console.log(`  ❌ Missing origin: ${s.destinationPOI?.name} (Type: ${s.destinationPOI?.serviceType?.name})`);
+                    });
+                }
+                
+                // Check service types in P2P filter
+                const typeBreakdown = {};
+                filtered.forEach(s => {
+                    const type = s.destinationPOI?.serviceType?.name || 'Unknown';
+                    typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
+                });
+                console.log('P2P Service Types:', typeBreakdown);
+                
+                // Show services that are NOT 'Punto a Punto' type
+                const nonP2PTypes = filtered.filter(s => 
+                    s.destinationPOI?.serviceType?.name !== 'Punto a Punto' && 
+                    s.originPOI?.serviceType?.name !== 'Punto a Punto'
+                );
+                
+                if (nonP2PTypes.length > 0) {
+                    console.warn(`⚠️ ${nonP2PTypes.length} services in P2P filter are NOT 'Punto a Punto' type:`);
+                    nonP2PTypes.slice(0, 8).forEach(s => {
+                        console.log(`  ⚠️ ${s.originPOI?.name || 'No origin'} → ${s.destinationPOI?.name} (Dest: ${s.destinationPOI?.serviceType?.name}, Origin: ${s.originPOI?.serviceType?.name || 'None'})`);
+                    });
+                }
+            }
+            
+            // Additional validation for Local  
+            if (type === 'local') {
+                const servicesWithOrigin = filtered.filter(s => s.originPOI);
+                const nonLocalWithOrigin = servicesWithOrigin.filter(s => 
+                    s.destinationPOI?.serviceType?.name !== 'Local'
+                );
+                if (nonLocalWithOrigin.length > 0) {
+                    console.warn(`⚠️ ${nonLocalWithOrigin.length} local services have origin (might be valid for Local type):`);
+                    nonLocalWithOrigin.slice(0, 3).forEach(s => {
+                        console.log(`  ⚠️ ${s.originPOI?.name} → ${s.destinationPOI?.name} (Type: ${s.destinationPOI?.serviceType?.name})`);
+                    });
+                }
+            }
             
             // Return filtered results
             return filtered;
@@ -741,16 +971,22 @@ table.dataTable thead th:nth-child(2) select {
             processing: true,
             serverSide: false, // Changed to client-side
             data: [], // Will be populated after data loads
+            ordering: false, // Disable all interactive column sorting
             columns: [
                 // 1. Ruta (Origin → Destination)
                 {
                     data: null,
-                    orderable: false,
+                    orderable: false, // Disable interactive sorting
                     render: function(data, type, row) {
                         const origin = row.originPOI?.name || null;
                         const destination = row.destinationPOI?.name || 'Destino';
                         
-                        if (type === 'filter' || type === 'sort') {
+                        if (type === 'sort') {
+                            // For sorting, use the full destination name for more natural ordering
+                            return destination;
+                        }
+                        
+                        if (type === 'filter') {
                             return `${origin || 'Local'} ${destination}`;
                         }
                         
@@ -809,9 +1045,15 @@ table.dataTable thead th:nth-child(2) select {
                             const sortedPrices = [...row.priceData].sort((a, b) => (a.price || 0) - (b.price || 0));
                             let pricesHtml = sortedPrices.map(p => {
                                 // Get capacity info from price data
-                                const defaultCapacity = p.vehicleType?.defaultCapacity || 4;
+                                let defaultCapacity = p.vehicleType?.defaultCapacity || 4;
                                 const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
                                 const vehicleName = p.vehicleType?.name || p.vehicleCode;
+                                
+                                // Reduce capacity by 1 if guide is active (guide takes a seat)
+                                const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+                                if (includeGuide && defaultCapacity > 1) {
+                                    defaultCapacity = defaultCapacity - 1;
+                                }
                                 
                                 // Display single price (client price if available, otherwise base price)
                                 const priceFormatted = `$${p.price.toLocaleString()} MXN`;
@@ -1024,8 +1266,7 @@ table.dataTable thead th:nth-child(2) select {
                 processing: '<i class="fas fa-spinner fa-spin fa-2x"></i><br>Cargando traslados...'
             },
             order: [
-                [1, 'asc'],  // 1. Categoría/Tarifa
-                [0, 'asc'],  // 2. Ruta
+                [0, 'asc']  // Sort by Ruta (airport code) alphabetically
             ],
             pageLength: 10,
             searchDelay: 300,
@@ -1044,7 +1285,8 @@ table.dataTable thead th:nth-child(2) select {
                 const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                 setTimeout(() => {
                     // Always apply currency formatting, even for default MXN
-                    updatePricesForFilters(currentPaymentType, currentCurrency);
+                    const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                    updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                 }, 50);
             }
         });
@@ -1055,12 +1297,96 @@ table.dataTable thead th:nth-child(2) select {
         // Initialize data and table
         async function initializeTable() {
             try {
-                // Only load services if we don't have filtered data already
-                // (in case rate filter already loaded the data)
-                if (filteredData.length === 0) {
-                    await loadAllServices();
+                // Get the current active filter (default to 'airport' if none selected)
+                const activeFilter = $('.filter-pill.active').data('filter') || 'airport';
+                
+                console.log(`🔧 initializeTable called with active filter: '${activeFilter}'`);
+                console.log(`🔧 Active filter pill:`, $('.filter-pill.active').length, $('.filter-pill.active').text());
+                
+                // Load all services
+                await loadAllServices();
+                
+                console.log(`📊 Total services loaded: ${allServicesData.length}`);
+                
+                // Apply the active filter to the loaded data
+                filteredData = filterServicesByType(activeFilter);
+                
+                console.log(`📊 After filtering for '${activeFilter}': ${filteredData.length} services`);
+                
+                // Enhanced filter analysis
+                if (activeFilter === 'p2p') {
+                    console.log('\n🔍 DETAILED P2P FILTER RESULTS:');
+                    console.log(`Total P2P services: ${filteredData.length}`);
+                    
+                    // Analyze what got through
+                    const analysis = {
+                        withOrigin: filteredData.filter(s => s.originPOI).length,
+                        withoutOrigin: filteredData.filter(s => !s.originPOI).length,
+                        puntoAPuntoType: filteredData.filter(s => 
+                            s.destinationPOI?.serviceType?.name === 'Punto a Punto' || 
+                            s.originPOI?.serviceType?.name === 'Punto a Punto'
+                        ).length,
+                        otherTypes: filteredData.filter(s => 
+                            s.destinationPOI?.serviceType?.name !== 'Punto a Punto' && 
+                            s.originPOI?.serviceType?.name !== 'Punto a Punto'
+                        ).length
+                    };
+                    
+                    console.log('P2P Analysis:', analysis);
+                    
+                    // Show problematic services
+                    const problematic = filteredData.filter(s => 
+                        !s.originPOI || 
+                        s.destinationPOI?.serviceType?.name === 'Local' ||
+                        s.destinationPOI?.serviceType?.name === 'Aeropuerto'
+                    );
+                    
+                    if (problematic.length > 0) {
+                        console.error(`❌ ${problematic.length} PROBLEMATIC P2P services:`);
+                        problematic.slice(0, 10).forEach(s => {
+                            console.log(`  ❌ ${s.originPOI?.name || 'NO_ORIGIN'} → ${s.destinationPOI?.name} (${s.destinationPOI?.serviceType?.name})`);
+                        });
+                    }
                 }
-                // Data loaded and filtered successfully
+                
+                // Verify airport filter is working correctly
+                if (activeFilter === 'airport') {
+                    const airportCodePattern = /\([A-Z]{3,4}\)/;
+                    
+                    // Check if ALL services have airport codes
+                    const invalidServices = filteredData.filter(service => {
+                        const dest = service.destinationPOI?.name || '';
+                        const origin = service.originPOI?.name || '';
+                        return !airportCodePattern.test(dest) && !airportCodePattern.test(origin);
+                    });
+                    
+                    if (invalidServices.length > 0) {
+                        console.error(`❌ ERROR: ${invalidServices.length} services WITHOUT airport codes in airport filter!`);
+                        console.log('Invalid services (should be removed):');
+                        invalidServices.slice(0, 10).forEach(service => {
+                            console.log(`  ❌ ${service.originPOI?.name || 'None'} → ${service.destinationPOI?.name}`);
+                        });
+                    } else {
+                        console.log('✅ All airport services have valid airport codes');
+                    }
+                    
+                    // Show sample of valid services
+                    const validServices = filteredData.filter(service => {
+                        const dest = service.destinationPOI?.name || '';
+                        const origin = service.originPOI?.name || '';
+                        return airportCodePattern.test(dest) || airportCodePattern.test(origin);
+                    });
+                    
+                    if (validServices.length > 0) {
+                        console.log(`✅ ${validServices.length} valid airport services:`);
+                        validServices.slice(0, 3).forEach(service => {
+                            const dest = service.destinationPOI?.name;
+                            const origin = service.originPOI?.name || 'None';
+                            const code = dest.match(airportCodePattern) || origin.match(airportCodePattern);
+                            console.log(`  ✓ ${origin} → ${dest} [${code}]`);
+                        });
+                    }
+                }
                 
                 // Clear existing data and add filtered data
                 dataTable.clear();
@@ -1079,7 +1405,8 @@ table.dataTable thead th:nth-child(2) select {
                         console.log('💳 Applying Agency Rate for Tarjeta payment type');
                     }
                     
-                    updatePricesForFilters(currentPaymentType, currentCurrency);
+                    const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                    updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                 }, 200);
                 
                 console.log('✅ DataTable updated with', filteredData.length, 'rows');
@@ -1134,6 +1461,9 @@ table.dataTable thead th:nth-child(2) select {
             $('.filter-pill[data-filter="airport"], .filter-pill[data-filter="p2p"], .filter-pill[data-filter="local"]').removeClass('active');
             $(this).addClass('active');
             
+            console.log('\n🔄 ==============================');
+            console.log(`🔄 SWITCHING TO: ${filterType.toUpperCase()}`);
+            console.log('🔄 ==============================');
             console.log('Filter pill clicked:', filterType);
             
             // Get the current selected rate to ensure we load data with proper pricing
@@ -1168,9 +1498,15 @@ table.dataTable thead th:nth-child(2) select {
             }
             
             // Update DataTable
+            console.log(`📊 Updating DataTable with ${filteredData.length} services for filter: ${filterType}`);
             dataTable.clear();
             dataTable.rows.add(filteredData);
             dataTable.draw();
+            
+            // Show/hide table container based on results
+            if (filteredData.length === 0) {
+                console.log('⚠️ No services found for this filter');
+            }
             
             console.log('✅ Filter applied, table updated with', filteredData.length, 'rows');
         });
@@ -1271,7 +1607,8 @@ table.dataTable thead th:nth-child(2) select {
                     const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                     const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                     if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
-                        updatePricesForFilters(currentPaymentType, currentCurrency);
+                        const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                        updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                     }
                 }, 100);
             } else {
@@ -1290,7 +1627,8 @@ table.dataTable thead th:nth-child(2) select {
                     const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                     const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                     if (currentPaymentType === 'transferencia' || currentCurrency === 'USD') {
-                        updatePricesForFilters(currentPaymentType, currentCurrency);
+                        const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                        updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                     }
                 }, 100);
             }
@@ -1304,6 +1642,9 @@ table.dataTable thead th:nth-child(2) select {
         
         // Store exchange rate data globally
         let currentExchangeRate = 0;
+        
+        // Store guide transport rate data globally (hourly rate)
+        let currentGuideRate = 0;
         
         // Check if current user is department manager or client
         const isDepartmentManager = (typeof userRole !== 'undefined' && userRole === 'department_manager');
@@ -1424,7 +1765,7 @@ table.dataTable thead th:nth-child(2) select {
                 const convertedValue = numericValue / currentExchangeRate;
                 
                 // Apply custom USD rounding rules
-                const roundedValue = applyUSDRoundingRules(convertedValue);
+                const roundedValue = PricingUtils.applyUSDRoundingRules(convertedValue);
                 
                 // Debug log for rounding
                 if (console && console.log) {
@@ -1438,52 +1779,80 @@ table.dataTable thead th:nth-child(2) select {
             }
         }
         
-        // Function to apply USD rounding rules
-        function applyUSDRoundingRules(value) {
-            // Find the base (nearest multiple of 5 below or equal)
-            const base = Math.floor(value / 5) * 5;
-            
-            // Calculate remainder when dividing by 5
-            const remainder = value % 5;
-            
-            // Special case: if remainder is 0 and value is not already a multiple of 5
-            // or if remainder is between 0.1 and 2.7, round down to base
-            // if remainder is > 2.7, round up to next multiple of 5
-            
-            if (remainder === 0) {
-                // If exact multiple of 5, keep as is unless it needs adjustment per examples
-                // Based on example $123.0 = $125, we round up when it's .0
-                // But $170.0 stays $170, so this needs special handling
-                
-                // Check if the last digit is 3, 8 (which would make .0 round up)
-                const lastDigitBeforeDecimal = Math.floor(value) % 10;
-                if (lastDigitBeforeDecimal === 3 || lastDigitBeforeDecimal === 8) {
-                    return base + 5; // Round up
-                } else {
-                    return base; // Keep as multiple of 5
-                }
-            } else if (remainder <= 2.7) {
-                // Round down to nearest 5
-                return base;
-            } else {
-                // Round up to next multiple of 5
-                return base + 5;
-            }
-        }
+        // USD rounding rules now handled by centralized PricingUtils.applyUSDRoundingRules()
 
-        // Function to update all displayed prices based on payment type and currency
-        function updatePricesForFilters(paymentType, currency) {
+        // Function to update all displayed prices based on payment type, currency, and guide option
+        function updatePricesForFilters(paymentType, currency, includeGuide = false) {
             console.log('🔄 updatePricesForFilters called with:', { 
                 paymentType, 
                 currency,
+                includeGuide,
                 currentTransferRate,
-                currentAgencyRate
+                currentAgencyRate,
+                currentGuideRate
+            });
+            
+            // Update capacity displays in main table
+            const capacitySelectors = [
+                '.price-item-card .text-muted',
+                '.price-container .text-muted',
+                '.fw-bold ~ .text-muted',
+                '.price-item-card .d-flex .text-muted'
+            ];
+            
+            capacitySelectors.forEach((selector) => {
+                const elements = $(selector);
+                
+                elements.each(function() {
+                    const capacityElement = $(this);
+                    const capacityText = capacityElement.html();
+                    
+                    // Look for user icon in the content
+                    if (capacityText && capacityText.includes('ti-user')) {
+                        // Extract capacity number and update it based on guide state
+                        const capacityMatch = capacityText.match(/(\d+)\s*<i[^>]*class="[^"]*ti-user[^"]*"[^>]*><\/i>/);
+                        if (capacityMatch) {
+                            const currentDisplayCapacity = parseInt(capacityMatch[1]);
+                            
+                            // Get or store the original capacity
+                            let originalCapacity = capacityElement.data('original-capacity');
+                            if (!originalCapacity) {
+                                originalCapacity = includeGuide ? currentDisplayCapacity + 1 : currentDisplayCapacity;
+                                capacityElement.data('original-capacity', originalCapacity);
+                            }
+                            
+                            // Calculate the correct display capacity
+                            let displayCapacity = originalCapacity;
+                            if (includeGuide && originalCapacity > 1) {
+                                displayCapacity = originalCapacity - 1;
+                            }
+                            
+                            // Update the display
+                            const newHtml = capacityText.replace(/(\d+)(\s*<i[^>]*class="[^"]*ti-user[^"]*"[^>]*><\/i>)/, `${displayCapacity}$2`);
+                            capacityElement.html(newHtml);
+                        }
+                    }
+                });
             });
             
             // Update main price column
             $('.price-container').each(function() {
                 const container = $(this);
                 const originalPrices = container.find('.fw-bold');
+                
+                // Get the service row to find the duration
+                const row = container.closest('tr');
+                let routeDuration = 0;
+                
+                // Find duration from the 3rd column (Duración de Trayecto)
+                const durationText = row.find('td:nth-child(3)').text();
+                const durationMatch = durationText.match(/(\d+(?:\.\d+)?)/);
+                if (durationMatch) {
+                    // Duration is in minutes, convert to hours
+                    const durationMinutes = parseFloat(durationMatch[1]);
+                    routeDuration = durationMinutes / 60;
+                    console.log('⏰ Route duration found:', durationMinutes, 'minutes =', routeDuration.toFixed(2), 'hours');
+                }
                 
                 originalPrices.each(function() {
                     const priceElement = $(this);
@@ -1508,6 +1877,21 @@ table.dataTable thead th:nth-child(2) select {
                         finalPrice = applyAgencyRate(finalPrice);
                     }
                     
+                    // Apply guide cost if enabled
+                    if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
+                        // Calculate guide cost: duration * 2 * hourly_rate
+                        const guideCost = routeDuration * 2 * currentGuideRate;
+                        console.log('🚗 Adding guide cost:', guideCost, 'MXN (', routeDuration, '* 2 *', currentGuideRate, ')');
+                        
+                        // Extract numeric value from price string
+                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                        if (priceMatch) {
+                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                            const newPrice = numericPrice + guideCost;
+                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                        }
+                    }
+                    
                     // Always apply currency conversion/formatting
                     finalPrice = applyCurrencyConversion(finalPrice, currency);
                     
@@ -1516,15 +1900,40 @@ table.dataTable thead th:nth-child(2) select {
             });
             
             // Update expanded rates view if open
-            $('.vehicle-option .fw-bold').each(function() {
-                const priceElement = $(this);
-                let originalPrice = priceElement.data('original-price');
+            $('.vehicle-option').each(function() {
+                const vehicleOption = $(this);
+                const priceElement = vehicleOption.find('.fw-bold');
                 
-                if (!originalPrice) {
-                    originalPrice = priceElement.text();
-                    priceElement.data('original-price', originalPrice);
+                // Skip if no price element found
+                if (priceElement.length === 0) return;
+                
+                // Get the service row to find the duration
+                const childRow = vehicleOption.closest('tr.child');
+                if (childRow.length === 0) return; // Not in an expanded row
+                
+                const row = childRow.prev('tr');
+                let routeDuration = 0;
+                
+                // Find duration from the 3rd column (Duración de Trayecto)
+                const durationText = row.find('td:nth-child(3)').text();
+                const durationMatch = durationText.match(/(\d+(?:\.\d+)?)/);
+                if (durationMatch) {
+                    // Duration is in minutes, convert to hours
+                    const durationMinutes = parseFloat(durationMatch[1]);
+                    routeDuration = durationMinutes / 60;
+                    console.log('⏰ [Expanded Update] Route duration:', durationMinutes, 'minutes =', routeDuration.toFixed(2), 'hours');
                 }
                 
+                let originalPrice = priceElement.attr('data-original-price');
+                
+                if (!originalPrice) {
+                    // Store the current text as original if not already stored
+                    originalPrice = priceElement.text();
+                    priceElement.attr('data-original-price', originalPrice);
+                    console.log('💰 [Expanded] Storing original price:', originalPrice);
+                }
+                
+                // Start from the clean original price
                 let finalPrice = originalPrice;
                 
                 // Apply appropriate rate based on payment type
@@ -1537,6 +1946,22 @@ table.dataTable thead th:nth-child(2) select {
                     finalPrice = applyAgencyRate(finalPrice);
                 }
                 
+                // Apply guide cost if enabled
+                if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
+                    // Calculate guide cost: duration * 2 * hourly_rate
+                    const guideCost = routeDuration * 2 * currentGuideRate;
+                    console.log('🚗 [Expanded] Adding guide cost:', guideCost, 'MXN to', finalPrice);
+                    
+                    // Extract numeric value from price string
+                    const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                    if (priceMatch) {
+                        const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                        const newPrice = numericPrice + guideCost;
+                        finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                        console.log('🚗 [Expanded] New price with guide:', finalPrice);
+                    }
+                }
+                
                 // Always apply currency conversion/formatting
                 finalPrice = applyCurrencyConversion(finalPrice, currency);
                 
@@ -1544,41 +1969,105 @@ table.dataTable thead th:nth-child(2) select {
             });
         }
 
+        // Guide toggle change handler
+        $(`#driverToggle-${tableId}`).on('change', function() {
+            const includeGuide = $(this).is(':checked');
+            const label = $(`#driverLabel-${tableId}`);
+            
+            // Update label text
+            label.text(includeGuide ? 'Con Guía' : 'Sin Guía');
+            
+            console.log('🚗 Guide toggle changed:', includeGuide ? 'Con Guía' : 'Sin Guía');
+            
+            // Get current filter states
+            const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+            const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
+            
+            // Option 1: Auto-refresh expanded rows (better UX)
+            // Check if there are any expanded rows
+            const expandedRows = $('.expand-services-prices-btn.expanded');
+            if (expandedRows.length > 0) {
+                console.log('🔄 Refreshing', expandedRows.length, 'expanded rows with new guide state');
+                
+                // Close and re-open each expanded row to get fresh prices
+                expandedRows.each(function() {
+                    const button = $(this);
+                    const rowId = button.data('row-id');
+                    
+                    // Find the DataTable row
+                    const row = dataTable.rows().nodes().to$().filter(function() {
+                        return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
+                    }).first();
+                    
+                    const dtRow = dataTable.row(row);
+                    
+                    // Close the row
+                    dtRow.child.hide();
+                    button.removeClass('expanded');
+                    
+                    // Re-open with updated prices
+                    setTimeout(() => {
+                        button.click();
+                    }, 100);
+                });
+            }
+            
+            // Update all prices with new guide state
+            updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
+        });
+        
         // Payment type filter change handler
         $(`#paymentTypeFilter-${tableId}`).on('change', function() {
             const selectedPaymentType = $(this).val();
             const selectedCurrency = $(`#currencyFilter-${tableId}`).val();
-            console.log('Payment type changed:', selectedPaymentType);
+            const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+            console.log('Payment type changed:', selectedPaymentType, 'Guide:', includeGuide);
+            
+            // Auto-refresh expanded rows
+            const expandedRows = $('.expand-services-prices-btn.expanded');
+            if (expandedRows.length > 0) {
+                console.log('🔄 Refreshing', expandedRows.length, 'expanded rows with new payment type');
+                
+                expandedRows.each(function() {
+                    const button = $(this);
+                    const rowId = button.data('row-id');
+                    
+                    const row = dataTable.rows().nodes().to$().filter(function() {
+                        return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
+                    }).first();
+                    
+                    const dtRow = dataTable.row(row);
+                    
+                    // Close and re-open
+                    dtRow.child.hide();
+                    button.removeClass('expanded');
+                    
+                    setTimeout(() => {
+                        button.click();
+                    }, 100);
+                });
+            }
             
             if (selectedPaymentType === 'transferencia') {
                 // Transferencia always uses Transfer Rate
                 if (currentTransferRate <= 0) {
                     loadCurrentTransferRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                     });
                 } else {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                 }
             } else if (selectedPaymentType === 'tarjeta') {
                 // Tarjeta always uses Agency Rate
                 if (currentAgencyRate <= 0) {
                     loadCurrentAgencyRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                        updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                     });
                 } else {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
-                }
-            } else if (selectedPaymentType === 'tarjeta') {
-                // Tarjeta uses agency rate
-                if (currentAgencyRate <= 0) {
-                    loadCurrentAgencyRate().then(() => {
-                        updatePricesForFilters(selectedPaymentType, selectedCurrency);
-                    });
-                } else {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                 }
             } else {
-                updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
             }
         });
 
@@ -1586,7 +2075,33 @@ table.dataTable thead th:nth-child(2) select {
         $(`#currencyFilter-${tableId}`).on('change', function() {
             const selectedCurrency = $(this).val();
             const selectedPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
-            console.log('🏪 Services currency changed:', selectedCurrency);
+            const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+            console.log('🏪 Services currency changed:', selectedCurrency, 'Guide:', includeGuide);
+            
+            // Auto-refresh expanded rows
+            const expandedRows = $('.expand-services-prices-btn.expanded');
+            if (expandedRows.length > 0) {
+                console.log('🔄 Refreshing', expandedRows.length, 'expanded rows with new currency');
+                
+                expandedRows.each(function() {
+                    const button = $(this);
+                    const rowId = button.data('row-id');
+                    
+                    const row = dataTable.rows().nodes().to$().filter(function() {
+                        return $(this).find('[data-row-id="' + rowId + '"]').length > 0;
+                    }).first();
+                    
+                    const dtRow = dataTable.row(row);
+                    
+                    // Close and re-open
+                    dtRow.child.hide();
+                    button.removeClass('expanded');
+                    
+                    setTimeout(() => {
+                        button.click();
+                    }, 100);
+                });
+            }
             
             // Call global sync to update all currency dropdowns across tables
             if (typeof window.syncCurrencyDropdowns === 'function') {
@@ -1597,10 +2112,10 @@ table.dataTable thead th:nth-child(2) select {
             if (selectedCurrency === 'USD' && currentExchangeRate <= 0) {
                 // Try to load exchange rate if not already loaded
                 loadCurrentExchangeRate().then(() => {
-                    updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                    updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
                 });
             } else {
-                updatePricesForFilters(selectedPaymentType, selectedCurrency);
+                updatePricesForFilters(selectedPaymentType, selectedCurrency, includeGuide);
             }
         });
 
@@ -1659,13 +2174,43 @@ table.dataTable thead th:nth-child(2) select {
                 }
             });
         }
+        
+        // Load current guide transport rate from API
+        function loadCurrentGuideRate() {
+            return $.ajax({
+                url: '/api/guide-transport-rate/current',
+                type: 'GET',
+                beforeSend: function(xhr) {
+                    const token = getAccessToken();
+                    if (token) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
+                success: function(response) {
+                    if (response.success && response.data) {
+                        currentGuideRate = response.data.value || 0;
+                        console.log('✅ Current guide transport rate loaded:', currentGuideRate, 'MXN per hour');
+                    } else {
+                        console.warn('⚠️ No active guide transport rate found');
+                        currentGuideRate = 0;
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('❌ Error loading guide transport rate:', error);
+                    currentGuideRate = 0;
+                }
+            });
+        }
 
-        // Load rates on initialization - BOTH rates needed for all users now
-        // Load both transfer and agency rates for ALL users
-        console.log('💰 Loading both Transfer and Agency rates for all users');
+        // Load rates on initialization - ALL rates needed for all users now
+        // Load transfer, agency, exchange and guide rates for ALL users
+        console.log('💰 Loading all rates for all users');
         
         // Load Transfer Rate
         loadCurrentTransferRate();
+        
+        // Load Guide Transport Rate
+        loadCurrentGuideRate();
         
         // Load Agency Rate
         loadCurrentAgencyRate().then(() => {
@@ -1677,7 +2222,7 @@ table.dataTable thead th:nth-child(2) select {
             
             // Note: initializeTable() will be called automatically by rate filter change event
             
-            console.log('💰 Both rates loaded, table initialized');
+            console.log('💰 All rates loaded, table initialized');
         });
 
         // Handle expand/collapse prices functionality
@@ -1752,6 +2297,30 @@ table.dataTable thead th:nth-child(2) select {
                                 pricesByRate[rateName].push(item);
                             });
                             
+                            // Get current filter states
+                            const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+                            const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
+                            const currentCurrency = $(`#currencyFilter-${tableId}`).val();
+                            let routeDuration = 0;
+                            
+                            // Find duration from the parent row's 3rd column
+                            const durationText = row.find('td:nth-child(3)').text();
+                            const durationMatch = durationText.match(/(\d+(?:\.\d+)?)/);
+                            if (durationMatch) {
+                                // Duration is in minutes, convert to hours
+                                const durationMinutes = parseFloat(durationMatch[1]);
+                                routeDuration = durationMinutes / 60;
+                                console.log('⏰ [Expand] Route duration:', durationMinutes, 'minutes =', routeDuration.toFixed(2), 'hours');
+                            }
+                            
+                            // Calculate guide cost if needed
+                            let guideCost = 0;
+                            if (includeGuide && currentGuideRate > 0 && routeDuration > 0) {
+                                guideCost = routeDuration * 2 * currentGuideRate;
+                                console.log('🚗 [Expand] Guide cost to add:', guideCost, 'MXN');
+                            }
+                            
+                            
                             // Generate card-based HTML for all rates
                             let allRatesHtml = '<div class="row g-3 mt-2">';
                             
@@ -1772,11 +2341,48 @@ table.dataTable thead th:nth-child(2) select {
                                 const vehicleOptionsHtml = sortedPrices.map(p => {
                                     const vehicleCode = p.vehicleType?.code || 'N/A';
                                     const vehicleName = p.vehicleType?.name || 'Vehículo';
-                                    const price = p.formattedPrice || `$${p.price || 0}`;
+                                    
+                                    // Apply all price transformations in correct order
+                                    let finalPrice = `$${p.price.toLocaleString()} MXN`;
+                                    
+                                    // 1. Apply payment type rates
+                                    if (currentPaymentType === 'transferencia') {
+                                        finalPrice = applyTransferRate(finalPrice);
+                                    } else if (currentPaymentType === 'tarjeta') {
+                                        finalPrice = applyAgencyRate(finalPrice);
+                                    }
+                                    
+                                    // 2. Apply guide cost
+                                    if (guideCost > 0) {
+                                        const priceMatch = finalPrice.match(/[\d,]+(?:\.\d+)?/);
+                                        if (priceMatch) {
+                                            const numericPrice = parseFloat(priceMatch[0].replace(/,/g, ''));
+                                            const newPrice = numericPrice + guideCost;
+                                            finalPrice = finalPrice.replace(/[\d,]+(?:\.\d+)?/, newPrice.toLocaleString());
+                                        }
+                                    }
+                                    
+                                    // 3. Apply currency conversion
+                                    finalPrice = applyCurrencyConversion(finalPrice, currentCurrency);
+                                    
+                                    console.log('💰 [Expand] Price transformation:', {
+                                        vehicle: vehicleName,
+                                        original: `$${p.price.toLocaleString()} MXN`,
+                                        final: finalPrice,
+                                        paymentType: currentPaymentType,
+                                        currency: currentCurrency,
+                                        guideCost: guideCost
+                                    });
                                     
                                     // Get capacity info from database
-                                    const defaultCapacity = p.vehicleType?.defaultCapacity || 4;
+                                    let defaultCapacity = p.vehicleType?.defaultCapacity || 4;
                                     const trunkCapacity = p.vehicleType?.trunkCapacity || 2;
+                                    
+                                    // Reduce capacity by 1 if guide is active (guide takes a seat)
+                                    if (includeGuide && defaultCapacity > 1) {
+                                        defaultCapacity = defaultCapacity - 1;
+                                    }
+                                    
                                     const capacityInfo = `${defaultCapacity} <i class="ti ti-user"></i> ${trunkCapacity} <i class="ti ti-briefcase"></i>`;
                                     
                                     return `
@@ -1792,9 +2398,9 @@ table.dataTable thead th:nth-child(2) select {
                                                 </div>
                                                 <div class="text-end">
                                                     ${(() => {
-                                                        // Display single price with consistent styling
-                                                        const priceFormatted = `$${p.price.toLocaleString()} MXN`;
-                                                        return `<div class="fw-bold small" style="color: ${rateColor}" data-price="${priceFormatted}">${priceFormatted}</div>`;
+                                                        // Store original price and display transformed price
+                                                        const originalPriceFormatted = `$${p.price.toLocaleString()} MXN`;
+                                                        return `<div class="fw-bold small" style="color: ${rateColor}" data-original-price="${originalPriceFormatted}">${finalPrice}</div>`;
                                                     })()}
                                                 </div>
                                             </div>
@@ -1846,7 +2452,8 @@ table.dataTable thead th:nth-child(2) select {
                                 const currentPaymentType = $(`#paymentTypeFilter-${tableId}`).val();
                                 const currentCurrency = $(`#currencyFilter-${tableId}`).val();
                                 // Always apply current filters to expanded prices
-                                updatePricesForFilters(currentPaymentType, currentCurrency);
+                                const currentGuideState = $(`#driverToggle-${tableId}`).is(':checked');
+                                updatePricesForFilters(currentPaymentType, currentCurrency, currentGuideState);
                             }, 100);
                         } else {
                             button.html('<i class="ti ti-chevron-down me-1"></i>Error al cargar')
@@ -2946,7 +3553,16 @@ table.dataTable thead th:nth-child(2) select {
                                             <strong>${vehicleType?.name || 'Vehículo'}</strong>
                                             ${isClientPrice ? '<span class="badge bg-success ms-2">Personalizado</span>' : ''}
                                             <br>
-                                            <small class="text-muted">${vehicleType?.code || ''} - Capacidad: ${vehicleType?.defaultCapacity || 'N/A'} pax</small>
+                                            <small class="text-muted">${vehicleType?.code || ''} - Capacidad: ${(() => {
+                                                let capacity = vehicleType?.defaultCapacity || 'N/A';
+                                                if (capacity !== 'N/A') {
+                                                    const includeGuide = $(`#driverToggle-${tableId}`).is(':checked');
+                                                    if (includeGuide && capacity > 1) {
+                                                        capacity = capacity - 1;
+                                                    }
+                                                }
+                                                return capacity;
+                                            })()} pax</small>
                                             ${isDevelopment && ratePriceId ? `<br><small class="text-info" style="font-size: 10px;"><i class="ti ti-bug"></i> RatePrices ID: ${ratePriceId}</small>` : ''}
                                         </div>
                                     </div>
@@ -3215,6 +3831,7 @@ table.dataTable thead th:nth-child(2) select {
         // Store the function in window scope for modal access
         window._saveAllClientPrices = saveAllClientPrices;
     }
+
 
     // Initialize when DOM is ready
     if (document.readyState === 'loading') {

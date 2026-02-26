@@ -432,6 +432,8 @@ class Role extends BaseModel {
         scope: 'system',
         organization: 'amexing',
         basePermissions: [
+          'profile.read',
+          'profile.update',
           'users.read',
           'users.create',
           'users.update',
@@ -462,6 +464,8 @@ class Role extends BaseModel {
         scope: 'organization',
         organization: 'client',
         basePermissions: [
+          'profile.read',
+          'profile.update',
           'users.read',
           'users.create',
           'users.update',
@@ -494,6 +498,8 @@ class Role extends BaseModel {
         scope: 'department',
         organization: 'client',
         basePermissions: [
+          'profile.read',
+          'profile.update',
           'users.read',
           'users.update',
           'bookings.read',
@@ -520,7 +526,14 @@ class Role extends BaseModel {
         level: 3,
         scope: 'department',
         organization: 'client',
-        basePermissions: ['bookings.read', 'bookings.create', 'services.read', 'pricing.read'],
+        basePermissions: [
+          'profile.read',
+          'profile.update',
+          'bookings.read',
+          'bookings.create',
+          'services.read',
+          'pricing.read',
+        ],
         delegatable: false,
         isSystemRole: true,
         conditions: {
@@ -539,6 +552,8 @@ class Role extends BaseModel {
         scope: 'operations',
         organization: 'amexing',
         basePermissions: [
+          'profile.read',
+          'profile.update',
           'bookings.read',
           'bookings.update',
           'vehicles.read',
@@ -564,6 +579,8 @@ class Role extends BaseModel {
         scope: 'operations',
         organization: 'amexing',
         basePermissions: [
+          'profile.read',
+          'profile.update',
           'trips.read',
           'trips.accept',
           'trips.complete',

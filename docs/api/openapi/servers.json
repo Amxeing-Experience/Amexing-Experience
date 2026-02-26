@@ -1,0 +1,16 @@
+{
+  "servers": [
+    {
+      "url": "http://localhost:1337",
+      "description": "Development server"
+    },
+    {
+      "url": "https://staging-api.amexing.com",
+      "description": "Staging server"
+    },
+    {
+      "url": "https://quotes.amexingexperience.com",
+      "description": "Production server"
+    }
+  ]
+}

@@ -110,6 +110,23 @@ class DashboardController extends BaseController {
         }
       }
 
+      // Get access token from various sources
+      // Since cookies are httpOnly, we need to get token from auth process
+      let accessToken = '';
+
+      // Try to get from res.locals (set by auth middleware)
+      const { accessToken: localsToken } = res.locals;
+      const { accessToken: reqToken } = req;
+      const { accessToken: cookieToken } = req.cookies || {};
+
+      if (localsToken) {
+        accessToken = localsToken;
+      } else if (reqToken) {
+        accessToken = reqToken;
+      } else if (cookieToken) {
+        accessToken = cookieToken;
+      }
+
       const dashboardData = {
         stats,
         user: req.user || {
@@ -122,7 +139,7 @@ class DashboardController extends BaseController {
         userRole: req.user?.role || 'guest',
         userName,
         userId: req.user?.id,
-        accessToken: res.locals.accessToken || req.cookies?.accessToken || '',
+        accessToken,
         breadcrumb: this.buildBreadcrumb(req.path, req.user?.role),
         ...additionalData, // Spread additionalData last so it can override defaults
       };

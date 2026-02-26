@@ -1,0 +1,10 @@
+{
+  "get": {
+    "tags": ["Audit"],
+    "summary": "Get audit logs for user",
+    "operationId": "getAuditLogsForUser",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [{ "in": "path", "name": "userId", "required": true, "schema": { "type": "string" } }],
+    "responses": { "200": { "description": "User audit logs" } }
+  }
+}

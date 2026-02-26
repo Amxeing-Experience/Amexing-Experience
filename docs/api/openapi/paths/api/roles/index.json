@@ -1,0 +1,56 @@
+{
+  "get": {
+    "tags": ["Roles"],
+    "summary": "Get all system roles",
+    "operationId": "getRoles",
+    "description": "Retrieve all available system roles.",
+    "security": [
+      { "bearerAuth": [] }
+    ],
+    "responses": {
+      "200": {
+        "description": "Roles list",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "properties": {
+                "success": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "data": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "role123"
+                      },
+                      "name": {
+                        "type": "string",
+                        "example": "admin"
+                      },
+                      "displayName": {
+                        "type": "string",
+                        "example": "Administrator"
+                      },
+                      "level": {
+                        "type": "integer",
+                        "example": 2
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "401": {
+        "$ref": "../../../components/responses/UnauthorizedError.json"
+      }
+    }
+  }
+}

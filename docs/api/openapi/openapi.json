@@ -1,0 +1,158 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "$ref": "./info.json#/info"
+  },
+  "servers": [
+    {
+      "$ref": "./servers.json#/servers/0"
+    },
+    {
+      "$ref": "./servers.json#/servers/1"
+    },
+    {
+      "$ref": "./servers.json#/servers/2"
+    }
+  ],
+  "x-tagGroups": [
+    {
+      "name": "Public API",
+      "tags": ["Authentication", "OAuth", "System"]
+    },
+    {
+      "name": "Protected API",
+      "tags": ["Profile", "Notifications", "Session"]
+    },
+    {
+      "name": "Admin API",
+      "tags": ["User Management", "Roles", "POIs", "Rates", "Service Types", "Vehicle Types", "Vehicles", "Billing", "Audit", "Payment Info"]
+    }
+  ],
+  "tags": [
+    { "$ref": "./tags.json#/tags/0" },
+    { "$ref": "./tags.json#/tags/1" },
+    { "$ref": "./tags.json#/tags/2" },
+    { "$ref": "./tags.json#/tags/3" },
+    { "$ref": "./tags.json#/tags/4" },
+    { "$ref": "./tags.json#/tags/5" },
+    { "$ref": "./tags.json#/tags/6" },
+    { "$ref": "./tags.json#/tags/7" },
+    { "$ref": "./tags.json#/tags/8" },
+    { "$ref": "./tags.json#/tags/9" },
+    { "$ref": "./tags.json#/tags/10" },
+    { "$ref": "./tags.json#/tags/11" },
+    { "$ref": "./tags.json#/tags/12" },
+    { "$ref": "./tags.json#/tags/13" },
+    { "$ref": "./tags.json#/tags/14" },
+    { "$ref": "./tags.json#/tags/15" }
+  ],
+  "security": [
+    { "bearerAuth": [] },
+    { "cookieAuth": [] }
+  ],
+  "paths": {
+    "/auth/login": { "$ref": "./paths/auth/login.json" },
+    "/auth/register": { "$ref": "./paths/auth/register.json" },
+    "/auth/logout": { "$ref": "./paths/auth/logout.json" },
+    "/auth/refresh": { "$ref": "./paths/auth/refresh.json" },
+    "/auth/forgot-password": { "$ref": "./paths/auth/forgot-password.json" },
+    "/auth/reset-password": { "$ref": "./paths/auth/reset-password.json" },
+    "/auth/change-password": { "$ref": "./paths/auth/change-password.json" },
+    "/auth/oauth/providers": { "$ref": "./paths/auth/oauth-providers.json" },
+    "/auth/oauth/{provider}": { "$ref": "./paths/auth/oauth-provider.json" },
+    "/auth/oauth/{provider}/callback": { "$ref": "./paths/auth/oauth-callback.json" },
+    "/auth/oauth/{provider}/link": { "$ref": "./paths/auth/oauth-link.json" },
+    "/auth/oauth/{provider}/unlink": { "$ref": "./paths/auth/oauth-unlink.json" },
+    "/api/status": { "$ref": "./paths/api/status.json" },
+    "/api/version": { "$ref": "./paths/api/version.json" },
+    "/api/auth/logout": { "$ref": "./paths/api/auth/logout.json" },
+    "/api/users": { "$ref": "./paths/api/users/index.json" },
+    "/api/users/search": { "$ref": "./paths/api/users/search.json" },
+    "/api/users/statistics": { "$ref": "./paths/api/users/statistics.json" },
+    "/api/users/{id}": { "$ref": "./paths/api/users/_id.json" },
+    "/api/users/{id}/reactivate": { "$ref": "./paths/api/users/reactivate.json" },
+    "/api/users/{id}/toggle-status": { "$ref": "./paths/api/users/toggle-status.json" },
+    "/api/users/{id}/archive": { "$ref": "./paths/api/users/archive.json" },
+    "/api/notifications": { "$ref": "./paths/api/notifications/index.json" },
+    "/api/notifications/{notificationId}/read": { "$ref": "./paths/api/notifications/read.json" },
+    "/api/notifications/mark-all-read": { "$ref": "./paths/api/notifications/mark-all-read.json" },
+    "/api/user/profile": { "$ref": "./paths/api/profile/user-profile.json" },
+    "/api/profile/image": { "$ref": "./paths/api/profile/image.json" },
+    "/api/roles": { "$ref": "./paths/api/roles/index.json" },
+    "/api/roles/{id}": { "$ref": "./paths/api/roles/_id.json" },
+    "/api/pois": { "$ref": "./paths/api/pois/index.json" },
+    "/api/pois/active": { "$ref": "./paths/api/pois/active.json" },
+    "/api/pois/{id}": { "$ref": "./paths/api/pois/_id.json" },
+    "/api/pois/{id}/toggle-status": { "$ref": "./paths/api/pois/toggle-status.json" },
+    "/api/rates": { "$ref": "./paths/api/rates/index.json" },
+    "/api/rates/active": { "$ref": "./paths/api/rates/active.json" },
+    "/api/rates/{id}": { "$ref": "./paths/api/rates/_id.json" },
+    "/api/rates/{id}/toggle-status": { "$ref": "./paths/api/rates/toggle-status.json" },
+    "/api/service-types": { "$ref": "./paths/api/service-types/index.json" },
+    "/api/service-types/active": { "$ref": "./paths/api/service-types/active.json" },
+    "/api/service-types/{id}": { "$ref": "./paths/api/service-types/_id.json" },
+    "/api/service-types/{id}/toggle-status": { "$ref": "./paths/api/service-types/toggle-status.json" },
+    "/api/vehicle-types": { "$ref": "./paths/api/vehicle-types/index.json" },
+    "/api/vehicle-types/active": { "$ref": "./paths/api/vehicle-types/active.json" },
+    "/api/vehicle-types/{id}": { "$ref": "./paths/api/vehicle-types/_id.json" },
+    "/api/vehicle-types/{id}/toggle-status": { "$ref": "./paths/api/vehicle-types/toggle-status.json" },
+    "/api/vehicles": { "$ref": "./paths/api/vehicles/index.json" },
+    "/api/vehicles/{id}": { "$ref": "./paths/api/vehicles/_id.json" },
+    "/api/vehicles/{id}/images": { "$ref": "./paths/api/vehicles/images.json" },
+    "/api/billing/get": { "$ref": "./paths/api/billing/get.json" },
+    "/api/billing/save": { "$ref": "./paths/api/billing/save.json" },
+    "/api/billing/get-user/{userId}": { "$ref": "./paths/api/billing/get-user.json" },
+    "/api/audit/logs": { "$ref": "./paths/api/audit/logs.json" },
+    "/api/audit/user/{userId}": { "$ref": "./paths/api/audit/user.json" },
+    "/api/audit/entity/{entityType}/{entityId}": { "$ref": "./paths/api/audit/entity.json" },
+    "/api/audit/statistics": { "$ref": "./paths/api/audit/statistics.json" },
+    "/api/payment-info": { "$ref": "./paths/api/payment-info/index.json" },
+    "/api/payment-info/default": { "$ref": "./paths/api/payment-info/default.json" },
+    "/api/payment-info/{id}": { "$ref": "./paths/api/payment-info/_id.json" },
+    "/api/payment-info/{id}/set-default": { "$ref": "./paths/api/payment-info/set-default.json" },
+    "/health": { "$ref": "./paths/health/health.json" },
+    "/metrics": { "$ref": "./paths/health/metrics.json" }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "$ref": "./components/securitySchemes/bearerAuth.json" },
+      "cookieAuth": { "$ref": "./components/securitySchemes/cookieAuth.json" }
+    },
+    "schemas": {
+      "LoginRequest": { "$ref": "./components/schemas/auth/LoginRequest.json" },
+      "LoginResponse": { "$ref": "./components/schemas/auth/LoginResponse.json" },
+      "RegisterRequest": { "$ref": "./components/schemas/auth/RegisterRequest.json" },
+      "ForgotPasswordRequest": { "$ref": "./components/schemas/auth/ForgotPasswordRequest.json" },
+      "ResetPasswordRequest": { "$ref": "./components/schemas/auth/ResetPasswordRequest.json" },
+      "ChangePasswordRequest": { "$ref": "./components/schemas/auth/ChangePasswordRequest.json" },
+      "OAuthProvidersResponse": { "$ref": "./components/schemas/auth/OAuthProvidersResponse.json" },
+      "TokenRefreshResponse": { "$ref": "./components/schemas/auth/TokenRefreshResponse.json" },
+      "User": { "$ref": "./components/schemas/user/User.json" },
+      "UserCreateRequest": { "$ref": "./components/schemas/user/UserCreateRequest.json" },
+      "UserUpdateRequest": { "$ref": "./components/schemas/user/UserUpdateRequest.json" },
+      "UserListResponse": { "$ref": "./components/schemas/user/UserListResponse.json" },
+      "UserStatistics": { "$ref": "./components/schemas/user/UserStatistics.json" },
+      "Notification": { "$ref": "./components/schemas/notification/Notification.json" },
+      "NotificationsResponse": { "$ref": "./components/schemas/notification/NotificationsResponse.json" },
+      "SuccessResponse": { "$ref": "./components/schemas/common/SuccessResponse.json" },
+      "ErrorResponse": { "$ref": "./components/schemas/common/ErrorResponse.json" },
+      "PaginationInfo": { "$ref": "./components/schemas/common/PaginationInfo.json" },
+      "SystemStatus": { "$ref": "./components/schemas/common/SystemStatus.json" },
+      "VersionInfo": { "$ref": "./components/schemas/common/VersionInfo.json" }
+    },
+    "responses": {
+      "UnauthorizedError": { "$ref": "./components/responses/UnauthorizedError.json" },
+      "ForbiddenError": { "$ref": "./components/responses/ForbiddenError.json" },
+      "NotFoundError": { "$ref": "./components/responses/NotFoundError.json" },
+      "ValidationError": { "$ref": "./components/responses/ValidationError.json" },
+      "RateLimitError": { "$ref": "./components/responses/RateLimitError.json" },
+      "ServerError": { "$ref": "./components/responses/ServerError.json" }
+    },
+    "parameters": {
+      "PageParameter": { "$ref": "./components/parameters/PageParameter.json" },
+      "LimitParameter": { "$ref": "./components/parameters/LimitParameter.json" },
+      "SortFieldParameter": { "$ref": "./components/parameters/SortFieldParameter.json" },
+      "SortDirectionParameter": { "$ref": "./components/parameters/SortDirectionParameter.json" }
+    }
+  }
+}

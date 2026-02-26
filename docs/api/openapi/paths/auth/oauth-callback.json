@@ -1,0 +1,55 @@
+{
+  "get": {
+    "tags": ["OAuth"],
+    "summary": "OAuth callback handler",
+    "operationId": "oauthCallback",
+    "description": "Handle OAuth provider callback after authentication.",
+    "security": [],
+    "parameters": [
+      {
+        "in": "path",
+        "name": "provider",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": ["apple", "corporate"]
+        },
+        "description": "OAuth provider name"
+      },
+      {
+        "in": "query",
+        "name": "code",
+        "schema": {
+          "type": "string"
+        },
+        "description": "Authorization code from provider"
+      },
+      {
+        "in": "query",
+        "name": "state",
+        "schema": {
+          "type": "string"
+        },
+        "description": "State parameter for CSRF protection"
+      }
+    ],
+    "responses": {
+      "200": {
+        "description": "OAuth callback processed successfully (API mode)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/auth/LoginResponse.json"
+            }
+          }
+        }
+      },
+      "302": {
+        "description": "Redirect to dashboard on success (browser mode)"
+      },
+      "401": {
+        "$ref": "../../components/responses/UnauthorizedError.json"
+      }
+    }
+  }
+}

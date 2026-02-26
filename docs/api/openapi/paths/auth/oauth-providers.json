@@ -1,0 +1,21 @@
+{
+  "get": {
+    "tags": ["OAuth"],
+    "summary": "Get available OAuth providers",
+    "operationId": "getOAuthProviders",
+    "description": "List all available OAuth authentication providers.",
+    "security": [],
+    "responses": {
+      "200": {
+        "description": "OAuth providers list",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../../components/schemas/auth/OAuthProvidersResponse.json"
+            }
+          }
+        }
+      }
+    }
+  }
+}

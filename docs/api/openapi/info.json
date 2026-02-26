@@ -1,0 +1,15 @@
+{
+  "info": {
+    "title": "AmexingWeb API",
+    "version": "0.6.0",
+    "description": "# AmexingWeb E-Commerce Platform API\n\nPCI DSS Level 1 compliant e-commerce platform with comprehensive security features.\n\n## Quick Links - API by Access Level\n\n| Category | Description | Link |\n|----------|-------------|------|\n| **Public API** | No authentication required (login, register, OAuth) | [View Public API](/api-docs/public) |\n| **Protected API** | Requires JWT token (profile, notifications) | [View Protected API](/api-docs/protected) |\n| **Admin API** | Requires JWT + Admin role (user management, catalogs) | [View Admin API](/api-docs/admin) |\n\n> **For Mobile App Team**: Use the links above to view only the endpoints relevant to your integration.\n\n---\n\n## Features\n- **Authentication**: Multi-provider OAuth 2.0 (Username/Password, Apple, Corporate)\n- **Security**: JWT Bearer tokens with secure HTTP-only cookies\n- **Authorization**: Role-based access control (RBAC) with 7 role levels\n- **Data Protection**: Encryption at rest and in transit\n- **Audit Logging**: Comprehensive audit trails for all operations\n\n## Security Standards\n- PCI DSS 4.0.1 Compliant\n- OWASP Top 10 Protection\n- Rate Limiting on all endpoints\n- CSRF Protection for state-changing operations\n- Security Headers (Helmet.js)\n\n## Authentication Flow\n1. Obtain JWT token via `/auth/login` or OAuth providers\n2. Include token in `Authorization: Bearer <token>` header\n3. Token lifetime: 8 hours (access), 7 days (refresh)\n4. Use `/auth/refresh` to renew tokens before expiration\n\n## Rate Limiting\n- Authentication endpoints: 50 requests / 15 minutes\n- API endpoints: 100 requests / 15 minutes\n- Write operations: 30 requests / 15 minutes\n- Password reset: 10 requests / 5 minutes\n\n## Download Specs\n- [Complete API Spec (JSON)](/api-docs.json)\n- [Public API Spec (JSON)](/api-docs/public.json)\n- [Protected API Spec (JSON)](/api-docs/protected.json)\n- [Admin API Spec (JSON)](/api-docs/admin.json)\n\n## Support\nFor API support, contact the Amexing Development Team.",
+    "contact": {
+      "name": "Amexing Development Team",
+      "email": "dev@amexing.com"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  }
+}

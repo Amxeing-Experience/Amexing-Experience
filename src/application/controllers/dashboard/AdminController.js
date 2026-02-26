@@ -600,6 +600,28 @@ class AdminController extends RoleBasedController {
     }
   }
 
+  async greeter(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'greeter', {
+        title: 'Gestión de Greeter',
+        breadcrumb: null, // Disable automatic breadcrumb
+        pageStyles: [
+          'https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css',
+          'https://cdn.datatables.net/responsive/2.5.0/css/responsive.bootstrap5.min.css',
+        ],
+        footerScripts: `
+          <!-- DataTables Core -->
+          <script src="https://cdn.datatables.net/1.13.7/js/jquery.dataTables.min.js"></script>
+          <script src="https://cdn.datatables.net/1.13.7/js/dataTables.bootstrap5.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/dataTables.responsive.min.js"></script>
+          <script src="https://cdn.datatables.net/responsive/2.5.0/js/responsive.bootstrap5.min.js"></script>
+        `,
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
   /**
    * Quotes management page.
    * @param {object} req - Express request object.
@@ -1074,6 +1096,45 @@ class AdminController extends RoleBasedController {
   }
 
   /**
+   * Get disposable prices data with session-based authentication
+   * Forwards request to API controller for disposable prices data.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to disposable prices data.
+   * @example
+   */
+  async disposablePricesData(req, res) {
+    try {
+      const DisposablePricesController = require('../api/DisposablePricesController');
+
+      // Forward the request to the API controller
+      // Use getCurrentPrices to get all price combinations for admin management
+      await DisposablePricesController.getCurrentPrices(req, res);
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * Batch update disposable prices with session-based authentication
+   * Forwards request to API controller for batch price updates.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to update results.
+   * @example
+   */
+  async disposablePricesBatchUpdate(req, res) {
+    try {
+      const DisposablePricesController = require('../api/DisposablePricesController');
+
+      // Forward the request to the API controller
+      await DisposablePricesController.batchUpdatePrices(req, res);
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
    * Price Settings management page.
    * @param {object} req - Express request object.
    * @param {object} res - Express response object.
@@ -1091,6 +1152,7 @@ class AdminController extends RoleBasedController {
       const AgencyRate = require('../../../domain/models/AgencyRate');
       const TransferRate = require('../../../domain/models/TransferRate');
       const DriverTourRate = require('../../../domain/models/DriverTourRate');
+      const GuideTransportRate = require('../../../domain/models/GuideTransportRate');
 
       // Get current rates
       let currentExchangeRate = await ExchangeRate.getCurrentExchangeRate();
@@ -1098,6 +1160,7 @@ class AdminController extends RoleBasedController {
       let currentAgencyRate = await AgencyRate.getCurrentAgencyRate();
       let currentTransferRate = await TransferRate.getCurrentTransferRate();
       let currentDriverTourRate = await DriverTourRate.getCurrentDriverTourRate();
+      let currentGuideTransportRate = await GuideTransportRate.getCurrentRate();
 
       // Create default inflation rate if none exists
       if (!currentInflationRate) {
@@ -1151,6 +1214,15 @@ class AdminController extends RoleBasedController {
         }
       }
 
+      // Create default guide transport rate if none exists
+      if (!currentGuideTransportRate) {
+        try {
+          currentGuideTransportRate = await GuideTransportRate.createDefaultIfNotExists();
+        } catch (error) {
+          console.warn('Could not create default guide transport rate:', error.message);
+        }
+      }
+
       // Create default exchange rate if none exists
       if (!currentExchangeRate) {
         try {
@@ -1169,6 +1241,7 @@ class AdminController extends RoleBasedController {
       const agencyValue = currentAgencyRate ? currentAgencyRate.get('value') : 15.0;
       const transferValue = currentTransferRate ? currentTransferRate.get('value') : 3.0;
       const driverTourValue = currentDriverTourRate ? currentDriverTourRate.get('value') : 635.0;
+      const guideTransportValue = currentGuideTransportRate ? currentGuideTransportRate.get('value') : 400.0;
 
       await this.renderRoleView(req, res, 'price-settings', {
         title: 'Ajustes de Precio',
@@ -1202,6 +1275,14 @@ class AdminController extends RoleBasedController {
           formatted: DriverTourRate.formatValue(driverTourValue),
           lastUpdated: currentDriverTourRate ? currentDriverTourRate.get('createdAt') : new Date(),
           id: currentDriverTourRate ? currentDriverTourRate.id : null,
+        },
+        currentGuideTransportRate: {
+          value: guideTransportValue,
+          formatted: currentGuideTransportRate ? currentGuideTransportRate.getFormattedValue() : '$400.00 MXN',
+          lastUpdated: currentGuideTransportRate
+            ? currentGuideTransportRate.get('effectiveDate') || currentGuideTransportRate.get('createdAt')
+            : new Date(),
+          id: currentGuideTransportRate ? currentGuideTransportRate.id : null,
         },
         breadcrumb: null, // Disable automatic breadcrumb
         pageStyles: [
@@ -1269,6 +1350,29 @@ class AdminController extends RoleBasedController {
         requestedFormId,
         pageStyles: [],
         footerScripts: '',
+      });
+    } catch (error) {
+      this.handleError(res, error);
+    }
+  }
+
+  /**
+   * A Disposición calculator page.
+   * Hourly vehicle rental pricing calculator with volume discounts.
+   * @param {object} req - Express request object.
+   * @param {object} res - Express response object.
+   * @returns {Promise<object>} - Promise resolving to operation result.
+   * @example
+   * Created by Denisse Maldonado.
+   */
+  async aDisposicion(req, res) {
+    try {
+      await this.renderRoleView(req, res, 'a-disposicion', {
+        title: 'Servicio a Disposición',
+        breadcrumb: null, // Disable automatic breadcrumb
+        pageStyles: [],
+        footerScripts: '',
+        csrfToken: res.locals.csrfToken, // Pass CSRF token to view
       });
     } catch (error) {
       this.handleError(res, error);

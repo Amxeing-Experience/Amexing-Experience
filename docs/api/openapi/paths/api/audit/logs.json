@@ -1,0 +1,17 @@
+{
+  "get": {
+    "tags": ["Audit"],
+    "summary": "Get audit logs",
+    "operationId": "getAuditLogs",
+    "description": "Retrieve audit logs with filtering and pagination.\n\n**PCI DSS Compliance:** Audit logs are retained for 90 days minimum.",
+    "security": [{ "bearerAuth": [] }],
+    "parameters": [
+      { "$ref": "../../../components/parameters/PageParameter.json" },
+      { "$ref": "../../../components/parameters/LimitParameter.json" },
+      { "in": "query", "name": "action", "schema": { "type": "string" }, "description": "Filter by action type" },
+      { "in": "query", "name": "startDate", "schema": { "type": "string", "format": "date" } },
+      { "in": "query", "name": "endDate", "schema": { "type": "string", "format": "date" } }
+    ],
+    "responses": { "200": { "description": "Audit logs" }, "403": { "$ref": "../../../components/responses/ForbiddenError.json" } }
+  }
+}
