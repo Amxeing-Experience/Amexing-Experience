@@ -67,6 +67,26 @@ if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging')
 app.set('views', path.join(__dirname, 'presentation', 'views'));
 app.set('view engine', 'ejs');
 
+// CSP Report endpoint (must be before body parser to handle application/csp-report)
+app.post(
+  '/api/csp-report',
+  express.json({
+    type: ['application/csp-report', 'application/json'],
+    limit: '1mb',
+  }),
+  (req, res) => {
+    try {
+      if (req.body && Object.keys(req.body).length > 0) {
+        logger.warn('CSP Violation Report:', JSON.stringify(req.body, null, 2));
+      }
+      res.status(204).end();
+    } catch (error) {
+      logger.warn('CSP Report parsing error:', error);
+      res.status(204).end();
+    }
+  }
+);
+
 // Body parsing middleware
 app.use(express.json({ limit: '250mb' }));
 app.use(express.urlencoded({ extended: true, limit: '250mb' }));

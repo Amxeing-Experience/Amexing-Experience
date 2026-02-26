@@ -510,7 +510,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="vehicle-card">
                         <div class="vehicle-card-image">
                             ${imageUrl ? 
-                                `<img src="${imageUrl}" alt="${vehicle.brand} ${vehicle.model}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                `<img src="${imageUrl}" alt="${vehicle.brand} ${vehicle.model}" class="vehicle-main-image" data-has-fallback="true">
                                  <div class="no-image" style="display: none;"><i class="ti ti-car"></i></div>` :
                                 `<div class="no-image"><i class="ti ti-car"></i></div>`
                             }
@@ -708,6 +708,19 @@ document.addEventListener('DOMContentLoaded', function() {
         const imageViewerModal = new bootstrap.Modal(document.getElementById('imageViewerModal'));
         imageViewerModal.show();
     }
+
+    // Add image error handler using event delegation (CSP-compliant)
+    document.addEventListener('error', function(e) {
+        if (e.target.classList.contains('vehicle-main-image') && e.target.dataset.hasFallback === 'true') {
+            // Hide the broken image
+            e.target.style.display = 'none';
+            // Show the fallback icon
+            const fallback = e.target.nextElementSibling;
+            if (fallback && fallback.classList.contains('no-image')) {
+                fallback.style.display = 'flex';
+            }
+        }
+    }, true); // Use capture phase to catch errors before bubbling
 
     // Load vehicles on page load
     loadVehicles();
