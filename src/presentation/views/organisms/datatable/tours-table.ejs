@@ -979,6 +979,13 @@ table.dataTable tbody tr.hover {
                             
                             console.log(`📊 Filtered ${newToursData.length - vehicleOnlyTours.length} walking tours out of ${newToursData.length} total tours`);
                             
+                            // Sort data alphabetically by destination name
+                            vehicleOnlyTours.sort((a, b) => {
+                                const nameA = (a.destinationPOI?.name || 'Tour').trim();
+                                const nameB = (b.destinationPOI?.name || 'Tour').trim();
+                                return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+                            });
+                            
                             allToursData = vehicleOnlyTours;
                             filteredData = allToursData; // Show filtered vehicle tours by default
                             
@@ -1827,6 +1834,14 @@ table.dataTable tbody tr.hover {
                         
                         // Update the data with price information (walking tours excluded)
                         allToursData = vehicleOnlyTours;
+                        
+                        // Sort data alphabetically by destination name
+                        allToursData.sort((a, b) => {
+                            const nameA = (a.destinationPOI?.name || 'Tour').trim();
+                            const nameB = (b.destinationPOI?.name || 'Tour').trim();
+                            return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+                        });
+                        
                         filteredData = allToursData;
                         
                         // Update table

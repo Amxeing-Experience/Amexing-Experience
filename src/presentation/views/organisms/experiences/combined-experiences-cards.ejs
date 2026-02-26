@@ -768,6 +768,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     await Promise.all(batch);
                     // Update display after each batch
                     allExperiences = [...regularExperiences, ...providerExps];
+                    
+                    // Sort experiences alphabetically by name
+                    allExperiences.sort((a, b) => {
+                        const nameA = (a.name || '').toLowerCase().trim();
+                        const nameB = (b.name || '').toLowerCase().trim();
+                        return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+                    });
+                    
                     filteredExperiences = [...allExperiences];
                     if (document.getElementById('experiencesGrid').style.display === 'flex') {
                         displayExperiences();
@@ -884,6 +892,14 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             allExperiences = [...regularExperiences, ...providerExps];
+            
+            // Sort experiences alphabetically by name
+            allExperiences.sort((a, b) => {
+                const nameA = (a.name || '').toLowerCase().trim();
+                const nameB = (b.name || '').toLowerCase().trim();
+                return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
+            });
+            
             filteredExperiences = [...allExperiences];
 
             // Show initial experiences immediately
@@ -1127,6 +1143,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 (experience.providerName && experience.providerName.toLowerCase().includes(searchFilter));
 
             return matchesSearch;
+        });
+        
+        // Sort filtered results alphabetically by name
+        filteredExperiences.sort((a, b) => {
+            const nameA = (a.displayName || a.name || '').toLowerCase().trim();
+            const nameB = (b.displayName || b.name || '').toLowerCase().trim();
+            return nameA.localeCompare(nameB, 'es', { numeric: true, sensitivity: 'base' });
         });
 
         displayExperiences();

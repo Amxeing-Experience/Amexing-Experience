@@ -644,7 +644,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success && data.data) {
                 // Filter for tours with vehicles (not walking tours)
                 allTours = data.data.filter(tour => !tour.isWalkingTour);
-                console.log(`✅ Loaded ${allTours.length} tours with vehicles`);
+                
+                // Sort tours alphabetically by destination (Destino)
+                allTours.sort((a, b) => {
+                    const destA = (a.destinationPOI?.name || '').toLowerCase();
+                    const destB = (b.destinationPOI?.name || '').toLowerCase();
+                    return destA.localeCompare(destB, 'es', { numeric: true, sensitivity: 'base' });
+                });
+                
+                console.log(`✅ Loaded ${allTours.length} tours with vehicles (sorted alphabetically by destination)`);
                 console.log('🔍 First tour data structure:', allTours[0]);
                 console.log('🔍 Selected rate ID:', selectedRateId);
                 applyFilters();
@@ -679,6 +687,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const guideMatch = true;
             
             return searchMatch && guideMatch;
+        });
+        
+        // Sort tours alphabetically by destination (Destino)
+        filteredTours.sort((a, b) => {
+            const destA = (a.destinationPOI?.name || '').toLowerCase();
+            const destB = (b.destinationPOI?.name || '').toLowerCase();
+            return destA.localeCompare(destB, 'es', { numeric: true, sensitivity: 'base' });
         });
         
         displayTours();
