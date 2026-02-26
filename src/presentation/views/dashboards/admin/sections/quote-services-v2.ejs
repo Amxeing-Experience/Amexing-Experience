@@ -58,6 +58,25 @@
                         </h6>
                     </div>
                     <div class="card-body">
+                        <!-- Currency and Payment Type Controls -->
+                        <div class="mb-3">
+                            <div class="mb-3">
+                                <label for="currencySelect" class="form-label">Moneda <span class="text-danger">*</span></label>
+                                <select class="form-select" id="currencySelect" required>
+                                    <option value="MXN" selected>MXN</option>
+                                    <option value="USD">USD</option>
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label for="priceTypeSelect" class="form-label">Pago <span class="text-danger">*</span></label>
+                                <select class="form-select" id="priceTypeSelect" required>
+                                    <option value="efectivo" selected>Efectivo</option>
+                                    <option value="transferencia">Transferencia</option>
+                                    <option value="tarjeta">Tarjeta de Crédito/Débito</option>
+                                </select>
+                            </div>
+                        </div>
+                        <hr>
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-muted">Subtotal:</span>
                             <span class="fw-semibold" id="subtotalAmount">$0.00</span>
@@ -111,11 +130,6 @@
                         </span>
                     </div>
                     <small class="text-muted">Los cambios se guardan automáticamente</small>
-                </div>
-                <div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" id="undoBtn" disabled>
-                        <i class="ti ti-arrow-back-up me-1"></i>Deshacer
-                    </button>
                 </div>
             </div>
         </div>

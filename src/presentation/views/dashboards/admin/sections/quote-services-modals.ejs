@@ -152,8 +152,7 @@
                                 </select>
                                 <div class="form-text">Las experiencias disponibles se cargan según el día seleccionado</div>
                             </div>
-                            <!-- Experience Details Container -->
-                            <div id="experienceDetails" class="mt-2"></div>
+                            
                         </div>
 
                         <!-- Tour Selection -->
@@ -163,12 +162,105 @@
                                 <select class="form-select" id="tourSelect" required>
                                     <option value="">-- Selecciona un tour --</option>
                                 </select>
-                                <small class="form-text text-muted mt-1">
-                                    <i class="ti ti-info-circle me-1"></i>Todos los tours incluyen 1 guía
-                                </small>
+                                <div class="form-text">Los tours disponibles se cargan según el día seleccionado</div>
                             </div>
                             <!-- Tour Details Container -->
                             <div id="tourDetails" class="mt-2"></div>
+                            
+                            <!-- Tour Details Fields (Read-only) -->
+                            <div class="row">
+                                <div class="col-md-12 mb-3">
+                                    <label for="tourDescription" class="form-label">Descripción</label>
+                                    <textarea class="form-control bg-light" id="tourDescription" rows="2" readonly></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="tourAdvanceBookingTime" class="form-label">Tiempo de Reserva Anticipada</label>
+                                    <input type="text" class="form-control bg-light" id="tourAdvanceBookingTime" readonly>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="tourLanguages" class="form-label">Idiomas</label>
+                                    <input type="text" class="form-control bg-light" id="tourLanguages" readonly>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="tourIncludes" class="form-label">Incluye</label>
+                                    <textarea class="form-control bg-light" id="tourIncludes" rows="2" readonly></textarea>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="tourNotIncludes" class="form-label">No Incluye</label>
+                                    <textarea class="form-control bg-light" id="tourNotIncludes" rows="2" readonly></textarea>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="tourClientNotes" class="form-label">Notas para el Cliente</label>
+                                <textarea class="form-control bg-light" id="tourClientNotes" rows="2" readonly></textarea>
+                            </div>
+                            
+                            <!-- Tour Time Schedule -->
+                            <div class="row mb-3">
+                                <div class="col-md-12">
+                                    <label class="form-label fw-bold text-primary">Horarios Disponibles</label>
+                                    <!-- Single time display (read-only) -->
+                                    <input type="text" class="form-control bg-light" id="tourSingleTime" readonly style="display: none !important;">
+                                    <!-- Multiple times selection -->
+                                    <select class="form-select" id="tourMultipleTime" style="display: none;">
+                                        <option value="">-- Selecciona un horario --</option>
+                                    </select>
+                                    <!-- Availability status message -->
+                                    <div class="text-muted" id="tourAvailabilityStatus">
+                                        <i class="ti ti-info-circle me-1"></i><span id="tourAvailabilityMessage">Horario según disponibilidad</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <hr class="my-4">
+                            
+                            <!-- Tour People Limits Alert -->
+                            <div class="alert alert-info py-2 mb-3" id="tourPeopleLimitsAlert" style="display: none;">
+                                <i class="ti ti-users me-2"></i>
+                                <span id="tourPeopleLimitsText">Mínimo: 1 persona • Máximo: 10 personas</span>
+                                <small class="float-end text-primary">
+                                    Total actual: <strong id="tourCurrentTotalPeople">0</strong>
+                                </small>
+                            </div>
+                            
+                            <!-- People Quantities for Tour -->
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="tourAdultsQuantity" class="form-label">Adultos</label>
+                                    <input type="number" class="form-control tour-quantity-input" id="tourAdultsQuantity" min="0" max="50" value="0">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="tourChildrenQuantity" class="form-label">Niños</label>
+                                    <input type="number" class="form-control tour-quantity-input" id="tourChildrenQuantity" min="0" max="50" value="0">
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="tourAdultsNoAlcoholQuantity" class="form-label">Adultos sin Alcohol</label>
+                                    <input type="number" class="form-control tour-quantity-input" id="tourAdultsNoAlcoholQuantity" min="0" max="50" value="0">
+                                </div>
+                            </div>
+                            
+                            <!-- Tour Pricing -->
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="tourAdultPrice" class="form-label">Precio Adulto</label>
+                                    <input type="number" class="form-control" id="tourAdultPrice" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="tourChildPrice" class="form-label">Precio Niño</label>
+                                    <input type="number" class="form-control" id="tourChildPrice" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="tourNoAlcoholPrice" class="form-label">Precio sin Alcohol</label>
+                                    <input type="number" class="form-control" id="tourNoAlcoholPrice" min="0" step="0.01" placeholder="0.00">
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Transport Fields -->
@@ -374,6 +466,26 @@
                                 <label for="conceptoConcept" class="form-label">Concepto <span class="text-danger">*</span></label>
                                 <input type="text" class="form-control" id="conceptoConcept" placeholder="Describe el servicio...">
                             </div>
+                            <div class="mb-3">
+                                <label for="conceptoTime" class="form-label">Horario</label>
+                                <input type="time" class="form-control" id="conceptoTime" placeholder="HH:MM">
+                            </div>
+                            
+                            <!-- People Quantities for Concepto -->
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="conceptoAdultsQuantity" class="form-label">Adultos</label>
+                                    <input type="number" class="form-control concepto-quantity-input" id="conceptoAdultsQuantity" min="0" max="50" value="1">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="conceptoChildrenQuantity" class="form-label">Niños</label>
+                                    <input type="number" class="form-control concepto-quantity-input" id="conceptoChildrenQuantity" min="0" max="50" value="0">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="conceptoAdultsNoAlcoholQuantity" class="form-label">Adultos sin Alcohol</label>
+                                    <input type="number" class="form-control concepto-quantity-input" id="conceptoAdultsNoAlcoholQuantity" min="0" max="50" value="0">
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -409,26 +521,9 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="currencySelect" class="form-label">Moneda <span class="text-danger">*</span></label>
-                            <select class="form-select" id="currencySelect" required>
-                                <option value="MXN" selected>MXN</option>
-                                <option value="USD">USD</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="priceTypeSelect" class="form-label">Pago <span class="text-danger">*</span></label>
-                            <select class="form-select" id="priceTypeSelect" required>
-                                <option value="efectivo" selected>Efectivo</option>
-                                <option value="transferencia">Transferencia</option>
-                                <option value="tarjeta">Tarjeta de Crédito/Débito</option>
-                            </select>
-                        </div>
-                    </div>
                     
-                    <div class="row">
+                    <!-- Standard pricing for non-experience services -->
+                    <div class="row" id="standardPricingSection">
                         <div class="col-md-6 mb-3">
                             <label for="servicePrice" class="form-label">Precio Unitario <span class="text-danger">*</span></label>
                             <div class="input-group">
@@ -442,6 +537,120 @@
                             <input type="number" class="form-control" id="serviceQuantity" value="1" min="1" required>
                         </div>
                     </div>
+                    
+                    <!-- Experience pricing with adult/child/no-alcohol options -->
+                    <div id="experiencePricingSection" class="d-none">
+                        <!-- Experience Information (Read-only) -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold text-primary">Descripción</label>
+                                <textarea class="form-control bg-light" id="experienceDescription" rows="3" readonly></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-primary">Tiempo de reserva anticipada</label>
+                                <input type="text" class="form-control bg-light" id="advanceBookingTime" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-primary">Idiomas</label>
+                                <input type="text" class="form-control bg-light" id="experienceLanguages" readonly>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-primary">Incluye</label>
+                                <textarea class="form-control bg-light" id="experienceIncludes" rows="4" readonly></textarea>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold text-primary">No incluye</label>
+                                <textarea class="form-control bg-light" id="experienceNotIncludes" rows="4" readonly></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Client Notes Field -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold text-primary">Notas para Cliente</label>
+                                <textarea class="form-control bg-light" id="experienceClientNotes" rows="3" readonly></textarea>
+                            </div>
+                        </div>
+                        
+                        <!-- Experience Time Schedule -->
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label class="form-label fw-bold text-primary">Horarios Disponibles</label>
+                                <!-- Single time display (read-only) -->
+                                <input type="text" class="form-control bg-light" id="experienceSingleTime" readonly style="display: none;">
+                                <!-- Multiple times selection -->
+                                <select class="form-select" id="experienceMultipleTime" style="display: none;">
+                                    <option value="">-- Selecciona un horario --</option>
+                                </select>
+                                <!-- Availability status message -->
+                                <div class="text-muted" id="experienceAvailabilityStatus" style="display: none;">
+                                    <i class="ti ti-info-circle me-1"></i><span id="experienceAvailabilityMessage">Horario según disponibilidad</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        
+                        <!-- People limits display -->
+                        <div class="alert alert-info py-2 mb-3" id="peopleLimitsAlert" style="display: none;">
+                            <i class="ti ti-users me-2"></i>
+                            <span id="peopleLimitsText">Mínimo: 1 persona • Máximo: 10 personas</span>
+                            <small class="float-end text-primary">
+                                Total actual: <strong id="currentTotalPeople">0</strong>
+                            </small>
+                        </div>
+                        
+                        <!-- Quantity fields for adults, children, adults without alcohol -->
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label for="adultsQuantity" class="form-label">Adultos</label>
+                                <input type="number" class="form-control experience-quantity-input" id="adultsQuantity" value="0" min="0" max="50">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="childrenQuantity" class="form-label">Niños</label>
+                                <input type="number" class="form-control experience-quantity-input" id="childrenQuantity" value="0" min="0" max="50">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="adultsNoAlcoholQuantity" class="form-label">Adultos sin alcohol</label>
+                                <input type="number" class="form-control experience-quantity-input" id="adultsNoAlcoholQuantity" value="0" min="0" max="50">
+                            </div>
+                        </div>
+                        
+                        <!-- Price fields for each type -->
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="adultPrice" class="form-label">Precio Adulto <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="adultPrice" placeholder="0.00" step="0.01" min="0">
+                                    <span class="input-group-text currency-symbol">MXN</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="childPrice" class="form-label">Precio Niño</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="childPrice" placeholder="0.00" step="0.01" min="0">
+                                    <span class="input-group-text currency-symbol">MXN</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="noAlcoholPrice" class="form-label">Precio sin alcohol</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="noAlcoholPrice" placeholder="0.00" step="0.01" min="0">
+                                    <span class="input-group-text currency-symbol">MXN</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
 
                     <div class="mb-3">
                         <label for="serviceNotes" class="form-label">Notas Adicionales</label>

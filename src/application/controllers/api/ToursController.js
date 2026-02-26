@@ -73,6 +73,7 @@ class ToursController {
    * // Usage example documented above
    */
   async getTours(req, res) {
+    console.log('🚀 getTours API called!', req.query);
     try {
       const currentUser = req.user;
       if (!currentUser) {
@@ -216,6 +217,9 @@ class ToursController {
       const data = tours.map((tour) => {
         const destinationPOI = tour.get('destinationPOI');
 
+        // Debug every tour
+        console.log(`🔍 Processing tour ${tour.id} - ${destinationPOI?.get('name')}`);
+
         // Add client pricing information if available
         const tourClientPrices = {};
         if (clientId && clientPricesMap.size > 0) {
@@ -226,6 +230,18 @@ class ToursController {
               tourClientPrices[`${rateId}_${vehicleId}`] = priceInfo;
             }
           }
+        }
+
+        // Debug logging for Atotonilco tour
+        if (destinationPOI?.get('name') === 'Atotonilco') {
+          console.log('🔍 DEBUG - Atotonilco tour data from database:');
+          console.log('  - description:', tour.get('description'));
+          console.log('  - price:', tour.get('price'));
+          console.log('  - price_child:', tour.get('price_child'));
+          console.log('  - price_no_alcohol:', tour.get('price_no_alcohol'));
+          console.log('  - languages:', tour.get('languages'));
+          console.log('  - includes:', tour.get('includes'));
+          console.log('  - All attributes:', Object.keys(tour.attributes));
         }
 
         return {
@@ -241,6 +257,24 @@ class ToursController {
           exists: tour.get('exists') || true,
           createdAt: tour.get('createdAt'),
           updatedAt: tour.get('updatedAt'),
+          // Additional fields needed for frontend
+          type: tour.get('type') || null,
+          description: tour.get('description') || null,
+          price: tour.get('price') || null,
+          price_no_alcohol: tour.get('price_no_alcohol') || null,
+          price_child: tour.get('price_child') || null,
+          travel_duration: tour.get('travel_duration') || null,
+          advance_booking_time: tour.get('advance_booking_time') || null,
+          min_people: tour.get('min_people') || null,
+          max_people: tour.get('max_people') || null,
+          includes: tour.get('includes') || [],
+          notincludes: tour.get('notincludes') || [],
+          languages: tour.get('languages') || [],
+          // Notes fields
+          internal_notes: tour.get('internal_notes') || null,
+          client_booking_notes: tour.get('client_booking_notes') || null,
+          provider_notes: tour.get('provider_notes') || null,
+          team_notes: tour.get('team_notes') || null,
           // Walking tour pricing fields
           isWalkingTour: tour.get('isWalkingTour') || false,
           walkingPriceSmall: tour.get('walkingPriceSmall') || null,
