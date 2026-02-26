@@ -273,7 +273,7 @@ table.dataTable thead .sorting_desc_disabled {
             for (const key of possibleKeys) {
                 const token = localStorage.getItem(key);
                 if (token) {
-                    console.log(`Found token in localStorage with key: ${key}`);
+                    // Token found in localStorage
                     return token;
                 }
             }
@@ -283,7 +283,7 @@ table.dataTable thead .sorting_desc_disabled {
             for (let cookie of cookies) {
                 const [name, value] = cookie.trim().split('=');
                 if (['authToken', 'accessToken', 'token'].includes(name)) {
-                    console.log(`Found token in cookies with key: ${name}`);
+                    // Token found in cookies
                     return value;
                 }
             }
@@ -294,7 +294,7 @@ table.dataTable thead .sorting_desc_disabled {
 
         // Test authentication before setting up DataTable
         async function testAuthentication() {
-            console.log('🔍 Testing authentication before loading greeter data...');
+            // Testing authentication before loading greeter data
             
             try {
                 const response = await $.ajax({
@@ -305,15 +305,14 @@ table.dataTable thead .sorting_desc_disabled {
                         const token = getAccessToken();
                         if (token) {
                             xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-                            console.log('✅ Auth test - Using token:', token.substring(0, 20) + '...');
+                            // Token authentication configured
                         } else {
-                            console.log('⚠️ Auth test - No token, relying on cookies');
+                            // Using cookie-based authentication
                         }
-                        console.log('📋 Auth test - Available cookies:', document.cookie);
                     }
                 });
                 
-                console.log('✅ Authentication test passed:', response);
+                // Authentication test passed
                 return true;
             } catch (error) {
                 console.error('❌ Authentication test failed:', {
@@ -595,12 +594,12 @@ table.dataTable thead .sorting_desc_disabled {
                     const token = getAccessToken();
                     if (token) {
                         xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-                        console.log('Sending request with Authorization header');
+                        // Sending request with Authorization header
                     } else {
                         console.warn('No authentication token available - relying on session cookies');
                     }
                     // Debug: log all available cookies
-                    console.log('Available cookies:', document.cookie);
+                    // Using cookie-based authentication
                 },
                 dataSrc: function(json) {
                     return json.data || [];
