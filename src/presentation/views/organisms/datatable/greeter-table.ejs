@@ -341,6 +341,9 @@ table.dataTable thead .sorting_desc_disabled {
         let currentTransferRate = 0;
         let currentAgencyRate = 0;
         let currentExchangeRate = 0;
+        
+        // DataTable variable (needs to be accessible to other functions)
+        let dataTable;
 
         // Use global PricingUtils (loaded from /public/dashboard/js/utils/pricing-utils.js)
 
@@ -581,7 +584,7 @@ table.dataTable thead .sorting_desc_disabled {
         }
         
         function initDataTable() {
-            const dataTable = $(`#${tableId}`).DataTable({
+            dataTable = $(`#${tableId}`).DataTable({
             processing: true,
             serverSide: true,
             ajax: {
